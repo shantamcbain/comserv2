@@ -112,7 +112,7 @@ sub index :Path('/Accounting') :Args(0) {
     my ($acct_count, $entry_count, $ap_outstanding, $ar_outstanding,
         $item_count, $supplier_count, $location_count, $low_stock) = (0) x 8;
 
-    eval { $acct_count    = $schema->resultset('Accounting::CoaAccount')->search({ obsolete => 0 })->count };
+    eval { $acct_count    = $schema->resultset('Accounting::CoaAccount')->search({ obsolete => 0, sitename => $self->_sitename($c) })->count };
     eval { $entry_count   = $schema->resultset('Accounting::GlEntry')->search({ sitename => $sitename })->count };
     eval {
         $ap_outstanding = $schema->resultset('Accounting::InventorySupplierInvoice')->search(
@@ -177,18 +177,77 @@ sub index :Path('/Accounting') :Args(0) {
 # Chart of Accounts
 # -------------------------------------------------------------------------
 
+# Accounts that genuinely apply to EVERY site and so are shown regardless of
+# sitename. Deliberately small and explicit — NULL/empty sitename is NOT
+# treated as global, because rows seeded from another site's template landed
+# with NULL and leaked into every chart (3D Print Sales, Filament, Honey,
+# Brew, Printer Depreciation...).
+#
+# Shared across sites (per Shanta): SSL certificates, hosting fees, domain
+# registration, depreciation, shipping, taxes paid (GST/PST/HST), and similar
+# common overheads. Site-specific revenue and materials (3D print, apiary,
+# brew, craft) are NOT global — they belong to their own site.
+sub global_coa_accnos {
+    return [
+        # Common overhead — applies to every site
+        '1300',   # Prepaid Expenses
+        '1310',   # GST/HST Receivable (ITC)
+        '2000',   # Accounts Payable
+        '2100',   # Sales Tax Payable
+        '2200',   # Accrued Liabilities
+        '6310',   # Taxes Paid (GST/PST/HST)
+        '6400',   # Shipping & Postage
+        '6500',   # Depreciation Expense
+        '6600',   # Domain Registration & Renewals
+        '6610',   # Web Hosting Expense
+        '6620',   # SSL Certificates
+        '6700',   # Software Subscriptions
+        '6710',   # Bank & Payment Processing Fees
+        '6900',   # Other Expenses
+    ];
+}
+
 sub coa_list :Path('/Accounting/coa') :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'coa_list', 'COA list');
 
-    my $schema = $self->_schema($c);
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
     my @accounts;
     my $list_error;
     eval {
+        # Each site sees ONLY its own chart, plus a small set of genuinely
+        # shared accounts. All sites currently share one `coa_accounts` table
+        # (moving to separate Postgres DBs later); filtering by sitename now
+        # keeps behaviour identical before and after that split.
+        #
+        # IMPORTANT: NULL/empty sitename is NOT treated as "global" any more.
+        # Rows seeded from another site's template (3d Print Sales 4210,
+        # Filament 6210, Printer Depreciation 6510, Honey 4220, Brew 4235...)
+        # were landing with NULL sitename and therefore leaked into every
+        # site's chart. Instead, global means: explicitly listed below.
         @accounts = $schema->resultset('Accounting::CoaAccount')->search(
-            { obsolete => 0 },
+            {
+                obsolete => 0,
+                -or      => [
+                    { sitename => $sitename },
+                    { accno => { -in => $self->global_coa_accnos } },
+                ],
+            },
             { order_by => 'accno' }
         )->all;
+    };
+    my $balances = {};
+
+    # Balances live in Comserv::Util::Accounting::CoaScope (site-scoped,
+    # single grouped query) so this controller stays thin.
+    eval {
+        require Comserv::Util::Accounting::CoaScope;
+        my @ids = map { $_->id } @accounts;
+        $balances = Comserv::Util::Accounting::CoaScope::balances_for(
+            $schema, $sitename, \@ids
+        );
+        Comserv::Util::Accounting::CoaScope::apply_normal_balance($balances, \@accounts);
     };
     if ($@) {
         $list_error = $@;
@@ -197,8 +256,189 @@ sub coa_list :Path('/Accounting/coa') :Args(0) {
 
     $c->stash(
         accounts   => \@accounts,
+        balances   => $balances,
         list_error => $list_error,
         template   => 'Accounting/coa/list.tt',
+    );
+}
+
+# GET /Accounting/trial_balance
+# Per-account debits/credits grouped by category, with a balance check.
+# All the maths lives in Util::Accounting::CoaScope.
+sub trial_balance :Path('/Accounting/trial_balance') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my @accounts;
+    eval {
+        @accounts = $schema->resultset('Accounting::CoaAccount')->search(
+            {
+                obsolete => 0,
+                -or      => [
+                    { sitename => $sitename },
+                    { accno => { -in => $self->global_coa_accnos } },
+                ],
+            },
+            { order_by => 'accno' }
+        )->all;
+    };
+
+    my $tb = {};
+    eval {
+        require Comserv::Util::Accounting::CoaScope;
+        $tb = Comserv::Util::Accounting::CoaScope::trial_balance(
+            $schema, $sitename, \@accounts
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'trial_balance', "failed: $@");
+    }
+
+    $c->stash(
+        %$tb,
+        sitename => $sitename,
+        template => 'Accounting/trial_balance.tt',
+    );
+}
+
+# POST /Accounting/coa/set_sitename
+#
+# Admin tool: assign a Chart-of-Accounts row to a site, or mark it GLOBAL.
+# Lets CSC admin see every account (across all sites) and move each to the
+# site it actually belongs to — e.g. "3D Print Sales" -> 3d, "Honey & Apiary
+# Sales" -> BMaster, while hosting/domain/SSL/tax stay global.
+#
+# SAFETY: this changes VISIBILITY ONLY. CoaAccount is just a label
+# (accno + description + sitename); it holds no balance. Transactions live in
+# GlEntryLine, which points at CoaAccount.id — so re-pointing sitename never
+# moves or invalidates posted GL.
+#
+# It deliberately does NOT merge accounts. Where an accno exists twice (e.g.
+# 1100 and "1100 - SiteName Hosting") those are different IDs with real
+# transactions split across them; merging would rewrite GL history and is a
+# data migration, not a rename.
+sub coa_set_sitename :Path('/Accounting/coa/set_sitename') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $is_admin = $c->session->{is_admin}
+        || (grep { /^(admin|accounting)$/i }
+             (ref($c->session->{roles}) ? @{$c->session->{roles}}
+              : split(/[\s,]+/, $c->session->{roles} || '')));
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/Accounting/coa'));
+        return;
+    }
+
+    unless (($c->req->method || '') eq 'POST') {
+        $c->res->status(405);
+        $c->res->body('POST required');
+        return;
+    }
+
+    my $p     = $c->req->body_parameters;
+    my $id    = $p->{id};
+    my $new   = defined $p->{sitename} ? $p->{sitename} : '';
+    $new =~ s/^\s+|\s+$//g;
+
+    unless ($id && $id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Account id required.';
+        $c->res->redirect($c->uri_for('/Accounting/coa'));
+        return;
+    }
+
+    my $schema = $self->_schema($c);
+    my $row    = eval { $schema->resultset('Accounting::CoaAccount')->find($id) };
+    unless ($row) {
+        $c->flash->{error_msg} = "Account #$id not found.";
+        $c->res->redirect($c->uri_for('/Accounting/coa'));
+        return;
+    }
+
+    # '' or 'global' means visible to every site.
+    my $stored = (!length($new) || lc($new) eq 'global') ? undef : $new;
+
+    my %upd = ( sitename => $stored );
+
+    # Optional: correct the category (A/L/Q/I/E). Some rows were seeded or
+    # edited with the wrong category, which files them under the wrong
+    # heading in the COA list and in the trial balance.
+    my $cat = defined $p->{category} ? $p->{category} : '';
+    $cat =~ s/^\s+|\s+$//g;
+    if (length $cat) {
+        $cat = uc($cat);
+        unless ($cat =~ /^[ALQIE]$/) {
+            $c->flash->{error_msg} = "Invalid category '$cat' (use A, L, Q, I or E).";
+            $c->res->redirect($c->uri_for('/Accounting/coa'));
+            return;
+        }
+        $upd{category} = $cat;
+    }
+
+    # Optional: contra flag (0/1).
+    if (defined $p->{is_contra} && $p->{is_contra} ne '') {
+        $upd{is_contra} = $p->{is_contra} ? 1 : 0;
+    }
+
+    eval { $row->update(\%upd) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'coa_set_sitename', "update failed for #$id: $@");
+        $c->flash->{error_msg} = "Update failed: $@";
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'coa_set_sitename', sprintf(
+                "account #%s (%s %s) sitename -> %s by %s",
+                $id, $row->accno, $row->description,
+                defined $stored ? $stored : 'GLOBAL',
+                $c->session->{username} || '?'));
+        $c->flash->{success_msg} = sprintf('%s %s is now %s%s.',
+            $row->accno, $row->description,
+            defined $stored ? "on site '$stored'" : 'GLOBAL',
+            (exists $upd{category} ? " and categorised " . $upd{category} : ''));
+    }
+
+    $c->res->redirect($c->uri_for('/Accounting/coa'));
+}
+
+# Admin view: every account across all sites, with a control to set the
+# sitename. Read-only listing plus the reassignment form above.
+sub coa_admin :Path('/Accounting/coa/admin') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $is_admin = $c->session->{is_admin}
+        || (grep { /^(admin|accounting)$/i }
+             (ref($c->session->{roles}) ? @{$c->session->{roles}}
+              : split(/[\s,]+/, $c->session->{roles} || '')));
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/Accounting/coa'));
+        return;
+    }
+
+    my $schema = $self->_schema($c);
+    my @accounts;
+    my @sites;
+    eval {
+        @accounts = $schema->resultset('Accounting::CoaAccount')->search(
+            { obsolete => 0 },
+            { order_by => ['sitename', 'accno'] }
+        )->all;
+    };
+    eval {
+        @sites = $schema->resultset('Site')->search(
+            {}, { order_by => 'name' }
+        )->all;
+    };
+
+    $c->stash(
+        accounts    => \@accounts,
+        sites       => \@sites,
+        site_names  => [ map { $_->name } @sites ],
+        template    => 'Accounting/coa/admin.tt',
     );
 }
 
@@ -289,7 +529,8 @@ sub gl_view :Path('/Accounting/gl/view') :Args(1) {
 
 sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
     my ($self, $c) = @_;
-    my $schema = $self->_schema($c);
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
 
     my $existing = 0;
     eval { $existing = $schema->resultset('Accounting::CoaAccount')->count };
@@ -372,6 +613,11 @@ sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
                 category    => $acct->{category},
                 is_contra   => $acct->{is_contra} || 0,
                 obsolete    => 0,
+                # Stamp the site. Without this every seeded row got NULL
+                # sitename and appeared in EVERY site's chart — that is how
+                # "3D Print Sales" / "Honey & Apiary" / "3D Printer
+                # Depreciation" ended up visible on CSC.
+                sitename    => $sitename,
             });
             $added++;
         }
@@ -393,7 +639,8 @@ sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
 
 sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
     my ($self, $c) = @_;
-    my $schema = $self->_schema($c);
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
 
     my @all_accounts = (
         { accno => '1000', description => 'Cash / Chequing Account',        category => 'A' },
@@ -453,7 +700,9 @@ sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
     my ($added, $skipped) = (0, 0);
     eval {
         for my $acct (@all_accounts) {
-            my $existing = $schema->resultset('Accounting::CoaAccount')->find({ accno => $acct->{accno} });
+            my $existing = $schema->resultset('Accounting::CoaAccount')->find(
+                { accno => $acct->{accno}, sitename => $sitename }
+            );
             if ($existing) {
                 $skipped++;
             } else {
@@ -463,6 +712,10 @@ sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
                     category    => $acct->{category},
                     is_contra   => $acct->{is_contra} || 0,
                     obsolete    => 0,
+                    # Stamp the site: previously new rows got NULL sitename,
+                    # which (a) made them invisible under per-site scoping and
+                    # (b) leaked them into every other site's chart.
+                    sitename    => $sitename,
                 });
                 $added++;
             }
@@ -516,8 +769,15 @@ sub transfer_new :Path('/Accounting/transfer/new') :Args(0) {
     my (@asset_accounts, @liability_accounts, @expense_accounts);
     eval {
         my @all = $schema->resultset('Accounting::CoaAccount')->search(
-            { obsolete => 0 },
-            { order_by => 'accno' }
+            # Site-scoped: this site's rows PLUS global (NULL/empty) rows.
+            # Mirrors Controller::Inventory's COA lookups so account pickers
+            # never offer another site's accounts (which would post GL to the
+            # wrong entity).
+            [
+                { sitename => $sitename, obsolete => 0 },
+                { accno => { -in => $self->global_coa_accnos }, obsolete => 0 },
+            ],
+            { order_by => 'accno', distinct => 1 }
         )->all;
         for my $a (@all) {
             push @asset_accounts,     $a if $a->category eq 'A';
@@ -1570,6 +1830,121 @@ sub setup_ai_generate :Path('/Accounting/setup/ai_generate') :Args(0) {
 sub setup_ai_commit :Path('/Accounting/setup/ai_commit') :Args(0) {
     my ($self, $c) = @_;
     return $c->controller('Accounting::Setup')->ai_commit($c);
+}
+
+# -------------------------------------------------------------------------
+# Manufacturing Traveler (todo #2399) — absolute Paths on this controller so
+# /Accounting/manufacturing works even if Accounting::Manufacturing is not
+# reloaded by a stale worker (same pattern as setup_ai_generate).
+# -------------------------------------------------------------------------
+sub manufacturing :Path('/Accounting/manufacturing') :Args(0) {
+    my ($self, $c) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl && $ctl->can('_render_index')) {
+        return $ctl->_render_index($c);
+    }
+    require Comserv::Util::Manufacturing::Traveler;
+    my $traveler = Comserv::Util::Manufacturing::Traveler->new;
+    my $pack = eval { $traveler->get_customers_with_open_orders($c) } || {};
+    $c->stash(
+        template    => 'Accounting/Manufacturing/index.tt',
+        customers   => $pack->{customers} || [],
+        open_orders => $pack->{open_orders} || [],
+        title       => 'Manufacturing — Customers with open orders',
+    );
+}
+
+sub manufacturing_customer :Path('/Accounting/manufacturing/customer') :Args(1) {
+    my ($self, $c, $customer_name) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl) {
+        return $ctl->customer($c, $customer_name);
+    }
+}
+
+sub manufacturing_view :Path('/Accounting/manufacturing/view') :Args(1) {
+    my ($self, $c, $order_id) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl && $ctl->can('_render_view')) {
+        return $ctl->_render_view($c, $order_id);
+    }
+    require Comserv::Util::Manufacturing::Traveler;
+    my $data = Comserv::Util::Manufacturing::Traveler->new->get_traveler_data($c, $order_id);
+    $c->stash(
+        template => 'Accounting/Manufacturing/traveler_view.tt',
+        traveler => $data,
+        title    => "Manufacturing Traveler #$order_id",
+    );
+}
+
+sub manufacturing_view_item :Path('/Accounting/manufacturing/view/item') :Args(1) {
+    my ($self, $c, $item_id) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl && $ctl->can('_render_view')) {
+        return $ctl->_render_view($c, 'item-' . $item_id);
+    }
+}
+
+sub manufacturing_print :Path('/Accounting/manufacturing/print') :Args(1) {
+    my ($self, $c, $order_id) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl && $ctl->can('_render_print')) {
+        return $ctl->_render_print($c, $order_id);
+    }
+    require Comserv::Util::Manufacturing::Traveler;
+    my $data = Comserv::Util::Manufacturing::Traveler->new->get_traveler_data($c, $order_id);
+    $c->stash(
+        template   => 'Accounting/Manufacturing/traveler_print.tt',
+        traveler   => $data,
+        title      => "Print Traveler #$order_id",
+        no_wrapper => 1,
+    );
+}
+
+sub manufacturing_print_item :Path('/Accounting/manufacturing/print/item') :Args(1) {
+    my ($self, $c, $item_id) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl && $ctl->can('_render_print')) {
+        return $ctl->_render_print($c, 'item-' . $item_id);
+    }
+}
+
+# POST JSON: part_id, status=in_pick_box|printed|qc_passed
+sub manufacturing_api_update_part :Path('/Accounting/manufacturing/api/update_part') :Args(0) {
+    my ($self, $c) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl && $ctl->can('api_update_part')) {
+        return $ctl->api_update_part($c);
+    }
+    # Inline fallback if nested controller method not loaded yet
+    require JSON;
+    require Comserv::Util::Manufacturing::Traveler;
+    my $p = {};
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $p = JSON::decode_json($raw) if $raw;
+            } else {
+                $p = JSON::decode_json($body);
+            }
+        }
+    };
+    $p = {} unless ref($p) eq 'HASH';
+    my $part_id = $p->{part_id} // $p->{item_id};
+    my $status  = lc($p->{status} // '');
+    my $result  = { success => 0, error => 'unknown status' };
+    if ($status eq 'in_pick_box' || $status eq 'pick_box' || $status eq 'printed_to_stock') {
+        my $r = Comserv::Util::Manufacturing::Traveler->new->put_part_in_pick_box($c, $part_id, $p->{quantity});
+        $result = { %$r, success => $r->{ok} ? 1 : 0 };
+    } elsif ($status eq 'printed' || $status eq 'qc_passed') {
+        $result = { success => 1, status => $status, part_id => $part_id };
+    }
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json($result));
+    $c->detach;
 }
 
 __PACKAGE__->meta->make_immutable;

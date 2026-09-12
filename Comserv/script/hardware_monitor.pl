@@ -15,7 +15,8 @@ use warnings;
 # This script only CURls the `run` endpoint on each candidate node. The first
 # node that answers 200 wins. If NO node answers, that itself means the
 # containers are down / the world can't see the app — and the only signal we can
-# emit is this script's OWN stderr → root's cron mail (design A). We never
+# emit is this script's OWN stderr → root's cron mail (design A). Success
+# produces zero output (no cron mail, no log spam on gateway hosts). We never
 # touch the DB directly, so we can't write a system_log row when the app is dark.
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -91,7 +92,13 @@ for my $url (@NODES) {
 }
 
 if ($ok_node) {
-    print _ts() . " [hardware_monitor] monitoring triggered via $ok_node (HTTP $http)\n";
+    # Success: produce ZERO output (stdout or stderr). This prevents cron mail
+    # on gateway hosts (e.g. .03 / proxmoxt210) where the redirect target
+    # (/var/log/...) may be unwritable by the crontab user. Real success is
+    # recorded as monitor_heartbeat rows by the /run endpoint; the only
+    # channel we intentionally use for outage is STDERR on the failure path below.
+    # (Previously the two print lines produced exactly the lines appearing in
+    # the unwanted emails.)
 
     # Also trigger the logging-coverage audit on the same node (mirrors run): the
     # app scan (system_log grouping + code grep for silent error swallowing) writes
@@ -104,7 +111,7 @@ if ($ok_node) {
                  . " -H 'X-Ingest-Token: $token'"
                  . " --connect-timeout 10 --max-time 45 '$audit_url' 2>/dev/null";
         my $acode = `$acmd`; chomp $acode;
-        print _ts() . " [hardware_monitor] logging audit triggered via $audit_url (HTTP $acode)\n";
+        # No print on success for audit either.
     }
     exit 0;
 }

@@ -13,6 +13,7 @@ use DateTime;
 use Comserv::Util::Logging;
 use Comserv::Util::ModelCatalog;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::Git;
 
 BEGIN { extends 'Catalyst::Controller' }
 
@@ -101,8 +102,14 @@ sub providers :Local :Args(0) {
             label           => $m->{label} // $id,
             unreachable     => $m->{unreachable} ? 1 : 0,
             local           => $m->{local}     ? 1 : 0,
-            price_prompt    => $m->{price_prompt}     // 0,
-            price_completion=> $m->{price_completion} // 0,
+            # price_known tells the client whether these numbers are real.
+            # When absent/0 the client must NOT render "$0.00 — free"
+            # (x.AI publishes no pricing; see Grok.pm %XAI_PRICING).
+            price_prompt     => $m->{price_prompt},
+            price_completion => $m->{price_completion},
+            price_known      => ( exists $m->{price_known} && defined $m->{price_known} )
+                                ? ( $m->{price_known} ? 1 : 0 ) : 1,
+            price_tier      => $m->{price_tier},
         };
     }
 
@@ -152,18 +159,51 @@ sub providers :Local :Args(0) {
 sub editing_widget_popup :Local :Args(0) {
     my ($self, $c) = @_;
 
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
         'ai2_editing_widget_popup', "AI2 code editor popup opened");
 
     my $router = eval { $c->model('AI2::Router') } || undef;
 
+    # select_best_model returns [$model,$prov]; coerce to a plain string for TT/JS.
     my $selected_model = $router ? $router->select_best_model($c) : 'grok-beta';
-    my $recommended_models = $router ? $router->get_recommended_models($c) : ['grok-beta','ollama/llama3','ollama/codellama'];
+    if (ref $selected_model eq 'ARRAY') {
+        my ($model, $prov) = @$selected_model;
+        $selected_model = (defined $prov && length $prov && defined $model && length $model)
+            ? "$prov|$model"
+            : (defined $model && length $model ? $model : 'grok-beta');
+    } elsif (ref $selected_model) {
+        $selected_model = 'grok-beta';
+    }
+    $selected_model = 'grok-beta' unless defined $selected_model && !ref($selected_model) && length $selected_model;
+    # Model <select> is filled by ComservChat.modelSelect.init from catalog — do not
+    # stash hashrefs (TT [% m | html %] → HASH(0x…)). Empty list keeps TT safe.
+    my $recommended_models = [];
     my $branches = $router ? $router->get_available_branches($c) : ['main','ai2-refactor','feature/ai2-popup'];
+    $branches = [] unless $branches && ref $branches eq 'ARRAY';
 
-    # Sort branches: current branch first, then alphabetically
-    my $current_branch = 'main';
-    @$branches = sort { $a eq $current_branch ? -1 : $b eq $current_branch ? 1 : $a cmp $b } @$branches;
+    # Live checkout branch for THIS process (e.g. aisystem on :4006) — never hardcode main.
+    my $git = eval { Comserv::Util::Git->new(logging => $self->logging) };
+    my $current_branch = ($git ? eval { $git->get_current_branch($c) } : '') // '';
+    $current_branch = '' unless defined $current_branch;
+    $current_branch = '' if $current_branch eq 'unknown';
+    # Ensure current branch appears in the dropdown even if the branch list omitted it.
+    if (length $current_branch && !grep { $_ eq $current_branch } @$branches) {
+        unshift @$branches, $current_branch;
+    }
+    # Sort: current first, then alphabetically
+    if (length $current_branch) {
+        @$branches = sort {
+            $a eq $current_branch ? -1 : $b eq $current_branch ? 1 : $a cmp $b
+        } @$branches;
+    } else {
+        @$branches = sort { $a cmp $b } @$branches;
+        $current_branch = $branches->[0] // 'main';
+    }
 
     # Accept optional file path to load on open
     my $file_to_load = $c->req->param('file') || '';
@@ -173,6 +213,7 @@ sub editing_widget_popup :Local :Args(0) {
         selected_model      => $selected_model,
         recommended_models  => $recommended_models,
         branches            => $branches,
+        current_branch      => $current_branch,
         no_wrapper          => 1,
         ai_popup_mode       => 1,   # triggers conditional loading of ai2editor/*.js in js_load.tt
         show_ai2_editor     => 1,
@@ -871,37 +912,73 @@ sub chat :Local :Args(0) {
         return;
     }
 
-    # ── Create-todo intent: do this BEFORE the LLM. Free/small models invent
-    # a fake "Add" box instead of emitting [ACTION: create_todo]. One brain:
-    # Model::AI2::TodoCreate (same as /ai2/action and the 📝 button).
-    # Use ->new not $c->model: a newly added Model::* is not in Catalyst's
-    # component registry until the next process start (we must not restart).
-    my $todo_hit = eval {
-        require Comserv::Model::AI2::TodoCreate;
-        my $brain = eval { $c->model('AI2::TodoCreate') };
-        $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
-        $brain->try_chat_create($c,
+    # ── Create-HelpDesk-ticket intent BEFORE todo / LLM.
+    # Ticket prompts that mention "todo" (bug subjects) must not fall into
+    # TodoCreate's project picker (3D-20260907-3180 / 6510). Use ->new: a newly
+    # added Model::* is not in Catalyst's registry until process start.
+    my $hd_hit = eval {
+        require Comserv::Model::AI2::HelpDeskTicketCreate;
+        my $hbrain = eval { $c->model('AI2::HelpDeskTicketCreate') };
+        $hbrain = Comserv::Model::AI2::HelpDeskTicketCreate->new if !$hbrain || !ref $hbrain;
+        $hbrain->try_chat_create($c,
             prompt    => $prompt,
             page_path => $page_path,
         );
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            'ai2_chat', "TodoCreate try_chat_create threw: $@");
+            'ai2_chat', "HelpDeskTicketCreate try_chat_create threw: $@");
     }
-    if ($todo_hit && $todo_hit->{handled}) {
+    if ($hd_hit && $hd_hit->{handled}) {
         $c->res->body(encode_json({
-            success         => $todo_hit->{success} ? 1 : 0,
-            response        => $todo_hit->{response} // '',
-            model           => $todo_hit->{model} // '(todo-create)',
-            provider        => $todo_hit->{provider} // 'ai2-todo',
+            success         => $hd_hit->{success} ? 1 : 0,
+            response        => $hd_hit->{response} // '',
+            model           => $hd_hit->{model} // '(helpdesk-ticket-create)',
+            provider        => $hd_hit->{provider} // 'ai2-helpdesk',
             needs_web_search=> 0,
-            error           => $todo_hit->{error},
-            todo_action     => $todo_hit->{todo_action},
+            error           => $hd_hit->{error},
+            ticket_action   => $hd_hit->{ticket_action},
             conversation_id => $conversation_id,
             thinking        => [],
         }));
         return;
+    }
+
+    # ── Create-todo intent: AFTER ticket, BEFORE the LLM. Free/small models
+    # invent a fake "Add" box instead of emitting [ACTION: create_todo].
+    # AI Editor agents must not short-circuit into TodoCreate — plan/analyze
+    # prompts often say "create todos".
+    require Comserv::Model::AI2::ChatIntent;
+    my $editor_todo_skip = Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id);
+    my $todo_hit;
+    if (!$editor_todo_skip) {
+        $todo_hit = eval {
+            require Comserv::Model::AI2::TodoCreate;
+            my $brain = eval { $c->model('AI2::TodoCreate') };
+            $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
+            $brain->try_chat_create($c,
+                prompt    => $prompt,
+                page_path => $page_path,
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'ai2_chat', "TodoCreate try_chat_create threw: $@");
+        }
+        if ($todo_hit && $todo_hit->{handled}) {
+            $c->res->body(encode_json({
+                success         => $todo_hit->{success} ? 1 : 0,
+                response        => $todo_hit->{response} // '',
+                model           => $todo_hit->{model} // '(todo-create)',
+                provider        => $todo_hit->{provider} // 'ai2-todo',
+                needs_web_search=> 0,
+                error           => $todo_hit->{error},
+                todo_action     => $todo_hit->{todo_action},
+                conversation_id => $conversation_id,
+                thinking        => [],
+            }));
+            return;
+        }
     }
 
     # Invoice-create intent: BEFORE the LLM. Draft only; never posts GL.
@@ -931,7 +1008,7 @@ sub chat :Local :Args(0) {
     }
 
     # Code-read: "can you read the files" must not reach Hy3.
-    if (lc($agent_id) eq 'code' || ($prompt =~ /\b(read|files|source|codebase|filesystem)\b/i)) {
+    if (lc($agent_id) =~ /^(?:code|coding|programming)$/ || ($prompt =~ /\b(read|files|source|codebase|filesystem)\b/i)) {
         my $read_hit = eval {
             require Comserv::Model::AI2::CodeRead;
             my $brain = eval { $c->model('AI2::CodeRead') };
@@ -965,9 +1042,11 @@ sub chat :Local :Args(0) {
     # Delegates to Model::AI2::FocusTune (the SAME brain the /api/focus/top5
     # UI button uses) so the question is answerable from Chat-with-AI too.
     # Triggered by the 'focustune' agent_id OR a natural-language intent.
-    my $is_focus = (lc($agent_id) eq 'focustune')
+    # Programming/coding agents in AI Editor must not divert to FocusTune on plan/build words.
+    my $editor_prog = (lc($agent_id // '') =~ /^(?:programming|coding|code|documentation|analyze)$/);
+    my $is_focus = (!$editor_prog) && ((lc($agent_id) eq 'focustune')
         || ($prompt =~ /\b(top\s*5|top five|most important|should i (do|work on|tackle)|what (todo|todos) (should|to) i|priorit)/i
-            && $prompt =~ /\b(todo|todos|task|tasks|plan|next step|next steps|build)\b/i);
+            && $prompt =~ /\b(todo|todos|task|tasks|plan|next step|next steps|build)\b/i));
     if ($is_focus) {
         my $tune = $c->model('AI2::FocusTune');
         my $now_epoch = time();
@@ -1111,6 +1190,94 @@ sub apiary_voice_save :Local :Args(0) {
 sub action :Local :Args(0) {
     my ($self, $c) = @_;
     $c->model('AI2::Actions')->perform($c);
+}
+
+
+# -------------------------------------------------------------------
+# AI2 editor Review panel — list/create worktrees (developer/editor/admin).
+# Create-only; merge/push remain on /admin/git (admin-gated).
+# Reuses Comserv::Util::Git->create_worktree / list_worktrees (same validation
+# as POST /admin/git/create_worktree).
+# -------------------------------------------------------------------
+
+# GET /ai2/git_worktrees
+# Prefer build_worktree_list (worktrees.json) — same source as the Git dashboard.
+# list_worktrees(porcelain) currently mis-parses "branch refs/heads/..." lines.
+sub git_worktrees :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    return unless $self->_ai2_require_editor_role($c);
+
+    my $git = Comserv::Util::Git->new(logging => $self->logging);
+    my $raw = eval { $git->build_worktree_list() } || [];
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'git_worktrees', "$@");
+        $c->response->body(encode_json({ success => 0, error => 'Failed to list worktrees' }));
+        return;
+    }
+
+    # Shape expected by ai2editor/git-review.js
+    my @wts = map {
+        my $name = $_->{name} // '';
+        {
+            branch  => $name,
+            port    => $_->{port},
+            label   => $_->{label} // $name,
+            path    => $_->{cmd},
+            ahead   => 0,
+            behind  => 0,
+            is_main => ($name eq 'main' || $name eq 'master') ? 1 : 0,
+        }
+    } @$raw;
+
+    $c->response->body(encode_json({ success => 1, worktrees => \@wts }));
+}
+
+# POST /ai2/git_create_worktree  (branch, parent=main, label, url)
+sub git_create_worktree :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    return unless $self->_ai2_require_editor_role($c);
+
+    unless (($c->request->method || '') eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $p      = $c->req->params;
+    my $branch = $p->{branch} // '';
+    my $parent = $p->{parent} // 'main';
+    my $label  = $p->{label}  // $branch;
+    my $url    = $p->{url}    // '/planning/daily';
+    $label = $branch if !defined $label || $label eq '';
+
+    unless ($branch) {
+        $c->response->body(encode_json({ success => 0, error => 'branch is required' }));
+        return;
+    }
+
+    my $git = Comserv::Util::Git->new(logging => $self->logging);
+    my $res = $git->create_worktree($c, $branch,
+        { parent => $parent, label => $label, url => $url });
+
+    $self->logging->log_with_details(
+        $c, $res->{success} ? 'info' : 'error', __FILE__, __LINE__,
+        'git_create_worktree',
+        "user=" . ($c->session->{username} // '') .
+        " branch='$branch' parent='$parent' port=" . ($res->{port} // '?') .
+        ($res->{error} ? " error=$res->{error}" : '')
+    );
+
+    $c->response->body(encode_json({
+        success => $res->{success} ? 1 : 0,
+        branch  => $branch,
+        port    => $res->{port},
+        path    => $res->{path},
+        cmd     => $res->{cmd},
+        ($res->{error} ? (error => $res->{error}) : ()),
+    }));
 }
 
 __PACKAGE__->meta->make_immutable;

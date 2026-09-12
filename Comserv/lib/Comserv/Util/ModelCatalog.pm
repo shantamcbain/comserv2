@@ -281,7 +281,7 @@ our @FREE_PREFERENCE = (
     'openrouter|stealth/ox-alpha',                     # 0/0 priced, no :free suffix
 );
 
-our $CODING_DEFAULT = 'openrouter|tencent/hy3';
+our $CODING_DEFAULT = 'openrouter|cohere/north-mini-code:free';
 
 sub default_for {
     my ($class, $c, %opts) = @_;
@@ -380,6 +380,20 @@ sub _flatten {
         # Skip Router sentinels — they are status markers, not selectable models.
         next if $name =~ /^(ollama_empty|ollama_unreachable)$/;
         next if $name =~ /_unconfigured$/;
+
+        # Is the price actually known? x.AI's /v1/models publishes no pricing,
+        # so Grok entries previously arrived with price 0 and were flattened as
+        # free/paid=0 — which is exactly why every Grok model showed as free.
+        my $known = $m->{price_known};
+        $known = ( defined $m->{price_prompt} || defined $m->{price_completion}
+                   || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0
+            unless defined $known;
+
+        my $pp = ( $m->{price_prompt}     // 0 ) + 0;
+        my $pc = ( $m->{price_completion} // 0 ) + 0;
+        my $is_free = ( $name =~ /:free$/ )
+                   || ( $known && $pp == 0 && $pc == 0 );
+
         push @flat, {
             value    => "$svc|$name",
             label    => ( defined $m->{label} ? $m->{label} : $name ),
@@ -389,14 +403,16 @@ sub _flatten {
             #   local : runs on our own hardware — no cash cost, but it does
             #           consume workstation GPU/VRAM, so it is NOT the guest default
             #   paid  : bills real money per token
-            free     => ( $name =~ /:free$/ ? 1 : 0 ),
+            free     => $is_free ? 1 : 0,
             local    => ( $svc eq 'ollama' ? 1 : 0 ),
-            paid     => ( $svc ne 'ollama' && $svc ne 'supergrok' && $name !~ /:free$/ ? 1 : 0 ),
+            # Unknown price => treat as PAID, never free (fail closed).
+            paid     => ( $svc ne 'ollama' && $svc ne 'supergrok' && !$is_free ? 1 : 0 ),
             # AIMPS-P1 (#253): real per-token cost from the provider feed.
             # price_prompt / price_completion are USD per 1M tokens; price_tier
             # is threshold-derived (never a hardcoded model list, see plan §3).
-            price_prompt     => ( $m->{price_prompt}     // 0 ) + 0,
-            price_completion => ( $m->{price_completion} // 0 ) + 0,
+            price_prompt     => $pp,
+            price_completion => $pc,
+            price_known      => $known ? 1 : 0,
             price_tier       => $class->_price_tier($m),
         };
     }
@@ -415,7 +431,18 @@ sub _price_tier {
     my $pc = ( $m->{price_completion} // 0 ) + 0;
     my $max = ( $pp > $pc ) ? $pp : $pc;   # rank by the dearer side
     return 'prepaid' if ($m->{provider} || '') eq 'supergrok' || $m->{prepaid};
-    return 'free'   if $max <= 0;
+    return 'free'   if ($m->{name} // '') =~ /:free$/;
+
+    # Only call a zero price "free" when the price is genuinely known.
+    # x.AI publishes no pricing in /v1/models, so its entries used to land here
+    # with $max == 0 and be tiered "free". Fail closed: unknown => 'unknown'.
+    my $known = $m->{price_known};
+    $known = ( defined $m->{price_prompt} || defined $m->{price_completion}
+               || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0
+        unless defined $known;
+    return 'free' if $known && $max <= 0;
+    return 'unknown' unless $known;
+
     return 'cheap'  if $max <= 1;
     return 'mid'    if $max <= 5;
     return 'premium';

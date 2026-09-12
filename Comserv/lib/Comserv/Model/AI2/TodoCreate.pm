@@ -270,13 +270,39 @@ sub detect_create_intent {
 
     return if $p =~ /^(how\s+(do\s+i|to)|what\s+is|explain|where\s+(is|do))\b/i;
     return if $p =~ /\b(top\s*5|list (my |the )?(todos|tasks)|which todo|show (me )?(my )?todos)\b/i;
-    return unless $p =~ /\b(add|create|make|file|track)\b/i
-               && $p =~ /\b(todos?|tasks?|to-dos?|to dos?)\b/i;
+
+    # Negations: "does not create todos", "don't create", "without creating", etc.
+    return if $p =~ /\b(?:does\s+not|doesn'?t|do\s+not|don'?t|never|not|without)\s+(?:creating|create|adding|add|making|make|tracking|track)\b/i;
+
+    # HelpDesk ticket is the primary ask — do not steal into todo/project picker
+    # even when the ticket text mentions "todo"/"task" (3D-20260907-3180 / 6510).
+    # Yield only when the user clearly asked to create a todo/task instead.
+    require Comserv::Model::AI2::ChatIntent;
+    if (Comserv::Model::AI2::ChatIntent::looks_like_helpdesk_ticket_create($p)
+        && !Comserv::Model::AI2::ChatIntent::looks_like_todo_create($p)) {
+        return;
+    }
+
+    # Drop overly broad "file" (matches file paths). Require clear create-todo
+    # intent: (add|create|make|track) near todo/task, or classic "create a todo".
+    my $todo_word = qr/(?:todos?|tasks?|to-dos?|to\s+dos?)/i;
+    my $verb = qr/(?:add|create|make|track)/i;
+    my $clear = 0;
+    if ($p =~ /\b$verb\s+(?:me\s+)?(?:a\s+|an\s+|new\s+)*$todo_word(?:\s+item)?\b/i) {
+        $clear = 1;
+    }
+    elsif ($p =~ /\b$verb\b(?:\W+\w+){0,5}\W+\b$todo_word\b/i) {
+        $clear = 1;
+    }
+    elsif ($p =~ /\b$todo_word\b(?:\W+\w+){0,5}\W+\b$verb\b/i) {
+        $clear = 1;
+    }
+    return unless $clear;
 
     my $rest = $p;
     $rest =~ s/^(please\s+)//i;
     $rest =~ s/^(can you|could you|would you|will you)\s+(please\s+)?//i;
-    $rest =~ s/^(add|create|make|file|track)\s+(me\s+)?(a\s+|an\s+|new\s+)*((todo|task|to-do|to do)s?)(\s+item)?\s*//i;
+    $rest =~ s/^(add|create|make|track)\s+(me\s+)?(a\s+|an\s+|new\s+)*((todo|task|to-do|to do)s?)(\s+item)?\s*//i;
     $rest =~ s/^(to\s+the\s+|to\s+|for\s+the\s+|for\s+|:\s*|-\s*)//i;
     $rest =~ s/\s+/ /g;
     $rest =~ s/^\s+|\s+$//g;

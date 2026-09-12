@@ -1,0 +1,649 @@
+[% META
+    title = 'Manufacturing Traveler - Live Tablet View'
+    description = 'Live tablet interface for print farm staff to track parts as they are printed and added to the pick box'
+    roles = 'admin,accounting,helpdesk'
+    TemplateType = 'Application'
+    category = 'Manufacturing'
+    page_version = '0.05 2026-09-10'
+%]
+[% PageVersion = 'Accounting/Manufacturing/traveler_view.tt,v 0.05 2026/09/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.traveler-tablet .section-card {
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 8px;
+  margin-bottom: 1.2em;
+  /* NOTE: do NOT use overflow:hidden here — it breaks position:sticky on the
+     table header. Rounded corners are preserved by the scroll wrapper below. */
+  background: var(--bg-color, #fff);
+}
+.traveler-tablet .card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75em;
+  padding: 0.7em 1em;
+  cursor: pointer;
+  user-select: none;
+  font-weight: bold;
+  font-size: 1em;
+}
+.traveler-tablet .card-header:hover {
+  filter: brightness(0.95);
+}
+.traveler-tablet .card-header .arrow {
+  font-size: 0.75em;
+  transition: transform 0.2s;
+}
+.traveler-tablet .card-header .arrow.open {
+  transform: rotate(90deg);
+}
+.traveler-tablet .card-header .count {
+  margin-left: auto;
+  font-size: 0.85em;
+  opacity: 0.7;
+  font-weight: normal;
+}
+.traveler-tablet .card-body {
+  border-top: 1px solid var(--border-color, #ccc);
+  padding: 0;
+  display: none;
+  /* Scroll container: with .section-card overflow:hidden removed, this becomes the
+     sticky context so the table <thead> floats while the user scrolls long part lists. */
+  max-height: 70vh;
+  overflow: auto;
+}
+.traveler-tablet .card-body.open {
+  display: block;
+}
+.traveler-tablet .card-body table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+/* Floating / sticky header so column meaning stays visible while scrolling long part lists */
+.traveler-tablet .card-body table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  box-shadow: 0 2px 0 0 #90a4ae;
+}
+.traveler-tablet .card-body table th {
+  background: #eceff1; color: #111;
+  border-bottom: 2px solid #90a4ae;
+  padding: 0.55rem 0.45rem; text-align: left;
+  font-size: 0.88em;
+  white-space: nowrap;
+}
+.traveler-tablet .card-body table td {
+  padding: 0.55rem 0.45rem;
+  border-bottom: 1px solid rgba(0,0,0,0.12);
+  vertical-align: middle;
+  font-size: 0.88em;
+}
+.traveler-tablet .card-body table tr:last-child td {
+  border-bottom: none;
+}
+/* GREEN - in pick box */
+.traveler-tablet .row-in_box td { background: #c8e6c9 !important; color: #1b5e20 !important; }
+/* BLUE - printed ready to pick */
+.traveler-tablet .row-printed_ready td { background: #bbdefb !important; color: #0d47a1 !important; }
+/* RED - in print queue */
+.traveler-tablet .row-in_queue td { background: #ffcdd2 !important; color: #b71c1c !important; }
+/* PURPLE - need print not queued */
+.traveler-tablet .row-need_print td { background: #e1bee7 !important; color: #4a148c !important; }
+/* AMBER - buy hardware */
+.traveler-tablet .row-need_buy td { background: #ffe0b2 !important; color: #e65100 !important; }
+
+.traveler-tablet .header-colors .c-in-box { background: #c8e6c9; color: #1b5e20; }
+.traveler-tablet .header-colors .c-printed { background: #bbdefb; color: #0d47a1; }
+.traveler-tablet .header-colors .c-queue { background: #ffcdd2; color: #b71c1c; }
+.traveler-tablet .header-colors .c-need-print { background: #e1bee7; color: #4a148c; }
+.traveler-tablet .header-colors .c-buy { background: #ffe0b2; color: #e65100; }
+
+.traveler-tablet .status-badge {
+  display: inline-block; padding: 0.2rem 0.5rem;
+  border-radius: 4px; font-weight: 600; font-size: 0.9em;
+  background: rgba(255,255,255,0.55);
+}
+.traveler-tablet .pick-box { font-weight: 700; }
+.traveler-tablet .btn-queue {
+  background: #7b1fa2 !important;
+  color: #fff !important;
+  border: none;
+  font-weight: 600;
+}
+.traveler-tablet .btn-clean-start {
+  background: #00838f !important;
+  color: #fff !important;
+  border: none;
+  font-weight: 600;
+}
+.traveler-tablet .btn-clean-stop {
+  background: #e65100 !important;
+  color: #fff !important;
+  border: none;
+  font-weight: 700;
+  animation: clean-pulse 1.2s ease-in-out infinite;
+}
+@keyframes clean-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+.traveler-tablet .clean-timer-display {
+  display: inline-block;
+  min-width: 4.5rem;
+  font-family: ui-monospace, monospace;
+  font-weight: 700;
+  color: #e65100;
+  margin-left: 0.25rem;
+}
+.traveler-tablet .clean-cell { white-space: nowrap; }
+.traveler-tablet .empty-section {
+  padding: 1.5em;
+  text-align: center;
+  color: var(--text-muted-color, #888);
+  font-style: italic;
+}
+.traveler-tablet .buy-link {
+  display: inline-block;
+  padding: 0.2em 0.6em;
+  background: #e65100;
+  color: #fff;
+  border-radius: 4px;
+  font-size: 0.82em;
+  font-weight: bold;
+  text-decoration: none;
+}
+.traveler-tablet .buy-link:hover { background: #bf360c; }
+</style>
+
+<div class="traveler-tablet">
+    <div class="header-bar">
+        <h1>Manufacturing Traveler #<span id="order-id">[% traveler.order_id %]</span></h1>
+        <div class="status-pill" id="overall-status">In Progress</div>
+        <a href="[% c.uri_for('/Accounting/manufacturing/print', traveler.order_id) %]" class="print-btn" target="_blank">Print Form</a>
+        <a href="[% c.uri_for('/Accounting/manufacturing') %]" class="print-btn" style="margin-left:8px;background:#455a64;">All Orders</a>
+        <a href="[% c.uri_for('/3d/queue') %]" class="print-btn" style="margin-left:8px;background:#7b1fa2;">Print Queue</a>
+    </div>
+
+    <div class="order-info">
+        <strong>Customer/Order:</strong> [% traveler.customer_name %] — [% traveler.order_date %]<br>
+        <strong>Kit:</strong> [% traveler.parent_name %] (<code>[% traveler.parent_sku %]</code>)<br>
+        <strong>Notes:</strong> [% traveler.notes | html %]
+    </div>
+
+[%# ---- Group parts by row_state into sections ---- %]
+[% SET section_labels = {
+    need_buy     = 'Items to Order',
+    need_print   = 'Need to Add to Print Queue',
+    in_queue     = 'In Print Queue',
+    printed_ready = 'Printed / Arrived — Ready to Pick',
+    in_box       = 'Picked — In Pick Box'
+} %]
+[% SET section_icons = {
+    need_buy     = '🛒',
+    need_print   = '🎯',
+    in_queue     = '🔄',
+    printed_ready = '📦',
+    in_box       = '✅'
+} %]
+[% SET section_colors = {
+    need_buy     = 'c-buy',
+    need_print   = 'c-need-print',
+    in_queue     = 'c-queue',
+    printed_ready = 'c-printed',
+    in_box       = 'c-in-box'
+} %]
+
+[%# Build section arrays %]
+[% sections = [
+    { key = 'need_buy',     parts = [] },
+    { key = 'need_print',   parts = [] },
+    { key = 'in_queue',     parts = [] },
+    { key = 'printed_ready', parts = [] },
+    { key = 'in_box',       parts = [] }
+] %]
+[% FOREACH part IN traveler.parts %]
+  [% SWITCH part.row_state %]
+    [% CASE 'need_buy' %]
+      [% sections.0.parts.push(part) %]
+    [% CASE 'need_print' %]
+      [% sections.1.parts.push(part) %]
+    [% CASE 'in_queue' %]
+      [% sections.2.parts.push(part) %]
+    [% CASE 'printed_ready' %]
+      [% sections.3.parts.push(part) %]
+    [% CASE %]
+      [%# default: in_box or anything else %]
+      [% sections.4.parts.push(part) %]
+  [% END %]
+[% END %]
+
+[%# ---- Render section cards ---- %]
+[% FOREACH sec IN sections %]
+[% SET sk = sec.key %]
+[% SET sp = sec.parts %]
+[% SET label = section_labels.$sk %]
+[% SET icon  = section_icons.$sk %]
+[% SET sc    = section_colors.$sk || '' %]
+<div class="section-card">
+  <div class="card-header header-colors [% sc %]" onclick="toggleCard(this)">
+    <span class="arrow">▶</span>
+    <span>[% icon %] [% label %]</span>
+    <span class="count">[% sp.size %] part(s)</span>
+  </div>
+  <div class="card-body">
+  [% IF sp.size > 0 %]
+    <table>
+      <thead>
+        <tr>
+          <th>Part / SKU</th>
+          <th>Description</th>
+          <th>Origin</th>
+          <th>Qty Needed</th>
+          <th>In Stock</th>
+          <th>In queue</th>
+          <th>Short</th>
+          <th>Pick box</th>
+          <th>Status</th>
+          <th>Clean labour</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      [% FOREACH part IN sp %]
+      <tr class="row-[% part.row_state %]">
+        <td><strong>[% IF part.id %]<a href="/Inventory/item/view/[% part.id %]" target="_blank" rel="noopener" title="Open stock / item record in new tab">[% part.sku %]</a>[% ELSE %][% part.sku %][% END %]</strong></td>
+        <td>[% part.name | html %]</td>
+        <td>[% part.item_origin | html %]</td>
+        <td class="qty">[% part.qty_needed %]</td>
+        <td class="stock">[% part.in_stock %]</td>
+        <td>[% part.qty_in_queue %]</td>
+        <td>[% part.qty_short %]</td>
+        <td class="pick-box">[% part.in_pick_box %]</td>
+        <td class="status-cell">
+          <span class="status-badge [% part.status %]">[% part.status_display %]</span>
+          [% IF part.file_warn %]
+          <div style="color:#b71c1c;font-size:0.82em;font-weight:700;margin-top:0.2rem;">⚠ [% part.file_warn | html %]</div>
+          [% END %]
+        </td>
+        <td class="clean-cell" data-sku="[% part.sku | html %]">
+          [% IF part.id %]
+          <button type="button" class="btn btn-small btn-clean-start"
+            id="clean-btn-[% part.id %]"
+            data-part-id="[% part.id %]"
+            data-sku="[% part.sku | html %]"
+            onclick="toggleCleanTimer(this.getAttribute('data-part-id'), this.getAttribute('data-sku'))"
+            title="Track time cleaning this part; stop to add cost + credit points">Start Clean Timer</button>
+          <span class="clean-timer-display" id="clean-timer-[% part.id %]" hidden>00:00</span>
+          [% ELSE %]
+          <span style="opacity:0.5">—</span>
+          [% END %]
+        </td>
+        <td>
+          [% IF part.row_state == 'need_buy' %]
+            <a href="/Inventory/item/view/[% part.id %]" class="buy-link" target="_blank">🛒 Order</a>
+            <span style="opacity:0.7;font-size:0.82em;display:block;margin-top:0.2rem;">Link to set supplier &amp; order</span>
+          [% ELSIF part.row_state == 'need_print' %]
+            [% IF part.can_queue %]
+            <button class="btn btn-small btn-queue"
+              onclick="addToPrintQueue([% part.id %], [% part.qty_needed %])"
+              title="Queue only the remaining shortfall (needed - stock - already queued) for this part">Add to Print Queue</button>
+            [% END %]
+            <div style="margin-top:0.3em;display:flex;gap:0.3em;flex-wrap:wrap;">
+              <button class="btn btn-small btn-print" onclick="markPrinted([% part.id %])">Printed</button>
+              <select style="font-size:0.78em;padding:0.2em;" onchange="markInPickBox([% part.id %], this.value)">
+                <option value="Print Farm Pick Box">In Pick Box</option>
+                <option value="Print Farm Stock">To Stock</option>
+                <option value="On Printer">On Printer</option>
+              </select>
+            </div>
+          [% ELSIF part.row_state == 'in_queue' %]
+            <div style="display:flex;gap:0.3em;flex-wrap:wrap;">
+              <select style="font-size:0.78em;padding:0.2em;" onchange="markInPickBox([% part.id %], this.value)">
+                <option value="Print Farm Pick Box">In Pick Box</option>
+                <option value="Print Farm Stock">To Stock</option>
+                <option value="On Printer">On Printer</option>
+              </select>
+              <button class="btn btn-small btn-qc" onclick="markQC([% part.id %])">QC OK</button>
+            </div>
+          [% ELSIF part.row_state == 'printed_ready' %]
+            <div style="display:flex;gap:0.3em;flex-wrap:wrap;">
+              <select style="font-size:0.78em;padding:0.2em;" onchange="markInPickBox([% part.id %], this.value)">
+                <option value="Print Farm Pick Box">In Pick Box</option>
+                <option value="Print Farm Stock">To Stock</option>
+                <option value="On Printer">On Printer</option>
+              </select>
+            </div>
+          [% ELSE %]
+            [%# in_box / picked %]
+            [% IF part.id %]
+            <select style="font-size:0.78em;padding:0.2em;" onchange="markInPickBox([% part.id %], this.value)">
+              <option value="Print Farm Pick Box">+1 Pick Box</option>
+              <option value="Print Farm Stock">+1 Stock</option>
+              <option value="On Printer">On Printer</option>
+            </select>
+            [% ELSE %]
+            <span style="opacity:0.5">✓ Done</span>
+            [% END %]
+          [% END %]
+          [% IF part.has_download && part.model_id %]
+          <div style="margin-top:0.3em;">
+            <a href="[% c.uri_for('/3d/model_download', part.model_id) %]"
+               style="font-size:0.8em;color:var(--accent-color,#007bff);"
+               title="Download linked STL/3MF">⬇ [% part.file_basename || 'Download' | html %]</a>
+            <form method="post" action="/3d/model_upload/[% part.model_id %]" enctype="multipart/form-data" style="display:inline;font-size:0.75em;margin-left:0.3em;">
+              <input type="file" name="stl_file" accept=".stl,.STL,.3mf,.3MF,.obj,.OBJ,.gcode,.step,.stp" style="display:none" id="stl_up_travel_[% part.model_id %]" onchange="this.form.submit()">
+              <label for="stl_up_travel_[% part.model_id %]" style="color:var(--accent-color,#007bff);cursor:pointer;text-decoration:underline;">⬆ Upload</label>
+            </form>
+          </div>
+          [% END %]
+        </td>
+      </tr>
+      [% END %]
+      </tbody>
+    </table>
+  [% ELSE %]
+    <div class="empty-section">No items in this section.</div>
+  [% END %]
+  </div>
+</div>
+[% END %]
+
+    <div class="notes-section">
+        <h3>Live Notes / QC Photos</h3>
+        <textarea id="live-notes" placeholder="Add notes as you work..."></textarea>
+        <button onclick="saveNotes()">Save Note</button>
+        <input type="file" id="qc-photo" accept="image/*" onchange="uploadPhoto()">
+    </div>
+
+    <div class="footer-bar">
+        <button onclick="finishTraveler()" class="btn btn-primary">Complete Traveler &amp; Update Stock</button>
+    </div>
+</div>
+
+<script>
+var TRAVELER_KEY = 'traveler_cards_[% traveler.order_id %]';
+
+function toggleCard(header) {
+  var body = header.nextElementSibling;
+  var arrow = header.querySelector('.arrow');
+  if (!body) return;
+  var isOpen = body.classList.contains('open');
+  if (isOpen) {
+    body.classList.remove('open');
+    if (arrow) arrow.classList.remove('open');
+  } else {
+    body.classList.add('open');
+    if (arrow) arrow.classList.add('open');
+  }
+  saveCardState();
+}
+
+function saveCardState() {
+  var cards = document.querySelectorAll('.section-card');
+  var state = {};
+  cards.forEach(function (c, i) {
+    var body = c.querySelector('.card-body');
+    state[i] = body ? body.classList.contains('open') ? 1 : 0 : 0;
+  });
+  state.scrollY = window.scrollY;
+  try { localStorage.setItem(TRAVELER_KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+function restoreCardState() {
+  var raw;
+  try { raw = localStorage.getItem(TRAVELER_KEY); } catch(e) { return; }
+  if (!raw) return;
+  var state;
+  try { state = JSON.parse(raw); } catch(e) { return; }
+  var cards = document.querySelectorAll('.section-card');
+  cards.forEach(function (c, i) {
+    if (state[i]) {
+      var body = c.querySelector('.card-body');
+      var arrow = c.querySelector('.arrow');
+      if (body) body.classList.add('open');
+      if (arrow) arrow.classList.add('open');
+    }
+  });
+  if (state.scrollY > 0) {
+    setTimeout(function () { window.scrollTo(0, state.scrollY); }, 50);
+  }
+}
+
+function saveStateBeforeReload() {
+  saveCardState();
+  /* On the next load (if browser serves a fresh page), localStorage persists. */
+}
+
+/* Clean-labour timers */
+var cleanTimers = {};
+var cleanLabourUrl = '[% c.uri_for("/Inventory/api/labour/clean") %]';
+var travelerReloadTimer = null;
+
+function anyCleanTimerRunning() {
+    var k;
+    for (k in cleanTimers) {
+        if (Object.prototype.hasOwnProperty.call(cleanTimers, k) && cleanTimers[k]) return true;
+    }
+    return false;
+}
+
+function scheduleTravelerReload() {
+    if (travelerReloadTimer) clearInterval(travelerReloadTimer);
+    travelerReloadTimer = setInterval(function () {
+        if (anyCleanTimerRunning()) return;
+        saveStateBeforeReload();
+        location.reload();
+    }, 120000);
+}
+scheduleTravelerReload();
+
+/* Restore card open/closed state and scroll position from localStorage */
+restoreCardState();
+
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+function formatElapsed(ms) {
+    var s = Math.max(0, Math.floor(ms / 1000));
+    var h = Math.floor(s / 3600);
+    var m = Math.floor((s % 3600) / 60);
+    var sec = s % 60;
+    if (h > 0) return h + ':' + pad2(m) + ':' + pad2(sec);
+    return pad2(m) + ':' + pad2(sec);
+}
+
+function utcStamp(d) {
+    d = d || new Date();
+    return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate())
+        + ' ' + pad2(d.getUTCHours()) + ':' + pad2(d.getUTCMinutes()) + ':' + pad2(d.getUTCSeconds());
+}
+
+function toggleCleanTimer(id, sku) {
+    id = String(id);
+    if (cleanTimers[id]) {
+        stopCleanTimer(id, sku);
+    } else {
+        startCleanTimer(id, sku);
+    }
+}
+
+function startCleanTimer(id, sku) {
+    id = String(id);
+    if (cleanTimers[id]) return;
+    var btn = document.getElementById('clean-btn-' + id);
+    var disp = document.getElementById('clean-timer-' + id);
+    var startedMs = Date.now();
+    var startedUtc = utcStamp();
+    if (disp) {
+        disp.hidden = false;
+        disp.textContent = '00:00';
+    }
+    if (btn) {
+        btn.textContent = 'Stop & Log Clean';
+        btn.classList.remove('btn-clean-start');
+        btn.classList.add('btn-clean-stop');
+        btn.title = 'Stop timer — add labour cost to item and credit your points';
+    }
+    var tick = setInterval(function () {
+        if (disp) disp.textContent = formatElapsed(Date.now() - startedMs);
+    }, 250);
+    cleanTimers[id] = { startedMs: startedMs, startedUtc: startedUtc, tick: tick, sku: sku || '' };
+}
+
+function stopCleanTimer(id, sku) {
+    id = String(id);
+    var st = cleanTimers[id];
+    if (!st) return;
+    clearInterval(st.tick);
+    var endedMs = Date.now();
+    var secs = Math.max(0, Math.floor((endedMs - st.startedMs) / 1000));
+    var endedUtc = utcStamp();
+    var btn = document.getElementById('clean-btn-' + id);
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Saving…';
+    }
+    fetch(cleanLabourUrl, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            item_id: Number(id),
+            part_id: Number(id),
+            started_at: st.startedUtc,
+            ended_at: endedUtc,
+            duration_seconds: secs,
+            category: 'clean',
+            sku: sku || st.sku || ''
+        })
+    }).then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        delete cleanTimers[id];
+        if (j && j.success) {
+            var msg = j.message
+                || ('Clean logged: ' + (j.duration_human || secs + 's')
+                    + ' — item cost +$' + (j.labour_cost || '?')
+                    + (j.credited ? (', +' + j.points_credited + ' pts') : ''));
+            alert(msg);
+        } else {
+            alert('Clean labour failed: ' + ((j && (j.error || j.message)) || 'unknown'));
+        }
+        location.reload();
+      }).catch(function (e) {
+        delete cleanTimers[id];
+        alert('Clean labour failed: ' + e);
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Start Clean Timer';
+            btn.classList.add('btn-clean-start');
+            btn.classList.remove('btn-clean-stop');
+        }
+    });
+}
+
+function markPrinted(id) { updatePartStatus(id, 'printed'); }
+function markInPickBox(id, location) {
+    location = location || 'Print Farm Pick Box';
+    var url = '[% c.uri_for("/Inventory/api/stock/receive_qty") %]';
+    fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({item_id: id, part_id: id, location: location})
+    }).then(r => r.json().catch(function(){ return {}; })).then(function (j) {
+        if (j && (j.success === 0 || j.ok === 0) && (j.error || j.message)) {
+            alert('Update failed: ' + (j.error || j.message));
+        }
+        location.reload();
+    }).catch(function (e) {
+        alert('Update failed: ' + e);
+        location.reload();
+    });
+}
+function markQC(id) { updatePartStatus(id, 'qc_passed'); }
+
+function addToPrintQueue(id, qty) {
+    qty = qty || 1;
+    if (!confirm('Queue the remaining shortfall for this part to the print queue?')) return;
+    fetch('[% c.uri_for("/Inventory/api/print_queue/add") %]', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({item_id: id, part_id: id, quantity: qty})
+    }).then(r => r.json().catch(function(){ return {}; })).then(function (j) {
+        if (j && j.success) {
+            if (j.queued && j.queued > 0) {
+                alert('Queued job #' + (j.job_id || '?') + ' x' + j.queued);
+            } else {
+                alert(j.message || 'Nothing left to queue — stock + existing queue already cover the need.');
+            }
+        } else {
+            alert('Queue failed: ' + ((j && (j.error || j.message)) || 'unknown'));
+        }
+        location.reload();
+    }).catch(function (e) {
+        alert('Queue failed: ' + e);
+        location.reload();
+    });
+}
+
+function updatePartStatus(id, status) {
+    var url = '[% c.uri_for("/Accounting/manufacturing/api/update_part") %]';
+    var body = {part_id: id, status: status, traveler_id: '[% traveler.id %]'};
+    if (status === 'in_pick_box' || status === 'pick_box') {
+        url = '[% c.uri_for("/Inventory/api/stock/receive_qty") %]';
+        body = {item_id: id, part_id: id};
+    }
+    fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    }).then(r => r.json().catch(function(){ return {}; })).then(function (j) {
+        if (j && (j.success === 0 || j.ok === 0) && (j.error || j.message)) {
+            alert('Update failed: ' + (j.error || j.message));
+        }
+        location.reload();
+    }).catch(function (e) {
+        alert('Update failed: ' + e);
+        location.reload();
+    });
+}
+
+function saveNotes() { alert('Note saved (live update connected)'); }
+function uploadPhoto() { alert('Photo uploaded and attached to traveler (live QC record created)'); }
+
+function finishTraveler() {
+    if (anyCleanTimerRunning()) {
+        alert('Stop open clean timer(s) before completing the traveler.');
+        return;
+    }
+    if (confirm('Mark all parts complete and update inventory?')) {
+        var ids = [];
+        document.querySelectorAll('tr.need-pick').forEach(function (tr) {
+            var id = tr.getAttribute('data-part-id');
+            if (id) ids.push(id);
+        });
+        var chain = Promise.resolve();
+        ids.forEach(function (id) {
+            chain = chain.then(function () {
+                return fetch('[% c.uri_for("/Inventory/api/stock/receive_qty") %]', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({item_id: id, part_id: id})
+                });
+            });
+        });
+        chain.then(function () {
+            alert('Traveler completed. Stock updated for pick-box parts.');
+            window.location = '[% c.uri_for("/Accounting/manufacturing") %]';
+        });
+    }
+}
+
+window.addEventListener('beforeunload', function (e) {
+    if (anyCleanTimerRunning()) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
+</script>

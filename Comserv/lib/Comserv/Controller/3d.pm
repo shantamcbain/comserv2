@@ -572,6 +572,9 @@ sub _inventory_transaction {
                 quantity_on_hand  => $new_hand,
                 quantity_reserved => $new_res,
             });
+        } elsif ($type eq 'return') {
+            # Reverse of 'issue' — stock goes back on hand (job reopened, etc.)
+            $stock->update({ quantity_on_hand => $stock->quantity_on_hand + $qty });
         } elsif ($type eq 'receive') {
             $stock->update({ quantity_on_hand => $stock->quantity_on_hand + $qty });
         }
@@ -921,6 +924,9 @@ sub model_download :Path('/3d/model_download') :Args(1) {
     $c->response->content_type($mime);
     $c->response->header('Content-Disposition' => "attachment; filename=\"$dl_name\"");
     $c->response->header('Content-Length' => -s $path);
+    $c->response->header('Cache-Control' => 'no-cache, no-store, must-revalidate');
+    $c->response->header('Pragma' => 'no-cache');
+    $c->response->header('Expires' => '0');
     local $/ = undef;
     $c->response->body(<$fh>);
     close $fh;
@@ -1151,6 +1157,7 @@ sub my_orders :Path('/3d/my_orders') :Args(0) {
 
 sub queue :Path('/3d/queue') :Args(0) {
     my ($self, $c) = @_;
+    $c->stash( manufacturing_traveler_link => $c->uri_for('/Accounting/manufacturing') );
     $self->_require_module($c);
     $self->_require_admin($c);
 
@@ -1187,20 +1194,54 @@ sub queue :Path('/3d/queue') :Args(0) {
 
             } elsif ($action eq 'complete') {
                 my $printer    = $job->printer;
+
+                # ---- Auto-fetch print time from printer LAN (if linked) ----
+                my $lan_host = '';
+                if ($printer && (my $pn = $printer->notes // '')) {
+                    $lan_host = $1 if $pn =~ /\[LAN_HOST:([0-9.]+)\]/;
+                }
+                my $lan_print_time_min;
+                if ($lan_host) {
+                    require Comserv::Util::Printing3d::Adapter::Anycubic;
+                    my $adapter = Comserv::Util::Printing3d::Adapter::Anycubic->new;
+                    my $st = eval { $adapter->fetch_state($c, $lan_host, 18910) };
+                    if ($st && $st->{ok} && defined $st->{print_time_min}
+                        && $st->{print_time_min} !~ /^\s*$/) {
+                        $lan_print_time_min = 0 + $st->{print_time_min};
+                    }
+                }
+
                 my $grams_used = $c->req->params->{filament_grams} || undef;
                 $grams_used = undef if defined $grams_used && $grams_used !~ /^\d+\.?\d*$/;
 
                 my $print_hours;
-                my $ph_h = $c->req->params->{print_hours_h};
-                my $ph_m = $c->req->params->{print_hours_m};
-                if (defined $ph_h || defined $ph_m) {
-                    $ph_h = 0 + ($ph_h || 0);
-                    $ph_m = 0 + ($ph_m || 0);
-                    my $total = $ph_h + $ph_m / 60;
-                    $print_hours = $total > 0 ? $total : undef;
-                } else {
-                    $print_hours = $c->req->params->{print_hours} || undef;
-                    $print_hours = undef if defined $print_hours && $print_hours !~ /^\d+\.?\d*$/;
+                # If LAN time is available, use it (printer's own elapsed is ground truth).
+                if (defined $lan_print_time_min && $lan_print_time_min > 0) {
+                    $print_hours = $lan_print_time_min / 60;
+                }
+                # Fall back to manual only when no LAN time.
+                if (!defined $print_hours || $print_hours <= 0) {
+                    my $ph_h = $c->req->params->{print_hours_h};
+                    my $ph_m = $c->req->params->{print_hours_m};
+                    if (defined $ph_h || defined $ph_m) {
+                        $ph_h = 0 + ($ph_h || 0);
+                        $ph_m = 0 + ($ph_m || 0);
+                        my $total = $ph_h + $ph_m / 60;
+                        $print_hours = $total > 0 ? $total : undef;
+                    } else {
+                        $print_hours = $c->req->params->{print_hours} || undef;
+                        $print_hours = undef if defined $print_hours && $print_hours !~ /^\d+\.?\d*$/;
+                    }
+                }
+
+                # ---- Auto-fill filament grams from model STL weight if not manually entered ----
+                if (!$grams_used) {
+                    my $model = eval { $job->model };
+                    if ($model && $model->stl_weight_g && $model->stl_weight_g > 0) {
+                        $grams_used = $model->stl_weight_g;
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'queue',
+                            "complete job=$job_id auto-fill grams from model stl_weight_g=$grams_used");
+                    }
                 }
 
                 # ---- Cost calculation ----
@@ -1301,11 +1342,21 @@ sub queue :Path('/3d/queue') :Args(0) {
                         "Depreciation transaction failed for job $job_id: $@") if $@;
                 }
 
-                # Inventory: add finished printed item to stock (receive = goods in)
+                # Inventory: add finished printed PART to stock (receive = goods in).
+                # Prefer printing_3d_models.item_id — that is the component that was printed.
+                # source_item_id is often the parent unit/order (e.g. base assembly) and must
+                # NOT receive the finished part or wheel-half stock stays at 0 forever.
                 my $printed_item_id;
-                if ($job->source_item_id) {
+                if ($job->model_id) {
+                    my $model = eval { $job->model };
+                    $printed_item_id = $model->item_id
+                        if $model && eval { $model->item_id };
+                }
+                if (!$printed_item_id && $job->source_item_id) {
+                    # Fallback only when there is no model→item link
                     $printed_item_id = $job->source_item_id;
-                } elsif ($job->consignment_line_id) {
+                }
+                if (!$printed_item_id && $job->consignment_line_id) {
                     $printed_item_id = eval {
                         $schema->storage->dbh->selectrow_array(
                             'SELECT item_id FROM inventory_consignment_lines WHERE id = ?',
@@ -1329,14 +1380,35 @@ sub queue :Path('/3d/queue') :Args(0) {
                                 quantity         => $job->quantity || 1,
                                 unit_cost        => $total_cost   || undef,
                                 reference_number => '3D-JOB-' . $job->id,
-                                notes            => sprintf('Printed: %d unit(s) completed — job #%d',
-                                                        $job->quantity || 1, $job->id),
+                                notes            => sprintf('Printed: %d unit(s) completed — job #%d (item %d)',
+                                                        $job->quantity || 1, $job->id, $printed_item_id),
                                 performed_by     => $c->session->{username} || 'system',
                             );
                         };
                         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
                             "Finished goods receipt failed for job $job_id: $@") if $@;
+                    } else {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+                            "Finished goods receipt skipped job $job_id: no inventory_locations for '$sitename'");
                     }
+                } else {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'queue',
+                        "Job $job_id completed with no printable item_id (model.item_id / source_item_id empty) — stock not received");
+                }
+
+            } elsif ($action eq 'reopen') {
+                # Undo a mis-clicked complete/cancel: back to queued + reverse the
+                # inventory side effects (filament issue, finished-goods receipt).
+                # Logic lives in Util::Printing3d (3d.pm is at its size limit).
+                my $res = Comserv::Util::Printing3d->new->reopen_job($c, $job, $self);
+                if ($res && $res->{ok}) {
+                    my $rev = $res->{reversed} || [];
+                    $c->flash->{success_msg} = 'Job #' . $job_id
+                        . ' reopened — back in the queue.'
+                        . (@$rev ? ' Reversed: ' . join('; ', @$rev) . '.' : '');
+                } else {
+                    $c->flash->{error_msg} = 'Could not reopen job #' . $job_id
+                        . ': ' . (($res && $res->{error}) || 'unknown error');
                 }
 
             } elsif ($action eq 'cancel') {
@@ -1429,6 +1501,21 @@ sub queue :Path('/3d/queue') :Args(0) {
             { Slice => {} }, $sitename);
         @active_jobs = @{ $a_rows // [] };
     };
+
+    # Elapsed time is computed SERVER-SIDE by Comserv::Util::AppTime — the one
+    # time authority. Templates must never do JS Date math: a stored UTC stamp
+    # parsed with new Date('YYYY-MM-DD HH:MM:SS') is read as browser-local time,
+    # which produced wildly wrong runtimes (the ~95h bug). We pass pre-computed
+    # values so the view just renders them.
+    for my $job (@active_jobs) {
+        my $hm = Comserv::Util::AppTime->duration_hm( $job->{started_at} );
+        $job->{elapsed_h}       = $hm->{h};
+        $job->{elapsed_m}       = $hm->{m};
+        $job->{elapsed_human}   = Comserv::Util::AppTime->duration_human( $job->{started_at} );
+        my $d = Comserv::Util::AppTime->elapsed_since( $job->{started_at} );
+        $job->{elapsed_hours}   = $d ? $d->{total_hours} : undef;
+        $job->{elapsed_days}    = $d ? $d->{days} : undef;
+    }
     $queue_error = $@ if $@;
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
         "Queue fetch error: $queue_error") if $queue_error;
@@ -1445,6 +1532,8 @@ sub queue :Path('/3d/queue') :Args(0) {
                    j.quantity, j.print_hours, j.filament_quantity,
                    j.filament_cost, j.printer_cost, j.electricity_cost, j.total_cost,
                    j.completed_at,
+                   j.model_id, j.source_type,
+                   mo.nfs_path AS model_file,
                    pr.name AS printer_name,
                    fi.name AS filament_name,
                    mo.name AS model_name
@@ -1452,7 +1541,7 @@ sub queue :Path('/3d/queue') :Args(0) {
             LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
             LEFT JOIN printing_3d_models  mo ON mo.id = j.model_id
             LEFT JOIN inventory_items     fi ON fi.id = j.filament_item_id
-            WHERE j.sitename = ? AND j.status = 'completed'
+            WHERE j.sitename = ? AND j.status IN ('completed','cancelled')
             ORDER BY j.completed_at DESC
             LIMIT $history_limit
         ";
@@ -1636,7 +1725,18 @@ sub printers :Path('/3d/printers') :Args(0) {
                 my $printer = $schema->resultset('Printing3dPrinter')->find(
                     $c->req->params->{printer_id}
                 );
-                $printer->delete if $printer && $printer->status eq 'idle';
+                if ($printer) {
+                    # Unassign any jobs still referencing this printer
+                    my @jobs = $schema->resultset('Printing3dJob')->search(
+                        { printer_id => $printer->id, status => ['assigned', 'printing'] }
+                    )->all;
+                    for my $j (@jobs) {
+                        $j->update({ printer_id => undef, status => 'queued' });
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'printers',
+                            "Unassigned job #$j->id from printer #$printer->id ($printer->name) before delete");
+                    }
+                    $printer->delete;
+                }
             } elsif ($action eq 'pause_lan' || $action eq 'resume_lan') {
                 my $printer = $schema->resultset('Printing3dPrinter')->find(
                     $c->req->params->{printer_id}
@@ -1726,6 +1826,7 @@ sub admin :Path('/3d/admin') :Args(0) {
     my ($self, $c) = @_;
     $self->_require_module($c);
     $self->_require_admin($c);
+    $c->stash( manufacturing_traveler_link => $c->uri_for('/Accounting/manufacturing') );
 
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
@@ -2085,6 +2186,108 @@ sub model_stl_info :Path('/3d/model_stl_info') :Args(1) {
         weight_petg_g => sprintf('%.2f', $w_petg),
         weight_abs_g  => sprintf('%.2f', $w_abs),
     }));
+    $c->detach;
+}
+
+# ============================================================
+# Upload replacement STL for an existing model (overwrites the file on NFS)
+# POST /3d/model_upload/{model_id}  multipart: stl_file
+# ============================================================
+
+sub model_upload :Path('/3d/model_upload') :Args(1) {
+    my ($self, $c, $id) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $model = eval { $schema->resultset('Printing3dModel')->find({ id => $id, sitename => $sitename }) };
+    unless ($model) {
+        $c->flash->{error_msg} = 'Model not found.';
+        $c->res->redirect($c->uri_for('/3d/models'));
+        $c->detach;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->flash->{error_msg} = 'POST required.';
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    my $upload = $c->req->upload('stl_file');
+    unless ($upload) {
+        $c->flash->{error_msg} = 'No file provided.';
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    my ($orig_name) = ($upload->filename =~ /([^\/\\]+)$/);
+    my ($ext) = ($orig_name =~ /\.([^.]+)$/);
+    $ext = lc($ext // '');
+
+    my ($file_row, $upload_err) =
+        $c->model('File')->upload_and_record($c, $upload, 'path:/data/nfs/3d/models');
+    if ($upload_err) {
+        $c->flash->{error_msg} = "Upload failed: $upload_err";
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    my $nfs_stored = $file_row->nfs_path || $file_row->file_path || '';
+
+    # Resolve the path via NfsPath so we find it on any runtime (Docker/workstation)
+    my $resolved_path = '';
+    if ($nfs_stored) {
+        eval { $resolved_path = Comserv::Util::NfsPath->new->resolve_path($nfs_stored) };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'model_upload',
+            "model=$id stored=$nfs_stored resolved=$resolved_path size=" . ($upload->size // '?') . " orig=$orig_name");
+    }
+
+    my ($vol_cm3, $weight_g);
+    if ($ext eq 'stl' && $resolved_path && -r $resolved_path) {
+        my $file_size_kb = -s $resolved_path;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'model_upload',
+            "file on disk: $resolved_path size=${file_size_kb}b") if defined $file_size_kb && $file_size_kb > 0;
+
+        my $stl_info = $self->_parse_stl($resolved_path);
+        if ($stl_info) {
+            my $v = $stl_info->{volume_cm3};
+            if (defined $v && $v == $v && $v > 0) {
+                $vol_cm3  = $v;
+                $weight_g = sprintf('%.3f', $v * 1.24);
+            }
+        }
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'model_upload',
+            "File not visible at resolved path after upload — stl=$nfs_stored resolved=$resolved_path");
+        $c->flash->{error_msg} = 'Upload landed but the file is not visible on the server filesystem. Try again or check NFS mount.';
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    eval {
+        $model->update({
+            file_id          => $file_row->id,
+            nfs_path         => $nfs_stored,
+            file_type        => $ext || 'unknown',
+            stl_volume_cm3   => $vol_cm3  // undef,
+            stl_weight_g     => $weight_g // undef,
+        });
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Could not update model record: $@";
+    } else {
+        my $msg = "STL replaced for '$model->name' — uploaded $orig_name";
+        if ($vol_cm3) {
+            $msg .= " (${vol_cm3} cm³ → ~${weight_g} g PLA)";
+        }
+        $c->flash->{success_msg} = $msg;
+    }
+
+    # Redirect back to where they came from (queue page most likely)
+    my $ref = $c->req->referer || $c->uri_for('/3d/queue');
+    $c->res->redirect($ref);
     $c->detach;
 }
 

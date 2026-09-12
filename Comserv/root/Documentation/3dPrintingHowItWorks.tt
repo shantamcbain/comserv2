@@ -144,7 +144,7 @@
             <h2 class="doc-h2">6. Queue and Complete</h2>
             <p class="doc-body"><a href="[% c.uri_for('/3d/queue') %]" class="doc-link">/3d/queue</a>
             (admin). Download is <code>/3d/model_download/&lt;model_id&gt;</code> and only appears when
-            <code>nfs_path</code> is set. The file is named with the item SKU.</p>
+            <code>nfs_path</code> is set. The file is named with the item SKU. Paths are resolved via <code>NfsPath</code> for Docker/workstation portability; legacy records from before the 2026-08 NFS restructure may be stale (see changelog 2026-09-10 and .hermes plan for audit/fix).</p>
             <p class="doc-body">On Complete, <strong>Filament (g)</strong> is the grams the printer used for
             <em>that job</em> (the whole plate). The app does not multiply by quantity.
             Those grams issue from the filament inventory item (<code>3D-JOB-{id}</code>).

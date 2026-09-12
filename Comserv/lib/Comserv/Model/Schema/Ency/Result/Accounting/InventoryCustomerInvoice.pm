@@ -162,4 +162,6 @@ __PACKAGE__->belongs_to(
     { join_type => 'LEFT', on_delete => 'SET NULL' }
 );
 
+__PACKAGE__->add_unique_constraint('sitename_invoice_number' => ['sitename', 'invoice_number']);
+
 1;
