@@ -147,7 +147,7 @@ sub index :Path('/Accounting') :Args(0) {
             my $stock = $schema->resultset('Accounting::InventoryStockLevel')->search(
                 { item_id => $item->id }
             )->get_column('quantity')->sum // 0;
-            $low_stock++ if $stock <= $item->reorder_point;
+            $low_stock++ if $stock < $item->reorder_point;
         }
     };
 
