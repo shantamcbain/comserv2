@@ -1,0 +1,6 @@
+<div id="2026-09-11-dev-server-inotify-restart-fix" class="cl-entry">
+<h3>2026-09-11 — Limit dev server restart watcher to lib/ to avoid "Too many open files" (Inotify2)</h3>
+<p class="doc-body"><strong>What.</strong> Added logic in comserv_server.pl (before Catalyst::ScriptRunner) to automatically add --restart_directory lib when -r/--restart is used and no explicit restart_directory was provided. This applies to the standard (non-Twiggy) dev server startup.</p>
+<p class="doc-body"><strong>Why.</strong> Default behavior watched the entire app root (script/..) which includes root/ containing thousands of .tt templates, Documentation/, static assets, and subdirs across sites. When many comserv_server.pl -r instances run concurrently (across worktrees on ports like 3001, 4001, 4003, 4006, 4009), plus other inotify users (IDEs, etc.), the per-user inotify instance limit (fs.inotify.max_user_instances=128 default) is exceeded. Linux::Inotify2->new() then dies with "Cannot construct a Linux::Inotify2 object: Too many open files". Per-process ulimit -n 1024 is also low for complex workloads. The RemoteDB "select_connection" / health evaluator logs visible in the report were from the background health child process (forked early) and unrelated to the watcher failure.</p>
+<p class="doc-body"><strong>Files.</strong> <code>script/comserv_server.pl</code></p>
+</div>

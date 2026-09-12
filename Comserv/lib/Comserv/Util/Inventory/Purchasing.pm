@@ -175,5 +175,102 @@ sub create_po {
     };
 }
 
+=head2 stock_reorder_list
+
+Return low-stock items (total on_hand <= reorder_point) grouped by preferred supplier.
+Used for stock-sheet -> PO flow. Independent of BOM needs.
+
+=cut
+sub stock_reorder_list {
+    my ($self, $c, $p) = @_;
+    $p ||= {};
+    my $sitename = $p->{sitename} || $c->session->{SiteName} || 'default';
+    my $schema   = $c->model('DBEncy');
+
+    my @low_items;
+    eval {
+        my @items = $schema->resultset('Accounting::InventoryItem')->search(
+            {
+                sitename      => $sitename,
+                status        => 'active',
+                reorder_point => { '>' => 0 },
+            },
+            {
+                prefetch => [ 'stock_levels', { item_suppliers => 'supplier' } ],
+                order_by => ['category', 'name'],
+            }
+        )->all;
+
+        for my $item (@items) {
+            my $total = 0;
+            for my $sl ($item->stock_levels->all) {
+                $total += $sl->quantity_on_hand || 0;
+            }
+            next if $total > ($item->reorder_point || 0);
+
+            my $short = ($item->reorder_point || 0) - $total;
+            my $qty   = $item->reorder_quantity || $short || 1;
+
+            # Preferred supplier (or first linked)
+            my $pref = undef;
+            my @links = $item->item_suppliers->all;
+            for my $l (@links) {
+                if ($l->is_preferred) { $pref = $l; last; }
+            }
+            $pref ||= $links[0] if @links;
+
+            my $row = {
+                item_id           => $item->id,
+                sku               => $item->sku,
+                name              => $item->name,
+                category          => $item->category,
+                current_stock     => $total,
+                reorder_point     => $item->reorder_point || 0,
+                reorder_quantity  => $item->reorder_quantity || 0,
+                shortfall         => $short > 0 ? $short : 0,
+                suggested_qty     => $qty,
+                unit_cost         => $item->unit_cost,
+                unit_of_measure   => $item->unit_of_measure,
+                item_origin       => $item->item_origin,
+            };
+            if ($pref) {
+                $row->{supplier_id}   = $pref->supplier_id;
+                $row->{supplier_name} = eval { $pref->supplier->name } || 'Unknown';
+                $row->{supplier_sku}  = $pref->supplier_sku;
+                $row->{unit_cost}     = $pref->unit_cost || $item->unit_cost;
+                $row->{is_preferred}  = $pref->is_preferred ? 1 : 0;
+            }
+            push @low_items, $row;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'stock_reorder_list',
+            "Failed to compute reorder list: $@");
+        return { ok => 0, error => "DB error computing low stock: $@" };
+    }
+
+    # Group by supplier
+    my %by_sup;
+    my @unassigned;
+    for my $row (@low_items) {
+        if ($row->{supplier_id}) {
+            my $sid = $row->{supplier_id};
+            push @{ $by_sup{$sid}{items} }, $row;
+            $by_sup{$sid}{supplier_id}   = $sid;
+            $by_sup{$sid}{supplier_name} = $row->{supplier_name};
+        } else {
+            push @unassigned, $row;
+        }
+    }
+
+    return {
+        ok           => 1,
+        sitename     => $sitename,
+        by_supplier  => [ sort { $a->{supplier_name} cmp $b->{supplier_name} } values %by_sup ],
+        unassigned   => \@unassigned,
+        total_low    => scalar(@low_items),
+    };
+}
+
 __PACKAGE__->meta->make_immutable;
 1;

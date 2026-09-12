@@ -562,13 +562,11 @@ Diff${\ ($truncated ? ' (truncated)' : '')}:
 $diff
 PROMPT
 
-    # An explicit model from the Git dashboard wins. The dropdown offers the
-    # FULL catalog (Ollama + Grok + OpenRouter); the selected value is
-    # "provider|model" (e.g. "openrouter|cohere/north-mini-code:free"). If empty, the Router
-    # falls back to the app-wide default (openrouter|cohere/north-mini-code:free) unless no
-    # external key is configured, in which case it uses local Ollama — so the
-    # behavior is consistent with the chat widget and editor.
-    my $requested_model = $c->req->param('model') || '';
+    # An explicit model from the Git dashboard wins. For commit message suggestion
+    # we default to north-mini-code:free (cheap, reliable coding model) rather than
+    # letting routing pick Grok/SuperGrok. The dropdown offers the full catalog;
+    # value is "provider|model".
+    my $requested_model = $c->req->param('model') || 'openrouter|cohere/north-mini-code:free';
     $requested_model = '' if $requested_model =~ /[\x00\r\n]/;
 
     # SINGLE dispatch brain — identical code path to the chat widget and the

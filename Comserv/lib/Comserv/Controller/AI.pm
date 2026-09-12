@@ -12532,9 +12532,14 @@ sub grok_balance :Local :Args(0) {
     
     my $user_id = $c->session->{user_id};
     my $site_id = $c->session->{SiteID};
+
+    # Localhost / 192.168.1.0/24 LAN bypass (same trusted-address pattern as
+    # Api.pm system_logs / hardware_metrics). Remote still needs a session.
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
     
     # Early auth check - return clean JSON instead of letting Catalyst redirect or crash
-    unless ($user_id) {
+    unless ($is_local || $user_id) {
         $c->response->body(encode_json({
             success => JSON::false,
             error   => 'You must be logged in to check Grok/xAI balance and usage.',

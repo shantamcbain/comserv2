@@ -3,6 +3,7 @@ use Moose;
 use namespace::autoclean;
 use POSIX qw(strftime);
 use Comserv::Util::HealthLogger;
+use JSON::MaybeXS qw(encode_json);
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -20,7 +21,9 @@ detailed health status for CSC admin monitoring.
 # /health  -- lightweight liveness check used by Docker HEALTHCHECK
 sub index :Path('') :Args(0) {
     my ($self, $c) = @_;
-    $c->response->body('OK');
+    # Root also defines Path('/health'); keep JSON liveness style consistent.
+    $c->response->content_type('application/json');
+    $c->response->body(encode_json({ status => 'ok' }));
     $c->response->status(200);
 }
 
@@ -37,7 +40,7 @@ sub status :Local :Args(0) {
 
     $c->response->content_type('application/json');
     $c->response->body(
-        Comserv->json->encode(\%status)
+        encode_json(\%status)
     );
 }
 
@@ -75,7 +78,7 @@ sub app_health :Local :Args(0) {
     $c->response->status($http_status);
     $c->response->content_type('application/json');
     $c->response->body(
-        Comserv->json->encode($health)
+        encode_json($health)
     );
 }
 
@@ -124,12 +127,12 @@ sub recent_errors :Local :Args(0) {
     if ($@) {
         $c->response->status(500);
         $c->response->content_type('application/json');
-        $c->response->body(Comserv->json->encode({ error => "Failed to fetch errors: $@" }));
+        $c->response->body(encode_json({ error => "Failed to fetch errors: $@" }));
         return;
     }
 
     $c->response->content_type('application/json');
-    $c->response->body(Comserv->json->encode({
+    $c->response->body(encode_json({
         count      => scalar(@rows),
         window_min => $minutes,
         events     => \@rows,
