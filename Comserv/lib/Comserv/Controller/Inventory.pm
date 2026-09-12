@@ -94,10 +94,19 @@ sub index :Path('/Inventory') :Args(0) {
         $low_stock = 0;
         for my $item (@items) {
             my $total_qty = 0;
+            my $has_stock = 0;
             for my $sl ($item->stock_levels->all) {
                 $total_qty += $sl->quantity_on_hand;
+                $has_stock = 1;
             }
-            $low_stock++ if defined $item->reorder_point && $item->reorder_point > 0 && $total_qty <= $item->reorder_point;
+            my $reorder = $item->reorder_point || 0;
+            # Count as low/missing when: below an explicit reorder point, OR
+            # never received (no stock_level row) so a sale/need can't be met.
+            if ($reorder > 0 && $total_qty <= $reorder) {
+                $low_stock++;
+            } elsif (!$has_stock) {
+                $low_stock++;
+            }
         }
     };
     if ($@) {
