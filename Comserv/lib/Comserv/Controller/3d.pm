@@ -1206,8 +1206,39 @@ sub queue :Path('/3d/queue') :Args(0) {
                     my $adapter = Comserv::Util::Printing3d::Adapter::Anycubic->new;
                     my $st = eval { $adapter->fetch_state($c, $lan_host, 18910) };
                     if ($st && $st->{ok} && defined $st->{print_time_min}
-                        && $st->{print_time_min} !~ /^\s*$/) {
+                        && $st->{print_time_min} !~ /^\\s*$/) {
                         $lan_print_time_min = 0 + $st->{print_time_min};
+                    }
+
+                    # Write full current printer state to JSON for monitoring / error detection.
+                    # This is the raw data from the printer (info + temp + print + mqtt status).
+                    # Location chosen to be accessible and consistent with other 3d data.
+                    if ($lan_host && $st && ref($st) eq 'HASH') {
+                        eval {
+                            require File::Path;
+                            my $dir = '/data/nfs/3d/printer_states';
+                            File::Path::make_path($dir);
+                            my $safe_id = $printer ? $printer->id : 'unknown';
+                            my $json_file = "$dir/printer_${safe_id}.json";
+                            my $full = {
+                                printer_id     => $safe_id,
+                                fetched_at     => _now(),
+                                lan_host       => $lan_host,
+                                state          => $st,
+                            };
+                            # Pretty for humans + machines
+                            require JSON;
+                            my $json = JSON->new->pretty->canonical->encode($full);
+                            open(my $fh, '>', $json_file) or die $!;
+                            print $fh $json;
+                            close $fh;
+                            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'queue_complete',
+                                "wrote full printer state to $json_file");
+                        };
+                        if ($@) {
+                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue_complete',
+                                "failed to write printer state json: $@");
+                        }
                     }
                 }
 
@@ -1516,6 +1547,85 @@ sub queue :Path('/3d/queue') :Args(0) {
         $job->{elapsed_hours}   = $d ? $d->{total_hours} : undef;
         $job->{elapsed_days}    = $d ? $d->{days} : undef;
     }
+
+    # Fetch fresh state from ALL LAN printers (active or idle) and write full JSON.
+    # This populates /data/nfs/3d/printer_states/*.json reliably on every /3d/queue load
+    # (for monitoring, error detection, and remain_time-based polling decisions).
+    # Active jobs get current_job context; others get basic printer info.
+    # Full raw printer response (incl. remain_time_min, print_time_min) is preserved.
+    eval {
+        require Comserv::Util::Printing3d::Adapter::Anycubic;
+        my $adapter = Comserv::Util::Printing3d::Adapter::Anycubic->new;
+        my %seen;
+        # Active first (with job context)
+        for my $job (@active_jobs) {
+            next unless $job->{printer_id};
+            next if $seen{ $job->{printer_id} }++;
+            my $pr = $schema->resultset('Printing3dPrinter')->find($job->{printer_id});
+            next unless $pr;
+            my $notes = $pr->notes // '';
+            my $lan_host = $1 if $notes =~ /\[LAN_HOST:([0-9.]+)\]/;
+            next unless $lan_host;
+
+            my $st = eval { $adapter->fetch_state($c, $lan_host, 18910) };
+            next unless $st && $st->{ok};
+
+            require File::Path;
+            my $dir = '/data/nfs/3d/printer_states';
+            File::Path::make_path($dir);
+            my $json_file = "$dir/printer_" . $pr->id . ".json";
+            my $inv_item = eval { $pr->inventory_item };
+            my $printer_sku = $inv_item ? $inv_item->sku : undef;
+            my $full = {
+                printer_id   => $pr->id,
+                sku          => $printer_sku,
+                name         => $pr->name,
+                fetched_at   => _now(),
+                lan_host     => $lan_host,
+                current_job  => {
+                    id            => $job->{id},
+                    item_id       => $job->{source_item_id},
+                    status        => $job->{status},
+                    started_at    => $job->{started_at},
+                },
+                printer_state => $st,
+            };
+            require JSON;
+            open(my $fh, '>', $json_file) or next;
+            print $fh JSON->new->pretty->canonical->encode($full);
+            close $fh;
+        }
+        # Also write for any other LAN printers (idle, to ensure JSONs are always present)
+        my @all_printers = $schema->resultset('Printing3dPrinter')->search({ sitename => $sitename })->all;
+        for my $pr (@all_printers) {
+            next if $seen{ $pr->id }++;
+            my $notes = $pr->notes // '';
+            my $lan_host = $1 if $notes =~ /\[LAN_HOST:([0-9.]+)\]/;
+            next unless $lan_host;
+            my $st = eval { $adapter->fetch_state($c, $lan_host, 18910) };
+            next unless $st && $st->{ok};
+
+            require File::Path;
+            my $dir = '/data/nfs/3d/printer_states';
+            File::Path::make_path($dir);
+            my $json_file = "$dir/printer_" . $pr->id . ".json";
+            my $inv_item = eval { $pr->inventory_item };
+            my $printer_sku = $inv_item ? $inv_item->sku : undef;
+            my $full = {
+                printer_id   => $pr->id,
+                sku          => $printer_sku,
+                name         => $pr->name,
+                fetched_at   => _now(),
+                lan_host     => $lan_host,
+                current_job  => undef,
+                printer_state => $st,
+            };
+            require JSON;
+            open(my $fh, '>', $json_file) or next;
+            print $fh JSON->new->pretty->canonical->encode($full);
+            close $fh;
+        }
+    };
     $queue_error = $@ if $@;
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
         "Queue fetch error: $queue_error") if $queue_error;
@@ -2580,8 +2690,9 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
                 }
             }
 
+            my $job;
             eval {
-                $schema->resultset('Printing3dJob')->create({
+                $job = $schema->resultset('Printing3dJob')->create({
                     sitename            => $sitename,
                     model_id            => undef,
                     user_id             => $c->session->{user_id} || 0,
@@ -2599,6 +2710,7 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
                     quantity            => $qty || 1,
                     inventory_reserved  => 0,
                     created_at          => _now(),
+                    notes               => '',
                 });
                 $created++;
             };
@@ -2606,6 +2718,28 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue_sync',
                     "Job create failed: $@");
                 $c->flash->{error_msg} = "Error creating job: $@";
+            } elsif ($job && $src_type eq 'restock' && $src_id) {
+                # First-come, first-served assignment to an open manufacturing order.
+                # The job is "attached" to the oldest order that needs this item.
+                # Cancel releases it globally so other orders can claim.
+                eval {
+                    my @open_cos = $schema->resultset('Accounting::InventoryCustomerOrder')->search({
+                        sitename => $sitename,
+                        status => { -not_in => [qw(cancel cancelled void)] },
+                    }, { order_by => 'created_at' })->all;
+                    my $assigned = 0;
+                    for my $co (@open_cos) {
+                        for my $ln ($co->lines->all) {
+                            if (($ln->item_id || 0) == $src_id) {
+                                my $n = $job->notes || '';
+                                $job->update({ notes => $n . ' mfg_order:' . $co->id });
+                                $assigned = 1;
+                                last;
+                            }
+                        }
+                        last if $assigned;
+                    }
+                };
             }
         }
 

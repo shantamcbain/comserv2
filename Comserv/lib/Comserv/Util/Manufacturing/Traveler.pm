@@ -12,6 +12,12 @@ use URI::Escape qw(uri_escape uri_unescape);
 use constant HDRY_SYSTEM_ID  => 51;
 use constant HDRY_SYSTEM_SKU => 'INT-HDRY-001';
 
+# Base and Add-on sub-assemblies for separate in-house orders:
+use constant HDRY_BASE_ID  => 52;
+use constant HDRY_BASE_SKU => 'INT-HDRY-001-P36787';
+use constant HDRY_ADDON_ID  => 53;
+use constant HDRY_ADDON_SKU => 'INT-HDRY-001-P36788';
+
 # Order statuses that still need manufacturing / picking
 use constant OPEN_ORDER_STATUSES => qw(
     pending open processing in_progress confirmed accepted
@@ -510,12 +516,12 @@ sub _parts_from_leaves {
                 # 2. need_print (purple) — items to add to queue / need to print
                 # 3. in_queue (red) — picked items / already in queue / need to be picked
                 # 4. printed_ready (blue) — printed items that needs picking
+                #    Now also includes items that have arrived into stock (on_hand > 0)
+                #    but have not yet been picked/allocated into the pick box for this build.
                 # 5. in_box (green) — items in the pick box / picked items — LAST group
                 #
                 # Stock truth wins: if recorded on_hand already covers the need, the part is
-                # IN THE BOX (green) even if more are still printing. Any remaining queued
-                # qty is shown as a secondary note, never as a red/blue override, so a part
-                # that is already in the physical pick box is not mis-shown as "in queue".
+                # IN THE BOX (green) even if more are still printing.
                 if (!$is_print && $short > 0 && $on_hand < $qty) {
                     $row_state       = 'need_buy';         # amber — items to be ordered
                     $status          = 'pending';
@@ -540,10 +546,22 @@ sub _parts_from_leaves {
                     $row_state       = 'in_queue';         # red — picked items / already in queue
                     $status          = 'pending';
                     $status_display  = "In print queue ($in_queue)";
-                } elsif ($is_print && $short > 0 && $from_queue > $on_hand) {
-                    $row_state       = 'printed_ready';   # blue — printed items that needs picking
+                } elsif ($is_print && $short > 0 && ($from_queue > $on_hand || $on_hand > 0)) {
+                    # Printed arrived: includes completed prints not yet in stock,
+                    # AND items that are in stock (on_hand > 0) but not yet picked for this build.
+                    $row_state       = 'printed_ready';   # blue — printed / arrived items
                     $status          = 'printed';
-                    $status_display  = 'Printed — needs picking';
+                    if ($on_hand > 0) {
+                        $status_display  = 'Printed — arrived (in stock, not picked)';
+                    } else {
+                        $status_display  = 'Printed — needs picking';
+                    }
+                } elsif ($is_print && $qty > 0 && $on_hand == 0 && $in_queue == 0 && $from_queue == 0) {
+                    # Zero-stock needed printed item must never appear as satisfied "OK" or in in_box.
+                    # It belongs in need_print until a job is queued or stock appears.
+                    $row_state       = 'need_print';
+                    $status          = 'pending';
+                    $status_display  = 'Need print (no stock / no credit)';
                 } elsif ($on_hand > 0) {
                     $row_state       = 'in_box';
                     $status          = 'in_stock';
@@ -1165,7 +1183,11 @@ sub get_customers_with_open_orders {
 
     # Ensure In-House appears when there is an INT-HDRY-001 build to pick/print,
     # even if no inventory_customer_orders row exists yet.
-    my $has_inhouse = grep { lc($_) eq 'in-house' || lc($_) eq 'in house' } keys %by_customer;
+    # Only add synthetic if there are *no* In-House records at all (open or cancelled).
+    my $has_inhouse = $c->model('DBEncy')->resultset('Accounting::InventoryCustomerOrder')->search({
+        sitename => $self->_sitename($c),
+        customer_name => { -ilike => 'in-house' },
+    })->count > 0;
     unless ($has_inhouse) {
         my $hdry = eval {
             $c->model('DBEncy')->resultset('Accounting::InventoryItem')->find({
@@ -1197,6 +1219,84 @@ sub get_customers_with_open_orders {
                 customer_link => $synthetic->{customer_link},
                 latest_date   => $synthetic->{order_date},
             };
+        }
+
+        # Also add synthetic In-House entries for base and addon sub-units
+        # so separate orders for base unit and top/addon appear in the list.
+        foreach my $sub ( 
+            { id => HDRY_BASE_ID, sku => HDRY_BASE_SKU, name => 'HDRY Base unit (bottom, top, wheels)' },
+            { id => HDRY_ADDON_ID, sku => HDRY_ADDON_SKU, name => 'HDRY Add-on module (stacks, no bottom/top)' }
+        ) {
+            my $sub_item = eval {
+                $c->model('DBEncy')->resultset('Accounting::InventoryItem')->find({
+                    sitename => $self->_sitename($c),
+                    sku      => $sub->{sku},
+                });
+            };
+            my $sid = $sub_item ? $sub_item->id : $sub->{id};
+            my $sname = $sub_item ? $sub_item->name : $sub->{name};
+            my $sub_synthetic = {
+                customer      => 'In-House',
+                order_id      => 'item-' . $sid,
+                order_date    => $self->_today,
+                items         => "$sname (" . $sub->{sku} . ')',
+                status        => 'open',
+                scope_note    => 'In-house ' . ($sub->{id} == HDRY_BASE_ID ? 'base' : 'addon') . ' build',
+                source        => 'in_house_item',
+                link          => $c->uri_for('/Accounting/manufacturing/view/item', $sid),
+                print_link    => $c->uri_for('/Accounting/manufacturing/print/item', $sid),
+                customer_link => $c->uri_for('/Accounting/manufacturing/customer', uri_escape('In-House')),
+            };
+            # Add as additional open order under In-House (don't overwrite the main)
+            push @{ $by_customer{'In-House'}{open_orders} || [] }, $sub_synthetic;
+            push @{ $by_customer{'In-House'}{items_preview} || [] }, $sub_synthetic->{items};
+            $by_customer{'In-House'}{order_count} = ($by_customer{'In-House'}{order_count} || 0) + 1;
+        }
+    }
+
+    # Always add synthetic In-House entries for base and addon sub-assemblies
+    # if there is no real open customer order for that specific item.
+    # This makes in-house builds for base and top appear as separate orders
+    # under the "In-House" customer, just like a regular customer order.
+    foreach my $sub (
+        { id => HDRY_BASE_ID,  sku => HDRY_BASE_SKU,  name => 'HDRY Base unit (bottom, top, wheels)' },
+        { id => HDRY_ADDON_ID, sku => HDRY_ADDON_SKU, name => 'HDRY Add-on module (stacks, no bottom/top)' }
+    ) {
+        my $has_real_open_for_item = $c->model('DBEncy')->resultset('Accounting::InventoryCustomerOrder')->search({
+            sitename => $self->_sitename($c),
+            customer_name => { -ilike => 'in-house' },
+            status => { -in => [qw(pending open processing in_progress confirmed accepted picking manufacturing partial)] },
+        }, { join => 'lines' })->search({
+            'lines.item_id' => $sub->{id},
+        })->count > 0;
+
+        unless ($has_real_open_for_item) {
+            my $sub_item = eval {
+                $c->model('DBEncy')->resultset('Accounting::InventoryItem')->find({
+                    sitename => $self->_sitename($c),
+                    sku      => $sub->{sku},
+                });
+            };
+            my $sid = $sub_item ? $sub_item->id : $sub->{id};
+            my $sname = $sub_item ? $sub_item->name : $sub->{name};
+            my $sub_synthetic = {
+                customer      => 'In-House',
+                order_id      => 'item-' . $sid,
+                order_date    => $self->_today,
+                items         => "$sname (" . $sub->{sku} . ')',
+                status        => 'open',
+                scope_note    => 'In-house ' . ($sub->{id} == HDRY_BASE_ID ? 'base unit' : 'addon/top') . ' build',
+                source        => 'in_house_item',
+                link          => $c->uri_for('/Accounting/manufacturing/view/item', $sid),
+                print_link    => $c->uri_for('/Accounting/manufacturing/print/item', $sid),
+                customer_link => $c->uri_for('/Accounting/manufacturing/customer', uri_escape('In-House')),
+            };
+            push @{ $by_customer{'In-House'}{open_orders} || [] }, $sub_synthetic;
+            push @{ $by_customer{'In-House'}{items_preview} || [] }, $sub_synthetic->{items};
+            $by_customer{'In-House'}{order_count} = ($by_customer{'In-House'}{order_count} || 0) + 1;
+            $by_customer{'In-House'}{customer} ||= 'In-House';
+            $by_customer{'In-House'}{customer_link} ||= $c->uri_for('/Accounting/manufacturing/customer', uri_escape('In-House'));
+            $by_customer{'In-House'}{latest_date} ||= $sub_synthetic->{order_date};
         }
     }
 
@@ -1265,6 +1365,32 @@ sub get_orders_for_customer {
             link       => $c->uri_for('/Accounting/manufacturing/view/item', $hid),
             print_link => $c->uri_for('/Accounting/manufacturing/print/item', $hid),
         };
+
+        # Synthetic for base and addon when viewing In-House customer
+        foreach my $sub (
+            { id => HDRY_BASE_ID, sku => HDRY_BASE_SKU, name => 'HDRY Base unit (bottom, top, wheels)' },
+            { id => HDRY_ADDON_ID, sku => HDRY_ADDON_SKU, name => 'HDRY Add-on module (stacks, no bottom/top)' }
+        ) {
+            my $sub_item = eval {
+                $c->model('DBEncy')->resultset('Accounting::InventoryItem')->find({
+                    sitename => $self->_sitename($c),
+                    sku      => $sub->{sku},
+                });
+            };
+            my $sid = $sub_item ? $sub_item->id : $sub->{id};
+            my $sname = $sub_item ? $sub_item->name : $sub->{name};
+            push @orders, {
+                customer   => 'In-House',
+                order_id   => 'item-' . $sid,
+                order_date => $self->_today,
+                items      => "$sname (" . $sub->{sku} . ')',
+                status     => 'open',
+                scope_note => 'In-house ' . ($sub->{id} == HDRY_BASE_ID ? 'base unit' : 'addon/top') . ' build',
+                source     => 'in_house_item',
+                link       => $c->uri_for('/Accounting/manufacturing/view/item', $sid),
+                print_link => $c->uri_for('/Accounting/manufacturing/print/item', $sid),
+            };
+        }
     }
 
     return {
