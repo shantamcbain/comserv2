@@ -2172,6 +2172,78 @@ sub po_create :Path('/Inventory/po/create') :Args(0) {
     $c->res->redirect($c->uri_for('/Inventory/po'));
 }
 
+# One-click "Order" from the manufacturing traveler (need_buy parts) or anywhere an
+# item needs purchasing. Resolves the item's preferred supplier, creates a draft PO
+# for the default order qty, and redirects to the PO. If no supplier is linked, sends
+# the user to the item edit page to set one.
+sub po_order_item :Path('/Inventory/po/order_item') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $sitename = $self->_sitename($c);
+    my $params   = $c->req->body_parameters;
+    my $item_id  = $params->{item_id} || $c->req->params->{item_id};
+    my $return   = $params->{return_to} || $c->req->params->{return_to}
+                || $c->uri_for('/Inventory/purchase');
+
+    unless ($item_id) {
+        $c->flash->{error_msg} = 'No item specified to order.';
+        $c->res->redirect($return);
+        return;
+    }
+
+    my $schema = $self->_schema($c);
+    my $item   = eval { $schema->resultset('Accounting::InventoryItem')->find($item_id) };
+    unless ($item) {
+        $c->flash->{error_msg} = "Item $item_id not found.";
+        $c->res->redirect($return);
+        return;
+    }
+
+    # Preferred supplier (or first linked)
+    my ($supplier_id, $supplier_name);
+    eval {
+        my @links = $item->item_suppliers->all;
+        my $pref;
+        for my $l (@links) { if ($l->is_preferred) { $pref = $l; last; } }
+        $pref ||= $links[0] if @links;
+        if ($pref) {
+            $supplier_id   = $pref->supplier_id;
+            $supplier_name = eval { $pref->supplier->name } || 'supplier';
+        }
+    };
+    unless ($supplier_id) {
+        $c->flash->{error_msg} = "No supplier linked to [$item->sku] $item->name. "
+            . 'Add a preferred supplier, then order.';
+        $c->res->redirect($c->uri_for('/Inventory/item/edit', [$item_id]));
+        return;
+    }
+
+    my $qty = $params->{quantity} || $item->reorder_quantity || 1;
+    my $util = Comserv::Util::Inventory::Purchasing->new;
+    my $res = $util->create_po($c, {
+        sitename    => $sitename,
+        supplier_id => $supplier_id,
+        lines       => [ { item_id => $item_id, quantity => $qty } ],
+        notes       => "Ordered from traveler (need_buy). Item: $item->name.",
+        origin      => 'traveler',
+    });
+
+    if (!$res->{ok}) {
+        $c->flash->{error_msg} = $res->{error} || 'PO creation failed';
+        if ($res->{need_schema_compare}) {
+            $c->flash->{error_msg} .= ' (run schema-compare to add tables)';
+        }
+        $c->res->redirect($return);
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'po_order_item',
+        "Traveler order: PO $res->{po_number} for item $item_id (supplier $supplier_id, qty $qty)");
+    $c->flash->{success_msg} = "Purchase Order $res->{po_number} created for "
+        . "[$item->sku] $item->name (supplier: $supplier_name).";
+    $c->res->redirect($c->uri_for('/Inventory/po/view', [$res->{po_id}]));
+}
+
 sub po_list :Path('/Inventory/po') :Args(0) {
     my ($self, $c) = @_;
 
