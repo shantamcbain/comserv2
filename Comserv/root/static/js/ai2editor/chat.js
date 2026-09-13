@@ -126,9 +126,11 @@
     //     so detaching/reattaching never loses context. ---
     let chatLog = [];   // [{who:'You'|'AI'|'Think', html?, summary?, steps?, open?, done?}]
 
-    function ensureThinkingStyles() {
-        if (document.getElementById('ai2-editor-thinking-css')) return;
-        const style = document.createElement('style');
+    function ensureThinkingStyles(doc) {
+        doc = doc || document;
+        if (!doc || !doc.head) return;
+        if (doc.getElementById('ai2-editor-thinking-css')) return;
+        const style = doc.createElement('style');
         style.id = 'ai2-editor-thinking-css';
         style.textContent = [
             '.ai-thinking{margin:8px 0;border:1px solid #4a5568;border-radius:6px;background:#252830;color:#c8d0dc;font-size:12px;}',
@@ -142,7 +144,29 @@
             '.ai-thinking-live{border-color:#0e639c;box-shadow:0 0 0 1px rgba(14,99,156,.35);}',
             '.ai-thinking-live summary{color:#7ec8ff;}'
         ].join('');
-        document.head.appendChild(style);
+        doc.head.appendChild(style);
+    }
+
+    function autosizePrompt(el) {
+        if (!el || !el.style) return;
+        el.style.height = 'auto';
+        const max = 200;
+        const next = Math.min(Math.max(el.scrollHeight, 32), max);
+        el.style.height = next + 'px';
+        el.style.overflowY = (el.scrollHeight > max) ? 'auto' : 'hidden';
+    }
+
+    function wirePromptBox(el, onSend) {
+        if (!el || el._ai2PromptWired) return;
+        el._ai2PromptWired = true;
+        autosizePrompt(el);
+        el.addEventListener('input', function () { autosizePrompt(el); });
+        el.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (typeof onSend === 'function') onSend();
+            }
+        });
     }
 
     function refreshChatViews() {
@@ -157,7 +181,7 @@
 
     function renderChatLog(box) {
         if (!box) return;
-        ensureThinkingStyles();
+        ensureThinkingStyles(box.ownerDocument || document);
         box.innerHTML = '';
         if (!chatLog.length) {
             box.innerHTML = '<div><strong>AI:</strong> How can I help with this file?</div>';
@@ -201,7 +225,11 @@
 
     // Live thinking trail in chat (visible + kept for daily agent analysis).
     function startLiveThinking(meta) {
-        ensureThinkingStyles();
+        ensureThinkingStyles(document);
+        try {
+            const w = window._aiChatWin;
+            if (w && !w.closed) ensureThinkingStyles(w.document);
+        } catch (e0) { /* ignore */ }
         const id = 'think-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
         const startedAt = Date.now();
         const entry = {
@@ -384,37 +412,54 @@
                 '<title>AI Chat — editor</title>' +
                 '<style>body{margin:0;font-family:system-ui,sans-serif;background:#1e1f22;color:#ddd;height:100vh;display:flex;flex-direction:column;}' +
                 '#chat-messages{flex:1;overflow:auto;padding:8px;font-size:0.9em;}' +
-                '#chat-input{flex:1;padding:6px;border:1px solid #555;border-radius:3px;background:#1e1f22;color:#ddd;}' +
-                '#send{background:#0e639c;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;}' +
-                '.bar{display:flex;gap:6px;padding:6px;border-top:1px solid #555;}' +
+                '#chat-input{flex:1;min-height:32px;max-height:200px;resize:none;overflow-y:hidden;padding:6px;border:1px solid #555;border-radius:3px;background:#1e1f22;color:#ddd;font:inherit;line-height:1.35;}' +
+                '#send{background:#0e639c;color:#fff;border:none;padding:6px 12px;border-radius:3px;cursor:pointer;align-self:flex-end;}' +
+                '.bar{display:flex;gap:6px;padding:6px;border-top:1px solid #555;align-items:flex-end;}' +
+                '#chat-status{padding:4px 8px;font-size:11px;color:#9ecbff;border-top:1px solid #333;min-height:16px;}' +
+                '#chat-status.err{color:#f88;}' +
                 'h3{margin:0;padding:8px;background:#2b2b2b;font-size:13px;display:flex;justify-content:space-between;align-items:center;}' +
                 '#attach{background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;}</style>' +
                 '</head><body>' +
                 '<h3>AI Chat — detached <button id="attach">⊞ Attach</button></h3>' +
                 '<div id="chat-messages"></div>' +
-                '<div class="bar"><input id="chat-input" placeholder="Ask AI about the open file...">' +
+                '<div id="chat-status">Ready</div>' +
+                '<div class="bar"><textarea id="chat-input" rows="1" placeholder="Ask AI… Enter to send, Shift+Enter newline"></textarea>' +
                 '<button id="send">Send</button></div>' +
                 '</body></html>'
             );
             w.document.close();
+            ensureThinkingStyles(w.document);
             renderChatLog(w.document.getElementById('chat-messages'));
 
             const dInput = w.document.getElementById('chat-input');
             const dSend = w.document.getElementById('send');
             const dMsgs = w.document.getElementById('chat-messages');
+            const dStatus = w.document.getElementById('chat-status');
             const target = {
                 messages: dMsgs,
                 input: dInput,
                 sendBtn: dSend,
-                status: function () { /* detached window has no status bar */ }
+                status: function (msg, isError) {
+                    if (!dStatus) return;
+                    dStatus.textContent = msg || '';
+                    dStatus.className = isError ? 'err' : '';
+                }
             };
             function fire() {
-                const v = dInput.value;
+                const v = (dInput.value || '').trim();
+                if (!v) return;
                 dInput.value = '';
-                sendPrompt(v, target);
+                autosizePrompt(dInput);
+                try {
+                    sendPrompt(v, target);
+                } catch (err) {
+                    console.error('[AI2EditorChat] send failed', err);
+                    target.status('Send failed: ' + (err && err.message ? err.message : err), true);
+                    recordMessage('AI', '<span style="color:#f66">Send failed: ' + escapeHtml(String(err && err.message ? err.message : err)) + '</span>');
+                }
             }
             dSend.addEventListener('click', fire);
-            dInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') fire(); });
+            wirePromptBox(dInput, fire);
 
             // "Attach" inside the detached window re-attaches into the editor.
             const attachBtn = w.document.getElementById('attach');
@@ -728,6 +773,7 @@
         const sendBtn = target.sendBtn;
         if (!prompt || !prompt.trim()) return;
 
+        if (target.status) target.status('Starting…');
         // Record to the shared chat log (survives attach/detach).
         recordMessage('You', escapeHtml(prompt));
 
@@ -1011,18 +1057,21 @@
         const clear = document.getElementById('ai-chat-clear');
 
         if (sendBtn && input) {
-            sendBtn.addEventListener('click', function () {
-                const v = input.value;
+            function fireAttached() {
+                const v = (input.value || '').trim();
+                if (!v) return;
                 input.value = '';
-                sendPrompt(v);
-            });
-            input.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter') {
-                    const v = input.value;
-                    input.value = '';
+                autosizePrompt(input);
+                try {
                     sendPrompt(v);
+                } catch (err) {
+                    console.error('[AI2EditorChat] send failed', err);
+                    setStatus('Send failed: ' + (err && err.message ? err.message : err), true);
+                    recordMessage('AI', '<span style="color:#f66">Send failed: ' + escapeHtml(String(err && err.message ? err.message : err)) + '</span>');
                 }
-            });
+            }
+            sendBtn.addEventListener('click', fireAttached);
+            wirePromptBox(input, fireAttached);
         }
         if (approve) approve.addEventListener('click', approveSuggestion);
         if (reject) reject.addEventListener('click', rejectSuggestion);
