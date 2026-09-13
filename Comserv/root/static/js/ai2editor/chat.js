@@ -124,10 +124,40 @@
     //     panel is attached to the editor or detached into its own window.
     //     We keep the messages in memory and re-render whichever view is active,
     //     so detaching/reattaching never loses context. ---
-    let chatLog = [];   // [{who:'You'|'AI', html:'...'}]
+    let chatLog = [];   // [{who:'You'|'AI'|'Think', html?, summary?, steps?, open?, done?}]
+
+    function ensureThinkingStyles() {
+        if (document.getElementById('ai2-editor-thinking-css')) return;
+        const style = document.createElement('style');
+        style.id = 'ai2-editor-thinking-css';
+        style.textContent = [
+            '.ai-thinking{margin:8px 0;border:1px solid #4a5568;border-radius:6px;background:#252830;color:#c8d0dc;font-size:12px;}',
+            '.ai-thinking summary{cursor:pointer;padding:6px 10px;list-style:none;font-weight:600;color:#9ecbff;}',
+            '.ai-thinking summary::-webkit-details-marker{display:none;}',
+            '.ai-thinking summary::before{content:"▸ ";display:inline-block;transition:transform .1s;}',
+            '.ai-thinking[open] summary::before{transform:rotate(90deg);}',
+            '.ai-thinking-body{padding:4px 10px 8px;border-top:1px solid #3a4150;}',
+            '.ai-thinking-step{padding:4px 0;border-bottom:1px solid #333842;white-space:pre-wrap;line-height:1.35;}',
+            '.ai-thinking-step:last-child{border-bottom:none;}',
+            '.ai-thinking-live{border-color:#0e639c;box-shadow:0 0 0 1px rgba(14,99,156,.35);}',
+            '.ai-thinking-live summary{color:#7ec8ff;}'
+        ].join('');
+        document.head.appendChild(style);
+    }
+
+    function refreshChatViews() {
+        const attachedBox = document.getElementById('chat-messages');
+        if (attachedBox && sidebarAttached()) renderChatLog(attachedBox);
+        const w = window._aiChatWin;
+        if (w && !w.closed) {
+            const dBox = w.document.getElementById('chat-messages');
+            if (dBox) renderChatLog(dBox);
+        }
+    }
 
     function renderChatLog(box) {
         if (!box) return;
+        ensureThinkingStyles();
         box.innerHTML = '';
         if (!chatLog.length) {
             box.innerHTML = '<div><strong>AI:</strong> How can I help with this file?</div>';
@@ -135,6 +165,26 @@
         }
         for (let i = 0; i < chatLog.length; i++) {
             const e = chatLog[i];
+            if (e.who === 'Think') {
+                const details = document.createElement('details');
+                details.className = 'ai-thinking' + (e.done ? '' : ' ai-thinking-live');
+                details.open = e.open !== false;
+                if (e.id) details.dataset.thinkId = e.id;
+                const summary = document.createElement('summary');
+                summary.textContent = e.summary || 'AI thinking…';
+                const body = document.createElement('div');
+                body.className = 'ai-thinking-body';
+                (e.steps || []).forEach(function (step) {
+                    const stepEl = document.createElement('div');
+                    stepEl.className = 'ai-thinking-step';
+                    stepEl.textContent = step;
+                    body.appendChild(stepEl);
+                });
+                details.appendChild(summary);
+                details.appendChild(body);
+                box.appendChild(details);
+                continue;
+            }
             const div = document.createElement('div');
             div.style.marginBottom = '8px';
             div.innerHTML = '<strong>' + (e.who === 'AI' ? 'AI:' : 'You:') + '</strong> ' + e.html;
@@ -146,13 +196,82 @@
     // The single place a message is recorded + shown in whichever view is live.
     function recordMessage(who, html) {
         chatLog.push({ who: who, html: html });
-        const attachedBox = document.getElementById('chat-messages');
-        if (attachedBox && sidebarAttached()) renderChatLog(attachedBox);
-        const w = window._aiChatWin;
-        if (w && !w.closed) {
-            const dBox = w.document.getElementById('chat-messages');
-            if (dBox) renderChatLog(dBox);
+        refreshChatViews();
+    }
+
+    // Live thinking trail in chat (visible + kept for daily agent analysis).
+    function startLiveThinking(meta) {
+        ensureThinkingStyles();
+        const id = 'think-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+        const startedAt = Date.now();
+        const entry = {
+            who: 'Think',
+            id: id,
+            open: true,
+            done: false,
+            summary: '⏳ AI thinking…',
+            steps: []
+        };
+        chatLog.push(entry);
+
+        function find() {
+            for (let i = chatLog.length - 1; i >= 0; i--) {
+                if (chatLog[i].id === id) return chatLog[i];
+            }
+            return entry;
         }
+        function addStep(text) {
+            const e = find();
+            e.steps.push(String(text));
+            refreshChatViews();
+        }
+        function setSummary(text) {
+            const e = find();
+            e.summary = String(text);
+            refreshChatViews();
+        }
+        if (meta && meta.agent) addStep('Agent: ' + meta.agent);
+        if (meta && meta.phase) addStep('Phase: ' + meta.phase);
+        if (meta && meta.model) addStep('Model: ' + meta.model);
+        if (meta && meta.file) addStep('Open file: ' + meta.file);
+        addStep('Preparing request…');
+        setSummary('⏳ Thinking — ' + (meta && meta.phase ? meta.phase + ' / ' : '') + (meta && meta.model ? meta.model : 'model') + ' (0s)');
+
+        const heartbeat = setInterval(function () {
+            const secs = Math.round((Date.now() - startedAt) / 1000);
+            const e = find();
+            if (e.done) return;
+            e.summary = '⏳ Still thinking — ' + (meta && meta.phase ? meta.phase + ' / ' : '')
+                + (meta && meta.model ? meta.model : 'model') + ' (' + secs + 's)';
+            // Refresh last wait step or append tick every 5s for the record
+            if (secs > 0 && secs % 5 === 0) {
+                const waitLabel = 'Waiting on model… ' + secs + 's elapsed';
+                if (!e.steps.length || e.steps[e.steps.length - 1].indexOf('Waiting on model') !== 0) {
+                    e.steps.push(waitLabel);
+                } else {
+                    e.steps[e.steps.length - 1] = waitLabel;
+                }
+            }
+            refreshChatViews();
+            if (typeof setStatus === 'function') {
+                setStatus('AI thinking… ' + secs + 's (' + ((meta && meta.model) || '') + ')');
+            }
+        }, 1000);
+
+        function finalize(ok, extraSteps) {
+            clearInterval(heartbeat);
+            const e = find();
+            e.done = true;
+            const secs = Math.round((Date.now() - startedAt) / 1000);
+            (extraSteps || []).forEach(function (s) { e.steps.push(String(s)); });
+            e.steps.push(ok ? ('Done in ' + secs + 's') : ('Failed after ' + secs + 's'));
+            e.summary = (ok ? '🔍 AI thinking' : '⚠️ AI thinking (failed)')
+                + ' (' + e.steps.length + ' steps, ' + secs + 's)';
+            refreshChatViews();
+            return e.steps.slice();
+        }
+
+        return { id: id, addStep: addStep, setSummary: setSummary, finalize: finalize, startedAt: startedAt };
     }
 
     // --- Attach/Detach is a VIEW TOGGLE of one chat, not two chats. ---
@@ -621,17 +740,24 @@
             return;
         }
 
-        if (target.status) target.status('Asking AI...');
-
-        // Agent + phase: programming/documentation; analyze/plan use cheap free model;
-        // implement defaults to north-mini-code:free (header model select still wins).
+        // Agent + phase first so thinking UI can name model/phase immediately.
         maybeAdvancePhaseFromUser(prompt);
         const agentId = currentEditorAgentId();
         const phase = currentEditorPhase();
         const model = resolveEditorModel(phase);
         const filePath = currentFilePath();
 
+        if (target.status) target.status('AI thinking…');
+        const liveThink = startLiveThinking({
+            agent: agentId,
+            phase: phase,
+            model: model,
+            file: filePath || '(none)'
+        });
+
         loadCurrentFileContent().then(function (fileContent) {
+            liveThink.addStep('Loaded editor buffer' + (fileContent && fileContent.length
+                ? ' (' + fileContent.length + ' chars)' : ' (empty)'));
             const wantEval = isEvaluatePrompt(prompt);
             const filesP = wantEval
                 ? loadFilesForEval(filePath, fileContent)
@@ -643,9 +769,12 @@
                 const fullPrompt = blob
                     ? (contract + '\n\n' + prompt + '\n\n---\nThese files were loaded live from this app via GET /ai2/load_file. They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n' + blob)
                     : (contract + '\n\n' + prompt);
-                if (target.status && files.length) {
-                    target.status('Loaded ' + files.map(function (f) { return f.path; }).join(', '));
+                if (files.length) {
+                    liveThink.addStep('Attached files: ' + files.map(function (f) { return f.path; }).join(', '));
+                    if (target.status) target.status('Loaded ' + files.map(function (f) { return f.path; }).join(', '));
                 }
+                liveThink.addStep('Calling /ai2/chat (waiting on provider)…');
+                if (target.status) target.status('Asking AI…');
                 return fetch('/ai2/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -664,12 +793,20 @@
               if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
               if (!data || data.success === 0 || data.error) {
                   const err = (data && data.error) ? data.error : 'No response';
+                  const serverSteps = (data && data.thinking && data.thinking.length) ? data.thinking : [];
+                  liveThink.finalize(false, serverSteps.concat(['Error: ' + err]));
                   recordMessage('AI', '<span style="color:#f66">' + escapeHtml(err) + '</span>');
                   if (target.status) target.status('AI error: ' + err, true);
                   return;
               }
               const usedModel = (data.model ? data.model + (data.provider ? ' (' + data.provider + ')' : '') : EDITOR_MODEL);
               const resp = data.response || '';
+              const serverSteps = (data.thinking && data.thinking.length) ? data.thinking : [];
+              const extra = serverSteps.slice();
+              if (data.provider) extra.push('Provider: ' + data.provider);
+              if (data.model) extra.push('Model used: ' + data.model);
+              if (data.fallback) extra.push('Fallback used' + (data.fallback_from ? ' from ' + data.fallback_from : ''));
+              liveThink.finalize(true, extra);
               if (data.files_read && data.files_read.length) {
                   recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[read ' + escapeHtml(data.files_read.join(', ')) + ']</span>');
                   if (target.status) target.status('Read ' + data.files_read.join(', '));
@@ -721,8 +858,10 @@
                   }
               }
           })
+          
           .catch(function (err) {
               if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+              try { liveThink.finalize(false, ['Request failed: ' + (err && err.message ? err.message : err)]); } catch (e2) { /* ignore */ }
               recordMessage('AI', '<span style="color:#f66">Request failed: ' + escapeHtml(err.message) + '</span>');
               if (target.status) target.status('Request failed: ' + err.message, true);
           });
