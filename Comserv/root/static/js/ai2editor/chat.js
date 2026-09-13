@@ -771,7 +771,24 @@ function ensureThinkingStyles(doc) {
         if (/_initialize_ai_chat_schema/i.test(p)) hits++;
         if (/HTTP\/Server\/PSGI/i.test(p)) hits++;
         if (/\[workstation \(Standalone\):\d+\]/.test(p)) hits++;
+        if (/SQL_QUOTED_IDENTIFIER_CASE/i.test(p)) hits++;
+        if (/shanta@workstation:/i.test(p)) hits++;
         return hits >= 2;
+    }
+
+    // Free code models often invent tool calls or echo shell noise instead of analyzing.
+    function looksLikeJunkAnalyzeReply(text, phase) {
+        const t = String(text || '').trim();
+        if (!t) return true;
+        if (looksLikeLogNoise(t)) return true;
+        if (/\[ACTION:\s*\{/i.test(t) && t.length < 800) return true;
+        if (/^\s*\[ACTION:/i.test(t)) return true;
+        if ((phase === 'analyze' || phase === 'plan' || phase === 'clarify')
+            && /list_files|read_file|run_terminal/i.test(t)
+            && !/root cause|enabled_modules|SiteModule|can_beekeep/i.test(t)) {
+            return true;
+        }
+        return false;
     }
 
     function looksVague(prompt, filePath) {
@@ -1047,11 +1064,34 @@ function ensureThinkingStyles(doc) {
                   : { cleanText: resp, actions: [] };
               const display = extracted.cleanText || resp;
               // Prefix the reply with the model actually used, for transparency.
-              var bodyHtml = escapeHtml(display).replace(/\n/g, '<br>');
-              if (looksLikeLogNoise(display) || (display && display.length > 2500)) {
-                  bodyHtml = '<span style="color:#f88;">[noisy / log-like reply — ask a clearer question or use Clarify]</span>'
-                      + '<pre>' + escapeHtml(display).slice(0, 4000) + (display.length > 4000 ? '\n…[truncated]' : '') + '</pre>';
+              if (looksLikeJunkAnalyzeReply(display, phase)) {
+                  liveThink.finalize(false, ['Rejected junk/log-like model reply']);
+                  recordMessage('AI',
+                      '<span style="color:#f88;">[rejected reply]</span> '
+                      + 'That model response was shell/SQL log noise or a fake <code>[ACTION:…]</code> — '
+                      + '<strong>not</strong> an analysis of your bug.<br><br>'
+                      + 'Try again with Agent <strong>Analyze</strong>, Phase <strong>A Analyze</strong>, '
+                      + 'and clear the header model (or pick a free analyze model). '
+                      + 'Say <code>clarify</code> if you want gap questions first.<br>'
+                      + '<details style="margin-top:6px;opacity:0.75;"><summary>Show rejected snippet</summary>'
+                      + '<pre style="max-height:120px;overflow:auto;">'
+                      + escapeHtml(display).slice(0, 600) + '</pre></details>');
+                  if (target.status) target.status('Rejected junk model reply', true);
+                  // Re-open clarify on the last real user ask (not fabricated blob) when possible.
+                  if (!_clarifySession) {
+                      var gaps = [
+                          'Confirm the bug in one sentence (e.g. brew+beekeeping nav show on sitename 3d but should not).',
+                          'Where do you see it — top nav, Features menu, or /brew page?',
+                          'Expected: those features hidden/disabled for 3d — correct?'
+                      ];
+                      beginClarifySession(
+                          'Brew and beekeeping features appear for sitename 3d but should not (not subscribed / not enabled).',
+                          gaps, target, sendBtn
+                      );
+                  }
+                  return;
               }
+              var bodyHtml = escapeHtml(display).replace(/\n/g, '<br>');
               recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + bodyHtml);
 
               // Belt-and-suspenders: programming/docs agents must not create todos from chat.
