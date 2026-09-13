@@ -729,8 +729,8 @@ sub auto :Private {
                     $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
                 }
 
-                # Check hosting account for subscribed addons to enable them by default
-                my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                # Hosting requested_* column historically named "addons"; treat as site features.
+                $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
                     -or => [
                         { sitename => $mod_site },
                         { sitename => lc($mod_site) },
@@ -765,7 +765,10 @@ sub auto :Private {
                 $_site_modules_cache{$mod_site} = { modules => { %enabled }, at => $now_sm };
             }
 
-            # Brew site / brew.* hostnames / brew addon → nav + brew home
+            # Brew feature: brew.* host / Brew sitename, site_modules, or hosting features.
+            # Brew is a site FEATURE (not a paid "addon" gate). Do not force-zero it
+            # when SiteModule lacks a brew row — that hid Brew/Beekeeping on sitenames
+            # like 3d that enable features via hosting/site_modules inconsistently.
             my $req_host = $c->req->uri->host || '';
             $req_host =~ s/^www\.//i;
             my $is_brew_host = ($req_host =~ /^brew\./i) ? 1 : 0;
@@ -776,22 +779,30 @@ sub auto :Private {
                 $enabled{accounting} = 1 unless exists $enabled{accounting};
             }
 
-            # Check if the site actually has the brew addon enabled before enabling it
-            unless ($c->model('DBEncy')->resultset('SiteModule')->search({ sitename => $mod_site, module_name => 'brew', enabled => 1 })->count) {
-                # The site doesn't have brew addon enabled, so don't set the brew menu
-                $enabled{brew} = 0;
-            }
-
-            # If no SiteModule entry for this site yet, but hosting account has brew addon, then enable it
-            unless (exists $enabled{brew}) {
+            # Hosting "requested_addons" column is historical naming — treat as features.
+            # Re-load hosting when cache hit left $hosting undefined.
+            if (!$enabled{brew}) {
+                if (!$hosting) {
+                    $hosting = eval {
+                        $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                            -or => [
+                                { sitename => $mod_site },
+                                { sitename => lc($mod_site) },
+                                { sitename => uc($mod_site) },
+                                \[ 'LOWER(sitename) = ?', lc($mod_site) ],
+                            ]
+                        }, { rows => 1 })->single;
+                    };
+                }
                 if ($hosting && $hosting->requested_addons && $hosting->requested_addons =~ /brew/i) {
-                    $enabled{'brew'} = 1;
+                    $enabled{brew} = 1;
                 }
             }
 
-            # Show Brew menu only if brew addon is actually enabled for this site
+            # Nav/templates still read brew_addon_active (legacy stash key).
             if ($enabled{brew}) {
                 $c->stash->{brew_addon_active} = 1;
+                $c->stash->{brew_feature_active} = 1;
             }
 
             # Apply per-user overrides from user_module_access
