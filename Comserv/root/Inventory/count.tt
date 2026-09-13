@@ -1,0 +1,96 @@
+[% PageVersion = 'Inventory/count.tt,v 0.01 2026/09/12' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>📋 Physical Inventory Count</h1>
+<p>Site: <strong>[% sitename %]</strong></p>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
+
+<form method="GET" action="/Inventory/count" style="margin-bottom:1rem;">
+  <label>Category:
+    <select name="category">
+      <option value="">-- All Categories --</option>
+      [% FOREACH cat IN categories %]
+      <option value="[% cat %]"[% IF category == cat %] selected[% END %]>[% cat %]</option>
+      [% END %]
+    </select>
+  </label>
+  &nbsp;<input type="submit" value="Load Sheet">
+  [% IF has_draft %]<span style="color:var(--success-color,#28a745);margin-left:0.5rem;">⤿ Draft resumed</span>[% END %]
+</form>
+
+[% IF rows.size == 0 %]
+  <p>No active items for this filter.</p>
+[% ELSE %]
+<form method="POST" action="/Inventory/count/submit" id="count-form">
+  <input type="hidden" name="category" value="[% category %]">
+  <div style="margin-bottom:0.75rem;">
+    <button type="submit" formaction="/Inventory/count/save" class="btn-order"
+      onclick="return confirm('Save this count as a draft to resume later?');">💾 Save Draft</button>
+    &nbsp;
+    <button type="submit" class="btn-order"
+      onclick="return confirm('Apply counted values to stock? System stock will be set to what you entered (duplicates merged).');">✅ Submit Count</button>
+    <span style="font-size:0.8rem;color:#666;margin-left:0.5rem;">Enter found amount + unit. 1 each = 1000 g (1 kg spool). Difference updates stock up/down.</span>
+  </div>
+
+  <table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%;">
+    <thead style="background:#f0f0f0;">
+      <tr>
+        <th>SKU</th>
+        <th>Item</th>
+        <th>Location</th>
+        <th>System Qty (g)</th>
+        <th>Found Qty</th>
+        <th>Unit</th>
+        <th>Found (g)</th>
+        <th>Diff (g)</th>
+        <th>Note</th>
+      </tr>
+    </thead>
+    <tbody>
+    [% FOREACH row IN rows %]
+      [% SET fq = row.found_qty || '' %]
+      [% SET fu = row.found_unit || 'g' %]
+      [% SET factor = fu == 'kg' ? 1000 : (fu == 'each' ? 1000 : 1) %]
+      [% SET found_g = fq != '' ? (fq * factor) : '' %]
+      [% SET diff = found_g != '' ? (found_g - row.sys_g) : '' %]
+      <tr>
+        <td>[% row.sku %]</td>
+        <td>[% row.name %]</td>
+        <td>[% row.location_id || '—' %]</td>
+        <td style="text-align:right;">[% row.sys_g %]</td>
+        <td><input type="text" name="found_[% row.item_id %]_[% row.location_id %]" value="[% fq %]" size="8"
+                 oninput="recalc(this, [% row.sys_g %], '[% row.item_id %]_[% row.location_id %]')"></td>
+        <td>
+          <select name="unit_[% row.item_id %]_[% row.location_id %]" onchange="recalc(this, [% row.sys_g %], '[% row.item_id %]_[% row.location_id %]')">
+            <option value="g"[% IF fu == 'g' %] selected[% END %]>g</option>
+            <option value="kg"[% IF fu == 'kg' %] selected[% END %]>kg</option>
+            <option value="each"[% IF fu == 'each' %] selected[% END %]>each</option>
+          </select>
+        </td>
+        <td style="text-align:right;" id="fg_[% row.item_id %]_[% row.location_id %]">[% found_g %]</td>
+        <td style="text-align:right;[% IF diff != '' && diff < 0 %]color:#c00;[% ELSIF diff != '' && diff > 0 %]color:#080;[% END %]" id="df_[% row.item_id %]_[% row.location_id %]">[% diff %]</td>
+        <td><input type="text" name="note_[% row.item_id %]_[% row.location_id %]" value="[% row.note %]" size="14"></td>
+      </tr>
+    [% END %]
+    </tbody>
+  </table>
+  <p><em>[% rows.size %] row(s). Submit sets system stock to your entered values (grams); a physical_count transaction records the delta.</em></p>
+</form>
+[% END %]
+
+<script>
+function recalc(el, sys_g, key) {
+  var row = el.closest('tr');
+  var qty = parseFloat(row.querySelector('input[name^="found_"]').value) || 0;
+  var unit = row.querySelector('select[name^="unit_"]').value;
+  var factor = unit === 'kg' ? 1000 : (unit === 'each' ? 1000 : 1);
+  var fg = qty * factor;
+  var df = fg - sys_g;
+  document.getElementById('fg_' + key).textContent = fg;
+  var d = document.getElementById('df_' + key);
+  d.textContent = df;
+  d.style.color = df < 0 ? '#c00' : (df > 0 ? '#080' : '');
+}
+</script>

@@ -44,9 +44,23 @@ sub _detect_provider {
         $prefix = lc($1);
     }
     if ($prefix eq 'supergrok' || $prefix eq 'grok-oauth') {
+        $bare =~ s/^x-ai\///i;
         return ('supergrok', $bare);
     }
-    if ($prefix eq 'grok' || $bare =~ /^grok/i) {
+    # Grok-named models NEVER go through OpenRouter (that bills OpenRouter).
+    # SuperGrok (prepaid weekly) is the grok hop. xAI pay-per-token is only
+    # the explicit "grok|" prefix when SuperGrok is unavailable (select_model).
+    if ($bare =~ /^(?:x-ai\/)?grok/i) {
+        $bare =~ s/^x-ai\///i;
+        if ($prefix eq 'openrouter' || $prefix eq 'external') {
+            return ('supergrok', $bare);
+        }
+        if ($prefix eq 'grok') {
+            return ('grok', $bare);
+        }
+        return ('supergrok', $bare);
+    }
+    if ($prefix eq 'grok') {
         return ('grok', $bare);
     }
     if ($prefix eq 'openrouter' || $prefix eq 'external' || $bare =~ m{/}) {
@@ -55,7 +69,13 @@ sub _detect_provider {
     if ($requested_model =~ m{/}) {
         return ('external', $requested_model);
     }
-    if ($requested_model =~ /^(gpt|claude|llama3|mixtral|groq|openrouter|or-|tencent)/i) {
+    # Ollama tags are name:tag (llama3.1:8b, phi4:14b). OpenRouter ids use
+    # org/model. The old /^(llama3|...)/i match sent local llama3* tags to
+    # OpenRouter → 400 "is not a valid model ID" (audit todo 2308).
+    if ($prefix eq 'ollama' || ($bare =~ /:/ && $bare !~ m{/})) {
+        return ('ollama', $bare);
+    }
+    if ($requested_model =~ /^(gpt|claude|mixtral|groq|openrouter|or-|tencent)/i) {
         return ('external', $requested_model);
     }
     return ('ollama', $requested_model);
@@ -179,20 +199,18 @@ sub select_model {
     my $context_key = $self->_context_for($ctx{agent_id} // $ctx{page_context} // 'general');
 
     # 1) Explicit selection wins if the provider can serve it.
+    #    Grok-named models use SuperGrok (weekly prepaid) when that
+    #    credential exists — never OpenRouter Grok, never xAI pay-per-token first.
     if ($requested) {
         my ($prov, $model) = $self->_detect_provider($requested);
+        ($prov, $model) = $self->_prefer_supergrok($c, $prov, $model);
         return ($prov, $model);
     }
 
-    # 1.5) App-wide DEFAULT: prefer the off-host OpenRouter model so automatic
-    # selection never stalls the workstation by cold-loading a ~9GB local
-    # Ollama weight. This is the SINGLE default used by every surface that
-    # reaches the Router (chat widget, Git drafting, editor, focus-tune) so
-    # behavior is consistent across the whole app. Only used when an external
-    # key is actually resolvable AND the model is reachable.
-    my $default_external = 'openrouter|tencent/hy3';
-    if ($self->_external_default_available($c, $default_external)) {
-        return ('external', $default_external);
+    # 1.5) SuperGrok weekly credits BEFORE any paid OpenRouter hop.
+    # OpenRouter has no auto-fill — do not default the app onto a paid OR model.
+    if ($self->_external_default_available($c, 'supergrok|grok-4.6')) {
+        return ('supergrok', 'grok-4.6');
     }
 
     # 2) Build a lookup of installed chat models (short name -> full name).
@@ -229,6 +247,24 @@ sub select_model {
     return ('ollama', 'phi4:14b');
 }
 
+# If SuperGrok OAuth is present, every grok-* hop uses it (weekly credits)
+# instead of xAI pay-per-token or OpenRouter x-ai/grok.
+sub _prefer_supergrok {
+    my ($self, $c, $prov, $model) = @_;
+    return ($prov, $model) unless $c && $model;
+    my $bare = $self->_bare_model($model);
+    $bare =~ s/^x-ai\///i;
+    return ($prov, $model) unless $prov eq 'supergrok' || $prov eq 'grok' || $bare =~ /^grok/i;
+    my $g = try { $c->model('AI2::Provider::Grok') } catch { undef };
+    my $prepaid = ($g && $g->can('resolve_prepaid_key'))
+        ? (try { $g->resolve_prepaid_key($c) } catch { undef })
+        : undef;
+    if ($prepaid) {
+        return ('supergrok', $bare);
+    }
+    return ($prov eq 'grok' ? 'grok' : 'supergrok', $bare);
+}
+
 # -------------------------------------------------------------------
 # select_best_model — controller convenience wrapper returning a list.
 # -------------------------------------------------------------------
@@ -254,7 +290,34 @@ sub _credits_exhausted {
     # not known) — fall through rather than surfacing a dead provider.
     return 1 if $error =~ /can'?t connect|connection (refused|reset|timed? ?out)|name or service not known|temporary failure in name resolution|\b500 can't connect|\btimed? ?out\b/i;
     return 1 if $error =~ /402\b|payment.?required|insufficient credit|out of credit|credit.?balance|can only afford|prepaid credit|usage limit|quota|weekly usage|limit_remaining|no auto-fill/i;
+    # x.AI returns 403 (not 402) for a spent SuperGrok subscription/quota —
+    # "personal-team-blocked:spending-limit". Router must read that as "this
+    # hop is down" and fall through, not dead-end (todo #2374).
+    return 1 if $error =~ /spending.?limit|personal-team-blocked|out of credits|add credits|upgrade at/i;
+    return 1 if $self->_transient_outage($error);
     return 0;
+}
+
+# 502/503/504 / "Service Unavailable" — retry same hop, then fall through
+# (todo #2292: OpenRouter 503 killed the turn instead of retrying).
+sub _transient_outage {
+    my ($self, $error) = @_;
+    return 0 unless defined $error && length $error;
+    return 1 if $error =~ /\b50[234]\b/;
+    return 1 if $error =~ /service unavailable|bad gateway|gateway time-?out/i;
+    return 0;
+}
+
+sub _user_facing_error {
+    my ($self, $error) = @_;
+    $error = '' unless defined $error;
+    if ($self->_transient_outage($error) || $error =~ /can'?t connect|\btimed? ?out\b/i) {
+        return 'The selected model is temporarily unavailable. Retrying another model if possible — try Send again if this persists.';
+    }
+    if ($error =~ /402\b|insufficient credit|out of credit|quota|usage limit/i) {
+        return 'That paid model is out of credit. Falling back to a free or local model.';
+    }
+    return 'The AI provider did not complete this turn. Try again or pick another model.';
 }
 
 sub _provider_needs_credit_fallback {
@@ -279,6 +342,7 @@ sub pick_free_fallback {
         my $name = $m->{name} // '';
         my $svc  = $m->{provider} || '';
         next unless length $name;
+        next if $name =~ /grok/i || $name =~ /^x-ai\//i;
         next if $svc eq ($skip_provider // '') && $name eq ($skip_model // '');
         my $is_free  = $m->{free} || ($name =~ /:free$/);
         my $is_local = $m->{local} || ($svc eq 'ollama');
@@ -294,7 +358,7 @@ sub pick_free_fallback {
 }
 
 sub _chat_one {
-    my ($self, $c, $provider_name, $use_model, $messages) = @_;
+    my ($self, $c, $provider_name, $use_model, $messages, %opts) = @_;
 
     my $dispatch = {
         ollama     => 'AI2::Provider::Ollama',
@@ -322,6 +386,9 @@ sub _chat_one {
             model    => $self->_bare_model($use_model),
             host     => $host,
             port     => $port,
+            # Threaded from Chat.pm: the web-search toggle was set by the
+            # widget but dropped here, so Grok's search_parameters never fired.
+            ($opts{use_search} ? (use_search => 1) : ()),
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_chat_one',
@@ -336,11 +403,30 @@ sub _chat_one {
     return $resp;
 }
 
+# Same hop, up to 3 tries, on 502/503/504 only. Sleep 1s then 2s.
+# Does not retry 401/400 (bad key / bad model).
+sub _chat_one_with_retry {
+    my ($self, $c, $provider_name, $use_model, $messages, %opts) = @_;
+    my $resp;
+    for my $attempt (1 .. 3) {
+        $resp = $self->_chat_one($c, $provider_name, $use_model, $messages, %opts);
+        return $resp if $resp && $resp->{success};
+        my $err = ($resp && $resp->{error}) || '';
+        last unless $self->_transient_outage($err);
+        last if $attempt == 3;
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+            '_chat_one_with_retry',
+            "Transient $provider_name/$use_model ($err); retry $attempt/2 after ${attempt}s");
+        sleep $attempt;
+    }
+    return $resp;
+}
+
 # Paid OpenRouter (no auto-fill) and SuperGrok (prepaid, no remaining-quota
 # API) fall back to free OpenRouter then Ollama. xAI grok auto-fills — do
 # not steal the turn away from grok on a credit error.
 sub chat_with_fallback {
-    my ($self, $c, $provider_name, $use_model, $messages) = @_;
+    my ($self, $c, $provider_name, $use_model, $messages, %opts) = @_;
 
     my $skip_paid = 0;
     my $pre_err;
@@ -358,15 +444,23 @@ sub chat_with_fallback {
 
     my $resp;
     unless ($skip_paid) {
-        $resp = $self->_chat_one($c, $provider_name, $use_model, $messages);
+        $resp = $self->_chat_one_with_retry($c, $provider_name, $use_model, $messages, %opts);
         if ($resp && $resp->{success}) {
             return $resp;
         }
     }
 
     my $err = $pre_err || ($resp && $resp->{error}) || 'AI provider error';
-    my $do_fallback = $self->_provider_needs_credit_fallback($provider_name)
-        && ($skip_paid || $self->_credits_exhausted($err));
+    # Credit-exhaustion on paid providers OR a dead Ollama hop (docker cannot
+    # reach host:11434 — CSC-20260831-1585) should fall through to a free
+    # OpenRouter model instead of leaving the UI on Thinking… forever.
+    my $do_fallback = (
+        $self->_provider_needs_credit_fallback($provider_name)
+            && ($skip_paid || $self->_credits_exhausted($err))
+    ) || (
+        ($provider_name // '') eq 'ollama'
+            && ($resp && $resp->{unreachable} || $self->_credits_exhausted($err))
+    );
 
     unless ($do_fallback) {
         $resp ||= { success => 0, error => $err, provider => $provider_name };
@@ -375,11 +469,13 @@ sub chat_with_fallback {
     }
 
     my ($free, $local) = $self->pick_free_fallback($c, $provider_name, $use_model);
+    # When Ollama itself is the failing hop, do not retry another Ollama tag.
+    $local = undef if ($provider_name // '') eq 'ollama';
     for my $hop ($free, $local) {
         next unless $hop;
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
-            "Paid $provider_name exhausted ($err); falling back to $hop->{provider} $hop->{model}");
-        my $retry = $self->_chat_one($c, $hop->{provider}, $hop->{model}, $messages);
+            "$provider_name failed ($err); falling back to $hop->{provider} $hop->{model}");
+        my $retry = $self->_chat_one_with_retry($c, $hop->{provider}, $hop->{model}, $messages);
         if ($retry && $retry->{success}) {
             $retry->{provider}       = $hop->{provider};
             $retry->{fallback}       = 1;
@@ -429,13 +525,19 @@ sub get_available_models {
 
     my @all;
 
+    # Baseline: a small static list of confirmed-free OpenRouter models. This
+    # guarantees the catalog is never empty on hosts with no API keys or where
+    # Ollama / external provider probes fail. Live provider lists overlay below.
+    push @all, $self->_default_free_catalog($c);
+
     # --- Local Ollama ---
+    # Ollama is slow and can block Starman workers for tens of seconds when the
+    # host is down. It must NOT be probed during ordinary page rendering. Only
+    # refresh when an AI surface explicitly asks for the live list.
     # Production1 is image-only and cannot reach the workstation Ollama host.
-    # Catalog discovery runs during ordinary page rendering, so probing Ollama
-    # there pins one Starman worker per request under crawler traffic. Do not
-    # probe, log an unreachable sentinel, or advertise Ollama on production1.
     my $system_identifier = $ENV{SYSTEM_IDENTIFIER} // '';
-    my $skip_ollama = $system_identifier =~ /^(?:production1|comservproduction1)$/i;
+    my $skip_ollama = $system_identifier =~ /^(?:production1|comservproduction1)$/i
+                   || !$opts{include_ollama};
 
     unless ($skip_ollama) {
     # v2 parity with v1 get_user_providers: emit Ollama entries on hosts where
@@ -496,6 +598,28 @@ sub get_available_models {
     };
     }
 
+# Minimal static list used as the cheap default catalog, built on app startup
+# and ordinary page requests without probing Ollama or any external provider.
+# It covers the common free/cheap defaults so chat has something usable until
+# an explicit refresh pulls the live list.
+sub _default_free_catalog {
+    my ($self, $c) = @_;
+    return (
+        { name => 'google/gemma-4-31b-it:free', provider => 'openrouter',
+          label => 'OpenRouter: google/gemma-4-31b-it:free', local => 0, free => 1,
+          price_prompt => 0, price_completion => 0 },
+        { name => 'google/gemma-4-26b-a4b-it:free', provider => 'openrouter',
+          label => 'OpenRouter: google/gemma-4-26b-a4b-it:free', local => 0, free => 1,
+          price_prompt => 0, price_completion => 0 },
+        { name => 'nvidia/nemotron-3-nano-30b-a3b:free', provider => 'openrouter',
+          label => 'OpenRouter: nvidia/nemotron-3-nano-30b-a3b:free', local => 0, free => 1,
+          price_prompt => 0, price_completion => 0 },
+        { name => 'ollama_unreachable', provider => 'ollama',
+          label => 'Ollama (refresh to see local models)', local => 1,
+          unreachable => 1, disabled => 1 },
+    );
+}
+
     # --- External (x.AI / OpenRouter) ---
     # Driven by key *resolution*, not by the presence of a UserApiKeys row.
     # A provider is shown (with its live model catalog) when a key can be
@@ -538,6 +662,15 @@ sub get_available_models {
         if ($has_key) {
             if ($listed && $listed->{success} && $listed->{models} && @{$listed->{models}}) {
                 for my $m (@{$listed->{models}}) {
+                    # price_known distinguishes "this costs $0" (a genuinely
+                    # free model) from "the provider published no price"
+                    # (x.AI /v1/models returns no pricing at all). Defaulting
+                    # the latter to 0 made every Grok model look free and
+                    # leaked the paid x.AI catalog to guest-tier users.
+                    my $known = exists $m->{price_known}
+                        ? ($m->{price_known} ? 1 : 0)
+                        : ( (defined $m->{price_prompt} || defined $m->{price_completion}
+                             || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0 );
                     push @all, {
                         name     => $m->{id},
                         provider => $svc,
@@ -545,8 +678,11 @@ sub get_available_models {
                         local    => 0,
                         prepaid  => ($svc eq 'supergrok' || $m->{prepaid}) ? 1 : 0,
                         pricing          => $m->{pricing}        || {},
-                        price_prompt     => $m->{price_prompt}     // 0,
-                        price_completion => $m->{price_completion} // 0,
+                        # Keep undef when unknown — consumers must NOT read
+                        # undef as zero/free.
+                        price_prompt     => $m->{price_prompt},
+                        price_completion => $m->{price_completion},
+                        price_known      => $known,
                     };
                 }
                 next;
@@ -610,11 +746,24 @@ sub _role_filter_models {
         # Zero-priced external entries (e.g. stealth/ox-alpha, openrouter/auto)
         # cost nothing — treat them as free so the guest/member tiers keep them
         # (mirrors the JS cost logic in daily-plan-utils.js / model-select.js).
+        #
+        # CRITICAL: only trust a zero price when the price is actually KNOWN.
+        # x.AI's /v1/models returns no pricing field, so every Grok model used
+        # to arrive with price_prompt/price_completion == 0 and was classified
+        # "free" — labelling paid Grok models free and leaking the whole paid
+        # x.AI catalog to guest-tier users. price_known gates that inference.
         unless ($free) {
-            my $pp = ($m->{price_prompt}     // 0) + 0;
-            my $pc = ($m->{price_completion} // 0) + 0;
-            $free = 1 if !$m->{local} && $pp == 0 && $pc == 0 && !($m->{pricing} && %{$m->{pricing}}
-                          && (($m->{pricing}{prompt} // 1) + 0) > 0);
+            my $known = $m->{price_known};
+            $known = ( defined $m->{price_prompt} || defined $m->{price_completion}
+                       || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0
+                unless defined $known;
+            if ($known && !$m->{local}) {
+                my $pp = ($m->{price_prompt}     // 0) + 0;
+                my $pc = ($m->{price_completion} // 0) + 0;
+                my $pricing_prompt = ($m->{pricing} && %{$m->{pricing}})
+                    ? (($m->{pricing}{prompt} // 0) + 0) : 0;
+                $free = 1 if $pp == 0 && $pc == 0 && $pricing_prompt == 0;
+            }
         }
         my $local = $m->{local} || ( $svc eq 'ollama' ? 1 : 0 );
         if ($tier eq 'guest') {

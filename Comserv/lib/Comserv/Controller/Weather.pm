@@ -179,6 +179,14 @@ sub forecast :Path('/Weather/forecast') :Args(0) {
 sub configuration :Path('/Weather/configuration') :Args(0) {
     my ( $self, $c ) = @_;
 
+    # CSC-20260831-3242: admin-only; redirect guests to login; never render API keys below
+    my $root = $c->controller('Root');
+    unless ($root && $root->user_exists($c) && $root->check_user_roles($c, 'admin')) {
+        $c->flash->{error_msg} = 'Admin access required to configure weather API keys.';
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        $c->detach;
+    }
+
     # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
 
@@ -200,19 +208,47 @@ sub configuration :Path('/Weather/configuration') :Args(0) {
     # Get current configuration
     my $current_config = $self->_get_weather_configuration($c);
     
+    # Security: never expose the actual API key in the HTML response
+    my $has_api_key = 0;
+    if ($current_config && $current_config->{api_key}) {
+        $has_api_key = 1;
+        $current_config->{api_key} = '';  # blank so it is never pre-filled in source
+    }
+    
     # Get available weather providers
     my $providers = $self->weather_model->get_weather_providers($c);
 
     # Stash data for template
     $c->stash(
         current_config => $current_config,
+        has_api_key    => $has_api_key,
         weather_providers => $providers,
         template => 'Weather/configuration.tt'
     );
 }
 
+sub _require_weather_admin {
+    my ( $self, $c ) = @_;
+    my $root = $c->controller('Root');
+    unless ($root && $root->user_exists($c) && $root->check_user_roles($c, 'admin')) {
+        if (($c->req->header('X-Requested-With') || '') eq 'XMLHttpRequest'
+            || ($c->req->content_type || '') =~ /json/i
+            || ($c->req->param('format') || '') eq 'json') {
+            $c->response->status(403);
+            $c->stash->{json_data} = { success => 0, message => 'Admin access required' };
+            $c->forward('View::JSON');
+            $c->detach;
+        }
+        $c->flash->{error_msg} = 'Admin access required for weather configuration.';
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        $c->detach;
+    }
+    return 1;
+}
+
 sub test_configuration :Path('/Weather/test_config') :Args(0) {
     my ( $self, $c ) = @_;
+    $self->_require_weather_admin($c);
 
     # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
@@ -258,6 +294,7 @@ sub test_configuration :Path('/Weather/test_config') :Args(0) {
 
 sub test_location :Path('/Weather/test_location') :Args(0) {
     my ( $self, $c ) = @_;
+    $self->_require_weather_admin($c);
 
     # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
@@ -319,6 +356,7 @@ sub test_location :Path('/Weather/test_location') :Args(0) {
 
 sub lookup_postal_code :Path('/Weather/lookup_postal') :Args(0) {
     my ( $self, $c ) = @_;
+    $self->_require_weather_admin($c);
 
     # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
@@ -369,6 +407,7 @@ sub lookup_postal_code :Path('/Weather/lookup_postal') :Args(0) {
 
 sub save_configuration :Path('/Weather/save_configuration') :Args(0) {
     my ( $self, $c ) = @_;
+    $self->_require_weather_admin($c);
 
     # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
@@ -432,13 +471,7 @@ sub _check_weather_config {
 
 sub poll_now :Path('/Weather/poll') :Args(0) {
     my ($self, $c) = @_;
-
-    my @roles = @{$c->session->{roles} || []};
-    unless (grep { /^admin$/i } @roles) {
-        $c->flash->{error_msg} = 'Admin access required to run weather poll.';
-        $c->response->redirect($c->uri_for('/Weather'));
-        return;
-    }
+    $self->_require_weather_admin($c);
 
     my $config = try {
         $self->weather_model->get_weather_config($c);
@@ -610,9 +643,21 @@ sub _get_weather_configuration {
 sub _handle_configuration_save {
     my ( $self, $c ) = @_;
     
+    # Get user and site context first
+    my $user_id = $c->session->{user_id};
+    my $site_id = $c->session->{site_id};
+
+    # Check if we have required session data
+    unless ($user_id && $site_id) {
+        $c->stash->{error_message} = 'User session required to save weather configuration';
+        $c->response->redirect($c->uri_for('/Weather/configuration'));
+        return;
+    }
+
+    my $submitted_key = $c->request->param('api_key') || '';
     my $config = {
         api_service => $c->request->param('api_service'),
-        api_key => $c->request->param('api_key'),
+        api_key => $submitted_key,
         location_method => $c->request->param('location_method'),
         location_value => $c->request->param('location_value'),
         country_code => $c->request->param('country_code'),
@@ -620,16 +665,13 @@ sub _handle_configuration_save {
         temperature_units => $c->request->param('temperature_units'),
         language => $c->request->param('language')
     };
-    
-    # Get user and site context
-    my $user_id = $c->session->{user_id};
-    my $site_id = $c->session->{site_id};
-    
-    # Check if we have required session data
-    unless ($user_id && $site_id) {
-        $c->stash->{error_message} = "User session required to save weather configuration";
-        $c->response->redirect($c->uri_for('/Weather/configuration'));
-        return;
+
+    # Security: if no new key provided, preserve the existing one
+    if (!$submitted_key || $submitted_key =~ /^\s*$/) {
+        my $existing = try { $self->weather_model->get_weather_config($c, $user_id, $site_id) } catch { undef };
+        if ($existing && $existing->{api_key}) {
+            $config->{api_key} = $existing->{api_key};
+        }
     }
     
     # Ensure weather tables exist before saving

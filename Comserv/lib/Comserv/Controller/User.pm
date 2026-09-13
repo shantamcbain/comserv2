@@ -485,6 +485,28 @@ sub do_login :Local {
             }
         }
         
+        # Auto-assign "helpdesk" staff role for the official support bot (helpdesksupport / helpdesk@computersystemconsulting.ca).
+        # Gives the bot full HelpDesk staff access (queues, create_todo/escalate, admin views) vs normal/member (own tickets).
+        my %helpdesk_bots = map { $_ => 1 } qw(helpdesksupport helpdesk);
+        my $user_email = lc( $user->email || "" );
+        if ( $helpdesk_bots{ lc($username) } || $user_email eq 'helpdesk@computersystemconsulting.ca' ) {
+            my @current_roles = @$roles;
+            unless ( grep { lc($_) eq "helpdesk" } @current_roles ) {
+                push @current_roles, "helpdesk";
+                my $roles_str = join(",", @current_roles);
+                eval {
+                    $user->update({ roles => $roles_str });
+                    $c->session->{roles} = \@current_roles;
+                    $self->logging->log_with_details($c, "info", __FILE__, __LINE__, "do_login",
+                        "Auto-assigned helpdesk staff role to bot $username / $user_email");
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, "error", __FILE__, __LINE__, "do_login",
+                        "Failed to auto-assign helpdesk role: $@");
+                }
+            }
+        }
+
         # Log the final roles
         $roles_debug = ref($roles) eq 'ARRAY' ? join(', ', @$roles) : $roles;
         $self->logging->log_with_details(
@@ -1276,17 +1298,30 @@ sub do_create_account :Local {
     $c->session->{email_sent} = $email_sent ? 1 : 0;
     
     # Send notification to admin about successful registration
+    my $admin_notification_ok = 1;
     eval {
         my $admin_notified = $self->email_notification->send_admin_registration_notification($c, $new_user);
         if ($admin_notified) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
                 "Admin notification sent for new user: " . $new_user->username);
+        } else {
+            $admin_notification_ok = 0;
         }
     };
     if ($@) {
+        $admin_notification_ok = 0;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
             "Failed to send admin notification: $@");
     }
+    
+    # Provide user-visible feedback about admin notification
+    if ($admin_notification_ok) {
+        $c->flash->{success_msg} .= ' Admin notification sent to administrators.';
+    } else {
+        $c->flash->{error_msg} = 'Registration completed, but admin notification failed. Site administrators may not be aware of this new registration.';
+    }
+    
+    $c->session->{admin_notification_status} = $admin_notification_ok ? 1 : 0;
     
     $c->response->redirect($c->uri_for('/user/verify_email'));
 }
@@ -3782,7 +3817,7 @@ sub admin_delete_site_role :Local :Args(1) {
 sub _load_available_roles {
     my ($self, $c, $is_csc_admin, $sitename) = @_;
 
-    my @default_roles = qw(normal member editor developer admin);
+    my @default_roles = qw(normal member editor developer helpdesk admin);
 
     my @site_specific;
     eval {

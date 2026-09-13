@@ -13,6 +13,7 @@ use Comserv::Model::Ollama;
 use JSON qw(encode_json);
 use Time::Piece;
 use DateTime;
+use Comserv::Util::AppTime;
 use DateTime::Format::ISO8601;
 use POSIX ();
 
@@ -65,8 +66,8 @@ sub daily :Path('/planning/daily') :Args {
     }
 
     # Current date
-    my $now              = Time::Piece->new();
-    my $current_date_str = $now->strftime('%Y-%m-%d');
+    my $current_date_str = Comserv::Util::AppTime->today_ymd_for($c);
+    my $now = eval { Time::Piece->strptime($current_date_str, '%Y-%m-%d') } || Time::Piece->new();
     my $current_display  = $now->strftime('%A, %B %d, %Y');
 
     # Selected date (from URL or today)
@@ -212,23 +213,17 @@ sub daily :Path('/planning/daily') :Args {
                             push @{ $week_todos_by_date{$d_str} }, $todo unless $already;
                         }
                     } elsif ($start && $start eq $selected_date) {
-                        # Has scheduled start_date matching today — show it
+                        # Has scheduled start_date matching the day — show it
                         push @$todos_for_today, $todo;
                     } elsif (!$start && $due && $due eq $selected_date) {
-                        # No scheduled date, but due today — show it
+                        # No scheduled date, but due that day — show it
                         push @$todos_for_today, $todo;
-                    } elsif (!$is_done && !$start && !$due && $selected_date eq $current_date_str) {
-                        push @$todos_for_today, $todo;
-                    } elsif (!$is_done && !$is_recurr) {
-                        # Overdue: scheduled date in the past, OR (no scheduled date AND due date in past)
-                        if ($start && $start lt $selected_date) {
-                            push @$overdue_todos, $todo;
-                            push @$todos_for_today, $todo if $selected_date eq $current_date_str;
-                        } elsif (!$start && $due && $due lt $selected_date) {
-                            push @$overdue_todos, $todo;
-                            push @$todos_for_today, $todo if $selected_date eq $current_date_str;
-                        }
                     }
+                    # NOTE: undated open todos and overdue items are intentionally
+                    # NOT dumped into the day view. The day schedule shows only what
+                    # is actually scheduled for that date (start_date == date, or
+                    # due == date when no start). Overdue belongs in the backlog /
+                    # todos views, not the day schedule.
 
                     unless ($is_recurr) {
                         # Use start_date as calendar anchor; fall back to due_date only when no start_date
@@ -328,6 +323,43 @@ sub daily :Path('/planning/daily') :Args {
             }
         }
     };
+
+    # Branch awareness for the day view: on a worktree server (app_workflow !=
+    # main) keep ONLY todos that belong to the current branch's project tree.
+    # This is the same branch scope used by the Focus Queue, applied to the day
+    # schedule so the day view never shows another branch's scheduled work.
+    my $day_branch = $c->stash->{app_workflow} // 'main';
+    if ($day_branch ne 'main') {
+        my $day_hint = '';
+        my $day_list = eval { _build_worktree_list($c) } || [];
+        my ($day_wt) = grep { ($_->{name} || '') eq $day_branch } @$day_list;
+        $day_hint = $day_wt->{project_id} if $day_wt;
+        my @day_pids = eval {
+            Comserv::Util::ProjectDependencies::resolve_branch_project_ids(
+                $c, $day_branch, $day_hint
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'daily',
+                "Day-view branch scope resolve failed for '$day_branch': $@");
+            @day_pids = ();
+        }
+        if (@day_pids) {
+            my %day_scope = map { $_ => 1 } @day_pids;
+            my @day_filtered;
+            for my $todo (@$todos_for_today) {
+                my %h = $todo->get_columns;
+                push @day_filtered, $todo
+                    if Comserv::Util::FocusRanking::todo_matches_branch(
+                        \%h, $day_branch, \%day_scope
+                    );
+            }
+            $todos_for_today = \@day_filtered;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
+                "Day view branch-scoped to '$day_branch': "
+                . scalar(@day_filtered) . " of scheduled todos kept");
+        }
+    }
 
     # Convert todos_for_today to plain hashrefs with precomputed display fields.
     # Using get_columns() avoids TT2 relying on DBIx::Class method calls for basic
@@ -1152,8 +1184,8 @@ sub daily_impl :Private {
     }
 
     # Current date
-    my $now              = Time::Piece->new();
-    my $current_date_str = $now->strftime('%Y-%m-%d');
+    my $current_date_str = Comserv::Util::AppTime->today_ymd_for($c);
+    my $now = eval { Time::Piece->strptime($current_date_str, '%Y-%m-%d') } || Time::Piece->new();
     my $current_display  = $now->strftime('%A, %B %d, %Y');
 
     # Selected date (from URL or today)
@@ -1599,7 +1631,7 @@ sub refresh_audit :Path('/planning/refresh_audit') :Args(0) {
     my $username = $c->session->{username} || 'user';
     my $user_id  = $c->session->{user_id}  || 0;
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
 
     my $schema;
     eval { $schema = $c->model('DBEncy')->schema };
@@ -1709,8 +1741,8 @@ sub _daily_log_action {
     $user_id  //= $c->session->{user_id}  || 0;
 
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
-    my $now_time = do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
+    my $now_time = Comserv::Util::AppTime->now_hms_utc;
 
     my $schema;
     eval { $schema = $c->model('DBEncy')->schema };
@@ -1765,11 +1797,17 @@ sub _daily_log_action {
         my @audit_todo_subjects  = @{ $audit->{subjects} };
 
         # ── Check for open HelpDesk support tickets ──
+        # Link each ticket to /HelpDesk/ticket/view/<number> (not /HelpDesk public index).
         my $helpdesk_count = 0;
+        my @open_helpdesk_tickets;
         eval {
-            $helpdesk_count = $schema->resultset('SupportTicket')->count(
-                { status => 'open' }
-            ) || 0;
+            my %hd_search = ( status => 'open' );
+            $hd_search{site_name} = $sitename unless lc($sitename || '') eq 'csc';
+            @open_helpdesk_tickets = $schema->resultset('SupportTicket')->search(
+                \%hd_search,
+                { order_by => [{ -asc => 'priority' }, { -desc => 'created_at' }], rows => 20 }
+            )->all;
+            $helpdesk_count = scalar @open_helpdesk_tickets;
         };
 
         # ── Build daily log details ──
@@ -1782,7 +1820,14 @@ sub _daily_log_action {
             $details .= "\n";
         }
         if ($helpdesk_count) {
-            $details .= "\x{1F3AB} OPEN HELPDESK TICKETS: $helpdesk_count ticket(s) awaiting response — see <a href='/HelpDesk'>/HelpDesk</a>\n\n";
+            $details .= "\x{1F3AB} OPEN HELPDESK TICKETS: $helpdesk_count ticket(s) awaiting response:\n";
+            for my $ht (@open_helpdesk_tickets) {
+                my $num = eval { $ht->ticket_number } || '';
+                next unless $num;
+                my $subj = substr(eval { $ht->subject } || '', 0, 80);
+                $details .= "  \x{2022} <a href='/HelpDesk/ticket/view/$num'>$num</a> — $subj\n";
+            }
+            $details .= "  All open: <a href='/HelpDesk/admin/tickets/open'>/HelpDesk/admin/tickets/open</a>\n\n";
         }
         if (@top_todos) {
             $details .= "\x{1F4CB} TOP PRIORITIES FOR TODAY:\n";
@@ -1841,7 +1886,23 @@ sub _daily_log_action {
         $self->_schedule_day($c, $schema, $sitename, $today);
 
         my $stale_msg    = @stale_logs      ? " \x{26A0}\x{FE0F} <a href='/log?status=open' style='color:inherit;'>" . scalar(@stale_logs) . " unclosed log(s) from previous days</a>." : '';
-        my $helpdesk_msg = $helpdesk_count  ? " \x{1F3AB} $helpdesk_count open HelpDesk ticket(s) — <a href='/HelpDesk'>view tickets</a>." : '';
+        my $helpdesk_msg = '';
+        if ($helpdesk_count) {
+            if ($helpdesk_count == 1) {
+                my $num = eval { $open_helpdesk_tickets[0]->ticket_number } || '';
+                $helpdesk_msg = $num
+                    ? " \x{1F3AB} 1 open HelpDesk ticket — <a href='/HelpDesk/ticket/view/$num'>view $num</a>."
+                    : " \x{1F3AB} 1 open HelpDesk ticket — <a href='/HelpDesk/admin/tickets/open'>view ticket</a>.";
+            }
+            else {
+                # Toast stays short: first ticket deep-link + admin open list for the rest
+                my $first = eval { $open_helpdesk_tickets[0]->ticket_number } || '';
+                my $first_link = $first
+                    ? "<a href='/HelpDesk/ticket/view/$first'>$first</a>"
+                    : 'tickets';
+                $helpdesk_msg = " \x{1F3AB} $helpdesk_count open HelpDesk tickets — $first_link + <a href='/HelpDesk/admin/tickets/open'>all open</a>.";
+            }
+        }
         my $deploy_since = $audit->{last_deploy_dt} ? " since last deploy ($audit->{last_deploy_dt})" : " in last 24h";
         my $error_msg    = $error_count     ? " \x{1F6A8} $error_count error area(s) found$deploy_since — " . scalar(@audit_todo_subjects) . " AI-assisted todo(s) created — <a href='/todo'>view todos</a>." : '';
         my $priority_msg = @top_todos       ? " Top priority: " . substr($top_todos[0]->subject || '', 0, 60) . "." : '';
@@ -1872,7 +1933,7 @@ sub _daily_log_action {
                 error    => 'No open log entry for today',
             };
         }
-        my $now_end = do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
+        my $now_end = Comserv::Util::AppTime->now_hms_utc;
         eval { $open_entry->update({ status => 3, end_time => $now_end }) };
         return { success => JSON::false, error => "Could not close log entry: $@" } if $@;
 
@@ -2051,7 +2112,7 @@ sub schedule_day :Path('/planning/schedule_day') :Args(0) {
     }
     my $sitename = $c->session->{SiteName} || $c->stash->{SiteName} || 'CSC';
     my $username = $c->session->{username} || '';
-    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
     my $schema;
     eval { $schema = $c->model('DBEncy')->schema };
     if ($@ || !$schema) {
@@ -2327,7 +2388,7 @@ sub deploy :Path('deploy') :Args(0) {
                            no_cache => $c->req->body_params->{no_cache} // 0,
                        );
             my $ok = $deploy->deploy_to_target_safe();
-            print $log "[${\scalar localtime}] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
+            print $log "[${\Comserv::Util::AppTime->now_utc}] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
             close($log);
             exit($ok ? 0 : 1);
         } else {

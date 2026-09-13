@@ -852,6 +852,11 @@ sub view :Path('/Documentation') :Args(1) {
                     site_name => $site_name,
                     template => $path
                 };
+                # Documentation branch marker: book favicon on every doc page,
+                # and flag public docs for the production notice (Header.tt).
+                $stash_data->{documentation_favicon} = '/static/images/favicons/documentation-book.svg';
+                my @doc_roles = $metadata->{roles} ? split(/\s*,\s*/, $metadata->{roles}) : ();
+                $stash_data->{doc_is_public} = (!@doc_roles || (grep { $_ eq 'guest' } @doc_roles)) ? 1 : 0;
                 $self->_stash_changelog_index($c, $stash_data);
                 
                 # Special handling for DailyPlans pages - fetch todos for that day
@@ -1049,6 +1054,10 @@ sub view :Path('/Documentation') :Args(1) {
             site_name => $site_name,
             template => $tt_path
         };
+        # Documentation branch marker: book favicon on every doc page,
+        # and flag public docs for the production notice (Header.tt).
+        $stash_data->{documentation_favicon} = '/static/images/favicons/documentation-book.svg';
+        $stash_data->{doc_is_public} = (!@unreg_roles || (grep { $_ eq 'guest' } @unreg_roles)) ? 1 : 0;
         $self->_stash_changelog_index($c, $stash_data);
         
         # Special handling for DailyPlans pages - fetch todos for that day
@@ -1156,7 +1165,7 @@ sub manage_config :Path('/Documentation/manage_config') :Args {
     my $config = _load_json_file($config_file) || { categories => {}, pages => {} };
 
     # Available roles in the system
-    my @available_roles = qw(normal user editor admin developer);
+    my @available_roles = qw(normal user editor helpdesk admin developer);
 
     # Get list of all categories
     my @categories = sort keys %{$config->{categories}};
@@ -1506,7 +1515,7 @@ sub edit_category_form :Path('/Documentation/edit_category') :Args(1) {
     }
 
     # Available roles
-    my @available_roles = qw(normal user editor admin developer);
+    my @available_roles = qw(normal user editor helpdesk admin developer);
 
     # Load current categories from config
     my $config_file = _documentation_config_read_path($c);
@@ -1546,7 +1555,7 @@ sub add_category_form :Path('/Documentation/add_category') :Args(0) {
     }
 
     # Available roles
-    my @available_roles = qw(normal user editor admin developer);
+    my @available_roles = qw(normal user editor helpdesk admin developer);
 
     # Load current categories from config
     my $config_file = _documentation_config_read_path($c);
@@ -1643,7 +1652,7 @@ sub edit_roles :Path('/Documentation/edit_roles') :Args(1) {
     my $page_metadata = $pages->{$page_name};
     
     # Available roles in the system
-    my @available_roles = qw(normal user editor admin developer);
+    my @available_roles = qw(normal user editor helpdesk admin developer);
     
     $c->stash(
         template => 'admin/documentation/edit_roles.tt',
@@ -1704,7 +1713,7 @@ sub update_roles :Path('/Documentation/update_roles') :Args(1) {
         "Raw selected roles count: " . scalar(@selected_roles) . ", roles: " . join(', ', @selected_roles));
     
     # Validate roles
-    my @valid_roles = qw(normal user editor admin developer);
+    my @valid_roles = qw(normal user editor helpdesk admin developer);
     my @filtered_roles = grep { my $role = $_; grep { $_ eq $role } @valid_roles } @selected_roles;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_roles',

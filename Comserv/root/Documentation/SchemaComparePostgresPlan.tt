@@ -1,0 +1,236 @@
+[% META
+        title = "Schema-compare PostgreSQL connection"
+   description = "Make /admin/schema_compare able to see, connect to, CREATE, and deploy per-SiteName PostgreSQL accounting databases from Result classes. Schema-compare today is Maria-only; AccountingDB::provision_site is a separate PG path that already requires a template DB that does not exist yet."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "database,schema-management,postgresql"
+   page_version = "1.2"
+   last_updated = "Fri Aug 29 2026 (v1.2 — SCPG-REMOTEDB done: from_context + PG allowlist)"
+   site_specific = "false"
+   project_id = "289"
+   project_code = "SCHEMAPG"
+%]
+[% PageVersion = 'Documentation/SchemaComparePostgresPlan.tt,v 1.2 2026/08/29 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'Schema-compare PostgreSQL connection'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+<div id="toc" class="row doc-toc">
+    <div class="col-100">
+        <h2 class="doc-h2">Quick Navigation</h2>
+        <div class="doc-navrow">
+            <a href="#now" class="doc-navlink">Now</a>
+            <a href="#opt-in" class="doc-navlink">Opt-in</a>
+            <a href="#two-systems" class="doc-navlink">Two systems</a>
+            <a href="#measured" class="doc-navlink">Measured</a>
+            <a href="#tracking" class="doc-navlink">Tracking</a>
+            <a href="#work" class="doc-navlink">Work</a>
+            <a href="#decisions" class="doc-navlink">Decisions</a>
+            <a href="#handoff" class="doc-navlink">Handoff</a>
+            <a href="#see-also" class="doc-navlink">See also</a>
+        </div>
+        <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+    </div>
+</div>
+
+<div class="row">
+<div class="col-100">
+<h1 id="now" class="doc-h1">Schema-compare PostgreSQL connection</h1>
+<p class="doc-muted">Created: 2026-08-26 &nbsp;|&nbsp; Version: 1.2 &nbsp;|&nbsp; Status: ACTIVE (schema branch owns compare; InventoryAccounting owns provision + CoA wizard)</p>
+<p class="doc-body"><strong>Now (2026-08-29).</strong> <strong>SCPG-REMOTEDB is DONE</strong> on the schema branch: <code>Model::RemoteDB::from_context($c)</code> returns a real object (todo <a href="[% c.uri_for('/todo/details') %]?record_id=2343">#2343</a>); <code>select_connection</code> accepts <code>postgresql|postgres|pg</code> (#2325); named <code>get_connection('db_production_postgres')</code> returns a live handle (#2326). Schema-compare still dies on Maria SQL (<code>SELECT DATABASE()</code> / <code>SHOW TABLES</code>) after a PG connect — that is <strong>SCPG-COMPARE</strong> (#2327/#2328), not RemoteDB. Provision still needs <code>accounting_template</code>. Accounting remains opt-in.</p>
+<p class="doc-body"><strong>Next on schema.</strong> SCPG-COMPARE (#292): list PG databases without Maria SQL; keep Accounting Result namespace separate. Then D1 → SCPG-CREATEDB. Code is on the schema worktree (:4007 after reload); merge <em>schema → main from the primary checkout</em> when reviewed (never <code>git switch main</code> in this worktree).</p>
+<p class="doc-body">
+    <a class="doc-link" href="[% c.uri_for('/project/details') %]?project_id=289">Project #289 SCHEMAPG</a> ·
+    <a class="doc-link" href="[% c.uri_for('/todo') %]?project_id=289">Todos</a> ·
+    <a class="doc-link" href="[% c.uri_for('/project/details') %]?project_id=5">Parent #5 Schema</a> ·
+    <a class="doc-link" href="[% c.uri_for('/project/details') %]?project_id=232">ACCPG #232</a>
+</p>
+<p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+</div>
+</div>
+
+<div class="row">
+<div class="col-100">
+<h2 id="opt-in" class="doc-h2">Opt-in then setup (owner path)</h2>
+<ol class="doc-body">
+    <li>Owner adds Accounting on <a href="[% c.uri_for('/membership/addons') %]">/membership/addons</a>. Admin dashboard card is Add-only until that module is enabled for this SiteName (CSC is not auto-opted-in).</li>
+    <li>Setup database step = provision <code>&lt;sitename&gt;_accounting</code> from <code>accounting_template</code> (schema tables, not CoA rows). Fails if the template DB is missing. Not an empty database by design.</li>
+    <li>Chart wizard (IA :4001) = pick archetype / AI generate into PG <code>Chart</code>. AI route is a stub. Live <code>/Accounting/coa</code> still reads Maria. 3d and BMaster share the template store via <code>site_map.json</code> archetypes, not one chart.</li>
+    <li>Existing Maria rows = <code>/Accounting/migrate_to_pg</code> (CoA, GL, suppliers only).</li>
+</ol>
+<p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+</div>
+</div>
+
+<div class="row">
+<div class="col-100">
+<h2 id="two-systems" class="doc-h2">The two systems (they do not meet)</h2>
+<table class="doc-table">
+    <thead><tr><th class="doc-th">Piece</th><th class="doc-th">Where</th><th class="doc-th">What it actually does</th></tr></thead>
+    <tbody>
+        <tr>
+            <td class="doc-td">Schema-compare</td>
+            <td class="doc-td"><code>Controller::Admin::SchemaComparison</code> + <code>Util::SchemaCompare</code> (schema branch)</td>
+            <td class="doc-td">Maria Result vs live table. Server cards can <em>label</em> a 5433 port as postgresql, but create/sync uses Ency|Forager, <code>SHOW TABLES</code>, and <code>deployment_statements('MySQL')</code>. <code>$schema-&gt;source</code> is DBEncy.</td>
+        </tr>
+        <tr>
+            <td class="doc-td">RemoteDB</td>
+            <td class="doc-td"><code>Model::RemoteDB</code></td>
+            <td class="doc-td"><strong>DONE 2026-08-29.</strong> Plain Moose (not <code>Catalyst::Model</code> — class <code>config</code> collides). Callers use <code>from_context($c)</code> / <code>_remote_db($c)</code> because <code>$c-&gt;model('RemoteDB')</code> may return the bare class-name string (#2343). <code>select_connection</code> allowlist: <code>mysql|sqlite|mariadb|postgresql|postgres|pg</code> (#2325). <code>get_connection</code> / <code>test_connection</code> build <code>dbi:Pg</code> for PG slots (#2326). Compare can open a PG handle; Maria-only SQL in compare is still SCPG-COMPARE.</td>
+        </tr>
+        <tr>
+            <td class="doc-td">PG provision</td>
+            <td class="doc-td"><code>Model::AccountingDB::provision_site</code> (InventoryAccounting)</td>
+            <td class="doc-td">Admin connect to maintenance DB <code>postgres</code>, then <code>CREATE DATABASE "&lt;site&gt;_accounting" TEMPLATE accounting_template</code>. Refuses if <code>accounting_template</code> is missing. Not called from schema-compare.</td>
+        </tr>
+        <tr>
+            <td class="doc-td">PG Result tree</td>
+            <td class="doc-td"><code>Model::Schema::Accounting::Result::*</code> (~25 LedgerSMB-shaped classes)</td>
+            <td class="doc-td">Clone-target ORM. No live per-site PG DBs yet. Different namespace from <code>Ency::Result::Accounting::*</code> (Maria live CoA/inventory).</td>
+        </tr>
+        <tr>
+            <td class="doc-td">Secrets</td>
+            <td class="doc-td"><code>~/.comserv/secrets/dbi/db_production_postgres.json</code></td>
+            <td class="doc-td">Shape only: host 192.168.1.20, port 5433, database=csc, db_type=postgresql, server_group=db-server-1, role=primary. Dev file points at .198:5432 (TCP refused 2026-08-26).</td>
+        </tr>
+    </tbody>
+</table>
+<p class="doc-info">The 2026-08-26 <code>Can't find source for Accounting::InventoryPurchaseOrderLine</code> error was the <strong>Maria</strong> path: <code>Ency::Result::Accounting::InventoryPurchaseOrderLine</code> on InventoryAccounting :4001. That server had been up since 22 Aug; the Result files landed 26 Aug 20:36, so DBEncy never registered the source. That is not this PG plan — see <a href="[% c.uri_for('/todo/details') %]?record_id=2332">#2332</a>.</p>
+<p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+</div>
+</div>
+
+<div class="row">
+<div class="col-100">
+<h2 id="measured" class="doc-h2">Measured (perishable)</h2>
+<ul class="doc-body">
+    <li><strong>2026-08-29 SCPG-REMOTEDB verification (schema branch):</strong> <code>prove -l t/model_RemoteDB_from_context.t</code> PASS. <code>get_connection(db_production_postgres)</code> → live DBI handle. <code>get_connection_info('csc')</code> → <code>db_production_postgres</code>. Todos #2343, #2325, #2326 closed (status 3).</li>
+    <li>2026-08-26: TCP 192.168.1.20:5433 OPEN; 192.168.1.20:5432 OPEN; 192.168.1.198:5432 refused. No postgres listener on the workstation itself.</li>
+    <li><code>accounting_template.sql</code> exists in both schema and InventoryAccounting trees. Existence of the <em>database</em> <code>accounting_template</code> on .20 was not queried in the original measure. <code>provision_site</code> will fail until that DB exists.</li>
+    <li>Schema-compare create/list path is still Maria-SQL heavy (SchemaComparison.pm) — next work is SCPG-COMPARE, not more RemoteDB allowlist.</li>
+    <li>Hand-running <code>sql/accounting_template.sql</code> is forbidden (Result class is source of truth).</li>
+</ul>
+<p class="doc-warning">Re-probe network topology before coding CREATE DATABASE. RemoteDB object + PG allowlist findings above are code-verified on schema.</p>
+<p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+</div>
+</div>
+
+<div class="row">
+<div class="col-100">
+<h2 id="tracking" class="doc-h2">Project tracking</h2>
+<p class="doc-body">Parent project <a href="[% c.uri_for('/project/details') %]?project_id=5">#5 Schema</a>. This plan is <a href="[% c.uri_for('/project/details') %]?project_id=289">#289 SCHEMAPG</a>. Named sub-projects (not “Phase N”). GATE = done-when.</p>
+<table class="doc-table">
+    <thead><tr><th class="doc-th">Sub-project</th><th class="doc-th">Todo</th><th class="doc-th">Gate</th></tr></thead>
+    <tbody>
+        <tr>
+            <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=290">#290 SCPG-EVAL</a></td>
+            <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2323">#2323</a> role eval · <a href="[% c.uri_for('/todo/details') %]?record_id=2324">#2324</a> dep check</td>
+            <td class="doc-td">Evidence in the todo body; re-measure before the next sub-project.</td>
+        </tr>
+        <tr>
+            <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=291">#291 SCPG-REMOTEDB</a> <strong>DONE 2026-08-29</strong></td>
+            <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2325">#2325</a> allowlist · <a href="[% c.uri_for('/todo/details') %]?record_id=2326">#2326</a> named get_connection · <a href="[% c.uri_for('/todo/details') %]?record_id=2343">#2343</a> from_context (HASH-ref crash)</td>
+            <td class="doc-td"><strong>Met.</strong> Named PG secret connects (or returns a real Pg error). Never Invalid db_type. Callers use <code>from_context</code>.</td>
+        </tr>
+        <tr>
+            <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=292">#292 SCPG-COMPARE</a></td>
+            <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2327">#2327</a> list PG DBs · <a href="[% c.uri_for('/todo/details') %]?record_id=2328">#2328</a> Accounting namespace</td>
+            <td class="doc-td">PG card lists PG databases; Create Table on a PG Result does not run SHOW TABLES.</td>
+        </tr>
+        <tr>
+            <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=293">#293 SCPG-CREATEDB</a></td>
+            <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2329">#2329</a> first DB from compare · <a href="[% c.uri_for('/todo/details') %]?record_id=2330">#2330</a> provision_site (IA)</td>
+            <td class="doc-td">A PG database exists that compare created. No hand SQL. D1 decided first.</td>
+        </tr>
+        <tr>
+            <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=294">#294 SCPG-DEPLOY</a></td>
+            <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2331">#2331</a> one Result · <a href="[% c.uri_for('/todo/details') %]?record_id=2332">#2332</a> PO engine decision</td>
+            <td class="doc-td">One PG table matches its Result. D2 recorded before any InventoryPurchaseOrder create.</td>
+        </tr>
+        <tr>
+            <td class="doc-td">#289 parent</td>
+            <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2333">#2333</a> ROUTINE re-audit</td>
+            <td class="doc-td">Plan META/TOC/ids still true; PG probe refreshed.</td>
+        </tr>
+    </tbody>
+</table>
+<p class="doc-muted">Branch split: #2325–2328, #2331 schema worktree. #2330 InventoryAccounting. #2329 needs both after D1.</p>
+<p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+</div>
+</div>
+
+<div class="row">
+<div class="col-100">
+<h2 id="work" class="doc-h2">Work (dependency order)</h2>
+<ol class="doc-body">
+    <li><strong>RemoteDB allowlist + object resolve</strong> (#2325, #2343) — <strong>DONE 2026-08-29</strong>. <code>postgresql|postgres|pg</code> in allowlist; <code>from_context($c)</code> for Catalyst callers.</li>
+    <li><strong>Named PG connect</strong> (#2326) — <strong>DONE 2026-08-29</strong>. <code>db_production_postgres</code> returns a live handle on schema. Do not print the password.</li>
+    <li><strong>Compare PG listing + Accounting namespace</strong> (#2327, #2328) — <strong>NEXT</strong>. Separate the Maria path; do not teach SHOW TABLES to PostgreSQL.</li>
+    <li><strong>Create the first PG database from compare</strong> (#2329) after D1. Then IA <code>provision_site</code> (#2330).</li>
+    <li><strong>Deploy one Accounting Result</strong> (#2331). Then D2 for purchase-order tables (#2332).</li>
+</ol>
+<p class="doc-info"><strong>Caller rule (locked 2026-08-29):</strong> never call Moose accessors on <code>$c-&gt;model('RemoteDB')</code> directly. Use <code>Comserv::Model::RemoteDB-&gt;from_context($c)</code> or <code>Controller::RemoteDB::_remote_db($c)</code>. Do not <code>extends 'Catalyst::Model'</code> on this class — it collides with Catalyst's class-level <code>config</code>.</p>
+<p class="doc-body">ACCPG todos #1795–1801 stay on InventoryAccounting. This plan does not author the Maria→PG row clone. It only gives compare a PG connection and a way to create the empty (or Result-deployed) database those todos need. Umbrella schema todo <a href="[% c.uri_for('/todo/details') %]?record_id=2280">#2280</a> comments now point here for the PG half of G1.</p>
+<p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+</div>
+</div>
+
+<div class="row">
+<div class="col-100">
+<h2 id="decisions" class="doc-h2">Open decisions</h2>
+<table class="doc-table">
+    <thead><tr><th class="doc-th">#</th><th class="doc-th">Decision</th><th class="doc-th">Resolution</th></tr></thead>
+    <tbody>
+        <tr>
+            <td class="doc-td">D1</td>
+            <td class="doc-td">How the first PG database is born</td>
+            <td class="doc-td">OPEN — (a) compare CREATE DATABASE empty, then deploy every <code>Schema::Accounting</code> Result; or (b) one-time <code>accounting_template</code> DB from those Results, then keep <code>provision_site</code> TEMPLATE clone. Do not run <code>accounting_template.sql</code> by hand. Decide before #2329.</td>
+        </tr>
+        <tr>
+            <td class="doc-td">D2</td>
+            <td class="doc-td">Inventory* / purchase-order tables: Maria Ency vs site PG</td>
+            <td class="doc-td">OPEN — same question as ACCPG D2. <code>InventoryPurchaseOrderLine</code> today is <code>Ency::Result::Accounting</code> (Maria). Do not Create Table that onto PG, and do not assume :4001 has loaded new Result files (restart that server if you stay on Maria). Record here before #2331 on PO tables.</td>
+        </tr>
+    </tbody>
+</table>
+<p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+</div>
+</div>
+
+<div class="row">
+<div class="col-100">
+<h2 id="handoff" class="doc-h2">Handoff: schema → main → InventoryAccounting</h2>
+<ol class="doc-body">
+    <li>Review the schema worktree diff. Commit on <code>schema</code> only after that review.</li>
+    <li>Merge <strong>schema into main from the primary checkout</strong> <code>/home/shanta/PycharmProjects/comserv2</code>: <code>git merge --no-ff schema</code>. Never <code>git switch main</code> inside this worktree. Do not merge main back into schema just to clear “1 behind.”</li>
+    <li>Continue CoA/AI/provision on InventoryAccounting (:4001). Pull/merge <em>main into that worktree</em> when you need these schema commits — not the other way around in a loop.</li>
+</ol>
+<p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+</div>
+</div>
+
+<div class="row">
+<div class="col-100">
+<h2 id="see-also" class="doc-h2">See also</h2>
+<ul class="doc-body">
+    <li><a href="[% c.uri_for('/Documentation/SchemaMasterPlan') %]">SchemaMasterPlan</a> — DB-layer coordinator</li>
+    <li><a href="[% c.uri_for('/Documentation/SchemaSystemPlan') %]">SchemaSystemPlan</a> — G0–G5 (G1 PG half is this plan)</li>
+    <li><a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]">MASTER_PLAN</a></li>
+    <li><a href="[% c.uri_for('/Documentation/models/RemoteDB') %]">models/RemoteDB</a> — <code>from_context</code> + PG allowlist API notes</li>
+    <li>Changelog fragment <code>changelog/entries/2026-08-29-remotedb-from-context-pg.inc</code></li>
+    <li>ACCPG project <a href="[% c.uri_for('/project/details') %]?project_id=232">#232</a> (plan file still missing — do not author it on the schema branch)</li>
+</ul>
+<p class="doc-footer">[%# ai-plan-sync created todo_ids: 2323,2324,2325,2326,2327,2328,2329,2330,2331,2332,2333 under project_id=289 %]</p>
+<p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+</div>
+</div>
+
+</div>

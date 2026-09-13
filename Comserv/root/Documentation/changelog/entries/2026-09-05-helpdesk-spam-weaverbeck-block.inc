@@ -1,0 +1,6 @@
+<div id="2026-09-05-helpdesk-spam-weaverbeck-block" class="cl-entry">
+<h3>2026-09-05 — Block WEAVERBECK spam (Cloud-Mining / №J3147 / graph.org hs=) from HelpDesk</h3>
+<p class="doc-body"><strong>What.</strong> Strengthened _looks_like_spam_content with cloud.?mining, one.?message.?for.?you, open\s*[-=]*>+ arrows, tightened no.? pattern. Added identical pre-create spam check to create_helpdesk_ticket in both AI code paths.</p>
+<p class="doc-body"><strong>Why.</strong> Ticket WEAVERBECK-20260902-0936 with body "ONE MESSAGE for you №J3147 OPEN ->>> graph.org/Cloud-Mining-08-27?hs=f97558f514d3921e4b6e610897fd8538& 💹" (guest) was added. It bypassed because AI create_helpdesk_ticket (used by chat/AI assistant) had no honeypot, math, or content filter — unlike public /HelpDesk/ticket/submit and contact.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/lib/Comserv/Controller/HelpDesk.pm</code>, <code>Comserv/lib/Comserv/Controller/AI.pm</code>, <code>Comserv/lib/Comserv/Model/AI2/Actions.pm</code></p>
+</div>

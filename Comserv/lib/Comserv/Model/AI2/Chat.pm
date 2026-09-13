@@ -5,6 +5,7 @@ use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny s
 
 use Try::Tiny;
 use JSON qw(encode_json decode_json);
+use Comserv::Model::AI::ConversationScope qw(is_guest_session ensure_guest_session_id conversation_owned_by_session);
 
 use Comserv::Util::Logging;
 use Comserv::Util::ModelCatalog;
@@ -68,6 +69,9 @@ sub build_agent_prompt {
         planning => "You are a planning assistant. Focus on daily logs, tasks, and clear next steps.",
         todo     => "You are the Comserv todo agent. When the user wants a todo created, the server already performs that job — confirm the result, do not invent a form.",
         code     => "You are a coding assistant for the Comserv2 Catalyst app. The server already loads source into [FILE:] blocks. NEVER say you lack filesystem access or ask the user to paste files. Load other sources with [READ_FILE: lib/...] (optional :START-END). Prefer concise examples and one fenced code block so Approve can apply it.",
+        programming => "You are the AI Editor programming agent for Comserv2. Use loaded [FILE:] buffers; never claim no filesystem access. Plan then code only when phase is implement.",
+        documentation => "You are the AI Editor documentation agent. Prefer docs/changelog/planning guidance; avoid code file rewrites unless asked.",
+        analyze => "You are the AI Editor Analyze worker. Read loaded [FILE:] buffers and named paths only. Return root cause + short plan. Never rewrite files, never emit ## FIX / full-file patches, never ask the user to paste files already provided.",
         nav      => "You are a navigation assistant. Help the user find the right page or feature in Comserv.",
     );
     return $agent{$aid} if exists $agent{$aid};
@@ -87,23 +91,99 @@ sub build_system_prompt {
     push @parts, $args{page_context}        if $args{page_context};
     push @parts, $args{navigation_hint}     if $args{navigation_hint};
 
-    # Logged-in users can create todos from this same chat (widget + editor).
+    # Logged-in users can create HelpDesk tickets + todos from this same chat
+    # (widget + editor). Ticket contract always applies (editor may file bugs).
+    # Skip TodoCreate contract for AI Editor agents — they plan/analyze code,
+    # and "create todos" in those prompts must not become a todo agent contract.
     my $uname = eval { $c->session->{username} } || '';
+    require Comserv::Model::AI2::ChatIntent;
+    my $editor_todo_skip = Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id});
     if ($uname && lc($uname) ne 'guest') {
-        my $contract = eval {
-            require Comserv::Model::AI2::TodoCreate;
-            my $brain = eval { $c->model('AI2::TodoCreate') };
-            $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
-            $brain->chat_contract($c);
+        my $hd_contract = eval {
+            require Comserv::Model::AI2::HelpDeskTicketCreate;
+            my $hbrain = eval { $c->model('AI2::HelpDeskTicketCreate') };
+            $hbrain = Comserv::Model::AI2::HelpDeskTicketCreate->new if !$hbrain || !ref $hbrain;
+            $hbrain->chat_contract($c);
         };
         if ($@) {
             $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
-                'build_system_prompt', "TodoCreate chat_contract failed: $@");
+                'build_system_prompt', "HelpDeskTicketCreate chat_contract failed: $@");
         }
-        push @parts, $contract if $contract;
+        push @parts, $hd_contract if $hd_contract;
+
+        if (!$editor_todo_skip) {
+            my $contract = eval {
+                require Comserv::Model::AI2::TodoCreate;
+                my $brain = eval { $c->model('AI2::TodoCreate') };
+                $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
+                $brain->chat_contract($c);
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                    'build_system_prompt', "TodoCreate chat_contract failed: $@");
+            }
+            push @parts, $contract if $contract;
+        }
+
+        my $inv_contract = eval {
+            require Comserv::Model::AI2::InvoiceCreate;
+            my $ibrain = eval { $c->model('AI2::InvoiceCreate') };
+            $ibrain = Comserv::Model::AI2::InvoiceCreate->new if !$ibrain || !ref $ibrain;
+            $ibrain->chat_contract($c);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                'build_system_prompt', "InvoiceCreate chat_contract failed: $@");
+        }
+        push @parts, $inv_contract if $inv_contract;
     }
 
+    # Positive-learning retrieval (proj #288): reuse what the app already knows
+    # (documentation / planning / KB) so the model stops re-deriving it. Role +
+    # branch gated; every snippet is labelled UNVERIFIED/INTERNAL by design —
+    # nothing here is yet authoritative. Public callers never see INTERNAL.
+    my $recall = eval {
+        require Comserv::Model::AI2::KnowledgeRecall;
+        my $brain = eval { $c->model('AI2::KnowledgeRecall') };
+        $brain = Comserv::Model::AI2::KnowledgeRecall->new if !$brain || !ref $brain;
+        my $q = defined $args{prompt} ? $args{prompt}
+              : (defined $args{agent_system} ? $args{agent_system} : '');
+        $brain->recall_block($c, query => $q, roles => $args{roles});
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+            'build_system_prompt', "KnowledgeRecall failed: $@");
+    }
+    push @parts, $recall if $recall && length $recall;
+
+    # BRANCH/SITE CONTEXT (AISYSTEM §3d): the widget cannot see its own URL,
+    # so the SERVER states which branch instance and SiteName it serves
+    # (resolved from root/config/worktrees.json by port+sitename). Without
+    # this the model says "I can't detect the port" even though the answer is
+    # deterministic server-side.
+    my $site_ctx = eval { $self->branch_context_block($c) };
+    push @parts, $site_ctx if $site_ctx;
+
     return join("\n\n", grep { defined && length } @parts);
+}
+
+# Server-side branch context: "You are running on branch X (SiteName Y),
+# coordination project #N". Resolved from worktrees.json; never guesses.
+sub branch_context_block {
+    my ($self, $c) = @_;
+    my $rank = eval { $c->model('AI2::TodoRank') } or return '';
+    my $bctx = $rank->branch_context($c) or return '';
+    return '' unless $bctx->{branch};
+
+    my $block = "RUNTIME CONTEXT (from the server — authoritative):\n"
+             .  "- App instance / git branch: $bctx->{branch}\n"
+             .  "- SiteName: " . ($rank->_sitename($c)) . "\n";
+    $block .= "- Branch coordination project: #$bctx->{project_id}"
+           .  ($bctx->{project_name} ? " ($bctx->{project_name})" : '') . "\n"
+        if $bctx->{project_id};
+    $block .= "When the user asks about 'this branch', they mean the instance above. "
+           .  "Todos for this branch live under that project unless they say otherwise.";
+    return $block;
 }
 
 # Build the message array (history + new prompt).
@@ -138,29 +218,87 @@ sub process {
     my $prompt = $args{prompt} // '';
     return { success => 0, error => 'Prompt is required' } unless $prompt && length $prompt;
 
-    # Todo-create AGENT (in-chat job). Deterministic — does NOT use the
-    # picker model. Free models invent a fake "Add" box; this runs first.
-    my $todo_hit = eval {
-        require Comserv::Model::AI2::TodoCreate;
-        Comserv::Model::AI2::TodoCreate->new->try_chat_create($c,
+    # HelpDesk-ticket AGENT first — must beat TodoCreate when the prompt
+    # mentions both "ticket" and "todo" (3180 / 6510 hijack).
+    my $hd_hit = eval {
+        require Comserv::Model::AI2::HelpDeskTicketCreate;
+        my $hbrain = eval { $c->model('AI2::HelpDeskTicketCreate') };
+        $hbrain = Comserv::Model::AI2::HelpDeskTicketCreate->new if !$hbrain || !ref $hbrain;
+        $hbrain->try_chat_create($c,
             prompt    => $prompt,
             page_path => $args{page_path} || '',
         );
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
-            "TodoCreate try_chat_create threw: $@");
+            "HelpDeskTicketCreate try_chat_create threw: $@");
     }
-    if ($todo_hit && $todo_hit->{handled}) {
+    if ($hd_hit && $hd_hit->{handled}) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
-            'Todo-create agent handled chat (no LLM)');
+            'HelpDesk-ticket agent handled chat (no LLM)');
         return {
-            success     => 1,
-            response    => $todo_hit->{response} // '',
-            model       => $todo_hit->{model} // '(todo-create)',
-            provider    => $todo_hit->{provider} // 'ai2-todo',
-            todo_action => $todo_hit->{todo_action},
-            thinking    => [],
+            success       => 1,
+            response      => $hd_hit->{response} // '',
+            model         => $hd_hit->{model} // '(helpdesk-ticket-create)',
+            provider      => $hd_hit->{provider} // 'ai2-helpdesk',
+            ticket_action => $hd_hit->{ticket_action},
+            thinking      => [],
+        };
+    }
+
+    # Todo-create AGENT (in-chat job). Deterministic — does NOT use the
+    # picker model. Free models invent a fake "Add" box; this runs next.
+    # Skip for AI Editor agents (programming/coding/code/documentation).
+    require Comserv::Model::AI2::ChatIntent;
+    my $editor_todo_skip = Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id});
+    my $todo_hit;
+    if (!$editor_todo_skip) {
+        $todo_hit = eval {
+            require Comserv::Model::AI2::TodoCreate;
+            Comserv::Model::AI2::TodoCreate->new->try_chat_create($c,
+                prompt    => $prompt,
+                page_path => $args{page_path} || '',
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+                "TodoCreate try_chat_create threw: $@");
+        }
+        if ($todo_hit && $todo_hit->{handled}) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+                'Todo-create agent handled chat (no LLM)');
+            return {
+                success     => 1,
+                response    => $todo_hit->{response} // '',
+                model       => $todo_hit->{model} // '(todo-create)',
+                provider    => $todo_hit->{provider} // 'ai2-todo',
+                todo_action => $todo_hit->{todo_action},
+                thinking    => [],
+            };
+        }
+    }
+
+    # Invoice-create AGENT. Same intercept as todos — draft only, never posts GL.
+    my $inv_hit = eval {
+        require Comserv::Model::AI2::InvoiceCreate;
+        my $ibrain = eval { $c->model('AI2::InvoiceCreate') };
+        $ibrain = Comserv::Model::AI2::InvoiceCreate->new if !$ibrain || !ref $ibrain;
+        $ibrain->try_chat_create($c, prompt => $prompt);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+            "InvoiceCreate try_chat_create threw: $@");
+    }
+    if ($inv_hit && $inv_hit->{handled}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+            'Invoice-create agent handled chat (no LLM)');
+        return {
+            success        => 1,
+            response       => $inv_hit->{response} // '',
+            model          => $inv_hit->{model} // '(invoice-create)',
+            provider       => $inv_hit->{provider} // 'ai2-invoice',
+            invoice_action => $inv_hit->{invoice_action},
+            thinking       => [],
         };
     }
 
@@ -279,7 +417,11 @@ sub process {
     # xAI grok auto-fills — not the same provider as SuperGrok.
     my $router = $c->model('AI2::Router');
     my $resp = try {
-        $router->chat_with_fallback($c, $provider_name, $use_model, $messages);
+        # use_search must be threaded to the provider: it is set by the widget
+        # (local-chat.js) and parsed in AI2.pm, but was never forwarded past
+        # this point, so Grok's search_parameters (Grok.pm) never fired.
+        $router->chat_with_fallback($c, $provider_name, $use_model, $messages,
+            ($args{use_search} ? (use_search => 1) : ()));
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
             "Provider $provider_name threw: $_");
@@ -299,7 +441,9 @@ sub process {
                 request_type      => 'chat',
             );
         };
-        return { success => 0, error => $resp->{error} // 'AI provider error' };
+        my $public = eval { $c->model('AI2::Router')->_user_facing_error($resp->{error}) }
+                  || 'The AI provider did not complete this turn. Try again or pick another model.';
+        return { success => 0, error => $public };
     }
 
     if ($resp->{fallback}) {
@@ -361,13 +505,21 @@ sub process {
     my $created_at = '';
     try {
         my $schema = $c->model('DBEncy')->schema;
-        my $uid    = $c->session->{user_id} // 199;
+        my $is_guest = is_guest_session($c);
+        my $uid = $c->session->{user_id};
+        if ($is_guest) {
+            $uid = 199 unless defined $uid;
+        }
+        die "No user_id for conversation persist\n" unless defined $uid;
         my $agent  = $args{agent_id} // 'general';
+        my $gid = $is_guest ? ensure_guest_session_id($c) : '';
 
         # Create a new conversation only when none was supplied (first turn)
         unless ($conversation_id && $conversation_id =~ /^\d+$/) {
             $saved_title = $prompt ? substr($prompt, 0, 80) : 'Chat Conversation';
             $saved_title =~ s/\n/ /g;
+            my %meta = (agent_id => $agent);
+            $meta{guest_session_id} = $gid if $is_guest && length $gid;
             my $conv = $schema->resultset('AiConversation')->create({
                 user_id    => $uid,
                 title      => $saved_title,
@@ -375,9 +527,18 @@ sub process {
                 task_id    => $args{task_id},
                 model      => $resp->{model} // $use_model // '',
                 status     => 'active',
-                metadata   => encode_json({ agent_id => $agent }),
+                metadata   => encode_json(\%meta),
             });
             $conversation_id = $conv ? $conv->id : undef;
+        } else {
+            my $existing = $schema->resultset('AiConversation')->find($conversation_id);
+            if ($existing) {
+                unless (conversation_owned_by_session($c, $existing)) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+                        "Blocked persist into foreign conversation_id=$conversation_id");
+                    $conversation_id = undef;
+                }
+            }
         }
 
         if ($conversation_id) {

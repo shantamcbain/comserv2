@@ -1,8 +1,10 @@
 package Comserv::Controller::Api;
 use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
+use File::Spec;
 use JSON::MaybeXS;
 use DateTime;
+use Comserv::Util::AppTime;
 use Digest::SHA qw(sha256_hex);
 use Comserv::Util::Logging;
 use Comserv::Util::ApiTokenValidator;
@@ -44,10 +46,24 @@ sub _focus_external_models {
             next if $m->{disabled} || $m->{needs_key}; # skip unconfigured stubs
             my $name = $m->{name} // $m->{id} // '';
             next unless $name;
+
+            # Carry real cost through so the picker can show "$X/$Y per 1M"
+            # instead of guessing. price_known == 0 means the provider published
+            # no price (x.AI /v1/models) — the client must render that as
+            # "cost not published", never as "free".
+            my $known = $m->{price_known};
+            $known = ( defined $m->{price_prompt} || defined $m->{price_completion}
+                       || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0
+                unless defined $known;
+
             push @out, {
-                name     => $name,
-                provider => $prov,
-                label    => $m->{label} // $name,
+                name             => $name,
+                provider         => $prov,
+                label            => $m->{label} // $name,
+                price_prompt     => $m->{price_prompt},
+                price_completion => $m->{price_completion},
+                price_known      => $known ? 1 : 0,
+                price_tier       => Comserv::Util::ModelCatalog->_price_tier($m),
             };
         }
     };
@@ -132,7 +148,7 @@ sub api_generate_token :Local :Args(0) {
         $c->detach();
     }
     
-    my $token_name = $params->{token_name} || 'API Token ' . DateTime->now->ymd;
+    my $token_name = $params->{token_name} || 'API Token ' . Comserv::Util::AppTime->today_utc_ymd;
     my $expires_in_days = $params->{expires_in_days};
     
     my $schema = $c->model('DBEncy');
@@ -158,7 +174,7 @@ sub api_generate_token :Local :Args(0) {
     
     my $expires_at;
     if ($expires_in_days && $expires_in_days =~ /^\d+$/) {
-        my $dt = DateTime->now->add(days => $expires_in_days);
+        my $dt = Comserv::Util::AppTime->now_dt->add(days => $expires_in_days);
         $expires_at = $dt;
     }
     
@@ -167,7 +183,7 @@ sub api_generate_token :Local :Args(0) {
         token_hash => $token_hash,
         token_name => $token_name,
         is_active => 1,
-        created_at => DateTime->now,
+        created_at => Comserv::Util::AppTime->now_dt,
         expires_at => $expires_at,
     });
     
@@ -296,7 +312,7 @@ sub api_revoke_token :Local :Args(1) {
     
     $api_token->update({
         is_active => 0,
-        revoked_at => DateTime->now
+        revoked_at => Comserv::Util::AppTime->now_dt
     });
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_revoke_token',
@@ -419,7 +435,18 @@ sub api_list_todos :Path('todos') :Args(0) {
 POST /api/todo/create - Create a new todo (Bypass keyword/token for local/workstation.local)
 
 Required JSON fields: subject, start_date, due_date, priority, status
-Optional JSON fields: description, project_id, assigned_to
+Optional JSON fields: description, project_id, project_code, assigned_to, developer
+
+Optional columns honoured at create time (previously silently ignored, which
+forced a create-then-update workaround):
+    reporter owner is_blocking blocked_by_todo_id parent_id sort_order
+    todo_type billable estimated_man_hours comments company_code
+    time_of_day scheduled_date scheduled_start scheduled_end
+    plan_id point_rate role_category is_fixed is_recurring
+
+Set is_blocking => 1 on anything urgent: Util::TodoRanking dampens a
+priority-1 todo to 5 unless is_blocking is set (or the text matches outage
+keywords), so a bare P1 will not surface in the Focus Queue.
 
 Returns: { success, message, todo_id, todo: { ... } }
 =cut
@@ -536,7 +563,25 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         $c->detach();
     }
 
-    my $todo = $schema->resultset('Todo')->create({
+    # Optional columns a caller may set at create time.
+    #
+    # Historically these were silently dropped: the INSERT below listed only a
+    # fixed set, so passing reporter / owner / is_blocking appeared to succeed
+    # but stored nothing — callers had to create-then-update as a workaround.
+    # Now they are honoured when present. Only real Todo columns are accepted
+    # (whitelist), and anything not supplied keeps its documented default.
+    #
+    # Note is_blocking matters for ranking: Util::TodoRanking dampens a
+    # priority-1 todo to 5 unless is_blocking is set, so a P1 created without
+    # it is invisible in the Focus Queue.
+    my %OPTIONAL_CREATE_COLUMNS = map { $_ => 1 } qw(
+        reporter owner is_blocking blocked_by_todo_id parent_id
+        sort_order todo_type billable estimated_man_hours comments
+        company_code time_of_day scheduled_date scheduled_start scheduled_end
+        plan_id point_rate role_category is_fixed is_recurring
+    );
+
+    my %create = (
         subject => $params->{subject},
         description => $params->{description} || '',
         project_id => $project_id,
@@ -546,10 +591,10 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         status => $params->{status},
         developer => $params->{assigned_to} || $params->{developer} || $current_user,
         sitename => $sitename,
-        date_time_posted => DateTime->now->ymd . ' ' . DateTime->now->hms,
+        date_time_posted => Comserv::Util::AppTime->now_utc,
         username_of_poster => $current_user,
         last_mod_by => $current_user,
-        last_mod_date => DateTime->now->ymd,
+        last_mod_date => Comserv::Util::AppTime->today_ymd_for($c),
         parent_todo => '',
         estimated_man_hours => 0,
         accumulative_time => '00:00:00',
@@ -557,7 +602,15 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         project_code => $params->{project_code} || 'system',
         share => 0,
         user_id => $poster_user_id,
-    });
+    );
+
+    # Copy through any optional column the caller actually supplied.
+    for my $col (keys %OPTIONAL_CREATE_COLUMNS) {
+        next unless exists $params->{$col} && defined $params->{$col};
+        $create{$col} = $params->{$col};
+    }
+
+    my $todo = $schema->resultset('Todo')->create(\%create);
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_create',
         "Todo created via API: ID=" . $todo->id . ", Subject=" . $params->{subject});
@@ -571,6 +624,55 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         todo => $self->_todo_to_hash($todo)
     }));
     $c->detach();
+}
+
+# Thin AI/local aliases. DB writes stay in Controller::Inventory.
+sub api_inventory_items :Path('inventory/items') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_items($c);
+}
+
+sub api_inventory_item_create :Path('inventory/item/create') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_item_create($c);
+}
+
+sub api_inventory_item_update :Path('inventory/item/update') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_item_update($c);
+}
+
+sub api_inventory_bom_add :Path('inventory/bom/add') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_bom_add($c);
+}
+
+sub api_inventory_bom :Path('inventory/bom') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_bom($c);
+}
+
+sub api_inventory_stock :Path('inventory/stock') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_stock($c);
+}
+
+sub api_inventory_need :Path('inventory/need') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory::PurchaseOrder')->api_need($c);
+}
+
+sub api_inventory_po_create :Path('inventory/po/create') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory::PurchaseOrder')->api_po_create($c);
 }
 
 =head2 api_list_documentation
@@ -705,7 +807,7 @@ sub api_create_project :Path('project/create') :Args(0) {
             comments            => $params->{comments}             || '',
             username_of_poster  => $current_user,
             group_of_poster     => 'admin',
-            date_time_posted    => DateTime->now->ymd . ' ' . DateTime->now->hms,
+            date_time_posted    => Comserv::Util::AppTime->now_utc,
             parent_id           => $parent_id,
             record_id           => 0,
         });
@@ -1193,6 +1295,321 @@ sub api_system_logs :Path('system_logs') :Args(0) {
     $c->detach();
 }
 
+=head2 api_hardware_metrics
+
+GET /api/hardware_metrics - Read-only query of hardware_metrics for agents/monitoring
+
+Same localhost / 192.168.1.0/24 LAN bypass as GET /api/system_logs (no Bearer
+required from trusted LAN; remote callers need a valid API token). Does not
+require aiusagemonitor member admin login.
+
+Optional query params:
+  hostname     - exact hostname filter
+  metric_name  - exact metric_name filter
+  since        - datetime string (e.g. 2025-09-01 00:00:00); inclusive lower bound
+  until        - datetime string; inclusive upper bound
+  limit        - max rows (default 2000, max 5000)
+
+Year-long history is supported (UI dashboard caps at 168h; this API does not).
+Returns newest-first. Uses an id-floor heuristic when a time window is given so
+timestamp filters do not full-scan the large insert-only table.
+
+Returns: { success, count, filters, metrics: [ { timestamp, hostname,
+system_identifier, metric_name, metric_value, unit, level } ] }
+=cut
+
+sub api_hardware_metrics :Path('hardware_metrics') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+
+    unless ($is_local) {
+        my $validation = Comserv::Util::ApiTokenValidator->validate_from_request($c);
+        unless ($validation->{valid}) {
+            $c->res->status($validation->{code} || 401);
+            $c->res->content_type('application/json');
+            $c->res->body(encode_json({ success => 0, error => $validation->{error} || 'Authentication required' }));
+            $c->detach();
+        }
+    }
+
+    my $hostname    = $c->req->param('hostname')    // '';
+    my $metric_name = $c->req->param('metric_name') // '';
+    my $since       = $c->req->param('since')       // '';
+    my $until       = $c->req->param('until')       // '';
+    my $limit       = $c->req->param('limit')       // 2000;
+
+    $limit = int($limit) if defined $limit && $limit =~ /^-?\d+$/;
+    $limit = 2000 if !defined $limit || $limit < 1;
+    $limit = 5000 if $limit > 5000;
+
+    # Reject obvious injection in datetime params (expect ISO-ish / SQL datetime)
+    for my $dt_label (['since', \$since], ['until', \$until]) {
+        my ($label, $ref) = @$dt_label;
+        next unless $$ref;
+        unless ($$ref =~ /^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/) {
+            $c->res->status(400);
+            $c->res->content_type('application/json');
+            $c->res->body(encode_json({ success => 0, error => "Invalid $label datetime (use YYYY-MM-DD[ HH:MM:SS])" }));
+            $c->detach();
+        }
+        $$ref =~ s/T/ /;
+    }
+
+    my %where;
+    $where{hostname}    = $hostname    if $hostname ne '';
+    $where{metric_name} = $metric_name if $metric_name ne '';
+
+    if ($since ne '' && $until ne '') {
+        $where{timestamp} = { -between => [$since, $until] };
+    } elsif ($since ne '') {
+        $where{timestamp} = { '>=' => $since };
+    } elsif ($until ne '') {
+        $where{timestamp} = { '<=' => $until };
+    }
+
+    my $schema = $c->model('DBEncy');
+    my @rows;
+    eval {
+        my $rs = $schema->resultset('HardwareMetrics');
+
+        # hardware_metrics is large and insert-only; PK id tracks recency.
+        # When a time window is requested, bound by id first (same heuristic as
+        # Admin::HardwareMonitor) to avoid full-scan Lost-connection timeouts.
+        if ($since ne '' || $until ne '') {
+            my $max_id = $rs->get_column('id')->max;
+            if (defined $max_id) {
+                my $hours = 24 * 7;  # default window guess when only until given
+                if ($since ne '' && $since =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                    require Time::Local;
+                    my ($Y, $M, $D) = ($1, $2, $3);
+                    my $epoch = eval { Time::Local::timelocal(0, 0, 0, $D, $M - 1, $Y) };
+                    if (defined $epoch) {
+                        $hours = int((time() - $epoch) / 3600) + 24;
+                    }
+                }
+                $hours = 24 if $hours < 24;
+                $hours = 24 * 366 if $hours > 24 * 366;  # cap ~1y+
+                my $id_floor = $max_id - int(50_000 * $hours);
+                $id_floor = 0 if $id_floor < 0;
+                $where{id} = { '>=' => $id_floor };
+            }
+        }
+
+        @rows = $rs->search(
+            \%where,
+            {
+                order_by => { -desc => 'id' },
+                rows     => $limit,
+                columns  => [qw(timestamp hostname system_identifier metric_name metric_value unit level)],
+            }
+        )->all;
+    };
+    if ($@) {
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => "Database error: $@" }));
+        $c->detach();
+    }
+
+    my @metrics = map {
+        {
+            timestamp         => $_->timestamp . '',
+            hostname          => $_->hostname,
+            system_identifier => $_->system_identifier,
+            metric_name       => $_->metric_name,
+            metric_value      => (defined $_->metric_value ? $_->metric_value + 0 : undef),
+            unit              => $_->unit,
+            level             => $_->level,
+        }
+    } @rows;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_hardware_metrics',
+        "hardware_metrics queried via API: hostname=$hostname metric_name=$metric_name "
+        . "since=$since until=$until limit=$limit count=" . scalar(@metrics) . " (Local: $is_local)");
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success => 1,
+        count   => scalar(@metrics),
+        filters => {
+            hostname    => ($hostname    ne '' ? $hostname    : undef),
+            metric_name => ($metric_name ne '' ? $metric_name : undef),
+            since       => ($since       ne '' ? $since       : undef),
+            until       => ($until       ne '' ? $until       : undef),
+            limit       => $limit,
+        },
+        metrics => \@metrics,
+    }));
+    $c->detach();
+}
+
+
+=head2 api_ai_usage
+
+GET /api/ai_usage - Read-only query of ai_usage_logs for agents/monitoring
+
+Same localhost / 192.168.1.0/24 LAN bypass as GET /api/system_logs and
+GET /api/hardware_metrics (no Bearer required from trusted LAN; remote callers
+need a valid API token).
+
+Optional query params:
+  days - lookback window in days (default 7, min 1, max 365)
+
+Returns newest-first rows (capped at 200) plus a summary of calls/tokens/cost
+and error counts by provider and model for the full window.
+
+Column mapping (response field <- DB column):
+  created_at    <- created_at
+  provider      <- provider
+  model         <- model
+  status        <- status
+  error_message <- error_message
+  tokens        <- total_tokens
+  cost          <- estimated_cost_usd
+  duration_ms   <- duration_ms
+  (also included: prompt_tokens, completion_tokens, request_type, site_id)
+
+Returns: { success, days, count, summary, rows }
+
+=cut
+
+sub api_ai_usage :Path('ai_usage') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+
+    unless ($is_local) {
+        my $validation = Comserv::Util::ApiTokenValidator->validate_from_request($c);
+        unless ($validation->{valid}) {
+            $c->res->status($validation->{code} || 401);
+            $c->res->content_type('application/json');
+            $c->res->body(encode_json({ success => 0, error => $validation->{error} || 'Authentication required' }));
+            $c->detach();
+        }
+    }
+
+    my $days = $c->req->param('days') // 7;
+    $days = int($days) if defined $days && $days =~ /^-?\d+$/;
+    $days = 7   if !defined $days || $days < 1;
+    $days = 365 if $days > 365;
+
+    my $since = DateTime->now->subtract(days => $days)->ymd . ' 00:00:00';
+
+    my $schema = $c->model('DBEncy');
+    my @row_list;
+    my %by_provider;
+    my %by_model;
+    my %by_status;
+    my $total_calls  = 0;
+    my $total_tokens = 0;
+    my $total_cost   = 0;
+    my $error_count  = 0;
+
+    eval {
+        my $rs = $schema->resultset('AiUsageLog')->search(
+            { created_at => { '>=' => $since } },
+            { order_by => { -desc => 'created_at' } }
+        );
+
+        while (my $r = $rs->next) {
+            my $prov   = $r->provider // 'unknown';
+            my $mod    = $r->model // 'unknown';
+            my $status = $r->status // 'unknown';
+            my $tok    = $r->total_tokens // 0;
+            my $cost   = $r->estimated_cost_usd // 0;
+            my $is_err = ($status ne 'success') ? 1 : 0;
+
+            $total_calls++;
+            $total_tokens += $tok;
+            $total_cost   += $cost;
+            $error_count  += $is_err;
+            $by_status{$status}++;
+
+            $by_provider{$prov}{calls}  = ($by_provider{$prov}{calls}  // 0) + 1;
+            $by_provider{$prov}{tokens} = ($by_provider{$prov}{tokens} // 0) + $tok;
+            $by_provider{$prov}{cost}   = ($by_provider{$prov}{cost}   // 0) + $cost;
+            $by_provider{$prov}{errors} = ($by_provider{$prov}{errors} // 0) + $is_err;
+
+            my $mk = "$prov|$mod";
+            $by_model{$mk}{provider} = $prov;
+            $by_model{$mk}{model}    = $mod;
+            $by_model{$mk}{calls}    = ($by_model{$mk}{calls}  // 0) + 1;
+            $by_model{$mk}{tokens}   = ($by_model{$mk}{tokens} // 0) + $tok;
+            $by_model{$mk}{cost}     = ($by_model{$mk}{cost}   // 0) + $cost;
+            $by_model{$mk}{errors}   = ($by_model{$mk}{errors} // 0) + $is_err;
+
+            if (@row_list < 200) {
+                my $created = $r->created_at;
+                if (defined $created && ref($created) && $created->can('iso8601')) {
+                    $created = $created->iso8601();
+                } elsif (defined $created) {
+                    $created = "$created";
+                }
+                push @row_list, {
+                    created_at         => $created,
+                    provider           => $prov,
+                    model              => $mod,
+                    status             => $status,
+                    error_message      => $r->error_message,
+                    tokens             => 0 + $tok,
+                    prompt_tokens      => 0 + ($r->prompt_tokens // 0),
+                    completion_tokens  => 0 + ($r->completion_tokens // 0),
+                    cost               => 0 + $cost,
+                    duration_ms        => (defined $r->duration_ms ? 0 + $r->duration_ms : undef),
+                    request_type       => $r->request_type,
+                    site_id            => $r->site_id,
+                };
+            }
+        }
+    };
+    if ($@) {
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => "Database error: $@" }));
+        $c->detach();
+    }
+
+    # Round costs for JSON friendliness
+    for my $p (values %by_provider) {
+        $p->{cost} = 0 + sprintf('%.6f', $p->{cost} // 0);
+    }
+    for my $m (values %by_model) {
+        $m->{cost} = 0 + sprintf('%.6f', $m->{cost} // 0);
+    }
+
+    my $summary = {
+        days          => $days,
+        since         => $since,
+        total_calls   => $total_calls,
+        total_tokens  => $total_tokens,
+        total_cost    => 0 + sprintf('%.6f', $total_cost),
+        error_count   => $error_count,
+        by_status     => \%by_status,
+        by_provider   => \%by_provider,
+        by_model      => \%by_model,
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_ai_usage',
+        "ai_usage queried via API: days=$days rows=" . scalar(@row_list)
+        . " total_calls=$total_calls (Local: $is_local)");
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success => 1,
+        days    => $days,
+        count   => scalar(@row_list),
+        summary => $summary,
+        rows    => \@row_list,
+    }));
+    $c->detach();
+}
+
+
 =head2 _api_authenticate
 
 Shared auth gate for the data endpoints. Requests originating from localhost or the
@@ -1392,7 +1809,7 @@ sub api_todo_update :Path('todo/update') :Args(0) {
         if (@updated) {
             $todo->update({
                 last_mod_by   => $current_user,
-                last_mod_date => DateTime->now->ymd,
+                last_mod_date => Comserv::Util::AppTime->today_ymd_for($c),
             });
         }
     };
@@ -1596,11 +2013,7 @@ sub api_todo_open_log :Path('todo/open_log') :Args(0) {
     }
     my $username = $data->{actor} // $data->{username} // 'api';
 
-    my $now   = DateTime->now(time_zone => 'local');
-    my $today = $now->ymd;
-
-    # ONE shared implementation with the UI Start button. Start is a TOGGLE:
-    # if the todo is already active it stops instead (todo -> 2).
+    # Clock lives inside TodoLog (UTC HMS + viewer today).
     my $res = eval {
         Comserv::Util::TodoLog->toggle_start($c,
             record_id => $record_id,
@@ -1655,11 +2068,7 @@ sub api_todo_close_log :Path('todo/close_log') :Args(0) {
     my $username = $data->{actor} // $data->{username} // 'api';
     my $notes    = $data->{notes} // '';
 
-    my $now_dt   = DateTime->now(time_zone => 'local');
-    my $today    = $now_dt->ymd;
-
-    # ONE shared implementation with the UI close_log. Graceful when no log
-    # is open (caller mistake -> warn, never an ERROR audit todo).
+    # Clock lives inside TodoLog (UTC HMS + viewer today).
     my $res = eval {
         Comserv::Util::TodoLog->close_log($c,
             record_id => $record_id,
@@ -1710,10 +2119,7 @@ sub api_todo_done_with_log :Path('todo/done_with_log') :Args(0) {
     my $username = $data->{actor} // $data->{username} // 'api';
     my $notes    = $data->{notes} // '';
 
-    my $now_dt   = DateTime->now(time_zone => 'local');
-    my $today    = $now_dt->ymd;
-
-    # ONE shared implementation with the UI done_with_log.
+    # Clock lives inside TodoLog (UTC HMS + viewer today).
     my $res = eval {
         Comserv::Util::TodoLog->done_with_log($c,
             record_id => $record_id,
@@ -1960,6 +2366,154 @@ sub api_focus_models :Path('focus/models') :Args(0) {
     $c->res->body(encode_json({ success => 1, models => \@models, default => $default }));
 }
 
+# ============================================================================
+# TodoRank agent endpoints (project #287 TODOAGENT, plan
+# Documentation/TodoRankAgentPlan.tt Phases 1-tail/3/4). All AI work delegates
+# to Model::AI2::TodoRank. DRY-RUN BY DEFAULT: pass {"apply": true} to write.
+# ============================================================================
+
+# GET /api/todo/duplicates?sitename=CSC — normalized-subject grouping of open
+# todos (plan Phase 1 helper). Read-only; never deletes anything.
+sub api_todo_duplicates :Path('todo/duplicates') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $req = $c->req->params;
+    my $site = $req->{sitename} || $c->stash->{SiteName} || 'CSC';
+    my %groups;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my @rows = $schema->resultset('Todo')->search(
+            { sitename => $site, status => { -not_in => [3, 4, '3', '4'] } },
+            { columns => [qw(record_id subject project_id priority status)],
+              order_by => { -asc => 'record_id' }, rows => 2000 },
+        )->all;
+        for my $t (@rows) {
+            my $subj = lc($t->subject // '');
+            $subj =~ s/[^a-z0-9]+/ /g;
+            $subj =~ s/^\s+|\s+$//g;
+            next unless length $subj > 8;   # too-short subjects group everything
+            push @{ $groups{$subj} }, {
+                record_id  => $t->record_id,
+                subject    => $t->subject // '',
+                project_id => $t->project_id,
+                priority   => $t->priority,
+                status     => $t->status,
+            };
+        }
+    };
+    if ($@) {
+        $self->_json_error($c, 500, "duplicate scan failed: $@", 'scan_failed');
+    }
+    my @dupes = grep { @{ $_->{todos} } > 1 }
+                map { { key => $_, todos => $groups{$_} } } sort keys %groups;
+    $self->_json_ok($c, {
+        success       => 1,
+        sitename      => $site,
+        groups        => \@dupes,
+        group_count   => scalar(@dupes),
+        note          => 'Advisory only — duplicates are FLAGGED for human merge, never auto-deleted.',
+    });
+}
+
+# POST /api/todo/rank — the TodoRank coordinator (plan Phase 3).
+# Body: { sitename?, project_id?, model | models[], apply? (default false), limit? }
+# Lists open todos scoped to the branch/site/project, batches them (~15),
+# asks the model per batch, and returns per-record proposals + a diff of what
+# WOULD change. With apply:true it writes only differing values as
+# last_mod_by='ai-todorank'. Never closes/deletes rows; status=5 dates frozen.
+sub api_todo_rank :Path('todo/rank') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $data = $self->_api_json_body($c);
+    my $apply = ($data->{apply} && "$data->{apply}" eq '1') ? 1 : 0;
+
+    # Resolve target model(s): same contract as /api/focus/top5.
+    my @targets;
+    if (ref($data->{models}) eq 'ARRAY') {
+        for my $m (@{ $data->{models} }) {
+            push @targets, ref($m) ? { name => $m->{name}, host => $m->{host} // '' }
+                                   : { name => "$m", host => '' } if ref($m) ? $m->{name} : $m;
+        }
+    }
+    elsif (my $one = ($data->{model} // '') =~ s/^\s+|\s+$//gr) {
+        push @targets, { name => $one, host => $data->{host} // '' };
+    }
+    unless (@targets) {
+        $self->_json_error($c, 400, 'Missing required field: model (or models[])', 'validation_error');
+    }
+
+    my $rank = eval { $c->model('AI2::TodoRank') };
+    unless ($rank) {
+        $self->_json_error($c, 500, 'AI2::TodoRank model not available', 'model_missing');
+    }
+
+    # Branch/SiteName/role context: which branch instance am I serving, which
+    # coordination project owns it, who is asking. The agent ranks SITE
+    # OPERATIONS for this SiteName only — no git, no cross-site view.
+    my $bctx  = $rank->branch_context($c);
+    my @roles = ref($c->session->{roles}) eq 'ARRAY' ? @{ $c->session->{roles} } : ();
+
+    my ($rows, $rbid) = $rank->gather_todos($c,
+        sitename  => $data->{sitename},
+        project_id=> $data->{project_id} // $bctx->{project_id},
+    );
+    unless (@$rows) {
+        $self->_json_ok($c, { success => 1, message => 'No open todos matched the scope',
+                              batches => 0, results => [], dry_run => \!$apply });
+    }
+
+    my $limit = ($data->{limit} && $data->{limit} =~ /^\d+$/) ? $data->{limit} : 200;
+    @$rows = @$rows[0 .. ($#$rows < $limit - 1 ? $#$rows : $limit - 1)];
+
+    my @all_changes;
+    my $total_proposed = 0;
+    my @batch_errors;
+    my $bs = eval { $rank->can('BATCH_SIZE') } ? Comserv::Model::AI2::TodoRank->BATCH_SIZE : 15;
+    my %pctx = (
+        sitename     => $data->{sitename} // $rank->_sitename($c),
+        branch       => $bctx->{branch},
+        project_name => $bctx->{project_name},
+        roles        => \@roles,
+    );
+    while (@$rows) {
+        my @batch = splice(@$rows, 0, $bs);
+        my ($system, $user_prompt) = $rank->build_prompt(\@batch, \%pctx);
+        my $res = $rank->run_batch($c, $targets[0], $system, $user_prompt);
+        unless ($res && $res->{success}) {
+            push @batch_errors, ($res && $res->{error}) || 'AI ranking unavailable';
+            next;
+        }
+        my $parsed = $rank->parse_result($res, [ map { $_->{record_id} } @batch ]);
+        $total_proposed += scalar keys %{ $parsed->{proposals} };
+        my $applied = $rank->apply_proposals($c, $rbid, $parsed->{proposals},
+                                             apply => $apply, model => $targets[0]{name});
+        push @all_changes, @{ $applied->{changed} };
+    }
+
+    $self->_json_ok($c, {
+        success        => \1,
+        model          => $targets[0]{name},
+        sitename       => $pctx{sitename},
+        branch         => $bctx->{branch},
+        project_id     => $bctx->{project_id},
+        project_name   => $bctx->{project_name},
+        requester_roles=> \@roles,
+        scoped_todos   => 0 + (scalar keys %$rbid),
+        proposed       => $total_proposed,
+        changed        => \@all_changes,
+        change_count   => scalar(@all_changes),
+        batch_errors   => \@batch_errors,
+        applied        => $apply ? \1 : \0,
+        dry_run        => $apply ? \0 : \1,
+        note           => 'DRY-RUN by default: changed[] shows what WOULD be written. '
+                        . 'Re-post with {"apply":true} after review. Writes are attributed to ai-todorank.',
+    });
+}
+
 # Gather the plan-doc context for api_focus_top5: BOTH the on-disk planning
 # corpus (root/Documentation/**/*.{tt,md} that look like plan docs) AND the DB
 # DailyPlan rows (with their open phase todos). Pure, no mutation; returns an
@@ -2049,6 +2603,290 @@ sub _focus_top5_plan_docs {
     $c->log->warn("api_focus_top5: could not scan on-disk plan docs: $@") if $@;
 
     return @docs;
+}
+
+# ----------------------------------------------------------------------------
+# Local DB diagnostics / admin helpers (localhost-bypassed)
+# ----------------------------------------------------------------------------
+
+=head2 api_db_inspect
+
+GET /api/db/inspect - Return current DB connection user, existing application
+DB users, and current grants for the runtime DB user.
+=cut
+
+sub api_db_inspect :Path('db/inspect') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $info = eval { $c->model('DBEncy')->get_connection_info() };
+    my $error = $@ || '';
+
+    my ($current_user, $users, $grants);
+    if ($info && ref($info) eq 'HASH' && $info->{current_username}) {
+        $current_user = $info->{current_username};
+        my $dbh = eval { $c->model('DBEncy')->schema->storage->dbh };
+        if ($dbh) {
+            $users = eval {
+                my $sth = $dbh->prepare(
+                    "SELECT user, host FROM mysql.user WHERE user IN (?, ?, ?, ?)"
+                );
+                $sth->execute('comserv_app','comserv_admin','comserv_user',$current_user);
+                $sth->fetchall_arrayref({});
+            };
+            $grants = eval {
+                my $sth = $dbh->prepare("SHOW GRANTS");
+                $sth->execute();
+                $sth->fetchall_arrayref();
+            };
+        }
+    }
+
+    $c->res->body(encode_json({
+        success => 1,
+        current_user => $current_user,
+        connection_info => $info,
+        users => $users,
+        grants => $grants,
+        credentials_diag => {},
+        error => ($error ? "$error" : undef),
+    }));
+}
+
+=head2 api_db_users
+
+GET /api/db/users - List DB user/host entries for the known accounts.
+=cut
+
+sub api_db_users :Path('db/users') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $dbh = eval { $c->model('DBEncy')->schema->storage->dbh };
+    unless ($dbh) {
+        $c->res->body(encode_json({ success => 0, error => 'No DB handle' }));
+        return;
+    }
+
+    my $rows = eval {
+        my $sth = $dbh->prepare(
+            "SELECT user, host, plugin, password_expired FROM mysql.user WHERE user IN (?, ?, ?)"
+        );
+        $sth->execute('comserv_app','comserv_admin','shanta_forager');
+        $sth->fetchall_arrayref({});
+    };
+
+    $c->res->body(encode_json({
+        success => 1,
+        users => ($rows || []),
+        error => ($@ ? "$@" : undef),
+    }));
+}
+
+=head2 api_db_switch_user
+
+POST /api/db/switch_user  { user, password }
+Verifies the given credentials against the live DB host/db, and if they work,
+reconnects DBEncy as that user (in-process) and persists it to .env as the
+preferred app user. Falls back to the previous working user on failure.
+=cut
+
+sub api_db_switch_user :Path('db/switch_user') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Accept both JSON API calls and plain form POSTs from /admin.
+    my $data = eval { $self->_api_json_body($c) } || {};
+    my $is_form = !$data->{user};
+    if ($is_form) {
+        $data->{user}      = $c->request->params->{user}      // '';
+        $data->{return_to} = $c->request->params->{return_to} // '';
+    }
+
+    my $return_to = $data->{return_to} // '';
+
+    # Admin users can switch via the /admin page form; local 127.0.0.1 callers
+    # can still use the JSON endpoint directly.
+    my $is_admin = eval {
+        my $auth = Comserv::Util::AdminAuth->new();
+        $auth->check_admin_access($c, 'admin_dashboard');
+    } ? 1 : 0;
+    unless ($is_admin || _api_local_ok($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_db_switch_user',
+            'Unauthorized switch attempt');
+        return $self->_switch_user_response($c, 0, 'admin access required', $return_to);
+    }
+
+    my $user = $data->{user} // '';
+    my $pass = $data->{password} // '';
+
+    # If no password was supplied, look it up from the dbi/*.json secret file
+    # that RemoteDB uses as the source of truth for this workstation.
+    unless ($pass) {
+        eval {
+            require JSON;
+            my $home = $ENV{HOME} || '/home/shanta';
+            my $secret = "$home/.comserv/secrets/dbi/db_production_mysql.json";
+            if (-f $secret) {
+                open my $fh, '<', $secret or return;
+                local $/; my $raw = <$fh>; close $fh;
+                my $data = JSON::decode_json($raw);
+                for my $conn_name (keys %$data) {
+                    my $cfg = $data->{$conn_name};
+                    next unless ref($cfg) eq 'HASH';
+                    if (($cfg->{username} // '') eq $user && ($cfg->{password} // '') ne '') {
+                        $pass = $cfg->{password};
+                        last;
+                    }
+                }
+            }
+        };
+    }
+
+    unless ($user && $pass) {
+        return $self->_switch_user_response($c, 0, 'user not recognised or no stored password', $return_to);
+    }
+
+    my $conn = eval { $c->model('DBEncy')->get_connection_info } || {};
+    my $host = $conn->{host} || '192.168.1.20';
+    my $port = $conn->{port} || 3307;
+    my $db   = $conn->{database} || 'ency';
+
+    my $ok = 0;
+    my $err = '';
+    my $probe = eval {
+        require Comserv::Util::DbConfigPassword;
+        Comserv::Util::DbConfigPassword->new->test_login(
+            { db_type => 'mysql', host => $host, port => $port, database => $db, username => $user },
+            $pass
+        );
+    };
+    if ($probe && $probe->{ok}) {
+        $ok = 1;
+    } else {
+        $err = $@ || ($probe && $probe->{error}) || 'authentication failed';
+    }
+
+    unless ($ok) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_db_switch_user',
+            "Switch to '$user' rejected: $err");
+        return $self->_switch_user_response($c, 0, $err, $return_to, { user => $user });
+    }
+
+    # Reconnect DBEncy as the new user (in-process). If this fails, fall back.
+    my $reconnected = 0;
+    eval {
+        $reconnected = $c->model('DBEncy')->reconnect_as($c, $user, $pass) ? 1 : 0;
+    };
+    if (!$reconnected) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_db_switch_user',
+            "Switch to '$user' verified but in-process reconnect failed");
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_db_switch_user',
+        "Switched active DB user to '$user' (reconnected=$reconnected)");
+
+    return $self->_switch_user_response($c, 1, undef, $return_to, {
+        user => $user,
+        reconnected => $reconnected,
+    });
+}
+
+sub _switch_user_response {
+    my ($self, $c, $success, $error, $return_to, $extra) = @_;
+    $extra ||= {};
+
+    if ($return_to) {
+        if ($success) {
+            $c->flash->{success_msg} = "Switched active DB user to $extra->{user}.";
+        } else {
+            $c->flash->{error_msg} = "Could not switch to $extra->{user}: $error";
+        }
+        $c->response->redirect($return_to);
+        return;
+    }
+
+    $c->res->content_type('application/json');
+    if ($success) {
+        $c->res->body(encode_json({ success => 1, switched => 1, %$extra }));
+    } else {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => $error, switched => 0 }));
+    }
+}
+
+=head2 api_db_apply_grants
+
+POST /api/db/apply_grants - Create comserv_app/comserv_admin users and apply
+limited DML / DDL grants on the runtime database. Uses the current connection,
+so call this while connected as a user with CREATE USER + GRANT privileges.
+=cut
+
+sub api_db_apply_grants :Path('db/apply_grants') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $data = $self->_api_json_body($c);
+    my $app_password   = $data->{app_password}   // $data->{password} // '';
+    my $admin_password = $data->{admin_password} // $data->{password} // '';
+    unless ($app_password && $admin_password) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'app_password and admin_password required' }));
+        return;
+    }
+
+    my $dbh = eval { $c->model('DBEncy')->schema->storage->dbh };
+    unless ($dbh) {
+        $c->res->status(500);
+        $c->res->body(encode_json({ success => 0, error => 'Could not get DB handle' }));
+        return;
+    }
+
+    my $db = eval {
+        my $row = $dbh->selectrow_arrayref("SELECT DATABASE()");
+        $row ? $row->[0] : '';
+    } // '';
+    unless ($db) {
+        $c->res->status(500);
+        $c->res->body(encode_json({ success => 0, error => 'No current database selected' }));
+        return;
+    }
+
+    my @log;
+    my $ok = 1;
+    my $err = '';
+
+    my @statements = (
+        "CREATE USER IF NOT EXISTS 'comserv_app'@'%' IDENTIFIED BY '$app_password'",
+        "CREATE USER IF NOT EXISTS 'comserv_admin'@'%' IDENTIFIED BY '$admin_password'",
+        "GRANT SELECT, INSERT, UPDATE, DELETE ON `$db`.* TO 'comserv_app'@'%'",
+        "GRANT ALL PRIVILEGES ON `$db`.* TO 'comserv_admin'@'%'",
+        "FLUSH PRIVILEGES",
+    );
+
+    for my $sql (@statements) {
+        my $res = eval { $dbh->do($sql); 1; };
+        if ($@ || !$res) {
+            $ok = 0;
+            $err = $@ || $dbh->errstr || 'unknown';
+            push @log, { sql => $sql, ok => 0, error => "$err" };
+            last;
+        }
+        push @log, { sql => $sql, ok => 1 };
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_db_apply_grants',
+        "Applied grants for $db: ok=$ok") if $ok;
+
+    $c->res->status($ok ? 200 : 500);
+    $c->res->body(encode_json({
+        success => $ok,
+        database => $db,
+        log => \@log,
+        error => $ok ? undef : "$err",
+    }));
 }
 
 # Owner sitename for a write: explicit param, else the related project's

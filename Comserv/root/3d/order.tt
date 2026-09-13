@@ -38,6 +38,13 @@
     </div>
 
     <div style="margin-bottom:0.8em;">
+        <label style="font-weight:bold;">Filament Quantity (grams)</label><br>
+        <input type="number" name="filament_quantity" value="1" min="0.5" step="0.5"
+               style="width:100%;padding:0.5em 0.7em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);">
+        <small style="color:var(--muted-color)">Grams of filament to reserve for this order</small>
+    </div>
+
+    <div style="margin-bottom:0.8em;">
         <label style="font-weight:bold;">Quantity</label><br>
         <input type="number" name="quantity" value="1" min="1" max="50"
                style="width:80px;padding:0.5em 0.7em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);">

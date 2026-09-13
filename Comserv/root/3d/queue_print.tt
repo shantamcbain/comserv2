@@ -145,6 +145,7 @@
           <th>User</th>
           <th>Queued</th>
           <th style="width:60px">Notes</th>
+          <th style="width:60px">Action</th>
         </tr>
       </thead>
       <tbody>
@@ -155,6 +156,15 @@
           [% IF job.model_name %][% job.model_name | html %]
           [% ELSIF job.item_name %][% job.item_name | html %]
           [% ELSE %]Job #[% job.id %][% END %]
+          [% IF job.model_id %]
+          <br><small>
+            <a href="/3d/model_download/[% job.model_id %]" style="font-size:0.75em;color:#007bff;">⬇ Download</a>
+            <form method="post" action="/3d/model_upload/[% job.model_id %]" enctype="multipart/form-data" style="display:inline;font-size:0.75em;margin-left:0.3em;">
+              <input type="file" name="stl_file" accept=".stl,.3mf" style="display:none" id="pq_up_[% job.id %]" onchange="this.form.submit()">
+              <label for="pq_up_[% job.id %]" style="color:#007bff;cursor:pointer;text-decoration:underline;">⬆ Upload</label>
+            </form>
+          </small>
+          [% END %]
         </td>
         <td style="text-align:center">[% job.quantity %]</td>
         <td>
@@ -166,6 +176,11 @@
         <td>[% job.username | html %]</td>
         <td style="white-space:nowrap;font-size:0.82em">[% job.created_at %]</td>
         <td></td>
+        <td>
+          <button class="btn btn-sm btn-danger" onclick="deleteJob([% job.id %])" title="Delete this job from queue">
+            Delete
+          </button>
+        </td>
       </tr>
       [% END %]
       </tbody>
@@ -200,6 +215,15 @@
           [% ELSIF job.item_name %][% job.item_name | html %]
           [% ELSE %]Job #[% job.id %][% END %]
           <br><span class="badge badge-[% job.status %]">[% job.status %]</span>
+          [% IF job.model_id %]
+          <br><small>
+            <a href="/3d/model_download/[% job.model_id %]" style="font-size:0.75em;color:#007bff;">⬇ Download</a>
+            <form method="post" action="/3d/model_upload/[% job.model_id %]" enctype="multipart/form-data" style="display:inline;font-size:0.75em;margin-left:0.3em;">
+              <input type="file" name="stl_file" accept=".stl,.3mf" style="display:none" id="pq_up_active_[% job.id %]" onchange="this.form.submit()">
+              <label for="pq_up_active_[% job.id %]" style="color:#007bff;cursor:pointer;text-decoration:underline;">⬆ Upload</label>
+            </form>
+          </small>
+          [% END %]
         </td>
         <td style="text-align:center">[% job.quantity %]</td>
         <td>
@@ -210,7 +234,7 @@
         </td>
         <td>[% job.printer_name | html %]</td>
         <td>[% job.username | html %]</td>
-        <td style="white-space:nowrap;font-size:0.82em">[% job.started_at || job.created_at %]</td>
+        <td style="white-space:nowrap;font-size:0.82em">[% IF job.started_at %][% job.started_at %][% ELSE %]&mdash;[% END %]</td>
         <td></td>
       </tr>
       [% END %]
@@ -249,6 +273,15 @@
           [% IF job.model_name %][% job.model_name | html %]
           [% ELSIF job.item_name %][% job.item_name | html %]
           [% ELSE %]#[% job.id %][% END %]
+          [% IF job.model_id %]
+          <br><small>
+            <a href="/3d/model_download/[% job.model_id %]" style="font-size:0.75em;color:#007bff;">⬇ Download</a>
+            <form method="post" action="/3d/model_upload/[% job.model_id %]" enctype="multipart/form-data" style="display:inline;font-size:0.75em;margin-left:0.3em;">
+              <input type="file" name="stl_file" accept=".stl,.3mf" style="display:none" id="pq_up_done_[% job.id %]" onchange="this.form.submit()">
+              <label for="pq_up_done_[% job.id %]" style="color:#007bff;cursor:pointer;text-decoration:underline;">⬆ Upload</label>
+            </form>
+          </small>
+          [% END %]
         </td>
         <td style="text-align:center">[% job.quantity %]</td>
         <td style="font-size:0.82em">
@@ -274,6 +307,34 @@
 
 <script>
 document.getElementById('ts').textContent = new Date().toLocaleString();
+
+function deleteJob(id) {
+    if (!confirm('Are you sure you want to delete print job #' + id + '?\\n\\nThis action cannot be undone.')) {
+        return;
+    }
+    
+    fetch('[% c.uri_for("/3d/queue") %]', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: new URLSearchParams({
+            'job_id': id,
+            'action': 'delete'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Print job #' + id + ' deleted successfully');
+            location.reload();
+        } else {
+            alert('Delete failed: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Delete failed: ' + error);
+        location.reload();
+    });
+}
 </script>
 </body>
 </html>
