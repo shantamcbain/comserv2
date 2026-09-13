@@ -1037,12 +1037,12 @@
                   : { cleanText: resp, actions: [] };
               const display = extracted.cleanText || resp;
               // Prefix the reply with the model actually used, for transparency.
-                            var bodyHtml = escapeHtml(display).replace(/\n/g, '<br>');
+              var bodyHtml = escapeHtml(display).replace(/\n/g, '<br>');
               if (looksLikeLogNoise(display) || (display && display.length > 2500)) {
                   bodyHtml = '<span style="color:#f88;">[noisy / log-like reply — ask a clearer question or use Clarify]</span>'
                       + '<pre>' + escapeHtml(display).slice(0, 4000) + (display.length > 4000 ? '\n…[truncated]' : '') + '</pre>';
               }
-              recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + bodyHtml);font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + escapeHtml(display).replace(/\n/g, '<br>'));
+              recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + bodyHtml);
 
               // Belt-and-suspenders: programming/docs agents must not create todos from chat.
               const skipTodoCreate = /^(programming|coding|code|documentation|analyze)$/i.test(agentId);
