@@ -126,27 +126,37 @@
     //     so detaching/reattaching never loses context. ---
     let chatLog = [];   // [{who:'You'|'AI'|'Think', html?, summary?, steps?, open?, done?}]
 
-    function ensureEditorChatContrast(doc) {
+        function ensureEditorChatContrast(doc) {
         doc = doc || document;
         if (!doc || !doc.head) return;
-        if (doc.getElementById('ai2-editor-chat-contrast-css')) return;
+        if (doc.getElementById('ai2-editor-chat-contrast-css')) {
+            // Allow upgrades after deploy: replace contents
+            var existing = doc.getElementById('ai2-editor-chat-contrast-css');
+            if (existing && existing.getAttribute('data-v') === '2') return;
+            if (existing) existing.remove();
+        }
         const style = doc.createElement('style');
         style.id = 'ai2-editor-chat-contrast-css';
+        style.setAttribute('data-v', '2');
         style.textContent = [
-            '#ai-chat-sidebar,#ai-chat-sidebar .chat-messages,#ai-chat-sidebar #chat-messages{background:#1a1b1e!important;color:#f2f2f2!important;font-size:13px!important;line-height:1.45!important;}',
+            '#ai-chat-sidebar{background:#1e1f22!important;color:#f2f2f2!important;display:flex!important;flex-direction:column!important;min-height:0!important;}',
+            '#ai-chat-sidebar .chat-messages,#ai-chat-sidebar #chat-messages{flex:1 1 auto!important;min-height:0!important;background:#1a1b1e!important;color:#f2f2f2!important;font-size:13px!important;line-height:1.45!important;}',
             '#ai-chat-sidebar .chat-msg{margin-bottom:10px;padding:8px 10px;border-radius:6px;border:1px solid #3a3f4a;color:#f2f2f2!important;word-break:break-word;overflow-wrap:anywhere;}',
             '#ai-chat-sidebar .chat-msg-you{background:#243044!important;border-color:#3d5a80;}',
             '#ai-chat-sidebar .chat-msg-ai{background:#252830!important;border-color:#4a5568;}',
             '#ai-chat-sidebar .chat-msg strong{color:#9ecbff!important;}',
             '#ai-chat-sidebar .chat-msg-you strong{color:#ffd27a!important;}',
             '#ai-chat-sidebar .chat-msg pre,#ai-chat-sidebar .chat-msg code{background:#0f1115!important;color:#e6edf3!important;border:1px solid #333;border-radius:4px;padding:6px 8px;display:block;white-space:pre-wrap;font-size:12px!important;max-height:280px;overflow:auto;}',
-            '#ai-chat-sidebar #ai-chat-input{background:#0f1115!important;color:#f2f2f2!important;font-size:13px!important;}',
-            '.chat-msg{color:#f2f2f2!important;}'
+            '#ai-chat-sidebar .ai2-chat-input-row{flex:0 0 auto!important;display:flex!important;flex-direction:row!important;align-items:flex-end!important;gap:6px!important;padding:8px!important;border-top:1px solid #555!important;background:#1e1f22!important;width:100%!important;box-sizing:border-box!important;}',
+            '#ai-chat-sidebar #ai-chat-input{flex:1 1 auto!important;min-width:0!important;min-height:36px!important;max-height:120px!important;background:#0f1115!important;color:#f2f2f2!important;border:1px solid #555!important;border-radius:3px!important;padding:8px!important;font-size:13px!important;box-sizing:border-box!important;}',
+            '#ai-chat-sidebar #ai-chat-input::placeholder{color:#9aa3b2!important;opacity:1!important;}',
+            /* neutralize leaked widget class if still present */
+            '#ai-chat-sidebar .chat-input{flex:0 0 auto!important;display:flex!important;flex-direction:row!important;align-items:flex-end!important;background:#1e1f22!important;}'
         ].join('');
         doc.head.appendChild(style);
     }
 
-    function ensureThinkingStyles(doc) {
+function ensureThinkingStyles(doc) {
         doc = doc || document;
         if (!doc || !doc.head) return;
         if (doc.getElementById('ai2-editor-thinking-css')) return;
