@@ -1,0 +1,6 @@
+<div id="2026-09-12-inventory-dashboard-missing-stock" class="cl-entry">
+<h3>2026-09-12 — Dashboard Low Stock now counts missing/unstocked items</h3>
+<p class="doc-body"><strong>What.</strong> The Inventory and Accounting dashboards now count items that have no stock_level row (never received) as "Low Stock", matching the Stock Levels "Low stock only" view. Previously the dashboard only flagged items with an explicit reorder_point that was breached, so unstocked catalog items were invisible there while the stock view showed them as Missing — the two numbers disagreed.</p>
+<p class="doc-body"><strong>Why.</strong> A sale or BOM need consumes stock and creates reorder demand even for items that were never received (no stock_level row) or have the default reorder_point=0. Those should surface as low/missing on the dashboard, not just in the stock sheet. Verified via the live /Inventory/api/stock + /Inventory/api/items endpoints: both dashboards now return 96 for site 3d, identical to the stock-levels low-only total.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Controller/Inventory.pm</code> (index low_stock loop), <code>Controller/Accounting.pm</code> (index low_stock loop).</p>
+</div>

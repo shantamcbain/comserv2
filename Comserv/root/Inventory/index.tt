@@ -45,6 +45,7 @@
       <h3 style="margin-top:0;">Stock</h3>
       <ul style="list-style:none;padding:0;margin:0;">
         <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Inventory/stock/levels">Stock Levels</a></li>
+        <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Inventory/count">📋 Physical Count</a></li>
         <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Inventory/stock/adjust">Adjust Stock</a></li>
         <li style="padding:0.35rem 0;"><a href="/Inventory/stock/transactions">Transaction Log</a></li>
       </ul>
@@ -55,6 +56,8 @@
       <ul style="list-style:none;padding:0;margin:0;">
         <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Inventory/suppliers">Suppliers</a></li>
         <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Inventory/supplier/add">+ Add Supplier</a></li>
+        <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Inventory/purchase">Order from Suppliers (low stock)</a></li>
+        <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Inventory/po">Purchase Orders</a></li>
         <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Inventory/locations">Locations</a></li>
         <li style="padding:0.35rem 0;"><a href="/Inventory/location/add">+ Add Location</a></li>
       </ul>
