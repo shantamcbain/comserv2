@@ -36,6 +36,70 @@
         .sidebar-right .sidebar-icon.active { background:#0e639c; color:white; }
         #editor-right-rail { position:relative; }
         #editor-right-rail .rail-resize-handle { position:absolute; left:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:20; background:transparent; }
+    
+        /* AI Editor docked chat — high contrast (override light ai-chat.css .chat-messages) */
+        #ai-chat-sidebar {
+            background: #1e1f22 !important;
+            color: #f2f2f2 !important;
+            font-size: 13px;
+        }
+        #ai-chat-sidebar .chat-messages,
+        #ai-chat-sidebar #chat-messages {
+            background: #1a1b1e !important;
+            background-color: #1a1b1e !important;
+            color: #f2f2f2 !important;
+            font-size: 13px !important;
+            line-height: 1.45 !important;
+            gap: 8px;
+        }
+        #ai-chat-sidebar .chat-msg {
+            margin-bottom: 10px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px solid #3a3f4a;
+            color: #f2f2f2 !important;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            max-width: 100%;
+        }
+        #ai-chat-sidebar .chat-msg-you {
+            background: #243044 !important;
+            border-color: #3d5a80;
+        }
+        #ai-chat-sidebar .chat-msg-ai {
+            background: #252830 !important;
+            border-color: #4a5568;
+        }
+        #ai-chat-sidebar .chat-msg strong {
+            color: #9ecbff !important;
+        }
+        #ai-chat-sidebar .chat-msg-you strong {
+            color: #ffd27a !important;
+        }
+        #ai-chat-sidebar .chat-msg pre,
+        #ai-chat-sidebar .chat-msg code {
+            background: #0f1115 !important;
+            color: #e6edf3 !important;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 6px 8px;
+            display: block;
+            white-space: pre-wrap;
+            font-size: 12px !important;
+            max-height: 280px;
+            overflow: auto;
+        }
+        #ai-chat-sidebar #ai-chat-input {
+            background: #0f1115 !important;
+            color: #f2f2f2 !important;
+            border-color: #555 !important;
+            font-size: 13px !important;
+        }
+        #ai-chat-sidebar .chat-agent-phase {
+            background: #252830;
+            color: #ddd !important;
+        }
+        #ai-chat-sidebar a { color: #7ec8ff !important; }
     </style>
 </head>
 <body>
@@ -237,7 +301,7 @@
                     <button id="ai-chat-close" type="button" title="Hide chat (reopen from the 💬 button)" style="background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;">✕</button>
                 </span>
             </div>
-            <div id="chat-messages" class="chat-messages" style="flex:1; padding:8px; overflow:auto; font-size:0.9em;">
+            <div id="chat-messages" class="chat-messages" style="flex:1; padding:8px; overflow:auto; font-size:13px; background:#1a1b1e; color:#f2f2f2;">
                 <div><strong>AI:</strong> How can I help with this file?</div>
             </div>
             <div class="chat-agent-phase" style="padding:4px 6px; border-top:1px solid #555; display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:11px; color:#bbb;">
