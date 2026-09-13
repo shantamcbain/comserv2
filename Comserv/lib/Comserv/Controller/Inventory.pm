@@ -94,10 +94,19 @@ sub index :Path('/Inventory') :Args(0) {
         $low_stock = 0;
         for my $item (@items) {
             my $total_qty = 0;
+            my $has_stock = 0;
             for my $sl ($item->stock_levels->all) {
                 $total_qty += $sl->quantity_on_hand;
+                $has_stock = 1;
             }
-            $low_stock++ if defined $item->reorder_point && $item->reorder_point > 0 && $total_qty <= $item->reorder_point;
+            my $reorder = $item->reorder_point || 0;
+            # Count as low/missing when: below an explicit reorder point, OR
+            # never received (no stock_level row) so a sale/need can't be met.
+            if ($reorder > 0 && $total_qty <= $reorder) {
+                $low_stock++;
+            } elsif (!$has_stock) {
+                $low_stock++;
+            }
         }
     };
     if ($@) {
@@ -1900,18 +1909,32 @@ sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
     my $low_only   = $c->req->params->{low_only} || 0;
     my $item_id    = $c->req->params->{item_id}  || '';
     my $location_id = $c->req->params->{location_id} || '';
+    my $category   = $c->req->params->{category} || '';
 
-    my (@stock_rows, @items, @locations);
+    # Origins/categories that are never purchase-ordered (cost centres, printed
+    # parts, capital equipment/printers). Used to flag rows as non-orderable so
+    # the group "Order by supplier" action skips them.
+    my %skip_origin = map { $_ => 1 } qw(overhead cost 3d_printed);
+    my %skip_cat    = map { $_ => 1 } qw(Equipment 3d_printer);
+
+    my (@stock_rows, @items, @locations, @categories);
     eval {
         my %item_search = (sitename => $sitename, status => 'active');
         $item_search{id} = $item_id if $item_id;
+        $item_search{category} = $category if $category;
 
         @items     = $schema->resultset('Accounting::InventoryItem')->search(\%item_search, { order_by => 'name' })->all;
         @locations = $schema->resultset('Accounting::InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' })->all;
+        @categories = $schema->resultset('Accounting::InventoryItem')->search(
+            { sitename => $sitename, status => 'active', category => { '!=' => undef } },
+            { columns => ['category'], distinct => 1, order_by => 'category' }
+        )->get_column('category')->all;
 
         for my $item (@items) {
             my %sl_search = (item_id => $item->id);
             $sl_search{location_id} = $location_id if $location_id;
+
+            my $is_orderable = (!$skip_origin{ lc($item->item_origin||'') }) && (!$skip_cat{ $item->category||'' });
 
             my @sls = $schema->resultset('Accounting::InventoryStockLevel')->search(
                 \%sl_search,
@@ -1924,23 +1947,30 @@ sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
                     my $is_low  = ($reorder > 0 && $sl->quantity_on_hand <= $reorder) ? 1 : 0;
                     next if $low_only && !$is_low;
                     push @stock_rows, {
-                        sl       => $sl,
-                        item     => $item,
-                        location => $sl->location,
-                        is_low   => $is_low,
+                        sl           => $sl,
+                        item         => $item,
+                        location     => $sl->location,
+                        is_low       => $is_low,
+                        is_orderable => $is_orderable,
                     };
                 }
             } else {
-                # Item has no stock_level rows: effective qty is 0.
-                # It is below reorder when it has a reorder point set (0 <= reorder_point).
-                my $reorder = defined $item->reorder_point ? $item->reorder_point : 0;
-                my $is_low  = ($reorder > 0) ? 1 : 0;
+                # Item has no stock_level rows: it has never been received.
+                # In low_only view this is "missing stock" and must be shown so
+                # unstocked items are visible (they are genuinely short). In the
+                # full view they still appear, but only flagged low if a reorder
+                # point is set.
+                my $reorder    = defined $item->reorder_point ? $item->reorder_point : 0;
+                my $is_missing = 1;
+                my $is_low     = ($reorder > 0 || $low_only) ? 1 : 0;
                 next if $low_only && !$is_low;
                 push @stock_rows, {
-                    sl       => undef,
-                    item     => $item,
-                    location => undef,
-                    is_low   => $is_low,
+                    sl           => undef,
+                    item         => $item,
+                    location     => undef,
+                    is_low       => $is_low,
+                    is_missing   => $is_missing,
+                    is_orderable => $is_orderable,
                 };
             }
         }
@@ -1951,6 +1981,8 @@ sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
         stock_rows  => \@stock_rows,
         items       => \@items,
         locations   => \@locations,
+        categories  => \@categories,
+        category    => $category,
         low_only    => $low_only,
         item_id     => $item_id,
         location_id => $location_id,
@@ -2025,6 +2057,192 @@ sub stock_transactions :Path('/Inventory/stock/transactions') :Args(0) {
         sitename     => $sitename,
         template     => 'Inventory/stock/transactions.tt',
     );
+}
+
+# -------------------------------------------------------------------------
+# Physical Inventory Count (stock-take) sheet
+# -------------------------------------------------------------------------
+# GET /Inventory/count — filtered list of items (by SiteName + category) with
+# their current system stock (grams). User enters Found qty + picks unit
+# (g/kg/each). Save = persist draft; Submit = apply difference to stock.
+# Duplicate location rows are merged (summed) on read and rewritten as one on submit.
+
+my %UNIT_TO_G = ( g => 1, kg => 1000, each => 1000 );  # filament each = 1kg spool
+
+sub inventory_count :Path('/Inventory/count') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'inventory_count', 'Physical count sheet');
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $category = $c->req->params->{category} || '';
+
+    my (@items, @categories, $draft);
+    eval {
+        my %search = (sitename => $sitename, status => 'active');
+        $search{category} = $category if $category;
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
+            \%search, { prefetch => 'stock_levels', order_by => ['category','name'] }
+        )->all;
+
+        @categories = $schema->resultset('Accounting::InventoryItem')->search(
+            { sitename => $sitename, status => 'active', category => { '!=' => undef } },
+            { columns => ['category'], distinct => 1, order_by => 'category' }
+        )->get_column('category')->all;
+
+        # Resume an existing draft for this site+category+user if present.
+        my $sess = $schema->resultset('Accounting::InventoryCountSession')->search(
+            { sitename => $sitename, category => ($category || undef), status => 'draft',
+              created_by => $c->session->{username} },
+            { order_by => { -desc => 'updated_at' } }
+        )->first;
+        if ($sess) {
+            $draft = eval { JSON::decode_json($sess->rows_json) } if $sess->rows_json;
+        }
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading count sheet: $@" if $@;
+
+    # Build rows: merge duplicate stock_levels rows per location.
+    my @rows;
+    for my $item (@items) {
+        my %loc_qty;
+        for my $sl ($item->stock_levels->all) {
+            my $ln = $sl->location_id || 0;
+            $loc_qty{$ln} += $sl->quantity_on_hand || 0;
+        }
+        my @locs = keys %loc_qty;
+        @locs = (0) unless @locs;   # unlocated stock
+        for my $loc (@locs) {
+            my $sys_g = $loc_qty{$loc} || 0;
+            my $found = $draft->{ $item->id . '_' . $loc } if $draft;
+            push @rows, {
+                item_id      => $item->id,
+                sku          => $item->sku,
+                name         => $item->name,
+                category     => $item->category,
+                unit_of_measure => $item->unit_of_measure,
+                location_id  => $loc,
+                sys_g        => $sys_g,
+                found_qty    => $found->{qty},
+                found_unit   => $found->{unit} || 'g',
+                note         => $found->{note},
+            };
+        }
+    }
+
+    $c->stash(
+        rows       => \@rows,
+        categories => \@categories,
+        category   => $category,
+        sitename   => $sitename,
+        has_draft  => ($draft ? 1 : 0),
+        template   => 'Inventory/count.tt',
+    );
+}
+
+sub count_save :Path('/Inventory/count/save') :Args(0) {
+    my ($self, $c) = @_;
+    return _count_persist($self, $c, 'draft');
+}
+
+sub count_submit :Path('/Inventory/count/submit') :Args(0) {
+    my ($self, $c) = @_;
+    return _count_persist($self, $c, 'submitted');
+}
+
+sub _count_persist {
+    my ($self, $c, $mode) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $params   = $c->req->body_parameters;
+    my $category = $params->{category} || '';
+
+    my %rows;
+    for my $k (keys %$params) {
+        next unless $k =~ /^found_(\d+)_(\d+)$/;
+        my ($item_id, $loc) = ($1, $2);
+        my $qty  = $params->{"found_$item_id\_$loc"}  || 0;
+        my $unit = $params->{"unit_$item_id\_$loc"}    || 'g';
+        my $note = $params->{"note_$item_id\_$loc"}     || '';
+        next unless $qty ne '';
+        $rows{"$item_id\_$loc"} = { item_id => $item_id, loc => $loc, qty => $qty, unit => $unit, note => $note };
+    }
+
+    my $err;
+    eval {
+        $schema->txn_do(sub {
+            for my $key (keys %rows) {
+                my $r = $rows{$key};
+                my $factor = $UNIT_TO_G{ $r->{unit} } // 1;
+                my $found_g = ($r->{qty} + 0) * $factor;
+                my $loc_id  = $r->{loc} ? $r->{loc} : undef;
+
+                # Merge any duplicate stock_level rows for this (item,location).
+                my @existing = $schema->resultset('Accounting::InventoryStockLevel')->search(
+                    { item_id => $r->{item_id}, location_id => ($loc_id // 0) }
+                )->all;
+                my $sys_g = 0;
+                $sys_g += ($_->quantity_on_hand || 0) for @existing;
+                for my $e (@existing) { $e->delete; }
+
+                my $sl = $schema->resultset('Accounting::InventoryStockLevel')->create({
+                    item_id          => $r->{item_id},
+                    location_id      => ($loc_id // 0),
+                    quantity_on_hand  => $found_g,
+                    quantity_reserved => 0,
+                    quantity_on_order => 0,
+                    last_count_date  => substr($self->_now(), 0, 10),
+                });
+                my $delta = $found_g - $sys_g;
+                if ($delta != 0) {
+                    $schema->resultset('Accounting::InventoryTransaction')->create({
+                        item_id          => $r->{item_id},
+                        location_id      => ($loc_id // undef),
+                        transaction_type => 'physical_count',
+                        quantity         => $delta,
+                        unit_cost        => undef,
+                        reference_number => 'Physical count ' . ($mode eq 'submitted' ? 'submit' : 'draft'),
+                        sitename         => $sitename,
+                        notes            => $r->{note},
+                        performed_by     => $c->session->{username} || 'system',
+                        transaction_date => $self->_now(),
+                        created_at       => $self->_now(),
+                    });
+                }
+            }
+        });
+    };
+    if ($@) {
+        $err = $@;
+    }
+
+    # Persist draft row (or mark submitted).
+    my $json = eval { JSON::encode_json(\%rows) };
+    eval {
+        my $sess = $schema->resultset('Accounting::InventoryCountSession')->search(
+            { sitename => $sitename, category => ($category || undef), status => 'draft',
+              created_by => $c->session->{username} },
+            { order_by => { -desc => 'updated_at' } }
+        )->first;
+        $sess ||= $schema->resultset('Accounting::InventoryCountSession')->create({
+            sitename   => $sitename,
+            category   => ($category || undef),
+            created_by => $c->session->{username},
+            status     => 'draft',
+        });
+        $sess->update({ rows_json => $json, status => $mode, updated_at => $self->_now() });
+    };
+
+    if ($err) {
+        $c->flash->{error_msg} = "Count failed: $err";
+    } else {
+        $c->flash->{success_msg} = $mode eq 'submitted'
+            ? 'Physical count applied — stock updated to counted values.'
+            : 'Count draft saved. You can resume it later.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/count', { category => $category }));
 }
 
 # -------------------------------------------------------------------------
@@ -2155,6 +2373,141 @@ sub po_create :Path('/Inventory/po/create') :Args(0) {
         "PO created via web: $res->{po_number} for supplier $supplier_id, send_via=$send_via");
 
     $c->flash->{success_msg} = "Purchase Order $res->{po_number} created (status: $res->{status}).";
+    $c->res->redirect($c->uri_for('/Inventory/po'));
+}
+
+# One-click "Order" from the manufacturing traveler (need_buy parts) or anywhere an
+# item needs purchasing. Resolves the item's preferred supplier, creates a draft PO
+# for the default order qty, and redirects to the PO. If no supplier is linked, sends
+# the user to the item edit page to set one.
+sub po_order_item :Path('/Inventory/po/order_item') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $sitename = $self->_sitename($c);
+    my $params   = $c->req->body_parameters;
+    my $item_id  = $params->{item_id} || $c->req->params->{item_id};
+    my $return   = $params->{return_to} || $c->req->params->{return_to}
+                || $c->uri_for('/Inventory/purchase');
+
+    unless ($item_id) {
+        $c->flash->{error_msg} = 'No item specified to order.';
+        $c->res->redirect($return);
+        return;
+    }
+
+    my $schema = $self->_schema($c);
+    my $item   = eval { $schema->resultset('Accounting::InventoryItem')->find($item_id) };
+    unless ($item) {
+        $c->flash->{error_msg} = "Item $item_id not found.";
+        $c->res->redirect($return);
+        return;
+    }
+
+    # Preferred supplier (or first linked)
+    my ($supplier_id, $supplier_name);
+    eval {
+        my @links = $item->item_suppliers->all;
+        my $pref;
+        for my $l (@links) { if ($l->is_preferred) { $pref = $l; last; } }
+        $pref ||= $links[0] if @links;
+        if ($pref) {
+            $supplier_id   = $pref->supplier_id;
+            $supplier_name = eval { $pref->supplier->name } || 'supplier';
+        }
+    };
+    unless ($supplier_id) {
+        $c->flash->{error_msg} = "No supplier linked to [$item->sku] $item->name. "
+            . 'Add a preferred supplier, then order.';
+        $c->res->redirect($c->uri_for('/Inventory/item/edit', [$item_id]));
+        return;
+    }
+
+    my $qty = $params->{quantity} || $item->reorder_quantity || 1;
+    my $util = Comserv::Util::Inventory::Purchasing->new;
+    my $res = $util->create_po($c, {
+        sitename    => $sitename,
+        supplier_id => $supplier_id,
+        lines       => [ { item_id => $item_id, quantity => $qty } ],
+        notes       => "Ordered from traveler (need_buy). Item: $item->name.",
+        origin      => 'traveler',
+    });
+
+    if (!$res->{ok}) {
+        $c->flash->{error_msg} = $res->{error} || 'PO creation failed';
+        if ($res->{need_schema_compare}) {
+            $c->flash->{error_msg} .= ' (run schema-compare to add tables)';
+        }
+        $c->res->redirect($return);
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'po_order_item',
+        "Traveler order: PO $res->{po_number} for item $item_id (supplier $supplier_id, qty $qty)");
+    $c->flash->{success_msg} = "Purchase Order $res->{po_number} created for "
+        . " [$item->sku] $item->name (supplier: $supplier_name).";
+    $c->res->redirect($c->uri_for('/Inventory/po/view', [$res->{po_id}]));
+}
+
+# Group "Order by supplier" from the Stock Levels low-only / orderable list.
+# Accepts a list of item_ids (checkboxes) and, for each item's preferred supplier,
+# creates one draft PO containing that supplier's lines. BOM parents are expanded to
+# their short leaf components by orderable_low_list. If no ids are posted, orders all
+# orderable low/missing items. Redirects to the PO list when done.
+sub po_order_group :Path('/Inventory/po/order_group') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $sitename = $self->_sitename($c);
+    my $params   = $c->req->body_parameters;
+    my $return   = $params->{return_to} || $c->req->params->{return_to}
+                || $c->uri_for('/Inventory/stock/levels', { low_only => 1 });
+
+    my @ids;
+    my $ids_raw = $params->{item_id};
+    if (ref($ids_raw) eq 'ARRAY') { @ids = @$ids_raw; }
+    elsif ($ids_raw) { @ids = ($ids_raw); }
+
+    my $util = Comserv::Util::Inventory::Purchasing->new;
+    my $res  = $util->orderable_low_list($c, {
+        sitename     => $sitename,
+        selected_ids => \@ids,
+        expand_bom  => 1,
+    });
+    unless ($res->{ok}) {
+        $c->flash->{error_msg} = $res->{error} || 'Could not build order list';
+        $c->res->redirect($return);
+        return;
+    }
+
+    my @groups = @{ $res->{by_supplier} || [] };
+    unless (@groups) {
+        $c->flash->{error_msg} = 'No orderable items with a linked supplier selected.';
+        $c->res->redirect($return);
+        return;
+    }
+
+    my @created;
+    my $err;
+    for my $grp (@groups) {
+        my @lines = map { { item_id => $_->{item_id}, quantity => $_->{suggested_qty} || 1 } }
+                    @{ $grp->{items} || [] };
+        next unless @lines;
+        my $r = $util->create_po($c, {
+            sitename    => $sitename,
+            supplier_id => $grp->{supplier_id},
+            lines       => \@lines,
+            notes       => 'Group order from stock low list (by supplier).',
+            origin      => 'traveler',
+        });
+        if ($r->{ok}) { push @created, $r->{po_number}; }
+        else { $err .= " Supplier $grp->{supplier_name}: " . ($r->{error} || 'failed') . ';'; }
+    }
+
+    if ($err) {
+        $c->flash->{error_msg} = "Some POs failed:$err";
+    }
+    if (@created) {
+        $c->flash->{success_msg} = 'Created POs: ' . join(', ', @created);
+    }
     $c->res->redirect($c->uri_for('/Inventory/po'));
 }
 
@@ -4287,14 +4640,19 @@ sub print_stock_report :Path('/Inventory/print/stock') :Args(0) {
             $total_qty += $sl->quantity_on_hand;
             push @sl_detail, $sl;
         }
+        my $has_stock = @sl_detail ? 1 : 0;
         my $is_low = defined $item->reorder_point && $item->reorder_point > 0
                      && $total_qty <= $item->reorder_point;
-        next if $low_only && !$is_low;
+        # In low_only, also surface items that have never been received
+        # (no stock_level rows) — they are genuinely missing stock.
+        my $is_missing = !$has_stock ? 1 : 0;
+        next if $low_only && !$is_low && !$is_missing;
         push @report_rows, {
-            item      => $item,
-            sl_detail => \@sl_detail,
-            total_qty => $total_qty,
-            is_low    => $is_low,
+            item       => $item,
+            sl_detail  => \@sl_detail,
+            total_qty  => $total_qty,
+            is_low     => $is_low,
+            is_missing => $is_missing,
         };
     }
 
