@@ -105,6 +105,7 @@ __PACKAGE__->register_class('InventoryTransaction', 'Comserv::Model::Schema::Enc
 __PACKAGE__->register_class('InventoryAssignment', 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryAssignment');
 __PACKAGE__->register_class('InventoryItemSupplier', 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItemSupplier');
 __PACKAGE__->register_class('InventoryItemBOM', 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItemBOM');
+__PACKAGE__->register_class('InventoryCountSession', 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryCountSession');
 
 # Register HelpDesk support ticket and messaging classes
 __PACKAGE__->register_class('SupportTicket', 'Comserv::Model::Schema::Ency::Result::SupportTicket');

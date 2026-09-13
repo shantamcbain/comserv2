@@ -2060,6 +2060,192 @@ sub stock_transactions :Path('/Inventory/stock/transactions') :Args(0) {
 }
 
 # -------------------------------------------------------------------------
+# Physical Inventory Count (stock-take) sheet
+# -------------------------------------------------------------------------
+# GET /Inventory/count — filtered list of items (by SiteName + category) with
+# their current system stock (grams). User enters Found qty + picks unit
+# (g/kg/each). Save = persist draft; Submit = apply difference to stock.
+# Duplicate location rows are merged (summed) on read and rewritten as one on submit.
+
+my %UNIT_TO_G = ( g => 1, kg => 1000, each => 1000 );  # filament each = 1kg spool
+
+sub inventory_count :Path('/Inventory/count') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'inventory_count', 'Physical count sheet');
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $category = $c->req->params->{category} || '';
+
+    my (@items, @categories, $draft);
+    eval {
+        my %search = (sitename => $sitename, status => 'active');
+        $search{category} = $category if $category;
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
+            \%search, { prefetch => 'stock_levels', order_by => ['category','name'] }
+        )->all;
+
+        @categories = $schema->resultset('Accounting::InventoryItem')->search(
+            { sitename => $sitename, status => 'active', category => { '!=' => undef } },
+            { columns => ['category'], distinct => 1, order_by => 'category' }
+        )->get_column('category')->all;
+
+        # Resume an existing draft for this site+category+user if present.
+        my $sess = $schema->resultset('Accounting::InventoryCountSession')->search(
+            { sitename => $sitename, category => ($category || undef), status => 'draft',
+              created_by => $c->session->{username} },
+            { order_by => { -desc => 'updated_at' } }
+        )->first;
+        if ($sess) {
+            $draft = eval { JSON::decode_json($sess->rows_json) } if $sess->rows_json;
+        }
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading count sheet: $@" if $@;
+
+    # Build rows: merge duplicate stock_levels rows per location.
+    my @rows;
+    for my $item (@items) {
+        my %loc_qty;
+        for my $sl ($item->stock_levels->all) {
+            my $ln = $sl->location_id || 0;
+            $loc_qty{$ln} += $sl->quantity_on_hand || 0;
+        }
+        my @locs = keys %loc_qty;
+        @locs = (0) unless @locs;   # unlocated stock
+        for my $loc (@locs) {
+            my $sys_g = $loc_qty{$loc} || 0;
+            my $found = $draft->{ $item->id . '_' . $loc } if $draft;
+            push @rows, {
+                item_id      => $item->id,
+                sku          => $item->sku,
+                name         => $item->name,
+                category     => $item->category,
+                unit_of_measure => $item->unit_of_measure,
+                location_id  => $loc,
+                sys_g        => $sys_g,
+                found_qty    => $found->{qty},
+                found_unit   => $found->{unit} || 'g',
+                note         => $found->{note},
+            };
+        }
+    }
+
+    $c->stash(
+        rows       => \@rows,
+        categories => \@categories,
+        category   => $category,
+        sitename   => $sitename,
+        has_draft  => ($draft ? 1 : 0),
+        template   => 'Inventory/count.tt',
+    );
+}
+
+sub count_save :Path('/Inventory/count/save') :Args(0) {
+    my ($self, $c) = @_;
+    return _count_persist($self, $c, 'draft');
+}
+
+sub count_submit :Path('/Inventory/count/submit') :Args(0) {
+    my ($self, $c) = @_;
+    return _count_persist($self, $c, 'submitted');
+}
+
+sub _count_persist {
+    my ($self, $c, $mode) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $params   = $c->req->body_parameters;
+    my $category = $params->{category} || '';
+
+    my %rows;
+    for my $k (keys %$params) {
+        next unless $k =~ /^found_(\d+)_(\d+)$/;
+        my ($item_id, $loc) = ($1, $2);
+        my $qty  = $params->{"found_$item_id\_$loc"}  || 0;
+        my $unit = $params->{"unit_$item_id\_$loc"}    || 'g';
+        my $note = $params->{"note_$item_id\_$loc"}     || '';
+        next unless $qty ne '';
+        $rows{"$item_id\_$loc"} = { item_id => $item_id, loc => $loc, qty => $qty, unit => $unit, note => $note };
+    }
+
+    my $err;
+    eval {
+        $schema->txn_do(sub {
+            for my $key (keys %rows) {
+                my $r = $rows{$key};
+                my $factor = $UNIT_TO_G{ $r->{unit} } // 1;
+                my $found_g = ($r->{qty} + 0) * $factor;
+                my $loc_id  = $r->{loc} ? $r->{loc} : undef;
+
+                # Merge any duplicate stock_level rows for this (item,location).
+                my @existing = $schema->resultset('Accounting::InventoryStockLevel')->search(
+                    { item_id => $r->{item_id}, location_id => ($loc_id // 0) }
+                )->all;
+                my $sys_g = 0;
+                $sys_g += ($_->quantity_on_hand || 0) for @existing;
+                for my $e (@existing) { $e->delete; }
+
+                my $sl = $schema->resultset('Accounting::InventoryStockLevel')->create({
+                    item_id          => $r->{item_id},
+                    location_id      => ($loc_id // 0),
+                    quantity_on_hand  => $found_g,
+                    quantity_reserved => 0,
+                    quantity_on_order => 0,
+                    last_count_date  => substr($self->_now(), 0, 10),
+                });
+                my $delta = $found_g - $sys_g;
+                if ($delta != 0) {
+                    $schema->resultset('Accounting::InventoryTransaction')->create({
+                        item_id          => $r->{item_id},
+                        location_id      => ($loc_id // undef),
+                        transaction_type => 'physical_count',
+                        quantity         => $delta,
+                        unit_cost        => undef,
+                        reference_number => 'Physical count ' . ($mode eq 'submitted' ? 'submit' : 'draft'),
+                        sitename         => $sitename,
+                        notes            => $r->{note},
+                        performed_by     => $c->session->{username} || 'system',
+                        transaction_date => $self->_now(),
+                        created_at       => $self->_now(),
+                    });
+                }
+            }
+        });
+    };
+    if ($@) {
+        $err = $@;
+    }
+
+    # Persist draft row (or mark submitted).
+    my $json = eval { JSON::encode_json(\%rows) };
+    eval {
+        my $sess = $schema->resultset('Accounting::InventoryCountSession')->search(
+            { sitename => $sitename, category => ($category || undef), status => 'draft',
+              created_by => $c->session->{username} },
+            { order_by => { -desc => 'updated_at' } }
+        )->first;
+        $sess ||= $schema->resultset('Accounting::InventoryCountSession')->create({
+            sitename   => $sitename,
+            category   => ($category || undef),
+            created_by => $c->session->{username},
+            status     => 'draft',
+        });
+        $sess->update({ rows_json => $json, status => $mode, updated_at => $self->_now() });
+    };
+
+    if ($err) {
+        $c->flash->{error_msg} = "Count failed: $err";
+    } else {
+        $c->flash->{success_msg} = $mode eq 'submitted'
+            ? 'Physical count applied — stock updated to counted values.'
+            : 'Count draft saved. You can resume it later.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/count', { category => $category }));
+}
+
+# -------------------------------------------------------------------------
 # Supplier Purchase Orders (stock -> PO flow)
 # -------------------------------------------------------------------------
 # Clean path from stock sheet / low stock to grouped supplier PO creation.
