@@ -34,6 +34,7 @@ talk to OpenRouter must strip the "provider|" prefix first.
 # Process-level cache: built once, reused by every request/surface.
 our $CACHE_JSON;
 our $CACHE_ARR;
+our $CACHE_RAW;       # raw Router catalog (array of hashes with name/provider) for grouping
 our $CACHE_AT = 0;
 our $TTL      = 600;   # seconds; providers change rarely
 our $CACHE_GEN = 5;    # bump when catalog shape/providers/guest-default change
@@ -280,7 +281,7 @@ our @FREE_PREFERENCE = (
     'openrouter|stealth/ox-alpha',                     # 0/0 priced, no :free suffix
 );
 
-our $CODING_DEFAULT = 'openrouter|tencent/hy3';
+our $CODING_DEFAULT = 'openrouter|cohere/north-mini-code:free';
 
 sub default_for {
     my ($class, $c, %opts) = @_;
@@ -379,6 +380,20 @@ sub _flatten {
         # Skip Router sentinels — they are status markers, not selectable models.
         next if $name =~ /^(ollama_empty|ollama_unreachable)$/;
         next if $name =~ /_unconfigured$/;
+
+        # Is the price actually known? x.AI's /v1/models publishes no pricing,
+        # so Grok entries previously arrived with price 0 and were flattened as
+        # free/paid=0 — which is exactly why every Grok model showed as free.
+        my $known = $m->{price_known};
+        $known = ( defined $m->{price_prompt} || defined $m->{price_completion}
+                   || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0
+            unless defined $known;
+
+        my $pp = ( $m->{price_prompt}     // 0 ) + 0;
+        my $pc = ( $m->{price_completion} // 0 ) + 0;
+        my $is_free = ( $name =~ /:free$/ )
+                   || ( $known && $pp == 0 && $pc == 0 );
+
         push @flat, {
             value    => "$svc|$name",
             label    => ( defined $m->{label} ? $m->{label} : $name ),
@@ -388,14 +403,16 @@ sub _flatten {
             #   local : runs on our own hardware — no cash cost, but it does
             #           consume workstation GPU/VRAM, so it is NOT the guest default
             #   paid  : bills real money per token
-            free     => ( $name =~ /:free$/ ? 1 : 0 ),
+            free     => $is_free ? 1 : 0,
             local    => ( $svc eq 'ollama' ? 1 : 0 ),
-            paid     => ( $svc ne 'ollama' && $svc ne 'supergrok' && $name !~ /:free$/ ? 1 : 0 ),
+            # Unknown price => treat as PAID, never free (fail closed).
+            paid     => ( $svc ne 'ollama' && $svc ne 'supergrok' && !$is_free ? 1 : 0 ),
             # AIMPS-P1 (#253): real per-token cost from the provider feed.
             # price_prompt / price_completion are USD per 1M tokens; price_tier
             # is threshold-derived (never a hardcoded model list, see plan §3).
-            price_prompt     => ( $m->{price_prompt}     // 0 ) + 0,
-            price_completion => ( $m->{price_completion} // 0 ) + 0,
+            price_prompt     => $pp,
+            price_completion => $pc,
+            price_known      => $known ? 1 : 0,
             price_tier       => $class->_price_tier($m),
         };
     }
@@ -414,17 +431,28 @@ sub _price_tier {
     my $pc = ( $m->{price_completion} // 0 ) + 0;
     my $max = ( $pp > $pc ) ? $pp : $pc;   # rank by the dearer side
     return 'prepaid' if ($m->{provider} || '') eq 'supergrok' || $m->{prepaid};
-    return 'free'   if $max <= 0;
+    return 'free'   if ($m->{name} // '') =~ /:free$/;
+
+    # Only call a zero price "free" when the price is genuinely known.
+    # x.AI publishes no pricing in /v1/models, so its entries used to land here
+    # with $max == 0 and be tiered "free". Fail closed: unknown => 'unknown'.
+    my $known = $m->{price_known};
+    $known = ( defined $m->{price_prompt} || defined $m->{price_completion}
+               || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0
+        unless defined $known;
+    return 'free' if $known && $max <= 0;
+    return 'unknown' unless $known;
+
     return 'cheap'  if $max <= 1;
     return 'mid'    if $max <= 5;
     return 'premium';
 }
 
 sub _build {
-    my ($class, $c) = @_;
+    my ($class, $c, %opts) = @_;
 
     my $catalog = try {
-        $c->model('AI2')->get_available_models($c);
+        $c->model('AI2')->get_available_models($c, include_ollama => 0);
     } catch {
         my $err = $_;
         eval { $c->log->warn("ModelCatalog: build failed: $err") };
@@ -446,6 +474,67 @@ sub _build {
         $CACHE_AT = time() - $TTL + 30;   # retry sooner than a full TTL
     }
     return $CACHE_ARR;
+}
+
+=head2 refresh($c, %opts)
+
+Explicitly rebuild the catalog with the live provider lists (Ollama + external).
+Called by AI surfaces when the user opens chat, the AI editor, or an admin
+explicitly triggers a refresh. The cache is process-level, so this helps every
+subsequent request on this worker.
+
+If opts{once_per_session} is true, a flag is stored in the session to avoid
+refreshing more than once per user session.
+
+=cut
+
+sub refresh {
+    my ($class, $c, %opts) = @_;
+
+    if ($opts{once_per_session}) {
+        my $sess_key = '_ai_catalog_refreshed_v' . $CACHE_GEN;
+        return $CACHE_ARR if $c->session && $c->session->{$sess_key};
+    }
+
+    my $catalog = try {
+        $c->model('AI2')->get_available_models($c, include_ollama => 1);
+    } catch {
+        my $err = $_;
+        eval { $c->log->warn("ModelCatalog: refresh failed: $err") };
+        undef;
+    };
+
+    if ($catalog && ref($catalog) eq 'ARRAY') {
+        $CACHE_RAW = $catalog;   # keep raw Router shape for grouping endpoints
+        my $flat = $class->_flatten($catalog);
+        if (@$flat) {
+            $CACHE_ARR  = $flat;
+            $CACHE_JSON = try { JSON->new->utf8->canonical->encode($flat) } catch { '[]' };
+        }
+        $CACHE_AT = time();
+        $CACHE_GEN_LOADED = $CACHE_GEN;
+    }
+
+    if ($opts{once_per_session}) {
+        my $sess_key = '_ai_catalog_refreshed_v' . $CACHE_GEN;
+        $c->session->{$sess_key} = time() if $c->session;
+    }
+
+    return $CACHE_ARR;
+}
+
+=head2 raw_catalog
+
+Returns the most recently fetched raw Router catalog (array of hashes with
+name/provider/local etc.) as used by /ai2/providers for grouping. Empty if no
+refresh has run yet.
+
+=cut
+
+sub raw_catalog {
+    my ($class, $c) = @_;
+    $class->refresh($c, once_per_session => 1) unless $CACHE_RAW;
+    return $CACHE_RAW || [];
 }
 
 1;

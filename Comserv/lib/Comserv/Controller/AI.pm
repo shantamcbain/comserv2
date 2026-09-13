@@ -21,6 +21,7 @@ use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use Try::Tiny;
 use JSON;
+use Comserv::Model::AI::ConversationScope qw(is_guest_session ensure_guest_session_id guest_meta_ok conversation_owned_by_session);
 use Template;
 use DateTime;
 use LWP::UserAgent;
@@ -253,21 +254,23 @@ sub index :Path :Args(0) {
         push @_catalog, { value => "ollama|$name", label => $name, provider => 'ollama', local => 1, free => 0 };
     }
     # Live external models (Grok/xAI, OpenRouter, ...) — same dynamic source the
-    # chat dropdown uses. De-dupe by value, then role-filter so a guest sees
-    # only the free/open tier (never the full admin list).
-    my $live = try { $c->model('AI2::Router')->get_available_models($c) } catch { undef };
+    # chat dropdown uses. Refresh the full live catalog once per session when the
+    # AI page is opened, then de-dupe by value. No Ollama probe on ordinary pages.
+    my $live = try {
+        Comserv::Util::ModelCatalog->refresh($c, once_per_session => 1);
+    } catch { undef };
     if ($live && ref($live) eq 'ARRAY') {
         for my $m (@$live) {
             next unless $m && ref($m) eq 'HASH';
-            my $prov = $m->{provider} // '';
-            next if $prov eq 'ollama';
             next if $m->{disabled} || $m->{needs_key} || $m->{unreachable};
-            my $name = $m->{name} // $m->{id} // '';
-            next unless $name;
+            my $value = $m->{value} // '';
+            next unless $value;
+            # Skip Ollama entries already added from installed_models above.
+            next if ($m->{provider} // '') eq 'ollama';
             push @_catalog, {
-                value             => "$prov|$name",
-                label             => $m->{label} // $name,
-                provider          => $prov,
+                value             => $value,
+                label             => $m->{label} // '',
+                provider          => $m->{provider} // '',
                 free              => $m->{free} ? 1 : 0,
                 local             => $m->{local} ? 1 : 0,
                 price_prompt      => $m->{price_prompt} // 0,
@@ -363,8 +366,11 @@ sub widget :Local :Args(0) {
     # dropdown while the main page was fine. Pass the values explicitly.
     # Pull from the shared single-source-of-truth util rather than the stash:
     # this action detaches with its own Template->new, and Root::auto's stash is
-    # not guaranteed to be populated on this path.
-    my $cat_arr  = Comserv::Util::ModelCatalog->catalog($c);
+    # not guaranteed to be populated on this path. Refresh the live catalog once
+    # per session when the widget popup is opened.
+    my $cat_arr  = try {
+        Comserv::Util::ModelCatalog->refresh($c, once_per_session => 1);
+    } catch { Comserv::Util::ModelCatalog->catalog($c) };
     my $cat_json = Comserv::Util::ModelCatalog->catalog_json($c);
     my $css_v    = $c->stash->{css_v} || time();
     my $cat_def  = Comserv::Util::ModelCatalog->default_for($c, page => 'chat');
@@ -2671,7 +2677,7 @@ sub chat :Local :Args(0) {
     my $is_guest = 0;
     
     # If not logged in, create guest session
-    if (!$username) {
+    if (!$username || lc($username) eq 'guest' || $username =~ /^Guest-/i) {
         $is_guest = 1;
         
         # Create a unique guest session ID if not already present
@@ -5296,7 +5302,7 @@ sub _assess_response_quality {
     );
     my $lc_resp = lc($response);
     for my $phrase (@uncertain_phrases) {
-        return 'poor' if index($lc_resp, $phrase) >= 0;
+        return 'poor' if CORE::index($lc_resp, $phrase) >= 0;
     }
 
     return 'good';
@@ -5531,25 +5537,25 @@ sub _pick_ollama_tier {
         'deepseek'   => 7, 'command'  => 7,
         'kimi-k2'    => 232, 'kimi'   => 72,
     );
-    for my $n (@names) {
-        my $score;
-        # 1. Explicit Nb in name (deepseek-r1:7b, llama2:13b, etc.)
-        if ($n =~ /[:\-](\d+)b/i) { $score = $1; }
-        # 2. Known family prefix
-        unless ($score) {
-            for my $family (sort { length($b) <=> length($a) } keys %known_family) {
-                if (index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
+        for my $n (@names) {
+            my $score;
+            # 1. Explicit Nb in name (deepseek-r1:7b, llama2:13b, etc.)
+            if ($n =~ /[:\\-](\d+)b/i) { $score = $1; }
+            # 2. Known family prefix
+            unless ($score) {
+                for my $family (sort { length($b) <=> length($a) } keys %known_family) {
+                    if (CORE::index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
+                }
             }
+            # 3. Generic hints
+            $score //= $n =~ /tiny/i   ? 1
+                     : $n =~ /small/i  ? 3
+                     : $n =~ /mini/i   ? 3
+                     : $n =~ /medium/i ? 7
+                     : $n =~ /large/i  ? 13
+                     :                   7;
+            $size_score{$n} = $score;
         }
-        # 3. Generic hints
-        $score //= $n =~ /tiny/i   ? 1
-                 : $n =~ /small/i  ? 3
-                 : $n =~ /mini/i   ? 3
-                 : $n =~ /medium/i ? 7
-                 : $n =~ /large/i  ? 13
-                 :                   7;
-        $size_score{$n} = $score;
-    }
 
     my @sorted = sort { ($size_score{$a} || 7) <=> ($size_score{$b} || 7) } @names;
 
@@ -6541,7 +6547,7 @@ sub conversations :Local :Args(0) {
     my $is_guest = 0;
     
     # If not logged in, create guest session
-    if (!$username) {
+    if (!$username || lc($username) eq 'guest' || $username =~ /^Guest-/i) {
         $is_guest = 1;
         
         # Create a unique guest session ID if not already present
@@ -6612,19 +6618,7 @@ sub conversations :Local :Args(0) {
                 
                 # For guests, only show conversations that belong to this guest session
                 if ($is_guest) {
-                    my $conv_metadata = {};
-                    if ($conv->metadata) {
-                        try {
-                            $conv_metadata = decode_json($conv->metadata);
-                        } catch {
-                            # Metadata parsing failed, skip this conversation
-                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                                'conversations', "Failed to parse conversation metadata for ID=" . $conv->id);
-                        };
-                    }
-                    
-                    # Check if this conversation belongs to this guest session
-                    unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
+                    unless (guest_meta_ok($conv->metadata, $guest_session_id)) {
                         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                             'conversations', "Skipping conversation ID=" . $conv->id . " - not owned by this guest session");
                         next;
@@ -6945,20 +6939,15 @@ sub get_conversation_list :Local :Args(0) {
     
     $c->response->content_type('application/json');
     
-    my $username = $c->session->{username};
+    my $is_guest = is_guest_session($c);
     my $user_id = $c->session->{user_id};
-    my $guest_session_id = $c->session->{guest_session_id};
-    my $is_guest = 0;
-    
-    if (!$username) {
-        $is_guest = 1;
-        $user_id = 199;
-        unless ($guest_session_id) {
-            use Data::UUID;
-            my $ug = Data::UUID->new;
-            $guest_session_id = $ug->create_str();
-            $c->session->{guest_session_id} = $guest_session_id;
-        }
+    my $guest_session_id = ensure_guest_session_id($c);
+    if ($is_guest) {
+        $user_id = 199 unless defined $user_id;
+    }
+    unless (defined $user_id) {
+        $c->response->body(encode_json({ success => JSON::true, conversations => [] }));
+        return;
     }
     
     try {
@@ -6974,13 +6963,7 @@ sub get_conversation_list :Local :Args(0) {
         my @conv_list;
         foreach my $conv ($conv_rs->all) {
             if ($is_guest) {
-                my $conv_metadata = {};
-                if ($conv->metadata) {
-                    try {
-                        $conv_metadata = decode_json($conv->metadata);
-                    } catch {};
-                }
-                next unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id);
+                next unless guest_meta_ok($conv->metadata, $guest_session_id);
             }
             
             my $message_count = $conv->ai_messages->count;
@@ -7024,16 +7007,6 @@ sub get_conversation_messages :Local :Args(1) {
         return;
     }
     
-    my $username = $c->session->{username};
-    my $user_id = $c->session->{user_id};
-    my $guest_session_id = $c->session->{guest_session_id};
-    my $is_guest = 0;
-    
-    if (!$username) {
-        $is_guest = 1;
-        $user_id = 199;
-    }
-    
     try {
         my $schema = $c->model('DBEncy')->schema;
         my $conv = $schema->resultset('AiConversation')->find($conversation_id);
@@ -7046,28 +7019,12 @@ sub get_conversation_messages :Local :Args(1) {
             return;
         }
         
-        if ($conv->user_id != $user_id) {
+        unless (conversation_owned_by_session($c, $conv)) {
             $c->response->body(encode_json({
                 success => JSON::false,
                 error => 'Access denied'
             }));
             return;
-        }
-        
-        if ($is_guest) {
-            my $conv_metadata = {};
-            if ($conv->metadata) {
-                try {
-                    $conv_metadata = decode_json($conv->metadata);
-                } catch {};
-            }
-            unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
-                $c->response->body(encode_json({
-                    success => JSON::false,
-                    error => 'Access denied'
-                }));
-                return;
-            }
         }
         
         my @messages;
@@ -8794,6 +8751,14 @@ sub action :Local :Args(0) {
         my $user_id     = $c->session->{user_id} || undef;
         my $username    = $current_user;
 
+        if (Comserv::Controller::HelpDesk->_looks_like_spam_content($subject, $description)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'action',
+                "AI create_helpdesk_ticket blocked as spam: subject=" . substr($subject // '', 0, 80));
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Your request was blocked by our spam filter.' }));
+            return;
+        }
+
         my $ticket_number = uc($site_name) . '-' . DateTime->now->strftime('%Y%m%d') . '-' . sprintf('%04d', int(rand(9999)) + 1);
         my $now_str = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
 
@@ -8824,6 +8789,14 @@ sub action :Local :Args(0) {
         my $ticket_num = $new_ticket->ticket_number // $ticket_number;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
             "AI action create_helpdesk_ticket: id=$ticket_id num=$ticket_num sitename=$site_name by=$username subject='$subject'");
+        eval {
+            require Comserv::Util::HelpDeskWebhook;
+            Comserv::Util::HelpDeskWebhook->notify_ticket_change($c,
+                event  => 'ticket.created',
+                change => 'created',
+                ticket => $new_ticket,
+            );
+        };
         $c->response->body(encode_json({
             success       => JSON::true,
             message       => "Support ticket $ticket_num created: \"$subject\". An admin will be notified.",
@@ -12559,9 +12532,14 @@ sub grok_balance :Local :Args(0) {
     
     my $user_id = $c->session->{user_id};
     my $site_id = $c->session->{SiteID};
+
+    # Localhost / 192.168.1.0/24 LAN bypass (same trusted-address pattern as
+    # Api.pm system_logs / hardware_metrics). Remote still needs a session.
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
     
     # Early auth check - return clean JSON instead of letting Catalyst redirect or crash
-    unless ($user_id) {
+    unless ($is_local || $user_id) {
         $c->response->body(encode_json({
             success => JSON::false,
             error   => 'You must be logged in to check Grok/xAI balance and usage.',

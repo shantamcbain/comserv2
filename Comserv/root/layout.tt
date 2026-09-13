@@ -14,6 +14,13 @@
 [% END %]
     [% INCLUDE 'Header.tt' %]
 <body class="theme-[% theme_name || c.stash.theme_name || c.session.theme_name || 'default' %][% IF c.stash.has_bg_image %] has-bg-image[% END %]">
+[%# Documentation branch: notice when a PUBLIC doc is served on a production host #%]
+[% IF c.stash.doc_is_public && c.stash.system_identifier && c.stash.system_identifier.match('(?i)production') %]
+<div class="doc-public-notice" role="status">
+    <span class="doc-public-notice__icon" aria-hidden="true">📖</span>
+    <span class="doc-public-notice__text">You are reading <strong>public documentation</strong> on a <strong>production</strong> deployment. Content here is read-only reference.</span>
+</div>
+[% END %]
 [% IF c.stash.no_wrapper %]
     [% content %]
 [% ELSIF c.stash.ai_popup_mode %]

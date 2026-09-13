@@ -62,7 +62,7 @@
                         }
                     });
                 }
-                if (!opts.length) opts = [{ val: 'mistral:latest|ollama', label: 'mistral:latest (Ollama)' }];
+                if (!opts.length) opts = [{ val: '', label: '⚠ No models available — check AI provider config' }];
                 sel.innerHTML = '';
                 opts.forEach(function(o, i) {
                     var opt = document.createElement('option');
@@ -72,7 +72,7 @@
                 });
             })
             .catch(function() {
-                sel.innerHTML = '<option value="mistral:latest|ollama">mistral:latest (Ollama)</option>';
+                sel.innerHTML = '<option value="">⚠ Could not load models — retry the page</option>';
             });
     }
     loadInvoiceModels();
@@ -82,11 +82,17 @@
         if (!text) { alert('Please paste the invoice text first.'); return; }
 
         var sel   = document.getElementById('invoice-ai-model');
-        var parts = (sel && sel.value) ? sel.value.split('|') : ['mistral:latest', 'ollama'];
-        var model = parts[0], provider = parts[1] || 'ollama';
+        var parts = (sel && sel.value) ? sel.value.split('|') : ['', ''];
+        var model = parts[0], provider = parts[1] || '';
 
         var btn      = document.getElementById('invoice-parse-btn');
         var statusEl = document.getElementById('invoice-parse-status');
+
+        if (!model || !provider) {
+            statusEl.textContent = 'No AI model selected — pick one from the list (or reload the page if it is empty).';
+            btn.disabled = false;
+            return;
+        }
         btn.disabled = true;
         statusEl.textContent = 'Parsing with ' + model + '…';
         document.getElementById('invoice-parse-raw').style.display = 'none';

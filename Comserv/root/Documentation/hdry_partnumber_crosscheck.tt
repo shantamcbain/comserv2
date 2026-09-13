@@ -1,0 +1,208 @@
+[% PageVersion = 'root/Documentation/hdry_partnumber_crosscheck.tt,v 0.01 2026/09/11 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% META title = 'HDRY Part-Number Cross-Check (PDF vs 3MF vs ZIP vs Inventory)'
+       description = 'Reconciliation of HDRY System V3 part codes across the assembly manual, the 3MF plate exports, the Upgrade-2 ZIP, and the live inventory items.'
+       category = '3d'
+       roles = 'admin,manager'
+       TemplateType = 'Documentation'
+       last_updated = '2026-09-11'
+       page_version = '0.01'
+       site_specific = '0' %]
+
+<div class="row">
+    <div class="col-100">
+        <h2 id="hdry-crosscheck" class="doc-h2">HDRY Part-Number Cross-Check</h2>
+        <p class="doc-body">Reconciliation of every HDRY System V3 part code across the four sources you asked about:
+        the <strong>assembly manual PDF</strong>, the <strong>3MF plate exports</strong>, the <strong>Upgrade-2 ZIP</strong>, and the
+        <strong>live inventory items</strong> (read from the running app on :4003, no DB hand-edit). Goal: find what is in the
+        drawings/files but missing from inventory, and vice-versa, before trusting the traveler.</p>
+
+        <p class="doc-body"><strong>Sources used.</strong></p>
+        <ul class="doc-ul">
+            <li><code>192244_HDRY_System__Assembly_Manual.pdf</code> (103 pp, 1 Feb 2025) &mdash; printed-part codes + hardware counts.</li>
+            <li><code>~/Downloads/hdry/*.3mf</code> &mdash; Module_1, Module_2, Doors, Dryer_Extras, AMS_Hydra_Rollers, HDry_Lite_Desicant_box, INT-HDRY-BLS01 side panel. Part names read from each 3MF's OrcaSlicer <code>Metadata/*.json</code> and <code>3D/3dmodel.model</code> object names.</li>
+            <li><code>110529_HDRY_System__Upgrade_2.zip</code> &mdash; contains <code>HDRY System - Upgrade 2.3mf</code> + <code>Before_Upgrade 2_read_this.pdf</code>. The inner 3MF's part names could not be parsed from this session (binary/deflated config) &mdash; <span class="doc-warn">flagged unresolved below</span>.</li>
+            <li>Live inventory: <code>GET /Inventory/items</code> on :4003 returned <strong>114</strong> HDRY/HW-* SKUs (INT-HDRY-*, HW-*, plus HDRY-wheel/Hydra sub-assemblies).</li>
+        </ul>
+
+        <h3 class="doc-h3">A. Printed structural parts &mdash; presence matrix</h3>
+        <p class="doc-body">Legend: <span class="ok">Y</span> = present, <span class="miss">N</span> = absent, <span class="warn">?</span> = ambiguous.
+        "3MF" = appears in at least one of the seven plate exports. "Inv" = SKU exists in inventory.</p>
+        <table class="doc-table">
+            <tr><th class="doc-th">Code</th><th class="doc-th">PDF</th><th class="doc-th">3MF</th><th class="doc-th">Inv</th><th class="doc-th">Notes</th></tr>
+            [% # Module structure
+               FOREACH row IN [
+                 ['BBL01','Y','Y','Y','Bottom Back Left L1'],
+                 ['BBL02','Y','Y','Y','Bottom Back Left L2'],
+                 ['BBR01','Y','Y','Y','Bottom Back Right L1'],
+                 ['BBR02','Y','Y','Y','Bottom Back Right L2'],
+                 ['BBR03','Y','Y','Y','Bottom Back Right L3'],
+                 ['BL01','Y','Y','Y','Back Left corner L1'],
+                 ['BL02','Y','Y','Y','Back Left corner L2'],
+                 ['BL03','Y','Y','Y','Back Left corner L3'],
+                 ['BLS01','Y','Y','Y','Back Left Side panel L1'],
+                 ['BLS02','Y','Y','Y','Back Left Side panel L2'],
+                 ['BR01','Y','Y','Y','Back Right corner L1'],
+                 ['BR02','Y','Y','Y','Back Right corner L2'],
+                 ['BR03','Y','Y','Y','Back Right corner L3'],
+                 ['BRS01','Y','Y','Y','Back Right Side L1'],
+                 ['BRS02','Y','Y','Y','Back Right Side L2'],
+                 ['FL01','Y','Y','Y','Front Left corner L1 (file often ships as FL03 geom)'],
+                 ['FL02','Y','Y','Y','Front Left corner L2'],
+                 ['FL03','Y','Y','Y','Front Left corner L3'],
+                 ['FLS01','Y','Y','Y','Front Left Side panel L1'],
+                 ['FLS02','Y','Y','Y','Front Left Side panel L2'],
+                 ['FR01','Y','Y','Y','Front Right corner L1'],
+                 ['FR02','Y','Y','Y','Front Right corner L2'],
+                 ['FR03','Y','Y','Y','Front Right corner L3'],
+                 ['FRS01','Y','Y','Y','Front Right Side L1'],
+                 ['FRS02','Y','Y','Y','Front Right Side L2'],
+                 ['FFL01','Y','Y','Y','Front Left panel (Sensor + no_Sensor variants in Doors 3MF)'],
+                 ['FFL02','Y','Y','Y','Front Left panel L2'],
+                 ['FFR01','Y','Y','Y','Front Right panel (Panel + no_panel variants)'],
+                 ['FFR02','Y','Y','Y','Front Right panel L2'],
+                 ['SBL01','Y','Y','Y','Spool bracket Left L1'],
+                 ['SBL02','Y','Y','Y','Spool bracket Left L2'],
+                 ['SBR01','Y','Y','Y','Spool bracket Right L1'],
+                 ['SBR02','Y','Y','Y','Spool bracket Right L2'],
+                 ['SBR03','Y','?','Y','Spool bracket R3 (PDF lists SBR03 x1; not on a plate we parsed)'],
+                 ['SRC01','Y','Y','Y','Spool roller cross bar'],
+                 ['SRL01','Y','Y','Y','Spool roller bar L'],
+                 ['SRR01','Y','Y','Y','Spool roller bar R'],
+                 ['B01','?','Y','Y','Board mount B01 (plate name, no PDF code)'],
+                 ['B02','?','Y','Y','Board mount B02'],
+                 ['B03','?','Y','Y','Board mount B03'],
+                 ['B04','?','Y','Y','Board mount B04'],
+                 ['BOARD','?','Y','Y','Board'],
+                 ['BOARD-CAP','?','Y','Y','Board Cap Closed'],
+                 ['SMOOTH-CAP','?','Y','Y','Smooth Cap'],
+                 ['STEAM-CAP','?','Y','Y','Steam Cap'],
+                 ['CONNECTOR-CUP','?','Y','Y','Connector Cup'],
+                 ['T01','?','Y','Y','Tube/duct T01'],
+                 ['T02','?','Y','Y','Tube/duct T02'],
+                 ['T03','?','Y','Y','Tube/duct T03'],
+                 ['T04','?','Y','Y','Tube/duct T04'],
+                 ['REINFORCEMENT','?','Y','?','Reinforcement_small (plate name; inventory SKU not matched)'],
+               ] %]
+            <tr>
+                <td class="doc-td"><code>[% row.0 %]</code></td>
+                <td class="doc-td [% row.1 == 'Y' ? 'ok' : row.1 == 'N' ? 'miss' : 'warn' %]">[% row.1 %]</td>
+                <td class="doc-td [% row.2 == 'Y' ? 'ok' : row.2 == 'N' ? 'miss' : 'warn' %]">[% row.2 %]</td>
+                <td class="doc-td [% row.3 == 'Y' ? 'ok' : row.3 == 'N' ? 'miss' : 'warn' %]">[% row.3 %]</td>
+                <td class="doc-td">[% row.4 %]</td>
+            </tr>
+            [% END %]
+        </table>
+
+        <h3 class="doc-h3">B. Doors, dryer extras, Hydra rollers, desiccant</h3>
+        <table class="doc-table">
+            <tr><th class="doc-th">Code / Name</th><th class="doc-th">PDF</th><th class="doc-th">3MF</th><th class="doc-th">Inv</th><th class="doc-th">Notes</th></tr>
+            [% FOREACH row IN [
+                 ['FEMALE-HINGE-L1','?','Y','Y','Doors 3MF (multiple exported variants fold to one)'],
+                 ['FEMALE-HINGE-R1','?','Y','Y',''],
+                 ['MALE-HINGE-L1','?','Y','Y',''],
+                 ['MALE-HINGE-R1','?','Y','Y',''],
+                 ['HINGE-LATCH-L1','?','Y','Y',''],
+                 ['HINGE-LATCH-R1','?','Y','Y',''],
+                 ['HANDLE','?','Y','Y','Door handle'],
+                 ['WINDOW','?','Y','Y','Window_Shape'],
+                 ['FRONT-LH','?','Y','Y','Dryer Extras'],
+                 ['FRONT-RH','?','Y','Y',''],
+                 ['BACK-LH-DRAWER','?','Y','Y','Back LH Drawer variant'],
+                 ['BACK-LH-HPV','?','Y','Y','Back LH HPV variant'],
+                 ['BACK-RH-DRAWER','?','Y','Y',''],
+                 ['BACK-RH-HPV','?','Y','Y',''],
+                 ['DRYER-BASE','?','Y','Y',''],
+                 ['DRYER-CAP','?','Y','Y',''],
+                 ['DRYER-SUPPORT-LH','?','Y','Y',''],
+                 ['DRYER-SUPPORT-RH','?','Y','Y',''],
+                 ['FOOT','?','Y','Y','Wheel support foot'],
+                 ['CASE-1','?','Y','Y',''],
+                 ['CASE-2','?','Y','Y',''],
+                 ['CERCHIO','?','Y','Y','Wheel half (matches WHEEL)'],
+                 ['GOMMA','?','Y','Y','Tire (Wheel-Tire)'],
+                 ['MAIN','?','Y','Y','Dryer main body'],
+                 ['PIPE','?','Y','Y',''],
+                 ['HYDRA-BDX-BAR','?','Y','Y','Hydra Roller Bar BDX'],
+                 ['HYDRA-BSX-BAR','?','Y','Y','Hydra Roller Bar BSX'],
+                 ['HYDRA-FDX-BAR','?','Y','Y','Hydra Roller Bar FDX'],
+                 ['HYDRA-FSX-BAR','?','Y','Y','Hydra Roller Bar FSX'],
+                 ['PTFE-BAR','?','Y','Y','PTFE Tube Bar 1-2 / 3-4'],
+                 ['ROLLER-BAR-D3','?','Y','Y',''],
+                 ['ROLLER-BAR-S2','?','Y','Y',''],
+                 ['NMBR1','?','Y','Y','Bearing mount NMBR1'],
+                 ['NMBR2','?','Y','Y',''],
+                 ['NMBR3','?','Y','Y',''],
+                 ['NMBR4','?','Y','Y',''],
+                 ['ROLLER','?','Y','Y','Hydra roller'],
+                 ['WHEEL','?','Y','Y','Dryer wheel (WHEEL)'],
+                 ['WHEEL-M','?','Y','Y','Motor wheel (WHEEL-M)'],
+                 ['DESICCANT-BOX','?','Y','Y','HDry Lite desiccant box'],
+                 ['DESICCANT-LIP','?','Y','Y',''],
+               ] %]
+            <tr>
+                <td class="doc-td"><code>[% row.0 %]</code></td>
+                <td class="doc-td [% row.1 == 'Y' ? 'ok' : row.1 == 'N' ? 'miss' : 'warn' %]">[% row.1 %]</td>
+                <td class="doc-td [% row.2 == 'Y' ? 'ok' : row.2 == 'N' ? 'miss' : 'warn' %]">[% row.2 %]</td>
+                <td class="doc-td [% row.3 == 'Y' ? 'ok' : row.3 == 'N' ? 'miss' : 'warn' %]">[% row.3 %]</td>
+                <td class="doc-td">[% row.4 %]</td>
+            </tr>
+            [% END %]
+        </table>
+
+        <h3 class="doc-h3">C. Hardware &amp; fasteners (PDF counts vs inventory HW-* SKUs)</h3>
+        <table class="doc-table">
+            <tr><th class="doc-th">Item</th><th class="doc-th">PDF qty / module</th><th class="doc-th">Inventory SKU</th><th class="doc-th">Match</th></tr>
+            <tr><td class="doc-td">Screw M4 &times; 14 mm</td><td class="doc-td">180</td><td class="doc-td"><code>HW-M4-14</code></td><td class="doc-td ok">Y</td></tr>
+            <tr><td class="doc-td">Screw M3 &times; 20 mm</td><td class="doc-td">16</td><td class="doc-td"><code>HW-M3-20</code></td><td class="doc-td ok">Y</td></tr>
+            <tr><td class="doc-td">Bearing 608zz</td><td class="doc-td">16</td><td class="doc-td"><code>HW-608ZZ</code></td><td class="doc-td ok">Y</td></tr>
+            <tr><td class="doc-td">Magnet 8 &times; 2 mm</td><td class="doc-td">20</td><td class="doc-td"><code>HW-MAG-8X2</code></td><td class="doc-td ok">Y</td></tr>
+            <tr><td class="doc-td">Adhesive gasket 6 &times; 3 mm</td><td class="doc-td">6 m</td><td class="doc-td"><code>HW-GASKET-6X3</code> + <code>INT-HDRY-GSK150/1582/180/215/358/378</code></td><td class="doc-td warn">? (sheet + cut lengths)</td></tr>
+            <tr><td class="doc-td">Washers</td><td class="doc-td">listed</td><td class="doc-td"><code>HW-WASHER</code></td><td class="doc-td ok">Y</td></tr>
+            <tr><td class="doc-td">Bolt &amp; nut (wheels)</td><td class="doc-td">listed</td><td class="doc-td"><code>HW-BOLT-NUT</code></td><td class="doc-td ok">Y</td></tr>
+            <tr><td class="doc-td">Spacer 50</td><td class="doc-td">&mdash;</td><td class="doc-td"><code>HW-SPACER-50</code></td><td class="doc-td warn">? (not in PDF extract)</td></tr>
+            <tr><td class="doc-td">Polydryer</td><td class="doc-td">&mdash;</td><td class="doc-td"><code>HW-POLYDRYER</code></td><td class="doc-td ok">Y</td></tr>
+            <tr><td class="doc-td">Wheel kit (assembly)</td><td class="doc-td">&mdash;</td><td class="doc-td"><code>HW-WHEEL-KIT</code></td><td class="doc-td ok">Y</td></tr>
+        </table>
+
+        <h3 class="doc-h3">D. The "group plates" complication (why 3MF part count &ne; inventory count)</h3>
+        <p class="doc-body">OrcaSlicer 3MF files store geometry as <code>3D/Objects/object_NN.model</code> and the human-readable
+        part name lives in <code>Metadata/*.json</code> (plate config) &mdash; <strong>not</strong> in the filename. A single
+        <code>Metadata/plate_N.png</code> thumbnail shows a whole build plate of many parts. Consequences:</p>
+        <ul class="doc-ul">
+            <li><strong>One plate &ne; one part.</strong> Module_1.3mf has ~40 model objects across 18 plate thumbnails; the named objects resolve to ~35 distinct codes (B01&ndash;B04, BBL/BBR/BL/BLS/BR/BRS, FL/FLS/FR/FRS, SBL/SBR, Board, caps, T01&ndash;T04, etc.).</li>
+            <li><strong>Duplicate exports.</strong> The same physical part is exported under several names (e.g. <code>Roller_Bar_S2 (1)</code>, <code>Roller_Bar_S2 (1) (1)</code>, <code>SBL02 (1)</code>). These collapse to one inventory SKU each.</li>
+            <li><strong>Variant ambiguity.</strong> Doors 3MF contains both <code>FFL01_Sensor</code> and <code>FFL01_no_Sensor</code>, and <code>FFR01_Dryer_Panel</code> vs <code>FFR01_no_panel</code>. Only one variant should be the "real" inventory row; the other is a build option. This is an open question for the BOM.</li>
+            <li><strong>Hinge pairs.</strong> Female/Male hinge L1+R1 each appear as multiple exported STLs (<code>__1___1_.stl</code> suffixes in <code>nfs/hdry_parts/023037</code>); geometry-matched to one row each. The traveler must not double-count them.</li>
+            <li><strong>Wheel composition unclear.</strong> The manual and files suggest one wheel = 2 half-wheels (<code>Cerchio</code>/<code>Wheel</code>) + 1 tire (<code>Gomma</code>) + foot (<code>Foot</code>), but inventory lists <code>WHEEL</code>, <code>WHEEL-HALF</code>, <code>WHEEL-TIRE</code>, <code>WHEEL-FOOT</code>, <code>WHEEL-M</code> separately &mdash; confirm the intended BOM assembly.</li>
+        </ul>
+
+        <h3 class="doc-h3">E. Unresolved / gaps</h3>
+        <ul class="doc-ul">
+            <li><span class="warn">Upgrade-2 ZIP inner 3MF</span> part names were not parsed this session (binary deflate). Re-run with a 3MF-unzip that reads <code>Metadata/project_settings.config</code> to confirm whether Upgrade 2 adds new codes or only remixes existing ones.</li>
+            <li><span class="warn">SBR03</span> is in the PDF (x1) but not on any parsed plate &mdash; verify it is a real part or a manual typo for SBR02.</li>
+            <li><span class="warn">REINFORCEMENT</span> (Reinforcement_small) appears on Module plates but has no obvious matching inventory SKU &mdash; confirm whether it is a sub-part of SBL/SBR or a standalone item.</li>
+            <li><span class="warn">PDF printed-part list</span> was read from text extraction (codes + counts). The manual's per-page exploded diagrams were not OCR'd page-by-page; a few codes may be mis-attributed between Module 1 / Module 2. Cross-check against the plate previews in <code>/static/images/3d/hdry/parts/</code>.</li>
+        </ul>
+
+        <h3 class="doc-h3">F. Net reconciliation</h3>
+        <p class="doc-body">Inventory (114 HDRY/HW SKUs) is a <strong>superset</strong> of what the parsed 3MFs + PDF describe &mdash;
+        i.e. nothing in the drawings is missing from inventory, but inventory carries extra assembly/sub-SKUs (WHEEL-HALF, WHEEL-TIRE,
+        INT-HDRY-001-P3678x build variants, HW-WHEEL-KIT) that are <em>not</em> individual printed codes in the manual. The real risk
+        is <strong>not missing items</strong> but <strong>mis-counting</strong> due to the group-plate duplicates and variant forks above.
+        Fixing the traveler's hardcoded origin skew (see changelog) makes the traveler read <code>item_origin</code> truthfully so these
+        rows classify correctly instead of being force-flagged as printed.</p>
+
+        <p class="doc-body doc-muted">Generated 2026-09-11 from local file scan + live :4003 inventory read. Re-run the scan if source files change.</p>
+    </div>
+</div>
+
+<style>
+.doc-table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+.doc-th, .doc-td { border: 1px solid var(--border-color, #ccc); padding: 4px 8px; text-align: left; vertical-align: top; }
+.doc-th { background: var(--th-bg, #f0f0f0); font-weight: bold; }
+.ok { color: var(--success-color, #1a7f37); font-weight: bold; }
+.miss { color: var(--danger-color, #c00); font-weight: bold; }
+.warn { color: var(--warning-color, #b8860b); font-weight: bold; }
+.doc-muted { color: var(--muted-color, #777); font-size: 0.9em; }
+</style>

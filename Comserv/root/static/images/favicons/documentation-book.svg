@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Documentation branch marker: open book on a teal ground -->
+  <rect width="32" height="32" rx="4" fill="#004d5c"/>
+  <!-- Book (open) centered -->
+  <g fill="none" stroke="#ccffff" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Spine -->
+    <line x1="16" y1="8" x2="16" y2="24"/>
+    <!-- Left page -->
+    <path d="M16 8 C12.5 6.5 9.5 6.5 7 8 L7 24 C9.5 22.5 12.5 22.5 16 24 Z" fill="#0a3a44"/>
+    <!-- Right page -->
+    <path d="M16 8 C19.5 6.5 22.5 6.5 25 8 L25 24 C22.5 22.5 19.5 22.5 16 24 Z" fill="#0a3a44"/>
+    <!-- Text lines left -->
+    <line x1="9.5" y1="12" x2="14" y2="11.2" stroke="#FF9900" stroke-width="1"/>
+    <line x1="9.5" y1="15.5" x2="14" y2="14.7" stroke="#FF9900" stroke-width="1"/>
+    <line x1="9.5" y1="19" x2="14" y2="18.2" stroke="#FF9900" stroke-width="1"/>
+    <!-- Text lines right -->
+    <line x1="18" y1="11.2" x2="22.5" y2="12" stroke="#FF9900" stroke-width="1"/>
+    <line x1="18" y1="14.7" x2="22.5" y2="15.5" stroke="#FF9900" stroke-width="1"/>
+    <line x1="18" y1="18.2" x2="22.5" y2="19" stroke="#FF9900" stroke-width="1"/>
+  </g>
+</svg>

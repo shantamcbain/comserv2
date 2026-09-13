@@ -1,0 +1,16 @@
+{
+  "id": "ecommerce",
+  "label": "E-Commerce Overlay",
+  "description": "Layered onto any base archetype when the site's 'ecommerce' site-module is enabled. Merchant/processor fees, shipping, sales tax collected, refunds/chargebacks, COGS on goods sold.",
+  "accounts": [
+    { "accno": "4400", "description": "Online Sales Revenue",               "charttype": "A", "category": "I", "link": "AR_amount IC_sale", "gifi_accno": "8100" },
+    { "accno": "4410", "description": "Shipping Income Charged to Customers", "charttype": "A", "category": "I", "link": "", "gifi_accno": "8090" },
+    { "accno": "2110", "description": "Sales Tax Collected on Online Sales", "charttype": "A", "category": "L", "link": "AR_tax", "gifi_accno": "2640" },
+    { "accno": "2301", "description": "Customer Refunds & Chargebacks Payable", "charttype": "A", "category": "L", "link": "", "gifi_accno": "2650" },
+    { "accno": "6720", "description": "Merchant / Payment Processor Fees",  "charttype": "A", "category": "E", "link": "", "gifi_accno": "8710" },
+    { "accno": "6410", "description": "Shipping Expense (fulfilment)",      "charttype": "A", "category": "E", "link": "", "gifi_accno": "8870" },
+    { "accno": "4420", "description": "Sales Returns & Refunds",            "charttype": "A", "category": "I", "link": "", "gifi_accno": "8299", "contra": true },
+    { "accno": "5010", "description": "COGS — Goods Sold Online",           "charttype": "A", "category": "E", "link": "IC_cogs", "gifi_accno": "8519" }
+  ],
+  "headings": []
+}

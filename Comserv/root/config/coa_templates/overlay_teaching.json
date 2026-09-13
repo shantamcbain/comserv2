@@ -1,0 +1,14 @@
+{
+  "id": "teaching",
+  "label": "Teaching Overlay",
+  "description": "Layered onto a base archetype for sites that teach. Two sub-blocks that must stay separate in the books when a site does both (e.g. school + grants): tuition side (course fees, student deposits as LIABILITY unearned revenue, instructor cost) and grant/donation side.",
+  "accounts": [
+    { "accno": "4300", "description": "Tuition & Course Fee Revenue",       "charttype": "A", "category": "I", "link": "AR_amount", "gifi_accno": "8230" },
+    { "accno": "2300", "description": "Student Deposits Held (Unearned Tuition — Liability)", "charttype": "A", "category": "L", "link": "", "gifi_accno": "2650" },
+    { "accno": "6110", "description": "Instructor / Teaching Costs",        "charttype": "A", "category": "E", "link": "", "gifi_accno": "9060" },
+    { "accno": "4320", "description": "Grants Income (teaching programs)",  "charttype": "A", "category": "I", "link": "", "gifi_accno": "8242" },
+    { "accno": "4330", "description": "Donations Income (restricted funds)", "charttype": "A", "category": "I", "link": "", "gifi_accno": "8223" },
+    { "accno": "6120", "description": "Mentoring Program Expense",          "charttype": "A", "category": "E", "link": "", "gifi_accno": "9120" }
+  ],
+  "headings": []
+}

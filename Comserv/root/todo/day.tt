@@ -1010,7 +1010,10 @@ function _gcalApplyTodoLayout(el, siteColor) {
     el.style.borderLeft = '3px solid ' + col;
 }
 
-/* Fixed breaks/appointments in a narrow left lane; site todos in the right zone — never overlap. */
+/* All todos (including breaks/appointments) render inline in ONE day lane,
+   positioned by their start time. The separate "fixed lane" column has been
+   removed — breaks and appointments now appear in the day list like any other
+   scheduled item, just styled gray via .is-fixed-ev. */
 function _gcalLayoutArea(area) {
     if (!area) return;
     var evs = Array.from(area.querySelectorAll('.gcal-ev')).filter(function(el) {
@@ -1018,10 +1021,18 @@ function _gcalLayoutArea(area) {
     });
     if (!evs.length) return;
 
-    var fixed = [], todos = [];
+    // Group by site (excluding fixed items, which get their own neutral lane)
+    // so multiple sites still get side-by-side columns; fixed items stay full-width gray.
+    var bySite = {};
+    var fixed = [];
     evs.forEach(function(el) {
-        if (_gcalIsFixed(el)) fixed.push(el);
-        else todos.push(el);
+        if (_gcalIsFixed(el)) {
+            fixed.push(el);
+            return;
+        }
+        var site = el.getAttribute('data-site') || '_none';
+        if (!bySite[site]) bySite[site] = [];
+        bySite[site].push(el);
     });
 
     fixed.forEach(function(el) {
@@ -1029,19 +1040,11 @@ function _gcalLayoutArea(area) {
         var end   = _gcalEndMin(el);
         el.style.top = (start - GCAL_GRID_START) + 'px';
         el.style.height = Math.max(15, end - start) + 'px';
-        el.style.left = GCAL_FIXED_LANE.left + '%';
-        el.style.width = GCAL_FIXED_LANE.width + '%';
+        el.style.left = '0.3%';
+        el.style.width = '99.4%';
         el.style.zIndex = '3';
         el.classList.add('is-fixed-ev');
         _gcalClearSegments(el);
-    });
-
-    var bySite = {};
-    todos.forEach(function(el) {
-        el.classList.remove('is-fixed-ev');
-        var site = el.getAttribute('data-site') || '_none';
-        if (!bySite[site]) bySite[site] = [];
-        bySite[site].push(el);
     });
 
     var sites = Object.keys(bySite).sort();
@@ -1053,6 +1056,7 @@ function _gcalLayoutArea(area) {
         var width = colW - 0.5;
         var col = gcalSiteColor(site === '_none' ? '' : site);
         bySite[site].forEach(function(el) {
+            el.classList.remove('is-fixed-ev');
             el.style.left = left + '%';
             el.style.width = width + '%';
             el.style.zIndex = '3';
@@ -1082,7 +1086,7 @@ function gcalBuildLegend() {
     var fixedChip = document.createElement('span');
     fixedChip.className = 'gcal-fixed-legend-chip';
     fixedChip.textContent = '\u2615 Fixed (breaks / appointments)';
-    fixedChip.title = 'Gray column on the left \u2014 drag divider to resize';
+    fixedChip.title = 'Gray bars are breaks/appointments — shown inline in the day list, not a separate column';
     bar.appendChild(fixedChip);
 
     var siteKeys = Object.keys(sites).sort();
@@ -1174,7 +1178,6 @@ function gcalRescheduleTodos(btn) {
     var recordIds = [];
     document.querySelectorAll('.gcal-ev[data-todo-id]').forEach(function(el) {
         if (el.style.display === 'none') return;
-        if (el.getAttribute('data-is-fixed') === '1') return;
         var rid = parseInt(el.getAttribute('data-todo-id'), 10);
         if (rid) recordIds.push(rid);
     });
@@ -1679,7 +1682,7 @@ document.addEventListener('DOMContentLoaded', function() {
         [% END %]
 
         [% UNLESS include_mode %]
-        <div class="gcal-lane-resizer" id="gcal-lane-resizer" title="Drag to resize fixed-items column"></div>
+        [%# Lane resizer removed: breaks/appointments no longer occupy a separate column. %]
         [% END %]
         [% IF include_mode %]
         <div class="gcal-now-line gcal-now-line-col" style="display:none;"><div class="gcal-now-dot"></div></div>
@@ -1688,7 +1691,13 @@ document.addEventListener('DOMContentLoaded', function() {
         [% END %]
         <div class="gcal-drop-target-line" id="gcal-drop-line"></div>
 
-        [% SET gcal_todos = (!include_mode AND todos_for_today.size > 0) ? todos_for_today : todos %]
+        [%# The day grid shows ONLY the day's scheduled todos — never the full
+            calendar set. On /planning/daily the controller pre-computes
+            todos_for_today (branch-scoped, scheduled-only). On /todo/day the
+            controller sets `todos` to the day's scheduled list. Either way we
+            must NOT fall back to the whole `todos`/`all_todos_calendar` set,
+            which would dump every todo in the database into the day view. %]
+        [% SET gcal_todos = todos_for_today.size > 0 ? todos_for_today : todos %]
         [% FOREACH todo IN gcal_todos %]
             [% SET tp       = todo.priority || 9 %]
             [% SET ts       = todo.sitename || '' %]

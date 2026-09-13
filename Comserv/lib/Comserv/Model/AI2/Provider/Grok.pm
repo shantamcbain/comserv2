@@ -23,6 +23,46 @@ my @SUPERGROK_CHAT_FALLBACK = qw(
     grok-4.20-multi-agent-0309
 );
 
+# x.AI list price table — USD per 1M tokens, standard (< 200k prompt) tier.
+#
+# x.AI's GET /v1/models returns NO pricing field at all. Downstream we used to
+# read that as "price 0" and therefore "free", which labelled every Grok model
+# free (and leaked the whole paid x.AI catalog to guests). This table is the
+# authoritative fallback so cost is displayed and role-filtered correctly.
+#
+# Source: docs.x.ai/developers/pricing (per-million USD). Kept as a table
+# because x.AI publishes no machine-readable price endpoint; entries missing
+# here are reported as price_known => 0 (NOT free) rather than as zero-cost.
+my %XAI_PRICING = (
+    'grok-4.6'                      => [ 2.00,  6.00 ],
+    'grok-4.5'                      => [ 2.00,  6.00 ],
+    'grok-4.3'                      => [ 1.25,  2.50 ],
+    'grok-4.20-0309-reasoning'      => [ 1.25,  2.50 ],
+    'grok-4.20-0309-non-reasoning'  => [ 1.25,  2.50 ],
+    'grok-4.20-multi-agent-0309'    => [ 1.25,  2.50 ],
+    'grok-build-0.1'                => [ 1.00,  2.00 ],
+    'grok-4.1-fast'                 => [ 0.20,  0.50 ],
+    'grok-4-1-fast'                 => [ 0.20,  0.50 ],
+    'grok-4.1-fast-reasoning'       => [ 0.20,  0.50 ],
+    'grok-4.1-fast-non-reasoning'   => [ 0.20,  0.50 ],
+    'grok-3-mini'                   => [ 0.30,  0.50 ],
+    'grok-3'                        => [ 3.00, 15.00 ],
+    'grok-4'                        => [ 3.00, 15.00 ],
+    'grok-2-latest'                 => [ 2.00, 10.00 ],
+    'grok-2'                        => [ 2.00, 10.00 ],
+);
+
+# Look up list price for a model id. Returns (prompt, completion, known).
+# $known is 0 for ids absent from the table — the caller MUST treat those as
+# "cost unknown" (paid-by-default), never as free.
+sub _xai_price {
+    my ($id) = @_;
+    return (undef, undef, 0) unless defined $id && length $id;
+    my $row = $XAI_PRICING{$id};
+    return (undef, undef, 0) unless $row;
+    return ( $row->[0], $row->[1], 1 );
+}
+
 has 'logging' => (
     is      => 'ro',
     lazy    => 1,
@@ -96,10 +136,12 @@ sub _read_secret_file {
     return length($k) ? $k : undef;
 }
 
-# Same paths in every container: K8s /run/secrets, the mounted
-# ~/.comserv/secrets volume (compose already bind-mounts it at
-# /home/comserv/.comserv/secrets), then COMSERV_SECRETS_DIR.
-sub _portable_secret_paths {
+# Container/runtime secret paths only (K8s CSI + compose mount at
+# /home/comserv/.comserv/secrets). Do NOT put the workstation copy
+# ~/.comserv/secrets/supergrok_oauth first — it is often a stale sync and
+# shadows a fresh Hermes xai-oauth token (Git dashboard 403 bad-credentials,
+# todo #2355). That host path is tried AFTER Hermes auth.json.
+sub _runtime_secret_paths {
     my @paths = (
         '/run/secrets/supergrok_oauth',
         '/run/secrets/xai_oauth_token',
@@ -108,27 +150,63 @@ sub _portable_secret_paths {
     if ($ENV{COMSERV_SECRETS_DIR}) {
         push @paths, File::Spec->catfile($ENV{COMSERV_SECRETS_DIR}, 'supergrok_oauth');
     }
-    my $home = $ENV{HOME} || '';
-    push @paths, File::Spec->catfile($home, '.comserv', 'secrets', 'supergrok_oauth') if $home;
     return @paths;
+}
+
+sub _workstation_secret_paths {
+    my $home = $ENV{HOME} || '';
+    return $home
+        ? (File::Spec->catfile($home, '.comserv', 'secrets', 'supergrok_oauth'))
+        : ();
+}
+
+# Human-facing auth errors for UI (Git dashboard, chat). Never echo full JWT bodies.
+sub _sanitize_provider_error {
+    my ($code, $body) = @_;
+    $body //= '';
+    $body =~ s/\s+/ /g;
+    # x.AI answers 403 for BOTH "credential rejected" and "subscription/credit
+    # limit reached". Collapsing both into "login expired" sent humans to
+    # re-auth a perfectly valid token AND hid the real cause from Router's
+    # _credits_exhausted, so the free-model fallback never engaged and the turn
+    # just dead-ended (todo #2374).
+    if ($body =~ /spending.?limit|personal-team-blocked|out of credits|add credits|upgrade at/i
+        && $body !~ /unauthenticated|bad-credentials|invalid.?token|token could not be validated/i) {
+        return 'SuperGrok/xAI quota or spending limit reached — add credits or wait for the reset; falling back to a free model';
+    }
+    if ($code == 401 || $code == 403
+        || $body =~ /unauthenticated|bad-credentials|invalid.?token|token could not be validated/i) {
+        return 'SuperGrok/xAI login expired or invalid — re-auth (hermes auth add xai-oauth) then run script/sync_supergrok_token.pl';
+    }
+    # Keep short; strip obvious token-shaped blobs
+    $body =~ s/eyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-.]{10,}/[redacted-jwt]/g;
+    return length($body) > 180 ? substr($body, 0, 180) . '…' : $body;
 }
 
 sub resolve_prepaid_key {
     my ($self, $c) = @_;
     $self->{_last_cred_source} = undef;
-    for my $p ($self->_portable_secret_paths) {
+    # 1) True runtime secrets (pods / compose as comserv user)
+    for my $p ($self->_runtime_secret_paths) {
         my $k = _read_secret_file($p);
         return $self->_remember_source('supergrok_file', $k) if $k;
     }
+    # 2) Env
     if ($ENV{SUPERGROK_OAUTH_TOKEN} && length $ENV{SUPERGROK_OAUTH_TOKEN}) {
         return $self->_remember_source('supergrok_env', $ENV{SUPERGROK_OAUTH_TOKEN});
     }
     if ($ENV{XAI_OAUTH_TOKEN} && length $ENV{XAI_OAUTH_TOKEN}) {
         return $self->_remember_source('supergrok_env', $ENV{XAI_OAUTH_TOKEN});
     }
+    # 3) Live Hermes OAuth store (workstation freshest after hermes auth refresh)
     my $oauth = _supergrok_oauth_token_from_file($self->hermes_auth_json_path);
     if ($oauth) {
         return $self->_remember_source('supergrok_oauth', $oauth);
+    }
+    # 4) Host secrets dir last (may lag Hermes — keep for containers that only mount it)
+    for my $p ($self->_workstation_secret_paths) {
+        my $k = _read_secret_file($p);
+        return $self->_remember_source('supergrok_file', $k) if $k;
     }
     my $schema = eval { $c && $c->model('DBEncy')->schema } or return undef;
     my $uid = eval { $c->session->{user_id} };
@@ -199,10 +277,19 @@ sub _label_models {
     my @out;
     for my $id (@ids) {
         next unless $id && _is_chat_model_id($id);
+
+        # Attach real list price. x.AI's /v1/models carries no pricing, so we
+        # use the local table. $known is 0 when the id is not in the table —
+        # those are NOT free; the UI shows "cost not published" instead of $0.
+        my ($pp, $pc, $known) = _xai_price($id);
+
         push @out, {
             id      => $id,
             label   => $prepaid ? "SuperGrok: $id" : $id,
             prepaid => $prepaid ? 1 : 0,
+            price_prompt     => ($known ? $pp : undef),
+            price_completion => ($known ? $pc : undef),
+            price_known      => $known ? 1 : 0,
         };
     }
     # Pin grok-4.6 first — same as the Hermes SuperGrok picker.
@@ -298,9 +385,38 @@ sub chat {
     my $res = try { $ua->request($req) } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
             'grok_chat', "x.AI request failed: $_");
-        return undef;
+        # Pass the transport failure through VERBATIM so Router's
+        # _credits_exhausted can match it ("can't connect", "timed out")
+        # and fall through to the free-model chain instead of dead-ending.
+        return { success => 0, error => "Can't connect to api.x.ai:443: $_" };
     };
-    return { success => 0, error => 'Grok provider error' } unless $res && $res->is_success;
+    unless ($res && $res->is_success) {
+        my $code = $res ? $res->code : 599;
+        my $raw  = $res ? ($res->decoded_content // '') : 'no response';
+        my $safe = _sanitize_provider_error($code, substr($raw, 0, 300));
+        # A 403 is NOT automatically an auth failure: x.AI also returns 403 for
+        # a spent subscription ("personal-team-blocked:spending-limit"). Flagging
+        # that as auth_failed made callers (Git.pm suggest_commit_message) tell
+        # the user to re-auth when the real fix is credits/fallback
+        # (todo #2374 / #2375).
+        my $is_quota = ($raw =~ /spending.?limit|personal-team-blocked|out of credits|add credits|upgrade at/i
+            && $raw !~ /unauthenticated|bad-credentials|invalid.?token|token could not be validated/i) ? 1 : 0;
+        my $auth_fail = (!$is_quota
+            && ($code == 401 || $code == 403
+                || $raw =~ /unauthenticated|bad-credentials|invalid.?token/i)) ? 1 : 0;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'grok_chat',
+            "x.AI chat HTTP $code source=" . ($self->{_last_cred_source} || '?')
+                . " auth_failed=$auth_fail detail=" . substr($safe, 0, 120));
+        # Keep a machine-readable prefix so Router fallback can still match 401/403/429.
+        return {
+            success => 0,
+            error   => $auth_fail
+                ? $safe
+                : "$code $safe",
+            ($auth_fail ? (auth_failed => 1) : ()),
+        };
+    }
 
     my $data = try { decode_json($res->decoded_content) } catch { undef };
     return { success => 0, error => 'Bad JSON from Grok' } unless $data;

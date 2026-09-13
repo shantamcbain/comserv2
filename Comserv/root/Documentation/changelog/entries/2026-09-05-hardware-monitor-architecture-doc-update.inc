@@ -1,0 +1,6 @@
+<div id="2026-09-05-hardware-monitor-architecture-doc-update" class="cl-entry">
+<h3>2026-09-05 — Hardware Monitor docs &amp; plan updated</h3>
+<p class="doc-body"><strong>What.</strong> Major refresh of <code>root/Documentation/HardwareMonitorPlan.tt</code> (v1.1). Added sections explaining why two scripts are needed (thin trigger vs collector), exact file/cron/log/DB locations, current list of monitored hosts, why the dashboard has looked stale, and concrete plans for full fleet coverage + an "Add Server" UI.</p>
+<p class="doc-body"><strong>Why.</strong> User request to document the architecture clearly after gateway trigger updates and recent host additions (.1 gateway cron, new proxmox .2). Clarifies the split between <code>hardware_monitor.pl</code> (gateway "ping") and <code>device_agent.sh</code> (any-hardware collector) so everyone understands no duplication on production and how to expand.</p>
+<p class="doc-body"><strong>Files.</strong> <code>root/Documentation/HardwareMonitorPlan.tt</code>, <code>root/Documentation/changelog/entries/2026-09-05-hardware-monitor-architecture-doc-update.inc</code></p>
+</div>

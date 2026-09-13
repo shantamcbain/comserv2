@@ -1,0 +1,106 @@
+[% PageVersion = '3d/printer_control.tt,v 0.01 2026/09/05 shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+<meta http-equiv="refresh" content="15">
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Printer control</h1>
+    <p class="page-subtitle">[% printer.name | html %] — [% lan_host | html %]</p>
+  </div>
+
+  [% IF c.flash.error_msg %]
+  <p class="app-flash-error">[% c.flash.error_msg | html %]</p>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <p class="app-flash-success">[% c.flash.success_msg | html %]</p>
+  [% END %]
+
+  <p>
+    <a href="/3d/printers">Printer farm</a>
+    |
+    <a href="/3d/printer_lan/control?printer_id=[% printer.id %]">Refresh now</a>
+    (auto every 15s)
+  </p>
+
+  <div class="content-container">
+    <div class="app-section">
+      <h2>Identity (HTTP /info)</h2>
+      <table class="data-table">
+        <tr><th>Model</th><td>[% state.model_name | html %] ([% state.model_id | html %])</td></tr>
+        <tr><th>Serial</th><td>[% state.serial | html %]</td></tr>
+        <tr><th>LAN mode</th><td>[% state.ctrl_type | html %]</td></tr>
+        <tr><th>Host</th><td>[% state.host | html %]:18910</td></tr>
+        [% IF state.camera_url %]
+        <tr><th>Camera</th><td><a href="[% state.camera_url | html %]">[% state.camera_url | html %]</a></td></tr>
+        [% END %]
+      </table>
+    </div>
+
+    <div class="app-section">
+      <h2>Live state (LAN MQTT)</h2>
+      [% IF state.error %]
+      <p>[% state.error | html %]</p>
+      [% END %]
+      [% IF state.mqtt_ok %]
+      <table class="data-table">
+        <tr><th>Printer state</th><td>[% state.print_state || '—' | html %]</td></tr>
+        <tr><th>File</th><td>[% state.filename || '—' | html %]</td></tr>
+        <tr><th>Progress</th>
+          <td>[% IF state.progress != '' %][% state.progress | html %] %[% ELSE %]—[% END %]</td>
+        </tr>
+        <tr><th>Layer</th>
+          <td>
+            [% IF state.curr_layer.defined %][% state.curr_layer | html %][% ELSE %]—[% END %]
+            /
+            [% IF state.total_layers.defined %][% state.total_layers | html %][% ELSE %]—[% END %]
+          </td>
+        </tr>
+        <tr><th>Time (min)</th>
+          <td>
+            printed [% IF state.print_time_min.defined %][% state.print_time_min | html %][% ELSE %]—[% END %]
+            · remaining [% IF state.remain_time_min.defined %][% state.remain_time_min | html %][% ELSE %]—[% END %]
+          </td>
+        </tr>
+        <tr><th>Nozzle</th>
+          <td>
+            [% IF state.nozzle_temp.defined %][% state.nozzle_temp | html %] °C[% ELSE %]—[% END %]
+            / target [% IF state.target_nozzle.defined %][% state.target_nozzle | html %][% ELSE %]—[% END %]
+          </td>
+        </tr>
+        <tr><th>Bed</th>
+          <td>
+            [% IF state.bed_temp.defined %][% state.bed_temp | html %] °C[% ELSE %]—[% END %]
+            / target [% IF state.target_bed.defined %][% state.target_bed | html %][% ELSE %]—[% END %]
+          </td>
+        </tr>
+        [% IF state.firmware %]
+        <tr><th>Firmware</th><td>[% state.firmware | html %]</td></tr>
+        [% END %]
+      </table>
+      [% ELSE %]
+      <p>MQTT did not return a report. Identity above still came from HTTP /info. Pause/resume/stop need the local MQTT broker.</p>
+      [% END %]
+    </div>
+
+    <div class="app-section">
+      <h2>Control</h2>
+      <p>Does not start a print or upload gcode. Stop cancels the current job on the machine.</p>
+      <form method="post" action="/3d/printer_lan/command" class="app-form" style="display:inline;">
+        <input type="hidden" name="printer_id" value="[% printer.id %]">
+        <input type="hidden" name="cmd" value="pause">
+        <button type="submit" class="btn">Pause</button>
+      </form>
+      <form method="post" action="/3d/printer_lan/command" class="app-form" style="display:inline;">
+        <input type="hidden" name="printer_id" value="[% printer.id %]">
+        <input type="hidden" name="cmd" value="resume">
+        <button type="submit" class="btn">Resume</button>
+      </form>
+      <form method="post" action="/3d/printer_lan/command" class="app-form" style="margin-top:0.8em;">
+        <input type="hidden" name="printer_id" value="[% printer.id %]">
+        <input type="hidden" name="cmd" value="stop">
+        <label><input type="checkbox" name="confirm_stop" value="1"> Cancel the print</label>
+        <button type="submit" class="btn">Stop</button>
+      </form>
+    </div>
+  </div>
+</div>

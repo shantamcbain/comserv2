@@ -1,0 +1,79 @@
+[% PageVersion = 'Inventory/po/view.tt,v 0.01 2026/09/11 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>PO [% po.po_number || 'PO-' _ po.id %]</h1>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg | html %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg | html %]</p>[% END %]
+
+<div class="actions">
+  <a href="/Inventory/po">Back to PO List</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/purchase">Reorder Needs</a>
+</div>
+
+<div style="display:flex; gap:2rem; margin:1rem 0;">
+  <div>
+    <strong>Supplier:</strong> [% po.supplier ? po.supplier.name : '—' %]<br>
+    [% IF po.supplier && po.supplier.email %]<a href="mailto:[% po.supplier.email %]">Email supplier</a><br>[% END %]
+    [% IF po.supplier && po.supplier.phone %]Phone: [% po.supplier.phone %]<br>[% END %]
+    <strong>Status:</strong> [% po.status %]<br>
+    <strong>Order Date:</strong> [% po.order_date || '—' %]<br>
+    <strong>Created:</strong> [% po.created_at %] by [% po.created_by || '—' %]
+  </div>
+  <div>
+    <strong>Notes:</strong><br>
+    <pre style="white-space:pre-wrap; background:#f8f8f8; padding:0.5rem; border:1px solid #ddd; max-width:40em;">[% po.notes | html %]</pre>
+  </div>
+</div>
+
+<h3>Line Items</h3>
+[% IF po.lines.size %]
+<table border="1" cellpadding="4" cellspacing="0">
+  <thead>
+    <tr>
+      <th>SKU</th>
+      <th>Item</th>
+      <th>Qty Ordered</th>
+      <th>Qty Received</th>
+      <th>Unit Cost</th>
+      <th>Supplier SKU</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH ln IN po.lines %]
+    <tr>
+      <td>[% ln.item ? ln.item.sku : ln.item_id %]</td>
+      <td>[% ln.item ? ln.item.name : '—' | html %]</td>
+      <td>[% ln.quantity_ordered %]</td>
+      <td>[% ln.quantity_received %]</td>
+      <td>[% ln.unit_cost ? '$' _ ln.unit_cost : '—' %]</td>
+      <td>[% ln.supplier_sku || '—' %]</td>
+      <td>[% ln.notes || '' | html %]</td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p>No lines.</p>
+[% END %]
+
+[% IF po.status == 'draft' || po.status == 'sent' %]
+  <h3 style="margin-top:1.5rem;">Record Order Placement</h3>
+  <form method="POST" action="/Inventory/po/mark_sent/[% po.id %]">
+    <label>Send / Order method:
+      <select name="send_via">
+        <option value="email">Email</option>
+        <option value="online">Online / Supplier Portal</option>
+        <option value="mail">Mailed / Postal</option>
+        <option value="phone">Phone</option>
+        <option value="other">Other</option>
+      </select>
+    </label>
+    <input type="submit" value="Mark as Sent (update status + log method)">
+  </form>
+  <p style="font-size:0.8rem;">This appends to notes and sets status to 'sent'. (Later: email generation, attachments, etc.)</p>
+[% END %]
+
+<p><a href="/Inventory/po">← All Purchase Orders</a></p>

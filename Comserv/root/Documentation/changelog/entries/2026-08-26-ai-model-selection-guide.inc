@@ -1,0 +1,6 @@
+<div id="2026-08-26-ai-model-selection-guide" class="cl-entry">
+<h3>2026-08-26 — AI Model Selection Guide for Documentation Tasks</h3>
+<p class="doc-body"><strong>What.</strong> Created <code>Comserv/root/Documentation/AI_Model_Selection_Guide.tt</code> — a decision guide mapping each documentation task type (planning, organizing, wording, code docs, implementation, changelogs, AI stubs) to the model characteristics to look for in the live Router catalog, with recommended models and typical pricing tiers.</p>
+<p class="doc-body"><strong>Why.</strong> Developers on the Documentation branch needed an easy reference to choose the right AI model/agent for each documentation task, with live pricing from the catalog. The guide enforces the "live catalog only" rule (no hardcoded defaults) and documents Comserv2's provider specifics (OpenRouter free tier, Grok auto-fill, Ollama local, SuperGrok prepaid).</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/root/Documentation/AI_Model_Selection_Guide.tt</code>, <code>Comserv/root/Documentation/DocumentationMasterPlan.tt</code> (added link in AI-context section)</p>
+</div>

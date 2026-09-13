@@ -27,6 +27,7 @@ __PACKAGE__->register_class('User', 'Comserv::Model::Schema::Ency::Result::User'
 __PACKAGE__->register_class('AiConversation', 'Comserv::Model::Schema::Ency::Result::AiConversation');
 __PACKAGE__->register_class('AiMessage', 'Comserv::Model::Schema::Ency::Result::AiMessage');
 __PACKAGE__->register_class('AiUsageLog', 'Comserv::Model::Schema::Ency::Result::AiUsageLog');
+__PACKAGE__->register_class('AiSkill', 'Comserv::Model::Schema::Ency::Result::AiSkill');
 __PACKAGE__->register_class('AiNavigationShortcut', 'Comserv::Model::Schema::Ency::Result::AiNavigationShortcut');
 __PACKAGE__->register_class('ProjectDocumentationMapping', 'Comserv::Model::Schema::Ency::Result::ProjectDocumentationMapping');
 __PACKAGE__->register_class('ApiToken', 'Comserv::Model::Schema::Ency::Result::ApiToken');
@@ -104,6 +105,7 @@ __PACKAGE__->register_class('InventoryTransaction', 'Comserv::Model::Schema::Enc
 __PACKAGE__->register_class('InventoryAssignment', 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryAssignment');
 __PACKAGE__->register_class('InventoryItemSupplier', 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItemSupplier');
 __PACKAGE__->register_class('InventoryItemBOM', 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItemBOM');
+__PACKAGE__->register_class('InventoryCountSession', 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryCountSession');
 
 # Register HelpDesk support ticket and messaging classes
 __PACKAGE__->register_class('SupportTicket', 'Comserv::Model::Schema::Ency::Result::SupportTicket');

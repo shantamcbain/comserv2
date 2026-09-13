@@ -122,6 +122,11 @@
 <script src="/static/js/logging-dedupe.js?v=[% cv %]" defer></script>
 [% END %]
 
+<!-- Database Servers: generate + reveal password on /remotedb/change_password -->
+[% IF c.request.uri.match('/remotedb/') %]
+<script src="/static/js/remotedb-pw.js?v=[% cv %]" defer></script>
+[% END %]
+
 <!-- Schema Compare JS -->
 [% IF c.request.uri.match('/admin/schema_compare') %]
 <script src="/static/js/schema-compare.js?v=[% cv %]" defer></script>
@@ -200,6 +205,8 @@
 <script src="/static/js/ai2editor/adapters/ace.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/adapters/richtext.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/sidebar-toggle.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/git-panel.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/right-sidebar-toggle.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/git-review.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/file-diff.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/project-tree.js?v=[% cv %]" defer></script>
@@ -209,7 +216,9 @@
 <!-- Other feature modules -->
 <!-- Chat system migrated from polling to Server-Sent Events (SSE) – polling code removed (2026-07-01) -->
 <!-- AI Chat V2 modular suite: voice.js must load before local-chat.js (it is
-     wired from createChatWidget()); index.js loads last as the namespace shim. -->
+     wired from createChatWidget()); index.js loads last as the namespace shim.
+     Skipped in git_embed (?embed=1) so AI2 Git tab iframe has no Chat with AI. -->
+[% UNLESS git_embed %]
 <script src="/static/js/ai-chat/voice.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai-chat/support.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai-chat/page-context.js?v=[% cv %]" defer></script>
@@ -217,6 +226,7 @@
 <script src="/static/js/ai-chat/audio-backup.js?v=[% cv %]" defer></script>
 <script src="/static/js/local-chat.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai-chat/index.js?v=[% cv %]" defer></script>
+[% END %]
 
 <!-- Planning / Daily page JS (covers both /planning/daily and /Documentation/DailyPlan) -->
 [% IF c.request.uri.match('/planning/daily') || c.request.uri.match('/Documentation/DailyPlan') || c.request.uri.match('/project/') %]
@@ -288,17 +298,12 @@
         canSelectModel: [% (c.stash.ai_can_select_model || c.stash.ai_is_priv || c.stash.is_admin || c.session.is_admin) ? 'true' : 'false' %],
         siteName: '[% c.stash.SiteName || c.session.SiteName | html %]',
         cv: '[% cv %]',
-        // Canonical model catalog — THE single source of truth for every chat
-        // surface (floating "Chat with AI" widget, /ai page, admin/AI, git
-        // dashboard, AI2 editor). Built per-request in Root.pm auto from the v2
-        // Router (Model::AI2->get_available_models) — the SAME source as
-        // /ai2/providers — and emitted via the stash so it is always current and
-        // identical for every role (including an admin whose session predates a
-        // change). The chat widget reads this instead of fetching /ai2/providers
-        // on every open: no per-use fetch, no render race, guaranteed parity.
-        // NOTE: read the stash value (set every request), not the session value,
-        // so a stale per-session cache can never hide the full list.
-        models: [% c.stash.ai_model_catalog_json || '[]' %],
+    [%- IF ai_model_catalog_json && ai_model_catalog && ai_model_catalog.size > 0 -%]
+        models: [% ai_model_catalog_json %],
+    [%- ELSE -%]
+        // Lazy catalog: populated by /ai2/providers when the user opens an AI surface.
+        models: [],
+    [%- END -%]
         // Add more as needed - keep this small
     };
 </script>
@@ -334,7 +339,7 @@
     opening the editor empty, preserving prior behaviour. %]
 [% current_editor_file = '' %]
 [% IF c.stash.template %][% current_editor_file = 'root/' _ c.stash.template %][% END %]
-[% IF c.session.user_id && !c.request.uri.match('/ai2/') %]
+[% IF c.session.user_id && !git_embed && !c.request.uri.match('/ai2/') %]
 <button class="btn btn-primary btn-sm ai2-float-btn"
         onclick="openAI2EditorWindow('[% current_editor_file | html %]')"
         title="Open AI2 Code Editor (v2) — edits the current page source">
@@ -342,14 +347,11 @@
 </button>
 [% END %]
 
-[%# ---------------------------------------------------------------------------
-   SERVER-RENDERED AI model <select> for the floating "Chat with AI" widget.
-   Rendered here (every page) from the catalog in stash so the widget never has
-   to build its dropdown in JS. The widget's createChatWidget() finds this node
-   by id and MOVES it into the provider-selector bar (replacing the placeholder).
-   Hidden until the widget needs it. This is the single source of truth — the
-   same ai/model_select.tt partial every other surface uses.
---------------------------------------------------------------------------- %]
+[%# Server-rendered AI model <select> for the floating "Chat with AI" widget.
+    Rendered only when the controller has already populated the catalog stash;
+    otherwise the widget fetches /ai2/providers lazily and builds its own picker.
+%]
+[% IF ai_model_catalog && ai_model_catalog.size > 0 %]
 <div id="ai-provider-server-rendered" style="display:none;">
 [% PROCESS 'ai/model_select.tt'
     select_id   = 'ai-provider',
@@ -359,3 +361,4 @@
     css_class   = 'ai-model-select',
     catalog     = ai_model_catalog %]
 </div>
+[% END %]

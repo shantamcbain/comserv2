@@ -245,8 +245,21 @@
         if (typeof state.roleRank === 'number') return state.roleRank;
         return state.canSelectModel || state.isAdmin ? 2 : (state.isGuest ? 0 : 1);
     }
+    // Site Chat-with-AI must never act as a code editor. AI Editor popup sets AI2_EDITOR.
+    function isAi2EditorContext() {
+        try {
+            if (window.AI2_EDITOR || window.AI2EditorCore || window.AI2EditorChat) return true;
+            var p = (window.location && window.location.pathname) || '';
+            if (/editing_widget_popup|\/ai2\/editor|ai2editor/i.test(p)) return true;
+            if (document.getElementById('ace-editor')) return true;
+        } catch (e) { /* ignore */ }
+        return false;
+    }
+
     function _agentAllowed(agent) {
         if (!agent) return false;
+        // Coding/programming agents are AI Editor only — never offer on /ai Chat-with-AI
+        if (agent.editor_only && !isAi2EditorContext()) return false;
         if (agent.local_only && !state.isDevMode) return false;
         if (agent.admin_only && _userRoleRank() < 2) return false;
         var min = agent.min_role;
@@ -466,6 +479,15 @@
     // Called when the AI response contains [READ_FILE: path] tokens.
     // Fetches the file content and sends it back as a follow-up context message.
     function _handleReadFileRequest(path) {
+        // Hard disable code-read mutation path from site Chat-with-AI widget
+        if (!isAi2EditorContext()) {
+            console.warn('[Chat-with-AI] READ_FILE ignored outside AI Editor');
+            var msgInput0 = document.getElementById('message-input');
+            if (msgInput0) {
+                msgInput0.value = '[Chat-with-AI cannot load/edit code files. Open AI Editor for code work.]';
+            }
+            return;
+        }
         var url = '/ai/read_file?path=' + encodeURIComponent(path) + '&limit=300';
         fetch(url, { credentials: 'include' })
             .then(function(r) { return r.json(); })
@@ -549,6 +571,7 @@
         // an admin-only / non-public agent (that lands on Access denied).
         for (const [agentKey, agent] of Object.entries(agents)) {
             if (!agent.url_patterns) continue;
+            if (agent.editor_only && !isAi2EditorContext()) continue;
             if (agent.local_only && !state.isDevMode) continue;
             if (!_agentAllowed(agent)) continue;
 
@@ -1603,7 +1626,7 @@
             // Label from the SHARED helper: it derives the provider from the
             // "provider|model" value itself. The old code assumed anything that
             // was not Grok must be Ollama, so picking an OpenRouter model (e.g.
-            // openrouter|tencent/hy3) was mislabelled "Ollama (Local)".
+            // openrouter|…) was mislabelled "Ollama (Local)".
             let modelDisplay = describeModel(selectedVal, { host: state.ollamaHost });
             state.activeModel = modelDisplay;
             const statusEl = document.getElementById('chat-status');
@@ -1824,11 +1847,11 @@
             // Delegate catalog fetch + dropdown rendering to the SHARED module
             // (ai-chat/model-select.js). Both the general widget and the editor
             // chat use the same code path now, so model selection can't diverge.
-            // Pin hy3 to the top + default for this chat context.
+            // Pin coding default (north-mini-code:free) to the top for this chat context.
             ComservChat.modelSelect.init({
                 selectEl: providerSelect,
                 context: 'chat',
-                pinModel: 'tencent/hy3',
+                pinModel: 'cohere/north-mini-code:free',
                 onReady: function (catalog) {
                     // Re-derive model tiers (used by auto-tier query routing).
                     (catalog || []).forEach(function (p) {
@@ -2446,8 +2469,15 @@
                     _nfFields.auto_pay = '1';
                     _nfFields.auto_pay_method = (_methodM ? _methodM[1] : 'Visa') + ' Auto Pay';
                 }
-                const _supplierM = _billText.match(/HostGator|PayPal|Freedom Mobile|Rogers|Bell|Telus|Shaw|Koodo|Fido|Videotron|SaskTel|MTS|Eastlink|OpenAI|Anthropic|Google|Microsoft|AWS|Azure|Cloudflare|GitHub|Stripe|Mailgun|Twilio|eNom|GoDaddy|Namecheap|Hover|Tucows|WHC|Domain\.com/i);
-                const _supplierName = _supplierM ? _supplierM[0] : 'Supplier';
+                // Derive the vendor name WITHOUT a hardcoded list. The old
+                // regex (HostGator|PayPal|OpenAI|...) could not match new
+                // vendors, so "OpenRouter" fell back to the literal 'Supplier'
+                // and the dropdown stayed empty. Prefer an explicit
+                // "Receipt from X" / "Invoice from X"; else first line.
+                const _fromM = _billText.match(/(?:Receipt|Invoice)\s+from\s+([A-Za-z0-9][A-Za-z0-9 .,&'\-]{1,58}?)\s*(?=\$|\d|USD|CAD|Receipt|Invoice|Qty|Total|\.|$)/i);
+                const _supplierName = (_fromM && _fromM[1].trim())
+                    ? _fromM[1].trim()
+                    : (_billText.split(/[\n\r]/)[0] || 'Supplier').slice(0, 60);
                 const _billedToM = _billText.match(/Billed\s+To[:\s]+([^\n\r]+)/i);
                 const _billedTo = _billedToM ? ' (' + _billedToM[1].trim() + ')' : '';
                 if (!_nfFields.notes) {
@@ -2471,7 +2501,31 @@
                         const _qs = Object.keys(_tf).filter(k => _tf[k]).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(_tf[k])).join('&');
                         executeAIAction({ action: 'navigate_and_fill', url: '/Accounting/transfer/new?' + _qs, fields: _tf });
                     } else {
-                        executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: _nfFields });
+                        // Resolve the supplier NAME to its numeric id on the
+                        // server before navigating: the <select> is keyed by
+                        // id, and only the server reliably knows it.
+                        (function(fields, sName){
+                            if (!sName || sName === 'Supplier') {
+                                executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: fields });
+                                return;
+                            }
+                            fetch('/ai2/action', {
+                                method: 'POST',
+                                credentials: 'include',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'resolve_supplier', params: { name: sName } })
+                            })
+                            .then(function(r){ return r.json(); })
+                            .then(function(d){
+                                if (d && d.success && d.supplier_id) {
+                                    fields.supplier_id = String(d.supplier_id);
+                                }
+                            })
+                            .catch(function(e){ console.warn('resolve_supplier failed', e); })
+                            .then(function(){
+                                executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: fields });
+                            });
+                        })(_nfFields, _supplierName);
                     }
                     const _wAcc = document.createElement('div');
                     _wAcc.className = 'msg-wrapper msg-wrapper-ai';
@@ -2990,7 +3044,7 @@
                 // Use the SHARED describeModel() helper so the label always matches
                 // the provider that actually served the request. The previous code
                 // treated every non-Grok response as Ollama, which is why an
-                // OpenRouter answer displayed as "Ollama (Local): tencent/hy3".
+                // OpenRouter answer displayed as "Ollama (Local): <model>".
                 const providerParts2 = (state.selectedProvider || '').split('|');
                 // Prefer the user's selected prefix when the backend collapses
                 // SuperGrok onto the Grok client (same API, different billing).
@@ -3056,8 +3110,10 @@
                     });
                 }
 
-                // Coding agent: intercept [READ_FILE: path] requests automatically
-                if (state.pageContext && state.pageContext.agent_id === 'coding') {
+                // Coding READ_FILE auto-fetch is AI Editor only — hard-disable on site Chat-with-AI
+                if (isAi2EditorContext()
+                    && state.pageContext
+                    && (state.pageContext.agent_id === 'coding' || state.pageContext.agent_id === 'programming')) {
                     var rfMatch = cleanText.match(/\[READ_FILE:\s*([^\]]+)\]/i);
                     if (rfMatch) {
                         _handleReadFileRequest(rfMatch[1].trim());
@@ -5162,7 +5218,7 @@
             ComservChat.modelSelect.init({
                 selectEl: modelSelectEl,
                 context: 'chat',
-                pinModel: 'tencent/hy3',
+                pinModel: 'cohere/north-mini-code:free',
                 onReady: function () {
                     modelSelectEl.addEventListener('change', _applyPageModelSelection);
                     _applyPageModelSelection();

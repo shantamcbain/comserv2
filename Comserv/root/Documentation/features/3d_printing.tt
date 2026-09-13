@@ -6,6 +6,9 @@
 [% META roles = 'admin developer editor' %]
 
 <h1>3D Printing System</h1>
+<p class="doc-info">Current browse / Inventory vs Order / unit colour theme:
+<a href="[% c.uri_for('/Documentation/3dPrintingHowItWorks') %]">3dPrintingHowItWorks</a>
+(generic; matches Controller::3d as of 2026-08-27).</p>
 <p>
     <a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-link">3D printing coordinator plan</a>
     ·
@@ -81,7 +84,7 @@ Items are shown in the shop when their linked inventory item has <code>show_in_s
 <p><strong>Customer order flow:</strong></p>
 <ol>
     <li>Customer browses <a href="/shop">/shop</a> and adds a 3D-print item to cart.</li>
-    <li>Alternatively, they visit <a href="/3d/order">/3d/order</a> to place a direct print order.</li>
+    <li>Alternatively, they use <a href="/3d/browse">/3d/browse</a> Order (opens <code>/3d/model/&lt;id&gt;</code>; <code>/3d/order?model_id=</code> redirects there).</li>
     <li>The <strong>Add to Cart</strong> button at <a href="/3d/buy">/3d/buy</a> also goes to the Cart.</li>
     <li>Customers view their order history at <a href="/3d/my_orders">/3d/my_orders</a>.</li>
 </ol>
@@ -124,6 +127,50 @@ Each printer is an inventory item with category <code>3d_printer</code>, <code>3
     <li>If the <code>inventory_equipment</code> table does not exist, the printers page still loads — the equipment section shows an empty state rather than crashing.</li>
 </ul>
 
+<h3 id="printer-maintenance">5.1 Printer Maintenance (between-print, per printer type)</h3>
+<p class="doc-body">
+Maintenance is <strong>between-print work</strong>, performed by the worker <em>before</em> starting the next job
+— not on a cloud schedule. Our Anycubic printers previously tracked hours online (e.g. a 500-hour service
+interval) via the vendor cloud; that cloud link is now <strong>offline</strong>, so hour-based reminders no longer
+fire automatically.
+</p>
+
+<p class="doc-body">
+<strong>LAN switch timing (for hour back-fill):</strong> LAN mode (direct MQTT to the Kobra 3) was brought online in early-to-mid September 2026 (active development visible in commits around 2026-09-01 to 2026-09-11, including Kobra3 LAN discover/attach/control and state fetching). Pre-LAN prints (user recalls ~2–3 jobs) must be estimated from completed job records + any session logs from the setup period. Full printer state (including remain_time_min and print_time_min from the printer itself) is now captured on queue loads and job completion into per-printer JSON files at <code>/data/nfs/3d/printer_states/printer_&lt;id&gt;.json</code>. Use these + sum of <code>print_time</code> from completed <code>Printing3dJob</code> rows for cumulative hours per printer.
+</p>
+
+<p class="doc-body">
+Until an in-app maintenance tracker exists, the worker is responsible for doing the pre-print checks below by hand. Track hours/cycles on the printer's inventory-item notes so the interval is not missed.
+</p>
+
+<p class="doc-body"><strong>Universal pre-next-print checklist (all types):</strong></p>
+<ul class="doc-ul">
+    <li>Confirm the correct filament is loaded and the spool matches the job (filament changes are a maintenance action, not free).</li>
+    <li>Inspect the build surface / plate for residue, wipe / re-glue as needed.</li>
+    <li>Check nozzle for clog or ooze; cold-pull or swap if degraded.</li>
+    <li>Verify belts/tension and any visible wear.</li>
+    <li>Clear the physical pick area of the <em>previous</em> part before the new job starts (pickup hygiene).</li>
+</ul>
+
+<p class="doc-body"><strong>Per printer type — details differ:</strong></p>
+<table class="doc-table">
+    <tr><th class="doc-th">Type</th><th class="doc-th">Key maintenance notes</th></tr>
+    <tr><td class="doc-td">Anycubic (Kobra / similar, LAN mode)</td>
+        <td class="doc-td">Hour counter is now manual — log run-hours in item notes; perform the 500-hour service (lubricate axes, inspect PTFE, belt tension) at that mark. LAN-mode telemetry (MQTTS) gives live temp/state but <em>not</em> a maintenance alarm. Filament-path and bed-adhesion checks every swap.</td></tr>
+    <tr><td class="doc-td">Bambu / AMS-style</td>
+        <td class="doc-td">AMS roller/feeder cleaning on filament change; nozzle wipe + chamber checks. Hydra/AMS rollers are printed parts — verify they are not the worn item before assuming a printer fault.</td></tr>
+    <tr><td class="doc-td">Resin / SLA</td>
+        <td class="doc-td">Resin vat clean, FEP inspection, cure-station check. (Not yet in this farm's BOM; documented for when added.)</td></tr>
+</table>
+
+<p class="doc-body doc-muted">
+<b>Open:</b> no automated maintenance tracker yet. Future: a per-printer maintenance schedule in the app
+(last-service timestamp + interval per printer type) that blocks/flags a printer past its interval, and
+auto-assign-to-next-available-printer for the queue (deferred until the between-print ritual is reliable).
+The queue currently stays printer-agnostic; the <em>queue</em> (not the traveler) is responsible for choosing
+the next available printer.
+</p>
+
 <hr>
 
 <h2 id="consignment">6. Consignment Integration</h2>
@@ -160,7 +207,7 @@ Finished 3D prints can be consigned to other sites (e.g. a co-op shop or arts ma
         <tr><td><code>/3d/model_download/&lt;id&gt;</code></td><td>Download model file</td><td>All (if enabled)</td></tr>
         <tr><td><code>/3d/store</code></td><td>Redirects to /shop</td><td>All</td></tr>
         <tr><td><code>/3d/buy</code></td><td>Redirects to Cart</td><td>All</td></tr>
-        <tr><td><code>/3d/order</code></td><td>Place a print order</td><td>Logged in</td></tr>
+        <tr><td><code>/3d/order</code></td><td>Redirects to /3d/model/&lt;id&gt;</td><td>Logged in</td></tr>
         <tr><td><code>/3d/my_orders</code></td><td>Customer's order history</td><td>Logged in</td></tr>
         <tr><td><code>/3d/queue</code></td><td>Print job queue</td><td>Admin</td></tr>
         <tr><td><code>/3d/queue_print</code></td><td>Mark job as printed</td><td>Admin</td></tr>
@@ -179,7 +226,7 @@ Finished 3D prints can be consigned to other sites (e.g. a co-op shop or arts ma
 <p>
 Use this when a new 3D project arrives as a folder of 3MF/STL/PDF (the HDRY filament dryer is the
 worked example). Full tracking:
-<a href="/Documentation/DryerProjectImportPlan">/Documentation/DryerProjectImportPlan</a>
+<a href="/Documentation/DryerProjectPlan">/Documentation/DryerProjectPlan</a>
 (project <a href="/project/details?project_id=272">#272 DRYER-INT</a>).
 </p>
 <ol>

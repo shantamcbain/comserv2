@@ -638,6 +638,22 @@ if ($use_twiggy) {
     unlink $flag if -f $flag;
 }
 
+# Restrict -r/--restart file watching to 'lib' only (when no explicit --restart_directory given).
+# Watching the full app root (script/..) pulls in root/ (thousands of .tt files, site templates,
+# Documentation/, static/ etc.) which creates excessive inotify watches per server.
+# Combined with many concurrent -r servers across worktrees (3001/400x ports), this exhausts
+# fs.inotify.max_user_instances (default 128) or per-process fds (ulimit -n 1024).
+# Result: "Cannot construct a Linux::Inotify2 object: Too many open files".
+#
+# lib/ changes (.pm etc.) still auto-restart. For .tt / root/ / config changes, manually
+# restart the server or `touch lib/Comserv.pm` (or any watched .pm) to force a cycle.
+# This is consistent with the Twiggy (-w) path which already does `-R lib`.
+if ( grep { $_ eq '-r' || $_ eq '--restart' } @ARGV ) {
+    unless ( grep { /--?restart_directory/ } @ARGV ) {
+        push @ARGV, '--restart_directory', 'lib';
+    }
+}
+
 Catalyst::ScriptRunner->run('Comserv', 'Server');
 
 1;

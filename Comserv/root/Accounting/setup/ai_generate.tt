@@ -1,0 +1,131 @@
+[% INCLUDE Accounting/_acct_inv_nav.tt %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+
+  [% IF c.flash.error_msg %]
+  <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">[% c.flash.error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">[% c.flash.success_msg | html %]</div>
+  [% END %]
+
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.2rem;">
+    <h1 style="margin:0;">AI Chart of Accounts — [% sitename | html %]</h1>
+    <a href="/Accounting/setup" class="btn btn-secondary" style="font-size:0.88rem;">&larr; Setup</a>
+  </div>
+
+  <p style="font-size:0.9rem;color:var(--text-muted-color,#666);">
+    This draft is for <strong>[% sitename | html %]</strong> only. Business model comes from
+    the site map (you can change it). Overlays start from this site’s enabled modules
+    (teaching / e-commerce). Accounts that already have GL, inventory, or invoices
+    on this site are locked. Unused generic accounts may be dropped so Import will
+    not copy them. Live <a href="/Accounting/coa">/Accounting/coa</a> still reads Maria.
+  </p>
+
+  <form method="post" action="[% c.uri_for('/Accounting/setup') %]" style="border:1px solid var(--border-color,#dee2e6);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
+    <input type="hidden" name="go_ai" value="1">
+    <h2 style="font-size:1rem;margin:0 0 0.75rem;">1. Business model for [% sitename | html %]</h2>
+
+    <label style="display:block;font-size:0.88rem;margin-bottom:0.75rem;">Base archetype (industry)<br>
+      <select name="base_archetype" required style="width:100%;max-width:36rem;padding:0.4rem;">
+        [% FOREACH a IN archetypes %]
+        <option value="[% a.id %]" [% IF chosen_base == a.id %]selected[% END %]>[% a.label | html %]</option>
+        [% END %]
+      </select>
+    </label>
+
+    <p style="font-size:0.88rem;margin-bottom:0.35rem;">Capability overlays (from this site’s modules — change if needed)</p>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+      <label style="font-size:0.88rem;">
+        <input type="checkbox" name="overlays" value="teaching"[% FOREACH o IN selected_overlays %][% IF o == 'teaching' %] checked[% END %][% END %]>
+        Teaching
+      </label>
+      <label style="font-size:0.88rem;">
+        <input type="checkbox" name="overlays" value="ecommerce"[% FOREACH o IN selected_overlays %][% IF o == 'ecommerce' %] checked[% END %][% END %]>
+        E-commerce
+      </label>
+    </div>
+
+    <label style="display:block;font-size:0.88rem;margin-bottom:0.75rem;">Location / jurisdiction<br>
+      <input type="text" name="location" class="form-control" style="max-width:36rem;"
+             placeholder="e.g. British Columbia, Canada"
+             value="[% c.req.params.location | html %]">
+    </label>
+
+    <label style="display:block;font-size:0.88rem;margin-bottom:0.75rem;">Notes for the model (optional)<br>
+      <textarea name="notes" rows="3" class="form-control" style="max-width:36rem;" placeholder="What this site actually sells or makes"></textarea>
+    </label>
+
+    [% IF maria_count %]
+    <label style="display:block;font-size:0.88rem;margin-bottom:0.75rem;">
+      <input type="checkbox" name="use_maria" value="1" [% IF use_maria %]checked[% END %]>
+      Start from existing Maria chart ([% maria_count %] accounts for this site + shared generic). In-use accounts stay; unused industry-wrong ones may drop.
+    </label>
+    [% ELSE %]
+    <p style="font-size:0.85rem;color:var(--text-muted-color,#666);">No Maria chart on this site — the template store is the starting point.</p>
+    [% END %]
+
+    <button type="submit" class="btn btn-primary">Draft chart for review</button>
+  </form>
+
+  [% IF draft %]
+  <div style="border:1px solid var(--border-color,#dee2e6);border-radius:8px;padding:1rem 1.25rem;">
+    <h2 style="font-size:1rem;margin:0 0 0.5rem;">2. Review before seed — [% sitename | html %]</h2>
+    <p style="font-size:0.88rem;color:var(--text-muted-color,#666);">
+      Source: [% draft.source | html %]
+      [% IF draft.provider %] via [% draft.provider | html %][% END %].
+      Locked rows have postings on this site. Uncheck unused rows to drop them from PostgreSQL and from later Import.
+    </p>
+    [% IF draft.notes %]
+    <p style="font-size:0.9rem;">[% draft.notes | html %]</p>
+    [% END %]
+
+    <form method="post" action="[% c.uri_for('/Accounting/setup') %]"
+          onsubmit="return confirm('Seed the kept accounts into PostgreSQL for [% sitename | html %]? This does not change the live Maria chart.');">
+      <input type="hidden" name="go_ai_commit" value="1">
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        <thead>
+          <tr style="background:#f3f4f6;">
+            <th style="padding:0.4rem;">Seed</th>
+            <th style="padding:0.4rem;text-align:left;">Acc</th>
+            <th style="padding:0.4rem;text-align:left;">Description</th>
+            <th style="padding:0.4rem;">Cat</th>
+            <th style="padding:0.4rem;">In use</th>
+            <th style="padding:0.4rem;">Action</th>
+            <th style="padding:0.4rem;text-align:left;">Why</th>
+          </tr>
+        </thead>
+        <tbody>
+          [% FOREACH row IN draft.rows %]
+          <tr style="border-top:1px solid #eee;">
+            <td style="padding:0.35rem;text-align:center;">
+              [% IF row.in_use %]
+                <input type="hidden" name="accno" value="[% row.accno | html %]">
+                locked
+              [% ELSIF row.action == 'drop' %]
+                <input type="checkbox" name="accno" value="[% row.accno | html %]">
+              [% ELSE %]
+                <input type="checkbox" name="accno" value="[% row.accno | html %]" checked>
+              [% END %]
+            </td>
+            <td style="padding:0.35rem;font-family:monospace;">[% row.accno | html %]</td>
+            <td style="padding:0.35rem;">[% row.description | html %]</td>
+            <td style="padding:0.35rem;text-align:center;">[% row.category | html %]</td>
+            <td style="padding:0.35rem;text-align:center;">[% IF row.in_use %]yes ([% row.hits %])[% ELSE %]no[% END %]</td>
+            <td style="padding:0.35rem;text-align:center;">[% row.action | html %]</td>
+            <td style="padding:0.35rem;color:var(--text-muted-color,#666);">[% row.rationale | html %]</td>
+          </tr>
+          [% END %]
+        </tbody>
+      </table>
+      <label style="display:block;margin:0.9rem 0;font-size:0.88rem;">
+        <input type="checkbox" name="confirm" value="1" required>
+        I reviewed these accounts for [% sitename | html %]
+      </label>
+      <button type="submit" class="btn btn-primary">Seed selected accounts</button>
+    </form>
+  </div>
+  [% END %]
+
+</div>

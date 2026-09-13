@@ -1,0 +1,77 @@
+[% PageVersion = 'Accounting/coa/admin.tt,v 0.01 2026/09/10 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Chart of Accounts — Site Assignment (Admin)</h1>
+<p><a href="/Accounting/coa">← Chart of Accounts</a></p>
+
+[% IF flash.success_msg %]<p style="color:green;font-weight:bold">[% flash.success_msg %]</p>[% END %]
+[% IF flash.error_msg %]<p style="color:red">[% flash.error_msg %]</p>[% END %]
+
+<div style="background:var(--bg-subtle,#f6f6f6);border-left:4px solid var(--primary-color,#007bff);padding:10px 14px;margin:12px 0;">
+  <strong>Setting a site changes visibility only.</strong>
+  An account is a label (number + description + site); it holds no balance.
+  Transactions live in the GL and point at the account's ID, so re-assigning
+  the site never moves or invalidates posted entries.
+  Choose <strong>Global</strong> for shared overhead (hosting, domain, SSL,
+  depreciation, shipping, taxes, bank fees) and a specific site for
+  trade-specific accounts (3D print, apiary, brew, craft).
+</div>
+
+[% IF accounts.size %]
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;">
+  <thead>
+    <tr style="background:var(--bg-subtle,#eee);">
+      <th>Acc #</th>
+      <th>Description</th>
+      <th>Now</th>
+      <th>Current Site</th>
+      <th>Assign To</th>
+      <th>Category</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH a IN accounts %]
+    <tr>
+      <td>[% a.accno %]</td>
+      <td>[% a.description | html %]</td>
+      <td>[% a.category %]</td>
+      <td>[% IF a.sitename %][% a.sitename | html %][% ELSE %]<em>Global</em>[% END %]</td>
+      <td>
+        [%# One self-contained form per row: POSTs id + sitename + category.
+            No HTML5 form= attribute, which is unreliable in older Safari. %]
+        <form method="post" action="/Accounting/coa/set_sitename" style="margin:0;">
+          <input type="hidden" name="id" value="[% a.id %]">
+          <select name="sitename" style="min-width:150px;">
+            <option value="global" [% UNLESS a.sitename %]selected[% END %]>Global (all sites)</option>
+            [% FOREACH s IN site_names %]
+              <option value="[% s | html %]" [% IF a.sitename == s %]selected[% END %]>[% s | html %]</option>
+            [% END %]
+          </select>
+      </td>
+      <td>
+          <select name="category" style="min-width:110px;">
+            [% SET cats = {A='Asset', L='Liability', Q='Equity', I='Income', E='Expense'} %]
+            [% FOREACH k IN ['A','L','Q','I','E'] %]
+              <option value="[% k %]" [% IF a.category == k %]selected[% END %]>[% cats.${k} %]</option>
+            [% END %]
+          </select>
+      </td>
+      <td>
+          <button type="submit" style="padding:3px 10px;">Save</button>
+        </form>
+      </td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+
+<p style="margin-top:14px;color:#666;">
+  Note: where the same account number appears twice (e.g. two <code>1100</code>
+  rows) those are separate accounts with their own transactions. This tool
+  assigns them to sites; it does not merge them, because merging would rewrite
+  posted GL history.
+</p>
+[% ELSE %]
+<p>No accounts found.</p>
+[% END %]

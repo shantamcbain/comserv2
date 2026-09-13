@@ -14,6 +14,14 @@ has 'logging' => (
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
 
+    # CSC-20260906-6513: Site Management is admin-only (not guest-browsable)
+    my $root = $c->controller('Root');
+    unless ($root && $root->user_exists($c) && $root->check_user_roles($c, 'admin')) {
+        $c->flash->{error_msg} = 'Administrator access required for Site Management.';
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        $c->detach;
+    }
+
     # Log entry into the index method
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Enter in index');
 

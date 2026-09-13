@@ -1,0 +1,130 @@
+[% META
+    title = "Documentation Master Plan"
+    description = "The single coordinator for ALL documentation plans in Comserv2: where docs live, the audit of current state, and the work items to bring docs to compliance. Links every existing documentation plan."
+    roles = "admin,developer"
+    TemplateType = "Documentation"
+    category = "system"
+    page_version = "1.0"
+    last_updated = "2026-08-25"
+    site_specific = "false"
+    project_id = "138"
+    project_code = "DOCMASTER"
+%]
+[% PageVersion = 'Documentation/DocumentationMasterPlan.tt,v 1.0 2026/08/25 shanta Exp - Coordinator for all documentation plans; links existing doc plans, audit, work items' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container masterplan">
+
+<h1 id="top">Documentation Master Plan</h1>
+
+<div class="last-updated doc-muted">
+    Created: 2026-08-25 &nbsp;|&nbsp; Version: 1.0 &nbsp;|&nbsp; Status: COORDINATOR
+    &nbsp;|&nbsp; Parent project: <a href="/project/details?project_id=138" class="doc-link">#138 PLANNING</a>
+</div>
+
+<p>This is the <strong>single entry point for documentation work</strong>. It does not replace any
+sub-plan — it links them, records the current audit, and lists the work items. Every
+sub-plan below remains the authoritative spec for its own area. This plan follows the
+<a href="[% c.uri_for('/Documentation/PlanningLanguageStandard') %]">Planning Language Standard</a>:
+PROJECT = PLAN, PHASE = sub-project, STEP = todo. No abstract "Phase N".</p>
+
+<div class="doc-info">
+    <strong>Where docs live (the rule):</strong> the <em>only</em> documentation directory the
+    application serves is <code>Comserv/root/Documentation/</code> (the app resolves it via
+    <code>path_to('root','Documentation')</code>). Anything an AI or human writes to the
+    repo-root <code>Documentation/</code> folder is <strong>invisible to the app</strong>
+    (and is a duplicate of served files, or lost). Write documentation under
+    <code>Comserv/root/Documentation/</code> only.
+</div>
+
+<div class="doc-success">
+    <strong>The one system (2026-08-26):</strong>
+    <a href="[% c.uri_for('/Documentation/STANDARD') %]" class="doc-link">Documentation System Standard</a>
+    — human-readable / navigable pages that match the code, SQL catalog, JSON abandoned.
+    This coordinator stays the audit + work-item list. Do not start a third “docs system” plan.
+</div>
+
+<h2 id="summary">Summary (read this first)</h2>
+
+<table class="doc-table">
+    <tr><th class="doc-th">Finding</th><th class="doc-th">Measured</th><th class="doc-th">Meaning</th></tr>
+    <tr><td class="doc-td">Real doc directory</td><td class="doc-td"><code>Comserv/root/Documentation/</code></td><td class="doc-td">Only dir the app serves. ~827 files.</td></tr>
+    <tr><td class="doc-td">AI misplacement</td><td class="doc-td">repo-root <code>Documentation/</code></td><td class="doc-td">Duplicates served files + <code>DailyPlans/</code> the app never sees. Stop writing here.</td></tr>
+    <tr><td class="doc-td">Theming compliance</td><td class="doc-td">208 / 606 <code>.tt</code> use <code>var(--*)</code> (34%)</td><td class="doc-td">398 docs break on non-default themes — biggest gap.</td></tr>
+    <tr><td class="doc-td">Metadata</td><td class="doc-td">META 455/606 (75%), PageVersion 487/606 (80%)</td><td class="doc-td">~120 pages render without title/META.</td></tr>
+    <tr><td class="doc-td">Module landing pages</td><td class="doc-td">10 / 34 modules have <code>index.tt</code></td><td class="doc-td">24 modules have no navigable entry.</td></tr>
+    <tr><td class="doc-td">Stray / stale</td><td class="doc-td">49 stray <code>.md</code>, 62 stale <code>PycharmProjects</code> paths</td><td class="doc-td">Hygiene debt under the served tree.</td></tr>
+    <tr><td class="doc-td">Changelog</td><td class="doc-td">149 per-entry <code>.inc</code> fragments</td><td class="doc-td">Healthy — the model to follow.</td></tr>
+</table>
+
+<h2 id="existing">All existing documentation plans (linked)</h2>
+
+<p>Documentation has had plans before — they were never gathered in one place. They live here now:</p>
+
+<div class="doc-h3">Coordinators</div>
+<div class="doc-navrow">
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/STANDARD') %]">Documentation System Standard (the one system)</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/MASTER_PLAN') %]">Master Plan (all projects)</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN') %]">Documentation System Audit &amp; Planning (prior audit)</a>
+</div>
+<div class="doc-h3">Standards &amp; templates</div>
+<div class="doc-navrow">
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/PlanningLanguageStandard') %]">Planning Language Standard</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/DevelopmentStandards') %]">Development Standards</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/DocumentationTtTemplate') %]">DocumentationTtTemplate</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/ApplicationTtTemplate') %]">ApplicationTtTemplate</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/documentation_tt_template') %]">tt template (source)</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/Guidelines') %]">Development Guidelines</a>
+</div>
+<div class="doc-h3">Config &amp; tooling</div>
+<div class="doc-navrow">
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/documentation_config_guide') %]">documentation_config_guide</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/DocumentationConfigGuide') %]">DocumentationConfigGuide</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/DocumentationConfigAuditFindings') %]">Config Audit Findings</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/documentation_sync_analysis') %]">sync analysis</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/DocumentationWorkflow') %]">Workflow</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/Documentation_Workflow') %]">Workflow (alt)</a>
+</div>
+<div class="doc-h3">AI-context / agent guidance</div>
+<div class="doc-navrow">
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/AI_DEVELOPMENT_GUIDELINES') %]">AI Development Guidelines</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/AI_DOCUMENTATION_GUIDELINES') %]">AI Documentation Guidelines</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/AI_Guidelines') %]">AI Guidelines</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/AI_Model_Selection_Guide') %]">AI Model Selection Guide for Documentation Tasks</a>
+</div>
+<div class="doc-h3">Prior system docs</div>
+<div class="doc-navrow">
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/DocumentationSystem') %]">Documentation System</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/documentation_system') %]">documentation system (alt)</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/DocumentationOrganization') %]">Organization</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/DocumentationMigrationToTt') %]">Migration to .tt</a>
+</div>
+
+<h2 id="workitems">Work items (each = a STEP/todo under this plan)</h2>
+
+<p>These are the concrete jobs. Track them as todos under project <strong>#138 DOCMASTER</strong>
+(child of #138 PLANNING). No "Phase N" labels — each item names what it is.</p>
+
+<table class="doc-table">
+    <tr><th class="doc-th">Work item</th><th class="doc-th">Why</th><th class="doc-th">Size</th></tr>
+    <tr><td class="doc-td">Theming sweep: migrate 398 unthemed <code>.tt</code> to <code>var(--*)</code></td><td class="doc-td">Biggest compliance gap; breaks on other themes</td><td class="doc-td">L</td></tr>
+    <tr><td class="doc-td">Backfill META/PageVersion on ~120 missing <code>.tt</code> pages</td><td class="doc-td">Untitled/undated pages; weak search</td><td class="doc-td">M</td></tr>
+    <tr><td class="doc-td">Add <code>index.tt</code> to the 24 modules lacking one</td><td class="doc-td">No navigable module entry</td><td class="doc-td">M</td></tr>
+    <tr><td class="doc-td">Convert or archive 49 stray <code>.md</code> under served tree</td><td class="doc-td">Mixed formats in doc list</td><td class="doc-td">M</td></tr>
+    <tr><td class="doc-td">Scrub 62 stale <code>PycharmProjects</code> paths</td><td class="doc-td">Wrong references</td><td class="doc-td">M</td></tr>
+    <tr><td class="doc-td">Fix <code>README.tt</code>/<code>AGENTS.md</code> legacy <code>Comserv/docs/</code> refs</td><td class="doc-td">Dead pointers</td><td class="doc-td">S</td></tr>
+    <tr><td class="doc-td">Add a docs lint to CI (META, PageVersion, theming, stray <code>.md</code>)</td><td class="doc-td">Prevent drift</td><td class="doc-td">M</td></tr>
+    <tr><td class="doc-td">Stop AI misplacement: write only to <code>Comserv/root/Documentation/</code></td><td class="doc-td">Docs must be app-visible</td><td class="doc-td">S (rule + enforcement)</td></tr>
+    <tr><td class="doc-td"><a href="/Documentation/doc_config_db_move_plan" class="doc-link">Permanent DB move for doc catalog</a> — finish <code>load_from_db</code> + indexer + <code>save_config</code>→table (kills the JSON rewrite)</td><td class="doc-td">Cures the recurring merge-blocker at the architecture level; makes catalog per-site</td><td class="doc-td">M (schema owner for table write)</td></tr>
+</table>
+
+<h2 id="principles">Principles</h2>
+<ul>
+    <li><strong>One directory.</strong> <code>Comserv/root/Documentation/</code> is the only doc root. The repo-root <code>Documentation/</code> folder is a trap — do not use it.</li>
+    <li><strong>One reader.</strong> The Documentation controller renders <code>.tt</code>; changelog is per-entry <code>.inc</code> (generated reader). Don't hand-edit generated files.</li>
+    <li><strong>One vocabulary.</strong> Follow the Planning Language Standard. Link plans by project code, not by "Phase N".</li>
+    <li><strong>Humans see plans.</strong> Every plan is a linkable in-app <code>.tt</code>; the summary table sits at the top of the coordinator.</li>
+</ul>
+
+<p class="doc-backtop"><a href="#top">&#8593; Back to Top</a></p>
+</div>

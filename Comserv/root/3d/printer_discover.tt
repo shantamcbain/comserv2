@@ -1,0 +1,41 @@
+[% PageVersion = '3d/printer_discover.tt,v 0.2 2026/09/05 shanta Exp - attach existing farm row' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Printer Discovery (LAN Mode)</h1>
+
+<form method="get" action="/3d/printer_lan/discover" class="app-form" style="margin-bottom:1.2em;">
+    <label for="subnet">Subnet</label>
+    <input type="text" id="subnet" name="subnet" value="[% scan_subnet || '192.168.2.0/24' | html %]" size="18">
+    <button type="submit">Scan again</button>
+</form>
+
+<p>Found [% printers.size %] device(s) with TCP 18910 open.</p>
+
+[% IF printers.size > 0 %]
+<table class="printer-table">
+  <tr><th>IP</th><th>Model</th><th>Status</th><th>Attach to existing farm printer</th></tr>
+  [% FOREACH p IN printers %]
+  <tr>
+    <td>[% p.ip | html %]</td>
+    <td>[% p.model | html %]</td>
+    <td>[% p.status | html %]</td>
+    <td>
+      <form method="post" action="/3d/printer_lan/attach" class="app-form" style="display:inline;">
+        <input type="hidden" name="host" value="[% p.ip | html %]">
+        <select name="printer_id" required>
+          <option value="">— pick farm row —</option>
+          [% FOREACH f IN farm_printers %]
+          <option value="[% f.id %]">[% f.name | html %][% IF f.model %] ([% f.model | html %])[% END %]</option>
+          [% END %]
+        </select>
+        <button type="submit">Save LAN IP (update, do not add new)</button>
+      </form>
+    </td>
+  </tr>
+  [% END %]
+</table>
+[% ELSE %]
+<p>No host answered on port 18910. Enable LAN Mode on the printer, pick the subnet it actually uses, then Scan again.</p>
+[% END %]
+
+<p><a href="/3d/printers">Back to Printers</a></p>

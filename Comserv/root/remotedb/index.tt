@@ -59,6 +59,9 @@
             <td>[% cfg.role | html %]</td>
             <td>[% cfg.priority | html %]</td>
             <td class="action-cell">
+                <a href="[% c.uri_for('/remotedb/change_password') %]/[% name | uri %]"
+                   class="btn btn-sm btn-secondary"
+                   title="Change stored password for [% name | html %]">Password</a>
                 <a href="[% c.uri_for('/remotedb/test') %]/[% name | uri %]"
                    class="btn btn-sm btn-primary"
                    title="Check connection and count tables in [% cfg.database | html %]">Check DB</a>

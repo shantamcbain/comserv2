@@ -78,6 +78,12 @@ var items = [
 [% END %]
 ];
 
+var initialLines = [
+[% FOREACH l IN initial_lines %]
+  { item_id: "[% l.item_id %]", description: "[% l.description %]", quantity: "[% l.quantity %]", notes: "[% l.notes %]" }[% ',' UNLESS loop.last %]
+[% END %]
+];
+
 function buildItemSelect(name, idx) {
   var s = '<select name="' + name + '" id="item_sel_' + idx + '" onchange="itemChanged(' + idx + ')" style="max-width:220px;">'
     + '<option value="">— select item —</option>';
@@ -133,6 +139,42 @@ function addLine() {
   tr.innerHTML =
     '<td>' + (idx + 1) + '</td>'
     + '<td>' + buildItemSelect('item_id_' + idx, idx) + '</td>'
+    + '<td><input type=\"text\" name=\"description_' + idx + '\" id=\"description_' + idx + '\" style=\"width:160px;\"></td>'
+    + '<td><input type=\"number\" name=\"quantity_' + idx + '\" id=\"qty_' + idx + '\" value=\"1\" min=\"1\" style=\"width:55px;\" oninput=\"updateLine(' + idx + ')\"></td>'
+    + '<td>$<span id=\"unit_price_' + idx + '\">0.00</span></td>'
+    + '<td>$<span id=\"lt_' + idx + '\">0.00</span></td>'
+    + '<td><input type=\"text\" name=\"notes_line_' + idx + '\" style=\"width:120px;\"></td>'
+    + '<td><button type=\"button\" onclick=\"removeLine(' + idx + ')\">✕</button></td>';
+  tbody.appendChild(tr);
+  return idx;
+}
+
+function addLineWithValues(itemId, desc, qty, notes) {
+  var idx = addLine();
+  setTimeout(function() {
+    var sel = document.getElementById('item_sel_' + idx);
+    if (sel && itemId) {
+      sel.value = itemId;
+      itemChanged(idx);
+    }
+    var descEl = document.getElementById('description_' + idx);
+    if (descEl && desc) descEl.value = desc;
+    var qtyEl = document.getElementById('qty_' + idx);
+    if (qtyEl && qty) qtyEl.value = qty;
+    var notesEl = document.querySelector('input[name=\"notes_line_' + idx + '\"]');
+    if (notesEl && notes) notesEl.value = notes;
+    updateLine(idx);
+  }, 10);
+}
+
+function addLine() {
+  var idx = lineIndex++;
+  var tbody = document.getElementById('lines-body');
+  var tr = document.createElement('tr');
+  tr.id = 'row_' + idx;
+  tr.innerHTML =
+    '<td>' + (idx + 1) + '</td>'
+    + '<td>' + buildItemSelect('item_id_' + idx, idx) + '</td>'
     + '<td><input type="text" name="description_' + idx + '" id="description_' + idx + '" style="width:160px;"></td>'
     + '<td><input type="number" name="quantity_' + idx + '" id="qty_' + idx + '" value="1" min="1" style="width:55px;" oninput="updateLine(' + idx + ')"></td>'
     + '<td>$<span id="unit_price_' + idx + '">0.00</span></td>'
@@ -142,5 +184,29 @@ function addLine() {
   tbody.appendChild(tr);
 }
 
-addLine();
+function addLineWithValues(itemId, desc, qty, notes) {
+  var idx = addLine();
+  setTimeout(function() {
+    var sel = document.getElementById('item_sel_' + idx);
+    if (sel && itemId) {
+      sel.value = itemId;
+      itemChanged(idx);
+    }
+    var descEl = document.getElementById('description_' + idx);
+    if (descEl && desc) descEl.value = desc;
+    var qtyEl = document.getElementById('qty_' + idx);
+    if (qtyEl && qty) qtyEl.value = qty;
+    var notesEl = document.querySelector('input[name="notes_line_' + idx + '"]');
+    if (notesEl && notes) notesEl.value = notes;
+    updateLine(idx);
+  }, 10);
+}
+
+if (initialLines && initialLines.length > 0) {
+  initialLines.forEach(function(l) {
+    addLineWithValues(l.item_id, l.description, l.quantity, l.notes);
+  });
+} else {
+  addLine();
+}
 </script>

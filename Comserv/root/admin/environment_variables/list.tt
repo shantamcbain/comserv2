@@ -18,6 +18,9 @@
     <div class="page-header">
         <h1>Environment Variables Management</h1>
         <p class="page-subtitle">Manage system environment variables and configuration settings</p>
+        <p class="page-subtitle">To change a MariaDB/MySQL connection password, use
+            <a href="[% c.uri_for('/remotedb') %]">Database Servers → Password</a>
+            (not this env-var list).</p>
     </div>
     
     <div class="content-container">
