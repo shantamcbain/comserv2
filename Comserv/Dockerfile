@@ -43,7 +43,7 @@ RUN mkdir -p /opt/comserv/local/lib/perl5
 RUN cpanm --local-lib=/opt/comserv/local --notest \
     --mirror https://cpan.metacpan.org \
     --mirror https://www.cpan.org \
-    Crypt::CBC Catalyst::Plugin::Session::Store::Cookie
+    Crypt::CBC Catalyst::Plugin::Session Catalyst::Plugin::Session::Store::Cookie
 # ^^^ PRE-INSTALL FORK RESILIENCE ^^^
 RUN cpanm --local-lib=/opt/comserv/local --notest \
     --mirror https://cpan.metacpan.org \
