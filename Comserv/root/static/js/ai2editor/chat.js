@@ -126,6 +126,26 @@
     //     so detaching/reattaching never loses context. ---
     let chatLog = [];   // [{who:'You'|'AI'|'Think', html?, summary?, steps?, open?, done?}]
 
+    function ensureEditorChatContrast(doc) {
+        doc = doc || document;
+        if (!doc || !doc.head) return;
+        if (doc.getElementById('ai2-editor-chat-contrast-css')) return;
+        const style = doc.createElement('style');
+        style.id = 'ai2-editor-chat-contrast-css';
+        style.textContent = [
+            '#ai-chat-sidebar,#ai-chat-sidebar .chat-messages,#ai-chat-sidebar #chat-messages{background:#1a1b1e!important;color:#f2f2f2!important;font-size:13px!important;line-height:1.45!important;}',
+            '#ai-chat-sidebar .chat-msg{margin-bottom:10px;padding:8px 10px;border-radius:6px;border:1px solid #3a3f4a;color:#f2f2f2!important;word-break:break-word;overflow-wrap:anywhere;}',
+            '#ai-chat-sidebar .chat-msg-you{background:#243044!important;border-color:#3d5a80;}',
+            '#ai-chat-sidebar .chat-msg-ai{background:#252830!important;border-color:#4a5568;}',
+            '#ai-chat-sidebar .chat-msg strong{color:#9ecbff!important;}',
+            '#ai-chat-sidebar .chat-msg-you strong{color:#ffd27a!important;}',
+            '#ai-chat-sidebar .chat-msg pre,#ai-chat-sidebar .chat-msg code{background:#0f1115!important;color:#e6edf3!important;border:1px solid #333;border-radius:4px;padding:6px 8px;display:block;white-space:pre-wrap;font-size:12px!important;max-height:280px;overflow:auto;}',
+            '#ai-chat-sidebar #ai-chat-input{background:#0f1115!important;color:#f2f2f2!important;font-size:13px!important;}',
+            '.chat-msg{color:#f2f2f2!important;}'
+        ].join('');
+        doc.head.appendChild(style);
+    }
+
     function ensureThinkingStyles(doc) {
         doc = doc || document;
         if (!doc || !doc.head) return;
@@ -182,9 +202,10 @@
     function renderChatLog(box) {
         if (!box) return;
         ensureThinkingStyles(box.ownerDocument || document);
+        ensureEditorChatContrast(box.ownerDocument || document);
         box.innerHTML = '';
         if (!chatLog.length) {
-            box.innerHTML = '<div><strong>AI:</strong> How can I help with this file?</div>';
+            box.innerHTML = '<div class="chat-msg chat-msg-ai"><strong>AI:</strong> How can I help with this file?</div>';
             return;
         }
         for (let i = 0; i < chatLog.length; i++) {
@@ -210,7 +231,7 @@
                 continue;
             }
             const div = document.createElement('div');
-            div.style.marginBottom = '8px';
+            div.className = 'chat-msg ' + (e.who === 'AI' ? 'chat-msg-ai' : 'chat-msg-you');
             div.innerHTML = '<strong>' + (e.who === 'AI' ? 'AI:' : 'You:') + '</strong> ' + e.html;
             box.appendChild(div);
         }
@@ -721,19 +742,38 @@
         if (/\b(addon|feature)\b/i.test(lower) && !/\b(site_modules|enabled_modules|hosting|nav)\b/i.test(lower)) {
             gaps.push('Is this a site *feature* (nav/module enablement) or something else?');
         }
+                if (/SQL_[A-Z_]+\s*=>/.test(p) || /Address already in use/i.test(p) || /failed to listen to port/i.test(p)) {
+            gaps.push('That looks like a server log paste. What do you want fixed — the bug behind it, or help reading the log?');
+        }
         // Dedup, max 4
         const out = [];
         gaps.forEach(function (g) { if (out.indexOf(g) === -1) out.push(g); });
         return out.slice(0, 4);
     }
 
+    function looksLikeLogNoise(prompt) {
+        const p = String(prompt || '');
+        let hits = 0;
+        if (/SQL_[A-Z_]+\s*=>/.test(p)) hits++;
+        if (/Address already in use/i.test(p)) hits++;
+        if (/Exiting eval via next/i.test(p)) hits++;
+        if (/failed to listen to port/i.test(p)) hits++;
+        if (/_initialize_ai_chat_schema/i.test(p)) hits++;
+        if (/HTTP\/Server\/PSGI/i.test(p)) hits++;
+        if (/\[workstation \(Standalone\):\d+\]/.test(p)) hits++;
+        return hits >= 2;
+    }
+
     function looksVague(prompt, filePath) {
         const p = String(prompt || '').trim();
         if (/^(skip\s+clarify|analyze\s+now|looks\s+good)\b/i.test(p)) return false;
+        if (/^## Refined engineering task/.test(p)) return false; // already fabricated
+        if (looksLikeLogNoise(p)) return true;
         const gaps = promptGaps(p, filePath);
-        if (gaps.length >= 2) return true;
-        if (p.length < 60 && gaps.length >= 1) return true;
-        if (/\b(fix|help|broken|not working|whats wrong|what'?s wrong)\b/i.test(p) && p.length < 120) {
+        // One missing fact is enough — do not burn an analyze turn on a thin ask.
+        if (gaps.length >= 1) return true;
+        if (p.length < 100) return true;
+        if (/\b(fix|help|broken|not working|whats wrong|what'?s wrong|happening)\b/i.test(p)) {
             return true;
         }
         return false;
@@ -997,7 +1037,12 @@
                   : { cleanText: resp, actions: [] };
               const display = extracted.cleanText || resp;
               // Prefix the reply with the model actually used, for transparency.
-              recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + escapeHtml(display).replace(/\n/g, '<br>'));
+                            var bodyHtml = escapeHtml(display).replace(/\n/g, '<br>');
+              if (looksLikeLogNoise(display) || (display && display.length > 2500)) {
+                  bodyHtml = '<span style="color:#f88;">[noisy / log-like reply — ask a clearer question or use Clarify]</span>'
+                      + '<pre>' + escapeHtml(display).slice(0, 4000) + (display.length > 4000 ? '\n…[truncated]' : '') + '</pre>';
+              }
+              recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + bodyHtml);font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + escapeHtml(display).replace(/\n/g, '<br>'));
 
               // Belt-and-suspenders: programming/docs agents must not create todos from chat.
               const skipTodoCreate = /^(programming|coding|code|documentation|analyze)$/i.test(agentId);
