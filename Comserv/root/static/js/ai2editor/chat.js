@@ -423,7 +423,7 @@
                 '<h3>AI Chat — detached <button id="attach">⊞ Attach</button></h3>' +
                 '<div id="chat-messages"></div>' +
                 '<div id="chat-status">Ready</div>' +
-                '<div class="bar"><textarea id="chat-input" rows="1" placeholder="Ask AI… Enter to send, Shift+Enter newline"></textarea>' +
+                '<div class="bar"><textarea id="chat-input" rows="1" placeholder="Describe the bug… vague asks get Clarify first. Enter send, Shift+Enter newline"></textarea>' +
                 '<button id="send">Send</button></div>' +
                 '</body></html>'
             );
@@ -642,11 +642,16 @@
     }
 
 
-    // --- Agent + phase (analyze → plan → verify → implement) ---
+    // --- Agent + phase (clarify → analyze → plan → verify → implement) ---
+    // Budget: clarify + most analyze/plan stay on free models; implement uses a free
+    // code model by default. Header model select still overrides when set.
+    const CLARIFY_MODEL = 'openrouter|google/gemma-4-31b-it:free';
     const ANALYZE_MODEL = 'openrouter|google/gemma-4-31b-it:free';
     const IMPLEMENT_MODEL = 'openrouter|cohere/north-mini-code:free';
-    let _editorPhase = 'analyze'; // analyze | plan | implement
+    let _editorPhase = 'analyze'; // clarify | analyze | plan | implement
     let _planApproved = false;
+    // Pending clarify session: original vague ask + gap questions awaiting answers.
+    let _clarifySession = null; // { original, gaps, askedAt }
 
     function currentEditorAgentId() {
         const sel = document.getElementById('ai-editor-agent');
@@ -675,6 +680,9 @@
         const picked = (window.ComservChat && ComservChat.modelSelect)
             ? ComservChat.modelSelect.getSelectedValue()
             : '';
+        if (phase === 'clarify') {
+            return picked || CLARIFY_MODEL;
+        }
         // Analyze worker stays on the cheap analyze model unless user overrides.
         if (currentEditorAgentId() === 'analyze') {
             return picked || ANALYZE_MODEL;
@@ -686,23 +694,118 @@
         return picked || ANALYZE_MODEL;
     }
 
+    // Local gap detection — no tokens. Used before any clarify/analyze model call.
+    function promptGaps(prompt, filePath) {
+        const p = String(prompt || '').trim();
+        const lower = p.toLowerCase();
+        const gaps = [];
+        if (p.length < 40) {
+            gaps.push('What exactly is broken or missing? (one sentence symptom)');
+        }
+        const hasSite = /\b(sitename|site\s*name|3d|bmaster|csc|forager|brew)\b/i.test(p);
+        if (!hasSite && /\b(site|nav|menu|feature|addon|module)\b/i.test(lower)) {
+            gaps.push('Which sitename / host is this on? (e.g. 3d, CSC, BMaster)');
+        }
+        const hasPath = /(?:^|\s)(?:lib\/|root\/|Comserv\/|[\w.-]+\.(?:pm|tt|js|sql))\b/.test(p)
+            || (filePath && filePath.length > 0);
+        if (!hasPath && /\b(bug|broken|fix|error|fail|not work|missing|gate|nav)\b/i.test(lower)) {
+            gaps.push('Any file/module path you already suspect, or should we search from Root/nav?');
+        }
+        if (/\b(not work|broken|fail|wrong|missing|no .+ feature)\b/i.test(lower)
+            && !/\b(expected|should|want|instead)\b/i.test(lower)) {
+            gaps.push('What should happen instead? (expected behavior)');
+        }
+        if (!/\b(repro|steps|when i|after i|click|login|guest)\b/i.test(lower) && p.length < 200) {
+            gaps.push('How do you reproduce it? (short steps)');
+        }
+        if (/\b(addon|feature)\b/i.test(lower) && !/\b(site_modules|enabled_modules|hosting|nav)\b/i.test(lower)) {
+            gaps.push('Is this a site *feature* (nav/module enablement) or something else?');
+        }
+        // Dedup, max 4
+        const out = [];
+        gaps.forEach(function (g) { if (out.indexOf(g) === -1) out.push(g); });
+        return out.slice(0, 4);
+    }
+
+    function looksVague(prompt, filePath) {
+        const p = String(prompt || '').trim();
+        if (/^(skip\s+clarify|analyze\s+now|looks\s+good)\b/i.test(p)) return false;
+        const gaps = promptGaps(p, filePath);
+        if (gaps.length >= 2) return true;
+        if (p.length < 60 && gaps.length >= 1) return true;
+        if (/\b(fix|help|broken|not working|whats wrong|what'?s wrong)\b/i.test(p) && p.length < 120) {
+            return true;
+        }
+        return false;
+    }
+
+    function isSkipClarify(prompt) {
+        return /^\s*(skip\s+clarify|analyze\s+now|looks\s+good|just\s+analyze)\b/i.test(String(prompt || ''));
+    }
+
+    function synthesizePrompt(original, answers, filePath) {
+        const lines = [
+            '## Refined engineering task (fabricated from clarify)',
+            '',
+            '### Original ask',
+            String(original || '').trim(),
+            '',
+            '### Clarifications from user',
+            String(answers || '').trim() || '(none — user skipped; infer carefully from code)',
+            '',
+            '### Editor context',
+            'Open file: ' + (filePath || '(none)'),
+            '',
+            '### Required output',
+            '1. Reproduce / locate the real gate in Comserv code (not guesswork about DNS/addons unless evidence).',
+            '2. Name root cause with file/symbol references.',
+            '3. Propose the smallest safe fix.',
+            '4. How to verify on aisystem :4006 (no prod deploy).',
+            'Do not invent infrastructure. Prefer site *features* / enabled_modules / nav gating over "paid addon" language unless the code literally says addon.'
+        ];
+        return lines.join('\n');
+    }
+
+    function beginClarifySession(original, gaps, target, sendBtn) {
+        _clarifySession = {
+            original: original,
+            gaps: gaps.slice(),
+            askedAt: Date.now()
+        };
+        setEditorPhase('clarify');
+        const qHtml = gaps.map(function (g, i) {
+            return (i + 1) + '. ' + escapeHtml(g);
+        }).join('<br>');
+        recordMessage('AI',
+            '<span style="color:#ffd27a;font-size:0.9em;">[clarify · free]</span> '
+            + 'Your ask is a bit thin for a good analysis. Please answer:<br><br>'
+            + qHtml
+            + '<br><br><span style="opacity:0.85;">Reply with answers in one message, or say '
+            + '<code>skip clarify</code> / <code>analyze now</code> to proceed anyway.</span>');
+        if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+        if (target && target.status) target.status('Clarify — waiting for your answers');
+    }
+
     function phaseContract(phase, agentId) {
         const lines = [
             '[AI Editor agent=' + agentId + ' phase=' + phase + ']',
             'Contract:',
-            'A) analyze — cheap analysis only; no ## FIX / large rewrites.',
+            '0) clarify — ask only for missing facts; do not analyze code deeply yet.',
+            'A) analyze — cost-effective analysis; no ## FIX / large rewrites.',
             'B) plan — short plan for user verify; MAY include docs/planning/todo updates before code; end by asking for "approve plan".',
             'C) implement — code suggestion only after plan approval (or explicit implement request).'
         ];
         if (agentId === 'analyze') {
-            lines.push('You are the Analyze worker: read open buffers and named paths; explain root cause and a short plan only. Never emit ## FIX, never rewrite files, never ask to paste files already loaded via /ai2/load_file.');
+            lines.push('You are the Analyze worker: read open buffers and named paths; explain root cause and a short plan only. Never emit ## FIX, never rewrite files, never ask the user to paste files already loaded via /ai2/load_file.');
         } else if (agentId === 'documentation') {
             lines.push('You are in documentation mode: prefer docs/changelog/planning guidance; do not emit code file rewrites unless asked.');
         } else {
             lines.push('You are in programming mode: do NOT divert to FocusTune todo ranking; stay on code/docs/plan for this file.');
         }
-        if (phase === 'analyze') {
-            lines.push('Current phase ANALYZE: respond with analysis only.');
+        if (phase === 'clarify') {
+            lines.push('Current phase CLARIFY: ask 2–4 short questions about missing context only. No root-cause essay.');
+        } else if (phase === 'analyze') {
+            lines.push('Current phase ANALYZE: respond with analysis only. Prefer evidence from loaded files and Comserv patterns (features/modules/nav).');
         } else if (phase === 'plan') {
             lines.push('Current phase PLAN: propose the plan; wait for user "approve plan" / Verify before code.');
         } else {
@@ -786,12 +889,44 @@
             return;
         }
 
+        const filePathEarly = currentFilePath();
+
+        // Answer an open clarify session → fabricate analyze prompt (no extra clarify model $).
+        if (_clarifySession) {
+            const original = _clarifySession.original;
+            const answers = isSkipClarify(prompt) ? '' : prompt;
+            _clarifySession = null;
+            const fabricated = synthesizePrompt(original, answers, filePathEarly);
+            recordMessage('AI',
+                '<span style="color:#7fb7ff;font-size:0.9em;">[fabricated prompt → analyze · free]</span><br>'
+                + '<pre style="white-space:pre-wrap;margin:6px 0;font-size:0.85em;opacity:0.95;">'
+                + escapeHtml(fabricated) + '</pre>');
+            setEditorPhase('analyze');
+            prompt = fabricated;
+            if (target.status) target.status('Fabricated prompt — starting analyze…');
+        } else {
+            // Auto-clarify when ask is thin (or phase is Clarify).
+            maybeAdvancePhaseFromUser(prompt);
+            let phasePeek = currentEditorPhase();
+            const wantClarify = (phasePeek === 'clarify')
+                || ((phasePeek === 'analyze' || phasePeek === 'plan') && looksVague(prompt, filePathEarly));
+            if (wantClarify && !isSkipClarify(prompt)) {
+                const gaps = promptGaps(prompt, filePathEarly);
+                if (gaps.length) {
+                    beginClarifySession(prompt, gaps, target, sendBtn);
+                    return;
+                }
+                if (phasePeek === 'clarify') setEditorPhase('analyze');
+            }
+        }
+
         // Agent + phase first so thinking UI can name model/phase immediately.
         maybeAdvancePhaseFromUser(prompt);
         const agentId = currentEditorAgentId();
-        const phase = currentEditorPhase();
+        const phase = currentEditorPhase() === 'clarify' ? 'analyze' : currentEditorPhase();
+        if (currentEditorPhase() === 'clarify') setEditorPhase('analyze');
         const model = resolveEditorModel(phase);
-        const filePath = currentFilePath();
+        const filePath = filePathEarly;
 
         if (target.status) target.status('AI thinking…');
         const liveThink = startLiveThinking({
@@ -1076,6 +1211,7 @@
         if (approve) approve.addEventListener('click', approveSuggestion);
         if (reject) reject.addEventListener('click', rejectSuggestion);
         if (clear && input) clear.addEventListener('click', function () {
+            _clarifySession = null;
             chatLog = [];   // reset the shared log (both views re-render empty)
             renderChatLog(document.getElementById('chat-messages'));
             const w = window._aiChatWin;
