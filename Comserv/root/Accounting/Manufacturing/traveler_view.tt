@@ -113,6 +113,12 @@
   border: none;
   font-weight: 600;
 }
+.traveler-tablet .btn-order {
+  background: #e65100 !important;
+  color: #fff !important;
+  border: none;
+  font-weight: 600;
+}
 .traveler-tablet .btn-clean-start {
   background: #00838f !important;
   color: #fff !important;
@@ -178,7 +184,7 @@
     need_buy     = 'Items to Order',
     need_print   = 'Need to Add to Print Queue',
     in_queue     = 'In Print Queue',
-    printed_ready = 'Printed / Arrived — Ready to Pick',
+    printed_ready = 'Printed Arrived (in stock / not yet picked)',
     in_box       = 'Picked — In Pick Box'
 } %]
 [% SET section_icons = {
@@ -283,8 +289,12 @@
         </td>
         <td>
           [% IF part.row_state == 'need_buy' %]
-            <a href="/Inventory/item/view/[% part.id %]" class="buy-link" target="_blank">🛒 Order</a>
-            <span style="opacity:0.7;font-size:0.82em;display:block;margin-top:0.2rem;">Link to set supplier &amp; order</span>
+            <form method="post" action="/Inventory/po/order_item" style="display:inline;" onsubmit="return confirm('Create a draft PO for this item\\'s preferred supplier?');">
+              <input type="hidden" name="item_id" value="[% part.id %]">
+              <input type="hidden" name="return_to" value="[% c.req.uri %]">
+              <button type="submit" class="btn btn-small btn-order" title="Create a draft purchase order for this item's preferred supplier">🛒 Order</button>
+            </form>
+            <span style="opacity:0.7;font-size:0.82em;display:block;margin-top:0.2rem;">Draft PO → preferred supplier</span>
           [% ELSIF part.row_state == 'need_print' %]
             [% IF part.can_queue %]
             <button class="btn btn-small btn-queue"

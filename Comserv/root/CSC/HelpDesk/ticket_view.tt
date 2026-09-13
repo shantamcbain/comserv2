@@ -1,10 +1,16 @@
 [% PageVersion = 'CSC/HelpDesk/ticket_view.tt,v 0.02 2026/04/27' %]
 
 [% IF c.session.debug_mode == 1 %]<br>[% PageVersion %]</br>[% END %]
+<<<<<<< HEAD
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<div class="helpdesk-container">
 
+=======
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+>>>>>>> main
+<div class="helpdesk-container">
 
 
     <nav class="ticket-breadcrumb">
@@ -26,7 +32,6 @@
     </nav>
 
 
-
     [% IF error_msg || c.flash.error_msg %]
 
     <div class="hd-alert-error">[% error_msg || c.flash.error_msg %]</div>
@@ -40,7 +45,6 @@
     [% END %]
 
 
-
     [% IF !is_staff && (ticket.status == 'closed' || ticket.status == 'resolved') %]
 
     <div class="hd-alert-info">
@@ -52,7 +56,6 @@
     </div>
 
     [% END %]
-
 
 
     <div class="ticket-header-card">
@@ -136,7 +139,6 @@
     </div>
 
 
-
     [% IF is_staff %]
 
     <div class="ticket-status-panel">
@@ -198,7 +200,6 @@
                 [% END %]
 
             </form>
-
 
 
             [% IF ticket.email && (ticket.status == 'awaiting_response' || ticket.status == 'open' || ticket.status == 'in_progress') %]
@@ -288,7 +289,6 @@
 </div>
 
 
-
         [% IF ticket.resolution %]
 
         <div class="ticket-resolution-note">
@@ -302,7 +302,6 @@
     </div>
 
     [% END %]
-
 
 
     <div class="conversation-thread">
@@ -320,7 +319,6 @@
             <div class="message-body">[% ticket.description | html | replace('\n', '<br>') %]</div>
 
         </div>
-
 
 
         [% FOREACH msg IN messages %]
@@ -354,7 +352,6 @@
     </div>
 
 
-
     [% IF c.session.username %]
 
     [% IF ticket.status == 'closed' || ticket.status == 'resolved' %]
@@ -364,6 +361,10 @@
         <h3>
 
             [% IF is_staff %]Reply (will not reopen)[% ELSE %]Reply to Reopen[% END %]
+<<<<<<< HEAD
+
+=======
+>>>>>>> main
             <div class="reply-actions-small" style="margin-top:10px;">
                 <a href="[% c.uri_for('/HelpDesk') %]" class="btn btn-secondary" style="font-size:0.85em;">Back to Tickets</a>
             </div>
@@ -452,7 +453,6 @@
     </div>
 
     [% END %]
-
 
 
 </div>

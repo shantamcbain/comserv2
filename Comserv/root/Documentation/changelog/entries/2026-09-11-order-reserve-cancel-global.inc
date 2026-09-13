@@ -1,0 +1,6 @@
+<div id="2026-09-11-order-reserve-cancel-global" class="cl-entry">
+<h3>2026-09-11 — First-come assignment of print jobs to orders + global cancel/release + cancel button on manufacturing page</h3>
+<p class="doc-body"><strong>What.</strong> Added first-come-first-served attribution of jobs created via queue_sync to the oldest open manufacturing order that needs the item (via job notes "mfg_order:ID"). Added Cancel button on manufacturing order list (index and customer view). Cancel action sets order to cancelled, cancels non-running jobs for the order's items (by source_item_id), zeros reservations (global effect so other orders see released stock/queue slots). Jobs in queue now carry the order attribution for visibility.</p>
+<p class="doc-body"><strong>Why.</strong> Multiple open in-house orders (old full + new base + new top) all saw the same parts as "theirs". No way to attach/reserve on first come. No cancel on the manufacturing page. Cancel must release globally.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/lib/Comserv/Controller/Accounting/Manufacturing.pm</code> (cancel action), <code>Comserv/lib/Comserv/Controller/3d.pm</code> (attribution in queue_sync), templates <code>Accounting/Manufacturing/index.tt</code> and <code>customer_orders.tt</code> (cancel buttons).</p>
+</div>
