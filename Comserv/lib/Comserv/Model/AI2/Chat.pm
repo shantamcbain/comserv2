@@ -533,12 +533,13 @@ sub process {
             $quality = $ai_ctrl->_assess_response_quality($resp->{response} // '', $prompt);
         }
         my $site_audit = ($prompt =~ /\b(navigate|navigation|crawl|audit|failed\s+links?|each\s+page|readable|theme|look and content|site and report|broken\s+links?)\b/i) ? 1 : 0;
+        my $lookup_intent = ($prompt =~ /\b(find|look\s*up|search\s+for|what\s+is|who\s+is|tell\s+me\s+about|information\s+on|info\s+on)\b/i) ? 1 : 0;
         my $need = $can_enrich && $resp && $resp->{success}
-            && ($quality eq 'poor' || $site_audit)
+            && ($quality eq 'poor' || $site_audit || $lookup_intent)
             && !$args{use_search};
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
-            "auto_enrich check: can=$can_enrich quality=$quality site_audit=$site_audit need=$need");
-        push @thinking, "auto_enrich: quality=$quality site_audit=$site_audit need=$need";
+            "auto_enrich check: can=$can_enrich quality=$quality site_audit=$site_audit lookup_intent=$lookup_intent need=$need");
+        push @thinking, "auto_enrich: quality=$quality site_audit=$site_audit lookup_intent=$lookup_intent need=$need";
         if ($need) {
             my $extra = '';
             my $origin_host_early = eval { $c->req->uri->host } || 'workstation.local';

@@ -5305,6 +5305,16 @@ sub _assess_response_quality {
         "not in the current page context", "not present in the given context",
         "i don't have any information about", "no dedicated documentation",
         "would need to consult", "not included in this excerpt",
+        # Page-context refusals (substring match; develclub-style "does not contain any information")
+        "does not contain", "doesn't contain", "do not contain",
+        "current page does not", "page does not contain",
+        "not on this page", "not on the current page",
+        "does not contain any", "contain any information about",
+        "not contain any information",
+        "i'm sorry, but", "i am sorry, but",
+        "please let me know if you have a specific",
+        "cannot find", "could not find", "couldn't find",
+        "outside the scope of this page", "outside the scope of the provided",
     );
     my $lc_resp = lc($response);
     for my $phrase (@uncertain_phrases) {
