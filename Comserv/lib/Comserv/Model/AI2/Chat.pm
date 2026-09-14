@@ -517,6 +517,135 @@ sub process {
         }
     }
 
+
+    # ── Auto-enrich when in-app context is insufficient (Shanta 2026-09-14) ──
+    # Public web search AND/OR same-origin linked pages (site nav audit).
+    # Runs once per turn before persist. Controllers may not reload under -r;
+    # this lives in the Model so a :4006 restart picks it up reliably.
+    my $citations = [];
+    if (!$args{_auto_enrich_done}) {
+        my $roles_e = $c->session->{roles} || [];
+        $roles_e = [ split(/\s*,\s*/, $roles_e) ] unless ref $roles_e;
+        my $can_enrich = (grep { $_ =~ /^(admin|developer|editor)$/i } @$roles_e) ? 1 : 0;
+        my $ai_ctrl = eval { $c->controller('AI') };
+        my $quality = 'unknown';
+        if ($ai_ctrl && $ai_ctrl->can('_assess_response_quality')) {
+            $quality = $ai_ctrl->_assess_response_quality($resp->{response} // '', $prompt);
+        }
+        my $site_audit = ($prompt =~ /\b(navigate|navigation|crawl|audit|failed\s+links?|each\s+page|readable|theme|look and content|site and report|broken\s+links?)\b/i) ? 1 : 0;
+        my $need = $can_enrich && $resp && $resp->{success}
+            && ($quality eq 'poor' || $site_audit)
+            && !$args{use_search};
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+            "auto_enrich check: can=$can_enrich quality=$quality site_audit=$site_audit need=$need");
+        push @thinking, "auto_enrich: quality=$quality site_audit=$site_audit need=$need";
+        if ($need) {
+            my $extra = '';
+            # Same-origin linked pages (see beyond current page)
+            my @hrefs;
+            my $links = $args{page_links} || [];
+            if (ref $links eq 'ARRAY') {
+                for my $sec (@$links) {
+                    next unless defined $sec;
+                    while ($sec =~ m{(https?://[^\s]+|/[\w./\-]+)}g) {
+                        push @hrefs, $1;
+                    }
+                }
+            }
+            my $pc = $args{page_content} || '';
+            while ($pc =~ m{href=["']([^"']+)["']}gi) { push @hrefs, $1; }
+            my %seen; my @fetch;
+            my $origin_host = eval { $c->req->uri->host } || 'workstation.local';
+            my $base = eval { $c->req->base->as_string } || "http://$origin_host/";
+            $base =~ s{/$}{};
+            for my $h (@hrefs) {
+                next if $seen{$h}++;
+                my $url = $h;
+                $url = $base . $h if $h =~ m{^/};
+                next unless $url =~ m{^https?://}i;
+                # same host only
+                next unless $url =~ m{https?://\Q$origin_host\E(?::\d+)?/}i
+                         || $url =~ m{https?://(?:127\.0\.0\.1|localhost)(?::\d+)?/}i;
+                next if $url =~ m{/ai/widget}i;
+                push @fetch, $url;
+                last if @fetch >= 6;
+            }
+            if (@fetch) {
+                push @thinking, 'Fetching ' . scalar(@fetch) . ' same-origin pages for site context…';
+                require LWP::UserAgent;
+                my $ua = LWP::UserAgent->new(timeout => 8, max_size => 200_000);
+                $ua->agent('Comserv-AI-SiteAudit/1.0');
+                # Forward session cookie so auth pages work
+                if (my $cookie = $c->req->header('Cookie')) {
+                    $ua->default_header('Cookie' => $cookie);
+                }
+                my $bundle = "--- Same-origin pages (auto-fetched for site audit) ---\n";
+                for my $url (@fetch) {
+                    my $res = eval { $ua->get($url) };
+                    if ($res && $res->is_success) {
+                        my $html = $res->decoded_content // '';
+                        $html =~ s{<script\b[^>]*>.*?</script>}{}gsi;
+                        $html =~ s{<style\b[^>]*>.*?</style>}{}gsi;
+                        $html =~ s{<[^>]+>}{ }g;
+                        $html =~ s{\s+}{ }g;
+                        $html = substr($html, 0, 2500);
+                        $bundle .= "\n## $url\n$html\n";
+                        push @$citations, { url => $url, title => $url };
+                        push @thinking, "fetched OK $url (" . length($html) . " chars)";
+                    } else {
+                        my $code = $res ? $res->code : 'err';
+                        $bundle .= "\n## $url\nFAILED HTTP $code\n";
+                        push @thinking, "fetch FAIL $url ($code)";
+                        push @$citations, { url => $url, title => "FAILED $code" };
+                    }
+                }
+                $extra .= $bundle . "\n";
+            }
+            # Public web search
+            if ($ai_ctrl && $ai_ctrl->can('_do_web_search')) {
+                push @thinking, 'In-app answer incomplete or site-audit — auto web-search…';
+                my ($search_ctx, $sp) = ('', '');
+                eval { ($search_ctx, $sp) = $ai_ctrl->_do_web_search($c, $prompt, $args{agent_id} || 'general', \@thinking); };
+                if ($@) {
+                    push @thinking, "web-search threw: $@";
+                } elsif ($search_ctx && length $search_ctx) {
+                    push @thinking, "web-search via $sp";
+                    $extra .= "\n--- Web search (auto) ---\n$search_ctx\n";
+                    while ($search_ctx =~ /^URL:\s*(\S+)/mg) {
+                        push @$citations, { url => $1, title => $1 };
+                    }
+                } else {
+                    push @thinking, 'web-search returned no results';
+                }
+            }
+            if (length $extra) {
+                push @$messages, {
+                    role => 'user',
+                    content => "Additional context gathered automatically because the first answer lacked application/site coverage:\n$extra\n"
+                        . "Revise your answer using this context. For site audits, report navigation logic, look/content, readability/theme, and failed links from the fetched pages. Cite URLs.",
+                };
+                my $again = try {
+                    $router->chat_with_fallback($c, $provider_name, $use_model, $messages,
+                        ($args{use_search} ? (use_search => 1) : ()));
+                } catch {
+                    push @thinking, "enrich re-ask threw: $_";
+                    undef;
+                };
+                if ($again && $again->{success} && length($again->{response} // '')) {
+                    $resp = $again;
+                    $provider_name = $again->{provider} if $again->{provider};
+                    $use_model = $again->{model} if $again->{model};
+                    push @thinking, 'Provider re-answered after auto_enrich';
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+                        'auto_enrich re-answer ok len=' . length($resp->{response} // ''));
+                } else {
+                    push @thinking, 'enrich re-ask failed — keeping first answer';
+                }
+            }
+        }
+    }
+
+
     # ── Persist conversation + messages (v2 parity with v1 /ai/chat) ──
     # Without this, no conversation_id is ever created, so the widget can
     # never "start a new conversation" and nothing is saved to history.
@@ -645,6 +774,7 @@ sub process {
         created_at      => $created_at,
         thinking        => \@thinking,
         files_read      => \@files_read,
+        citations       => $citations || [],
     };
 }
 
