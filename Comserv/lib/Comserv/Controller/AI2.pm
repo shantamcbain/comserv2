@@ -1109,6 +1109,83 @@ sub chat :Local :Args(0) {
 
     $result //= { success => 0, error => 'No response' };
 
+    # Auto web-search when in-app context is insufficient (Shanta 2026-09-14).
+    # Old /ai path only offered consent; /ai2/chat never searched. Prefer answering
+    # from application learning first; if the reply is a "not in context" refusal,
+    # search the web once and re-answer with those results injected.
+    my @thinking = @{ $result->{thinking} || [] };
+    my $citations = [];
+    my $can_autosearch = 0;
+    {
+        my $roles = $c->session->{roles} || [];
+        $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
+        $can_autosearch = (grep { $_ =~ /^(admin|developer|editor)$/i } @$roles) ? 1 : 0;
+    }
+    my $ai_ctrl = eval { $c->controller('AI') };
+    if (
+        $can_autosearch
+        && !$use_search
+        && $result->{success}
+        && $ai_ctrl
+        && $ai_ctrl->can('_assess_response_quality')
+        && $ai_ctrl->_assess_response_quality($result->{response} // '', $prompt) eq 'poor'
+    ) {
+        push @thinking, 'In-app answer looked incomplete — auto web-search…';
+        my ($search_ctx, $search_provider) = ('', '');
+        eval {
+            ($search_ctx, $search_provider) = $ai_ctrl->_do_web_search(
+                $c, $prompt, $agent_id, \@thinking
+            );
+        };
+        if ($@) {
+            push @thinking, "Auto web-search threw: $@";
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'ai2_chat', "Auto web-search threw: $@");
+        }
+        if ($search_ctx && length $search_ctx) {
+            push @thinking, "Auto web-search via $search_provider — re-asking model";
+            my $system2 = ($system // '')
+                . "\n\n--- Web search (auto; not found in application context) ---\n"
+                . $search_ctx
+                . "\nAnswer using these web results when the application page/docs lack the answer. "
+                . "Cite URLs from the results. Do not invent links.\n";
+            my $result2 = try {
+                $c->model('AI2::Chat')->process($c,
+                    prompt          => $prompt,
+                    model           => $model,
+                    history         => $history,
+                    agent_id        => $agent_id,
+                    system          => $system2,
+                    page_path       => $page_path,
+                    page_title      => $page_title,
+                    page_content    => $page_content,
+                    use_search      => 1,
+                    conversation_id => $result->{conversation_id} || $conversation_id,
+                    project_id      => $project_id,
+                    task_id         => $task_id,
+                    audio_file_id      => $audio_file_id,
+                    transcript_file_id => $transcript_file_id,
+                );
+            } catch {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'ai2_chat', "Chat process (after web search) threw: $_");
+                undef;
+            };
+            if ($result2 && $result2->{success} && length($result2->{response} // '')) {
+                $result = $result2;
+                push @thinking, @{ $result2->{thinking} || [] };
+                # Rough citations from search context URLs
+                while ($search_ctx =~ /^URL:\s*(\S+)/mg) {
+                    push @$citations, { url => $1, title => $1 };
+                }
+            } else {
+                push @thinking, 'Web-search re-ask failed or empty — keeping first answer';
+            }
+        } else {
+            push @thinking, 'Auto web-search returned no results';
+        }
+    }
+
     $c->res->body(encode_json({
         success          => $result->{success} ? 1 : 0,
         response         => $result->{response} // '',
@@ -1119,9 +1196,10 @@ sub chat :Local :Args(0) {
         conversation_id  => $result->{conversation_id},
         title            => $result->{title},
         created_at       => $result->{created_at},
-        thinking         => $result->{thinking} // [],
+        thinking         => \@thinking,
         todo_action      => $result->{todo_action},
         files_read       => $result->{files_read} || [],
+        citations        => $citations,
     }));
 }
 
