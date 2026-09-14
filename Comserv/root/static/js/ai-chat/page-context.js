@@ -381,8 +381,12 @@
             context.agent_id = selectedAgent.id;
             context.agent_name = selectedAgent.display_name;
             context.system_prompt = selectedAgent.system_prompt
-                + '\nDo NOT invent file paths, documentation URLs, or system details not explicitly provided.'
+                + '\nDo NOT invent file paths, documentation URLs, or system details. Use only page content/docs and any Web search section included in this prompt.'
                 + '\nCurrent page: "' + pageTitle + '" at URL: ' + pathname
+                + ((window.AI_WIDGET_POPUP || PAGE_MODE)
+                    ? ('\nIMPORTANT: The chat UI may load from /ai/widget, but the user\'s page is '
+                       + pathname + '. Never say the current page is /ai/widget.')
+                    : '')
                 + (pageContent ? '\n\nPage content:\n' + pageContent : '')
                 + linksSection;
             context.capabilities = selectedAgent.capabilities;
@@ -392,9 +396,13 @@
             context.page_type = 'general';
             context.agent_id = 'general';
             context.system_prompt = 'You are a helpful AI assistant for the Comserv web application. '
-                + 'You can only answer based on information explicitly provided to you here. '
+                + 'Prefer answers from the application page content and docs provided here. If the answer is not in that material, say clearly that it is not in the application context (so a follow-up web search can run). '
                 + 'Do NOT invent file paths, documentation URLs, or system details not shown below.\n\n'
                 + 'Current page: "' + pageTitle + '" at URL: ' + pathname
+                + ((window.AI_WIDGET_POPUP || PAGE_MODE)
+                    ? ('\nIMPORTANT: The chat UI may load from /ai/widget, but the user\'s page is '
+                       + pathname + '. Never say the current page is /ai/widget.')
+                    : '')
                 + (pageContent ? '\n\nPage content:\n' + pageContent : '')
                 + linksSection;
         }

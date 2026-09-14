@@ -5299,6 +5299,12 @@ sub _assess_response_quality {
         "don't have access", "do not have access",
         "unable to answer", "cannot answer", "no relevant",
         "i don't have that", "not in my knowledge",
+        # CSC auto-websearch: refusals that only cite missing page context
+        "no mention", "not documented", "cannot confirm",
+        "based solely on the provided", "based only on the page content",
+        "not in the current page context", "not present in the given context",
+        "i don't have any information about", "no dedicated documentation",
+        "would need to consult", "not included in this excerpt",
     );
     my $lc_resp = lc($response);
     for my $phrase (@uncertain_phrases) {
