@@ -729,8 +729,8 @@ sub auto :Private {
                     $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
                 }
 
-                # Check hosting account for subscribed addons to enable them by default
-                my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                # Hosting requested_* column historically named "addons"; treat as site features.
+                $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
                     -or => [
                         { sitename => $mod_site },
                         { sitename => lc($mod_site) },
@@ -742,6 +742,14 @@ sub auto :Private {
                     my @addons = split(/\s*,\s*/, $hosting->requested_addons);
                     for my $a (@addons) {
                         my $lc_addon = lc($a);
+                        # Brew / Beekeeping: site_modules (or Brew/BMaster / brew.*)
+                        # only — never from hosting requested_addons. Skip BEFORE
+                        # the generic enable so a missing row cannot re-open them.
+                        if ($lc_addon eq 'brew' || $lc_addon eq 'brewhouse'
+                            || $lc_addon eq 'beekeeping' || $lc_addon eq 'apiary'
+                            || $lc_addon eq 'bmaster') {
+                            next;
+                        }
                         $enabled{$lc_addon} = 1 unless exists $enabled{$lc_addon};
                         if ($lc_addon eq 'printing_3d' || $lc_addon eq '3d') {
                             $enabled{'3d'} = 1 unless exists $enabled{'3d'};
@@ -751,13 +759,6 @@ sub auto :Private {
                             $enabled{'workshop'} = 1 unless exists $enabled{'workshop'};
                             $enabled{'workshops'} = 1 unless exists $enabled{'workshops'};
                         }
-                        if ($lc_addon eq 'brew' || $lc_addon eq 'brewhouse') {
-                            $enabled{'brew'} = 1 unless exists $enabled{'brew'};
-                        }
-                        if ($lc_addon eq 'beekeeping' || $lc_addon eq 'apiary' || $lc_addon eq 'bmaster') {
-                            $enabled{'beekeeping'} = 1 unless exists $enabled{'beekeeping'};
-                            $enabled{'apiary'}     = 1 unless exists $enabled{'apiary'};
-                        }
                     }
                 }
 
@@ -765,7 +766,9 @@ sub auto :Private {
                 $_site_modules_cache{$mod_site} = { modules => { %enabled }, at => $now_sm };
             }
 
-            # Brew site / brew.* hostnames / brew addon → nav + brew home
+            # Brew feature: brew.* host / Brew sitename, or site_modules.brew=1.
+            # Brew is a site FEATURE (not a paid "addon" gate). Hosting requested_addons
+            # must not auto-enable brew (see skip above) — that leaked Brew nav onto 3d.
             my $req_host = $c->req->uri->host || '';
             $req_host =~ s/^www\.//i;
             my $is_brew_host = ($req_host =~ /^brew\./i) ? 1 : 0;
@@ -776,22 +779,10 @@ sub auto :Private {
                 $enabled{accounting} = 1 unless exists $enabled{accounting};
             }
 
-            # Check if the site actually has the brew addon enabled before enabling it
-            unless ($c->model('DBEncy')->resultset('SiteModule')->search({ sitename => $mod_site, module_name => 'brew', enabled => 1 })->count) {
-                # The site doesn't have brew addon enabled, so don't set the brew menu
-                $enabled{brew} = 0;
-            }
-
-            # If no SiteModule entry for this site yet, but hosting account has brew addon, then enable it
-            unless (exists $enabled{brew}) {
-                if ($hosting && $hosting->requested_addons && $hosting->requested_addons =~ /brew/i) {
-                    $enabled{'brew'} = 1;
-                }
-            }
-
-            # Show Brew menu only if brew addon is actually enabled for this site
+            # Nav/templates still read brew_addon_active (legacy stash key).
             if ($enabled{brew}) {
                 $c->stash->{brew_addon_active} = 1;
+                $c->stash->{brew_feature_active} = 1;
             }
 
             # Apply per-user overrides from user_module_access
@@ -1397,7 +1388,7 @@ sub index :Path('/') :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "View parameter detected: $view");
         }
 
-        # Brew addon or brew.* host → brewing dashboard as site home (/)
+        # Brew sitename or brew.* host → brewing dashboard as site home (/)
         my $brew_home = 0;
         eval {
             my $em = $c->stash->{enabled_modules};
@@ -1405,7 +1396,8 @@ sub index :Path('/') :Args(0) {
             my $site_lc = lc( $c->stash->{SiteName} || $c->session->{SiteName} || '' );
             my $host = $c->req->uri->host || '';
             $host =~ s/^www\.//i;
-            if ( $em->{brew} || $site_lc eq 'brew' || $host =~ /^brew\./i ) {
+            # em->{brew} alone must NOT steal / for other sitenames (e.g. 3d).
+            if ( $site_lc eq 'brew' || $host =~ /^brew\./i ) {
                 $brew_home = 1;
             }
         };

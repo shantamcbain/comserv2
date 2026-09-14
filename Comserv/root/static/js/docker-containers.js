@@ -479,8 +479,9 @@
                     : '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="start" title="Start this stopped container" style="background:#28a745;color:#fff;padding:2px 8px;font-size:0.78em;">Start</button>'
                 ) +
                 '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="deploy-log" title="Show the most recent deploy log recorded for this container" style="background:#6c757d;color:#fff;padding:2px 8px;font-size:0.78em;">Deploy Log</button>' +
-                (c.name && c.name.match(/comserv/)
-                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rebuild" title="Full pipeline on the selected host: volume check, image build, backup of the old container, health check, zero-downtime handover" style="background:#ffc107;color:#333;padding:2px 8px;font-size:0.78em;">Rebuild</button>'
+                // Rebuild = workstation local rebuild only (never on production1/2)
+                (c.name && c.name.match(/^comserv2?-web-(prod|staging|dev)$/) && isLocal
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rebuild" title="Workstation only: build locally and replace this container. Does NOT push. Does NOT update production." style="background:#ffc107;color:#333;padding:2px 8px;font-size:0.78em;">Rebuild</button>'
                     : '') +
                 // Build & Push: only on workstation for comserv-web-prod
                 (c.name && c.name.match(/^comserv2?-web-prod/) && isLocal

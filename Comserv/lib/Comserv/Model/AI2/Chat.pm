@@ -218,6 +218,10 @@ sub process {
     my $prompt = $args{prompt} // '';
     return { success => 0, error => 'Prompt is required' } unless $prompt && length $prompt;
 
+    my @thinking;
+    push @thinking, 'Received prompt (' . length($prompt) . ' chars)';
+    push @thinking, 'agent_id=' . ($args{agent_id} // '(none)');
+
     # HelpDesk-ticket AGENT first — must beat TodoCreate when the prompt
     # mentions both "ticket" and "todo" (3180 / 6510 hijack).
     my $hd_hit = eval {
@@ -236,13 +240,14 @@ sub process {
     if ($hd_hit && $hd_hit->{handled}) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
             'HelpDesk-ticket agent handled chat (no LLM)');
+        push @thinking, 'Handled by HelpDesk-ticket agent (no LLM)';
         return {
             success       => 1,
             response      => $hd_hit->{response} // '',
             model         => $hd_hit->{model} // '(helpdesk-ticket-create)',
             provider      => $hd_hit->{provider} // 'ai2-helpdesk',
             ticket_action => $hd_hit->{ticket_action},
-            thinking      => [],
+            thinking      => \@thinking,
         };
     }
 
@@ -267,13 +272,14 @@ sub process {
         if ($todo_hit && $todo_hit->{handled}) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
                 'Todo-create agent handled chat (no LLM)');
+            push @thinking, 'Handled by Todo-create agent (no LLM)';
             return {
                 success     => 1,
                 response    => $todo_hit->{response} // '',
                 model       => $todo_hit->{model} // '(todo-create)',
                 provider    => $todo_hit->{provider} // 'ai2-todo',
                 todo_action => $todo_hit->{todo_action},
-                thinking    => [],
+                thinking    => \@thinking,
             };
         }
     }
@@ -292,13 +298,14 @@ sub process {
     if ($inv_hit && $inv_hit->{handled}) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
             'Invoice-create agent handled chat (no LLM)');
+        push @thinking, 'Handled by Invoice-create agent (no LLM)';
         return {
             success        => 1,
             response       => $inv_hit->{response} // '',
             model          => $inv_hit->{model} // '(invoice-create)',
             provider       => $inv_hit->{provider} // 'ai2-invoice',
             invoice_action => $inv_hit->{invoice_action},
-            thinking       => [],
+            thinking       => \@thinking,
         };
     }
 
@@ -319,13 +326,16 @@ sub process {
             "CodeRead try_chat_read threw: $@");
     }
     if ($read_hit && $read_hit->{handled}) {
+        push @thinking, 'Handled by Code-read agent (no LLM)';
+        push @thinking, 'files_read=' . join(', ', @{ $read_hit->{files_read} || [] })
+            if $read_hit->{files_read} && @{ $read_hit->{files_read} };
         return {
             success    => 1,
             response   => $read_hit->{response} // '',
             model      => $read_hit->{model} // '(code-read)',
             provider   => $read_hit->{provider} // 'ai2-coderead',
             files_read => $read_hit->{files_read} || [],
-            thinking   => [],
+            thinking   => \@thinking,
         };
     }
 
@@ -411,11 +421,14 @@ sub process {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
         "AI2 chat dispatch: user=$username provider=$provider_name model="
         . ($use_model // '(router-default)') . " can_select=$can_select");
+    push @thinking, "Dispatch: provider=$provider_name model="
+        . ($use_model // '(router-default)') . " can_select=$can_select";
 
     # One dispatch+fallback path (chat widget and FocusTune share Router).
     # SuperGrok / OpenRouter (no auto-fill) fall back to :free then Ollama.
     # xAI grok auto-fills — not the same provider as SuperGrok.
     my $router = $c->model('AI2::Router');
+    push @thinking, 'Calling provider (chat_with_fallback)...';
     my $resp = try {
         # use_search must be threaded to the provider: it is set by the widget
         # (local-chat.js) and parsed in AI2.pm, but was never forwarded past
@@ -425,6 +438,7 @@ sub process {
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
             "Provider $provider_name threw: $_");
+        push @thinking, "Provider threw: $_";
         undef;
     };
 
@@ -443,10 +457,16 @@ sub process {
         };
         my $public = eval { $c->model('AI2::Router')->_user_facing_error($resp->{error}) }
                   || 'The AI provider did not complete this turn. Try again or pick another model.';
-        return { success => 0, error => $public };
+        push @thinking, 'Provider failed: ' . ($resp->{error} // $public);
+        return { success => 0, error => $public, thinking => \@thinking };
     }
 
+    push @thinking, 'Provider responded'
+        . ($resp->{provider} ? (" via " . $resp->{provider}) : '')
+        . ($resp->{model} ? (" / " . $resp->{model}) : '');
     if ($resp->{fallback}) {
+        push @thinking, 'Fell back from ' . ($resp->{fallback_from} // '?')
+            . ' to ' . ($resp->{provider} // '') . '/' . ($resp->{model} // '');
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'process',
             "Fell back from $resp->{fallback_from} ($resp->{original_error}) to "
             . ($resp->{provider} // '') . '/' . ($resp->{model} // ''));
@@ -573,6 +593,7 @@ sub process {
                 content         => $resp->{response} // '',
                 agent_type      => $agent,
                 model_used      => $model_used,
+                metadata        => encode_json({ thinking_trace => \@thinking }),
             });
             $created_at = scalar(localtime);
         }
@@ -595,6 +616,7 @@ sub process {
             status            => 'success',
             metadata          => {
                 agent_id      => $args{agent_id},
+                thinking_steps => scalar(@thinking),
                 ($resp->{fallback} ? (
                     fallback      => 1,
                     fallback_from => $resp->{fallback_from},
@@ -621,7 +643,7 @@ sub process {
         conversation_id => $conversation_id,
         title           => $saved_title,
         created_at      => $created_at,
-        thinking        => [],
+        thinking        => \@thinking,
         files_read      => \@files_read,
     };
 }
