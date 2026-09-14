@@ -142,6 +142,9 @@ case "${1:-}" in
     --local-rebuild|local-rebuild)
         DEPLOY_MODE_DETECTED="local-rebuild"
         ;;
+    --push-only|push-only)
+        DEPLOY_MODE_DETECTED="push-only"
+        ;;
 esac
 
 # If a mode flag was passed, export it so the rest of the script can see it
@@ -653,7 +656,7 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
             exit $?
             ;;
 
-        "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild")
+        "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild"|"push-only")
             # Functions are defined below; late dispatch after canonical_deploy*.
             ;;
 
@@ -1352,6 +1355,25 @@ if [ "${DEPLOY_MODE:-}" = "build-push" ]; then
     fi
     canonical_deploy "local"
     exit $?
+fi
+
+if [ "${DEPLOY_MODE:-}" = "push-only" ]; then
+    echo "=== PUSH ONLY (no build, no container recreate) ==="
+    if is_production_host; then
+        echo "❌ REFUSING to push from production. Push from the workstation."
+        exit 1
+    fi
+    # Prefer the image currently used by the local web-prod container; fall back to :latest tag name.
+    local_img=$(docker inspect --format='{{.Image}}' comserv2-web-prod 2>/dev/null || docker inspect --format='{{.Image}}' comserv-web-prod 2>/dev/null || true)
+    if [ -n "$local_img" ]; then
+        echo "Tagging running container image $local_img as $IMAGE"
+        docker tag "$local_img" "$IMAGE" || { echo "❌ docker tag failed"; exit 1; }
+    else
+        echo "No local web-prod container — pushing existing $IMAGE if present"
+    fi
+    docker push "$IMAGE" || { echo "❌ docker push failed"; exit 1; }
+    echo "✅ Pushed $IMAGE (running container untouched)"
+    exit 0
 fi
 
 if [ "${DEPLOY_MODE:-}" = "local-rebuild" ]; then
