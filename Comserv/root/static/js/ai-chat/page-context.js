@@ -294,22 +294,45 @@
         return result; // array of sections
     }
 
-    function detectPageContext() {
-        // In PAGE_MODE (detached popup), honour the originating page URL so the
-        // same agent and context are used as on the page the widget was on.
-        let pathname = window.HELPDESK_PRESCREEN_PAGE_PATH || window.location.pathname;
-        let pageTitle = window.HELPDESK_PRESCREEN_PAGE_TITLE || document.title || 'Unknown Page';
-        if ((PAGE_MODE || window.AI_WIDGET_POPUP) && (state.detachedFromPath || window.AI_DETACHED_FROM_PATH)) {
-            pathname  = state.detachedFromPath  || window.AI_DETACHED_FROM_PATH  || pathname;
-            pageTitle = state.detachedFromTitle || window.AI_DETACHED_FROM_TITLE || pageTitle;
+
+    // Originating page for detached /ai/widget popup (CSC-20260914-8057).
+    // Never report the widget URL itself as page_path, and never append the
+    // widget's ?from_path= query onto the origin path.
+    function _originatingPathname() {
+        var det = (state && state.detachedFromPath) || window.AI_DETACHED_FROM_PATH || '';
+        var here = window.location.pathname || '';
+        if ((window.AI_WIDGET_POPUP || PAGE_MODE || here === '/ai/widget' || here.indexOf('/ai/widget') === 0) && det) {
+            return det;
         }
+        return window.HELPDESK_PRESCREEN_PAGE_PATH || here;
+    }
+    function _originatingTitle(fallback) {
+        var det = (state && state.detachedFromTitle) || window.AI_DETACHED_FROM_TITLE || '';
+        var here = window.location.pathname || '';
+        if ((window.AI_WIDGET_POPUP || PAGE_MODE || here === '/ai/widget') && det) {
+            return det;
+        }
+        return window.HELPDESK_PRESCREEN_PAGE_TITLE || fallback || document.title || 'Unknown Page';
+    }
+    function _originatingSearch() {
+        var here = window.location.pathname || '';
+        if (window.AI_WIDGET_POPUP || PAGE_MODE || here === '/ai/widget' || here.indexOf('/ai/widget') === 0) {
+            return '';
+        }
+        return window.location.search || '';
+    }
+
+    function detectPageContext() {
+        // Detached /ai/widget: honour originating page (CSC-20260914-8057).
+        let pathname = _originatingPathname();
+        let pageTitle = _originatingTitle();
         
         // Try to load and select agent from config
         const selectedAgent = _selectAgentForPage ? _selectAgentForPage() : null;
         state.currentAgent = selectedAgent;
         
         let context = {
-            page_path: pathname + (window.location.search || ''),
+            page_path: pathname + _originatingSearch(),
             page_title: pageTitle,
             page_url: window.AI_WIDGET_POPUP
                 ? (window.location.origin + pathname)
