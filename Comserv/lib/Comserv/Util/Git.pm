@@ -1928,7 +1928,7 @@ sub run_test_gate {
             my $msg = "Test gate REFUSED: checkout '$wt_dir' has $n uncommitted change(s) "
                     . "($preview...). The gate would test code that is not committed to "
                     . "the branch being merged. Commit (or stash) the changes first, then re-run the gate.";
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'test_gate',
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'test_gate',
                 "run_test_gate: dirty checkout for '$branch' — $n uncommitted changes");
             return { success => 0, dirty => 1, output => $msg };
         }
