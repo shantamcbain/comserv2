@@ -623,11 +623,20 @@
     }
 
     // Extract visible text content from the current page for context
+    function _pageDocument() {
+        try {
+            if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed && window.opener.document) {
+                return window.opener.document;
+            }
+        } catch (e) {}
+        return document;
+    }
     function extractPageContent() {
+        const rootDoc = _pageDocument();
         const skipSelectors = '#local-chat-widget, #chat-panel, script, style, nav, footer, .navbar, header';
         const contentSelectors = ['main', '.main-content', '#content', '.content-area', '.page-content', 'article', '.container'];
         for (const sel of contentSelectors) {
-            const el = document.querySelector(sel);
+            const el = rootDoc.querySelector(sel);
             if (!el) continue;
             const clone = el.cloneNode(true);
             clone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
@@ -637,7 +646,8 @@
             }
         }
         // Fallback: body text
-        const bodyClone = document.body.cloneNode(true);
+        if (!rootDoc.body) return '';
+        const bodyClone = rootDoc.body.cloneNode(true);
         bodyClone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
         const bodyText = bodyClone.textContent.replace(/\s+/g, ' ').trim();
         return bodyText.substring(0, 4000);
@@ -645,6 +655,7 @@
 
     // Extract all meaningful links from the current page (nav menu + quick links + content links)
     function extractPageLinks() {
+        const rootDoc = _pageDocument();
         const seen = new Set();
         const navLinks = [];
         const contentLinks = [];
@@ -662,7 +673,7 @@
         // 1. Navigation menu and header links (always include these for link auditing)
         const navSelectors = ['nav', 'header nav', '.navbar', '#main-menu', '#nav', '.nav-menu', '.site-nav', '.menu', 'header'];
         navSelectors.forEach(function(sel) {
-            const el = document.querySelector(sel);
+            const el = rootDoc.querySelector(sel);
             if (!el) return;
             // Exclude the chat widget itself
             if (el.closest('#local-chat-widget, #chat-panel')) return;
@@ -676,13 +687,13 @@
             '.tabs a', '.tab-links a', '[data-tab] a'
         ];
         prioritySelectors.forEach(function(sel) {
-            document.querySelectorAll(sel).forEach(function(a) { collectLink(a, contentLinks); });
+            rootDoc.querySelectorAll(sel).forEach(function(a) { collectLink(a, contentLinks); });
         });
 
         // 3. General content-area links
         const contentSelectors = ['main', '.main-content', '#content', '.content-area', '.page-content', 'article'];
         contentSelectors.forEach(function(sel) {
-            const el = document.querySelector(sel);
+            const el = rootDoc.querySelector(sel);
             if (!el) return;
             el.querySelectorAll('a[href]').forEach(function(a) { collectLink(a, contentLinks); });
         });
@@ -699,11 +710,30 @@
     // Originating page for detached /ai/widget popup (CSC-20260914-8057).
     // Never report the widget URL itself as page_path, and never append the
     // widget's ?from_path= query onto the origin path.
+    function _isWidgetPath(path) {
+        path = (path || '').split('?')[0];
+        return path === '/ai/widget' || path.indexOf('/ai/widget/') === 0
+            || path === '/ai' || path === '/ai/';
+    }
+    function _openerPathname() {
+        try {
+            if (window.opener && !window.opener.closed && window.opener.location) {
+                var op = window.opener.location.pathname || '';
+                if (op && !_isWidgetPath(op)) return op;
+            }
+        } catch (e) {}
+        return '';
+    }
     function _originatingPathname() {
         var det = (state && state.detachedFromPath) || window.AI_DETACHED_FROM_PATH || '';
         var here = window.location.pathname || '';
-        if ((window.AI_WIDGET_POPUP || PAGE_MODE || here === '/ai/widget' || here.indexOf('/ai/widget') === 0) && det) {
-            return det;
+        var onWidget = !!(window.AI_WIDGET_POPUP || PAGE_MODE || _isWidgetPath(here));
+        if (onWidget) {
+            if (det && !_isWidgetPath(det)) return det;
+            var fromOpener = _openerPathname();
+            if (fromOpener) return fromOpener;
+            // Last resort: never report the widget URL as the user's page.
+            if (_isWidgetPath(here)) return (det && det !== here) ? det : '/';
         }
         return window.HELPDESK_PRESCREEN_PAGE_PATH || here;
     }
@@ -2277,23 +2307,36 @@
             : loadAgentsConfig();
         
         ensureAgentsLoaded.then(function() {
-            // Initialize page context if not already done (after agents loaded)
-            if (!state.pageContext) {
-                state.pageContext = detectPageContext();
+            // Always re-detect so detached from_path / opener stay current (CSC-20260914-8057).
+            state.pageContext = detectPageContext();
+            if (state.taskPagePath) {
+                state.pageContext.page_path = state.taskPagePath;
             }
 
-            // Fetch documentation for the current page (cached after first load)
-            const docPromise = state.pageDocFetched
-                ? Promise.resolve('')
-                : fetchPageDoc(window.location.pathname).then(function(docText) {
+            // Fetch documentation for the ORIGINATING page — never /ai/widget.
+            // Cache the doc body so re-detect on later messages can re-attach it.
+            var originPath = _originatingPathname();
+            function _attachPageDoc(docText) {
+                if (docText && state.pageContext) {
+                    state.pageDocText = docText;
+                    state.pageContext.system_prompt =
+                        (state.pageContext.system_prompt || '') +
+                        '\n\n--- Page Documentation ---\n' + docText;
+                }
+            }
+            var docPromise;
+            if (state.pageDocText) {
+                _attachPageDoc(state.pageDocText);
+                docPromise = Promise.resolve(state.pageDocText);
+            } else if (state.pageDocFetched) {
+                docPromise = Promise.resolve('');
+            } else {
+                docPromise = fetchPageDoc(originPath).then(function(docText) {
                     state.pageDocFetched = true;
-                    if (docText && state.pageContext) {
-                        state.pageContext.system_prompt =
-                            (state.pageContext.system_prompt || '') +
-                            '\n\n--- Page Documentation ---\n' + docText;
-                    }
+                    _attachPageDoc(docText);
                     return docText;
                 });
+            }
 
             docPromise.then(function() {
                 var effectivePrompt = prompt;
@@ -2307,7 +2350,7 @@
 
                 if (state.pageContext && state.pageContext.agent_id === 'template_editor'
                         && !prompt.includes('[FILE:')) {
-                    var tplPath = _getTemplatePathForPage(window.location.pathname);
+                    var tplPath = _getTemplatePathForPage(_originatingPathname());
                     if (tplPath) {
                         fetch('/ai/read_file?path=' + encodeURIComponent(tplPath) + '&limit=500',
                               { credentials: 'include' })
