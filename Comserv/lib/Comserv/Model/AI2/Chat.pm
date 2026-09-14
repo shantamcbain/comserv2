@@ -573,25 +573,61 @@ sub process {
             if (@fetch) {
                 push @thinking, 'Fetching ' . scalar(@fetch) . ' same-origin pages for site context…';
                 require LWP::UserAgent;
-                my $ua = LWP::UserAgent->new(timeout => 8, max_size => 200_000);
+                require HTTP::Request;
+                my $ua = LWP::UserAgent->new(timeout => 8, max_size => 400_000, max_redirect => 3);
                 $ua->agent('Comserv-AI-SiteAudit/1.0');
-                # Forward session cookie so auth pages work
-                if (my $cookie = $c->req->header('Cookie')) {
-                    $ua->default_header('Cookie' => $cookie);
-                }
-                my $bundle = "--- Same-origin pages (auto-fetched for site audit) ---\n";
+                my $cookie = $c->req->header('Cookie') || '';
+                my $bundle = "--- Same-origin pages (auto-fetched for site audit) ---\n"
+                    . "NOTE: Shared header/nav/footer is normal. Judge each page by its MAIN content only.\n"
+                    . "Do NOT claim all pages are identical just because chrome matches.\n";
+                my %finger;
                 for my $url (@fetch) {
-                    my $res = eval { $ua->get($url) };
+                    my $req = HTTP::Request->new(GET => $url);
+                    $req->header('Host' => $origin_host . ( ($c->req->uri->port && $c->req->uri->port !~ /^(80|443)$/) ? (':' . $c->req->uri->port) : '' ));
+                    $req->header('Cookie' => $cookie) if length $cookie;
+                    $req->header('Accept' => 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8');
+                    my $res = eval { $ua->request($req) };
                     if ($res && $res->is_success) {
                         my $html = $res->decoded_content // '';
-                        $html =~ s{<script\b[^>]*>.*?</script>}{}gsi;
-                        $html =~ s{<style\b[^>]*>.*?</style>}{}gsi;
-                        $html =~ s{<[^>]+>}{ }g;
-                        $html =~ s{\s+}{ }g;
-                        $html = substr($html, 0, 2500);
-                        $bundle .= "\n## $url\n$html\n";
-                        push @$citations, { url => $url, title => $url };
-                        push @thinking, "fetched OK $url (" . length($html) . " chars)";
+                        my $ctype = $res->header('Content-Type') || '';
+                        my $text = '';
+                        if ($ctype =~ m{json}i || $html =~ /^\s*[\[{]/) {
+                            $text = substr($html, 0, 4000);
+                        } else {
+                            $html =~ s{<script\b[^>]*>.*?</script>}{}gsi;
+                            $html =~ s{<style\b[^>]*>.*?</style>}{}gsi;
+                            # Drop shared chrome so pages are distinguishable
+                            $html =~ s{<nav\b[^>]*>.*?</nav>}{}gsi;
+                            $html =~ s{<header\b[^>]*>.*?</header>}{}gsi;
+                            $html =~ s{<footer\b[^>]*>.*?</footer>}{}gsi;
+                            my $main = '';
+                            if ($html =~ m{<main\b[^>]*>(.*?)</main>}si) {
+                                $main = $1;
+                            } elsif ($html =~ m{id=["']content["'][^>]*>(.*)}si) {
+                                $main = substr($1, 0, 20000);
+                            } elsif ($html =~ m{class=["'][^"']*(?:main-content|page-content|content-area)[^"']*["'][^>]*>(.*)}si) {
+                                $main = substr($1, 0, 20000);
+                            } else {
+                                $main = $html;
+                            }
+                            $main =~ s{<[^>]+>}{ }g;
+                            $main =~ s{\s+}{ }g;
+                            $main =~ s{^\s+|\s+$}{}g;
+                            $text = substr($main, 0, 3500);
+                        }
+                        my $fp = substr($text, 0, 120);
+                        $finger{$fp}++;
+                        my $title = '';
+                        if (($res->decoded_content // '') =~ m{<title[^>]*>(.*?)</title>}si) {
+                            $title = $1;
+                            $title =~ s{\s+}{ }g;
+                            $title = substr($title, 0, 80);
+                        }
+                        $bundle .= "\n## $url\nHTTP " . $res->code
+                            . (length $title ? " | title: $title" : '')
+                            . " | main_chars=" . length($text) . "\n$text\n";
+                        push @$citations, { url => $url, title => ($title || $url) };
+                        push @thinking, "fetched OK $url main=" . length($text);
                     } else {
                         my $code = $res ? $res->code : 'err';
                         $bundle .= "\n## $url\nFAILED HTTP $code\n";
@@ -599,6 +635,10 @@ sub process {
                         push @$citations, { url => $url, title => "FAILED $code" };
                     }
                 }
+                my $unique = scalar keys %finger;
+                $bundle .= "\n[fingerprint] unique main-content samples among successes: $unique / "
+                    . scalar(@fetch) . "\n";
+                push @thinking, "unique main fingerprints=$unique";
                 $extra .= $bundle . "\n";
             }
             # Public web search
@@ -621,8 +661,13 @@ sub process {
             if (length $extra) {
                 push @$messages, {
                     role => 'user',
-                    content => "Additional context gathered automatically because the first answer lacked application/site coverage:\n$extra\n"
-                        . "Revise your answer using this context. For site audits, report navigation logic, look/content, readability/theme, and failed links from the fetched pages. Cite URLs.",
+                    content => "Additional context gathered automatically:\n$extra\n"
+                        . "Answer the ORIGINAL user question first (what they asked — e.g. whether Chat-with-AI/Grok can audit the site, and how).
+"
+                        . "If this is a site audit: for EACH fetched URL, describe its MAIN content separately. "
+                        . "Shared nav/header is normal — never conclude 'all pages are the homepage' from shared chrome. "
+                        . "Use title + main_chars + body text. Report failed fetches (non-2xx) as failed links. "
+                        . "Comment on readability and theme only from main content. Cite URLs.",
                 };
                 my $again = try {
                     $router->chat_with_fallback($c, $provider_name, $use_model, $messages,
