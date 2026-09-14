@@ -5939,6 +5939,7 @@ sub _build_navigation_command_guide {
         ]],
         [ 'AI Assistant (logged in)', 'user', [
             [ 'AI conversations / chat history', '/ai/conversations'    ],
+            [ 'AI search/audit index',      '/ai/search_index'          ],
             [ 'AI Usage & Billing Monitor', '/ai/usage'                 ],
             [ 'Manage API keys',            '/ai/manage_api_keys'       ],
             [ 'AI in-app action endpoint',  '/ai/action'                ],
@@ -12412,6 +12413,95 @@ sub transcribe_status :Local :Args(0) {
     } else {
         $c->response->body(encode_json({ success => JSON::true, status => 'processing' }));
     }
+}
+
+
+=head2 search_index
+
+Developer/admin browse of persisted WebSearchResult rows (auto-enrich
+web-search + site-audit hits). GET /ai/search_index?q=optional
+
+=cut
+
+sub search_index :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}
+            && lc($c->session->{username}) ne 'guest'
+            && $c->session->{username} !~ /^Guest-/i) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'search_index', 'Unauthorized — login required');
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
+    my $allowed = grep { /^(admin|developer|editor)$/i } @$roles;
+    unless ($allowed) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'search_index', 'Forbidden — admin/developer/editor required');
+        $c->flash->{error_msg} = 'Admin, developer, or editor role required to view the search index.';
+        $c->response->redirect($c->uri_for('/ai'));
+        return;
+    }
+
+    my $q = $c->req->param('q') || '';
+    $q =~ s/^\s+|\s+$//g;
+
+    my @hits;
+    my $error;
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $cond = {};
+        if (length $q) {
+            my $like = '%' . $q . '%';
+            $cond = {
+                -or => [
+                    { query => { -like => $like } },
+                    { result_title => { -like => $like } },
+                    { result_url => { -like => $like } },
+                    { result_snippet => { -like => $like } },
+                ]
+            };
+        }
+        my $rs = $schema->resultset('WebSearchResult')->search(
+            $cond,
+            { order_by => { -desc => 'created_at' }, rows => 100 }
+        );
+        for my $r ($rs->all) {
+            my $snip = $r->result_snippet // '';
+            $snip = substr($snip, 0, 200);
+            my $created = $r->created_at;
+            if (ref $created && $created->can('strftime')) {
+                $created = $created->strftime('%Y-%m-%d %H:%M:%S');
+            }
+            push @hits, {
+                id          => $r->id,
+                created_at  => $created,
+                query       => $r->query,
+                title       => $r->result_title,
+                url         => $r->result_url,
+                snippet     => $snip,
+                source_type => $r->source_type,
+                is_verified => $r->is_verified ? 1 : 0,
+            };
+        }
+    } catch {
+        $error = "$_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'search_index', "Failed to load WebSearchResult: $_");
+    };
+
+    $c->stash(
+        template   => 'ai/search_index.tt',
+        page_title => 'AI Search Index',
+        hits       => \@hits,
+        q          => $q,
+        error      => $error,
+        total      => scalar(@hits),
+        username   => $c->session->{username},
+    );
 }
 
 =head2 usage

@@ -541,6 +541,12 @@ sub process {
         push @thinking, "auto_enrich: quality=$quality site_audit=$site_audit need=$need";
         if ($need) {
             my $extra = '';
+            my $origin_host_early = eval { $c->req->uri->host } || 'workstation.local';
+            my $prior_hits = eval { $self->_format_prior_web_search_hits($c, $prompt, $origin_host_early) } || '';
+            if ($prior_hits) {
+                $extra .= $prior_hits;
+                push @thinking, 'prior learned search/audit hits injected';
+            }
             # Same-origin linked pages (see beyond current page)
             my @hrefs;
             my $links = $args{page_links} || [];
@@ -628,11 +634,40 @@ sub process {
                             . " | main_chars=" . length($text) . "\n$text\n";
                         push @$citations, { url => $url, title => ($title || $url) };
                         push @thinking, "fetched OK $url main=" . length($text);
+                        {
+                            my $path_snip = eval { $c->req->uri->path } || '';
+                            my $prompt_snip = $prompt // '';
+                            $prompt_snip =~ s/\s+/ /g;
+                            $prompt_snip = substr($prompt_snip, 0, 80);
+                            my $aq = 'site_audit:' . (length($path_snip) ? $path_snip : $prompt_snip);
+                            $self->_persist_web_search_hit($c,
+                                query          => $aq,
+                                result_title   => ($title || $url),
+                                result_url     => $url,
+                                result_snippet => substr($text, 0, 500),
+                                full_content   => $text,
+                                source_type    => 'web',
+                            );
+                        }
                     } else {
                         my $code = $res ? $res->code : 'err';
                         $bundle .= "\n## $url\nFAILED HTTP $code\n";
                         push @thinking, "fetch FAIL $url ($code)";
                         push @$citations, { url => $url, title => "FAILED $code" };
+                        {
+                            my $path_snip = eval { $c->req->uri->path } || '';
+                            my $prompt_snip = $prompt // '';
+                            $prompt_snip =~ s/\s+/ /g;
+                            $prompt_snip = substr($prompt_snip, 0, 80);
+                            my $aq = 'site_audit:' . (length($path_snip) ? $path_snip : $prompt_snip);
+                            $self->_persist_web_search_hit($c,
+                                query          => $aq,
+                                result_title   => "FAILED $code",
+                                result_url     => $url,
+                                result_snippet => "FAILED HTTP $code",
+                                source_type    => 'web',
+                            );
+                        }
                     }
                 }
                 my $unique = scalar keys %finger;
@@ -651,8 +686,36 @@ sub process {
                 } elsif ($search_ctx && length $search_ctx) {
                     push @thinking, "web-search via $sp";
                     $extra .= "\n--- Web search (auto) ---\n$search_ctx\n";
-                    while ($search_ctx =~ /^URL:\s*(\S+)/mg) {
-                        push @$citations, { url => $1, title => $1 };
+                    my $prompt_q = $prompt // '';
+                    $prompt_q =~ s/\s+/ /g;
+                    $prompt_q = substr($prompt_q, 0, 200);
+                    my $parsed = 0;
+                    while ($search_ctx =~ /^##\s*(.+?)\nURL:\s*(\S+)\n(.*?)(?=\n## |\nUse the above|\z)/msg) {
+                        my ($wt, $wu, $ws) = ($1, $2, $3);
+                        $ws =~ s/^\s+|\s+$//g;
+                        $ws = substr($ws, 0, 500);
+                        push @$citations, { url => $wu, title => ($wt || $wu) };
+                        $self->_persist_web_search_hit($c,
+                            query          => $prompt_q,
+                            result_title   => ($wt || $wu),
+                            result_url     => $wu,
+                            result_snippet => (length($ws) ? $ws : ($wt || $wu)),
+                            source_type    => 'web',
+                        );
+                        $parsed++;
+                    }
+                    if (!$parsed) {
+                        while ($search_ctx =~ /^URL:\s*(\S+)/mg) {
+                            my $wu = $1;
+                            push @$citations, { url => $wu, title => $wu };
+                            $self->_persist_web_search_hit($c,
+                                query          => $prompt_q,
+                                result_title   => $wu,
+                                result_url     => $wu,
+                                result_snippet => $wu,
+                                source_type    => 'web',
+                            );
+                        }
                     }
                 } else {
                     push @thinking, 'web-search returned no results';
@@ -821,6 +884,126 @@ sub process {
         files_read      => \@files_read,
         citations       => $citations || [],
     };
+}
+
+
+# ── WebSearchResult learn/persist helpers (aisystem 2026-09-14) ─────────────
+# Non-fatal: never break chat if DB write/read fails.
+sub _session_uid_for_wsr {
+    my ($self, $c) = @_;
+    my $uid = $c->session->{user_id};
+    if (eval { is_guest_session($c) }) {
+        $uid = 199 unless defined $uid;
+    }
+    return defined $uid ? $uid : 199;
+}
+
+sub _persist_web_search_hit {
+    my ($self, $c, %h) = @_;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my $query  = substr($h{query} // '', 0, 500);
+        my $url    = substr($h{result_url} // '', 0, 1000);
+        return 0 unless length $query && length $url;
+        my $title  = substr(($h{result_title} // $url), 0, 512);
+        $title = $url unless length $title;
+        my $snippet = $h{result_snippet} // '';
+        $snippet = substr($snippet, 0, 65000);
+        $snippet = '(empty)' unless length $snippet;
+
+        # Light dedup: skip if same query+url already stored
+        my $existing = $schema->resultset('WebSearchResult')->search(
+            { result_url => $url, query => $query },
+            { rows => 1, order_by => { -desc => 'id' } }
+        )->single;
+        return 0 if $existing;
+
+        my %row = (
+            query            => $query,
+            result_title     => $title,
+            result_url       => $url,
+            result_snippet   => $snippet,
+            source_type      => ($h{source_type} || 'web'),
+            found_by_user_id => ($h{found_by_user_id} // $self->_session_uid_for_wsr($c)),
+            is_verified      => 0,
+        );
+        if (defined $h{full_content} && length $h{full_content}) {
+            $row{full_content} = substr($h{full_content}, 0, 100_000);
+        }
+        $schema->resultset('WebSearchResult')->create(\%row);
+        1;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+            "WebSearchResult persist failed: $@");
+    }
+}
+
+sub _format_prior_web_search_hits {
+    my ($self, $c, $prompt, $origin_host) = @_;
+    my $out = '';
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my @keywords;
+        my %stop = map { $_ => 1 } qw(
+            that this with from have what when where which about page site link
+            http https navigate navigation audit report each content look theme
+            failed links broken crawl readable whether
+        );
+        for my $w (split /\W+/, lc($prompt // '')) {
+            next if length($w) < 4;
+            next if $stop{$w};
+            push @keywords, $w;
+            last if @keywords >= 5;
+        }
+        my @or;
+        for my $kw (@keywords) {
+            my $like = '%' . $kw . '%';
+            push @or,
+                { query => { -like => $like } },
+                { result_title => { -like => $like } },
+                { result_url => { -like => $like } },
+                { result_snippet => { -like => $like } };
+        }
+        if ($origin_host && length $origin_host) {
+            push @or, {
+                query      => { -like => 'site_audit:%' },
+                result_url => { -like => '%' . $origin_host . '%' },
+            };
+        }
+        return unless @or;
+        my @rows = $schema->resultset('WebSearchResult')->search(
+            { -or => \@or },
+            { order_by => { -desc => 'created_at' }, rows => 8 }
+        )->all;
+        return unless @rows;
+        $out = "--- Prior learned search/audit hits ---\n"
+             . "NOTE: prior/learned findings from websearchresult. Reuse when relevant; "
+             . "prefer live fetch when available.\n";
+        for my $r (@rows) {
+            my $created = $r->created_at;
+            if (ref $created && $created->can('strftime')) {
+                $created = $created->strftime('%Y-%m-%d %H:%M');
+            }
+            my $snip = $r->result_snippet // '';
+            $snip = substr($snip, 0, 300);
+            $out .= sprintf(
+                "[prior] %s | %s\n  url: %s\n  query: %s\n  %s\n",
+                $created // '',
+                $r->result_title // '',
+                $r->result_url // '',
+                $r->query // '',
+                $snip
+            );
+        }
+        $out .= "\n";
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+            "WebSearchResult prior load failed: $@");
+        return '';
+    }
+    return $out;
 }
 
 sub _can_select_model {
