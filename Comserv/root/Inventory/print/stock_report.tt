@@ -90,9 +90,13 @@
   <div class="summary">
     <strong>[% report_rows.size %]</strong> item(s) shown
     [% SET low_count = 0 %]
-    [% FOREACH row IN report_rows %][% IF row.is_low %][% low_count = low_count + 1 %][% END %][% END %]
+    [% SET missing_count = 0 %]
+    [% FOREACH row IN report_rows %][% IF row.is_low %][% low_count = low_count + 1 %][% END %][% IF row.is_missing %][% missing_count = missing_count + 1 %][% END %][% END %]
     [% IF low_count > 0 %]
     &nbsp;&mdash;&nbsp; <span style="color:#c00;font-weight:bold;">[% low_count %] below reorder point</span>
+    [% END %]
+    [% IF missing_count > 0 %]
+    &nbsp;&mdash;&nbsp; <span style="color:#c00;font-weight:bold;">[% missing_count %] missing stock (not received)</span>
     [% END %]
   </div>
 
@@ -136,11 +140,11 @@
     [% END %]
     [% SET available = row.total_qty - total_reserved %]
     [% SET stock_value = item.unit_cost ? (item.unit_cost * row.total_qty) : 0 %]
-    <tr[% IF row.is_low %] class="low-row"[% END %]>
+    <tr[% IF row.is_low || row.is_missing %] class="low-row"[% END %]>
       <td><strong>[% item.sku %]</strong></td>
-      <td>[% item.name | html %]</td>
+      <td>[% item.name | html %][% IF row.is_missing %] <span class="low-badge">&#9888; MISSING</span>[% END %]</td>
       <td>[% item.unit_of_measure %]</td>
-      <td style="text-align:right;font-weight:bold;">[% row.total_qty %]</td>
+      <td style="text-align:right;font-weight:bold;">[% row.total_qty %][% IF row.is_missing %] <span class="low-badge">(not received)</span>[% END %]</td>
       <td style="text-align:right;">[% total_reserved %]</td>
       <td style="text-align:right;">[% available %]</td>
       <td style="text-align:right;">

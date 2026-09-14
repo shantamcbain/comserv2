@@ -37,18 +37,39 @@ RUN mkdir -p /opt/comserv/local/lib/perl5
 # Application uses YAML::Tiny for all YAML operations
 # Use multiple mirrors for better dependency resolution
 # Template::Toolkit version is pinned in cpanfile (single source of truth)
-# Pre-install modules that cpanm --installdeps sometimes fails to resolve 
-# in its dependency walk (Crypt::CBC, Session::Store::Cookie)
-# vvv PRE-INSTALL FORK RESILIENCE vvv
+# CPAN install strategy (keep Catalyst OUT of the pre-install step):
+# 1) Crypt::CBC alone — fork-resilience, no Catalyst tree
+# 2) JSON backend with retries — metacpan/cpan sometimes serve truncated tarballs
+#    (Cpanel-JSON-XS "gzip: unexpected end of file"), which cascades into Plack/Catalyst failures
+# 3) --installdeps from cpanfile
+# 4) Session::Store::Cookie AFTER Catalyst exists (cpanfile already requires it; this is a safety net)
+# vvv CPAN INSTALL vvv
 RUN cpanm --local-lib=/opt/comserv/local --notest \
     --mirror https://cpan.metacpan.org \
     --mirror https://www.cpan.org \
-    Crypt::CBC Catalyst::Plugin::Session::Store::Cookie
-# ^^^ PRE-INSTALL FORK RESILIENCE ^^^
+    Crypt::CBC
+RUN set -eux; \
+    for i in 1 2 3 4 5; do \
+      cpanm --local-lib=/opt/comserv/local --notest --mirror https://cpan.metacpan.org --mirror https://www.cpan.org \
+        Cpanel::JSON::XS JSON::MaybeXS && break; \
+      echo "JSON backend install attempt $i failed — retrying"; \
+      sleep $((i * 5)); \
+    done; \
+    perl -MCpanel::JSON::XS -MJSON::MaybeXS -e1
+RUN set -eux; \
+    for i in 1 2 3; do \
+      cpanm --local-lib=/opt/comserv/local --notest \
+        --mirror https://cpan.metacpan.org \
+        --mirror https://www.cpan.org \
+        --installdeps . && break; \
+      echo "installdeps attempt $i failed — retrying"; \
+      sleep $((i * 10)); \
+    done
 RUN cpanm --local-lib=/opt/comserv/local --notest \
     --mirror https://cpan.metacpan.org \
     --mirror https://www.cpan.org \
-    --installdeps .
+    Catalyst::Plugin::Session::Store::Cookie
+# ^^^ CPAN INSTALL ^^^
 
 # Verify critical modules
 RUN perl -e 'use Catalyst; use DBIx::Class; use Template; use Starman; print "Core modules loaded\n"'
