@@ -3027,6 +3027,16 @@
                 throw new Error('AI server returned an empty response. Please try again.');
             }
 
+            if (data.success && !(data.response || '').trim() && !data.needs_web_search) {
+                // CSC-20260914-5166: server sometimes marks empty provider text as success.
+                console.error('AI returned empty success response', data);
+                statusIndicator.textContent = 'AI Error';
+                statusIndicator.className = 'chat-status error';
+                addMessage('The model returned an empty reply. Try again or pick another model.', 'ai-message');
+                persistMessages();
+                return;
+            }
+
             if (data.success) {
                 // Reset retry counter on success
                 state.retryCount = 0;
