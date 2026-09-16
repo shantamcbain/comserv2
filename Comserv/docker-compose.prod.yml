@@ -41,6 +41,11 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        GIT_BRANCH: ${GIT_BRANCH:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+        BUILD_HOST: ${BUILD_HOST:-unknown}
     image: shantamcsbain/comserv-web-prod:latest
     container_name: comserv2-web-prod
     restart: unless-stopped
