@@ -50,6 +50,7 @@ RUN cpanm --local-lib=/opt/comserv/local --notest \
     Crypt::CBC
 RUN set -eux; \
     for i in 1 2 3 4 5; do \
+      rm -rf /root/.cpanm && \
       cpanm --local-lib=/opt/comserv/local --notest --mirror https://cpan.metacpan.org --mirror https://www.cpan.org \
         Cpanel::JSON::XS JSON::MaybeXS && break; \
       echo "JSON backend install attempt $i failed — retrying"; \
@@ -58,6 +59,7 @@ RUN set -eux; \
     perl -MCpanel::JSON::XS -MJSON::MaybeXS -e1
 RUN set -eux; \
     for i in 1 2 3; do \
+      rm -rf /root/.cpanm && \
       cpanm --local-lib=/opt/comserv/local --notest \
         --mirror https://cpan.metacpan.org \
         --mirror https://www.cpan.org \
@@ -65,7 +67,8 @@ RUN set -eux; \
       echo "installdeps attempt $i failed — retrying"; \
       sleep $((i * 10)); \
     done
-RUN cpanm --local-lib=/opt/comserv/local --notest \
+RUN rm -rf /root/.cpanm && \
+    cpanm --local-lib=/opt/comserv/local --notest \
     --mirror https://cpan.metacpan.org \
     --mirror https://www.cpan.org \
     Catalyst::Plugin::Session::Store::Cookie
