@@ -2,6 +2,11 @@
 # Stage 1: Build environment with all dependencies
 ARG PERL_VERSION=5.40.0
 ARG BASE_IMAGE=perl:5.40.0
+# Build metadata (injected at build time via --build-arg)
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ARG BUILD_DATE=unknown
+ARG BUILD_HOST=unknown
 
 FROM ${BASE_IMAGE} AS builder
 
@@ -171,6 +176,18 @@ CMD []
 LABEL maintainer="Comserv Development Team"
 LABEL description="Comserv Catalyst Web Application - Production Container"
 LABEL version="1.0"
+# OCI standard labels (immutable image metadata, queryable via docker inspect)
+LABEL org.opencontainers.image.title="Comserv Web Application"
+LABEL org.opencontainers.image.description="Comserv Catalyst Web Application - Production Container"
+LABEL org.opencontainers.image.version="1.0"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
+LABEL org.opencontainers.image.source="https://github.com/shantamcbain/comserv2"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.authors="Comserv Development Team"
+LABEL org.opencontainers.image.licenses="Proprietary"
+LABEL org.opencontainers.image.ref.name="shantamcsbain/comserv-web-prod"
+LABEL org.opencontainers.image.branch="${GIT_BRANCH}"
+LABEL org.opencontainers.image.build.host="${BUILD_HOST}"
 
 # ===================================================================
 # Stage 3: Development image (IMGDEP Ph.0)
