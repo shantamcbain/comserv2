@@ -1308,20 +1308,27 @@ sub hermes_run :Local :Args(0) {
     $c->res->content_type('application/json');
     return unless $self->_ai2_require_editor_role($c);
 
-    # Parse JSON body
+    # Parse JSON body (Catalyst often gives a filehandle — slurp like /ai2/chat)
     my $body = {};
     try {
-        if ($c->req->can('data') && ref($c->req->data) eq 'HASH') {
+        if ($c->req->can('data') && ref($c->req->data) eq 'HASH' && %{$c->req->data}) {
             $body = $c->req->data;
-        } elsif (my $raw = $c->req->body) {
-            $body = decode_json($raw) if length($raw);
+        } else {
+            my $raw = $c->req->can('content') ? $c->req->content : $c->req->body;
+            $raw = do { local $/; <$raw> } if ref($raw);
+            $body = decode_json($raw) if defined $raw && length $raw;
         }
     } catch { };
     $body = {} unless ref($body) eq 'HASH';
 
-    my $prompt = $body->{prompt} // '';
+    # Also accept form/query fallbacks (same idea as token_login)
+    my $prompt = $body->{prompt}
+              // $c->req->param('prompt')
+              // '';
+    $prompt = '' unless defined $prompt;
     $prompt =~ s/^\s+|\s+$//g;
     unless (length $prompt) {
+        $c->res->status(400);
         $c->res->body(encode_json({ success => 0, error => 'prompt is required' }));
         return;
     }

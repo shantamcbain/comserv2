@@ -42,16 +42,32 @@
      * Get the current prompt from the editor's chat input, or a fallback.
      */
     function getCurrentPrompt() {
-        var input = document.getElementById('ai-chat-input');
-        if (input) {
-            var v = (input.value || '').trim();
-            if (v) return v;
+        // Prefer Hermes panel textarea, then main AI editor chat input, then context
+        var hermesTa = document.getElementById('hermes-run-prompt');
+        if (hermesTa) {
+            var hv = (hermesTa.value || '').trim();
+            if (hv) return hv;
         }
-        // Fallback — use the active file loaded in the editor
+        var candidates = [
+            'ai-chat-input',
+            'ai2-chat-input',
+            'chat-input',
+            'editor-chat-input'
+        ];
+        for (var i = 0; i < candidates.length; i++) {
+            var input = document.getElementById(candidates[i]);
+            if (input) {
+                var v = (input.value || input.textContent || '').trim();
+                if (v) return v;
+            }
+        }
+        var sel = '';
+        try { sel = String(window.getSelection && window.getSelection() || '').trim(); } catch (e) {}
+        if (sel) return sel;
         if (window.AI2_FILE_TO_LOAD) {
             return 'Review the current file: ' + window.AI2_FILE_TO_LOAD;
         }
-        return 'Analyze the current project state and suggest what to work on.';
+        return '';
     }
 
     /**
@@ -130,9 +146,13 @@
         function runHermes() {
             var prompt = (promptInput.value || '').trim() || getCurrentPrompt();
             if (!prompt) {
-                errorArea.textContent = 'Enter a prompt first.';
+                errorArea.textContent = 'Enter a prompt in the Hermes box (or the editor chat input) first.';
                 errorArea.style.display = 'block';
                 return;
+            }
+            // Keep textarea in sync so a retry shows what was sent
+            if (!(promptInput.value || '').trim()) {
+                promptInput.value = prompt;
             }
 
             runBtn.disabled = true;
