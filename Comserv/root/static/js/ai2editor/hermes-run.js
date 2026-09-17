@@ -79,28 +79,65 @@
             console.warn('[' + NS + '] Hermes panel not found');
             return;
         }
-
-        // Skip if already wired
         if (panel.dataset.hermesRunWired === '1') return;
         panel.dataset.hermesRunWired = '1';
 
-        // Create the button row and output area inside the Hermes panel.
-        // The panel already has content from editing_widget_popup.tt — we append
-        // to the inner wrapper (first child div that has padding:8px).
-        var wrapper = panel.querySelector('div');
-        if (!wrapper) return;
+        var copyBtn = document.getElementById('hermes-copy-cmd');
+        var cmdEl = document.getElementById('hermes-terminal-cmd');
+        if (copyBtn && cmdEl) {
+            copyBtn.addEventListener('click', function () {
+                var cmd = (cmdEl.textContent || '').trim();
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(cmd).then(function () {
+                        copyBtn.textContent = 'Copied';
+                        setTimeout(function () { copyBtn.textContent = 'Copy terminal command'; }, 1500);
+                    }).catch(function () {
+                        copyBtn.textContent = 'Select & copy manually';
+                    });
+                } else {
+                    copyBtn.textContent = 'Select & copy manually';
+                }
+            });
+        }
 
-        // Remove the placeholder text / iframe area, we replace with live controls
-        var placeholder = wrapper.querySelector('#hermes-placeholder');
-        var iframe = wrapper.querySelector('#hermes-iframe, iframe');
 
-        // Button row
+        // Restore familiar dashboard iframe when possible (do not remove it)
+        var iframe = document.getElementById('hermes-iframe');
+        var placeholder = document.getElementById('hermes-placeholder');
+        var openTab = document.getElementById('hermes-open-tab');
+        var dashUrl = '';
+        try {
+            var qs = new URLSearchParams(window.location.search || '');
+            dashUrl = qs.get('hermes') || '';
+        } catch (e) {}
+        if (!dashUrl && iframe && iframe.getAttribute('src')) {
+            dashUrl = iframe.getAttribute('src');
+        }
+        if (!dashUrl) {
+            // Same host as the editor (works for IP remote: 172.30.x.x:9119)
+            dashUrl = window.location.protocol + '//' + window.location.hostname + ':9119/';
+        }
+        if (iframe && dashUrl) {
+            iframe.src = dashUrl;
+            iframe.style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
+        }
+        if (openTab && dashUrl) {
+            openTab.href = dashUrl;
+        }
+
+        var mount = document.getElementById('hermes-run-section');
+        if (!mount) {
+            // Fallback: append under panel wrapper
+            mount = panel.querySelector('div') || panel;
+        }
+
         var btnRow = document.createElement('div');
-        btnRow.style.cssText = 'display:flex;gap:6px;margin-bottom:8px;align-items:center;';
+        btnRow.style.cssText = 'display:flex;gap:6px;margin-bottom:8px;align-items:flex-start;';
 
         var promptInput = document.createElement('textarea');
         promptInput.id = 'hermes-run-prompt';
-        promptInput.placeholder = 'Prompt for Hermes… (default: current editor state)';
+        promptInput.placeholder = 'Prompt for Hermes CLI oneshot…';
         promptInput.style.cssText = 'flex:1;background:#0f1115;color:#ddd;border:1px solid #555;border-radius:3px;padding:6px;font-size:12px;min-height:50px;resize:vertical;font-family:inherit;';
 
         var runBtn = document.createElement('button');
@@ -110,39 +147,33 @@
 
         btnRow.appendChild(promptInput);
         btnRow.appendChild(runBtn);
-        wrapper.appendChild(btnRow);
+        mount.appendChild(btnRow);
 
-        // Mode indicator
         var modeIndicator = document.createElement('div');
         modeIndicator.id = 'hermes-run-mode';
         modeIndicator.style.cssText = 'font-size:11px;color:#888;margin-bottom:4px;';
-        wrapper.appendChild(modeIndicator);
+        mount.appendChild(modeIndicator);
 
-        // Output area
         var outputBox = document.createElement('div');
         outputBox.id = 'hermes-run-output';
-        outputBox.style.cssText = 'background:#0f1115;color:#c8d0dc;border:1px solid #444;border-radius:4px;padding:8px;font-size:11px;line-height:1.4;max-height:400px;overflow:auto;white-space:pre-wrap;display:none;font-family:monospace;';
-        wrapper.appendChild(outputBox);
+        outputBox.style.cssText = 'background:#0f1115;color:#c8d0dc;border:1px solid #444;border-radius:4px;padding:8px;font-size:11px;line-height:1.4;max-height:280px;overflow:auto;white-space:pre-wrap;display:none;font-family:monospace;';
+        mount.appendChild(outputBox);
 
-        // Dashboard URL / launch hint area (shown when mode=desktop)
         var dashArea = document.createElement('div');
         dashArea.id = 'hermes-run-dashboard';
         dashArea.style.cssText = 'font-size:11px;color:#9ecbff;margin-top:4px;display:none;';
-        wrapper.appendChild(dashArea);
+        mount.appendChild(dashArea);
 
-        // Error area
         var errorArea = document.createElement('div');
         errorArea.id = 'hermes-run-error';
         errorArea.style.cssText = 'font-size:11px;color:#f66;margin-top:4px;display:none;';
-        wrapper.appendChild(errorArea);
+        mount.appendChild(errorArea);
 
-        // Hidden status area for the thinking indicator
         var statusArea = document.createElement('div');
         statusArea.id = 'hermes-run-status';
         statusArea.style.cssText = 'font-size:11px;color:#7ec8ff;margin-top:4px;display:none;';
-        wrapper.appendChild(statusArea);
+        mount.appendChild(statusArea);
 
-        // Run handler
         function runHermes() {
             var prompt = (promptInput.value || '').trim() || getCurrentPrompt();
             if (!prompt) {
@@ -150,7 +181,6 @@
                 errorArea.style.display = 'block';
                 return;
             }
-            // Keep textarea in sync so a retry shows what was sent
             if (!(promptInput.value || '').trim()) {
                 promptInput.value = prompt;
             }
@@ -161,18 +191,14 @@
             errorArea.style.display = 'none';
             dashArea.style.display = 'none';
             modeIndicator.textContent = '';
-            statusArea.textContent = '⏳ Probing desktop…';
+            statusArea.textContent = 'Probing desktop / starting CLI…';
             statusArea.style.display = 'block';
 
             callHermesRun(prompt, 'auto').then(function (data) {
-                if (!data) {
-                    throw new Error('Empty response from server');
-                }
-                if (!data.success && data.error) {
-                    throw new Error(data.error);
-                }
+                if (!data) throw new Error('Empty response from server');
+                if (!data.success && data.error) throw new Error(data.error);
 
-                var modeText = data.mode === 'desktop' ? '🖥️ Desktop' : '💻 CLI';
+                var modeText = data.mode === 'desktop' ? 'Desktop' : 'CLI';
                 modeIndicator.textContent = 'Mode: ' + modeText + ' — ' + (data.message || '');
 
                 if (data.mode === 'desktop') {
@@ -212,14 +238,13 @@
 
         runBtn.addEventListener('click', runHermes);
         promptInput.addEventListener('keydown', function (e) {
-            // Ctrl+Enter to send from the prompt textarea
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
                 runHermes();
             }
         });
 
-        console.log('[' + NS + '] Hermes Run panel ready');
+        console.log('[' + NS + '] Hermes Dashboard + Run panel ready; iframe=' + dashUrl);
     }
 
     if (document.readyState === 'loading') {
