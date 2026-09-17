@@ -1440,7 +1440,7 @@ sub hermes_run :Local :Args(0) {
     }
 
     my $message = $mode eq 'desktop'
-        ? "Desktop mode — Hermes Dashboard at $desktop_url"
+        ? "Desktop mode — Desktop reachable; dashboard URL  $desktop_url"
         : (length $output)
             ? "CLI mode — hermes chat ran successfully"
             : "CLI mode — hermes chat completed (no output)";
@@ -1455,6 +1455,117 @@ sub hermes_run :Local :Args(0) {
         error          => (length $cli_error) ? $cli_error : undef,
     }));
 }
+
+# -------------------------------------------------------------------
+# POST /ai2/hermes_start_desktop
+# Actually launch Hermes Desktop Electron with aisystem --cwd.
+# Opens on the workstation display (DISPLAY), not in the browser.
+# Auth: editor/admin/developer. Non-blocking spawn.
+# -------------------------------------------------------------------
+sub hermes_start_desktop :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->res->content_type('application/json');
+    return unless $self->_ai2_require_editor_role($c);
+
+    my $aisystem_root = '/home/shanta/.comserv/worktrees/aisystem/Comserv';
+    try {
+        my $wt_config = Comserv::Util::Git->build_worktree_list();
+        for my $b (@$wt_config) {
+            if ($b->{name} && lc($b->{name}) eq 'aisystem' && $b->{cmd}) {
+                if ($b->{cmd} =~ m{cd\s+(/\S+?)/Comserv\s*&&}) {
+                    my $d = $1;
+                    $aisystem_root = $d if -d $d;
+                }
+                last;
+            }
+        }
+    } catch { };
+
+    unless (-d $aisystem_root) {
+        $c->res->status(500);
+        $c->res->body(encode_json({
+            success => 0,
+            error   => "aisystem worktree not found: $aisystem_root",
+        }));
+        return;
+    }
+
+    my $hermes_bin = '/home/shanta/.local/bin/hermes';
+    $hermes_bin = 'hermes' unless -x $hermes_bin;
+
+    # Already running?
+    my $already = 0;
+    my $pids = '';
+    if (open my $ph, '-|', 'pgrep', '-af', 'hermes.*desktop|Hermes.*Desktop|apps/desktop') {
+        local $/;
+        $pids = <$ph> // '';
+        close $ph;
+        $already = 1 if $pids =~ /\d+/ && $pids !~ /pgrep/;
+    }
+
+    my $cmd = "$hermes_bin desktop --skip-build --cwd "
+            . quotemeta($aisystem_root);
+    my $launch_hint = "hermes desktop --skip-build --cwd $aisystem_root";
+
+    if ($already) {
+        $c->res->body(encode_json({
+            success     => 1,
+            started     => 0,
+            already     => 1,
+            cwd         => $aisystem_root,
+            launch_hint => $launch_hint,
+            message     => 'Hermes Desktop already appears to be running on the workstation. '
+                         . 'Use that window (aisystem cwd if started with --cwd). '
+                         . 'This is not a browser page.',
+            note        => 'Desktop opens on the workstation screen, not in your remote browser.',
+        }));
+        return;
+    }
+
+    my $log = '/tmp/hermes-desktop-aisystem.log';
+    my $display = $ENV{DISPLAY} || ':0';
+    my $spawn_err = '';
+    eval {
+        # Detach so Starman is not blocked; inherit user session display when possible.
+        my $full = "DISPLAY=$display "
+                 . "HERMES_DESKTOP_CWD=" . quotemeta($aisystem_root) . " "
+                 . "nohup $cmd >> " . quotemeta($log) . " 2>&1 &";
+        my $rc = system('/bin/bash', '-lc', $full);
+        if ($rc != 0) {
+            $spawn_err = "spawn exit status $rc";
+        }
+    };
+    if ($@ || $spawn_err) {
+        $c->res->status(500);
+        $c->res->body(encode_json({
+            success => 0,
+            error   => $spawn_err || "$@",
+            cwd     => $aisystem_root,
+            launch_hint => $launch_hint,
+            log     => $log,
+        }));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'hermes_start_desktop', "Spawned Desktop cwd=$aisystem_root DISPLAY=$display");
+
+    $c->res->body(encode_json({
+        success     => 1,
+        started     => 1,
+        already     => 0,
+        cwd         => $aisystem_root,
+        display     => $display,
+        launch_hint => $launch_hint,
+        log         => $log,
+        message     => 'Started Hermes Desktop with aisystem worktree. '
+                     . 'Look for the Electron window on the workstation (DISPLAY). '
+                     . 'Remote browsers will not show Desktop — use the workstation screen or Hermes CLI in a terminal.',
+        note        => 'Desktop ≠ browser dashboard. For browser UI use hermes dashboard separately.',
+    }));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

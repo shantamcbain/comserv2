@@ -100,6 +100,53 @@
             });
         }
 
+        var startDesk = document.getElementById('hermes-start-desktop');
+        var deskStatus = document.getElementById('hermes-desktop-status');
+        if (startDesk) {
+            startDesk.addEventListener('click', function () {
+                startDesk.disabled = true;
+                startDesk.textContent = 'Starting…';
+                if (deskStatus) {
+                    deskStatus.style.display = 'block';
+                    deskStatus.style.color = '#7ec8ff';
+                    deskStatus.textContent = 'Spawning Hermes Desktop with aisystem --cwd on the workstation…';
+                }
+                fetch('/ai2/hermes_start_desktop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: '{}',
+                    credentials: 'include'
+                }).then(function (res) { return res.json(); }).then(function (data) {
+                    startDesk.disabled = false;
+                    startDesk.textContent = 'Start Hermes Desktop (aisystem)';
+                    if (!deskStatus) return;
+                    deskStatus.style.display = 'block';
+                    if (!data || !data.success) {
+                        deskStatus.style.color = '#f66';
+                        deskStatus.textContent = (data && data.error) ? data.error : 'Start failed';
+                        return;
+                    }
+                    deskStatus.style.color = '#9ecbff';
+                    var lines = [];
+                    lines.push(data.message || 'OK');
+                    if (data.cwd) lines.push('cwd: ' + data.cwd);
+                    if (data.already) lines.push('(already running)');
+                    if (data.note) lines.push(data.note);
+                    if (data.launch_hint) lines.push('hint: ' + data.launch_hint);
+                    deskStatus.textContent = lines.join('\n');
+                }).catch(function (err) {
+                    startDesk.disabled = false;
+                    startDesk.textContent = 'Start Hermes Desktop (aisystem)';
+                    if (deskStatus) {
+                        deskStatus.style.display = 'block';
+                        deskStatus.style.color = '#f66';
+                        deskStatus.textContent = 'Request failed: ' + (err && err.message ? err.message : String(err));
+                    }
+                });
+            });
+        }
+
+
 
         // Restore familiar dashboard iframe when possible (do not remove it)
         var iframe = document.getElementById('hermes-iframe');
