@@ -211,6 +211,7 @@
 <script src="/static/js/ai2editor/file-diff.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/project-tree.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/chat.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/hermes-run.js?v=[% cv %]" defer></script>
 [% END %]
 
 <!-- Other feature modules -->
