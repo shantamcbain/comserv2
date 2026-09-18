@@ -446,7 +446,21 @@ sub chat_with_fallback {
     unless ($skip_paid) {
         $resp = $self->_chat_one_with_retry($c, $provider_name, $use_model, $messages, %opts);
         if ($resp && $resp->{success}) {
-            return $resp;
+            my $body = $resp->{response} // '';
+            $body =~ s/^\s+|\s+$//g;
+            if (length $body) {
+                return $resp;
+            }
+            # CSC-20260914-5166: HTTP success with blank text looks like a hang.
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
+                "Provider $provider_name returned empty content (model="
+                . ($use_model // '?') . "); treating as failure");
+            $resp = {
+                success  => 0,
+                error    => 'Provider returned empty content',
+                provider => $provider_name,
+                model    => $resp->{model} || $use_model,
+            };
         }
     }
 
@@ -454,9 +468,10 @@ sub chat_with_fallback {
     # Credit-exhaustion on paid providers OR a dead Ollama hop (docker cannot
     # reach host:11434 — CSC-20260831-1585) should fall through to a free
     # OpenRouter model instead of leaving the UI on Thinking… forever.
+    # Also fall through on empty content (CSC-20260914-5166).
     my $do_fallback = (
         $self->_provider_needs_credit_fallback($provider_name)
-            && ($skip_paid || $self->_credits_exhausted($err))
+            && ($skip_paid || $self->_credits_exhausted($err) || $err =~ /empty content/i)
     ) || (
         ($provider_name // '') eq 'ollama'
             && ($resp && $resp->{unreachable} || $self->_credits_exhausted($err))

@@ -517,6 +517,244 @@ sub process {
         }
     }
 
+
+    # ── Auto-enrich when in-app context is insufficient (Shanta 2026-09-14) ──
+    # Public web search AND/OR same-origin linked pages (site nav audit).
+    # Runs once per turn before persist. Controllers may not reload under -r;
+    # this lives in the Model so a :4006 restart picks it up reliably.
+    my $citations = [];
+    if (!$args{_auto_enrich_done}) {
+        my $roles_e = $c->session->{roles} || [];
+        $roles_e = [ split(/\s*,\s*/, $roles_e) ] unless ref $roles_e;
+        my $can_enrich = (grep { $_ =~ /^(admin|developer|editor)$/i } @$roles_e) ? 1 : 0;
+        my $ai_ctrl = eval { $c->controller('AI') };
+        my $quality = 'unknown';
+        if ($ai_ctrl && $ai_ctrl->can('_assess_response_quality')) {
+            $quality = $ai_ctrl->_assess_response_quality($resp->{response} // '', $prompt);
+        }
+        my $site_audit = ($prompt =~ /\b(navigate|navigation|crawl|audit|failed\s+links?|each\s+page|readable|theme|look and content|site and report|broken\s+links?)\b/i) ? 1 : 0;
+        my $lookup_intent = ($prompt =~ /\b(find|look\s*up|search\s+for|what\s+is|who\s+is|tell\s+me\s+about|information\s+on|info\s+on)\b/i) ? 1 : 0;
+        my $need = $can_enrich && $resp && $resp->{success}
+            && ($quality eq 'poor' || $site_audit || $lookup_intent)
+            && !$args{use_search};
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+            "auto_enrich check: can=$can_enrich quality=$quality site_audit=$site_audit lookup_intent=$lookup_intent need=$need");
+        push @thinking, "auto_enrich: quality=$quality site_audit=$site_audit lookup_intent=$lookup_intent need=$need";
+        if ($need) {
+            my $extra = '';
+            my $origin_host_early = eval { $c->req->uri->host } || 'workstation.local';
+            my $prior_hits = eval { $self->_format_prior_web_search_hits($c, $prompt, $origin_host_early) } || '';
+            if ($prior_hits) {
+                $extra .= $prior_hits;
+                push @thinking, 'prior learned search/audit hits injected';
+            }
+            # Same-origin linked pages (see beyond current page)
+            my @hrefs;
+            my $links = $args{page_links} || [];
+            if (ref $links eq 'ARRAY') {
+                for my $sec (@$links) {
+                    next unless defined $sec;
+                    while ($sec =~ m{(https?://[^\s]+|/[\w./\-]+)}g) {
+                        push @hrefs, $1;
+                    }
+                }
+            }
+            my $pc = $args{page_content} || '';
+            while ($pc =~ m{href=["']([^"']+)["']}gi) { push @hrefs, $1; }
+            my %seen; my @fetch;
+            my $origin_host = eval { $c->req->uri->host } || 'workstation.local';
+            my $base = eval { $c->req->base->as_string } || "http://$origin_host/";
+            $base =~ s{/$}{};
+            for my $h (@hrefs) {
+                next if $seen{$h}++;
+                my $url = $h;
+                $url = $base . $h if $h =~ m{^/};
+                next unless $url =~ m{^https?://}i;
+                # same host only
+                next unless $url =~ m{https?://\Q$origin_host\E(?::\d+)?/}i
+                         || $url =~ m{https?://(?:127\.0\.0\.1|localhost)(?::\d+)?/}i;
+                next if $url =~ m{/ai/widget}i;
+                push @fetch, $url;
+                last if @fetch >= 6;
+            }
+            if (@fetch) {
+                push @thinking, 'Fetching ' . scalar(@fetch) . ' same-origin pages for site context…';
+                require LWP::UserAgent;
+                require HTTP::Request;
+                my $ua = LWP::UserAgent->new(timeout => 8, max_size => 400_000, max_redirect => 3);
+                $ua->agent('Comserv-AI-SiteAudit/1.0');
+                my $cookie = $c->req->header('Cookie') || '';
+                my $bundle = "--- Same-origin pages (auto-fetched for site audit) ---\n"
+                    . "NOTE: Shared header/nav/footer is normal. Judge each page by its MAIN content only.\n"
+                    . "Do NOT claim all pages are identical just because chrome matches.\n";
+                my %finger;
+                for my $url (@fetch) {
+                    my $req = HTTP::Request->new(GET => $url);
+                    $req->header('Host' => $origin_host . ( ($c->req->uri->port && $c->req->uri->port !~ /^(80|443)$/) ? (':' . $c->req->uri->port) : '' ));
+                    $req->header('Cookie' => $cookie) if length $cookie;
+                    $req->header('Accept' => 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8');
+                    my $res = eval { $ua->request($req) };
+                    if ($res && $res->is_success) {
+                        my $html = $res->decoded_content // '';
+                        my $ctype = $res->header('Content-Type') || '';
+                        my $text = '';
+                        if ($ctype =~ m{json}i || $html =~ /^\s*[\[{]/) {
+                            $text = substr($html, 0, 4000);
+                        } else {
+                            $html =~ s{<script\b[^>]*>.*?</script>}{}gsi;
+                            $html =~ s{<style\b[^>]*>.*?</style>}{}gsi;
+                            # Drop shared chrome so pages are distinguishable
+                            $html =~ s{<nav\b[^>]*>.*?</nav>}{}gsi;
+                            $html =~ s{<header\b[^>]*>.*?</header>}{}gsi;
+                            $html =~ s{<footer\b[^>]*>.*?</footer>}{}gsi;
+                            my $main = '';
+                            if ($html =~ m{<main\b[^>]*>(.*?)</main>}si) {
+                                $main = $1;
+                            } elsif ($html =~ m{id=["']content["'][^>]*>(.*)}si) {
+                                $main = substr($1, 0, 20000);
+                            } elsif ($html =~ m{class=["'][^"']*(?:main-content|page-content|content-area)[^"']*["'][^>]*>(.*)}si) {
+                                $main = substr($1, 0, 20000);
+                            } else {
+                                $main = $html;
+                            }
+                            $main =~ s{<[^>]+>}{ }g;
+                            $main =~ s{\s+}{ }g;
+                            $main =~ s{^\s+|\s+$}{}g;
+                            $text = substr($main, 0, 3500);
+                        }
+                        my $fp = substr($text, 0, 120);
+                        $finger{$fp}++;
+                        my $title = '';
+                        if (($res->decoded_content // '') =~ m{<title[^>]*>(.*?)</title>}si) {
+                            $title = $1;
+                            $title =~ s{\s+}{ }g;
+                            $title = substr($title, 0, 80);
+                        }
+                        $bundle .= "\n## $url\nHTTP " . $res->code
+                            . (length $title ? " | title: $title" : '')
+                            . " | main_chars=" . length($text) . "\n$text\n";
+                        push @$citations, { url => $url, title => ($title || $url) };
+                        push @thinking, "fetched OK $url main=" . length($text);
+                        {
+                            my $path_snip = eval { $c->req->uri->path } || '';
+                            my $prompt_snip = $prompt // '';
+                            $prompt_snip =~ s/\s+/ /g;
+                            $prompt_snip = substr($prompt_snip, 0, 80);
+                            my $aq = 'site_audit:' . (length($path_snip) ? $path_snip : $prompt_snip);
+                            $self->_persist_web_search_hit($c,
+                                query          => $aq,
+                                result_title   => ($title || $url),
+                                result_url     => $url,
+                                result_snippet => substr($text, 0, 500),
+                                full_content   => $text,
+                                source_type    => 'web',
+                            );
+                        }
+                    } else {
+                        my $code = $res ? $res->code : 'err';
+                        $bundle .= "\n## $url\nFAILED HTTP $code\n";
+                        push @thinking, "fetch FAIL $url ($code)";
+                        push @$citations, { url => $url, title => "FAILED $code" };
+                        {
+                            my $path_snip = eval { $c->req->uri->path } || '';
+                            my $prompt_snip = $prompt // '';
+                            $prompt_snip =~ s/\s+/ /g;
+                            $prompt_snip = substr($prompt_snip, 0, 80);
+                            my $aq = 'site_audit:' . (length($path_snip) ? $path_snip : $prompt_snip);
+                            $self->_persist_web_search_hit($c,
+                                query          => $aq,
+                                result_title   => "FAILED $code",
+                                result_url     => $url,
+                                result_snippet => "FAILED HTTP $code",
+                                source_type    => 'web',
+                            );
+                        }
+                    }
+                }
+                my $unique = scalar keys %finger;
+                $bundle .= "\n[fingerprint] unique main-content samples among successes: $unique / "
+                    . scalar(@fetch) . "\n";
+                push @thinking, "unique main fingerprints=$unique";
+                $extra .= $bundle . "\n";
+            }
+            # Public web search
+            if ($ai_ctrl && $ai_ctrl->can('_do_web_search')) {
+                push @thinking, 'In-app answer incomplete or site-audit — auto web-search…';
+                my ($search_ctx, $sp) = ('', '');
+                eval { ($search_ctx, $sp) = $ai_ctrl->_do_web_search($c, $prompt, $args{agent_id} || 'general', \@thinking); };
+                if ($@) {
+                    push @thinking, "web-search threw: $@";
+                } elsif ($search_ctx && length $search_ctx) {
+                    push @thinking, "web-search via $sp";
+                    $extra .= "\n--- Web search (auto) ---\n$search_ctx\n";
+                    my $prompt_q = $prompt // '';
+                    $prompt_q =~ s/\s+/ /g;
+                    $prompt_q = substr($prompt_q, 0, 200);
+                    my $parsed = 0;
+                    while ($search_ctx =~ /^##\s*(.+?)\nURL:\s*(\S+)\n(.*?)(?=\n## |\nUse the above|\z)/msg) {
+                        my ($wt, $wu, $ws) = ($1, $2, $3);
+                        $ws =~ s/^\s+|\s+$//g;
+                        $ws = substr($ws, 0, 500);
+                        push @$citations, { url => $wu, title => ($wt || $wu) };
+                        $self->_persist_web_search_hit($c,
+                            query          => $prompt_q,
+                            result_title   => ($wt || $wu),
+                            result_url     => $wu,
+                            result_snippet => (length($ws) ? $ws : ($wt || $wu)),
+                            source_type    => 'web',
+                        );
+                        $parsed++;
+                    }
+                    if (!$parsed) {
+                        while ($search_ctx =~ /^URL:\s*(\S+)/mg) {
+                            my $wu = $1;
+                            push @$citations, { url => $wu, title => $wu };
+                            $self->_persist_web_search_hit($c,
+                                query          => $prompt_q,
+                                result_title   => $wu,
+                                result_url     => $wu,
+                                result_snippet => $wu,
+                                source_type    => 'web',
+                            );
+                        }
+                    }
+                } else {
+                    push @thinking, 'web-search returned no results';
+                }
+            }
+            if (length $extra) {
+                push @$messages, {
+                    role => 'user',
+                    content => "Additional context gathered automatically:\n$extra\n"
+                        . "Answer the ORIGINAL user question first (what they asked — e.g. whether Chat-with-AI/Grok can audit the site, and how).
+"
+                        . "If this is a site audit: for EACH fetched URL, describe its MAIN content separately. "
+                        . "Shared nav/header is normal — never conclude 'all pages are the homepage' from shared chrome. "
+                        . "Use title + main_chars + body text. Report failed fetches (non-2xx) as failed links. "
+                        . "Comment on readability and theme only from main content. Cite URLs.",
+                };
+                my $again = try {
+                    $router->chat_with_fallback($c, $provider_name, $use_model, $messages,
+                        ($args{use_search} ? (use_search => 1) : ()));
+                } catch {
+                    push @thinking, "enrich re-ask threw: $_";
+                    undef;
+                };
+                if ($again && $again->{success} && length($again->{response} // '')) {
+                    $resp = $again;
+                    $provider_name = $again->{provider} if $again->{provider};
+                    $use_model = $again->{model} if $again->{model};
+                    push @thinking, 'Provider re-answered after auto_enrich';
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+                        'auto_enrich re-answer ok len=' . length($resp->{response} // ''));
+                } else {
+                    push @thinking, 'enrich re-ask failed — keeping first answer';
+                }
+            }
+        }
+    }
+
+
     # ── Persist conversation + messages (v2 parity with v1 /ai/chat) ──
     # Without this, no conversation_id is ever created, so the widget can
     # never "start a new conversation" and nothing is saved to history.
@@ -645,7 +883,128 @@ sub process {
         created_at      => $created_at,
         thinking        => \@thinking,
         files_read      => \@files_read,
+        citations       => $citations || [],
     };
+}
+
+
+# ── WebSearchResult learn/persist helpers (aisystem 2026-09-14) ─────────────
+# Non-fatal: never break chat if DB write/read fails.
+sub _session_uid_for_wsr {
+    my ($self, $c) = @_;
+    my $uid = $c->session->{user_id};
+    if (eval { is_guest_session($c) }) {
+        $uid = 199 unless defined $uid;
+    }
+    return defined $uid ? $uid : 199;
+}
+
+sub _persist_web_search_hit {
+    my ($self, $c, %h) = @_;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my $query  = substr($h{query} // '', 0, 500);
+        my $url    = substr($h{result_url} // '', 0, 1000);
+        return 0 unless length $query && length $url;
+        my $title  = substr(($h{result_title} // $url), 0, 512);
+        $title = $url unless length $title;
+        my $snippet = $h{result_snippet} // '';
+        $snippet = substr($snippet, 0, 65000);
+        $snippet = '(empty)' unless length $snippet;
+
+        # Light dedup: skip if same query+url already stored
+        my $existing = $schema->resultset('WebSearchResult')->search(
+            { result_url => $url, query => $query },
+            { rows => 1, order_by => { -desc => 'id' } }
+        )->single;
+        return 0 if $existing;
+
+        my %row = (
+            query            => $query,
+            result_title     => $title,
+            result_url       => $url,
+            result_snippet   => $snippet,
+            source_type      => ($h{source_type} || 'web'),
+            found_by_user_id => ($h{found_by_user_id} // $self->_session_uid_for_wsr($c)),
+            is_verified      => 0,
+        );
+        if (defined $h{full_content} && length $h{full_content}) {
+            $row{full_content} = substr($h{full_content}, 0, 100_000);
+        }
+        $schema->resultset('WebSearchResult')->create(\%row);
+        1;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+            "WebSearchResult persist failed: $@");
+    }
+}
+
+sub _format_prior_web_search_hits {
+    my ($self, $c, $prompt, $origin_host) = @_;
+    my $out = '';
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my @keywords;
+        my %stop = map { $_ => 1 } qw(
+            that this with from have what when where which about page site link
+            http https navigate navigation audit report each content look theme
+            failed links broken crawl readable whether
+        );
+        for my $w (split /\W+/, lc($prompt // '')) {
+            next if length($w) < 4;
+            next if $stop{$w};
+            push @keywords, $w;
+            last if @keywords >= 5;
+        }
+        my @or;
+        for my $kw (@keywords) {
+            my $like = '%' . $kw . '%';
+            push @or,
+                { query => { -like => $like } },
+                { result_title => { -like => $like } },
+                { result_url => { -like => $like } },
+                { result_snippet => { -like => $like } };
+        }
+        if ($origin_host && length $origin_host) {
+            push @or, {
+                query      => { -like => 'site_audit:%' },
+                result_url => { -like => '%' . $origin_host . '%' },
+            };
+        }
+        return unless @or;
+        my @rows = $schema->resultset('WebSearchResult')->search(
+            { -or => \@or },
+            { order_by => { -desc => 'created_at' }, rows => 8 }
+        )->all;
+        return unless @rows;
+        $out = "--- Prior learned search/audit hits ---\n"
+             . "NOTE: prior/learned findings from websearchresult. Reuse when relevant; "
+             . "prefer live fetch when available.\n";
+        for my $r (@rows) {
+            my $created = $r->created_at;
+            if (ref $created && $created->can('strftime')) {
+                $created = $created->strftime('%Y-%m-%d %H:%M');
+            }
+            my $snip = $r->result_snippet // '';
+            $snip = substr($snip, 0, 300);
+            $out .= sprintf(
+                "[prior] %s | %s\n  url: %s\n  query: %s\n  %s\n",
+                $created // '',
+                $r->result_title // '',
+                $r->result_url // '',
+                $r->query // '',
+                $snip
+            );
+        }
+        $out .= "\n";
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+            "WebSearchResult prior load failed: $@");
+        return '';
+    }
+    return $out;
 }
 
 sub _can_select_model {
