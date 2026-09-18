@@ -1,0 +1,77 @@
+[% META
+   title = "AI Search Index"
+   description = "Browse persisted web-search and site-audit hits learned by Chat auto-enrich."
+   roles = "admin,developer,editor"
+   category = "AI Module"
+   page_version = "0.01"
+   last_updated = "Mon Sep 14 17:40:00 UTC 2026"
+%]
+
+[% PageVersion = 'ai/search_index.tt,v 0.01 2026/09/14 aisystem Exp - WebSearchResult browse UI' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+  <div class="ai-conversations-header-section">
+    <h1>AI Search / Audit Index</h1>
+    <p class="intro">
+      Persisted <code>websearchresult</code> rows from Chat auto-enrich
+      (web search + same-origin site audits). Used so the model can reuse prior findings.
+    </p>
+    <p>
+      <a href="/ai/conversations" class="button button-secondary">Conversations</a>
+      <a href="/ai/usage" class="button button-secondary">Usage</a>
+      <a href="/ai" class="button button-primary">AI Chat</a>
+    </p>
+  </div>
+
+  [% IF error %]
+  <div class="alert alert-error">[% error | html %]</div>
+  [% END %]
+
+  <form method="get" action="/ai/search_index" class="ai-search-index-filter" style="margin:1rem 0;">
+    <label for="q">Filter</label>
+    <input type="text" id="q" name="q" value="[% q | html %]" placeholder="query, title, url, or snippet…" style="min-width:280px;" />
+    <button type="submit" class="button button-primary">Search</button>
+    [% IF q %]
+    <a href="/ai/search_index" class="button button-secondary">Clear</a>
+    [% END %]
+    <span class="muted" style="margin-left:0.75rem;">Showing up to 100 newest rows ([% total %] matched)</span>
+  </form>
+
+  [% IF hits.size == 0 %]
+  <p>No stored search/audit hits yet. They appear after Chat auto-enrich runs a site audit or web search.</p>
+  [% ELSE %]
+  <div style="overflow-x:auto;">
+  <table class="table" style="width:100%; border-collapse:collapse;">
+    <thead>
+      <tr>
+        <th style="text-align:left;padding:0.4rem;border-bottom:1px solid #ccc;">Created</th>
+        <th style="text-align:left;padding:0.4rem;border-bottom:1px solid #ccc;">Query</th>
+        <th style="text-align:left;padding:0.4rem;border-bottom:1px solid #ccc;">Title</th>
+        <th style="text-align:left;padding:0.4rem;border-bottom:1px solid #ccc;">URL</th>
+        <th style="text-align:left;padding:0.4rem;border-bottom:1px solid #ccc;">Snippet</th>
+        <th style="text-align:left;padding:0.4rem;border-bottom:1px solid #ccc;">Source</th>
+        <th style="text-align:left;padding:0.4rem;border-bottom:1px solid #ccc;">Verified</th>
+      </tr>
+    </thead>
+    <tbody>
+      [% FOREACH h IN hits %]
+      <tr>
+        <td style="padding:0.4rem;border-bottom:1px solid #eee;white-space:nowrap;">[% h.created_at | html %]</td>
+        <td style="padding:0.4rem;border-bottom:1px solid #eee;max-width:180px;word-break:break-word;">[% h.query | html %]</td>
+        <td style="padding:0.4rem;border-bottom:1px solid #eee;max-width:160px;word-break:break-word;">[% h.title | html %]</td>
+        <td style="padding:0.4rem;border-bottom:1px solid #eee;max-width:220px;word-break:break-all;">
+          <a href="[% h.url | html %]" target="_blank" rel="noopener noreferrer">[% h.url | html %]</a>
+        </td>
+        <td style="padding:0.4rem;border-bottom:1px solid #eee;max-width:280px;word-break:break-word;">[% h.snippet | html %]</td>
+        <td style="padding:0.4rem;border-bottom:1px solid #eee;">[% h.source_type | html %]</td>
+        <td style="padding:0.4rem;border-bottom:1px solid #eee;">[% IF h.is_verified %]yes[% ELSE %]no[% END %]</td>
+      </tr>
+      [% END %]
+    </tbody>
+  </table>
+  </div>
+  [% END %]
+</div>

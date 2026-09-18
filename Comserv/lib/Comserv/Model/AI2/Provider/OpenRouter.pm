@@ -184,7 +184,33 @@ sub chat {
 
     my $text = '';
     if ($data->{choices} && ref($data->{choices}) eq 'ARRAY' && @{$data->{choices}}) {
-        $text = $data->{choices}[0]{message}{content} // '';
+        my $msg = $data->{choices}[0]{message} // {};
+        $text = $msg->{content} // '';
+        # Some free models (e.g. nemotron) return null content and put text in
+        # reasoning / reasoning_content, or content as a list of parts.
+        if ((!defined $text || $text eq '') && ref($msg) eq 'HASH') {
+            $text = $msg->{reasoning_content} // $msg->{reasoning} // '';
+        }
+        if (ref($text) eq 'ARRAY') {
+            $text = join('', map {
+                ref($_) eq 'HASH' ? ($_->{text} // $_->{content} // '') : (defined $_ ? "$_" : '')
+            } @$text);
+        }
+        $text = '' unless defined $text;
+    }
+    $text =~ s/^\s+|\s+$//g if defined $text;
+    unless (defined $text && length $text) {
+        my $body = substr($res->decoded_content // '', 0, 600);
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'openrouter_chat',
+            "OpenRouter empty content (model=$model, user="
+            . ($c->session->{username} // 'Guest') . ") body=$body");
+        return {
+            success => 0,
+            error   => 'OpenRouter returned empty content',
+            model   => $data->{model} || $model,
+            usage   => $data->{usage} || {},
+        };
     }
     return { success => 1, response => $text, model => $data->{model} || $model, usage => $data->{usage} || {} };
 }

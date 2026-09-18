@@ -270,14 +270,32 @@
 
             <div id="panel-hermes" class="sidebar-panel" style="display:none; padding:0; width:420px; background:#2b2b2b; overflow:auto;">
                 <div style="padding:8px;">
-                    <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa;">HERMES DASHBOARD</h4>
-                    <p style="font-size:11px;color:#888;margin:0 0 6px;">Embedded Hermes web view (set HERMES_DASHBOARD_URL to enable).</p>
+                    <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa;">HERMES</h4>
+                    <p style="font-size:11px;color:#888;margin:0 0 6px;">The full Hermes UI you know is <code>hermes chat</code> in a terminal (aisystem worktree). This panel is optional web dashboard + CLI oneshot — it is not the terminal TUI.</p>
+                    <div style="font-size:11px;color:#c8d0dc;background:#0f1115;border:1px solid #444;border-radius:4px;padding:8px;margin-bottom:8px;">
+                      <div style="color:#888;margin-bottom:4px;">Terminal (normal Hermes):</div>
+                      <code id="hermes-terminal-cmd" style="word-break:break-all;">cd /home/shanta/.comserv/worktrees/aisystem/Comserv &amp;&amp; hermes chat</code>
+                      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+                        <button type="button" id="hermes-copy-cmd" style="background:#37474f;color:#fff;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Copy terminal command</button>
+                        <button type="button" id="hermes-start-desktop" style="background:#6a1b9a;color:#fff;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Start Hermes Desktop (aisystem)</button>
+                      </div>
+                      <div id="hermes-desktop-status" style="font-size:11px;color:#9ecbff;margin-top:6px;display:none;"></div>
+                    </div>
                     [% IF c.config.hermes_dashboard_url %]
-                        <iframe src="[% c.config.hermes_dashboard_url | html %]" style="width:100%;height:420px;border:1px solid #555;border-radius:4px;"></iframe>
+                        <iframe id="hermes-iframe" src="[% c.config.hermes_dashboard_url | html %]" style="width:100%;height:360px;border:1px solid #555;border-radius:4px;background:#111;"></iframe>
                     [% ELSE %]
-                        <iframe id="hermes-iframe" src="" style="width:100%;height:420px;border:1px solid #555;border-radius:4px;display:none;"></iframe>
-                        <div id="hermes-placeholder" style="color:#888;font-size:12px;padding:12px;">No Hermes dashboard URL configured. Set <code>HERMES_DASHBOARD_URL</code> in the app config or pass <code>?hermes=URL</code> to this page.</div>
+                        <iframe id="hermes-iframe" src="" style="width:100%;height:360px;border:1px solid #555;border-radius:4px;background:#111;display:none;"></iframe>
+                        <div id="hermes-placeholder" style="color:#888;font-size:12px;padding:12px;border:1px dashed #555;border-radius:4px;margin-bottom:8px;">
+                            No dashboard URL yet. Starting from this page host on port <code>9119</code>, or set <code>HERMES_DASHBOARD_URL</code> / <code>?hermes=URL</code>.
+                            <div style="margin-top:8px;">
+                              <a id="hermes-open-tab" href="#" target="_blank" rel="noopener" style="color:#7ec8ff;">Open Hermes dashboard in a new tab</a>
+                            </div>
+                        </div>
                     [% END %]
+                    <div id="hermes-run-section" style="margin-top:10px;border-top:1px solid #444;padding-top:8px;">
+                      <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa;">HERMES RUN (auto)</h4>
+                      <p style="font-size:11px;color:#888;margin:0 0 6px;">CLI oneshot when Desktop is down — does not replace the dashboard above.</p>
+                    </div>
                 </div>
             </div>
 
