@@ -161,8 +161,8 @@
             dashUrl = iframe.getAttribute('src');
         }
         if (!dashUrl) {
-            // Same host as the editor (works for IP remote: 172.30.x.x:9119)
-            dashUrl = window.location.protocol + '//' + window.location.hostname + ':9119/';
+            // Same host as the editor (localhost or ZeroTier IP): Hermes dashboard sessions
+            dashUrl = window.location.protocol + '//' + window.location.hostname + ':9119/sessions';
         }
         if (iframe && dashUrl) {
             iframe.src = dashUrl;
