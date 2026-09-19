@@ -1358,42 +1358,33 @@ sub hermes_run :Local :Args(0) {
     my $desktop_url = '';
     my $launch_hint = '';
 
-    # --- Probe Desktop ---
+    # --- Probe browser dashboard (:9119), NOT Electron Desktop ---
+    # "auto" must not treat a running Hermes Electron app as the dashboard
+    # (that caused AI Editor to chase Desktop login instead of /sessions).
     if ($prefer eq 'desktop' || $prefer eq 'auto') {
-        # 1. Check configured URL
+        my $host = eval { $c->req->uri->host } || '127.0.0.1';
         $desktop_url = $ENV{HERMES_DASHBOARD_URL}
                     || ($c->config->{hermes_dashboard_url} // '')
-                    || 'http://localhost:9876';
+                    || ("http://${host}:9119/sessions");
 
-        # 2. Try HTTP probe (quick GET, 3s timeout)
-        my $desktop_reachable = 0;
-
-        # Try HTTP probe (quick GET, 3s timeout) on the configured URL
+        my $dashboard_reachable = 0;
         eval {
             require LWP::UserAgent;
             my $base = $desktop_url;
             $base =~ s{/+$}{};
-            my $ua = LWP::UserAgent->new(timeout => 2);
+            my $ua = LWP::UserAgent->new(timeout => 2, max_redirect => 0);
             my $res = $ua->get($base);
-            $desktop_reachable = 1 if $res && $res->is_success;
+            # 200/302/401 all mean the dashboard HTTP service is up
+            my $code = $res ? $res->code : 0;
+            $dashboard_reachable = 1 if $code && $code >= 200 && $code < 500;
         };
 
-        # 3. Also check for running hermes process
-        unless ($desktop_reachable) {
-            open(my $ph, '-|', 'pgrep', '-f', 'hermes.*desktop') or undef;
-            if ($ph) {
-                my $pid = <$ph>;
-                close $ph;
-                $desktop_reachable = 1 if defined $pid && $pid =~ /\d+/;
-            }
-        }
-
-        if ($desktop_reachable) {
-            $mode = 'desktop';
-            $launch_hint = "hermes desktop --skip-build --cwd $aisystem_root";
+        if ($dashboard_reachable) {
+            $mode = 'desktop';  # kept for API compat; means browser dashboard
+            $launch_hint = "Open dashboard: $desktop_url (not hermes desktop Electron)";
         } elsif ($prefer eq 'desktop') {
-            # Desktop was explicitly requested but not reachable — fall back to CLI and say so
             $mode = 'cli';
+            $launch_hint = "Dashboard not reachable at $desktop_url — fell back to CLI";
         }
     }
 
@@ -1440,7 +1431,7 @@ sub hermes_run :Local :Args(0) {
     }
 
     my $message = $mode eq 'desktop'
-        ? "Desktop mode — Desktop reachable; dashboard URL  $desktop_url"
+        ? "Dashboard mode — browser UI reachable at  $desktop_url"
         : (length $output)
             ? "CLI mode — hermes chat ran successfully"
             : "CLI mode — hermes chat completed (no output)";

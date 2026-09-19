@@ -1,6 +1,6 @@
 /**
  * hermes-run.js
- * "Run with Hermes (auto)" button for the AI Editor's Hermes panel.
+ * "Run Hermes CLI oneshot" button for the AI Editor's Hermes panel.
  * Calls POST /ai2/hermes_run to auto-pick Desktop-vs-CLI mode.
  *
  * Rules:
@@ -109,7 +109,7 @@
                 if (deskStatus) {
                     deskStatus.style.display = 'block';
                     deskStatus.style.color = '#7ec8ff';
-                    deskStatus.textContent = 'Spawning Hermes Desktop with aisystem --cwd on the workstation…';
+                    deskStatus.textContent = 'Optional: starting Electron Desktop (not the browser dashboard)…';
                 }
                 fetch('/ai2/hermes_start_desktop', {
                     method: 'POST',
@@ -172,6 +172,25 @@
         if (openTab && dashUrl) {
             openTab.href = dashUrl;
         }
+        // Primary action: show dashboard (never Electron login)
+        var reloadDash = document.getElementById('hermes-reload-dashboard');
+        if (!reloadDash) {
+            reloadDash = document.createElement('button');
+            reloadDash.id = 'hermes-reload-dashboard';
+            reloadDash.type = 'button';
+            reloadDash.textContent = 'Load dashboard /sessions';
+            reloadDash.style.cssText = 'background:#1565c0;color:#fff;border:none;padding:6px 10px;border-radius:3px;cursor:pointer;font-size:12px;margin:6px 0;';
+            var ph = document.getElementById('hermes-placeholder') || iframe;
+            if (ph && ph.parentNode) ph.parentNode.insertBefore(reloadDash, ph);
+        }
+        reloadDash.onclick = function () {
+            var u = window.location.protocol + '//' + window.location.hostname + ':9119/sessions';
+            if (iframe) { iframe.src = u; iframe.style.display = 'block'; }
+            if (placeholder) placeholder.style.display = 'none';
+            if (openTab) openTab.href = u;
+            window.open(u, '_blank', 'noopener');
+        };
+
 
         var mount = document.getElementById('hermes-run-section');
         if (!mount) {
@@ -189,7 +208,7 @@
 
         var runBtn = document.createElement('button');
         runBtn.id = 'hermes-run-btn';
-        runBtn.textContent = 'Run with Hermes (auto)';
+        runBtn.textContent = 'Run Hermes CLI oneshot';
         runBtn.style.cssText = 'background:#6a1b9a;color:#fff;border:none;padding:6px 12px;border-radius:3px;cursor:pointer;font-size:12px;white-space:nowrap;';
 
         btnRow.appendChild(promptInput);
@@ -241,7 +260,7 @@
             statusArea.textContent = 'Probing desktop / starting CLI…';
             statusArea.style.display = 'block';
 
-            callHermesRun(prompt, 'auto').then(function (data) {
+            callHermesRun(prompt, 'cli').then(function (data) {
                 if (!data) throw new Error('Empty response from server');
                 if (!data.success && data.error) throw new Error(data.error);
 
@@ -272,14 +291,14 @@
 
                 statusArea.style.display = 'none';
                 runBtn.disabled = false;
-                runBtn.textContent = 'Run with Hermes (auto)';
+                runBtn.textContent = 'Run Hermes CLI oneshot';
             }).catch(function (err) {
                 console.error('[' + NS + '] hermes_run failed', err);
                 errorArea.textContent = 'Request failed: ' + (err && err.message ? err.message : String(err));
                 errorArea.style.display = 'block';
                 statusArea.style.display = 'none';
                 runBtn.disabled = false;
-                runBtn.textContent = 'Run with Hermes (auto)';
+                runBtn.textContent = 'Run Hermes CLI oneshot';
             });
         }
 
