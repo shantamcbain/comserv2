@@ -277,7 +277,7 @@
                       <code id="hermes-terminal-cmd" style="word-break:break-all;">cd /home/shanta/.comserv/worktrees/aisystem/Comserv &amp;&amp; hermes chat</code>
                       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
                         <button type="button" id="hermes-copy-cmd" style="background:#37474f;color:#fff;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Copy terminal command</button>
-                        <button type="button" id="hermes-start-desktop" style="background:#6a1b9a;color:#fff;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Start Hermes Desktop (aisystem)</button>
+                        <button type="button" id="hermes-start-desktop" style="background:#6a1b9a;color:#fff;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Optional: Electron Desktop (not dashboard)</button>
                       </div>
                       <div id="hermes-desktop-status" style="font-size:11px;color:#9ecbff;margin-top:6px;display:none;"></div>
                     </div>
@@ -293,7 +293,7 @@
                         </div>
                     [% END %]
                     <div id="hermes-run-section" style="margin-top:10px;border-top:1px solid #444;padding-top:8px;">
-                      <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa;">HERMES RUN (auto)</h4>
+                      <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa;">HERMES CLI ONESHOT</h4>
                       <p style="font-size:11px;color:#888;margin:0 0 6px;">CLI oneshot when Desktop is down — does not replace the dashboard above.</p>
                     </div>
                 </div>
