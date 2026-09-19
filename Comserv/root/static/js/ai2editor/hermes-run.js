@@ -113,10 +113,20 @@
                 }
                 fetch('/ai2/hermes_start_desktop', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: '{}',
                     credentials: 'include'
-                }).then(function (res) { return res.json(); }).then(function (data) {
+                }).then(function (res) {
+                    return res.text().then(function (txt) {
+                        var data;
+                        try { data = JSON.parse(txt); }
+                        catch (e) {
+                            throw new Error('Start Desktop needs /ai2/hermes_start_desktop (use :4006 or restart :3001). Got HTTP ' + res.status + ' non-JSON');
+                        }
+                        if (!res.ok && data && data.error) throw new Error(data.error);
+                        return data;
+                    });
+                }).then(function (data) {
                     startDesk.disabled = false;
                     startDesk.textContent = 'Start Hermes Desktop (aisystem)';
                     if (!deskStatus) return;
