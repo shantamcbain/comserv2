@@ -262,6 +262,194 @@ sub products :Path('/BMaster/products') :Args(0) {
     );
 }
 
+# Teaching visit / daily beework prototype (Lumby Wed 2026-09-23 pilot)
+# GET /BMaster/visits/:visit_id  — hardcoded pilot data OK for MVP
+sub visits :Path('/BMaster/visits') :Args(1) {
+    my ($self, $c, $visit_id) = @_;
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'visits',
+        "BMaster visits method called for visit_id=$visit_id");
+
+    $visit_id = '' unless defined $visit_id;
+    $visit_id =~ s/[^a-zA-Z0-9._-]//g;
+
+    # Only the Lumby pilot is wired for Wednesday; other ids -> soft redirect later.
+    if ($visit_id ne 'lumby-2026-09-23') {
+        $c->flash->{error_msg} = "Unknown visit '$visit_id'. Showing Lumby Wed 2026-09-23 pilot.";
+        return $c->response->redirect($c->uri_for('/BMaster/visits', 'lumby-2026-09-23'));
+    }
+
+    # Experience tier from session when present; guests -> potential
+    my $tier = 'potential';
+    my $username = $c->session->{username} || $c->session->{user} || '';
+    if ($username) {
+        # Soft signals only for prototype - full account/site experience later
+        my $roles = $c->session->{roles} || $c->session->{user_roles} || [];
+        $roles = [$roles] unless ref $roles eq 'ARRAY';
+        my $role_str = lc join(' ', map { ref $_ ? '' : $_ } @$roles);
+        if ($role_str =~ /mentor|instructor|teacher|admin/) {
+            $tier = 'mentor';
+        } elsif ($role_str =~ /developer|staff/) {
+            $tier = 'multi_year';
+        } else {
+            $tier = 'student';  # logged-in default for pilot; refine later
+        }
+    }
+
+    # Page families after 2026-09-22 seed: mentor_* / expect_* / core_*
+    # Shared cores every stack can open; old six codes still redirect.
+    my @page_codes = (
+        { code => 'core_keeper_decides_today',        title => 'Keeper decides Inspection TODAY', tags => 'core:decision' },
+        { code => 'core_disease_screen_signs',        title => 'Disease screen - observation signs', tags => 'core:disease HUMAN_REVIEW' },
+        { code => 'core_struggling_small_hive',       title => 'Struggling small hive - evaluation pattern', tags => 'core:small_hive HUMAN_REVIEW' },
+        { code => 'core_bee_first_ethics',            title => 'Bee-first inspection ethics (core)', tags => 'core:ethics' },
+        { code => 'core_weather_open_caution',        title => 'Weather open caution', tags => 'core:weather' },
+        { code => 'core_yard_safety_silent_observation', title => 'Yard safety and silent observation', tags => 'core:safety' },
+        { code => 'core_autumn_stores_interior_bc',   title => 'Autumn stores / winter prep interior BC', tags => 'core:autumn HUMAN_REVIEW' },
+        { code => 'mentor_mixed_level_yard',          title => 'Mentor: mixed-level yard visit', tags => 'family:mentor' },
+        { code => 'mentor_disease_first_look',        title => 'Mentor: disease-first look', tags => 'family:mentor HUMAN_REVIEW' },
+        { code => 'mentor_struggling_small_hive',     title => 'Mentor: struggling small hive', tags => 'family:mentor HUMAN_REVIEW' },
+        { code => 'mentor_yard_safety_brief',         title => 'Mentor: yard safety brief at the gate', tags => 'family:mentor' },
+        { code => 'mentor_bee_first_ethics',          title => 'Mentor: bee-first inspection ethics', tags => 'family:mentor' },
+        { code => 'mentor_autumn_stores_interior_bc', title => 'Mentor: autumn stores interior BC', tags => 'family:mentor HUMAN_REVIEW' },
+    );
+
+    my @hives = (
+        {
+            id       => 'acq-large-1',
+            label    => 'Two large newly acquired hives - first inspection',
+            expect   => 'Unknown history; temperament and stores unknown. Interior BC late September - autumn / winter-prep phenology.',
+            goal     => 'Your call at the gate: calm baseline (stores, brood presence, queen signs, temperament, pests) and records - or observation only if weather or bees say wait.',
+            do_not   => 'Do not chase production goals, move boxes aggressively, or open longer than you decide is needed for a first look.',
+            teach_for => '2-year may lead parts under mentor; 5-year may coach; beginners often observe from a calm 2-box instead.',
+        },
+        {
+            id       => 'nuc-struggling',
+            label    => 'One small nucleus that struggled all summer',
+            expect   => 'Possible weak stores, spotty brood, or queen issues after a hard season.',
+            goal     => 'Diagnose before "fix." Options you may consider on site include stabilize, feed, or unite - you decide for the bees.',
+            do_not   => 'Do not expand, requeen on impulse, or treat without a clear diagnosis you own.',
+            teach_for => '5-year may lead differential; mentor verifies; newer students listen and record.',
+        },
+        {
+            id       => 'two-box-new-queen',
+            label    => 'Several new two-box colonies (new queens this year)',
+            expect   => 'More familiar patterns; good place to practice naming what you see.',
+            goal     => 'Confirm queen performance, autumn stores, space vs congestion, and a winter-prep path you choose.',
+            do_not   => 'Do not overcrowd teaching on these if weather turns cold/wet - observation day is a valid choice.',
+            teach_for => 'Potential observes; guided beginner frame-lifts with mentor when you open; student logs own notes.',
+        },
+    );
+
+    # Stack composition from family outline (composer input). Shared cores on every tier.
+    my @shared_cores = (
+        'core_keeper_decides_today',
+        'core_disease_screen_signs',
+        'core_struggling_small_hive',
+    );
+
+    my @stack_list = (
+        {
+            key => 'potential',
+            label => 'Potential / guest',
+            blurb => 'Optional opens: safety, etiquette, and what to expect today. Observe when invited; pages set expectations - you still decide whether to open.',
+            pages => [
+                @shared_cores,
+                'expect_potential_yard_safety',
+                'expect_potential_bee_first',
+                'expect_potential_visit_day',
+                'expect_potential_first_look',
+            ],
+        },
+        {
+            key => 'guided',
+            label => 'Guided beginner',
+            blurb => 'What to expect from mentor coaching today. Pages suggest a path; your mentor and you choose the opens.',
+            pages => [
+                @shared_cores,
+                'expect_guided_yard_safety',
+                'expect_guided_bee_first',
+                'expect_guided_first_look',
+                'expect_guided_autumn_stores_interior_bc',
+                'expect_guided_visit_day',
+            ],
+        },
+        {
+            key => 'student',
+            label => 'Active student (own site)',
+            blurb => 'What mentor may ask you to lead or record. Tools and pages support your Inspection TODAY decision.',
+            pages => [
+                @shared_cores,
+                'expect_student_bee_first',
+                'expect_student_first_look',
+                'expect_student_struggling_hive',
+                'expect_student_autumn_stores_interior_bc',
+                'expect_student_visit_day',
+            ],
+        },
+        {
+            key => 'multi_year',
+            label => 'Multi-year student',
+            blurb => 'What mentor expects you to facilitate. Practice mentoring moves; keep bee welfare and keeper decision first.',
+            pages => [
+                @shared_cores,
+                'expect_multi_year_bee_first',
+                'expect_multi_year_first_look',
+                'expect_multi_year_struggling_hive',
+                'expect_multi_year_visit_day',
+                'mentor_mixed_level_yard',
+            ],
+        },
+        {
+            key => 'mentor',
+            label => 'Mentor / instructor',
+            blurb => 'Process cards for running the visit. Agenda and stacks are aids - the beekeeper still owns Inspection TODAY.',
+            pages => [
+                @shared_cores,
+                'mentor_yard_safety_brief',
+                'mentor_bee_first_ethics',
+                'mentor_disease_first_look',
+                'mentor_struggling_small_hive',
+                'mentor_autumn_stores_interior_bc',
+                'mentor_mixed_level_yard',
+            ],
+        },
+    );
+
+    my @agenda = (
+        { when => 'Arrive / gate', what => 'Weather call: full inspection vs observation day. Safety briefing.' },
+        { when => 'Warm-up', what => 'Potential + guided: silent observation on a calm 2-box; name what you see without opening if cold.' },
+        { when => 'Block A', what => 'Newly acquired large hives - calm first look (2-year leads parts; mentor watches temperament).' },
+        { when => 'Block B', what => 'Struggling nuc - diagnose before fix (5-year + mentor).' },
+        { when => 'Block C', what => '2-box new-queen colonies - autumn stores / winter-prep path; beginners practice naming.' },
+        { when => 'Close', what => 'Records in Beemaster; feedback on the daily-beework prototype page.' },
+    );
+
+    $c->stash(
+        template       => 'BMaster/visit_today.tt',
+        visit_id       => $visit_id,
+        visit_title    => 'Lumby BC teaching visit',
+        visit_date     => 'Wednesday, September 23, 2026',
+        visit_location => 'Lumby area, interior BC',
+        season_label   => 'Autumn / winter-prep',
+        hemisphere     => 'northern',
+        zone           => 'interior_bc',
+        weather_strip  => {
+            status  => 'placeholder',
+            summary => 'Check conditions at the gate. Cold, wet, or windy -> observation day instead of full opens.',
+            note    => 'Live WeatherAPI hook deferred for this pilot.',
+        },
+        hives          => \@hives,
+        page_catalog   => \@page_codes,
+        stack_list     => \@stack_list,
+        viewer_tier    => $tier,
+        agenda         => \@agenda,
+        bee_first_note => "We work for the bees' health and learning, not for a production checklist.",
+        workshop_id     => 9,
+        workshop_url    => '/workshop/details?id=9',
+    );
+}
+
 # Default action to handle any undefined routes
 sub default :Path :Args {
     my ($self, $c) = @_;
