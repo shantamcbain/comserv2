@@ -76,6 +76,25 @@ and the remaining work to roll the fix out to the production containers.</p>
 <code>ok:1, missed:0, age_sec:&lt;real seconds&gt;, last_run:&lt;epoch&gt;</code> instead of
 <code>age=1000000000s</code>. The cron command runs clean under <code>dash</code> (exit 0).</p>
 
+<h2 id="identity-alias-2026-09-23">2b. Identity alias fix (2026-09-23) — false CRITICAL #2447</h2>
+<p><strong>Root cause:</strong> cron heartbeats hit Docker <code>:5000</code> which wrote
+<code>system_identifier=workstation.computersystemconsulting.ca</code> (from
+<code>SYSTEM_IDENTIFIER</code>), while Standalone <code>:3001</code> watchdog queried bare
+<code>workstation</code>. Exact-key match → false missed-window CRITICAL even though
+cron was alive (<code>:5000</code> watchdog <code>missed:0</code>).</p>
+<p><strong>Fix (main tree, no Docker deploy / no :3001 restart required for the code change):</strong></p>
+<ul>
+    <li><code>_canonicalize_node_key</code> / <code>_node_identity</code> always use the short host
+        (<code>workstation</code>, <code>production1</code>).</li>
+    <li>Watchdog searches alias keys (<code>workstation</code>, <code>.local</code>, FQDN) so a peer
+        runtime heartbeat under the other name counts as fresh.</li>
+    <li><code>Logging::get_system_identifier</code> normalizes FQDN <code>SYSTEM_IDENTIFIER</code> to short
+        before appending runtime tag/port (takes effect in Docker after a future deploy).</li>
+</ul>
+<p><strong>Ops note:</strong> Prefer polling <code>:5000 /admin/hardware_monitor/watchdog</code> (or
+<code>run</code>) for smoke checks. Avoid casually hitting <code>:3001 /watchdog</code> on the old
+process — it still logs CRITICAL + spawns a probe until that Standalone process reloads this code.</p>
+
 <h2 id="remaining">3. Current status (2026-09-19)</h2>
 <ul>
     <li><strong>device_agent.sh deployed to all 5 monitoring targets:</strong>

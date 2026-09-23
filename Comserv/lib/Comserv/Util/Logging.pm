@@ -298,9 +298,15 @@ sub get_system_identifier {
 
     my $identifier = '';
 
-    # 1. Explicit override via environment variable (set in Docker compose / systemd unit)
+    # 1. Explicit override via environment variable (set in Docker compose / systemd unit).
+    # Normalize known FQDN / .local forms to the short host so Docker
+    # (SYSTEM_IDENTIFIER=workstation.computersystemconsulting.ca) and Standalone
+    # (resolved short "workstation") share one base identity before runtime tags.
     if ($ENV{SYSTEM_IDENTIFIER} && $ENV{SYSTEM_IDENTIFIER} ne '') {
         $identifier = $ENV{SYSTEM_IDENTIFIER};
+        if ($identifier =~ /^([A-Za-z0-9_-]+)\.(?:local|computersystemconsulting\.ca)$/i) {
+            $identifier = $1;
+        }
     } else {
         # Check if we are inside a Docker container
         my $is_docker = -f '/.dockerenv' || -f '/run/.containerenv' || ($ENV{container} && $ENV{container} eq 'docker');
