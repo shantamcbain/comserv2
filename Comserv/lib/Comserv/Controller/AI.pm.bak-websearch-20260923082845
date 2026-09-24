@@ -5490,8 +5490,8 @@ Small = tinyllama or smallest by name; Large = llama3.1 or largest by name.
 # a formatted context string ready to inject into the model prompt.
 #
 # Provider priority (per agent):
-#   all agents      →  searxng (AI2::Search) → brave → ddg → ollama-cloud
-#   (ollama cloud often 401; DDG Instant Answer often empty; SearXNG local is reliable)
+#   ency / bmaster  →  brave (if key) → searxng (if configured) → ddg
+#   all others      →  ollama-cloud (if key) → ddg → brave → searxng
 #
 # Returns: (context_string, provider_used) or ('', '') on failure.
 # ──────────────────────────────────────────────────────────────────────────────
@@ -5531,14 +5531,15 @@ sub _do_web_search {
     };
 
     # ── determine provider order ──
-    # Agent-specific order removed: SearXNG-first for all (incl. ency/bmaster).
-    my @order = ('searxng', 'brave', 'ddg', 'ollama_cloud');
+    my $is_precise_agent = ($agent_id && $agent_id =~ /^(ency|bmaster|bmast|usbm|accounting)$/i) ? 1 : 0;
+    my @order = $is_precise_agent
+        ? ('brave', 'searxng', 'ollama_cloud', 'ddg')
+        : ('ollama_cloud', 'ddg', 'brave', 'searxng');
 
     for my $provider (@order) {
 
         # ── Brave Search ───────────────────────────────────────────────────
         if ($provider eq 'brave' && $keys{brave}) {
-            my ($br_ctx, $br_prov);
             eval {
                 my $url  = 'https://api.search.brave.com/res/v1/web/search?q='
                          . URI::Escape::uri_escape($query) . '&count=5';
@@ -5556,91 +5557,68 @@ sub _do_web_search {
                     } } @{ $data->{web}{results} || [] };
                     if (@results) {
                         push @$trace_ref, sprintf("🌐 Brave search: %d results", scalar @results);
-                        ($br_ctx, $br_prov) = $format_results->(\@results, 'Brave');
+                        my ($ctx, $p) = $format_results->(\@results, 'Brave');
+                        return ($ctx, $p);
                     }
                 } else {
                     push @$trace_ref, "⚠️ Brave search HTTP " . $resp->code;
                 }
             };
             push @$trace_ref, "⚠️ Brave search error: $@" if $@;
-            return ($br_ctx, $br_prov) if defined $br_ctx && length $br_ctx;
             next;
         }
 
         # ── SearXNG ────────────────────────────────────────────────────────
-        # Canonical path: Model::AI2::Search (services.json POST JSON).
-        # Legacy comserv.conf GET is fallback only; skip HTML responses.
+        # Prefer root/config/services.json "search" (canonical; InvoiceCreate /
+        # AI2::Search already use it). comserv.conf <SearXNG host> is legacy
+        # fallback only — it historically pointed at :8080 (Open WebUI), which
+        # returns HTML and blows JSON::decode_json. Must be form-encoded GET;
+        # POSTing a JSON body also returns HTML from SearXNG.
         if ($provider eq 'searxng') {
-            my $used_ai2 = 0;
-            my ($sx_ctx, $sx_prov);
+            my $host = '';
             eval {
                 require Comserv::Model::AI2::Search;
-                my $svc = eval { $c->model('AI2::Search') } || Comserv::Model::AI2::Search->new;
-                my $r = $svc->query($c, query => $query);
-                $used_ai2 = 1;
-                if ($r && $r->{success} && @{$r->{results}||[]}) {
-                    my @results = map {
-                        { title => $_->{title}, url => $_->{url}, snippet => $_->{content} }
-                    } @{$r->{results}}[0..4];
-                    # Drop undef holes if results < 5
-                    @results = grep { $_ && $_->{url} } @results;
-                    push @$trace_ref, sprintf('🌐 SearXNG(AI2::Search): %d results', scalar @results);
-                    ($sx_ctx,$sx_prov) = $format_results->(\@results, 'SearXNG');
+                my $svc = Comserv::Model::AI2::Search->_cfg($c) || {};
+                if ($svc->{enabled} && $svc->{url}) {
+                    $host = $svc->{url};
                 }
-                push @$trace_ref, '⚠️ SearXNG: '.($r->{error}||'no results') if $r && !($sx_ctx && length $sx_ctx);
+            };
+            if (!$host) {
+                my $cfg = $c->config->{SearXNG} || {};
+                $host = $cfg->{host} || '';
+            }
+            $host =~ s{/+$}{} if $host;
+            next unless $host;
+            eval {
+                require URI::Escape;
+                my $url  = "$host/search?q=" . URI::Escape::uri_escape($query)
+                         . '&format=json&categories=general&language=en';
+                my $req  = HTTP::Request->new(GET => $url);
+                $req->header('Accept' => 'application/json');
+                my $resp = $ua->request($req);
+                if ($resp->is_success) {
+                    my $body = $resp->decoded_content // '';
+                    if ($body =~ /^\s*</) {
+                        push @$trace_ref, "⚠️ SearXNG returned HTML (wrong URL or JSON not enabled) at $host";
+                    } else {
+                        my $data    = JSON::decode_json($body);
+                        my @results = map { {
+                            title   => $_->{title}   || '',
+                            url     => $_->{url}     || '',
+                            snippet => $_->{content} || '',
+                        } } @{ $data->{results} || [] }[0..4];
+                        if (@results) {
+                            push @$trace_ref, sprintf("🌐 SearXNG: %d results", scalar @results);
+                            my ($ctx, $p) = $format_results->(\@results, 'SearXNG');
+                            return ($ctx, $p);
+                        }
+                        push @$trace_ref, "⚠️ SearXNG: 0 results";
+                    }
+                } else {
+                    push @$trace_ref, "⚠️ SearXNG HTTP " . $resp->code;
+                }
             };
             push @$trace_ref, "⚠️ SearXNG error: $@" if $@;
-            # return outside eval — return inside eval BLOCK only exits the eval (Perl)
-            return ($sx_ctx, $sx_prov) if defined $sx_ctx && length $sx_ctx;
-            # Legacy GET fallback only if AI2::Search path did not run / was disabled
-            if (!$used_ai2) {
-                my $host = '';
-                eval {
-                    require Comserv::Model::AI2::Search;
-                    my $svc = Comserv::Model::AI2::Search->_cfg($c) || {};
-                    if ($svc->{enabled} && $svc->{url}) {
-                        $host = $svc->{url};
-                    }
-                };
-                if (!$host) {
-                    my $cfg = $c->config->{SearXNG} || {};
-                    $host = $cfg->{host} || '';
-                }
-                $host =~ s{/+$}{} if $host;
-                if ($host) {
-                    eval {
-                        require URI::Escape;
-                        my $url  = "$host/search?q=" . URI::Escape::uri_escape($query)
-                                 . '&format=json&categories=general&language=en';
-                        my $req  = HTTP::Request->new(GET => $url);
-                        $req->header('Accept' => 'application/json');
-                        my $resp = $ua->request($req);
-                        if ($resp->is_success) {
-                            my $ctype = $resp->header('Content-Type') // '';
-                            my $body = $resp->decoded_content // '';
-                            if ($ctype =~ /html/i || $body =~ /^\s*</) {
-                                push @$trace_ref, "⚠️ SearXNG returned HTML (skip JSON decode) at $host";
-                            } else {
-                                my $data    = JSON::decode_json($body);
-                                my @results = map { {
-                                    title   => $_->{title}   || '',
-                                    url     => $_->{url}     || '',
-                                    snippet => $_->{content} || '',
-                                } } @{ $data->{results} || [] }[0..4];
-                                if (@results) {
-                                    push @$trace_ref, sprintf("🌐 SearXNG: %d results", scalar @results);
-                                    my ($ctx, $p) = $format_results->(\@results, 'SearXNG');
-                                    return ($ctx, $p);
-                                }
-                                push @$trace_ref, "⚠️ SearXNG: 0 results";
-                            }
-                        } else {
-                            push @$trace_ref, "⚠️ SearXNG HTTP " . $resp->code;
-                        }
-                    };
-                    push @$trace_ref, "⚠️ SearXNG legacy error: $@" if $@;
-                }
-            }
             next;
         }
 

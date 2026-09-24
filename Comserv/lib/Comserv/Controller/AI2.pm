@@ -1274,7 +1274,9 @@ sub git_create_worktree :Local :Args(0) {
         { parent => $parent, label => $label, url => $url });
 
     $self->logging->log_with_details(
-        $c, $res->{success} ? 'info' : 'error', __FILE__, __LINE__,
+        $c, $res->{success} ? 'info'
+            : ($res->{error} && $res->{error} =~ /valid branch name/i) ? 'warn'
+            : 'error', __FILE__, __LINE__,
         'git_create_worktree',
         "user=" . ($c->session->{username} // '') .
         " branch='$branch' parent='$parent' port=" . ($res->{port} // '?') .
