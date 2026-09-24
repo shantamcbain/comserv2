@@ -1274,7 +1274,9 @@ sub git_create_worktree :Local :Args(0) {
         { parent => $parent, label => $label, url => $url });
 
     $self->logging->log_with_details(
-        $c, $res->{success} ? 'info' : 'error', __FILE__, __LINE__,
+        $c, $res->{success} ? 'info'
+            : ($res->{error} && $res->{error} =~ /valid branch name/i) ? 'warn'
+            : 'error', __FILE__, __LINE__,
         'git_create_worktree',
         "user=" . ($c->session->{username} // '') .
         " branch='$branch' parent='$parent' port=" . ($res->{port} // '?') .
@@ -1362,19 +1364,21 @@ sub hermes_run :Local :Args(0) {
     # "auto" must not treat a running Hermes Electron app as the dashboard
     # (that caused AI Editor to chase Desktop login instead of /sessions).
     if ($prefer eq 'desktop' || $prefer eq 'auto') {
-        my $host = eval { $c->req->uri->host } || '127.0.0.1';
+        # Probe loopback (this host always reaches 127.0.0.1). Return a
+        # browser URL on the same hostname the editor was opened with
+        # (localhost, workstation.local, workstation.zero, ZeroTier IP).
+        my $req_host = eval { $c->req->uri->host } || '127.0.0.1';
+        $req_host =~ s/:\d+$//;
+        $req_host = '127.0.0.1' unless $req_host;
         $desktop_url = $ENV{HERMES_DASHBOARD_URL}
                     || ($c->config->{hermes_dashboard_url} // '')
-                    || ("http://${host}:9119/sessions");
+                    || ("http://${req_host}:9119/chat");
 
         my $dashboard_reachable = 0;
         eval {
             require LWP::UserAgent;
-            my $base = $desktop_url;
-            $base =~ s{/+$}{};
             my $ua = LWP::UserAgent->new(timeout => 2, max_redirect => 0);
-            my $res = $ua->get($base);
-            # 200/302/401 all mean the dashboard HTTP service is up
+            my $res = $ua->get('http://127.0.0.1:9119/chat');
             my $code = $res ? $res->code : 0;
             $dashboard_reachable = 1 if $code && $code >= 200 && $code < 500;
         };

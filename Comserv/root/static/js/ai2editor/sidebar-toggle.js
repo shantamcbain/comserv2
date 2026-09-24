@@ -11,7 +11,7 @@
     'use strict';
 
     var MIN_W = 160;
-    var MAX_W = 900;
+    var MAX_W = 1100;
 
     // Preferred defaults when a panel is first opened in the session.
     var _defaultWidths = {
@@ -19,7 +19,7 @@
         git: 520,
         terminal: 320,
         review: 360,
-        hermes: 440,
+        hermes: 720,
         settings: 280
     };
 
@@ -47,7 +47,7 @@
 
     function styleOpenPanel(name, panel, container) {
         if (!panel) return;
-        if (name === 'git') {
+        if (name === 'git' || name === 'hermes') {
             panel.style.display = 'flex';
             panel.style.flexDirection = 'column';
             panel.style.height = '100%';
@@ -87,7 +87,7 @@
         styleOpenPanel(name, panel, container);
         if (container && container.style.display === 'none') {
             // styleOpenPanel already set display for git; ensure visible for others
-            if (name !== 'git') container.style.display = 'block';
+            if (name !== 'git' && name !== 'hermes') container.style.display = 'block';
         }
         if (icon) icon.classList.add('active');
         try {
