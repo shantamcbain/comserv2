@@ -1,0 +1,62 @@
+[% META
+   title = "Health Kitchen recipes"
+   description = "Food recipes; mark as made to deduct pantry or inventory"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "HealthKitchen"
+   page_version = "0.01"
+   last_updated = "2026-09-23"
+%]
+[% PageVersion = 'healthkitchen/recipes.tt,v 0.01 2026/09/23 hermes-agent Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Recipes</h1>
+        <p>
+            <a href="[% c.uri_for('/healthkitchen') %]">Health Kitchen</a>
+            ·
+            <a href="[% c.uri_for('/healthkitchen/pantry') %]">Pantry</a>
+        </p>
+    </div>
+
+    [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+
+    [% IF hk_has_inventory %]
+        <p><strong>Made</strong> removes the recipe amounts from inventory items (use transaction) so the purchase short list can reorder.</p>
+    [% ELSE %]
+        <p><strong>Made</strong> removes the recipe amounts from your personal pantry only.</p>
+    [% END %]
+
+    [% IF !hk_recipe_ready %]
+        <div class="alert alert-warning">Create tables <code>Recipe</code> / <code>RecipeLine</code> via Schema Compare first.</div>
+    [% ELSE %]
+        <form method="post" action="[% c.uri_for('/healthkitchen/seed_morning') %]">
+            <button type="submit" class="btn btn-secondary">Add morning turmeric coffee</button>
+        </form>
+
+        [% FOREACH r IN hk_recipes %]
+            <div class="content-section">
+                <h2>[% r.name | html %]</h2>
+                [% IF r.preparation %]<p>[% r.preparation | html %]</p>[% END %]
+                [% IF r.lines && r.lines.size %]
+                    <ul>
+                        [% FOREACH ln IN r.lines %]
+                            <li>[% ln.name | html %]
+                                [% IF ln.quantity %] — [% ln.quantity | html %] [% ln.unit | html %][% END %]
+                            </li>
+                        [% END %]
+                    </ul>
+                [% END %]
+                <form method="post" action="[% c.uri_for('/healthkitchen/recipe_make') %]/[% r.id %]">
+                    <label>Batches <input type="number" name="batches" value="1" min="1" step="1" /></label>
+                    <button type="submit" class="btn btn-primary">Mark as made</button>
+                </form>
+            </div>
+        [% END %]
+        [% IF !hk_recipes.size %]
+            <p class="doc-muted">No food recipes yet.</p>
+        [% END %]
+    [% END %]
+</div>

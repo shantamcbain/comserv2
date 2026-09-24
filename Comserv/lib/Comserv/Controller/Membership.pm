@@ -103,6 +103,13 @@ sub _get_modules_data {
             route       => '/ency',
         },
         {
+            key         => 'healthkitchen',
+            name        => 'Health Kitchen',
+            owner       => 'ENCY',
+            description => 'Personal pantry of foods and herbs, ENCY-linked knowledge, and wellness menus from active symptoms.',
+            route       => '/healthkitchen',
+        },
+        {
             key         => 'ecommerce',
             name        => 'E-Commerce & Store',
             owner       => 'CSC',
@@ -396,6 +403,132 @@ sub addons :Local :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+# Member self-serve: personal add-ons (HEALTHKITCHEN D1). granted_by enum is
+# membership|manual|admin — use 'manual' for self-grant (no schema change).
+my %MEMBER_SELF_SERVE_ADDON = ( healthkitchen => 1 );
+
+sub _self_serve_site {
+    my ( $self, $c ) = @_;
+    my $name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $site;
+    eval {
+        $site = $c->model('DBEncy')->resultset('Site')->search(
+            { name => $name },
+            { rows => 1 }
+        )->single;
+    };
+    if ($@) {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, '_self_serve_site',
+            "Site lookup failed: $@" );
+        return;
+    }
+    return $site;
+}
+
+sub enable_addon :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    unless ( $c->req->method eq 'POST' ) {
+        $c->flash->{error_msg} = 'Invalid request.';
+        $c->response->redirect( $c->uri_for('/membership/addons') );
+        return;
+    }
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->flash->{error_msg} = 'Please log in.';
+        $c->response->redirect( $c->uri_for('/user/login') );
+        return;
+    }
+    my $service = lc( $c->req->param('service_name') || '' );
+    unless ( $MEMBER_SELF_SERVE_ADDON{$service} ) {
+        $c->flash->{error_msg} = 'That add-on cannot be enabled from your account.';
+        $c->response->redirect( $c->uri_for('/membership/addons') );
+        return;
+    }
+    my $site = $self->_self_serve_site($c);
+    unless ($site) {
+        $c->flash->{error_msg} = 'Could not resolve the current site.';
+        $c->response->redirect( $c->uri_for('/membership/addons') );
+        return;
+    }
+    eval {
+        my $rs  = $c->model('DBEncy')->resultset('MembershipServiceAccess');
+        my $row = $rs->search({
+            user_id      => $user_id,
+            site_id      => $site->id,
+            service_name => $service,
+        })->single;
+        if ($row) {
+            $row->update({ is_active => 1, granted_by => 'manual' });
+        }
+        else {
+            $rs->create({
+                user_id      => $user_id,
+                site_id      => $site->id,
+                service_name => $service,
+                granted_by   => 'manual',
+                is_active    => 1,
+            });
+        }
+        $c->flash->{success_msg} = 'Health Kitchen added to your account.';
+        $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'enable_addon',
+            "user_id=$user_id site_id=" . $site->id . " service=$service" );
+    };
+    if ($@) {
+        my $err = "$@";
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'enable_addon',
+            "Failed: $err" );
+        $c->flash->{error_msg} = 'Could not add the add-on. Please try again.';
+        $c->response->redirect( $c->uri_for('/membership/addons') );
+        return;
+    }
+    $c->response->redirect( $c->uri_for('/healthkitchen') );
+}
+
+sub disable_addon :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    unless ( $c->req->method eq 'POST' ) {
+        $c->flash->{error_msg} = 'Invalid request.';
+        $c->response->redirect( $c->uri_for('/membership/addons') );
+        return;
+    }
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->flash->{error_msg} = 'Please log in.';
+        $c->response->redirect( $c->uri_for('/user/login') );
+        return;
+    }
+    my $service = lc( $c->req->param('service_name') || '' );
+    unless ( $MEMBER_SELF_SERVE_ADDON{$service} ) {
+        $c->flash->{error_msg} = 'That add-on cannot be changed from your account.';
+        $c->response->redirect( $c->uri_for('/membership/addons') );
+        return;
+    }
+    my $site = $self->_self_serve_site($c);
+    unless ($site) {
+        $c->flash->{error_msg} = 'Could not resolve the current site.';
+        $c->response->redirect( $c->uri_for('/membership/addons') );
+        return;
+    }
+    eval {
+        my $row = $c->model('DBEncy')->resultset('MembershipServiceAccess')->search({
+            user_id      => $user_id,
+            site_id      => $site->id,
+            service_name => $service,
+        })->single;
+        $row->update({ is_active => 0 }) if $row;
+        $c->flash->{success_msg} = 'Health Kitchen removed from your account.';
+        $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'disable_addon',
+            "user_id=$user_id site_id=" . $site->id . " service=$service" );
+    };
+    if ($@) {
+        my $err = "$@";
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'disable_addon',
+            "Failed: $err" );
+        $c->flash->{error_msg} = 'Could not remove the add-on. Please try again.';
+    }
+    $c->response->redirect( $c->uri_for('/membership/addons') );
+}
+
 sub hosting_signup :Local :Args(0) {
     my ($self, $c) = @_;
 
@@ -473,7 +606,7 @@ sub hosting_signup :Local :Args(0) {
 
     if ($c->req->method eq 'POST') {
         my $p = $c->req->body_parameters;
-        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency ecommerce membership accounting printing_3d brew);
+        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency healthkitchen ecommerce membership accounting printing_3d brew);
         my $addons_str = join(',', grep { $p->{"addon_$_"} } @addon_keys);
         
         my $base_price = $plan_price{ $p->{plan_slug} } // 0;
@@ -500,7 +633,8 @@ sub hosting_signup :Local :Args(0) {
             beekeeping => 10.00,
             planning   => 15.00,
             accounting => 20.00,
-            ency       => 5.00,
+            ency           => 5.00,
+            healthkitchen  => 5.00,
             ecommerce  => 15.00,
             helpdesk   => 10.00,
             foraging   => 5.00,
@@ -589,6 +723,39 @@ sub hosting_signup :Local :Args(0) {
                 $notifier->send_hosting_signup_notification($c, $new_account);
                 $notifier->send_hosting_signup_confirmation($c, $new_account);
             };
+            if ( $c->session->{user_id} && $addons_str =~ /(?:^|,)healthkitchen(?:,|$)/ ) {
+                eval {
+                    my $site = $c->model('DBEncy')->resultset('Site')->search(
+                        { name => $site_name }, { rows => 1 }
+                    )->single;
+                    if ($site) {
+                        my $rs  = $c->model('DBEncy')->resultset('MembershipServiceAccess');
+                        my $row = $rs->search({
+                            user_id      => $c->session->{user_id},
+                            site_id      => $site->id,
+                            service_name => 'healthkitchen',
+                        })->single;
+                        if ($row) {
+                            $row->update({ is_active => 1, granted_by => 'manual' });
+                        }
+                        else {
+                            $rs->create({
+                                user_id      => $c->session->{user_id},
+                                site_id      => $site->id,
+                                service_name => 'healthkitchen',
+                                granted_by   => 'manual',
+                                is_active    => 1,
+                            });
+                        }
+                        $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'hosting_signup',
+                            'Also granted personal healthkitchen to user_id=' . $c->session->{user_id} );
+                    }
+                };
+                if ($@) {
+                    $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'hosting_signup',
+                        "healthkitchen personal grant failed: $@" );
+                }
+            }
             return $c->response->redirect($c->uri_for('/membership'));
         }
     }

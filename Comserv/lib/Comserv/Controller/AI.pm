@@ -1659,8 +1659,12 @@ sub generate :Local :Args(0) {
                 die "OpenRouter query failed: $or_error";
             }
 
-            $response  = { response => $or_response->{response} };
-            $model_used = $or_response->{model} || $model;
+            $response  = {
+                response => $or_response->{response},
+                model    => $or_response->{model} || $model,
+                usage    => $or_response->{usage} || {},
+            };
+            $model_used = $response->{model};
         } else {
             # Default to Ollama
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 

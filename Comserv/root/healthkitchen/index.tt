@@ -1,0 +1,74 @@
+[% META
+   title = "Health Kitchen"
+   description = "Personal pantry, ENCY-linked foods, and wellness menus from active symptoms"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "HealthKitchen"
+   page_version = "0.02"
+   last_updated = "2026-09-23"
+%]
+[% PageVersion = 'healthkitchen/index.tt,v 0.02 2026/09/23 hermes-agent Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Health Kitchen</h1>
+        <p class="doc-muted">Personal wellness planner — not diagnosis or treatment. Menus use your pantry and ENCY knowledge only.</p>
+    </div>
+
+    [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+
+    <p>
+        <a href="[% c.uri_for('/healthkitchen/pantry') %]" class="btn btn-primary">Pantry</a>
+        <a href="[% c.uri_for('/healthkitchen/recipes') %]" class="btn btn-primary">Recipes</a>
+        <a href="[% c.uri_for('/ENCY') %]" class="btn btn-secondary">ENCY</a>
+    </p>
+
+    <div class="content-section">
+        [% IF hk_has_inventory %]
+            <p><strong>Mode:</strong> site inventory is on. Marking a recipe as made deducts SKU stock so the inventory short list can reorder. Accounting invoices are not required.</p>
+        [% ELSE %]
+            <p><strong>Mode:</strong> personal pantry only (no inventory/accounting package). Marking a recipe as made deducts your pantry rows. The need-buy list below is yours — not AP invoices.</p>
+        [% END %]
+
+        [% IF !hk_pantry_ready || !hk_recipe_ready %]
+            <div class="alert alert-warning">
+                Pantry/recipe tables are not on this database yet. Admin: Schema Compare → Create Table for
+                <code>HealthKitchen::UserPantryQty</code>,
+                <code>HealthKitchen::InventoryEncyMap</code>,
+                and (if missing) <code>Recipe</code> / <code>RecipeLine</code>.
+            </div>
+        [% END %]
+
+        <h2>Need to buy</h2>
+        [% IF hk_short && hk_short.size %]
+            <ul>
+                [% FOREACH n IN hk_short %]
+                    <li>[% n.name | html %]
+                        [% IF n.qty %] — [% n.qty | html %][% IF n.unit %] [% n.unit | html %][% END %][% END %]
+                        <span class="doc-muted">([% n.via | html %])</span>
+                    </li>
+                [% END %]
+            </ul>
+        [% ELSE %]
+            <p class="doc-muted">Nothing flagged yet.</p>
+        [% END %]
+
+        <h2>Your recipes</h2>
+        [% IF hk_recipes && hk_recipes.size %]
+            <ul>
+                [% FOREACH r IN hk_recipes %]
+                    <li>[% r.name | html %]</li>
+                [% END %]
+            </ul>
+        [% ELSE %]
+            <p class="doc-muted">No food recipes yet. Open Recipes to seed the morning turmeric coffee.</p>
+        [% END %]
+
+        <form method="post" action="[% c.uri_for('/membership/disable_addon') %]">
+            <input type="hidden" name="service_name" value="healthkitchen" />
+            <button type="submit" class="btn btn-sm btn-secondary">Remove Health Kitchen from my account</button>
+        </form>
+    </div>
+</div>

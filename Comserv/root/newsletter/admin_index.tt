@@ -8,7 +8,7 @@
                 <a href="[% c.uri_for('/mail') %]">Mail</a> &rsaquo; Newsletters
             </nav>
             <p style="margin:6px 0 0;font-size:0.9em;color:var(--text-muted-color);">
-                Each row is a <strong>newsletter</strong> (e.g. Hosting News). Expand to see <strong>published issues</strong> only.
+                Each row is a <strong>newsletter</strong>. Expand for issues (drafts and published). Use <strong>Email subscribers</strong> to send.
                 [% IF !is_csc %]Shared newsletters are hosted by CSC but appear here for [% sitename %].[% END %]
             </p>
         </div>
@@ -50,8 +50,12 @@
                 </div>
                 [% END %]
             </div>
-            <div style="display:flex;align-items:center;gap:8px;" onclick="event.stopPropagation();">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;" onclick="event.stopPropagation();">
                 [% IF pub.can_manage %]
+                [% IF pub.latest_issue && pub.latest_issue.can_manage %]
+                <a href="[% c.uri_for('/mail/newsletter/send', pub.latest_issue.id) %]" class="btn btn-success btn-sm"
+                   title="Email subscribers for the latest issue">Email subscribers</a>
+                [% END %]
                 [% IF pub.page_code %]
                 <a href="[% c.uri_for('/mail/newsletter/publication/edit', pub.page_code) %]" class="btn btn-secondary btn-sm">Edit Newsletter</a>
                 [% END %]
@@ -68,8 +72,9 @@
                     <tr style="background:#f8f9fc;">
                         <th style="padding:8px 10px;text-align:left;">Issue</th>
                         <th style="padding:8px 10px;">#</th>
+                        <th style="padding:8px 10px;">Status</th>
                         <th style="padding:8px 10px;">Visibility</th>
-                        <th style="padding:8px 10px;">Published</th>
+                        <th style="padding:8px 10px;">Updated</th>
                         <th style="padding:8px 10px;">Actions</th>
                     </tr>
                 </thead>
@@ -82,13 +87,18 @@
                         </td>
                         <td style="padding:8px 10px;text-align:center;">[% issue.nl_version %]</td>
                         <td style="padding:8px 10px;text-align:center;font-size:0.85em;">
+                            [% IF issue.status == 'draft' %]<span style="color:#b45309;font-weight:bold;">Draft</span>
+                            [% ELSIF issue.status == 'active' || issue.status == 'published' %]<span style="color:#15803d;">Published</span>
+                            [% ELSE %][% issue.status | html %][% END %]
+                        </td>
+                        <td style="padding:8px 10px;text-align:center;font-size:0.85em;">
                             [% IF issue.is_public %]Public[% ELSE %][% issue.roles | html %][% END %]
                         </td>
                         <td style="padding:8px 10px;text-align:center;font-size:0.85em;">[% issue.updated_at %]</td>
                         <td style="padding:8px 10px;text-align:center;white-space:nowrap;">
                             [% IF issue.can_manage %]
+                            <a href="[% c.uri_for('/mail/newsletter/send', issue.id) %]" class="btn btn-success" style="font-size:0.82em;padding:3px 8px;">Email subscribers</a>
                             <a href="[% c.uri_for('/mail/newsletter/edit', issue.page_code) %]" class="btn btn-secondary" style="font-size:0.82em;padding:3px 8px;">Edit</a>
-                            <a href="[% c.uri_for('/mail/newsletter/send', issue.id) %]" class="btn btn-primary" style="font-size:0.82em;padding:3px 8px;">Send</a>
                             [% END %]
                             <a href="[% c.uri_for('/page', issue.page_code) %]" class="btn btn-secondary" style="font-size:0.82em;padding:3px 8px;">View</a>
                         </td>
@@ -98,7 +108,7 @@
             </table>
             [% ELSE %]
             <p style="margin:0;color:var(--text-muted-color);font-size:0.9em;">
-                No published issues yet.
+                No issues yet (drafts will show here too).
                 [% IF pub.can_manage %]
                 <a href="[% c.uri_for('/mail/newsletter/issue/create', { pub => pub.id }) %]">Create the first issue</a>.
                 [% END %]

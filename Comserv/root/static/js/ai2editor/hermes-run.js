@@ -172,6 +172,7 @@
             dashUrl = iframe.getAttribute('src');
         }
         if (!dashUrl) {
+            // Same host as the editor (localhost or ZeroTier IP): Hermes dashboard sessions
             dashUrl = window.location.protocol + '//' + window.location.hostname + ':9119/sessions';
         }
         function applyDashUrl(u) {
