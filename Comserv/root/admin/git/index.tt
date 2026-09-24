@@ -344,6 +344,8 @@
                                             data-cmd="[% b.cmd | html %]">Open</button>
                                     <button type="button" class="admin-btn admin-btn-sm"
                                             data-hermes-branch="[% b.name | html %]"
+                                            data-hermes-port="[% b.hermes_port || 9119 %]"
+                                            data-hermes-cwd="[% b.hermes_cwd | html %]"
                                             data-hermes-cmd="[% b.hermes_cmd | html %]">Hermes</button>
                                     <button type="button" class="admin-btn admin-btn-sm admin-btn-danger"
                                             data-branch-action="stop" data-branch="[% b.name | html %]" data-port="[% b.port %]">Stop</button>

@@ -226,19 +226,20 @@
                 // command for manual copy.
                 var hermesBranch = el.getAttribute('data-hermes-branch');
                 if (hermesBranch) {
+                    var hport = el.getAttribute('data-hermes-port') || '9119';
                     var hcmd = el.getAttribute('data-hermes-cmd') || '';
+                    // Compose on the client: window.location.hostname is port-free.
+                    // A TT-built host:port URL double-ports (RELATIVE-URL TRAP).
+                    var hurl = window.location.protocol + '//' + window.location.hostname
+                        + ':' + hport + '/chat';
+                    // Open first (sync in the click) so the browser does not treat
+                    // it as a delayed popup. Then start the isolated dashboard.
+                    window.open(hurl, '_blank');
                     if (navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(hcmd).then(function () {
-                            if (typeof window.HermesNotify === 'function') {
-                                window.HermesNotify('Copied Hermes command for ' + hermesBranch);
-                            } else {
-                                window.alert('Copied to clipboard:\n' + hcmd);
-                            }
-                        }).catch(function () { window.alert(hcmd); });
-                    } else {
-                        window.alert(hcmd);
+                        navigator.clipboard.writeText(hcmd);
                     }
-                    showDevConsole(hermesBranch, el.getAttribute('data-port') || '', '', hcmd);
+                    showDevConsole(hermesBranch, hport, hurl, hcmd);
+                    branchServerAction('hermes', hermesBranch, el.getAttribute('data-port'), el);
                     return;
                 }
                 var action = el.getAttribute('data-branch-action');
