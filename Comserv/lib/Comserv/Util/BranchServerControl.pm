@@ -129,11 +129,16 @@ sub open_or_start_hermes {
 
     my $bin = -x '/home/shanta/.local/bin/hermes' ? '/home/shanta/.local/bin/hermes' : 'hermes';
     my $log = "/tmp/hermes-dash-$branch.log";
+    # Pin TERMINAL_CWD to this worktree. Unset session/update leftovers so a
+    # spawn from 9119 cannot leak InventoryAccounting (or any other) cwd into
+    # the new isolated dashboard. bash -c not -l: login profiles often cd away.
     my $cmd = 'cd ' . quotemeta($cwd)
-            . ' && nohup ' . quotemeta($bin)
+            . ' && env -u HERMES_SESSION_ID -u HERMES_UPDATE_POST_SWAP -u HERMES_UPDATE_REEXEC'
+            . ' TERMINAL_CWD=' . quotemeta($cwd)
+            . ' nohup ' . quotemeta($bin)
             . " dashboard --isolated --host 0.0.0.0 --port $hport --no-open --skip-build"
             . ' >> ' . quotemeta($log) . ' 2>&1 &';
-    my $rc = system('/bin/bash', '-lc', $cmd);
+    my $rc = system('/bin/bash', '-c', $cmd);
     if ($rc != 0) {
         return {
             ok => 0, error => "spawn exit $rc",
