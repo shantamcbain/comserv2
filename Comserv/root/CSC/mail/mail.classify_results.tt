@@ -21,4 +21,9 @@
     [% END %]
     
     <p><a href="[% c.uri_for('/mail/invoice/api') %]">View Classified Invoices</a></p>
+    <form method="post" action="[% c.uri_for('/Inventory/api/invoice/draft_from_mail') %]" style="margin-top:1em;">
+        <input type="hidden" name="sitename" value="[% c.stash.SiteName || c.session.SiteName || 'CSC' %]">
+        <button type="submit" class="btn btn-primary">Create draft AP invoices from classified mail</button>
+        <span style="color:var(--text-muted-color,#888);font-size:0.9em;"> No GL post. Skips unmatched/personal.</span>
+    </form>
 </div>

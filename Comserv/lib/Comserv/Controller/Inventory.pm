@@ -4,7 +4,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::PointSystem;
 use Comserv::Util::EmailNotification;
-use POSIX qw(strftime);
+use Comserv::Util::AppTime;
 
 has 'logging' => (
     is      => 'ro',
@@ -65,7 +65,14 @@ sub _schema {
 }
 
 sub _now {
-    return strftime('%Y-%m-%d %H:%M:%S', localtime);
+    require Comserv::Util::AppTime;
+    return Comserv::Util::AppTime->now_utc;
+}
+
+sub _today {
+    my ($self, $c) = @_;
+    require Comserv::Util::AppTime;
+    return $c ? Comserv::Util::AppTime->today_ymd_for($c) : Comserv::Util::AppTime->today_utc_ymd;
 }
 
 # -------------------------------------------------------------------------
@@ -174,6 +181,10 @@ sub items :Path('/Inventory/items') :Args(0) {
         'consumable'       => 'var(--cat-consumable, #f39c12)',
         'tool'             => 'var(--cat-tool, #34495e)',
         'equipment'        => 'var(--cat-equipment, #1abc9c)',
+        'food'             => 'var(--cat-food, #27ae60)',
+        'herb'             => 'var(--cat-herb, #1abc9c)',
+        'spice'            => 'var(--cat-spice, #e67e22)',
+        'produce'          => 'var(--cat-produce, #2ecc71)',
         'default'          => 'var(--cat-default, #95a5a6)',
     );
 
@@ -418,6 +429,9 @@ sub _create_item {
     my $now    = $self->_now();
 
     my $sitename = $p->{sitename} || $self->_sitename($c);
+    my $cat      = $p->{category};
+    my $consumable = $p->{is_consumable} ? 1 : 0;
+    $consumable = 1 if $cat && $cat =~ /^(food|herb|spice|produce)$/i;
 
     # HARD GUARD: never create a second item with the same (sitename, sku).
     # Prevents duplicate-SKU data corruption that previously occurred when rows were
@@ -439,9 +453,10 @@ sub _create_item {
         sku                 => $p->{sku},
         name                => $p->{name},
         description         => $p->{description},
-        category            => $p->{category},
+        category            => $cat,
         item_origin         => $p->{item_origin} || 'purchased',
         is_assemblable      => $p->{is_assemblable} ? 1 : 0,
+        is_consumable       => $consumable,
         unit_of_measure     => $p->{unit_of_measure} || 'each',
         unit_cost           => $p->{unit_cost}  || undef,
         unit_price          => $p->{unit_price} || undef,
@@ -612,13 +627,17 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
     if ($c->req->method eq 'POST') {
         my $params = $c->req->body_parameters;
         eval {
+            my $cat = $params->{category};
+            my $consumable = $params->{is_consumable} ? 1 : 0;
+            $consumable = 1 if $cat && $cat =~ /^(food|herb|spice|produce)$/i;
             $item->update({
                 sku                => $params->{sku},
                 name               => $params->{name},
                 description        => $params->{description},
-                category           => $params->{category},
+                category           => $cat,
                 item_origin        => $params->{item_origin} || 'purchased',
                 is_assemblable     => $params->{is_assemblable} ? 1 : 0,
+                is_consumable      => $consumable,
                 unit_of_measure    => $params->{unit_of_measure} || 'each',
                 unit_cost          => $params->{unit_cost}  || undef,
                 unit_price         => $params->{unit_price} || undef,
@@ -2596,6 +2615,15 @@ sub po_mark_sent :Path('/Inventory/po/mark_sent') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'po_mark_sent',
         "PO $id marked sent via $send_via");
 
+    eval {
+        require Comserv::Util::Inventory::Purchasing;
+        Comserv::Util::Inventory::Purchasing->new->adjust_on_order_for_po($c, $po, 1);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'po_mark_sent',
+            "on_order bump failed: $@");
+    }
+
     $c->flash->{success_msg} = "PO marked as sent via $send_via.";
     $c->res->redirect($c->uri_for('/Inventory/po/view', [$id]));
 }
@@ -2687,6 +2715,7 @@ sub api_items :Path('/Inventory/api/items') :Args(0) {
             category         => $_->category,
             item_origin      => $_->item_origin,
             is_assemblable   => $_->is_assemblable ? 1 : 0,
+            is_consumable    => $_->is_consumable ? 1 : 0,
             unit_of_measure  => $_->unit_of_measure,
             unit_cost        => $_->unit_cost,
             reorder_point    => $_->reorder_point,
@@ -2879,6 +2908,13 @@ sub api_item_update :Path('/Inventory/api/item/update') :Args(0) {
     }
     if (exists $p->{is_assemblable}) {
         $upd{is_assemblable} = $p->{is_assemblable} ? 1 : 0;
+    }
+    if (exists $p->{is_consumable}) {
+        $upd{is_consumable} = $p->{is_consumable} ? 1 : 0;
+    }
+    my $cat_for_cons = exists $upd{category} ? $upd{category} : $item->category;
+    if ($cat_for_cons && $cat_for_cons =~ /^(food|herb|spice|produce)$/i) {
+        $upd{is_consumable} = 1;
     }
     unless (keys %upd) {
         $c->res->status(400);
@@ -3280,7 +3316,7 @@ sub invoice_list :Path('/Inventory/invoice') :Args(0) {
         )->all;
     };
     $list_error = $@ if $@;
-    my $today = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $today = Comserv::Util::AppTime->today_utc_ymd;
     $c->stash(
         invoices   => \@invoices,
         error_msg  => $list_error,
@@ -3381,8 +3417,8 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
                 my $inv_date  = $saved_invoice->invoice_date || '';
                 my $inv_url   = $c->uri_for('/Inventory/invoice/view', [$saved_invoice->id]);
                 my $poster    = $c->session->{username} || 'system';
-                my $now_date  = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
-                my $now_dt    = $now_date . ' ' . do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
+                my $now_date  = Comserv::Util::AppTime->today_utc_ymd;
+                my $now_dt    = $self->_now;
 
                 my $admin_user = eval {
                     $schema->resultset('Member')->search(
@@ -3466,7 +3502,7 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
         locations    => \@locations,
         coa_accounts => $self->_load_coa_accounts($c),
         sitename     => $sitename,
-        today        => do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) },
+        today        => Comserv::Util::AppTime->today_utc_ymd,
         template     => 'Inventory/invoice/new.tt',
     );
 }
@@ -3575,7 +3611,7 @@ sub invoice_edit :Path('/Inventory/invoice/edit') :Args(1) {
         locations    => \@locations,
         coa_accounts => $self->_load_coa_accounts($c),
         sitename     => $sitename,
-        today        => do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) },
+        today        => Comserv::Util::AppTime->today_utc_ymd,
         template     => 'Inventory/invoice/edit.tt',
     );
 }
@@ -4036,7 +4072,7 @@ sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
             eval {
                 my $ha = $schema->resultset('Accounting::HostingAccount')->search({ sitename => $sitename })->single;
                 if ($ha) {
-                    my $note = 'PAID:' . $invoice->invoice_number . ':' . DateTime->now->strftime('%Y-%m-%d');
+                    my $note = 'PAID:' . $invoice->invoice_number . ':' . Comserv::Util::AppTime->today_utc_ymd;
                     my $existing = $ha->notes || '';
                     $ha->update({ notes => $existing ? "$existing\n$note" : $note });
                 }
@@ -4074,7 +4110,7 @@ sub process_auto_pay :Path('/Inventory/invoice/process_auto_pay') :Args(0) {
 
     my $schema   = $self->_schema($c);
     my $sitename = $self->_sitename($c);
-    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $today    = Comserv::Util::AppTime->today_utc_ymd;
     my $confirmed_id = $c->req->body_parameters->{invoice_id};
 
     if ($confirmed_id) {
@@ -4082,7 +4118,7 @@ sub process_auto_pay :Path('/Inventory/invoice/process_auto_pay') :Args(0) {
         eval { $inv = $schema->resultset('Accounting::InventorySupplierInvoice')->find($confirmed_id) };
         if ($inv && $inv->sitename eq $sitename && $inv->auto_pay && $inv->status ne 'paid') {
             eval {
-                $inv->update({ status => 'paid', updated_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S') });
+                $inv->update({ status => 'paid', updated_at => $self->_now });
 
                 my $csc_inv = $schema->resultset('Accounting::InventoryCustomerInvoice')->search({
                     sitename       => 'CSC',
@@ -4352,7 +4388,7 @@ sub customer_invoice_new :Path('/Inventory/sales/new') :Args(0) {
         prefill_order => $prefill_order,
         coa_accounts  => $self->_load_coa_accounts($c),
         sitename      => $sitename,
-        today         => do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) },
+        today         => Comserv::Util::AppTime->today_utc_ymd,
         template      => 'Inventory/sales/new.tt',
     );
 }
@@ -5486,7 +5522,7 @@ sub timesheet_log :Path('/Inventory/timesheet/log') :Args(0) {
 
     my $hours    = int($params->{hours}   || 0);
     my $minutes  = int($params->{minutes} || 0);
-    my $log_date = $params->{log_date} || strftime('%Y-%m-%d', localtime);
+    my $log_date = $params->{log_date} || Comserv::Util::AppTime->today_utc_ymd;
     my $note     = $params->{note} || '';
 
     unless ($hours > 0 || $minutes > 0) {

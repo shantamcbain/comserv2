@@ -171,12 +171,17 @@
         // Build :9119 on the SAME hostname the editor was opened with:
         // localhost / 127.0.0.1, workstation.local, workstation.zero, or ZeroTier IP.
         // A hardcoded 127.0.0.1 iframe is useless on phone/tablet/laptop over ZT.
+        function hermesPortFromApp() {
+            var p = parseInt(window.location.port, 10) || 0;
+            if (!p || p === 3001) return 9119;
+            return 9100 + (p % 100);
+        }
         function localDashUrl(path) {
             path = path || '/chat';
             if (path.charAt(0) !== '/') path = '/' + path;
             var host = window.location.hostname || '127.0.0.1';
             var proto = window.location.protocol || 'http:';
-            return proto + '//' + host + ':9119' + path;
+            return proto + '//' + host + ':' + hermesPortFromApp() + path;
         }
         if (!dashUrl && iframe && iframe.getAttribute('src')) {
             dashUrl = iframe.getAttribute('src');

@@ -2,6 +2,7 @@ package Comserv::Controller::CustomerOrder;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::AppTime;
 
 has 'logging' => (
     is      => 'ro',
@@ -38,10 +39,7 @@ sub _is_admin {
 }
 
 sub _now {
-    my ($self) = @_;
-    my @t = localtime;
-    return sprintf('%04d-%02d-%02d %02d:%02d:%02d',
-        $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+    return Comserv::Util::AppTime->now_utc;
 }
 
 # -------------------------------------------------------------------------

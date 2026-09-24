@@ -243,7 +243,8 @@ sub provision_site_for_owner {
             my $reg = $c->model('DBEncy')->resultset('SiteAccountingDb')
                           ->find({ sitename => $sitename });
             if ($reg) {
-                my $stamp = scalar(localtime);
+                require Comserv::Util::AppTime;
+                my $stamp = Comserv::Util::AppTime->now_utc;
                 my $note  = "Provisioned by '$actor' on $stamp (self-serve).";
                 my $prev  = $reg->notes // '';
                 $reg->update({ notes => ($prev ? "$prev\n$note" : $note) });

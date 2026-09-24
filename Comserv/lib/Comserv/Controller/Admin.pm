@@ -7873,6 +7873,25 @@ sub branch_server_action :Path('/admin/branch_server_action') :Args(0) {
         my $res = $ctrl->open_or_start($branch, $port);
         $c->response->body(encode_json($res));
     }
+    elsif ($action eq 'hermes') {
+        my $res = eval { $ctrl->open_or_start_hermes($branch, $port) };
+        if ($@ || !$res) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'branch_server_action', "hermes start failed branch=$branch: $@");
+            $c->response->body(encode_json({ ok => 0, error => "$@"}));
+            return;
+        }
+        if (!$res->{ok}) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'branch_server_action', "hermes start refused branch=$branch: " . ($res->{error} // ''));
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'branch_server_action',
+                "hermes branch=$branch port=" . ($res->{hermes_port} // '') .
+                " started=" . ($res->{started} // 0) . " cwd=" . ($res->{cwd} // ''));
+        }
+        $c->response->body(encode_json($res));
+    }
     else {
         $c->response->body(encode_json({ok=>0, error=>'Unknown action'}));
     }
