@@ -2721,13 +2721,26 @@ sub _check_server_live {
     my $last_error    = '';
     my @routes;
 
+    # Collapse credential slots that share host:port. db-server-1:3307 has
+    # app/admin/fallback/production_server — four logins, ONE Maria listener.
+    # Listing each slot as a Host line made it look like four databases.
+    my %by_endpoint;
     for my $conn_name (@$conns_for_group) {
         my $cfg = $all->{$conn_name}{config}
             or next;
-        my $host = $cfg->{host}  || 'localhost';
-        my $port = $cfg->{port}  || 3306;
+        my $host = $cfg->{host} || 'localhost';
+        my $port = $cfg->{port} || 3306;
+        my $key  = lc("$host:$port");
+        $by_endpoint{$key} ||= { host => $host, port => $port, conns => [] };
+        push @{ $by_endpoint{$key}{conns} }, $conn_name;
+    }
 
-        # Tier 1: is this route's server process listening?
+    for my $key ( sort keys %by_endpoint ) {
+        my $ep   = $by_endpoint{$key};
+        my $host = $ep->{host};
+        my $port = $ep->{port};
+
+        # Tier 1: one TCP probe per unique host:port.
         my $sock = IO::Socket::INET->new(
             PeerHost => $host,
             PeerPort => $port,
@@ -2738,36 +2751,41 @@ sub _check_server_live {
         close($sock) if $sock;
         $any_reachable ||= $reachable;
 
-        # Tier 2: only attempt a login if the route is reachable.
-        my ($db_ok, $err) = (0, '');
+        my ( $db_ok, $err ) = ( 0, '' );
         if ($reachable) {
-            my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
-            if ($dbh) {
-                $db_ok = eval {
-                    my $sth = $dbh->prepare('SELECT 1');
-                    $sth->execute();
-                    $sth->finish;
-                    1;
-                } ? 1 : 0;
-                $dbh->disconnect;
-            } else {
-                $err = $remote_db->last_connection_error || 'login failed';
-                $err =~ s/\s+/ /g;
-                $err = substr($err, 0, 160);
+            for my $conn_name ( @{ $ep->{conns} } ) {
+                my $dbh = eval { $remote_db->get_connection( undef, $conn_name ) };
+                if ($dbh) {
+                    $db_ok = eval {
+                        my $sth = $dbh->prepare('SELECT 1');
+                        $sth->execute();
+                        $sth->finish;
+                        1;
+                    } ? 1 : 0;
+                    $dbh->disconnect;
+                    last if $db_ok;
+                }
+                else {
+                    $err = $remote_db->last_connection_error || 'login failed';
+                    $err =~ s/\s+/ /g;
+                    $err = substr( $err, 0, 160 );
+                }
             }
             $any_db_ok ||= $db_ok;
-            $last_error = $err if $err;
-        } else {
-            $err = "no service on $host:$port (TCP)";
+            $last_error = $err if $err && !$db_ok;
+        }
+        else {
+            $err        = "no service on $host:$port (TCP)";
             $last_error ||= $err;
         }
 
         push @routes, {
-            host      => $host,
-            port      => $port,
-            reachable => $reachable,
-            db_ok     => $db_ok,
-            error     => $err,
+            host       => $host,
+            port       => $port,
+            reachable  => $reachable,
+            db_ok      => $db_ok,
+            error      => $err,
+            slot_count => scalar @{ $ep->{conns} },
         };
     }
 
