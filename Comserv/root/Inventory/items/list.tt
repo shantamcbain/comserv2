@@ -39,6 +39,10 @@
       <option value="3d_filament">3D Filament</option>
       <option value="3d_supply">3D Supply</option>
       <option value="3d_printed_item">3D Printed Item</option>
+      <option value="food">Food</option>
+      <option value="herb">Herb</option>
+      <option value="spice">Spice</option>
+      <option value="produce">Produce</option>
       [% FOREACH cat IN categories %]
       <option value="[% cat | html %]">[% cat | html %]</option>
       [% END %]
@@ -174,6 +178,10 @@
 .category-row-consumable td { border-left: 3px solid var(--cat-consumable, #f39c12); }
 .category-row-tool td { border-left: 3px solid var(--cat-tool, #34495e); }
 .category-row-equipment td { border-left: 3px solid var(--cat-equipment, #1abc9c); }
+.category-row-food td { border-left: 3px solid var(--cat-food, #27ae60); }
+.category-row-herb td { border-left: 3px solid var(--cat-herb, #1abc9c); }
+.category-row-spice td { border-left: 3px solid var(--cat-spice, #e67e22); }
+.category-row-produce td { border-left: 3px solid var(--cat-produce, #2ecc71); }
 .category-row-Uncategorized td { border-left: 3px solid var(--cat-default, #95a5a6); }
 .category-row-default td { border-left: 3px solid var(--cat-default, #95a5a6); }
 </style>

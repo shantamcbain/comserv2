@@ -1399,7 +1399,9 @@ sub build_worktree_list {
         # Do NOT pass -w: Comserv worktrees ARE the isolation. `hermes chat -w`
         # creates a nested hermes/hermes-* branch (often from origin/main) and
         # the agent then edits the wrong tree.
-        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && hermes chat',
+        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2 && hermes chat',
+        hermes_port => 9119,
+        hermes_cwd => '/home/shanta/PycharmProjects/comserv2',
     };
 
     my $cfg = eval { _worktree_config() } // { branches => {} };
@@ -1416,6 +1418,11 @@ sub build_worktree_list {
             # Branch Hermes: cwd = the worktree git root so its .hermes.md loads.
             # No -w — see main hermes_cmd comment above.
             hermes_cmd => "cd $base/$name/Comserv && hermes chat",
+            hermes_port => (eval {
+                require Comserv::Util::BranchServerControl;
+                Comserv::Util::BranchServerControl->new->hermes_port_for($name, $b->{port} // 0);
+            } || (9100 + int(($b->{port} // 0) % 100))),
+            hermes_cwd => "$base/$name/Comserv",
             project_id => $b->{project_id} // undef,
             host       => $b->{host} // undef,
             sitename   => $b->{sitename} // undef,

@@ -11,6 +11,7 @@ use File::Path qw(make_path);
 use File::Path;
 use Try::Tiny;
 use Comserv::Util::Logging;
+use Comserv::Util::AppTime;
 
 sub new {
     my ($class, %args) = @_;
@@ -54,7 +55,7 @@ sub classify_all_mail {
 
     my %result;
     $result{metadata} = {
-        generated_at => scalar(localtime),
+        generated_at => Comserv::Util::AppTime->now_utc,
         source => $source,
         total_messages_scanned => scalar(@messages),
         first_run => $first_run,
@@ -321,6 +322,114 @@ sub _category_keywords {
         return [qr/hardware/i, qr/parts/i, qr/components/i, qr/equipment/i, qr/kobra/i, qr/flashforge/i, qr/ace/i];
     }
     return [];
+}
+
+# Create draft AP rows from classified mail. Never posts GL.
+# Matches InventorySupplier.email to From:. Skips unmatched + personal.
+sub draft_supplier_invoices {
+    my ($self, $c, %args) = @_;
+    my $sitename = $args{sitename} || ($c && $c->session->{SiteName}) || 'CSC';
+    my $file = $args{file} || File::Spec->catfile($self->{output_dir}, 'classified_invoices.json');
+    my $schema = $c->model('DBEncy');
+    my @created;
+    my @skipped;
+    unless (-f $file) {
+        $self->{logging}->log_with_details($c, 'warn', __FILE__, __LINE__, 'draft_supplier_invoices',
+            "no classified file $file");
+        return { ok => 0, error => "classified file missing: $file" };
+    }
+    my $data;
+    eval {
+        open my $fh, '<', $file or die $!;
+        local $/;
+        $data = JSON->new->utf8->decode(<$fh>);
+        close $fh;
+    };
+    if ($@ || ref($data) ne 'HASH') {
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'draft_supplier_invoices',
+            "parse: $@");
+        return { ok => 0, error => "parse failed: $@" };
+    }
+    my $now  = Comserv::Util::AppTime->now_utc;
+    my $today = Comserv::Util::AppTime->today_utc_ymd;
+    my $cats = $data->{categories} || {};
+    for my $cat (keys %$cats) {
+        next if $cat eq 'personal';
+        my $block = $cats->{$cat} || {};
+        my $sites = $block->{sites} || [];
+        if (@$sites && !grep { $_ eq 'all' || lc($_) eq lc($sitename) } @$sites) {
+            next;
+        }
+        for my $inv (@{ $block->{invoices} || [] }) {
+            next unless $inv && $inv->{is_invoice};
+            my $mail_id = $inv->{id} || '';
+            my $inv_no  = $mail_id ? ('MAIL-' . substr($mail_id, 0, 16)) : undef;
+            if ($inv_no) {
+                my $exists = eval {
+                    $schema->resultset('Accounting::InventorySupplierInvoice')->search({
+                        sitename => $sitename, invoice_number => $inv_no,
+                    })->first;
+                };
+                if ($exists) {
+                    push @skipped, { id => $mail_id, reason => 'exists' };
+                    next;
+                }
+            }
+            my $from = $inv->{from} || '';
+            my ($email) = $from =~ /<([^>]+)>/;
+            $email ||= $from;
+            $email =~ s/^\s+|\s+$//g;
+            my $supplier;
+            if ($email && $email =~ /@/) {
+                $supplier = eval {
+                    $schema->resultset('Accounting::InventorySupplier')->search({
+                        sitename => $sitename,
+                        email    => { -like => '%' . $email . '%' },
+                    }, { rows => 1 })->first;
+                };
+            }
+            unless ($supplier) {
+                push @skipped, { id => $mail_id, reason => 'no_supplier', from => $from };
+                next;
+            }
+            my $amount = 0;
+            if (($inv->{body_preview} || '') =~ /(?:total|amount|due)[^\d]{0,20}(\d+[\.,]\d{2})/i) {
+                ($amount = $1) =~ s/,/./;
+            }
+            my $notes = join("\n",
+                'Draft from mail classifier. No GL post.',
+                'mail_id=' . $mail_id,
+                'from=' . $from,
+                'subject=' . ($inv->{subject} || ''),
+                'date=' . ($inv->{date} || ''),
+            );
+            my $row;
+            eval {
+                $row = $schema->resultset('Accounting::InventorySupplierInvoice')->create({
+                    sitename       => $sitename,
+                    supplier_id    => $supplier->id,
+                    invoice_number => $inv_no,
+                    invoice_date   => $today,
+                    total_amount   => $amount,
+                    status         => 'draft',
+                    notes          => $notes,
+                    created_by     => ($c->session->{username} || 'hermes-agent'),
+                    created_at     => $now,
+                    updated_at     => $now,
+                });
+            };
+            if ($@ || !$row) {
+                $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'draft_supplier_invoices',
+                    "create failed: $@");
+                push @skipped, { id => $mail_id, reason => "$@" };
+                next;
+            }
+            push @created, { invoice_id => $row->id, invoice_number => $inv_no, supplier_id => $supplier->id, amount => $amount };
+        }
+    }
+    $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, 'draft_supplier_invoices',
+        "sitename=$sitename created=" . scalar(@created) . " skipped=" . scalar(@skipped));
+    return { ok => 1, created => \@created, skipped => \@skipped };
 }
 
 1;
