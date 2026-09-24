@@ -168,12 +168,21 @@
             var qs = new URLSearchParams(window.location.search || '');
             dashUrl = qs.get('hermes') || '';
         } catch (e) {}
+        // Build :9119 on the SAME hostname the editor was opened with:
+        // localhost / 127.0.0.1, workstation.local, workstation.zero, or ZeroTier IP.
+        // A hardcoded 127.0.0.1 iframe is useless on phone/tablet/laptop over ZT.
+        function localDashUrl(path) {
+            path = path || '/chat';
+            if (path.charAt(0) !== '/') path = '/' + path;
+            var host = window.location.hostname || '127.0.0.1';
+            var proto = window.location.protocol || 'http:';
+            return proto + '//' + host + ':9119' + path;
+        }
         if (!dashUrl && iframe && iframe.getAttribute('src')) {
             dashUrl = iframe.getAttribute('src');
         }
         if (!dashUrl) {
-            // Same host as the editor (localhost or ZeroTier IP): Hermes dashboard sessions
-            dashUrl = window.location.protocol + '//' + window.location.hostname + ':9119/sessions';
+            dashUrl = localDashUrl('/chat');
         }
         function applyDashUrl(u) {
             dashUrl = u;
@@ -283,7 +292,7 @@
                     openHermesPanel();
                     return;
                 }
-                var u = dashUrl || (window.location.protocol + '//' + window.location.hostname + ':9119/sessions');
+                var u = dashUrl || localDashUrl('/chat');
                 var w = null;
                 try {
                     w = window.open(u, 'AI2HermesDetach', 'width=1280,height=900,left=40,top=20,resizable=yes,scrollbars=yes');
@@ -313,14 +322,13 @@
             reloadDash = document.createElement('button');
             reloadDash.id = 'hermes-reload-dashboard';
             reloadDash.type = 'button';
-            reloadDash.textContent = 'Load dashboard /sessions';
+            reloadDash.textContent = 'Load dashboard /chat';
             reloadDash.style.cssText = 'background:#1565c0;color:#fff;border:none;padding:6px 10px;border-radius:3px;cursor:pointer;font-size:12px;margin:6px 0;';
             var ph = document.getElementById('hermes-placeholder') || iframe;
             if (ph && ph.parentNode) ph.parentNode.insertBefore(reloadDash, ph);
         }
         reloadDash.onclick = function () {
-            var u = window.location.protocol + '//' + window.location.hostname + ':9119/sessions';
-            applyDashUrl(u);
+            applyDashUrl(localDashUrl('/chat'));
         };
 
 
