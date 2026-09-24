@@ -1,0 +1,66 @@
+[% META
+   title = "Health Kitchen pantry"
+   description = "Personal pantry overlay; optional link to site inventory SKUs"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "HealthKitchen"
+   page_version = "0.01"
+   last_updated = "2026-09-23"
+%]
+[% PageVersion = 'healthkitchen/pantry.tt,v 0.01 2026/09/23 hermes-agent Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Pantry</h1>
+        <p>
+            <a href="[% c.uri_for('/healthkitchen') %]">Health Kitchen</a>
+            ·
+            <a href="[% c.uri_for('/healthkitchen/recipes') %]">Recipes</a>
+        </p>
+    </div>
+
+    [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+
+    [% IF hk_has_inventory %]
+        <p>This site has inventory. The list below is <strong>inventory stock</strong> (food/consumable SKUs). Recipe “made” deducts those SKUs so the purchase short list can reorder. The form adds a personal overlay row if you need something not yet in inventory.</p>
+    [% ELSE %]
+        <p>No inventory package on this site. Add foods by name and quantity. Recipe “made” deducts these rows only.</p>
+    [% END %]
+
+    [% IF !hk_pantry_ready %]
+        <div class="alert alert-warning">Create table <code>HealthKitchen::UserPantryQty</code> via Schema Compare first.</div>
+    [% ELSE %]
+        <form method="post" action="[% c.uri_for('/healthkitchen/pantry') %]" class="content-section">
+            <p>
+                <label>Name <input type="text" name="name" required /></label>
+                <label>Qty <input type="number" name="qty" step="0.001" value="0" /></label>
+                <label>Unit <input type="text" name="unit" value="each" /></label>
+                <label>Reorder at <input type="number" name="reorder_point" step="0.001" value="0" /></label>
+                [% IF hk_has_inventory %]
+                    <label>Inventory item id (optional) <input type="number" name="inventory_item_id" /></label>
+                [% END %]
+                <button type="submit" class="btn btn-primary">Save pantry item</button>
+            </p>
+        </form>
+
+        [% IF hk_pantry && hk_pantry.size %]
+            <table class="table">
+                <tr><th>Name</th><th>Qty</th><th>Unit</th><th>Reorder</th><th>Source</th><th>SKU</th></tr>
+                [% FOREACH p IN hk_pantry %]
+                    <tr>
+                        <td>[% p.name | html %]</td>
+                        <td>[% p.qty | html %]</td>
+                        <td>[% p.unit | html %]</td>
+                        <td>[% p.reorder_point | html %]</td>
+                        <td>[% p.via | html %]</td>
+                        <td>[% p.sku || p.inventory_item_id || '—' | html %]</td>
+                    </tr>
+                [% END %]
+            </table>
+        [% ELSE %]
+            <p class="doc-muted">Pantry is empty.</p>
+        [% END %]
+    [% END %]
+</div>
