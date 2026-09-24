@@ -40,7 +40,14 @@ sub _detect_provider {
 
     my $bare = $requested_model;
     my $prefix = '';
-    if ($bare =~ s/^([^|]+)\|//) {
+    # Wire format is normally "provider|model". Also accept "provider/model"
+    # for first-party provider names — OpenRouter-style slash otherwise leaks
+    # "supergrok/grok-4.6" into the external hop as a literal model id
+    # (CSC-20260914-4380 → OpenRouter 400 invalid model).
+    if ($bare =~ s/^(supergrok|grok-oauth|grok|ollama|openrouter|external)[|\/]//i) {
+        $prefix = lc($1);
+    }
+    elsif ($bare =~ s/^([^|]+)\|//) {
         $prefix = lc($1);
     }
     if ($prefix eq 'supergrok' || $prefix eq 'grok-oauth') {
@@ -150,7 +157,10 @@ sub _is_chat_model {
 sub _bare_model {
     my ($self, $model) = @_;
     return $model unless defined $model;
-    $model =~ s/^[^|]+\|//;   # drop leading "provider|"
+    # Drop leading "provider|" or accidental "provider/" for first-party names
+    # (CSC-20260914-4380: "supergrok/grok-4.6" must become bare "grok-4.6").
+    $model =~ s/^(?:supergrok|grok-oauth|grok|ollama|openrouter|external)[|\/]//i;
+    $model =~ s/^[^|]+\|//;   # drop any other leading "provider|"
     return $model;
 }
 
@@ -294,6 +304,10 @@ sub _credits_exhausted {
     # "personal-team-blocked:spending-limit". Router must read that as "this
     # hop is down" and fall through, not dead-end (todo #2374).
     return 1 if $error =~ /spending.?limit|personal-team-blocked|out of credits|add credits|upgrade at/i;
+    # Auth expiry / rejected OAuth: fall through to free/local instead of
+    # dead-ending the turn (CSC-20260914-4380). Do not force a re-login UI —
+    # Provider::Grok already includes the hermes re-auth hint in the error.
+    return 1 if $error =~ /login expired|auth_failed|unauthenticated|bad-credentials|invalid.?token|token could not be validated/i;
     return 1 if $self->_transient_outage($error);
     return 0;
 }
@@ -316,6 +330,9 @@ sub _user_facing_error {
     }
     if ($error =~ /402\b|insufficient credit|out of credit|quota|usage limit/i) {
         return 'That paid model is out of credit. Falling back to a free or local model.';
+    }
+    if ($error =~ /login expired|unauthenticated|bad-credentials|invalid.?token/i) {
+        return 'SuperGrok/xAI login expired or invalid. Falling back to a free or local model when possible.';
     }
     return 'The AI provider did not complete this turn. Try again or pick another model.';
 }
