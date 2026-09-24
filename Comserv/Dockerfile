@@ -2,6 +2,11 @@
 # Stage 1: Build environment with all dependencies
 ARG PERL_VERSION=5.40.0
 ARG BASE_IMAGE=perl:5.40.0
+# Build metadata (injected at build time via --build-arg)
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ARG BUILD_DATE=unknown
+ARG BUILD_HOST=unknown
 
 FROM ${BASE_IMAGE} AS builder
 
@@ -50,6 +55,7 @@ RUN cpanm --local-lib=/opt/comserv/local --notest \
     Crypt::CBC
 RUN set -eux; \
     for i in 1 2 3 4 5; do \
+      rm -rf /root/.cpanm && \
       cpanm --local-lib=/opt/comserv/local --notest --mirror https://cpan.metacpan.org --mirror https://www.cpan.org \
         Cpanel::JSON::XS JSON::MaybeXS && break; \
       echo "JSON backend install attempt $i failed — retrying"; \
@@ -58,6 +64,7 @@ RUN set -eux; \
     perl -MCpanel::JSON::XS -MJSON::MaybeXS -e1
 RUN set -eux; \
     for i in 1 2 3; do \
+      rm -rf /root/.cpanm && \
       cpanm --local-lib=/opt/comserv/local --notest \
         --mirror https://cpan.metacpan.org \
         --mirror https://www.cpan.org \
@@ -65,7 +72,8 @@ RUN set -eux; \
       echo "installdeps attempt $i failed — retrying"; \
       sleep $((i * 10)); \
     done
-RUN cpanm --local-lib=/opt/comserv/local --notest \
+RUN rm -rf /root/.cpanm && \
+    cpanm --local-lib=/opt/comserv/local --notest \
     --mirror https://cpan.metacpan.org \
     --mirror https://www.cpan.org \
     Catalyst::Plugin::Session::Store::Cookie
@@ -168,6 +176,18 @@ CMD []
 LABEL maintainer="Comserv Development Team"
 LABEL description="Comserv Catalyst Web Application - Production Container"
 LABEL version="1.0"
+# OCI standard labels (immutable image metadata, queryable via docker inspect)
+LABEL org.opencontainers.image.title="Comserv Web Application"
+LABEL org.opencontainers.image.description="Comserv Catalyst Web Application - Production Container"
+LABEL org.opencontainers.image.version="1.0"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
+LABEL org.opencontainers.image.source="https://github.com/shantamcbain/comserv2"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.authors="Comserv Development Team"
+LABEL org.opencontainers.image.licenses="Proprietary"
+LABEL org.opencontainers.image.ref.name="shantamcsbain/comserv-web-prod"
+LABEL org.opencontainers.image.branch="${GIT_BRANCH}"
+LABEL org.opencontainers.image.build.host="${BUILD_HOST}"
 
 # ===================================================================
 # Stage 3: Development image (IMGDEP Ph.0)
