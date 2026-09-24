@@ -6,7 +6,7 @@ use Comserv::Model::AccountingDB;
 use Comserv::Model::CoaTemplate;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::Accounting::Migrator;
-use POSIX qw(strftime);
+use Comserv::Util::AppTime;
 use LWP::UserAgent;
 use JSON;
 
@@ -96,7 +96,7 @@ sub auto :Private {
 
 sub _sitename { return $_[1]->session->{SiteName} || 'default' }
 sub _schema   { return $_[1]->model('DBEncy') }
-sub _now      { return strftime('%Y-%m-%d %H:%M:%S', localtime) }
+sub _now      { return Comserv::Util::AppTime->now_utc }
 
 # -------------------------------------------------------------------------
 # Dashboard /Accounting
@@ -1405,10 +1405,9 @@ sub ai_usage :Path('/Accounting/ai_usage') :Args(0) {
 
     my $schema = $self->_schema($c)->schema;
 
-    # Date range defaults: first of current month → today
-    use POSIX qw(strftime);
-    my $today      = strftime('%Y-%m-%d', localtime);
-    my $month_from = strftime('%Y-%m-01',  localtime);
+    # Date range defaults: first of current UTC month → today UTC
+    my $today      = Comserv::Util::AppTime->today_utc_ymd;
+    my $month_from = substr($today, 0, 8) . '01';
 
     my $period_from  = $c->request->params->{period_from}  || $month_from;
     my $period_to    = $c->request->params->{period_to}    || $today;
@@ -1960,6 +1959,19 @@ sub manufacturing_api_update_part :Path('/Accounting/manufacturing/api/update_pa
     }
     $c->res->content_type('application/json');
     $c->res->body(JSON::encode_json($result));
+    $c->detach;
+}
+
+# POST /Accounting/manufacturing/api/reserve — stale-worker fallback
+sub manufacturing_api_reserve :Path('/Accounting/manufacturing/api/reserve') :Args(0) {
+    my ($self, $c) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl && $ctl->can('api_reserve')) {
+        return $ctl->api_reserve($c);
+    }
+    $c->res->status(503);
+    $c->res->content_type('application/json');
+    $c->res->body('{"success":0,"error":"Manufacturing controller not loaded"}');
     $c->detach;
 }
 

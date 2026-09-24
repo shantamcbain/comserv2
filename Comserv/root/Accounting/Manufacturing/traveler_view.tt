@@ -4,9 +4,9 @@
     roles = 'admin,accounting,helpdesk'
     TemplateType = 'Application'
     category = 'Manufacturing'
-    page_version = '0.05 2026-09-10'
+    page_version = '0.06 2026-09-24'
 %]
-[% PageVersion = 'Accounting/Manufacturing/traveler_view.tt,v 0.05 2026/09/10 shanta Exp shanta ' %]
+[% PageVersion = 'Accounting/Manufacturing/traveler_view.tt,v 0.06 2026/09/24 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <style>
@@ -171,6 +171,12 @@
         <a href="[% c.uri_for('/Accounting/manufacturing/print', traveler.order_id) %]" class="print-btn" target="_blank">Print Form</a>
         <a href="[% c.uri_for('/Accounting/manufacturing') %]" class="print-btn" style="margin-left:8px;background:#455a64;">All Orders</a>
         <a href="[% c.uri_for('/3d/queue') %]" class="print-btn" style="margin-left:8px;background:#7b1fa2;">Print Queue</a>
+        <button type="button" class="print-btn" id="reserve-bom-btn"
+            style="margin-left:8px;background:var(--primary-color,#1565c0);border:0;cursor:pointer;"
+            onclick="reserveBom()">Reserve on-hand</button>
+        <button type="button" class="print-btn" id="unreserve-bom-btn"
+            style="margin-left:8px;background:var(--text-muted-color,#546e7a);border:0;cursor:pointer;"
+            onclick="unreserveBom()">Release reserve</button>
     </div>
 
     <div class="order-info">
@@ -621,6 +627,73 @@ function updatePartStatus(id, status) {
 
 function saveNotes() { alert('Note saved (live update connected)'); }
 function uploadPhoto() { alert('Photo uploaded and attached to traveler (live QC record created)'); }
+
+function reserveBom() {
+    var btn = document.getElementById('reserve-bom-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Reserving…'; }
+    var payload = {
+        order_id: '[% IF traveler.order_kind == "inventory_item" %]item-[% traveler.order_id %][% ELSE %][% traveler.order_id %][% END %]',
+        parent_sku: '[% traveler.parent_sku | html %]',
+        quantity: 1,
+        sitename: '[% c.stash.SiteName || c.session.SiteName | html %]'
+    };
+    [% IF traveler.order_kind == 'inventory_item' && traveler.id %]
+    payload.parent_item_id = [% traveler.id %];
+    [% ELSIF traveler.order_kind == 'customer_order' && traveler.id %]
+    payload.customer_order_id = [% traveler.id %];
+    [% END %]
+    fetch('[% c.uri_for("/Accounting/manufacturing/api/reserve") %]', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    }).then(function (r) { return r.json().catch(function(){ return {}; }); }).then(function (j) {
+        if (j && j.success) {
+            var msg = 'Reserved ' + (j.reserved || 0) + ' line(s). Buy shortfall: ' + (j.buy || 0)
+                + '. Print shortfall: ' + (j.print || 0);
+            if (j.already) { msg += ' (already reserved: ' + j.already + ')'; }
+            alert(msg);
+        } else {
+            alert('Reserve failed: ' + ((j && (j.error || (j.errors && j.errors[0]))) || 'unknown'));
+        }
+        location.reload();
+    }).catch(function (e) {
+        alert('Reserve failed: ' + e);
+        if (btn) { btn.disabled = false; btn.textContent = 'Reserve on-hand'; }
+    });
+}
+
+function unreserveBom() {
+    var btn = document.getElementById('unreserve-bom-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Releasing…'; }
+    var payload = {
+        parent_sku: '[% traveler.parent_sku | html %]',
+        quantity: 1,
+        sitename: '[% c.stash.SiteName || c.session.SiteName | html %]'
+    };
+    [% IF traveler.order_kind == 'inventory_item' && traveler.id %]
+    payload.parent_item_id = [% traveler.id %];
+    [% ELSIF traveler.order_kind == 'customer_order' && traveler.id %]
+    payload.customer_order_id = [% traveler.id %];
+    [% END %]
+    fetch('[% c.uri_for("/Inventory/api/stock/unreserve") %]', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    }).then(function (r) { return r.json().catch(function(){ return {}; }); }).then(function (j) {
+        if (j && j.success) {
+            var n = (j.released && j.released.length) ? j.released.length : 0;
+            var msg = 'Released ' + n + ' reserve line(s).';
+            if (j.already) { msg += ' (already released)'; }
+            alert(msg);
+        } else {
+            alert('Release failed: ' + ((j && j.error) || 'unknown'));
+        }
+        location.reload();
+    }).catch(function (e) {
+        alert('Release failed: ' + e);
+        if (btn) { btn.disabled = false; btn.textContent = 'Release reserve'; }
+    });
+}
 
 function finishTraveler() {
     if (anyCleanTimerRunning()) {

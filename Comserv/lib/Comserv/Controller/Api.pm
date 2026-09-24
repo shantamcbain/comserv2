@@ -675,6 +675,30 @@ sub api_inventory_po_create :Path('inventory/po/create') :Args(0) {
     $c->controller('Inventory::PurchaseOrder')->api_po_create($c);
 }
 
+sub api_inventory_po_receive :Path('inventory/po/receive') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory::PurchaseOrder')->api_po_receive($c);
+}
+
+sub api_inventory_draft_from_mail :Path('inventory/invoice/draft_from_mail') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory::PurchaseOrder')->api_draft_from_mail($c);
+}
+
+sub api_inventory_stock_reserve :Path('inventory/stock/reserve') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory::PurchaseOrder')->api_stock_reserve($c);
+}
+
+sub api_inventory_stock_unreserve :Path('inventory/stock/unreserve') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory::PurchaseOrder')->api_stock_unreserve($c);
+}
+
 =head2 api_list_documentation
 
 GET /api/documentation - List all documentation pages (Bypass keyword/token for local/workstation.local)

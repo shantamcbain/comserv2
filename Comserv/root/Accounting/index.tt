@@ -1,4 +1,4 @@
-[% PageVersion = 'Accounting/index.tt,v 0.02 2026/04/15 shanta Exp' %]
+[% PageVersion = 'Accounting/index.tt,v 0.03 2026/09/24 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
@@ -194,6 +194,32 @@
         </li>
         <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
           <a href="/Inventory/print/labels" target="_blank">All Item Labels</a>
+        </li>
+      </ul>
+    </div>
+
+    [%# ── Onboarding (ACCON intake paths) ────────────────────────── %]
+    <div class="content-section" style="margin:0;">
+      <h2 style="margin-top:0;color:var(--primary-color,#1e40af);border-bottom:2px solid var(--border-color,#93c5fd);padding-bottom:0.4rem;">
+        Accounting onboarding
+      </h2>
+      <p style="font-size:0.82rem;color:var(--text-muted-color,#666);margin:0 0 0.5rem;">
+        Site owners start at <a href="/Accounting/setup">/Accounting/setup</a> (module → provision PG → chart).
+        Three chart-intake paths; only Path A is live.
+        Guide: <a href="[% c.uri_for('/Documentation/AccountingOnboarding') %]">Accounting onboarding</a>.
+      </p>
+      <ul style="list-style:none;padding:0;margin:0;">
+        <li style="padding:0.4rem 0;border-bottom:1px solid var(--border-color,#f0f0f0);">
+          <a href="/Accounting/setup?ai=1" style="font-weight:bold;">Path A — AI chart (review, then commit)</a>
+          <div style="font-size:0.78rem;color:var(--text-muted-color,#666);">Live. Also <code>/Accounting/setup/ai_generate</code>. No GL until you commit.</div>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid var(--border-color,#f0f0f0);">
+          Path B — import a chart from PDF/image
+          <div style="font-size:0.78rem;color:var(--text-muted-color,#666);">Not built (todo #1806). Do not upload statements here.</div>
+        </li>
+        <li style="padding:0.4rem 0;">
+          Path C — master data / history import
+          <div style="font-size:0.78rem;color:var(--text-muted-color,#666);">Not built (todos #1807/#1808).</div>
         </li>
       </ul>
     </div>
