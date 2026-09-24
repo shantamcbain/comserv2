@@ -271,7 +271,7 @@
             <div id="panel-hermes" class="sidebar-panel" style="display:none; padding:0; width:720px; background:#2b2b2b; overflow:hidden;">
                 <div style="padding:8px; display:flex; flex-direction:column; height:100%; min-height:0; box-sizing:border-box;">
                     <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa; flex:0 0 auto;">HERMES</h4>
-                    <p style="font-size:11px;color:#888;margin:0 0 6px;flex:0 0 auto;">Dashboard embeds below (port 9119). Drag the panel edge to widen, drag the bar under the frame to change height, or Detach for a full window. Over ZeroTier open the dashboard on this machine&apos;s IP:9119 after firewall allows it.</p>
+                    <p style="font-size:11px;color:#888;margin:0 0 6px;flex:0 0 auto;">Hermes dashboard opens on this page&apos;s hostname at port 9119 (<code>/chat</code>) — localhost, <code>*.local</code>, <code>*.zero</code>, or the ZeroTier IP, matching how you opened the editor. Drag the panel edge to widen, drag the bar under the frame to change height, or Detach for a full window.</p>
                     <p style="font-size:11px;color:#9ecbff;margin:0 0 6px;flex:0 0 auto;">Login: username <code>shanta</code> (dashboard password is the one you set locally).</p>
                     <div style="font-size:11px;color:#c8d0dc;background:#0f1115;border:1px solid #444;border-radius:4px;padding:8px;margin-bottom:8px;flex:0 0 auto;">
                       <div style="color:#888;margin-bottom:4px;">Terminal (normal Hermes):</div>
