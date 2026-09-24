@@ -162,6 +162,7 @@
         var iframe = document.getElementById('hermes-iframe');
         var placeholder = document.getElementById('hermes-placeholder');
         var openTab = document.getElementById('hermes-open-tab');
+        var frameWrap = document.getElementById('hermes-frame-wrap');
         var dashUrl = '';
         try {
             var qs = new URLSearchParams(window.location.search || '');
@@ -171,17 +172,140 @@
             dashUrl = iframe.getAttribute('src');
         }
         if (!dashUrl) {
-            // Same host as the editor (localhost or ZeroTier IP): Hermes dashboard sessions
             dashUrl = window.location.protocol + '//' + window.location.hostname + ':9119/sessions';
         }
-        if (iframe && dashUrl) {
-            iframe.src = dashUrl;
-            iframe.style.display = 'block';
+        function applyDashUrl(u) {
+            dashUrl = u;
+            if (iframe) {
+                iframe.src = u;
+                iframe.style.display = 'block';
+            }
+            if (frameWrap) frameWrap.style.display = 'block';
             if (placeholder) placeholder.style.display = 'none';
+            if (openTab) openTab.href = u;
         }
-        if (openTab && dashUrl) {
-            openTab.href = dashUrl;
+        if (iframe && dashUrl) applyDashUrl(dashUrl);
+        if (openTab && dashUrl) openTab.href = dashUrl;
+
+        // Height: persist + taller/shorter + drag
+        var HEIGHT_KEY = 'ai2-hermes-iframe-h';
+        function clampH(h) {
+            h = parseInt(h, 10);
+            if (!h || isNaN(h)) h = Math.min(window.innerHeight * 0.7, 720);
+            return Math.max(280, Math.min(1200, h));
         }
+        function setFrameHeight(px) {
+            if (!frameWrap) return;
+            var h = clampH(px);
+            frameWrap.style.height = h + 'px';
+            frameWrap.style.minHeight = Math.min(h, 420) + 'px';
+            try { sessionStorage.setItem(HEIGHT_KEY, String(h)); } catch (e) {}
+        }
+        try {
+            var savedH = sessionStorage.getItem(HEIGHT_KEY);
+            if (savedH) setFrameHeight(savedH);
+        } catch (e) {}
+        var taller = document.getElementById('hermes-taller');
+        var shorter = document.getElementById('hermes-shorter');
+        if (taller) taller.addEventListener('click', function () {
+            var cur = frameWrap ? (parseInt(frameWrap.style.height, 10) || frameWrap.offsetHeight || 520) : 520;
+            setFrameHeight(cur + 80);
+        });
+        if (shorter) shorter.addEventListener('click', function () {
+            var cur = frameWrap ? (parseInt(frameWrap.style.height, 10) || frameWrap.offsetHeight || 520) : 520;
+            setFrameHeight(cur - 80);
+        });
+        var resizeBar = document.getElementById('hermes-iframe-resize');
+        if (resizeBar && frameWrap) {
+            var dragging = false;
+            var startY = 0;
+            var startH = 0;
+            resizeBar.addEventListener('mousedown', function (e) {
+                dragging = true;
+                startY = e.clientY;
+                startH = frameWrap.offsetHeight || 520;
+                e.preventDefault();
+                document.body.style.userSelect = 'none';
+            });
+            document.addEventListener('mousemove', function (e) {
+                if (!dragging) return;
+                setFrameHeight(startH + (e.clientY - startY));
+            });
+            document.addEventListener('mouseup', function () {
+                if (!dragging) return;
+                dragging = false;
+                document.body.style.userSelect = '';
+            });
+        }
+
+        // Detach / Attach (popup window)
+        var detachBtn = document.getElementById('hermes-detach');
+        var _detachWin = null;
+        var _detachPoll = null;
+        var _detached = false;
+        function setDetachLabel(detached) {
+            if (!detachBtn) return;
+            detachBtn.textContent = detached ? '⊞ Attach' : '⤢ Detach';
+            detachBtn.title = detached
+                ? 'Close detached window and show Hermes in the editor'
+                : 'Open Hermes dashboard in its own window';
+        }
+        function closeHermesPanel() {
+            if (window.AI2Sidebar && typeof window.AI2Sidebar.closePanel === 'function') {
+                window.AI2Sidebar.closePanel('hermes');
+                return;
+            }
+            var icon = document.querySelector('#sidebar-icons .sidebar-icon[data-panel="hermes"]');
+            if (icon && icon.classList.contains('active')) icon.click();
+        }
+        function openHermesPanel() {
+            if (window.AI2Sidebar && typeof window.AI2Sidebar.openPanel === 'function') {
+                window.AI2Sidebar.openPanel('hermes');
+                return;
+            }
+            var icon = document.querySelector('#sidebar-icons .sidebar-icon[data-panel="hermes"]');
+            if (icon && !icon.classList.contains('active')) icon.click();
+        }
+        function clearDetach() {
+            _detached = false;
+            _detachWin = null;
+            if (_detachPoll) { clearInterval(_detachPoll); _detachPoll = null; }
+            setDetachLabel(false);
+        }
+        if (detachBtn) {
+            detachBtn.addEventListener('click', function () {
+                if (_detached) {
+                    if (_detachWin && !_detachWin.closed) {
+                        try { _detachWin.close(); } catch (e) {}
+                    }
+                    clearDetach();
+                    openHermesPanel();
+                    return;
+                }
+                var u = dashUrl || (window.location.protocol + '//' + window.location.hostname + ':9119/sessions');
+                var w = null;
+                try {
+                    w = window.open(u, 'AI2HermesDetach', 'width=1280,height=900,left=40,top=20,resizable=yes,scrollbars=yes');
+                } catch (e) {
+                    console.error('[' + NS + '] detach blocked', e);
+                    return;
+                }
+                if (!w) {
+                    console.warn('[' + NS + '] popup blocked');
+                    return;
+                }
+                _detachWin = w;
+                _detached = true;
+                setDetachLabel(true);
+                closeHermesPanel();
+                if (_detachPoll) clearInterval(_detachPoll);
+                _detachPoll = setInterval(function () {
+                    if (!_detachWin || _detachWin.closed) clearDetach();
+                }, 700);
+                try { w.focus(); } catch (e2) {}
+            });
+        }
+
         // Primary action: show dashboard (never Electron login)
         var reloadDash = document.getElementById('hermes-reload-dashboard');
         if (!reloadDash) {
@@ -195,10 +319,7 @@
         }
         reloadDash.onclick = function () {
             var u = window.location.protocol + '//' + window.location.hostname + ':9119/sessions';
-            if (iframe) { iframe.src = u; iframe.style.display = 'block'; }
-            if (placeholder) placeholder.style.display = 'none';
-            if (openTab) openTab.href = u;
-            window.open(u, '_blank', 'noopener');
+            applyDashUrl(u);
         };
 
 

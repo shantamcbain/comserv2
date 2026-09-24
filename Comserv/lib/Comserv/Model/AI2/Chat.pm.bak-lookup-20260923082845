@@ -533,7 +533,7 @@ sub process {
             $quality = $ai_ctrl->_assess_response_quality($resp->{response} // '', $prompt);
         }
         my $site_audit = ($prompt =~ /\b(navigate|navigation|crawl|audit|failed\s+links?|each\s+page|readable|theme|look and content|site and report|broken\s+links?)\b/i) ? 1 : 0;
-        my $lookup_intent = ($prompt =~ /\b(find|look\s*up|search\s+for|what\s+is|who\s+is|tell\s+me\s+about|tell\s+me\s+what|information\s+on|info\s+on|used\s+for)\b/i) ? 1 : 0;
+        my $lookup_intent = ($prompt =~ /\b(find|look\s*up|search\s+for|what\s+is|who\s+is|tell\s+me\s+about|information\s+on|info\s+on)\b/i) ? 1 : 0;
         my $need = $can_enrich && $resp && $resp->{success}
             && ($quality eq 'poor' || $site_audit || $lookup_intent)
             && !$args{use_search};
