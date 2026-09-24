@@ -191,8 +191,8 @@ sub stock_reorder_list {
     eval {
         my @items = $schema->resultset('Accounting::InventoryItem')->search(
             {
-                sitename      => $sitename,
-                status        => 'active',
+                'me.sitename' => $sitename,
+                'me.status'   => 'active',
             },
             {
                 prefetch => [ 'stock_levels', { item_suppliers => 'supplier' } ],
