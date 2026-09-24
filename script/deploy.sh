@@ -8,9 +8,14 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 # The container carries the app code, but host-side cron scripts (hardware_monitor.pl)
 # and deploy.sh itself must live on the HOST (they run outside the container). This
 # step copies every changed script the host cron/deploy needs so all servers stay
-# identical. Runs as the very first action of deploy so a fresh server gets the
-# sync_deploy_artifacts() — SYNC THE CANONICAL DEPLOY ARTIFACT SET INTO THE
-# BUILD-SOURCE CHECKOUT BEFORE ANY BUILD.
+# identical.
+#
+# NOTE for pure gateway hosts (e.g. .03 / proxmoxt210): there is no application
+# code or container there — only the hardware_monitor cron. Deploy may not run
+# the full host-script sync on those boxes. For those, manually copy
+# script/hardware_monitor.pl → /usr/local/bin/hardware_monitor.pl on the gateway
+# after editing the source here. The cron setup (CRON_LINE) can still be refreshed
+# by running the relevant setup function or by hand.
 #
 # Root-cause of repeated "fix not in the rebuild" bugs: the build reads from a
 # server-side git checkout (e.g. /opt/comserv/Comserv), but edits were made on a
@@ -136,6 +141,9 @@ case "${1:-}" in
         ;;
     --local-rebuild|local-rebuild)
         DEPLOY_MODE_DETECTED="local-rebuild"
+        ;;
+    --push-only|push-only)
+        DEPLOY_MODE_DETECTED="push-only"
         ;;
 esac
 
@@ -442,13 +450,27 @@ setup_shared_secrets_standalone() {
         esac
     fi
 
-    # Marker MUST be at end of the cron line. A leading "# comserv-..." after the
+    # Ensure monitor log target is always writable (cron user may be non-root;
+    # /var/log often root-owned). Use /tmp (world-writable sticky bit) so
+    # >> never fails and never generates cron mail of success output.
+    # With the updated hardware_monitor.pl (no stdout on success) the log
+    # will only contain real outage lines (the STDERR CRITICAL path).
+    local HW_LOG="/tmp/comserv-hardware-monitor.log"
+    mkdir -p "$(dirname "$HW_LOG")" 2>/dev/null || true
+    touch "$HW_LOG" 2>/dev/null || true
+    chmod 666 "$HW_LOG" 2>/dev/null || true
+
+    # Marker MUST be at end of the cron line. A leading "# comserv-... " after the
     # schedule turns the rest of the line into a comment and the job never runs.
     local CRON_MARKER="# comserv-hardware-monitor"
-    local CRON_LINE="*/5 * * * * HW_MONITOR_NODES='$MON_NODES' HW_INGEST_TOKEN=\"\$(cat /usr/local/etc/comserv/hw_ingest_token 2>/dev/null || echo MISSING_TOKEN)\" /usr/local/bin/hardware_monitor.pl >> /var/log/comserv-hardware-monitor.log 2>&1 $CRON_MARKER"
+    local CRON_LINE="*/5 * * * * HW_MONITOR_NODES='$MON_NODES' HW_INGEST_TOKEN=\"\$(cat /usr/local/etc/comserv/hw_ingest_token 2>/dev/null || echo MISSING_TOKEN)\" /usr/local/bin/hardware_monitor.pl >> $HW_LOG 2>&1 $CRON_MARKER"
     local TMP_CRON
     TMP_CRON=$(mktemp)
-    ( crontab -l 2>/dev/null | grep -v "$CRON_MARKER" ) > "$TMP_CRON" 2>/dev/null || true
+    # Aggressively clean *any* old hardware monitor cron lines (with or without
+    # the marker, old log paths, old versions of the script) so that re-running
+    # the setup on the gateway host fully replaces stale entries that were
+    # still mailing the success output.
+    ( crontab -l 2>/dev/null | grep -v -E "$CRON_MARKER|hardware_monitor\.pl|comserv-hardware-monitor" ) > "$TMP_CRON" 2>/dev/null || true
     echo "$CRON_LINE" >> "$TMP_CRON"
     crontab "$TMP_CRON" 2>/dev/null && echo "  ✅ cron installed: $CRON_MARKER (every 5 min)" || echo "  ⚠ crontab install failed (non-fatal)"
     rm -f "$TMP_CRON"
@@ -634,7 +656,7 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
             exit $?
             ;;
 
-        "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild")
+        "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild"|"push-only")
             # Functions are defined below; late dispatch after canonical_deploy*.
             ;;
 
@@ -1333,6 +1355,25 @@ if [ "${DEPLOY_MODE:-}" = "build-push" ]; then
     fi
     canonical_deploy "local"
     exit $?
+fi
+
+if [ "${DEPLOY_MODE:-}" = "push-only" ]; then
+    echo "=== PUSH ONLY (no build, no container recreate) ==="
+    if is_production_host; then
+        echo "❌ REFUSING to push from production. Push from the workstation."
+        exit 1
+    fi
+    # Prefer the image currently used by the local web-prod container; fall back to :latest tag name.
+    local_img=$(docker inspect --format='{{.Image}}' comserv2-web-prod 2>/dev/null || docker inspect --format='{{.Image}}' comserv-web-prod 2>/dev/null || true)
+    if [ -n "$local_img" ]; then
+        echo "Tagging running container image $local_img as $IMAGE"
+        docker tag "$local_img" "$IMAGE" || { echo "❌ docker tag failed"; exit 1; }
+    else
+        echo "No local web-prod container — pushing existing $IMAGE if present"
+    fi
+    docker push "$IMAGE" || { echo "❌ docker push failed"; exit 1; }
+    echo "✅ Pushed $IMAGE (running container untouched)"
+    exit 0
 fi
 
 if [ "${DEPLOY_MODE:-}" = "local-rebuild" ]; then

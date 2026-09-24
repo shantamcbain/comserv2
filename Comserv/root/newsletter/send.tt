@@ -14,15 +14,16 @@
     [% END %]
 
     <div class="admin-card">
-        <p><strong>Online page:</strong> <a href="[% read_url %]" target="_blank">[% read_url %]</a></p>
-        <p style="color:var(--text-muted-color);">
-            Email includes your formatted teaser plus a <em>Read full newsletter online</em> button.
+        <p><strong>Online page:</strong> <a href="[% read_url %]" target="_blank" rel="noopener">[% read_url %]</a></p>
+        <p style="color:var(--text-muted-color);margin-bottom:0;">
+            Everything for this mailout is on this page: pick a list, tick who gets it, add one-off addresses, and review the exact outgoing email below.
         </p>
 
         <form method="POST" action="[% c.uri_for('/mail/newsletter/send', page.id) %]" id="nl-send-form">
+            <input type="hidden" name="roster_reviewed" value="1">
 
-            <div class="form-group">
-                <label for="mailing_list_id">Mailing list <span style="color:red">*</span></label>
+            <div class="form-group" style="margin-top:16px;">
+                <label for="mailing_list_id">Mailing list (switch to load names) <span style="color:red">*</span></label>
                 [% IF mailing_lists && mailing_lists.size %]
                 <select name="mailing_list_id" id="mailing_list_id" required class="form-control">
                     <optgroup label="Auto-synced lists (members, roles, workshops, hosting)">
@@ -47,14 +48,62 @@
                     </optgroup>
                 </select>
                 <small>
-                    Includes all active lists for this site (hosting customers, role lists, workshop attendees, and custom lists).
-                    <a href="[% c.uri_for('/mail/lists') %]">Manage mailing lists</a>
-                    · <a href="[% c.uri_for('/mail/subscribe') %]">Subscribe page</a>
+                    Changing the list reloads the roster below. Tick only the people for <em>this</em> send.
+                    Empty lists (e.g. Newsletter with 0) need one-off adds or a different list — no new list required.
                 </small>
                 [% ELSE %]
                 <p style="color:#c00;">No mailing lists for this site.
                     <a href="[% c.uri_for('/mail/lists') %]">Create a list</a> first.</p>
                 [% END %]
+            </div>
+
+            <div id="nl-recipient-box" style="background:#f0f4ff;border:1px solid #c5d0e8;border-radius:6px;padding:12px;margin:16px 0;">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+                    <div>
+                        <strong>Who gets this email:</strong>
+                        <span id="nl-recipient-count">0</span> selected from
+                        <em id="nl-recipient-list-name">…</em>
+                        (<span id="nl-roster-total">0</span> on list)
+                    </div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <button type="button" id="nl-select-all" class="btn btn-secondary" style="font-size:0.85em;padding:4px 10px;">Select all</button>
+                        <button type="button" id="nl-select-none" class="btn btn-secondary" style="font-size:0.85em;padding:4px 10px;">Select none</button>
+                    </div>
+                </div>
+                <div id="nl-roster-status" style="font-size:0.9em;color:var(--text-muted-color);margin-bottom:8px;">Loading roster…</div>
+                <div style="max-height:320px;overflow:auto;border:1px solid #c5d0e8;border-radius:4px;background:#fff;">
+                    <table id="nl-roster-table" style="width:100%;border-collapse:collapse;font-size:0.92em;">
+                        <thead>
+                            <tr style="background:#e8eefc;text-align:left;">
+                                <th style="padding:8px;width:40px;">Send</th>
+                                <th style="padding:8px;">Name</th>
+                                <th style="padding:8px;">Email</th>
+                                <th style="padding:8px;">Note</th>
+                            </tr>
+                        </thead>
+                        <tbody id="nl-roster-body"></tbody>
+                    </table>
+                </div>
+                <div id="nl-recipient-inputs"></div>
+                <span id="nl-recipient-warn" style="color:#c00;display:none;">
+                    No one selected — tick addresses above or add one below.
+                </span>
+
+                <div style="margin-top:14px;padding-top:12px;border-top:1px solid #c5d0e8;">
+                    <strong>Add address not on any list</strong>
+                    <span style="font-size:0.85em;color:var(--text-muted-color);"> — one-shot for this send only; does not create a list or subscribe them.</span>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-top:8px;">
+                        <div style="flex:1;min-width:140px;">
+                            <label for="nl-add-name" style="font-size:0.85em;display:block;">Name (optional)</label>
+                            <input type="text" id="nl-add-name" class="form-control" placeholder="First Last">
+                        </div>
+                        <div style="flex:2;min-width:200px;">
+                            <label for="nl-add-email" style="font-size:0.85em;display:block;">Email <span style="color:red">*</span></label>
+                            <input type="email" id="nl-add-email" class="form-control" placeholder="name@example.com">
+                        </div>
+                        <button type="button" id="nl-add-btn" class="btn btn-secondary">Add to this send</button>
+                    </div>
+                </div>
             </div>
 
             <div class="form-group">
@@ -65,7 +114,7 @@
 
             <div class="form-group">
                 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
-                    <label for="teaser" style="margin:0;">Email teaser <small>(HTML — shown in inbox)</small></label>
+                    <label for="teaser" style="margin:0;">Email intro / teaser <small>(HTML)</small></label>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <span id="nl-teaser-mode-badge" class="label label-success" style="font-size:0.85em;">Formatted HTML</span>
                         <button type="button" id="nl-teaser-toggle-mode" class="btn btn-secondary" style="font-size:0.85em;padding:4px 10px;">
@@ -73,36 +122,33 @@
                         </button>
                     </div>
                 </div>
-                <div class="nl-teaser-layout" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;">
-                    <div>
-                        <textarea name="teaser" id="teaser" rows="10" required class="form-control"
-                                  style="font-family:monospace;font-size:0.9em;">[% teaser | html %]</textarea>
-                        <small style="display:block;margin-top:6px;color:var(--text-muted-color);">
-                            Personalization: <code>[FIRST_NAME]</code> <code>[LAST_NAME]</code>
-                            <code>[EMAIL]</code> <code>[USERNAME]</code>
-                        </small>
-                    </div>
-                    <div>
-                        <div style="font-size:0.8em;color:var(--text-muted-color);margin-bottom:4px;font-weight:bold;">
-                            Preview (sample — tags not replaced until send)
-                        </div>
-                        <div id="nl-teaser-preview" class="newsletter-issue-preview"
-                             style="min-height:200px;padding:16px;border:1px solid var(--border-color,#ddd);
-                                    border-radius:6px;background:#fff;overflow:auto;"></div>
-                    </div>
-                </div>
+                <textarea name="teaser" id="teaser" rows="8" required class="form-control"
+                          style="font-family:monospace;font-size:0.9em;">[% teaser | html %]</textarea>
+                <small style="display:block;margin-top:6px;color:var(--text-muted-color);">
+                    Personalization: <code>[FIRST_NAME]</code> <code>[LAST_NAME]</code>
+                    <code>[EMAIL]</code> <code>[USERNAME]</code>
+                </small>
+                <label class="checkbox-label" style="display:block;margin-top:10px;">
+                    <input type="checkbox" name="include_full_body" id="include_full_body" value="1" checked>
+                    Include the full newsletter body in the email (preview matches what they read — recommended)
+                </label>
             </div>
 
-            <div id="nl-recipient-box" style="background:#f0f4ff;border:1px solid #c5d0e8;border-radius:6px;padding:12px;margin:16px 0;">
-                <strong>Recipients:</strong> <span id="nl-recipient-count">[% sub_count %]</span> active subscriber(s) on
-                <em id="nl-recipient-list-name">[% IF mailing_lists && mailing_lists.size %][% FOREACH ml IN mailing_lists %][% IF ml.id == selected_list_id %][% ml.name | html %][% END %][% END %][% ELSE %](no list)[% END %]</em>.
-                <span id="nl-recipient-warn" style="color:#c00;[% IF sub_count > 0 %]display:none;[% END %]">
-                    <br>No subscribers on this list — choose another list or add members first.
-                </span>
+            <div class="form-group">
+                <div style="font-weight:bold;font-size:1.1em;margin-bottom:8px;color:#0d47a1;">
+                    Exact email the recipient receives
+                    <small style="display:block;font-weight:normal;color:var(--text-muted-color);font-size:0.85em;margin-top:4px;">
+                        Live preview — updates as you edit the intro. Full issue included while the box above is checked.
+                    </small>
+                </div>
+                <div id="nl-email-preview" class="newsletter-issue-preview"
+                     style="min-height:360px;max-height:720px;padding:20px;border:3px solid #1565c0;border-radius:8px;background:#fff;overflow:auto;"></div>
+                <div id="nl-page-body-raw" style="display:none;">[% page_body %]</div>
+                <input type="hidden" id="nl-read-url" value="[% read_url | html %]">
             </div>
 
             <div class="form-actions">
-                <button type="submit" id="nl-send-btn" class="btn btn-primary" [% IF !mailing_lists || !mailing_lists.size || sub_count == 0 %]disabled[% END %]>
+                <button type="submit" id="nl-send-btn" class="btn btn-primary" disabled>
                     Send Newsletter
                 </button>
                 <a href="[% c.uri_for('/mail/newsletter/edit', page.page_code) %]" class="btn btn-secondary">Back to Edit</a>
@@ -114,30 +160,49 @@
 <style>
     .newsletter-issue-preview p { margin: 0.6em 0; line-height: 1.55; }
     .newsletter-issue-preview a { color: var(--primary-color, #1565c0); }
-    @media (max-width: 900px) {
-        .nl-teaser-layout { grid-template-columns: 1fr !important; }
-    }
+    #nl-roster-table tr.nl-selected { background: #eef7ee; }
+    #nl-roster-table tr.nl-oneshot { background: #fff8e8; }
 </style>
 
 <script>
 (function() {
     var teaserEl   = document.getElementById('teaser');
-    var previewEl  = document.getElementById('nl-teaser-preview');
+    var previewEl  = document.getElementById('nl-email-preview');
     var listSel    = document.getElementById('mailing_list_id');
     var countEl    = document.getElementById('nl-recipient-count');
+    var totalEl    = document.getElementById('nl-roster-total');
     var listNameEl = document.getElementById('nl-recipient-list-name');
     var warnEl     = document.getElementById('nl-recipient-warn');
     var sendBtn    = document.getElementById('nl-send-btn');
     var form       = document.getElementById('nl-send-form');
     var toggleBtn  = document.getElementById('nl-teaser-toggle-mode');
     var badge      = document.getElementById('nl-teaser-mode-badge');
+    var fullBodyCb = document.getElementById('include_full_body');
+    var pageBodyEl = document.getElementById('nl-page-body-raw');
+    var readUrlEl  = document.getElementById('nl-read-url');
     var isHtmlMode = true;
     var storedHtml = '';
 
-    function updatePreview() {
-        if (!previewEl || !teaserEl) return;
-        var html = isHtmlMode ? teaserEl.value : plainToHtml(teaserEl.value);
-        previewEl.innerHTML = html || '<p style="color:#888;font-style:italic;">Preview will appear here…</p>';
+    var rosterBody   = document.getElementById('nl-roster-body');
+    var rosterInputs = document.getElementById('nl-recipient-inputs');
+    var rosterStatus = document.getElementById('nl-roster-status');
+    var addNameEl    = document.getElementById('nl-add-name');
+    var addEmailEl   = document.getElementById('nl-add-email');
+    var addBtn       = document.getElementById('nl-add-btn');
+    var selectAllBtn = document.getElementById('nl-select-all');
+    var selectNoneBtn= document.getElementById('nl-select-none');
+    var rosterUrlTpl = [% IF c %]'[% c.uri_for('/mail/newsletter/list_subscribers', 'LIST_ID') %]'[% ELSE %]'/mail/newsletter/list_subscribers/LIST_ID'[% END %];
+    // {email, name, note, oneshot, selected}
+    var roster = [];
+
+    function escapeHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function normalizeEmail(e) {
+        return String(e || '').trim().toLowerCase();
     }
 
     function htmlToPlain(html) {
@@ -155,10 +220,169 @@
         }).join('\n');
     }
 
+    function personalize(html) {
+        return String(html || '')
+            .replace(/\[FIRST_NAME\]/g, 'Alex')
+            .replace(/\[LAST_NAME\]/g, 'Keeper')
+            .replace(/\[EMAIL\]/g, 'alex@example.com')
+            .replace(/\[USERNAME\]/g, 'alex');
+    }
+
+    function updatePreview() {
+        if (!previewEl || !teaserEl) return;
+        var teaser = isHtmlMode ? teaserEl.value : plainToHtml(teaserEl.value);
+        teaser = personalize(teaser);
+        var readUrl = readUrlEl ? readUrlEl.value : '';
+        var includeFull = fullBodyCb && fullBodyCb.checked;
+        var body = teaser;
+        if (includeFull && pageBodyEl) {
+            body += '<hr style="border:none;border-top:1px solid #ddd;margin:24px 0;">'
+                 + '<div class="nl-full-issue">' + personalize(pageBodyEl.innerHTML) + '</div>';
+        }
+        var readBlock;
+        if (includeFull) {
+            readBlock = '<p style="font-size:0.9em;color:#555;margin-top:24px;">Online copy: <a href="'
+                + escapeHtml(readUrl) + '">' + escapeHtml(readUrl) + '</a></p>';
+        } else {
+            readBlock = '<p style="margin:24px 0;">'
+                + '<a href="' + escapeHtml(readUrl) + '" style="display:inline-block;background:#1565c0;color:#fff;'
+                + 'padding:12px 24px;text-decoration:none;border-radius:4px;font-weight:bold;">'
+                + 'Read full newsletter online</a></p>'
+                + '<p style="font-size:0.9em;color:#555;">Or copy this link: <a href="'
+                + escapeHtml(readUrl) + '">' + escapeHtml(readUrl) + '</a></p>';
+        }
+        previewEl.innerHTML =
+            '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;">'
+            + body + readBlock
+            + '<p style="font-size:0.85em;color:#666;margin-top:24px;"><em>Unsubscribe link appears for list members.</em></p>'
+            + '</div>';
+    }
+
+    function selectedCount() {
+        var n = 0;
+        roster.forEach(function(r) { if (r.selected) n++; });
+        return n;
+    }
+
+    function syncRosterUi() {
+        if (!rosterBody || !rosterInputs) return;
+        rosterBody.innerHTML = '';
+        rosterInputs.innerHTML = '';
+        roster.forEach(function(r, idx) {
+            var tr = document.createElement('tr');
+            tr.style.borderTop = '1px solid #e0e6f2';
+            if (r.selected) tr.className = 'nl-selected';
+            if (r.oneshot) tr.className = (tr.className ? tr.className + ' ' : '') + 'nl-oneshot';
+            tr.innerHTML =
+                '<td style="padding:8px;text-align:center;">'
+                + '<input type="checkbox" class="nl-include" data-idx="' + idx + '"'
+                + (r.selected ? ' checked' : '') + '></td>'
+                + '<td style="padding:8px;">' + escapeHtml(r.name || 'No Name') + '</td>'
+                + '<td style="padding:8px;"><code style="font-size:0.9em;">' + escapeHtml(r.email) + '</code></td>'
+                + '<td style="padding:8px;font-size:0.85em;color:#555;">' + escapeHtml(r.note || '') + '</td>';
+            rosterBody.appendChild(tr);
+            if (r.selected) {
+                var inp = document.createElement('input');
+                inp.type = 'hidden';
+                inp.name = 'recipient_email';
+                inp.value = r.email;
+                rosterInputs.appendChild(inp);
+            }
+        });
+        var n = selectedCount();
+        if (countEl) countEl.textContent = String(n);
+        if (totalEl) totalEl.textContent = String(roster.length);
+        if (warnEl) warnEl.style.display = n > 0 ? 'none' : 'inline';
+        if (sendBtn) sendBtn.disabled = n <= 0 || !listSel || !listSel.value;
+        rosterBody.querySelectorAll('.nl-include').forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                var i = parseInt(cb.getAttribute('data-idx'), 10);
+                if (!isNaN(i) && roster[i]) {
+                    roster[i].selected = !!cb.checked;
+                    syncRosterUi();
+                }
+            });
+        });
+    }
+
+    function setRosterFromSubscribers(subs) {
+        var oneshots = roster.filter(function(r) { return r.oneshot && r.selected; });
+        roster = [];
+        var seen = {};
+        (subs || []).forEach(function(s) {
+            var email = String(s.email || '').trim();
+            var key = normalizeEmail(email);
+            if (!email || !key || seen[key]) return;
+            seen[key] = 1;
+            var note = s.source ? ('from list · ' + s.source) : 'from list';
+            roster.push({
+                email: email,
+                name: s.name || 'No Name',
+                note: note,
+                oneshot: false,
+                // Large lists start unchecked so you pick a few; tiny lists start checked.
+                selected: false
+            });
+        });
+        oneshots.forEach(function(o) {
+            var key = normalizeEmail(o.email);
+            if (seen[key]) return;
+            seen[key] = 1;
+            roster.push(o);
+        });
+        // Auto-check if only a handful
+        if (roster.filter(function(r){return !r.oneshot;}).length > 0
+            && roster.filter(function(r){return !r.oneshot;}).length <= 5) {
+            roster.forEach(function(r) { if (!r.oneshot) r.selected = true; });
+        }
+        syncRosterUi();
+    }
+
+    function refreshRecipients() {
+        if (!listSel) return;
+        var opt = listSel.options[listSel.selectedIndex];
+        if (!opt) return;
+        var listId = opt.value;
+        if (listNameEl) listNameEl.textContent = opt.text.split(' — ')[0];
+        if (!listId) {
+            setRosterFromSubscribers([]);
+            if (rosterStatus) rosterStatus.textContent = 'Choose a mailing list.';
+            return;
+        }
+        if (rosterStatus) rosterStatus.textContent = 'Loading roster…';
+        var url = rosterUrlTpl.replace('LIST_ID', encodeURIComponent(listId));
+        fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (!data || !data.ok) {
+                    throw new Error((data && data.error) || 'Failed to load subscribers');
+                }
+                setRosterFromSubscribers(data.subscribers || []);
+                var listed = (data.subscribers || []).length;
+                if (rosterStatus) {
+                    if (!listed) {
+                        rosterStatus.textContent = 'This list has 0 subscribers. Switch lists above, or add addresses below for this send only.';
+                    } else if (listed > 5) {
+                        rosterStatus.textContent = 'Loaded ' + listed + ' — tick the few you want (starts with none selected). One-shot adds stay selected.';
+                    } else {
+                        rosterStatus.textContent = 'Loaded ' + listed + ' — uncheck anyone who should not get this send.';
+                    }
+                }
+            })
+            .catch(function(err) {
+                setRosterFromSubscribers([]);
+                if (rosterStatus) rosterStatus.textContent = 'Could not load roster: ' + (err && err.message ? err.message : err);
+                if (sendBtn) sendBtn.disabled = true;
+            });
+    }
+
     if (teaserEl) {
         teaserEl.addEventListener('input', updatePreview);
-        updatePreview();
     }
+    if (fullBodyCb) {
+        fullBodyCb.addEventListener('change', updatePreview);
+    }
+    updatePreview();
 
     if (toggleBtn && teaserEl) {
         toggleBtn.addEventListener('click', function(e) {
@@ -179,15 +403,52 @@
         });
     }
 
-    function refreshRecipients() {
-        if (!listSel) return;
-        var opt = listSel.options[listSel.selectedIndex];
-        if (!opt) return;
-        var n = parseInt(opt.getAttribute('data-sub-count') || '0', 10);
-        if (countEl) countEl.textContent = String(n);
-        if (listNameEl) listNameEl.textContent = opt.text.split(' — ')[0];
-        if (warnEl) warnEl.style.display = n > 0 ? 'none' : 'inline';
-        if (sendBtn) sendBtn.disabled = n <= 0;
+    if (addBtn) {
+        addBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var email = addEmailEl ? String(addEmailEl.value || '').trim() : '';
+            var name  = addNameEl ? String(addNameEl.value || '').trim() : '';
+            if (!email || email.indexOf('@') < 0) {
+                alert('Enter a valid email address to add.');
+                return;
+            }
+            var key = normalizeEmail(email);
+            for (var i = 0; i < roster.length; i++) {
+                if (normalizeEmail(roster[i].email) === key) {
+                    roster[i].selected = true;
+                    if (roster[i].oneshot && name) roster[i].name = name;
+                    syncRosterUi();
+                    if (rosterStatus) rosterStatus.textContent = 'That address was already on the roster — now selected.';
+                    return;
+                }
+            }
+            roster.push({
+                email: email,
+                name: name || 'No Name',
+                note: 'not on list · this send only',
+                oneshot: true,
+                selected: true
+            });
+            if (addEmailEl) addEmailEl.value = '';
+            if (addNameEl) addNameEl.value = '';
+            syncRosterUi();
+            if (rosterStatus) rosterStatus.textContent = 'Added one-shot address (not written to any mailing list).';
+        });
+    }
+
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            roster.forEach(function(r) { r.selected = true; });
+            syncRosterUi();
+        });
+    }
+    if (selectNoneBtn) {
+        selectNoneBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            roster.forEach(function(r) { r.selected = false; });
+            syncRosterUi();
+        });
     }
 
     if (listSel) {
@@ -200,9 +461,15 @@
             if (!isHtmlMode && teaserEl) {
                 teaserEl.value = plainToHtml(teaserEl.value);
             }
-            var n = countEl ? parseInt(countEl.textContent || '0', 10) : 0;
+            syncRosterUi();
+            var n = selectedCount();
             var name = listNameEl ? listNameEl.textContent : 'this list';
-            if (!confirm('Send this newsletter to ' + n + ' subscriber(s) on “' + name + '”?')) {
+            if (n <= 0) {
+                e.preventDefault();
+                alert('Select or add at least one recipient before sending.');
+                return;
+            }
+            if (!confirm('Send this newsletter to ' + n + ' recipient(s) (list context: “' + name + '”)?')) {
                 e.preventDefault();
             }
         });

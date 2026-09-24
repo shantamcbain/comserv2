@@ -271,9 +271,11 @@ sub publication_edit :Path('/mail/newsletter/publication/edit') :Args(1) {
 
     my $pub_meta = $self->_parse_publication_meta($pub->keywords, $pub->title);
     my $pub_site_id = $self->_get_site_id_for_sitename($c, $pub->sitename);
+    my @pub_issues = $self->_fetch_all_issues_for_publication($c, $pub->id);
     $c->stash(
         publication       => $pub,
         pub_meta          => $pub_meta,
+        pub_issues        => \@pub_issues,
         newsletter_series => [ $self->_newsletter_series_list() ],
         mailing_lists     => [ $self->_fetch_site_mailing_lists($c, $pub_site_id) ],
         mailing_list_link => $self->_mailing_list_link_status($c, $pub->sitename, $pub_meta),
@@ -557,7 +559,13 @@ sub edit :Path('/mail/newsletter/edit') :Args(1) {
                     $msg .= ' Online page is published. When ready, use Send Newsletter to email subscribers.';
                 }
                 $c->flash->{success_msg} = $msg;
-                $c->res->redirect($c->uri_for('/mail/newsletter/edit', $page_code));
+                my $return_pub = $c->req->param('return_pub_code') // '';
+                $return_pub =~ s/[^\w\-.]//g;
+                if ($return_pub ne '') {
+                    $c->res->redirect($c->uri_for('/mail/newsletter/publication/edit', $return_pub));
+                } else {
+                    $c->res->redirect($c->uri_for('/mail/newsletter/edit', $page_code));
+                }
             }
         };
         if ($@) {
@@ -627,8 +635,21 @@ sub send :Path('/mail/newsletter/send') :Args(1) {
     my $sub_count = 0;
     for my $ml (@mailing_lists) {
         if ($ml->{id} == $selected_list_id) {
-            $sub_count = $ml->{sub_count};
+            $sub_count = $ml->{sub_count} // 0;
             last;
+        }
+    }
+    # Linked "Newsletter" list may be empty — still show it, but land on a populated list so roster is usable.
+    if (($sub_count // 0) == 0) {
+        my $fallback = $self->_default_mailing_list_id(\@mailing_lists);
+        if ($fallback && $fallback != $selected_list_id) {
+            $selected_list_id = $fallback;
+            for my $ml (@mailing_lists) {
+                if ($ml->{id} == $selected_list_id) {
+                    $sub_count = $ml->{sub_count} // 0;
+                    last;
+                }
+            }
         }
     }
 
@@ -640,6 +661,7 @@ sub send :Path('/mail/newsletter/send') :Args(1) {
 
     $c->stash(
         page               => $page,
+        page_body          => $page->body // '',
         mailing_lists      => \@mailing_lists,
         selected_list_id   => $selected_list_id,
         sub_count          => $sub_count,
@@ -648,6 +670,47 @@ sub send :Path('/mail/newsletter/send') :Args(1) {
         template           => 'newsletter/send.tt',
     );
     $c->forward($c->view('TT'));
+}
+
+
+# ─── JSON roster for send page (live name+email before Send) ─────────────────
+
+sub list_subscribers :Path('/mail/newsletter/list_subscribers') :Args(1) {
+    my ($self, $c, $list_id) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($self->_has_newsletter_admin_role($c)) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ ok => 0, error => 'Admin or editor access required.' }));
+        return;
+    }
+
+    unless ($list_id && $list_id =~ /^\d+$/) {
+        $c->response->body(encode_json({ ok => 0, error => 'Invalid mailing list id.' }));
+        return;
+    }
+
+    my @subscribers;
+    for my $r ($self->_get_list_recipients_with_tokens($c, $list_id)) {
+        my $name = join(' ', grep { defined $_ && length $_ } ($r->{first_name} // '', $r->{last_name} // ''));
+        $name =~ s/^\s+|\s+$//g;
+        push @subscribers, {
+            email      => $r->{email},
+            name       => ($name ne '' ? $name : 'No Name'),
+            first_name => $r->{first_name} // '',
+            last_name  => $r->{last_name}  // '',
+            source     => $r->{subscription_source} // '',
+            status     => 'subscribed',
+            on_list    => 1,
+        };
+    }
+    @subscribers = sort { lc($a->{name}) cmp lc($b->{name}) } @subscribers;
+
+    $c->response->body(encode_json({
+        ok          => 1,
+        subscribers => \@subscribers,
+        count       => scalar(@subscribers),
+    }));
 }
 
 # ─── AI context JSON (form assistant + chat widget) ───────────────────────────
@@ -1342,11 +1405,62 @@ sub _do_send {
         return;
     }
 
-    my @recipients = $self->_get_list_recipients_with_tokens($c, $list_id);
-    unless (@recipients) {
-        $c->flash->{error_msg} = 'No active subscribers on the selected list.';
-        $c->res->redirect($c->uri_for('/mail/newsletter/send', $page->id));
-        return;
+    my @list_recipients = $self->_get_list_recipients_with_tokens($c, $list_id);
+    my %by_email = map { lc($_->{email}) => $_ } grep { $_->{email} } @list_recipients;
+
+    my @requested = $c->req->param('recipient_email');
+    @requested = map {
+        my $e = $_;
+        $e =~ s/^\s+|\s+$//g if defined $e;
+        $e;
+    } @requested;
+    @requested = grep { defined $_ && $_ =~ /\@/ } @requested;
+
+    my $roster_reviewed = $c->req->param('roster_reviewed');
+    my @recipients;
+    if ($roster_reviewed || @requested) {
+        my %seen;
+        for my $email (@requested) {
+            my $key = lc $email;
+            next if $seen{$key}++;
+            if (my $existing = $by_email{$key}) {
+                push @recipients, $existing;
+            }
+            else {
+                my $rec = {
+                    email             => $email,
+                    first_name        => '',
+                    last_name         => '',
+                    username          => '',
+                    unsubscribe_token => '',
+                };
+                eval {
+                    my $u = $c->model('DBEncy')->resultset('User')->search(
+                        { email => $email }, { rows => 1 }
+                    )->single;
+                    if ($u) {
+                        $rec->{first_name} = $u->first_name // '';
+                        $rec->{last_name}  = $u->last_name  // '';
+                        $rec->{username}   = $u->username   // '';
+                    }
+                    1;
+                };
+                push @recipients, $rec;
+            }
+        }
+        unless (@recipients) {
+            $c->flash->{error_msg} = 'Recipient roster is empty — add at least one address before sending.';
+            $c->res->redirect($c->uri_for('/mail/newsletter/send', $page->id));
+            return;
+        }
+    }
+    else {
+        @recipients = @list_recipients;
+        unless (@recipients) {
+            $c->flash->{error_msg} = 'No active subscribers on the selected list.';
+            $c->res->redirect($c->uri_for('/mail/newsletter/send', $page->id));
+            return;
+        }
     }
 
     my $read_url = $self->_absolute_uri($c, $c->uri_for('/page', $page->page_code));
@@ -1410,11 +1524,23 @@ sub _do_send {
 sub _build_email_body {
     my ($self, $c, $teaser, $read_url, $recipient, $page) = @_;
 
-    my $body = $teaser;
+    my $body = $teaser // '';
     for my $tag (qw/first_name last_name email username/) {
         my $macro = uc $tag;
         my $val   = $recipient->{$tag} // '';
         $body =~ s/\[$macro\]/$val/g;
+    }
+
+    my $include_full = $c->req->param('include_full_body');
+    if ($include_full && $page && defined $page->body && $page->body =~ /\S/) {
+        my $full = $page->body;
+        for my $tag (qw/first_name last_name email username/) {
+            my $macro = uc $tag;
+            my $val   = $recipient->{$tag} // '';
+            $full =~ s/\[$macro\]/$val/g;
+        }
+        $body .= qq{\n<hr style="border:none;border-top:1px solid #ddd;margin:24px 0;">\n}
+               . qq{<div class="nl-full-issue">$full</div>};
     }
 
     my $unsub = '';
@@ -1425,16 +1551,26 @@ sub _build_email_body {
             <a href="$unsub_url">Unsubscribe</a> from this mailing list.</p>};
     }
 
-    return qq{
-<div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
-  $body
+    my $read_block = '';
+    unless ($include_full) {
+        $read_block = qq{
   <p style="margin:24px 0;">
     <a href="$read_url" style="display:inline-block;background:#1565c0;color:#fff;
        padding:12px 24px;text-decoration:none;border-radius:4px;font-weight:bold;">
       Read full newsletter online
     </a>
   </p>
-  <p style="font-size:0.9em;color:#555;">Or copy this link: <a href="$read_url">$read_url</a></p>
+  <p style="font-size:0.9em;color:#555;">Or copy this link: <a href="$read_url">$read_url</a></p>};
+    }
+    else {
+        $read_block = qq{
+  <p style="font-size:0.9em;color:#555;margin-top:24px;">Online copy: <a href="$read_url">$read_url</a></p>};
+    }
+
+    return qq{
+<div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+  $body
+  $read_block
   $unsub
 </div>};
 }
@@ -1453,11 +1589,12 @@ sub _get_list_recipients_with_tokens {
             my $email = $sub->user ? $sub->user->email : $sub->email;
             next unless $email && $email =~ /\@/;
             push @recipients, {
-                email              => $email,
-                first_name         => ($sub->user ? $sub->user->first_name : $sub->first_name) // '',
-                last_name          => ($sub->user ? $sub->user->last_name  : $sub->last_name)  // '',
-                username           => ($sub->user ? $sub->user->username   : '') // '',
-                unsubscribe_token  => $sub->unsubscribe_token // '',
+                email                 => $email,
+                first_name            => ($sub->user ? $sub->user->first_name : $sub->first_name) // '',
+                last_name             => ($sub->user ? $sub->user->last_name  : $sub->last_name)  // '',
+                username              => ($sub->user ? $sub->user->username   : '') // '',
+                unsubscribe_token     => $sub->unsubscribe_token // '',
+                subscription_source   => $sub->subscription_source // '',
             };
         }
     };
@@ -1902,6 +2039,32 @@ sub _fetch_publications_for_admin {
     return @$rows;
 }
 
+
+sub _fetch_all_issues_for_publication {
+    my ($self, $c, $pub_id) = @_;
+    my @issues;
+    return @issues unless $pub_id;
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('Page')->search(
+            {
+                page_type => 'newsletter',
+                status    => { -in => [qw/draft active published inactive/] },
+                -or       => [
+                    { keywords => { -like => '%"nl_pub_id":' . $pub_id . '%' } },
+                    { keywords => { -like => '%"nl_pub_id": ' . $pub_id . '%' } },
+                ],
+            },
+            { order_by => { -desc => 'updated_at' } },
+        );
+        while (my $p = $rs->next) {
+            my $h = $self->_page_to_hash($p);
+            $h->{body} = $p->body // '';
+            push @issues, $h;
+        }
+    };
+    return @issues;
+}
+
 sub _fetch_published_issues_for_publication {
     my ($self, $c, $pub_id) = @_;
     my @issues;
@@ -1932,14 +2095,18 @@ sub _build_admin_newsletter_tree {
     my @tree;
 
     for my $pub (@pubs) {
-        my @pub_issues = $self->_fetch_published_issues_for_publication($c, $pub->{id});
-        @pub_issues = sort { ($b->{nl_version} // 0) <=> ($a->{nl_version} // 0) } @pub_issues;
+        my @pub_issues = $self->_fetch_all_issues_for_publication($c, $pub->{id});
+        @pub_issues = sort {
+            (($b->{updated_at} // '') cmp ($a->{updated_at} // ''))
+            || (($b->{nl_version} // 0) <=> ($a->{nl_version} // 0))
+        } @pub_issues;
         for my $issue (@pub_issues) {
             $issue->{can_manage} = ($is_csc || $issue->{sitename} eq $sitename) ? 1 : 0;
         }
         $pub->{can_manage}   = ($is_csc || $pub->{host_sitename} eq $sitename) ? 1 : 0;
         $pub->{issues}       = \@pub_issues;
         $pub->{issue_count}  = scalar @pub_issues;
+        $pub->{latest_issue} = @pub_issues ? $pub_issues[0] : undef;
         push @tree, $pub;
     }
 
