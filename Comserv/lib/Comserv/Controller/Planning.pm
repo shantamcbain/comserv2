@@ -527,6 +527,17 @@ sub daily :Path('/planning/daily') :Args {
     my @active_priorities;
     eval {
         my $roles    = $c->stash->{user_roles} || [];
+        # Determine ai_role_tier for client-side JavaScript consistency
+        my $is_admin = $c->stash->{is_admin} || 0;
+        my $is_staff = 0;
+        if ($c->session->{user_id}) {
+            my $user_roles = $c->stash->{user_roles} || [];
+            $is_staff = grep { $_ eq 'helpdesksupport' || $_ eq 'staff' } @$user_roles;
+        }
+        my $ai_role_tier = $is_admin ? 'priv' : 
+                           $is_staff ? 'staff' : 
+                           $c->session->{user_id} ? 'member' : 'guest';
+        $c->stash->{ai_role_tier} = $ai_role_tier;
 
         my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
         my %ap_cond = (status => { -not_in => \@done_statuses });
