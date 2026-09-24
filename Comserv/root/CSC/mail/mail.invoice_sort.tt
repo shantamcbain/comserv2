@@ -1,0 +1,38 @@
+[% META title = 'Sort Invoices to Sites' %]
+[% IF debug_mode == 1 %][% PageVersion = '/CSC/mail/mail.invoice_sort.tt,v 0.01 2026/09/12 shanta Exp shanta ' %][% END %]
+
+<div class="invoice-sort">
+    <h1>Sort Invoices to Sites</h1>
+    
+    <p>Assign classified invoices to the correct SiteName. Each site admin sees only their invoices.</p>
+    
+    <div class="sort-instructions">
+        <h3>Instructions</h3>
+        <ul>
+            <li>Review the unsorted invoices below</li>
+            <li>Assign each invoice to the correct site</li>
+            <li>Use "Create Invoice" to add to accounting</li>
+            <li>Use "Create Receipt" to record payment</li>
+            <li>Use "Mark Unsorted" to send back for CSC review</li>
+        </ul>
+    </div>
+    
+    <div class="site-selector">
+        <label for="site_filter">Filter by Site:</label>
+        <select id="site_filter" name="site_filter">
+            <option value="all">All Sites</option>
+            [% FOREACH site IN sites %]
+                <option value="[% site.id %]">[% site.name %]</option>
+            [% END %]
+        </select>
+    </div>
+    
+    <div class="sort-area">
+        <div class="unsorted-invoices">
+            <h2>Unsorted Invoices</h2>
+            <div id="unsorted-list">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+</div>

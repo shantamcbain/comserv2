@@ -1,0 +1,5 @@
+<h3>2026-09-12 — aisystem worktree SQLite site-table errors (documented non-repro)</h3>
+<ul>
+    <li><strong>Diagnosis:</strong> The <code>aisystem</code> worktree (port 4006) DBEncy fell back to SQLite offline mode when MariaDB was unreachable at process start. The fallback SQLite database lacks the <code>sites</code> and <code>sitedomain</code> tables, causing <code>Site.pm</code> queries (<code>get_all_sites</code>, <code>get_site_details_by_name</code>, <code>get_site_domain</code>) to log <code>no such table</code> errors.</li>
+    <li><strong>Status:</strong> All affected <code>Site.pm</code> methods wrap queries in <code>try/catch</code> — the error is caught gracefully (returns <code>[]</code> or <code>undef</code>), no crash. MariaDB is reachable now. Closing as <strong>documented non-repro</strong> — the error would only recur if the aisystem worktree restarts while MariaDB is down.</li>
+</ul>

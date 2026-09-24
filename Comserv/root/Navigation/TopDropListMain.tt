@@ -1,4 +1,4 @@
-[% PageVersion = 'Navigation/TopDropListMain.tt,v 0.02 2025/09/03 shanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListMain.tt,v 0.03 2026/09/12 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [%# PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
@@ -51,7 +51,6 @@
                 <a href="http://mail.coop.ca/roundcube/" target="_blank" class="submenu-link"><i class="icon-webmail"></i>COOP Webmail</a>
                 <a href="http://wbeck.zapto.org/roundcube/" target="_blank" class="submenu-link"><i class="icon-webmail"></i>WB Webmail</a>
                 [% END %]
-                
                 [% SET main_db_links = c.stash.nav_merged_links.Main_links || c.stash.main_links || [] %]
                 [% INCLUDE 'Navigation/inc/menu_db_links.tt'
                     db_links = main_db_links

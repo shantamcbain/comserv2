@@ -7,7 +7,7 @@
    category = 'developer'
    tags = 'server, development, cpanfile, dependencies, perlbrew'
 %]
-[% PageVersion = 'admintopmenu.tt,v 0.6 2026/04/22 P3.2 theme-audit: no hardcoded colours; all CSS-var compliant' %]
+[% PageVersion = 'admintopmenu.tt,v 0.7 2026/09/12 shanta Exp shanta ' %]
 [% IF debug == 1 %]
     [%# PageVersion %]
     [% #INCLUDE 'debug.tt' %]
@@ -52,6 +52,10 @@
                 <a href="/remotedb"><i class="icon-server"></i>Database Servers</a>
                 <a href="/remotedb"><i class="icon-key"></i>Change DB password</a>
                 <a href='/admin/view_log'><i class="icon-view"></i>View Log</a>
+                [% IF c.session.roles.grep('admin').size %]
+                <a href="[% c.uri_for('/mail/invoice/api') %]"><i class="icon-invoice"></i>Invoice Classification</a>
+                <a href="[% c.uri_for('/mail/invoice/sort') %]"><i class="icon-sort"></i>Sort Invoices by Site</a>
+                [% END %]
                 [% SET admin_sub_db = c.stash.admin_submenu_links || [] %]
                 [% INCLUDE 'Navigation/inc/menu_db_links.tt'
                     db_links = admin_sub_db

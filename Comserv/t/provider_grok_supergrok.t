@@ -72,11 +72,25 @@ subtest 'detect_provider routes SuperGrok wire format' => sub {
     my ($p, $m) = $r->_detect_provider('supergrok|grok-4.6');
     is($p, 'supergrok', 'supergrok|slug stays SuperGrok (not xAI)');
     is($m, 'grok-4.6', 'bare slug after prefix strip');
+    # CSC-20260914-4380: slash form must NOT become OpenRouter model id.
+    ($p, $m) = $r->_detect_provider('supergrok/grok-4.6');
+    is($p, 'supergrok', 'supergrok/slug stays SuperGrok (not OpenRouter)');
+    is($m, 'grok-4.6', 'bare slug after slash prefix strip');
+    is($r->_bare_model('supergrok/grok-4.6'), 'grok-4.6', '_bare_model strips slash prefix');
     ($p, $m) = $r->_detect_provider('llama3.1:8b');
     is($p, 'ollama', 'local llama3.1:8b is Ollama, not OpenRouter');
     is($m, 'llama3.1:8b', 'ollama tag kept intact');
     ($p, $m) = $r->_detect_provider('meta-llama/llama-3.1-8b-instruct');
     is($p, 'external', 'org/model still OpenRouter');
+};
+
+subtest 'auth expiry counts as fallback-eligible' => sub {
+    require Comserv::Model::AI2::Router;
+    my $r = Comserv::Model::AI2::Router->new;
+    ok($r->_credits_exhausted('SuperGrok/xAI login expired or invalid — re-auth'),
+       'login expired triggers free/local fallback');
+    ok(!$r->_credits_exhausted('some unrelated provider error'),
+       'generic error does not falsely fall back');
 };
 
 done_testing();

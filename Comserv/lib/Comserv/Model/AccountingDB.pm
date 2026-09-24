@@ -389,7 +389,8 @@ sub provision_site {
     # Data-driven: base archetype from site_map.json + capability overlays
     # derived from enabled site_modules. Idempotent — existing accnos skipped.
     eval {
-        my $coa = Comserv::Model::CoaTemplate->instance;
+        # CoaTemplate is a plain Moose object (no singleton). Other callers use ->new.
+        my $coa = Comserv::Model::CoaTemplate->new;
         my ($base_id, $overlay_ids) = $coa->chart_for_site($c, $sitename);
         my $site_schema = $self->schema_for_site($c, $sitename);
         if ($site_schema) {
