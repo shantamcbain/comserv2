@@ -526,14 +526,14 @@ sub process {
     if (!$args{_auto_enrich_done}) {
         my $roles_e = $c->session->{roles} || [];
         $roles_e = [ split(/\s*,\s*/, $roles_e) ] unless ref $roles_e;
-        my $can_enrich = (grep { $_ =~ /^(admin|developer|editor)$/i } @$roles_e) ? 1 : 0;
+        my $can_enrich = (grep { $_ =~ /^(admin|developer|editor|member)$/i } @$roles_e) ? 1 : 0;
         my $ai_ctrl = eval { $c->controller('AI') };
         my $quality = 'unknown';
         if ($ai_ctrl && $ai_ctrl->can('_assess_response_quality')) {
             $quality = $ai_ctrl->_assess_response_quality($resp->{response} // '', $prompt);
         }
         my $site_audit = ($prompt =~ /\b(navigate|navigation|crawl|audit|failed\s+links?|each\s+page|readable|theme|look and content|site and report|broken\s+links?)\b/i) ? 1 : 0;
-        my $lookup_intent = ($prompt =~ /\b(find|look\s*up|search\s+for|what\s+is|who\s+is|tell\s+me\s+about|information\s+on|info\s+on)\b/i) ? 1 : 0;
+        my $lookup_intent = ($prompt =~ /\b(find|look\s*up|search\s+for|what\s+is|who\s+is|tell\s+me\s+about|tell\s+me\s+what|information\s+on|info\s+on|used\s+for)\b/i) ? 1 : 0;
         my $need = $can_enrich && $resp && $resp->{success}
             && ($quality eq 'poor' || $site_audit || $lookup_intent)
             && !$args{use_search};
@@ -1023,7 +1023,9 @@ sub _can_select_model {
 sub _bare_model {
     my ($self, $model) = @_;
     return $model unless defined $model;
-    $model =~ s/^[^|]+\|//;   # drop leading "provider|"
+    # Mirror Router::_bare_model (CSC-20260914-4380 slash form).
+    $model =~ s/^(?:supergrok|grok-oauth|grok|ollama|openrouter|external)[|\/]//i;
+    $model =~ s/^[^|]+\|//;   # drop any other leading "provider|"
     return $model;
 }
 
