@@ -413,7 +413,10 @@ sub details :Path('/workshop/details') :Args(0) {
     };
 
     if ($@ || !$workshop) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to find workshop with ID $id: " . ($@ || 'Workshop not found'));
+        # Missing ID is almost always a crawler/probe (not a DB fault). ERROR
+        # created hundreds of audit todos; keep ERROR only when find() threw.
+        my $level = $@ ? 'error' : 'warn';
+        $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'workshop', "Failed to find workshop with ID $id: " . ($@ || 'Workshop not found'));
         $c->flash->{error_msg} = 'Failed to find workshop: ' . ($@ || 'Workshop not found');
         $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
