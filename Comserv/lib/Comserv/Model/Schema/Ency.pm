@@ -96,6 +96,12 @@ __PACKAGE__->register_class('CoaAccount',        'Comserv::Model::Schema::Ency::
 __PACKAGE__->register_class('GlEntry',           'Comserv::Model::Schema::Ency::Result::Accounting::GlEntry');
 __PACKAGE__->register_class('GlEntryLine',       'Comserv::Model::Schema::Ency::Result::Accounting::GlEntryLine');
 
+# Health Kitchen pantry map (create tables via Admin schema-compare)
+__PACKAGE__->register_class('HealthKitchen::InventoryEncyMap', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::InventoryEncyMap');
+__PACKAGE__->register_class('HealthKitchen::UserPantryQty',    'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserPantryQty');
+__PACKAGE__->register_class('InventoryEncyMap',                'Comserv::Model::Schema::Ency::Result::HealthKitchen::InventoryEncyMap');
+__PACKAGE__->register_class('UserPantryQty',                   'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserPantryQty');
+
 # Register Inventory system classes
 __PACKAGE__->register_class('InventoryItem', 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItem');
 __PACKAGE__->register_class('InventorySupplier', 'Comserv::Model::Schema::Ency::Result::Accounting::InventorySupplier');
