@@ -1399,7 +1399,7 @@ sub build_worktree_list {
         # Do NOT pass -w: Comserv worktrees ARE the isolation. `hermes chat -w`
         # creates a nested hermes/hermes-* branch (often from origin/main) and
         # the agent then edits the wrong tree.
-        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2 && hermes chat',
+        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2 && hermes dashboard --isolated --host 0.0.0.0 --port 9119 --no-open --skip-build',
         hermes_port => 9119,
         hermes_cwd => '/home/shanta/PycharmProjects/comserv2',
     };
@@ -1408,6 +1408,10 @@ sub build_worktree_list {
     my $branches = $cfg->{branches} // {};
     for my $name (sort keys %$branches) {
         my $b = $branches->{$name} // {};
+        my $hp = eval {
+            require Comserv::Util::BranchServerControl;
+            Comserv::Util::BranchServerControl->new->hermes_port_for($name, $b->{port} // 0);
+        } || (9100 + int(($b->{port} // 0) % 100));
         push @list, {
             name  => $name,
             port  => $b->{port} // 0,
@@ -1415,13 +1419,10 @@ sub build_worktree_list {
             url   => $b->{url}   // '/planning/daily',
             cmd   => "cd $base/$name/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p "
                    . ($b->{port} // 0) . ' -r',
-            # Branch Hermes: cwd = the worktree git root so its .hermes.md loads.
-            # No -w — see main hermes_cmd comment above.
-            hermes_cmd => "cd $base/$name/Comserv && hermes chat",
-            hermes_port => (eval {
-                require Comserv::Util::BranchServerControl;
-                Comserv::Util::BranchServerControl->new->hermes_port_for($name, $b->{port} // 0);
-            } || (9100 + int(($b->{port} // 0) % 100))),
+            # Branch Hermes: isolated dashboard in the worktree git root so
+            # .hermes.md loads and 9119 (main) is not reused. No hermes -w.
+            hermes_port => $hp,
+            hermes_cmd => "cd $base/$name/Comserv && hermes dashboard --isolated --host 0.0.0.0 --port $hp --no-open --skip-build",
             hermes_cwd => "$base/$name/Comserv",
             project_id => $b->{project_id} // undef,
             host       => $b->{host} // undef,
