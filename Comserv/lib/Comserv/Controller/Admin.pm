@@ -7909,11 +7909,16 @@ sub branch_server_log :Path('/admin/branch_server_log') :Args(0) {
 
     my $file = $c->req->param('file') || '';
     my $branch = $c->req->param('branch') || '';
+    my $kind = $c->req->param('kind') || '';
 
-    # Resolve to /tmp/branch-<branch>.log. Prefer the branch param; if a full file
-    # path was supplied, only honor it when it matches the locked pattern.
+    # Resolve to /tmp/branch-<branch>.log (or hermes-dash when kind=hermes).
+    # Prefer the branch param; if a full file path was supplied, only honor it
+    # when it matches the locked pattern.
     my $path;
-    if ($branch =~ m{^[A-Za-z0-9._/-]+$} && $branch !~ m{\.\./} && $branch !~ m{^/}) {
+    if ($kind eq 'hermes' && $branch =~ m{^[A-Za-z0-9._-]+$}) {
+        $path = "/tmp/hermes-dash-$branch.log";
+    }
+    elsif ($branch =~ m{^[A-Za-z0-9._/-]+$} && $branch !~ m{\.\./} && $branch !~ m{^/}) {
         $path = "/tmp/branch-$branch.log";
     }
     elsif ($file =~ m{^/tmp/branch-[A-Za-z0-9._-]+\.log$}) {
