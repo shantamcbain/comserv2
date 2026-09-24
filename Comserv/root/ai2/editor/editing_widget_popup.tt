@@ -36,6 +36,106 @@
         .sidebar-right .sidebar-icon.active { background:#0e639c; color:white; }
         #editor-right-rail { position:relative; }
         #editor-right-rail .rail-resize-handle { position:absolute; left:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:20; background:transparent; }
+    
+        /* AI Editor docked chat — high contrast + layout (beat ai-chat.css .chat-input) */
+        #ai-chat-sidebar {
+            background: #1e1f22 !important;
+            color: #f2f2f2 !important;
+            font-size: 13px;
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: 0 !important;
+        }
+        #ai-chat-sidebar .chat-header { flex: 0 0 auto !important; }
+        #ai-chat-sidebar .chat-agent-phase {
+            flex: 0 0 auto !important;
+            background: #252830 !important;
+            color: #ddd !important;
+        }
+        #ai-chat-sidebar .chat-messages,
+        #ai-chat-sidebar #chat-messages {
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+            background: #1a1b1e !important;
+            background-color: #1a1b1e !important;
+            color: #f2f2f2 !important;
+            font-size: 13px !important;
+            line-height: 1.45 !important;
+            gap: 8px;
+        }
+        #ai-chat-sidebar .chat-msg {
+            margin-bottom: 10px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px solid #3a3f4a;
+            color: #f2f2f2 !important;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            max-width: 100%;
+        }
+        #ai-chat-sidebar .chat-msg-you {
+            background: #243044 !important;
+            border-color: #3d5a80;
+        }
+        #ai-chat-sidebar .chat-msg-ai {
+            background: #252830 !important;
+            border-color: #4a5568;
+        }
+        #ai-chat-sidebar .chat-msg strong { color: #9ecbff !important; }
+        #ai-chat-sidebar .chat-msg-you strong { color: #ffd27a !important; }
+        #ai-chat-sidebar .chat-msg pre,
+        #ai-chat-sidebar .chat-msg code {
+            background: #0f1115 !important;
+            color: #e6edf3 !important;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 6px 8px;
+            display: block;
+            white-space: pre-wrap;
+            font-size: 12px !important;
+            max-height: 280px;
+            overflow: auto;
+        }
+        /* IMPORTANT: do not use class name chat-input — ai-chat.css forces column + light bg */
+        #ai-chat-sidebar .ai2-chat-input-row {
+            flex: 0 0 auto !important;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: flex-end !important;
+            gap: 6px !important;
+            padding: 8px !important;
+            border-top: 1px solid #555 !important;
+            background: #1e1f22 !important;
+            background-color: #1e1f22 !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        #ai-chat-sidebar #ai-chat-input {
+            flex: 1 1 auto !important;
+            width: auto !important;
+            min-width: 0 !important;
+            min-height: 36px !important;
+            max-height: 120px !important;
+            resize: none !important;
+            background: #0f1115 !important;
+            background-color: #0f1115 !important;
+            color: #f2f2f2 !important;
+            border: 1px solid #555 !important;
+            border-radius: 3px !important;
+            padding: 8px !important;
+            font-size: 13px !important;
+            line-height: 1.35 !important;
+            box-sizing: border-box !important;
+        }
+        #ai-chat-sidebar #ai-chat-input::placeholder {
+            color: #9aa3b2 !important;
+            opacity: 1 !important;
+        }
+        #ai-chat-sidebar #ai-chat-send {
+            flex: 0 0 auto !important;
+            align-self: flex-end !important;
+        }
+        #ai-chat-sidebar a { color: #7ec8ff !important; }
     </style>
 </head>
 <body>
@@ -170,14 +270,32 @@
 
             <div id="panel-hermes" class="sidebar-panel" style="display:none; padding:0; width:420px; background:#2b2b2b; overflow:auto;">
                 <div style="padding:8px;">
-                    <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa;">HERMES DASHBOARD</h4>
-                    <p style="font-size:11px;color:#888;margin:0 0 6px;">Embedded Hermes web view (set HERMES_DASHBOARD_URL to enable).</p>
+                    <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa;">HERMES</h4>
+                    <p style="font-size:11px;color:#888;margin:0 0 6px;">Hermes dashboard embeds below (same host, port 9119). Use Desktop/CLI buttons as needed. Over ZeroTier open the dashboard on this machine&apos;s IP:9119 after firewall allows it.</p>
+                    <div style="font-size:11px;color:#c8d0dc;background:#0f1115;border:1px solid #444;border-radius:4px;padding:8px;margin-bottom:8px;">
+                      <div style="color:#888;margin-bottom:4px;">Terminal (normal Hermes):</div>
+                      <code id="hermes-terminal-cmd" style="word-break:break-all;">cd /home/shanta/.comserv/worktrees/aisystem/Comserv &amp;&amp; hermes chat</code>
+                      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+                        <button type="button" id="hermes-copy-cmd" style="background:#37474f;color:#fff;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Copy terminal command</button>
+                        <button type="button" id="hermes-start-desktop" style="background:#6a1b9a;color:#fff;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Optional: Electron Desktop (not dashboard)</button>
+                      </div>
+                      <div id="hermes-desktop-status" style="font-size:11px;color:#9ecbff;margin-top:6px;display:none;"></div>
+                    </div>
                     [% IF c.config.hermes_dashboard_url %]
-                        <iframe src="[% c.config.hermes_dashboard_url | html %]" style="width:100%;height:420px;border:1px solid #555;border-radius:4px;"></iframe>
+                        <iframe id="hermes-iframe" src="[% c.config.hermes_dashboard_url | html %]" style="width:100%;height:480px;border:1px solid #555;border-radius:4px;background:#111;"></iframe>
                     [% ELSE %]
-                        <iframe id="hermes-iframe" src="" style="width:100%;height:420px;border:1px solid #555;border-radius:4px;display:none;"></iframe>
-                        <div id="hermes-placeholder" style="color:#888;font-size:12px;padding:12px;">No Hermes dashboard URL configured. Set <code>HERMES_DASHBOARD_URL</code> in the app config or pass <code>?hermes=URL</code> to this page.</div>
+                        <iframe id="hermes-iframe" src="" style="width:100%;height:480px;border:1px solid #555;border-radius:4px;background:#111;display:none;"></iframe>
+                        <div id="hermes-placeholder" style="color:#888;font-size:12px;padding:12px;border:1px dashed #555;border-radius:4px;margin-bottom:8px;">
+                            No dashboard URL yet. Starting from this page host on port <code>9119</code>, or set <code>HERMES_DASHBOARD_URL</code> / <code>?hermes=URL</code>.
+                            <div style="margin-top:8px;">
+                              <a id="hermes-open-tab" href="#" target="_blank" rel="noopener" style="color:#7ec8ff;">Open Hermes /sessions in a new tab (best if iframe login is blocked)</a>
+                            </div>
+                        </div>
                     [% END %]
+                    <div id="hermes-run-section" style="margin-top:10px;border-top:1px solid #444;padding-top:8px;">
+                      <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa;">HERMES CLI ONESHOT</h4>
+                      <p style="font-size:11px;color:#888;margin:0 0 6px;">CLI oneshot when Desktop is down — does not replace the dashboard above.</p>
+                    </div>
                 </div>
             </div>
 
@@ -237,7 +355,7 @@
                     <button id="ai-chat-close" type="button" title="Hide chat (reopen from the 💬 button)" style="background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;">✕</button>
                 </span>
             </div>
-            <div id="chat-messages" class="chat-messages" style="flex:1; padding:8px; overflow:auto; font-size:0.9em;">
+            <div id="chat-messages" class="chat-messages" style="flex:1; padding:8px; overflow:auto; font-size:13px; background:#1a1b1e; color:#f2f2f2;">
                 <div><strong>AI:</strong> How can I help with this file?</div>
             </div>
             <div class="chat-agent-phase" style="padding:4px 6px; border-top:1px solid #555; display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:11px; color:#bbb;">
@@ -248,7 +366,8 @@
                     <option value="documentation">📚 Documentation</option>
                 </select>
                 <label for="ai-editor-phase" style="margin:0;">Phase</label>
-                <select id="ai-editor-phase" title="analyze → plan → Verify → implement" style="background:#222;color:#ddd;border:1px solid #555;border-radius:3px;padding:1px 4px;max-width:110px;">
+                <select id="ai-editor-phase" title="clarify → analyze → plan → Verify → implement" style="background:#222;color:#ddd;border:1px solid #555;border-radius:3px;padding:1px 4px;max-width:120px;">
+                    <option value="clarify">0 Clarify</option>
                     <option value="analyze" selected>A Analyze</option>
                     <option value="plan">B Plan</option>
                     <option value="implement">C Implement</option>
@@ -256,9 +375,9 @@
                 <button id="ai-editor-verify" type="button" title="Approve plan and move to implement" style="background:#2e7d32;color:white;border:none;border-radius:3px;cursor:pointer;font-size:11px;padding:2px 8px;">Verify</button>
                 <span id="ai-editor-phase-badge" style="opacity:0.85;">Phase: analyze</span>
             </div>
-            <div class="chat-input" style="padding:6px; border-top:1px solid #555; display:flex; gap:6px;">
-                <input id="ai-chat-input" type="text" style="flex:1" placeholder="Ask about this file (analyze→plan→Verify→code)">
-                <button id="ai-chat-send" type="button" style="background:#0e639c;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">Send</button>
+            <div class="ai2-chat-input-row">
+                <textarea id="ai-chat-input" rows="2" placeholder="Describe the bug (vague asks get Clarify first) — Enter send, Shift+Enter newline"></textarea>
+                <button id="ai-chat-send" type="button" style="background:#0e639c;color:white;border:none;padding:6px 12px;border-radius:3px;cursor:pointer;">Send</button>
             </div>
         </div>
 

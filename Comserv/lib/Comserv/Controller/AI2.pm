@@ -897,6 +897,7 @@ sub chat :Local :Args(0) {
     my $page_path   = $json_data->{page_path} // '';
     my $page_title  = $json_data->{page_title} // '';
     my $page_content= $json_data->{page_content} // '';
+    my $page_links  = $json_data->{page_links} // [];
     my $use_search  = $json_data->{use_search} ? 1 : 0;
     my $conversation_id = $json_data->{conversation_id};
     my $project_id = $json_data->{project_id};
@@ -1094,6 +1095,7 @@ sub chat :Local :Args(0) {
             page_path       => $page_path,
             page_title      => $page_title,
             page_content    => $page_content,
+            page_links      => $page_links,
             use_search      => $use_search,
             conversation_id => $conversation_id,
             project_id      => $project_id,
@@ -1109,6 +1111,8 @@ sub chat :Local :Args(0) {
 
     $result //= { success => 0, error => 'No response' };
 
+    # Auto web-search / same-origin enrich lives in Model::AI2::Chat::process
+    # (so it runs even when this controller is stale under -r).
     $c->res->body(encode_json({
         success          => $result->{success} ? 1 : 0,
         response         => $result->{response} // '',
@@ -1122,6 +1126,7 @@ sub chat :Local :Args(0) {
         thinking         => $result->{thinking} // [],
         todo_action      => $result->{todo_action},
         files_read       => $result->{files_read} || [],
+        citations        => $result->{citations} || [],
     }));
 }
 
@@ -1283,6 +1288,272 @@ sub git_create_worktree :Local :Args(0) {
         path    => $res->{path},
         cmd     => $res->{cmd},
         ($res->{error} ? (error => $res->{error}) : ()),
+    }));
+}
+
+# -------------------------------------------------------------------
+# Hermes Run — auto-pick Desktop-vs-CLI and run a prompt.
+#
+# POST /ai2/hermes_run
+# JSON body: { prompt, prefer: "auto"|"desktop"|"cli" }
+# Response:  { success, mode, message, output?, dashboard_url?,
+#              launch_hint?, error? }
+#
+# Auth: editor/admin/developer only (same as the rest of AI2).
+# Timeout: ~180s. Non-fatal errors return JSON, never a 500 HTML page.
+# -------------------------------------------------------------------
+sub hermes_run :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->res->content_type('application/json');
+    return unless $self->_ai2_require_editor_role($c);
+
+    # Parse JSON body (Catalyst often gives a filehandle — slurp like /ai2/chat)
+    my $body = {};
+    try {
+        if ($c->req->can('data') && ref($c->req->data) eq 'HASH' && %{$c->req->data}) {
+            $body = $c->req->data;
+        } else {
+            my $raw = $c->req->can('content') ? $c->req->content : $c->req->body;
+            $raw = do { local $/; <$raw> } if ref($raw);
+            $body = decode_json($raw) if defined $raw && length $raw;
+        }
+    } catch { };
+    $body = {} unless ref($body) eq 'HASH';
+
+    # Also accept form/query fallbacks (same idea as token_login)
+    my $prompt = $body->{prompt}
+              // $c->req->param('prompt')
+              // '';
+    $prompt = '' unless defined $prompt;
+    $prompt =~ s/^\s+|\s+$//g;
+    unless (length $prompt) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'prompt is required' }));
+        return;
+    }
+
+    my $prefer = $body->{prefer} // 'auto';
+    $prefer = 'auto' unless $prefer =~ /^(auto|desktop|cli)$/;
+
+    # --- Resolve the aisystem worktree git root ---
+    # Use worktrees.json base_dir + "aisystem" branch. Fallback to the
+    # known aisystem path. hermes chat must run from the git root so it
+    # reads its own .hermes.md (never -w for Comserv worktrees).
+    my $aisystem_root = '/home/shanta/.comserv/worktrees/aisystem/Comserv';
+    try {
+        my $wt_config = Comserv::Util::Git->build_worktree_list();
+        for my $b (@$wt_config) {
+            if ($b->{name} && lc($b->{name}) eq 'aisystem' && $b->{cmd}) {
+                if ($b->{cmd} =~ m{cd\s+(/\S+?)/Comserv\s*&&}) {
+                    my $d = $1;
+                    $aisystem_root = $d if -d $d;
+                }
+                last;
+            }
+        }
+    } catch { };
+
+    my $mode      = 'cli';
+    my $desktop_url = '';
+    my $launch_hint = '';
+
+    # --- Probe browser dashboard (:9119), NOT Electron Desktop ---
+    # "auto" must not treat a running Hermes Electron app as the dashboard
+    # (that caused AI Editor to chase Desktop login instead of /sessions).
+    if ($prefer eq 'desktop' || $prefer eq 'auto') {
+        my $host = eval { $c->req->uri->host } || '127.0.0.1';
+        $desktop_url = $ENV{HERMES_DASHBOARD_URL}
+                    || ($c->config->{hermes_dashboard_url} // '')
+                    || ("http://${host}:9119/sessions");
+
+        my $dashboard_reachable = 0;
+        eval {
+            require LWP::UserAgent;
+            my $base = $desktop_url;
+            $base =~ s{/+$}{};
+            my $ua = LWP::UserAgent->new(timeout => 2, max_redirect => 0);
+            my $res = $ua->get($base);
+            # 200/302/401 all mean the dashboard HTTP service is up
+            my $code = $res ? $res->code : 0;
+            $dashboard_reachable = 1 if $code && $code >= 200 && $code < 500;
+        };
+
+        if ($dashboard_reachable) {
+            $mode = 'desktop';  # kept for API compat; means browser dashboard
+            $launch_hint = "Open dashboard: $desktop_url (not hermes desktop Electron)";
+        } elsif ($prefer eq 'desktop') {
+            $mode = 'cli';
+            $launch_hint = "Dashboard not reachable at $desktop_url — fell back to CLI";
+        }
+    }
+
+    # --- CLI fallback ---
+    my $output    = '';
+    my $cli_error = '';
+
+    if ($mode eq 'cli') {
+        require IPC::Run3;
+        my $out = '';
+        my $err = '';
+        my @cmd = ('/home/shanta/.local/bin/hermes', 'chat', '-q', $prompt, '--oneshot');
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'hermes_run', "CLI mode: running hermes chat in $aisystem_root");
+
+        eval {
+            chdir $aisystem_root;
+            local $SIG{ALRM} = sub { die "TIMEOUT\n" };
+            alarm 180;
+            IPC::Run3::run3(\@cmd, \undef, \$out, \$err);
+            alarm 0;
+        };
+        my $eval_err = $@;
+
+        if ($eval_err && $eval_err eq "TIMEOUT\n") {
+            $cli_error = 'Command timed out after 180s';
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'hermes_run', "CLI timeout");
+        } elsif ($eval_err) {
+            $cli_error = "Execution error: $eval_err";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'hermes_run', "CLI failed: $eval_err");
+        }
+
+        $output = $out // '';
+        if (length($output) > 8000) {
+            $output = substr($output, 0, 8000) . "\n\n[... truncated at 8000 chars ...]";
+        }
+        if (length($err // '')) {
+            $cli_error //= '';
+            $cli_error .= "stderr: " . substr($err, 0, 2000) if length $cli_error < 2000;
+        }
+    }
+
+    my $message = $mode eq 'desktop'
+        ? "Dashboard mode — browser UI reachable at  $desktop_url"
+        : (length $output)
+            ? "CLI mode — hermes chat ran successfully"
+            : "CLI mode — hermes chat completed (no output)";
+
+    $c->res->body(encode_json({
+        success        => ($mode eq 'cli' && $cli_error && !length $output) ? 0 : 1,
+        mode           => $mode,
+        message        => $message,
+        output         => (length $output)  ? $output : undef,
+        dashboard_url  => ($mode eq 'desktop') ? $desktop_url : undef,
+        launch_hint    => ($mode eq 'desktop') ? $launch_hint : undef,
+        error          => (length $cli_error) ? $cli_error : undef,
+    }));
+}
+
+# -------------------------------------------------------------------
+# POST /ai2/hermes_start_desktop
+# Actually launch Hermes Desktop Electron with aisystem --cwd.
+# Opens on the workstation display (DISPLAY), not in the browser.
+# Auth: editor/admin/developer. Non-blocking spawn.
+# -------------------------------------------------------------------
+sub hermes_start_desktop :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->res->content_type('application/json');
+    return unless $self->_ai2_require_editor_role($c);
+
+    my $aisystem_root = '/home/shanta/.comserv/worktrees/aisystem/Comserv';
+    try {
+        my $wt_config = Comserv::Util::Git->build_worktree_list();
+        for my $b (@$wt_config) {
+            if ($b->{name} && lc($b->{name}) eq 'aisystem' && $b->{cmd}) {
+                if ($b->{cmd} =~ m{cd\s+(/\S+?)/Comserv\s*&&}) {
+                    my $d = $1;
+                    $aisystem_root = $d if -d $d;
+                }
+                last;
+            }
+        }
+    } catch { };
+
+    unless (-d $aisystem_root) {
+        $c->res->status(500);
+        $c->res->body(encode_json({
+            success => 0,
+            error   => "aisystem worktree not found: $aisystem_root",
+        }));
+        return;
+    }
+
+    my $hermes_bin = '/home/shanta/.local/bin/hermes';
+    $hermes_bin = 'hermes' unless -x $hermes_bin;
+
+    # Already running?
+    my $already = 0;
+    my $pids = '';
+    if (open my $ph, '-|', 'pgrep', '-af', 'hermes.*desktop|Hermes.*Desktop|apps/desktop') {
+        local $/;
+        $pids = <$ph> // '';
+        close $ph;
+        $already = 1 if $pids =~ /\d+/ && $pids !~ /pgrep/;
+    }
+
+    my $cmd = "$hermes_bin desktop --skip-build --cwd "
+            . quotemeta($aisystem_root);
+    my $launch_hint = "hermes desktop --skip-build --cwd $aisystem_root";
+
+    if ($already) {
+        $c->res->body(encode_json({
+            success     => 1,
+            started     => 0,
+            already     => 1,
+            cwd         => $aisystem_root,
+            launch_hint => $launch_hint,
+            message     => 'Hermes Desktop already appears to be running on the workstation. '
+                         . 'Use that window (aisystem cwd if started with --cwd). '
+                         . 'This is not a browser page.',
+            note        => 'Desktop opens on the workstation screen, not in your remote browser.',
+        }));
+        return;
+    }
+
+    my $log = '/tmp/hermes-desktop-aisystem.log';
+    my $display = $ENV{DISPLAY} || ':0';
+    my $spawn_err = '';
+    eval {
+        # Detach so Starman is not blocked; inherit user session display when possible.
+        my $full = "DISPLAY=$display "
+                 . "HERMES_DESKTOP_CWD=" . quotemeta($aisystem_root) . " "
+                 . "nohup $cmd >> " . quotemeta($log) . " 2>&1 &";
+        my $rc = system('/bin/bash', '-lc', $full);
+        if ($rc != 0) {
+            $spawn_err = "spawn exit status $rc";
+        }
+    };
+    if ($@ || $spawn_err) {
+        $c->res->status(500);
+        $c->res->body(encode_json({
+            success => 0,
+            error   => $spawn_err || "$@",
+            cwd     => $aisystem_root,
+            launch_hint => $launch_hint,
+            log     => $log,
+        }));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'hermes_start_desktop', "Spawned Desktop cwd=$aisystem_root DISPLAY=$display");
+
+    $c->res->body(encode_json({
+        success     => 1,
+        started     => 1,
+        already     => 0,
+        cwd         => $aisystem_root,
+        display     => $display,
+        launch_hint => $launch_hint,
+        log         => $log,
+        message     => 'Started Hermes Desktop with aisystem worktree. '
+                     . 'Look for the Electron window on the workstation (DISPLAY). '
+                     . 'Remote browsers will not show Desktop — use the workstation screen or Hermes CLI in a terminal.',
+        note        => 'Desktop ≠ browser dashboard. For browser UI use hermes dashboard separately.',
     }));
 }
 

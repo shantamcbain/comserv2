@@ -5299,6 +5299,22 @@ sub _assess_response_quality {
         "don't have access", "do not have access",
         "unable to answer", "cannot answer", "no relevant",
         "i don't have that", "not in my knowledge",
+        # CSC auto-websearch: refusals that only cite missing page context
+        "no mention", "not documented", "cannot confirm",
+        "based solely on the provided", "based only on the page content",
+        "not in the current page context", "not present in the given context",
+        "i don't have any information about", "no dedicated documentation",
+        "would need to consult", "not included in this excerpt",
+        # Page-context refusals (substring match; develclub-style "does not contain any information")
+        "does not contain", "doesn't contain", "do not contain",
+        "current page does not", "page does not contain",
+        "not on this page", "not on the current page",
+        "does not contain any", "contain any information about",
+        "not contain any information",
+        "i'm sorry, but", "i am sorry, but",
+        "please let me know if you have a specific",
+        "cannot find", "could not find", "couldn't find",
+        "outside the scope of this page", "outside the scope of the provided",
     );
     my $lc_resp = lc($response);
     for my $phrase (@uncertain_phrases) {
@@ -5933,6 +5949,7 @@ sub _build_navigation_command_guide {
         ]],
         [ 'AI Assistant (logged in)', 'user', [
             [ 'AI conversations / chat history', '/ai/conversations'    ],
+            [ 'AI search/audit index',      '/ai/search_index'          ],
             [ 'AI Usage & Billing Monitor', '/ai/usage'                 ],
             [ 'Manage API keys',            '/ai/manage_api_keys'       ],
             [ 'AI in-app action endpoint',  '/ai/action'                ],
@@ -12406,6 +12423,95 @@ sub transcribe_status :Local :Args(0) {
     } else {
         $c->response->body(encode_json({ success => JSON::true, status => 'processing' }));
     }
+}
+
+
+=head2 search_index
+
+Developer/admin browse of persisted WebSearchResult rows (auto-enrich
+web-search + site-audit hits). GET /ai/search_index?q=optional
+
+=cut
+
+sub search_index :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}
+            && lc($c->session->{username}) ne 'guest'
+            && $c->session->{username} !~ /^Guest-/i) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'search_index', 'Unauthorized — login required');
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
+    my $allowed = grep { /^(admin|developer|editor)$/i } @$roles;
+    unless ($allowed) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'search_index', 'Forbidden — admin/developer/editor required');
+        $c->flash->{error_msg} = 'Admin, developer, or editor role required to view the search index.';
+        $c->response->redirect($c->uri_for('/ai'));
+        return;
+    }
+
+    my $q = $c->req->param('q') || '';
+    $q =~ s/^\s+|\s+$//g;
+
+    my @hits;
+    my $error;
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $cond = {};
+        if (length $q) {
+            my $like = '%' . $q . '%';
+            $cond = {
+                -or => [
+                    { query => { -like => $like } },
+                    { result_title => { -like => $like } },
+                    { result_url => { -like => $like } },
+                    { result_snippet => { -like => $like } },
+                ]
+            };
+        }
+        my $rs = $schema->resultset('WebSearchResult')->search(
+            $cond,
+            { order_by => { -desc => 'created_at' }, rows => 100 }
+        );
+        for my $r ($rs->all) {
+            my $snip = $r->result_snippet // '';
+            $snip = substr($snip, 0, 200);
+            my $created = $r->created_at;
+            if (ref $created && $created->can('strftime')) {
+                $created = $created->strftime('%Y-%m-%d %H:%M:%S');
+            }
+            push @hits, {
+                id          => $r->id,
+                created_at  => $created,
+                query       => $r->query,
+                title       => $r->result_title,
+                url         => $r->result_url,
+                snippet     => $snip,
+                source_type => $r->source_type,
+                is_verified => $r->is_verified ? 1 : 0,
+            };
+        }
+    } catch {
+        $error = "$_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'search_index', "Failed to load WebSearchResult: $_");
+    };
+
+    $c->stash(
+        template   => 'ai/search_index.tt',
+        page_title => 'AI Search Index',
+        hits       => \@hits,
+        q          => $q,
+        error      => $error,
+        total      => scalar(@hits),
+        username   => $c->session->{username},
+    );
 }
 
 =head2 usage
