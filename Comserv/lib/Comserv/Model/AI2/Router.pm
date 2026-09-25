@@ -364,6 +364,7 @@ sub pick_free_fallback {
         next unless length $name;
         next if $name =~ /grok/i || $name =~ /^x-ai\//i;
         next if $svc eq ($skip_provider // '') && $name eq ($skip_model // '');
+        next if $self->_model_is_killed($c, $svc, $name);
         my $is_free  = $m->{free} || ($name =~ /:free$/);
         my $is_local = $m->{local} || ($svc eq 'ollama');
         if (!$free && $is_free && $svc =~ /^(openrouter|external)$/) {
@@ -445,8 +446,30 @@ sub _chat_one_with_retry {
 # Paid OpenRouter (no auto-fill) and SuperGrok (prepaid, no remaining-quota
 # API) fall back to free OpenRouter then Ollama. xAI grok auto-fills — do
 # not steal the turn away from grok on a credit error.
+sub _model_is_killed {
+    my ($self, $c, $provider, $model) = @_;
+    my $hit = try {
+        require Comserv::Model::AI2::KillSwitch;
+        Comserv::Model::AI2::KillSwitch->new->is_killed($c, $provider, $model);
+    } catch { 0 };
+    return $hit;
+}
+
 sub chat_with_fallback {
     my ($self, $c, $provider_name, $use_model, $messages, %opts) = @_;
+
+    if (my $killed = $self->_model_is_killed($c, $provider_name, $use_model)) {
+        my $why = (ref $killed eq 'HASH' && $killed->{reason}) ? $killed->{reason} : 'operator';
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
+            "Kill switch blocked $provider_name/$use_model ($why)");
+        return {
+            success  => 0,
+            killed   => 1,
+            error    => "Model $provider_name/$use_model is stopped ($why). Unkill it on /ai/usage.",
+            provider => $provider_name,
+            model    => $use_model,
+        };
+    }
 
     my $skip_paid = 0;
     my $pre_err;
