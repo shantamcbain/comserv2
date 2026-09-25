@@ -1,130 +1,138 @@
-[%# AI Usage Monitor - for customer billing and system usage anticipation
-   # Shows provider breakdown (grok vs ollama etc), tokens, estimated costs, per-site
-   # so operators can bill AI-enabled customers and plan capacity (local GPU load vs paid API spend).
+[% PageVersion = 'ai/usage.tt,v 0.06 2026/09/25 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[%
+  META
+    title = 'AI Usage & Activity Monitor'
+    description = 'Org-wide tokens, cost, model effectiveness, anomalies, and kill switch'
+    category = 'AI'
+    TemplateType = 'ApplicationTtTemplate'
+    last_updated = '2026-09-25'
+    page_version = '0.06'
 %]
-[%- 
-  # simple number format helper
-  MACRO fmt_num(n) BLOCK; n | format('%d'); END;
-  MACRO fmt_cost(c) BLOCK; c | format('%.4f'); END;
--%]
 
-<div class="ai-usage-page" style="max-width:1200px;margin:0 auto;padding:1rem;">
-  <h1>🤖 AI Usage Monitor</h1>
-  <p class="muted">Track usage for billing customers with AI enabled + anticipate load on providers (local Ollama hosts vs xAI/Grok/OpenAI).</p>
+<div class="ai-usage-page" style="max-width:1200px;margin:0 auto;padding:1rem;color:var(--text-color);">
+  <h1 style="color:var(--primary-color);">AI Usage &amp; Activity Monitor</h1>
+  <p class="doc-muted">Live org view: app chat (<code>ai_usage_logs</code>) plus Hermes sessions (<code>state.db</code>). Grok bot / daily eval POST to <code>/ai/usage_ingest</code>.</p>
+  <p id="usage-live-stamp" class="doc-muted" data-usage-live="1">Loading live totals…</p>
 
-  [% IF error %]<div class="alert alert-error">[% error %]</div>[% END %]
-  [% IF success_msg %]<div class="alert alert-success">[% success_msg %]</div>[% END %]
+  [% IF org.errors.size %]
+    [% FOREACH e IN org.errors %]
+      <div class="doc-warning" role="alert">[% e | html %]</div>
+    [% END %]
+  [% END %]
+
+  [% IF org.anomalies.size %]
+  <div class="doc-warning" role="alert">
+    <strong>Anomalies</strong>
+    <ul>
+      [% FOREACH a IN org.anomalies %]
+        <li>
+          <strong>[% a.severity %]</strong> [% a.text | html %]
+          [% IF a.provider && a.model %]
+            <button type="button" class="btn btn-secondary" data-kill-model="1"
+                    data-provider="[% a.provider | html %]" data-model="[% a.model | html %]"
+                    data-reason="[% a.kind %]">Kill</button>
+          [% END %]
+        </li>
+      [% END %]
+    </ul>
+  </div>
+  [% END %]
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+    <div class="card" style="flex:1;min-width:160px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+      <div class="doc-muted">Org calls (app + Hermes)</div>
+      <div style="font-size:1.8em;font-weight:600;">[% org.org_totals.calls || 0 %]</div>
+      <div class="doc-muted">app [% org.org_totals.app_calls || 0 %] · hermes [% org.org_totals.hermes_calls || 0 %]</div>
+    </div>
+    <div class="card" style="flex:1;min-width:160px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+      <div class="doc-muted">Tokens (app ledger)</div>
+      <div style="font-size:1.8em;font-weight:600;">[% org.totals.tokens || 0 %]</div>
+      <div class="doc-muted">Hermes [% org.hermes.totals.tokens || 0 %]</div>
+    </div>
+    <div class="card" style="flex:1;min-width:160px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+      <div class="doc-muted">Est. cost USD</div>
+      <div style="font-size:1.8em;font-weight:600;color:var(--primary-color);">$[% org.org_totals.cost || '0.0000' %]</div>
+      <div class="doc-muted">app $[% org.totals.cost || 0 %] · hermes $[% org.hermes.totals.cost || 0 %]</div>
+    </div>
+    <div class="card" style="flex:1;min-width:160px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+      <div class="doc-muted">App success / error</div>
+      <div style="font-size:1.8em;font-weight:600;">[% org.totals.ok || 0 %] / [% org.totals.errors || 0 %]</div>
+    </div>
+  </div>
+
+  <div class="row" style="display:flex;gap:16px;flex-wrap:wrap;">
+    <div style="flex:1;min-width:320px;">
+      <h3>Tokens by day</h3>
+      <canvas id="usage-tokens-chart" width="560" height="180" data-usage-chart="tokens"></canvas>
+    </div>
+    <div style="flex:1;min-width:320px;">
+      <h3>Cost by day (USD)</h3>
+      <canvas id="usage-cost-chart" width="560" height="180" data-usage-chart="cost"></canvas>
+    </div>
+  </div>
+  <script type="application/json" id="usage-chart-data">{
+    "app_days": [
+      [% FOREACH r IN org.by_day %]{"day":"[% r.day %]","tokens":[% r.tokens || 0 %],"cost":[% r.cost || 0 %],"calls":[% r.calls || 0 %]}[% UNLESS loop.last %],[% END %][% END %]
+    ],
+    "hermes_days": [
+      [% FOREACH r IN org.hermes.by_day %]{"day":"[% r.day %]","tokens":[% r.tokens || 0 %],"cost":[% r.cost || 0 %],"calls":[% r.calls || 0 %]}[% UNLESS loop.last %],[% END %][% END %]
+    ]
+  }</script>
 
   [% IF provider_status.supergrok.over_threshold %]
   <div class="doc-warning" role="alert">
-    SuperGrok is at [% provider_status.supergrok.pct %]% of this month's allowance
-    ($[% provider_status.supergrok.spend_usd %] / $[% provider_status.supergrok.limit_usd %],
-    [% provider_status.supergrok.calls %] requests). A system error was logged — review spend before more SuperGrok calls.
-    Chat will fall back to free OpenRouter then Ollama.
-  </div>
-  [% END %]
-  [% IF provider_status.openrouter.exhausted %]
-  <div class="doc-warning" role="alert">
-    OpenRouter credits are empty (no auto-fill). Paid OpenRouter calls fall back to a <code>:free</code> model then Ollama.
+    SuperGrok is at [% provider_status.supergrok.pct %]% of this month's allowance.
   </div>
   [% END %]
 
-  <p class="doc-muted">xAI (pay-per-token, auto-fill) is <strong>not</strong> SuperGrok (prepaid OAuth). OpenRouter does not auto-fill. Compare models below by estimated USD per successful call.</p>
-
-  <div class="row">
-    <div class="col-33">
-      <div class="card">
-        <div class="card-header">SuperGrok (prepaid OAuth)</div>
-        <div class="card-body">
-          [% IF provider_status.supergrok.ok %]
-          <p class="doc-body">Logged SuperGrok turns this month:
-            <strong>[% provider_status.supergrok.calls %]</strong> calls,
-            [% provider_status.supergrok.tokens || 0 %] tokens,
-            est. $[% provider_status.supergrok.spend_usd %] from our log.</p>
-          <p class="doc-muted">Not the grok.com 43% bar. xAI does not publish SuperGrok remaining %. Check grok.com → Settings → Usage for that. These numbers are only turns we logged as provider=supergrok.</p>
-          [% ELSE %]
-          <p class="doc-muted">[% provider_status.supergrok.error || 'No SuperGrok rows in our log yet. Pick SuperGrok in the Model list, then a turn will appear here.' %]</p>
-          [% END %]
-        </div>
-      </div>
-    </div>
-    <div class="col-33">
-      <div class="card">
-        <div class="card-header">xAI Grok API (auto-fill)</div>
-        <div class="card-body">
-          [% IF provider_status.grok.ok %]
-          <p class="doc-body">This month from our log: <strong>$[% provider_status.grok.spend_usd %]</strong>
-            — [% provider_status.grok.calls %] calls,
-            [% provider_status.grok.tokens || 0 %] tokens.</p>
-          <p class="doc-muted">Pay-per-token at console.x.ai. Auto-fill is ON — we do not fall back on xAI credit errors. Not SuperGrok.</p>
-          [% ELSE %]
-          <p class="doc-muted">[% provider_status.grok.error || 'No xAI grok rows yet.' %]</p>
-          [% END %]
-        </div>
-      </div>
-    </div>
-    <div class="col-33">
-      <div class="card">
-        <div class="card-header">OpenRouter (no auto-fill)</div>
-        <div class="card-body">
-          [% IF provider_status.openrouter.ok %]
-          <p class="doc-body">Used: <strong>$[% provider_status.openrouter.usage %]</strong>
-            [% IF provider_status.openrouter.limit.defined %]
-            of $[% provider_status.openrouter.limit %]
-            ([% provider_status.openrouter.pct %]%)
-            [% END %]
-            [% IF provider_status.openrouter.remaining.defined %]
-            — remaining $[% provider_status.openrouter.remaining %]
-            [% END %]
-          </p>
-          <p class="doc-muted">Live from GET openrouter.ai/api/v1/auth/key (real remaining credits). Empty → :free then Ollama.</p>
-          [% ELSE %]
-          <p class="doc-muted">[% provider_status.openrouter.error || 'No OpenRouter key / status.' %]</p>
-          [% END %]
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <h3>Daily usage by model (cost vs volume)</h3>
-  <p class="doc-muted">From our API call log (ai_usage_logs). Use USD/OK to compare how much coding you got per dollar.</p>
+  <h3>Kill switch</h3>
+  <p class="doc-muted">Stops Router from calling a leaking, hallucinating, or thrashing model. Live — no server restart.</p>
+  [% IF org.kill_switch.killed.size %]
   <table class="data-table">
-    <thead><tr><th>Day</th><th>Provider</th><th>Model</th><th>Calls</th><th>OK</th><th>Tokens</th><th>Est. USD</th><th>USD/OK</th></tr></thead>
+    <thead><tr><th>Provider</th><th>Model</th><th>Reason</th><th>By</th><th></th></tr></thead>
     <tbody>
-    [% FOREACH r IN daily_models %]
+    [% FOREACH k IN org.kill_switch.killed %]
       <tr>
-        <td>[% r.day %]</td>
-        <td>[% r.provider %]</td>
-        <td>[% r.model %]</td>
-        <td>[% r.calls %]</td>
-        <td>[% r.ok %]</td>
-        <td>[% r.tokens %]</td>
-        <td>$[% r.cost %]</td>
-        <td>$[% r.cost_per_ok %]</td>
+        <td>[% k.provider | html %]</td>
+        <td>[% k.model | html %]</td>
+        <td>[% k.reason | html %]</td>
+        <td>[% k.by | html %]</td>
+        <td><button type="button" class="btn" data-unkill-model="1"
+                    data-provider="[% k.provider | html %]" data-model="[% k.model | html %]">Restore</button></td>
       </tr>
-    [% END %]
-    [% IF ! daily_models.size %]
-      <tr><td colspan="8" class="doc-muted">No per-model rows yet. New v2 chat calls now write this log.</td></tr>
     [% END %]
     </tbody>
   </table>
+  [% ELSE %]
+  <p class="doc-muted">No models killed.</p>
+  [% END %]
+  <form id="usage-kill-form" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin:8px 0;">
+    <label>Provider<br><input name="provider" type="text" placeholder="grok" required></label>
+    <label>Model<br><input name="model" type="text" placeholder="grok-4.6" required></label>
+    <label>Reason<br>
+      <select name="reason">
+        <option value="leak">Sensitive data leak</option>
+        <option value="hallucinate">Hallucinating</option>
+        <option value="thrash">Thrashing</option>
+        <option value="other">Other</option>
+      </select>
+    </label>
+    <label>Notes<br><input name="notes" type="text" placeholder="optional"></label>
+    <button type="submit" class="btn btn-primary">Kill model</button>
+  </form>
+  <div id="usage-kill-result" class="doc-muted"></div>
 
-  <!-- Live xAI / Grok balance check -->
-  <div class="card" style="margin:16px 0;">
-    <div class="card-header">xAI prepaid (declare only)</div>
-    <div class="card-body">
-    <p class="doc-muted">xAI does not return remaining SuperGrok or prepaid credits on the chat key. Paste a number from console.x.ai if you want an estimate. OpenRouter remaining above is live.</p>
-    <button type="button" class="btn btn-primary" data-check-grok="1">Check Live xAI Balance / Usage</button>
-    <div style="margin-top:8px;">
-      <input type="number" id="declare-xai-balance" class="form-control" step="0.01" placeholder="e.g. 42.50" style="width:120px;display:inline-block;" />
-      <button type="button" class="btn btn-secondary" data-declare-grok="1">Declare current balance from console.x.ai &amp; refresh</button>
-    </div>
-    <div id="grok-live-result" class="doc-code" style="margin-top:10px;white-space:pre-wrap;"></div>
-    </div>
-  </div>
+  <h3>Grok bot daily evaluation</h3>
+  [% IF org.daily_eval %]
+    <p class="doc-muted">Last ingest: [% org.daily_eval.created_at %] · [% org.daily_eval.provider %]/[% org.daily_eval.model %]</p>
+    <pre class="doc-code" style="white-space:pre-wrap;color:var(--text-color);">[% org.daily_eval.evaluation | html %]</pre>
+  [% ELSE %]
+    <p class="doc-muted">None yet. Grok bot (LAN) POST JSON to <code>/ai/usage_ingest</code>:</p>
+    <pre class="doc-code">{ "source":"daily_eval", "provider":"grok", "model":"grok-bot", "evaluation":"…" }</pre>
+  [% END %]
 
-  <!-- Filters -->
-  <form method="GET" class="ai-usage-filters" style="background:#f8f9fa;padding:12px;border-radius:6px;margin:12px 0;display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+  <form method="GET" class="ai-usage-filters" style="background:var(--card-bg, var(--bg-color));padding:12px;border:1px solid var(--border-color);border-radius:6px;margin:12px 0;display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
     <div>
       <label>Days</label><br>
       <select name="days">
@@ -144,7 +152,7 @@
     </div>
     [% IF is_admin %]
     <div>
-      <label>Site / Customer</label><br>
+      <label>Site</label><br>
       <select name="site_id">
         <option value="">All sites</option>
         [% FOREACH s IN sites %]
@@ -155,141 +163,147 @@
     [% END %]
     <div>
       <label>Model contains</label><br>
-      <input type="text" name="model" value="[% filters.model | html %]" placeholder="grok-3, llama...">
+      <input type="text" name="model" value="[% filters.model | html %]">
     </div>
     <div>
       <button type="submit" class="btn">Filter</button>
-      <a href="?" class="btn btn-secondary" style="margin-left:4px;">Reset</a>
-    </div>
-    <div style="margin-left:auto;font-size:0.9em;color:#555;">
-      Showing up to 200 recent records for the period.
+      <a href="[% c.uri_for('/ai/usage') %]" class="btn btn-secondary">Reset</a>
     </div>
   </form>
 
-  <!-- Summary cards -->
-  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
-    <div style="flex:1;min-width:180px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:12px;">
-      <div style="font-size:0.85em;color:#666;">Total Calls</div>
-      <div style="font-size:1.8em;font-weight:600;">[% summary.total_calls %]</div>
-    </div>
-    <div style="flex:1;min-width:180px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:12px;">
-      <div style="font-size:0.85em;color:#666;">Total Tokens</div>
-      <div style="font-size:1.8em;font-weight:600;">[% summary.total_tokens %]</div>
-    </div>
-    <div style="flex:1;min-width:180px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:12px;">
-      <div style="font-size:0.85em;color:#666;">Est. External Cost (USD)</div>
-      <div style="font-size:1.8em;font-weight:600;color:#0a0;">$[% summary.total_cost %]</div>
-      <div style="font-size:0.75em;color:#888;">(local/ollama = $0; paid providers only)</div>
-    </div>
-  </div>
-
-  <!-- By Provider breakdown -->
-  <h3 style="margin-top:0;">By Provider (for anticipating paid vs local spend/load)</h3>
-  <table class="table" style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-    <thead><tr style="background:#f0f0f0;"><th>Provider</th><th>Calls</th><th>Tokens</th><th>Est. Cost USD</th></tr></thead>
+  <h3>App ledger — model effectiveness</h3>
+  <table class="data-table">
+    <thead><tr><th>Provider</th><th>Model</th><th>Calls</th><th>OK</th><th>Err</th><th>OK%</th><th>Tokens</th><th>Avg tok</th><th>USD</th><th>USD/OK</th><th></th></tr></thead>
     <tbody>
-    [% FOREACH p IN summary.by_provider.keys.sort %]
+    [% FOREACH r IN org.by_model %]
       <tr>
-        <td><strong>[% p %]</strong></td>
-        <td>[% summary.by_provider.$p.calls %]</td>
-        <td>[% summary.by_provider.$p.tokens %]</td>
-        <td>$[% fmt_cost(summary.by_provider.$p.cost) %]</td>
+        <td>[% r.provider %]</td>
+        <td>[% r.model %]</td>
+        <td>[% r.calls %]</td>
+        <td>[% r.ok %]</td>
+        <td>[% r.errors %]</td>
+        <td>[% r.ok_rate %]</td>
+        <td>[% r.tokens %]</td>
+        <td>[% r.avg_tokens %]</td>
+        <td>$[% r.cost %]</td>
+        <td>$[% r.cost_per_ok %]</td>
+        <td><button type="button" class="btn btn-secondary" data-kill-model="1"
+                    data-provider="[% r.provider | html %]" data-model="[% r.model | html %]" data-reason="other">Kill</button></td>
       </tr>
     [% END %]
-    [% IF ! summary.by_provider.size %]<tr><td colspan="4" class="muted">No data for filters.</td></tr>[% END %]
+    [% IF ! org.by_model.size %]<tr><td colspan="11" class="doc-muted">No app ledger rows in this window.</td></tr>[% END %]
     </tbody>
   </table>
 
-  [% IF is_admin %]
-  <!-- By Site / Customer (billing view) -->
-  <h3>By Site / Customer (for billing AI-enabled accounts + free quota harmony)</h3>
-  <p style="font-size:0.9em;color:#555;">Free daily calls come from the site's active MembershipPlan.ai_requests_per_day (the "included with AI addon" allowance). Local Ollama calls primarily consume the free quota. Paid providers (grok etc.) are tracked for cost even when under quota.</p>
-  <table class="table" style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-    <thead><tr style="background:#f0f0f0;"><th>Site ID</th><th>Plan Free/Day</th><th>Calls (free / over)</th><th>Tokens</th><th>Est. Cost</th></tr></thead>
+  [% IF org.combinations.size %]
+  <h3>Model combinations (fallbacks)</h3>
+  <table class="data-table">
+    <thead><tr><th>Combo</th><th>Calls</th><th>OK</th><th>Err</th><th>OK%</th></tr></thead>
     <tbody>
-    [% FOREACH sid IN summary.by_site.keys.sort %]
-      <tr>
-        <td><a href="/ai/usage?site_id=[% sid %]">[% sid %]</a></td>
-        <td>[% summary.by_site.$sid.plan_quota || '—' %]</td>
-        <td>
-          [% summary.by_site.$sid.calls %]
-          [% IF summary.by_site.$sid.free_calls OR summary.by_site.$sid.overage_calls %]
-            <br><small>(free: [% summary.by_site.$sid.free_calls || 0 %] / over: [% summary.by_site.$sid.overage_calls || 0 %])</small>
-          [% END %]
-        </td>
-        <td>[% summary.by_site.$sid.tokens %]</td>
-        <td>$[% fmt_cost(summary.by_site.$sid.cost) %]</td>
-      </tr>
+    [% FOREACH r IN org.combinations %]
+      <tr><td>[% r.combo | html %]</td><td>[% r.calls %]</td><td>[% r.ok %]</td><td>[% r.errors %]</td><td>[% r.ok_rate %]</td></tr>
     [% END %]
-    [% IF ! summary.by_site.size %]<tr><td colspan="5" class="muted">No per-site data.</td></tr>[% END %]
     </tbody>
   </table>
   [% END %]
 
-  <!-- Recent logs table -->
-  <h3>Recent AI Calls (latest 200)</h3>
-  <table class="table ai-usage-table" style="width:100%;font-size:0.9em;border-collapse:collapse;">
-    <thead>
-      <tr style="background:#f0f0f0;">
-        <th>When</th>
-        <th>Provider / Model</th>
-        <th>User/Site</th>
-        <th style="text-align:right;">Tokens (in/out/total)</th>
-        <th style="text-align:right;">Cost</th>
-        <th>Dur</th>
-        <th>Status</th>
-        <th>Type</th>
-      </tr>
-    </thead>
+  <h3>By user</h3>
+  <table class="data-table">
+    <thead><tr><th>User</th><th>Calls</th><th>OK</th><th>Tokens</th><th>USD</th></tr></thead>
     <tbody>
-    [% FOREACH log IN logs %]
-      <tr style="border-bottom:1px solid #eee;[% IF log.status != 'success' %]background:#fff3f3;[% END %]">
-        <td>[% log.created_at.strftime('%Y-%m-%d %H:%M') IF log.created_at %]</td>
-        <td>
-          <strong>[% log.provider %]</strong><br>
-          <small>[% log.model %]</small>
-          [% IF log.ollama_host %]<br><small style="color:#666;">@ [% log.ollama_host %]</small>[% END %]
-        </td>
-        <td>
-          u:[% log.user_id || 'guest' %]<br>
-          <small>s:[% log.site_id || '-' %] [% IF log.guest_session_id %]<span title="guest">g</span>[% END %]</small>
-        </td>
-        <td style="text-align:right;white-space:nowrap;">
-          [% log.prompt_tokens || 0 %] / [% log.completion_tokens || 0 %]<br>
-          <strong>[% log.total_tokens || 0 %]</strong>
-        </td>
-        <td style="text-align:right;">$[% fmt_cost(log.estimated_cost_usd) %]</td>
-        <td>[% log.duration_ms ? (log.duration_ms / 1000) _ 's' : '-' %]</td>
-        <td>
-          [% IF log.status == 'success' %]
-            <span style="color:#0a0;">✓</span>
-          [% ELSE %]
-            <span style="color:#c00;" title="[% log.error_message | html %]">✗ [% log.status %]</span>
-          [% END %]
-        </td>
-        <td><small>[% log.request_type %]</small></td>
+    [% FOREACH r IN org.by_user %]
+      <tr><td>[% r.username | html %]</td><td>[% r.calls %]</td><td>[% r.ok %]</td><td>[% r.tokens %]</td><td>$[% r.cost %]</td></tr>
+    [% END %]
+    [% IF ! org.by_user.size %]<tr><td colspan="5" class="doc-muted">No per-user rows.</td></tr>[% END %]
+    </tbody>
+  </table>
+
+  [% IF is_admin %]
+  <h3>By sitename</h3>
+  <table class="data-table">
+    <thead><tr><th>Site</th><th>Calls</th><th>OK</th><th>Tokens</th><th>USD</th></tr></thead>
+    <tbody>
+    [% FOREACH r IN org.by_site %]
+      <tr>
+        <td><a href="[% c.uri_for('/ai/usage') %]?site_id=[% r.site_id %]" style="color:var(--link-color);">[% r.sitename | html %]</a></td>
+        <td>[% r.calls %]</td><td>[% r.ok %]</td><td>[% r.tokens %]</td><td>$[% r.cost %]</td>
       </tr>
     [% END %]
-    [% IF ! logs.size %]
-      <tr><td colspan="8" class="muted" style="padding:20px;text-align:center;">No AI usage records match the current filters.</td></tr>
+    [% IF ! org.by_site.size %]<tr><td colspan="5" class="doc-muted">No per-site rows.</td></tr>[% END %]
+    </tbody>
+  </table>
+  [% END %]
+
+  <h3>By source (app request_type)</h3>
+  <table class="data-table">
+    <thead><tr><th>Source</th><th>Calls</th><th>Tokens</th><th>USD</th></tr></thead>
+    <tbody>
+    [% FOREACH r IN org.by_source %]
+      <tr><td>[% r.request_type || '(unset)' %]</td><td>[% r.calls %]</td><td>[% r.tokens %]</td><td>$[% r.cost %]</td></tr>
     [% END %]
     </tbody>
   </table>
 
-  <div style="margin-top:20px;font-size:0.85em;color:#666;">
-    Notes: 
-    <ul>
-      <li>Local Ollama usage is tracked for capacity planning (your GPU/CPU hosts). Cost is always $0.</li>
-      <li>External providers (grok/xAI etc.) show rough estimated cost based on current token pricing — use for customer billing quotes and actual invoices.</li>
-      <li>Customers with AI enabled are those whose MembershipPlan includes ai_* services or ai_models_allowed.</li>
-      <li>For full exports / heavy reporting, query the <code>ai_usage_logs</code> table directly or extend this page.</li>
-    </ul>
-    <p><a href="/ai">← Back to AI Chat</a> &nbsp; | &nbsp; <a href="/ai/conversations">Chat History</a> &nbsp; | &nbsp; <a href="/membership/admin">Membership / Plans (AI enablement)</a></p>
-  </div>
-</div>
+  <h3>Hermes (live from state.db)</h3>
+  [% IF org.hermes.ok %]
+  <p class="doc-muted">[% org.hermes.totals.calls %] sessions · [% org.hermes.totals.tokens %] tokens · $[% org.hermes.totals.cost %] · last [% org.hermes.days %] days. Not copied into MySQL (avoids double-count).</p>
+  <table class="data-table">
+    <thead><tr><th>Provider</th><th>Model</th><th>Sessions</th><th>Tokens</th><th>USD</th></tr></thead>
+    <tbody>
+    [% FOREACH r IN org.hermes.by_model %]
+      <tr>
+        <td>[% r.provider %]</td><td>[% r.model %]</td><td>[% r.calls %]</td><td>[% r.tokens %]</td><td>$[% r.cost %]</td>
+      </tr>
+    [% END %]
+    </tbody>
+  </table>
+  <h4>Hermes channel</h4>
+  <table class="data-table">
+    <thead><tr><th>Source</th><th>Sessions</th><th>Tokens</th><th>USD</th></tr></thead>
+    <tbody>
+    [% FOREACH r IN org.hermes.by_source %]
+      <tr><td>[% r.request_type %]</td><td>[% r.calls %]</td><td>[% r.tokens %]</td><td>$[% r.cost %]</td></tr>
+    [% END %]
+    </tbody>
+  </table>
+  [% ELSE %]
+  <p class="doc-muted">Hermes overlay unavailable: [% org.hermes.error || 'no state.db' %]</p>
+  [% END %]
 
-<style>
-.ai-usage-page .table td, .ai-usage-page .table th { padding: 6px 8px; vertical-align: top; }
-.ai-usage-page .muted { color:#888; }
-.ai-usage-page select, .ai-usage-page input { padding:4px 6px; }
-</style>
+  <h3>Recent app calls</h3>
+  <table class="data-table">
+    <thead><tr><th>When</th><th>Provider / Model</th><th>User/Site</th><th>Tokens</th><th>Cost</th><th>Status</th><th>Type</th></tr></thead>
+    <tbody>
+    [% FOREACH log IN org.recent %]
+      <tr>
+        <td>[% log.created_at %]</td>
+        <td><strong>[% log.provider %]</strong><br><small>[% log.model %]</small></td>
+        <td>u:[% log.user_id || 'guest' %]<br><small>s:[% log.site_id || '-' %]</small></td>
+        <td>[% log.prompt_tokens %]/[% log.completion_tokens %] ([% log.total_tokens %])</td>
+        <td>$[% log.cost %]</td>
+        <td>[% log.status %]</td>
+        <td>[% log.request_type %]</td>
+      </tr>
+    [% END %]
+    [% IF ! org.recent.size %]<tr><td colspan="7" class="doc-muted">No recent app rows.</td></tr>[% END %]
+    </tbody>
+  </table>
+
+  <div class="card" style="margin:16px 0;border:1px solid var(--border-color);padding:12px;">
+    <div class="card-header">xAI prepaid (declare only)</div>
+    <p class="doc-muted">xAI does not return remaining SuperGrok on the chat key. OpenRouter remaining is live from their API.</p>
+    <button type="button" class="btn btn-primary" data-check-grok="1">Check Live xAI Balance / Usage</button>
+    <div style="margin-top:8px;">
+      <input type="number" id="declare-xai-balance" class="form-control" step="0.01" placeholder="e.g. 42.50" style="width:120px;display:inline-block;" />
+      <button type="button" class="btn btn-secondary" data-declare-grok="1">Declare current balance from console.x.ai</button>
+    </div>
+    <div id="grok-live-result" class="doc-code" style="margin-top:10px;white-space:pre-wrap;"></div>
+  </div>
+
+  <p class="doc-muted">
+    App chat already writes <code>ai_usage_logs</code>. Hermes is read live from <code>~/.hermes/state.db</code>.
+    Grok bot: <code>POST /ai/usage_ingest</code> with <code>source=grok_bot</code> or <code>daily_eval</code> (LAN / operator).
+    <a href="[% c.uri_for('/ai') %]" style="color:var(--link-color);">AI Chat</a>
+    · <a href="[% c.uri_for('/ai/conversations') %]" style="color:var(--link-color);">History</a>
+  </p>
+</div>
