@@ -1,5 +1,5 @@
 [% META title = 'Admin Dashboard' %]
-[% PageVersion = 'admin/index.tt,v 0.02 2025/09/10 shanta Exp shanta ' %]
+[% PageVersion = 'admin/index.tt,v 0.03 2026/09/12 shanta Exp shanta ' %]
 
 <div class="admin-dashboard">
     <div class="dashboard-header">
@@ -244,6 +244,16 @@
                         <i class="fas fa-clipboard-list"></i>
                         <span>Manufacturing Traveler</span>
                     </a>
+                    [% IF c.session.roles.grep('admin').size %]
+                    <a href="[% c.uri_for('/mail/invoice/api') %]" class="admin-link">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>Mail Invoice Classification</span>
+                    </a>
+                    <a href="[% c.uri_for('/mail/invoice/sort') %]" class="admin-link">
+                        <i class="fas fa-sort"></i>
+                        <span>Sort Invoices by Site</span>
+                    </a>
+                    [% END %]
                     [% ELSE %]
                     <a href="[% c.uri_for('/membership/addons') %]" class="admin-link">
                         <i class="fas fa-plus-circle"></i>
