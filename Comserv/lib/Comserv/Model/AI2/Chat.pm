@@ -5,6 +5,7 @@ use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny s
 
 use Try::Tiny;
 use JSON qw(encode_json decode_json);
+use Time::HiRes qw(gettimeofday tv_interval);
 use Comserv::Model::AI::ConversationScope qw(is_guest_session ensure_guest_session_id conversation_owned_by_session);
 
 use Comserv::Util::Logging;
@@ -54,6 +55,7 @@ sub build_agent_prompt {
     return $existing if $existing;
 
     my $aid = lc($agent_id // '');
+    $aid = 'planning' if $aid eq 'todo' || $aid eq 'projects' || $aid eq 'project';
 
     # BMaster gets the full beekeeping-aware prompt (apiary schema, voice
     # inspection workflow, ACTION contract) — ported from v1 (2026-07-24).
@@ -66,10 +68,10 @@ sub build_agent_prompt {
         helpdesk => "You are a helpful support agent for the Comserv system. Be concise and practical.",
         ency     => "You are an encyclopedia assistant. Provide clear, factual answers.",
         bmaster  => "You are a business master / project assistant. Be professional and concise.",
-        planning => "You are a planning assistant. Focus on daily logs, tasks, and clear next steps.",
-        todo     => "You are the Comserv todo agent. When the user wants a todo created, the server already performs that job — confirm the result, do not invent a form.",
+        planning => "You are the Comserv Planning Assistant (also covers Project Manager and Task Assistant). Use LIVE TODO/PROJECT data when injected. The TODO ACTION contract is already in the system prompt — after a provider retry never say you have no todo tool. Confirm server-created todos; do not invent a form.",
+        todo     => "You are the Comserv Task Assistant (agent id=todo). The system prompt already contains the TODO ACTION contract and live project catalog. After a provider retry or fallback you MUST keep using that contract — never say you have no todo tool. When the user wants a todo created, the server may already have done it; confirm the result, do not invent a form.",
         code     => "You are a coding assistant for the Comserv2 Catalyst app. The server already loads source into [FILE:] blocks. NEVER say you lack filesystem access or ask the user to paste files. Load other sources with [READ_FILE: lib/...] (optional :START-END). Prefer concise examples and one fenced code block so Approve can apply it.",
-        programming => "You are the AI Editor programming agent for Comserv2. Use loaded [FILE:] buffers; never claim no filesystem access. Plan then code only when phase is implement.",
+        programming => "You are the AI Editor programming agent for Comserv2. Use loaded [FILE:] buffers; never claim no filesystem access. Plan then code only when phase is implement. Never create todos, never emit [ACTION: create_todo], never file HelpDesk tickets or invoices.",
         documentation => "You are the AI Editor documentation agent. Prefer docs/changelog/planning guidance; avoid code file rewrites unless asked.",
         analyze => "You are the AI Editor Analyze worker. Read loaded [FILE:] buffers and named paths only. Return root cause + short plan. Never rewrite files, never emit ## FIX / full-file patches, never ask the user to paste files already provided.",
         nav      => "You are a navigation assistant. Help the user find the right page or feature in Comserv.",
@@ -91,14 +93,14 @@ sub build_system_prompt {
     push @parts, $args{page_context}        if $args{page_context};
     push @parts, $args{navigation_hint}     if $args{navigation_hint};
 
-    # Logged-in users can create HelpDesk tickets + todos from this same chat
-    # (widget + editor). Ticket contract always applies (editor may file bugs).
-    # Skip TodoCreate contract for AI Editor agents — they plan/analyze code,
-    # and "create todos" in those prompts must not become a todo agent contract.
+    # Logged-in Chat-with-AI users get the todo ACTION contract (#2295).
+    # AI Editor agents must not: the open buffer + phase contract mention
+    # "todo" and the intercept would create real rows (#2423).
     my $uname = eval { $c->session->{username} } || '';
     require Comserv::Model::AI2::ChatIntent;
-    my $editor_todo_skip = Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id});
-    if ($uname && lc($uname) ne 'guest') {
+    my $editor_agent = Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id})
+        || $args{skip_app_writes};
+    if ($uname && lc($uname) ne 'guest' && !$editor_agent) {
         my $hd_contract = eval {
             require Comserv::Model::AI2::HelpDeskTicketCreate;
             my $hbrain = eval { $c->model('AI2::HelpDeskTicketCreate') };
@@ -111,19 +113,17 @@ sub build_system_prompt {
         }
         push @parts, $hd_contract if $hd_contract;
 
-        if (!$editor_todo_skip) {
-            my $contract = eval {
-                require Comserv::Model::AI2::TodoCreate;
-                my $brain = eval { $c->model('AI2::TodoCreate') };
-                $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
-                $brain->chat_contract($c);
-            };
-            if ($@) {
-                $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
-                    'build_system_prompt', "TodoCreate chat_contract failed: $@");
-            }
-            push @parts, $contract if $contract;
+        my $contract = eval {
+            require Comserv::Model::AI2::TodoCreate;
+            my $brain = eval { $c->model('AI2::TodoCreate') };
+            $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
+            $brain->chat_contract($c);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                'build_system_prompt', "TodoCreate chat_contract failed: $@");
         }
+        push @parts, $contract if $contract;
 
         my $inv_contract = eval {
             require Comserv::Model::AI2::InvoiceCreate;
@@ -136,6 +136,18 @@ sub build_system_prompt {
                 'build_system_prompt', "InvoiceCreate chat_contract failed: $@");
         }
         push @parts, $inv_contract if $inv_contract;
+
+        my $sched_contract = eval {
+            require Comserv::Model::AI2::Scheduler;
+            my $sbrain = eval { $c->model('AI2::Scheduler') };
+            $sbrain = Comserv::Model::AI2::Scheduler->new if !$sbrain || !ref $sbrain;
+            $sbrain->chat_contract($c);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                'build_system_prompt', "Scheduler chat_contract failed: $@");
+        }
+        push @parts, $sched_contract if $sched_contract;
     }
 
     # Positive-learning retrieval (proj #288): reuse what the app already knows
@@ -212,19 +224,48 @@ sub select_provider_and_model {
 }
 
 # Main entry: run a chat turn. Returns { success, response, model, usage? }.
+# AIMPS #2030 extras for ai_usage_logs (duration_ms + metadata surface/role).
+sub _aimps_elapsed_ms {
+    my ($t0) = @_;
+    return undef unless $t0 && ref($t0) eq 'ARRAY';
+    return int(tv_interval($t0) * 1000);
+}
+
+sub _aimps_meta {
+    my ($self, $c, $args, $extra) = @_;
+    $args  ||= {};
+    $extra ||= {};
+    my $roles = $c->session->{roles} || [];
+    $roles = [ split(/,/, $roles) ] unless ref $roles;
+    my $surface = $args->{surface}
+        || (($args->{skip_app_writes} || $args->{phase}) ? 'editor' : 'chat');
+    return {
+        surface  => $surface,
+        role     => join(',', @$roles) || 'guest',
+        agent_id => $args->{agent_id} // '',
+        %$extra,
+    };
+}
+
 sub process {
     my ($self, $c, %args) = @_;
 
     my $prompt = $args{prompt} // '';
     return { success => 0, error => 'Prompt is required' } unless $prompt && length $prompt;
+    my $t0 = [gettimeofday];
 
     my @thinking;
     push @thinking, 'Received prompt (' . length($prompt) . ' chars)';
     push @thinking, 'agent_id=' . ($args{agent_id} // '(none)');
 
+    require Comserv::Model::AI2::ChatIntent;
+    my $editor_todo_skip = Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id})
+        || $args{skip_app_writes};
+
     # HelpDesk-ticket AGENT first — must beat TodoCreate when the prompt
     # mentions both "ticket" and "todo" (3180 / 6510 hijack).
-    my $hd_hit = eval {
+    # Skip for AI Editor: loaded files mention tickets/todos (#2423).
+    my $hd_hit = (!$editor_todo_skip) && eval {
         require Comserv::Model::AI2::HelpDeskTicketCreate;
         my $hbrain = eval { $c->model('AI2::HelpDeskTicketCreate') };
         $hbrain = Comserv::Model::AI2::HelpDeskTicketCreate->new if !$hbrain || !ref $hbrain;
@@ -254,8 +295,6 @@ sub process {
     # Todo-create AGENT (in-chat job). Deterministic — does NOT use the
     # picker model. Free models invent a fake "Add" box; this runs next.
     # Skip for AI Editor agents (programming/coding/code/documentation).
-    require Comserv::Model::AI2::ChatIntent;
-    my $editor_todo_skip = Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id});
     my $todo_hit;
     if (!$editor_todo_skip) {
         $todo_hit = eval {
@@ -285,7 +324,7 @@ sub process {
     }
 
     # Invoice-create AGENT. Same intercept as todos — draft only, never posts GL.
-    my $inv_hit = eval {
+    my $inv_hit = (!$editor_todo_skip) && eval {
         require Comserv::Model::AI2::InvoiceCreate;
         my $ibrain = eval { $c->model('AI2::InvoiceCreate') };
         $ibrain = Comserv::Model::AI2::InvoiceCreate->new if !$ibrain || !ref $ibrain;
@@ -403,6 +442,7 @@ sub process {
     my $system_prompt = $self->build_system_prompt($c,
         roles          => $roles,
         agent_id       => $args{agent_id},
+        skip_app_writes => $args{skip_app_writes},
         agent_system   => $args{system},
         model          => $args{model},
         module_data    => $args{module_data},
@@ -453,8 +493,14 @@ sub process {
                 status            => 'error',
                 error_message     => $resp->{error} // 'AI provider error',
                 request_type      => 'chat',
+                duration_ms       => _aimps_elapsed_ms($t0),
+                metadata          => $self->_aimps_meta($c, \%args),
             );
         };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+                "Failed to record AI usage (error path): $@");
+        }
         my $public = eval { $c->model('AI2::Router')->_user_facing_error($resp->{error}) }
                   || 'The AI provider did not complete this turn. Try again or pick another model.';
         push @thinking, 'Provider failed: ' . ($resp->{error} // $public);
@@ -477,9 +523,16 @@ sub process {
                 status            => 'error',
                 error_message     => $resp->{original_error} || 'credits exhausted, fell back',
                 request_type      => 'chat',
-                metadata          => { fallback_to => $resp->{provider} },
+                duration_ms       => _aimps_elapsed_ms($t0),
+                metadata          => $self->_aimps_meta($c, \%args, {
+                    fallback_to => $resp->{provider},
+                }),
             );
         };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+                "Failed to record AI usage (fallback path): $@");
+        }
         $provider_name = $resp->{provider} if $resp->{provider};
         $use_model     = $resp->{model}     if $resp->{model};
     }
@@ -833,7 +886,7 @@ sub process {
                 model_used      => $model_used,
                 metadata        => encode_json({ thinking_trace => \@thinking }),
             });
-            $created_at = scalar(localtime);
+            $created_at = eval { require Comserv::Util::AppTime; Comserv::Util::AppTime->now_utc } || scalar(localtime);
         }
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
@@ -843,23 +896,30 @@ sub process {
 
     eval {
         my $usage_info = $resp->{usage} || {};
+        my $used = $resp->{model} || $use_model || 'unknown';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+            "AIMPS model_used provider=$provider_name model=$used "
+            . "prompt_tokens=" . ($usage_info->{prompt_tokens} || 0)
+            . " completion_tokens=" . ($usage_info->{completion_tokens} || 0)
+            . " total_tokens=" . ($usage_info->{total_tokens} || 0)
+            . " user=$username duration_ms=" . (_aimps_elapsed_ms($t0) // '?'));
         $c->model('AI')->log_usage($c,
             provider          => $provider_name,
-            model             => $resp->{model} || $use_model || 'unknown',
+            model             => $used,
             prompt_tokens     => $usage_info->{prompt_tokens} || 0,
             completion_tokens => $usage_info->{completion_tokens} || 0,
             total_tokens      => $usage_info->{total_tokens} || 0,
             request_type      => 'chat',
             conversation_id   => $conversation_id,
             status            => 'success',
-            metadata          => {
-                agent_id      => $args{agent_id},
+            duration_ms       => _aimps_elapsed_ms($t0),
+            metadata          => $self->_aimps_meta($c, \%args, {
                 thinking_steps => scalar(@thinking),
                 ($resp->{fallback} ? (
                     fallback      => 1,
                     fallback_from => $resp->{fallback_from},
                 ) : ()),
-            },
+            }),
         );
         # SuperGrok ≠ xAI grok. Only SuperGrok (prepaid, no auto-fill) trips the 80% alert.
         my $from = $resp->{fallback_from} || $provider_name || '';

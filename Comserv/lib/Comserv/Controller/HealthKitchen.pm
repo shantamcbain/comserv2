@@ -76,8 +76,11 @@ sub _stash_mode {
     my $inv = $self->hk->site_has_inventory($c) ? 1 : 0;
     $c->stash->{hk_has_inventory} = $inv;
     $c->stash->{hk_mode}          = $inv ? 'inventory' : 'personal';
-    $c->stash->{hk_pantry_ready}  = $self->hk->pantry_ready($c) ? 1 : 0;
-    $c->stash->{hk_recipe_ready}  = $self->hk->recipe_ready($c) ? 1 : 0;
+    $c->stash->{hk_pantry_ready}   = $self->hk->pantry_ready($c) ? 1 : 0;
+    $c->stash->{hk_recipe_ready}   = $self->hk->recipe_ready($c) ? 1 : 0;
+    $c->stash->{hk_map_ready}      = $self->hk->map_ready($c) ? 1 : 0;
+    $c->stash->{hk_symptom_ready}  = $self->hk->symptom_ready($c) ? 1 : 0;
+    $c->stash->{hk_profile_ready}  = $self->hk->profile_ready($c) ? 1 : 0;
 }
 
 sub index :Path('/healthkitchen') :Args(0) {
@@ -175,6 +178,88 @@ sub recipe_make :Local :Args(1) {
     }
     $c->response->redirect( $c->uri_for( $self->action_for('recipes') ) );
     $c->detach;
+}
+
+sub pantry_map :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'pantry_map',
+        'HealthKitchen pantry_map method=' . ( $c->req->method || '' ) );
+    unless ( $c->req->method eq 'POST' ) {
+        $c->response->redirect( $c->uri_for( $self->action_for('pantry') ) );
+        $c->detach;
+        return;
+    }
+    my $res = $self->hk->upsert_ency_map(
+        $c,
+        {
+            inventory_item_id => $c->req->params->{inventory_item_id},
+            herb_id           => $c->req->params->{herb_id},
+            organism_id       => $c->req->params->{organism_id},
+            animal_id         => $c->req->params->{animal_id},
+            insect_id         => $c->req->params->{insect_id},
+            formula_id        => $c->req->params->{formula_id},
+            unlink            => $c->req->params->{unlink},
+        }
+    );
+    if ( $res->{ok} ) {
+        $c->flash->{success_msg} = $c->req->params->{unlink} ? 'ENCY link removed.' : 'ENCY link saved.';
+    }
+    else {
+        $c->flash->{error_msg} = $res->{error} || 'Could not save ENCY link.';
+    }
+    $c->response->redirect( $c->uri_for( $self->action_for('pantry') ) );
+    $c->detach;
+}
+
+sub symptoms :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'symptoms',
+        'HealthKitchen symptoms' );
+    if ( $c->req->method eq 'POST' ) {
+        my $action = $c->req->params->{hk_action} || 'add';
+        my $res;
+        if ( $action eq 'resolve' ) {
+            $res = $self->hk->resolve_symptom( $c, $c->req->params->{id} );
+        }
+        elsif ( $action eq 'profile' ) {
+            $res = $self->hk->save_profile(
+                $c,
+                {
+                    diet_flags => $c->req->params->{diet_flags},
+                    allergies  => $c->req->params->{allergies},
+                    goals      => $c->req->params->{goals},
+                }
+            );
+        }
+        else {
+            $res = $self->hk->set_active_symptom(
+                $c,
+                {
+                    symptom_id => $c->req->params->{symptom_id},
+                    severity   => $c->req->params->{severity},
+                }
+            );
+        }
+        if ( $res->{ok} ) {
+            $c->flash->{success_msg} = 'Saved.';
+        }
+        else {
+            $c->flash->{error_msg} = $res->{error} || 'Could not save.';
+        }
+        $c->response->redirect( $c->uri_for( $self->action_for('symptoms') ) );
+        $c->detach;
+        return;
+    }
+    my $active = $self->hk->list_active_symptoms($c);
+    $c->stash(
+        hk_profile  => $self->hk->get_profile($c),
+        hk_active   => $active,
+        hk_symptoms => $self->hk->list_ency_symptoms($c),
+        hk_match    => $self->hk->match_for_symptoms(
+            $c, { symptom_ids => [ map { $_->{symptom_id} } @$active ] }
+        ),
+        template => 'healthkitchen/symptoms.tt',
+    );
 }
 
 __PACKAGE__->meta->make_immutable;

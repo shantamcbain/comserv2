@@ -87,6 +87,24 @@ sub providers :Local :Args(0) {
     };
     $catalog ||= [];
 
+    # AIMPS W1.1: page-class shortlist via Router (not a per-action array).
+    my $page = $c->req->param('page') || $c->req->param('surface') || '';
+    unless (length $page) {
+        my $ref = $c->req->referer || $c->req->header('Referer') || $c->req->path || '';
+        $page = try {
+            my $r = $c->model('AI2::Router');
+            $r && $r->can('infer_page') ? $r->infer_page($ref) : 'chat';
+        } catch { 'chat' };
+    }
+    $catalog = try {
+        Comserv::Util::ModelCatalog->shortlist($c, page => $page);
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'ai2_providers', "Shortlist failed: $_");
+        $catalog;
+    };
+    $c->stash->{ai_chat_page} = $page;
+
     # Group flattened catalog (each: value, label, provider, local, free, ...)
     # into providers[]. The JS consumes either value (provider|model) or id.
     my %by_service;
@@ -141,10 +159,18 @@ sub providers :Local :Args(0) {
     # returned by refresh() is the wrong shape for prime(), so skip it here.
     # eval { Comserv::Util::ModelCatalog->prime($c, $catalog); };
 
+    my $model_count = 0;
+    $model_count += @{ $_->{models} || [] } for @providers;
     $c->res->content_type('application/json');
     $c->res->body(encode_json({
         success           => 1,
         providers         => \@providers,
+        page              => $page,
+        page_class        => (eval {
+            my $r = $c->model('AI2::Router');
+            $r && $r->can('page_class_for') ? $r->page_class_for($page) : '';
+        } || ''),
+        model_count       => $model_count,
         is_admin          => $is_admin ? 1 : 0,
         can_select_model  => $is_admin ? 1 : 0,
         can_access_history=> $is_admin ? 1 : 0,
@@ -662,6 +688,8 @@ sub diagnostics :Local :Args(0) {
     # --- v2 catalog the widget would actually show (as this user) ---
     try {
         $diag{catalog} = $c->model('AI2')->get_available_models($c);
+        my $router = $c->model('AI2::Router');
+        $diag{failover} = $router->failover_snapshot($c) if $router && $router->can('failover_snapshot');
     } catch {
         $diag{catalog} = { error => "unavailable: $_" };
     };
@@ -887,6 +915,8 @@ sub chat :Local :Args(0) {
     my $model   = $json_data->{model}  // '';
     my $history = $json_data->{history} // [];
     my $agent_id= $json_data->{agent_id} // '';
+    my $agent_id_requested = $agent_id;
+    my $editor_phase = lc($json_data->{phase} // '');
     unless (Comserv::Util::ModelCatalog->agent_allowed($c, $agent_id)) {
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
             'ai2_chat', "Clamped disallowed agent_id='$agent_id' to general");
@@ -907,6 +937,7 @@ sub chat :Local :Args(0) {
     # message can be attached to its audio + transcript files.
     my $audio_file_id      = $json_data->{audio_file_id};
     my $transcript_file_id = $json_data->{transcript_file_id};
+    my $skip_role_prompt   = $json_data->{skip_role_prompt} ? 1 : 0;
 
     # The dropdown sends "provider|model" (e.g. openrouter|anthropic/...,
     # grok|grok-4..., ollama|llama3...). Extract the real model name.
@@ -923,7 +954,12 @@ sub chat :Local :Args(0) {
     # Ticket prompts that mention "todo" (bug subjects) must not fall into
     # TodoCreate's project picker (3D-20260907-3180 / 6510). Use ->new: a newly
     # added Model::* is not in Catalyst's registry until process start.
-    my $hd_hit = eval {
+    # AI Editor never writes tickets/todos from the loaded buffer (#2423).
+    require Comserv::Model::AI2::ChatIntent;
+    my $editor_skip_writes = Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id)
+        || Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id_requested)
+        || ($editor_phase =~ /^(?:clarify|analyze|plan|verify|implement)$/);
+    my $hd_hit = (!$skip_role_prompt && !$editor_skip_writes) && eval {
         require Comserv::Model::AI2::HelpDeskTicketCreate;
         my $hbrain = eval { $c->model('AI2::HelpDeskTicketCreate') };
         $hbrain = Comserv::Model::AI2::HelpDeskTicketCreate->new if !$hbrain || !ref $hbrain;
@@ -953,12 +989,9 @@ sub chat :Local :Args(0) {
 
     # ── Create-todo intent: AFTER ticket, BEFORE the LLM. Free/small models
     # invent a fake "Add" box instead of emitting [ACTION: create_todo].
-    # AI Editor agents must not short-circuit into TodoCreate — plan/analyze
-    # prompts often say "create todos".
-    require Comserv::Model::AI2::ChatIntent;
-    my $editor_todo_skip = Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id);
+    # AI Editor: never intercept, even if the buffer says "create a todo" (#2423).
     my $todo_hit;
-    if (!$editor_todo_skip) {
+    if (!$skip_role_prompt && !$editor_skip_writes) {
         $todo_hit = eval {
             require Comserv::Model::AI2::TodoCreate;
             my $brain = eval { $c->model('AI2::TodoCreate') };
@@ -989,7 +1022,7 @@ sub chat :Local :Args(0) {
     }
 
     # Invoice-create intent: BEFORE the LLM. Draft only; never posts GL.
-    my $inv_hit = eval {
+    my $inv_hit = (!$skip_role_prompt && !$editor_skip_writes) && eval {
         require Comserv::Model::AI2::InvoiceCreate;
         my $ibrain = eval { $c->model('AI2::InvoiceCreate') };
         $ibrain = Comserv::Model::AI2::InvoiceCreate->new if !$ibrain || !ref $ibrain;
@@ -1010,6 +1043,33 @@ sub chat :Local :Args(0) {
             invoice_action  => $inv_hit->{invoice_action},
             conversation_id => $conversation_id,
             thinking        => [],
+        }));
+        return;
+    }
+
+    # Scheduler: AFTER todo-create, BEFORE the LLM. Preview by default; WRITE
+    # only on apply. Never bulk-reschedules (#2218).
+    my $sched_hit = (!$skip_role_prompt && !$editor_skip_writes) && eval {
+        require Comserv::Model::AI2::Scheduler;
+        my $sbrain = eval { $c->model('AI2::Scheduler') };
+        $sbrain = Comserv::Model::AI2::Scheduler->new if !$sbrain || !ref $sbrain;
+        $sbrain->try_chat_schedule($c, prompt => $prompt);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'ai2_chat', "Scheduler try_chat_schedule threw: $@");
+    }
+    if ($sched_hit && $sched_hit->{handled}) {
+        $c->res->body(encode_json({
+            success          => $sched_hit->{success} ? 1 : 0,
+            response         => $sched_hit->{response} // '',
+            model            => $sched_hit->{model} // '(scheduler)',
+            provider         => $sched_hit->{provider} // 'ai2-scheduler',
+            needs_web_search => 0,
+            error            => $sched_hit->{error},
+            schedule_action  => $sched_hit->{schedule_action},
+            conversation_id  => $conversation_id,
+            thinking         => [],
         }));
         return;
     }
@@ -1102,6 +1162,10 @@ sub chat :Local :Args(0) {
             task_id         => $task_id,
             audio_file_id      => $audio_file_id,
             transcript_file_id => $transcript_file_id,
+            skip_role_prompt   => $skip_role_prompt,
+            skip_app_writes    => $editor_skip_writes ? 1 : 0,
+            surface            => $editor_skip_writes ? 'editor' : 'chat',
+            phase              => $editor_phase,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
