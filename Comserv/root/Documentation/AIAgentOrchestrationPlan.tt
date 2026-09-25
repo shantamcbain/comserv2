@@ -101,6 +101,7 @@
         <div class="col-100">
             <h2 id="inapp" class="doc-h2">5. In-app agents (HelpDesk / Beekeeping / Ency) — BLOCKED</h2>
             <p class="doc-body">These cannot be built until their <strong>blocking todos exist</strong> and are listed in DailyPlan. Phase 2 enumerates those blockers and adds them to DailyPlan first; only then do we formalize each agent's boundary. <strong>Beekeeping (BMaster)</strong> is the cleanest isolated domain and the first candidate. These currently live outside Hermes and will migrate into the AI editor.</p>
+            <p class="doc-body">HelpDesk blockers (enumerated 2026-09-24, parent todo #2485, project 269, scheduled_date today for DailyPlan): <a href="/todo/details?record_id=2490" class="doc-link">#2490</a> spam/rate/honeypot parity; <a href="/todo/details?record_id=2491" class="doc-link">#2491</a> no reply/status/close; <a href="/todo/details?record_id=2494" class="doc-link">#2494</a> notify gate #2197/#2488; <a href="/todo/details?record_id=2495" class="doc-link">#2495</a> editor skip #2423. Do not build the HelpDesk agent until those are ACCEPT.</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
@@ -109,7 +110,7 @@
     <div class="row">
         <div class="col-100">
             <h2 id="secretary" class="doc-h2">6. Secretary sub-project (where it lives)</h2>
-            <p class="doc-body">The Secretary agent is tracked as a <strong>sub-project of #267 (AGENTS — Autonomous Agents, job-specific)</strong>, NOT under the Planning project. (Parent #267 already has the agent taxonomy: 268 Agent Framework Core, 269 Built-in Job Agents, 270 Agent Ops &amp; Safety.) The exact Secretary sub-project ID must be created in the app (the <code>/api/projects</code> write did not persist in this session — create it via the project UI, then stamp its ID here). Until then, reference it as "<strong>SECRETARY-AGENT</strong>, child of #267."</p>
+            <p class="doc-body">The Secretary agent is tracked as a <strong>sub-project of #267 (AGENTS — Autonomous Agents, job-specific)</strong>, NOT under the Planning project. (Parent #267 already has the agent taxonomy: 268 Agent Framework Core, 269 Built-in Job Agents, 270 Agent Ops &amp; Safety.) Created 2026-09-24: <strong>project_id 302</strong>, code <code>SECRETARY-AGENT</code>, parent_id 267. Tracker todo #2484 points at AISYS-W3 #2200 (do not duplicate the VoIP page).</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
@@ -167,7 +168,7 @@
                 <tr class="doc-tr-alt">
                     <td class="doc-td">Create SECRETARY-AGENT sub-project under #267</td>
                     <td class="doc-td">app project UI</td>
-                    <td class="doc-td">sub-project exists; ID stamped in this plan &#167;6</td>
+                    <td class="doc-td">sub-project exists; ID 302 stamped in this plan &#167;6</td>
                 </tr>
                 <tr>
                     <td class="doc-td">Email agent (missing input)</td>

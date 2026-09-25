@@ -908,6 +908,9 @@
                     if (ra !== rb) return ra - rb;
                     var la = !!a.local, lb = !!b.local;
                     if (la !== lb) return la ? -1 : 1;
+                    var fa = !!(a.free || /(^|:)(free)$/i.test(a.name || '') || (!a.local && costOf(a) === 0 && !a.price_tier));
+                    var fb = !!(b.free || /(^|:)(free)$/i.test(b.name || '') || (!b.local && costOf(b) === 0 && !b.price_tier));
+                    if (fa !== fb) return fa ? -1 : 1;
                     var ca = costOf(a), cb2 = costOf(b);
                     if (ca !== cb2) return ca - cb2;
                     return String(a.name).localeCompare(String(b.name));

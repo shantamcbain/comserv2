@@ -37,7 +37,7 @@ our $CACHE_ARR;
 our $CACHE_RAW;       # raw Router catalog (array of hashes with name/provider) for grouping
 our $CACHE_AT = 0;
 our $TTL      = 600;   # seconds; providers change rarely
-our $CACHE_GEN = 5;    # bump when catalog shape/providers/guest-default change
+our $CACHE_GEN = 7;    # bump when catalog shape/providers/guest-default change
 our $CACHE_GEN_LOADED = 0;
 
 sub _expired {
@@ -95,16 +95,18 @@ sub filter_catalog_for_role {
         next unless $m && ref($m) eq 'HASH';
         my $svc  = $m->{provider} || '';
         my $name = $m->{name} // $m->{id} // '';
-        my $free = $m->{free} || ( $name =~ /:free$/ ) ? 1 : 0;
+        my $pp = ($m->{price_prompt}     // 0) + 0;
+        my $pc = ($m->{price_completion} // 0) + 0;
+        my $max = ( $pp > $pc ) ? $pp : $pc;
         my $local = $m->{local} || ( $svc eq 'ollama' ) ? 1 : 0;
+        my $free = $m->{free} || ( $name =~ /:free$/ )
+            || (!$local && $max == 0 && !($m->{price_tier} // '')) ? 1 : 0;
         if ($tier eq 'guest') {
+            # #2024: guests never see paid/premium (Grok included).
             push @out, $m if $free || $local;
         } else { # member
             next if $svc eq 'grok' || $svc eq 'supergrok';
-            my $pp = ($m->{price_prompt}     // 0) + 0;
-            my $pc = ($m->{price_completion} // 0) + 0;
-            my $max = ( $pp > $pc ) ? $pp : $pc;
-            next if $max > 5;
+            next if $max > 5;   # premium excluded for members
             push @out, $m;
         }
     }
@@ -293,8 +295,15 @@ sub default_for {
 
     my $tier = $class->_role_tier($c);
 
-    # Coding surfaces get the designated coding model when the user may use it.
-    if ($page eq 'editor' && $have{$CODING_DEFAULT} && $class->_is_priv($c)) {
+    # Coding surfaces (editor/git/code) get the designated coding model
+    # when the user may use it. Page class is Router-owned (AIMPS #2026/#2029).
+    my $page_class = 'general';
+    eval {
+        my $router = $c->model('AI2::Router');
+        $page_class = $router->page_class_for($page) if $router && $router->can('page_class_for');
+        1;
+    };
+    if ($page_class eq 'coding' && $have{$CODING_DEFAULT} && $class->_is_priv($c)) {
         return $CODING_DEFAULT;
     }
 
@@ -339,8 +348,35 @@ Drop the cache so the next call rebuilds (use after a provider/key change).
 sub invalidate {
     $CACHE_JSON = undef;
     $CACHE_ARR  = undef;
+    $CACHE_RAW  = undef;
     $CACHE_AT   = 0;
+    $CACHE_GEN_LOADED = 0;
     return 1;
+}
+
+=head2 shortlist($c, %opts)
+
+Role-filtered catalog, then Router page-class shortlist (AIMPS W1.1).
+C<page> defaults to C<chat>. Pass C<page => 'all'> to skip the cap.
+
+=cut
+
+sub shortlist {
+    my ($class, $c, %opts) = @_;
+    my $all = $class->catalog($c);
+    return $all unless $all && @$all;
+    my $page = $opts{page} || 'chat';
+    my $router = eval { $c->model('AI2::Router') };
+    unless ($router && $router->can('shortlist_models')) {
+        eval {
+            require Comserv::Util::Logging;
+            Comserv::Util::Logging->instance->log_with_details(
+                $c, 'warning', __FILE__, __LINE__,
+                'shortlist', 'AI2::Router shortlist_models unavailable; returning role catalog');
+        };
+        return $all;
+    }
+    return $router->shortlist_models($all, page => $page);
 }
 
 =head2 prime($c, $catalog)

@@ -75,7 +75,10 @@
             "url_patterns": [
                 "/planning/daily",
                 "/admin/plan",
-                "/project"
+                "/project",
+                "/projects",
+                "/todo",
+                "/tasks"
             ],
             "capabilities": {
                 "search_docs": true,
@@ -313,7 +316,9 @@
                 "Suggest priority and dependency structures",
                 "Recommend project management best practices",
                 "Provide time estimation guidance"
-            ]
+            ],
+            "hidden": true,
+            "alias_of": "planning"
         },
         "todo": {
             "id": "todo",
@@ -343,7 +348,9 @@
                 "Suggest productivity frameworks",
                 "Break down complex tasks into subtasks",
                 "Provide motivation and deadline management tips"
-            ]
+            ],
+            "hidden": true,
+            "alias_of": "planning"
         },
         "general": {
             "id": "general",

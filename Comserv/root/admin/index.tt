@@ -67,6 +67,20 @@
     [% END %]
     [% END %]
 
+    [% # ── In-app system notifications (#2197) ──────────────────────── %]
+    [% IF notifications && notifications.size %]
+    [% FOREACH n IN notifications %]
+    <div class="banner-hosting" data-notify-level="[% n.type | html %]">
+      <div>
+        <strong class="banner-hosting-title">[% IF n.type == 'danger' %]&#9888; [% ELSIF n.type == 'success' %]&#10003; [% ELSE %]&#9432; [% END %][% n.message | html %]</strong>
+      </div>
+      [% IF n.link %]
+      <a href="[% n.link %]" class="banner-hosting-link">Open →</a>
+      [% END %]
+    </div>
+    [% END %]
+    [% END %]
+
     <!-- Admin Sections -->
     <div class="admin-sections">
         [% IF is_csc %]
