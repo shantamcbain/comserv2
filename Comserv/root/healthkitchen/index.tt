@@ -22,6 +22,7 @@
     <p>
         <a href="[% c.uri_for('/healthkitchen/pantry') %]" class="btn btn-primary">Pantry</a>
         <a href="[% c.uri_for('/healthkitchen/recipes') %]" class="btn btn-primary">Recipes</a>
+        <a href="[% c.uri_for('/healthkitchen/symptoms') %]" class="btn btn-primary">Symptoms</a>
         <a href="[% c.uri_for('/ENCY') %]" class="btn btn-secondary">ENCY</a>
     </p>
 
