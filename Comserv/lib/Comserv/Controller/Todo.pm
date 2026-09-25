@@ -3641,15 +3641,15 @@ sub open_log :Path('open_log') :Args(0) {
         $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$err")) . '}');
         return;
     }
-    if ($res->{action} eq 'stopped') {
+    if (($res->{action} // '') eq 'already_active' || $res->{already_active}) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'open_log',
-            "Start toggle stopped active log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
-        $c->response->body('{"ok":1,"stopped":1,"log_id":' . ($res->{log_id}//0) . ',"duration_mins":' . ($res->{duration_mins}//0) . '}');
+            "Start skipped — todo $record_id already being worked (status 5, log_id=" . ($res->{log_id}//0) . ")");
+        $c->response->body('{"ok":1,"already_active":1,"log_id":' . ($res->{log_id}//0) . ',"todo_status":' . ($res->{todo_status}//5) . '}');
         return;
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'open_log',
         "Log opened for todo $record_id by $username (log_id=$res->{log_id})");
-    $c->response->body('{"ok":1,"log_id":' . ($res->{log_id} // 0) . '}');
+    $c->response->body('{"ok":1,"log_id":' . ($res->{log_id} // 0) . ',"todo_status":' . ($res->{todo_status}//5) . '}');
 }
 
 sub close_log :Path('close_log') :Args(0) {
@@ -3701,8 +3701,12 @@ sub close_log :Path('close_log') :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'close_log',
-        "Closed log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
-    $c->response->body('{"ok":1,"duration_mins":' . ($res->{duration_mins} // 0) . '}');
+        $res->{recovered}
+            ? "Recovered stuck status 5 -> 2 for todo $record_id (no open log)"
+            : "Closed log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
+    $c->response->body('{"ok":1,"duration_mins":' . ($res->{duration_mins} // 0)
+        . ',"todo_status":' . ($res->{todo_status}//2)
+        . ',"recovered":' . ($res->{recovered} ? 1 : 0) . '}');
 }
 
 sub done_with_log :Path('done_with_log') :Args(0) {
@@ -3749,7 +3753,7 @@ sub done_with_log :Path('done_with_log') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'done_with_log',
         "Todo $record_id marked done by $username" . ($res->{log_closed} ? " (log closed)" : " (completed log inserted)"));
-    $c->response->body('{"ok":1}');
+    $c->response->body('{"ok":1,"already_done":' . ($res->{already_done} ? 1 : 0) . ',"todo_status":' . ($res->{todo_status}//3) . '}');
 }
 
 sub next_step :Path('next_step') :Args(0) {

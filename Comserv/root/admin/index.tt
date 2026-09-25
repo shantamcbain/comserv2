@@ -1,5 +1,5 @@
 [% META title = 'Admin Dashboard' %]
-[% PageVersion = 'admin/index.tt,v 0.03 2026/09/12 shanta Exp shanta ' %]
+[% PageVersion = 'admin/index.tt,v 0.05 2026/09/25 shanta Exp shanta ' %]
 
 <div class="admin-dashboard">
     <div class="dashboard-header">
@@ -510,13 +510,33 @@
 
         <div id="section-ai" class="admin-section theme-section">
             <div class="section-header">
-                <h3><i class="fas fa-robot"></i> AI Configuration</h3>
+                <h3><i class="fas fa-robot"></i> AI System</h3>
             </div>
             <div class="section-content">
                 <div class="admin-links">
-                    <a href="[% c.uri_for('/admin/ai/configure') %]" class="admin-link">
+                    <a href="[% c.uri_for('/ai/usage') %]" class="admin-link">
+                        <i class="fas fa-chart-line"></i>
+                        <span>AI Usage &amp; Activity Monitor</span>
+                    </a>
+                    <a href="[% c.uri_for('/ai/models') %]" class="admin-link">
                         <i class="fas fa-cogs"></i>
-                        <span>AI Model Configuration</span>
+                        <span>Model Management</span>
+                    </a>
+                    <a href="[% c.uri_for('/ai/admin/agents') %]" class="admin-link">
+                        <i class="fas fa-robot"></i>
+                        <span>Agent Management</span>
+                    </a>
+                    <a href="[% c.uri_for('/ai/manage_api_keys') %]" class="admin-link">
+                        <i class="fas fa-key"></i>
+                        <span>API Keys</span>
+                    </a>
+                    <a href="[% c.uri_for('/ai2') %]" class="admin-link">
+                        <i class="fas fa-comments"></i>
+                        <span>AI2 Chat</span>
+                    </a>
+                    <a href="[% c.uri_for('/ai/conversations') %]" class="admin-link">
+                        <i class="fas fa-history"></i>
+                        <span>Chat History</span>
                     </a>
                 </div>
             </div>
