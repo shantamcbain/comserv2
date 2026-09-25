@@ -32,6 +32,10 @@
           <option value="Supplies">Supplies</option>
           <option value="Apiary">Apiary</option>
           <option value="Garden">Garden</option>
+          <option value="food">Food</option>
+          <option value="herb">Herb</option>
+          <option value="spice">Spice</option>
+          <option value="produce">Produce</option>
           <option value="Craft">Craft</option>
           <option value="Electronics">Electronics</option>
           <option value="Office">Office</option>

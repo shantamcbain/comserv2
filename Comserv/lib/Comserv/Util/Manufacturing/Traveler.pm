@@ -3,7 +3,7 @@ package Comserv::Util::Manufacturing::Traveler;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
-use POSIX qw(strftime);
+use Comserv::Util::AppTime;
 use URI::Escape qw(uri_escape uri_unescape);
 
 # HDRY system master assembly (in-house / product):
@@ -35,7 +35,7 @@ sub _sitename {
 }
 
 sub _today {
-    return strftime('%Y-%m-%d', localtime);
+    return Comserv::Util::AppTime->today_utc_ymd;
 }
 
 sub _fmt_date {

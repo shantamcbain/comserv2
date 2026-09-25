@@ -268,11 +268,12 @@
                 </div>
             </div>
 
-            <div id="panel-hermes" class="sidebar-panel" style="display:none; padding:0; width:420px; background:#2b2b2b; overflow:auto;">
-                <div style="padding:8px;">
-                    <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa;">HERMES</h4>
-                    <p style="font-size:11px;color:#888;margin:0 0 6px;">Hermes dashboard embeds below (same host, port 9119). Use Desktop/CLI buttons as needed. Over ZeroTier open the dashboard on this machine&apos;s IP:9119 after firewall allows it.</p>
-                    <div style="font-size:11px;color:#c8d0dc;background:#0f1115;border:1px solid #444;border-radius:4px;padding:8px;margin-bottom:8px;">
+            <div id="panel-hermes" class="sidebar-panel" style="display:none; padding:0; width:720px; background:#2b2b2b; overflow:hidden;">
+                <div style="padding:8px; display:flex; flex-direction:column; height:100%; min-height:0; box-sizing:border-box;">
+                    <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa; flex:0 0 auto;">HERMES</h4>
+                    <p style="font-size:11px;color:#888;margin:0 0 6px;flex:0 0 auto;">Hermes dashboard opens on this page&apos;s hostname at port 9119 (<code>/chat</code>) — localhost, <code>*.local</code>, <code>*.zero</code>, or the ZeroTier IP, matching how you opened the editor. Drag the panel edge to widen, drag the bar under the frame to change height, or Detach for a full window.</p>
+                    <p style="font-size:11px;color:#9ecbff;margin:0 0 6px;flex:0 0 auto;">Login: username <code>shanta</code> (dashboard password is the one you set locally).</p>
+                    <div style="font-size:11px;color:#c8d0dc;background:#0f1115;border:1px solid #444;border-radius:4px;padding:8px;margin-bottom:8px;flex:0 0 auto;">
                       <div style="color:#888;margin-bottom:4px;">Terminal (normal Hermes):</div>
                       <code id="hermes-terminal-cmd" style="word-break:break-all;">cd /home/shanta/.comserv/worktrees/aisystem/Comserv &amp;&amp; hermes chat</code>
                       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
@@ -281,18 +282,28 @@
                       </div>
                       <div id="hermes-desktop-status" style="font-size:11px;color:#9ecbff;margin-top:6px;display:none;"></div>
                     </div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;flex:0 0 auto;">
+                      <button type="button" id="hermes-detach" style="background:#1565c0;color:#fff;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px;" title="Open Hermes dashboard in its own window">⤢ Detach</button>
+                      <button type="button" id="hermes-reload-dashboard" style="background:#37474f;color:#fff;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px;">Load dashboard</button>
+                      <button type="button" id="hermes-taller" style="background:#455a64;color:#fff;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px;">Taller</button>
+                      <button type="button" id="hermes-shorter" style="background:#455a64;color:#fff;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px;">Shorter</button>
+                      <a id="hermes-open-tab" href="#" target="_blank" rel="noopener" style="color:#7ec8ff;font-size:11px;">Open /sessions in a new tab</a>
+                    </div>
                     [% IF c.config.hermes_dashboard_url %]
-                        <iframe id="hermes-iframe" src="[% c.config.hermes_dashboard_url | html %]" style="width:100%;height:480px;border:1px solid #555;border-radius:4px;background:#111;"></iframe>
+                        <div id="hermes-frame-wrap" style="position:relative;width:100%;min-height:420px;height:min(70vh,720px);border:1px solid #555;border-radius:4px;background:#111;overflow:hidden;flex:1 1 auto;">
+                          <iframe id="hermes-iframe" src="[% c.config.hermes_dashboard_url | html %]" title="Hermes dashboard" style="width:100%;height:100%;border:0;display:block;background:#111;"></iframe>
+                          <div id="hermes-iframe-resize" title="Drag to resize height" style="position:absolute;left:0;right:0;bottom:0;height:8px;cursor:ns-resize;background:linear-gradient(transparent,#555);"></div>
+                        </div>
                     [% ELSE %]
-                        <iframe id="hermes-iframe" src="" style="width:100%;height:480px;border:1px solid #555;border-radius:4px;background:#111;display:none;"></iframe>
-                        <div id="hermes-placeholder" style="color:#888;font-size:12px;padding:12px;border:1px dashed #555;border-radius:4px;margin-bottom:8px;">
+                        <div id="hermes-placeholder" style="color:#888;font-size:12px;padding:12px;border:1px dashed #555;border-radius:4px;margin-bottom:8px;flex:0 0 auto;">
                             No dashboard URL yet. Starting from this page host on port <code>9119</code>, or set <code>HERMES_DASHBOARD_URL</code> / <code>?hermes=URL</code>.
-                            <div style="margin-top:8px;">
-                              <a id="hermes-open-tab" href="#" target="_blank" rel="noopener" style="color:#7ec8ff;">Open Hermes /sessions in a new tab (best if iframe login is blocked)</a>
-                            </div>
+                        </div>
+                        <div id="hermes-frame-wrap" style="position:relative;width:100%;min-height:420px;height:min(70vh,720px);border:1px solid #555;border-radius:4px;background:#111;overflow:hidden;flex:1 1 auto;display:none;">
+                          <iframe id="hermes-iframe" src="" title="Hermes dashboard" style="width:100%;height:100%;border:0;display:block;background:#111;"></iframe>
+                          <div id="hermes-iframe-resize" title="Drag to resize height" style="position:absolute;left:0;right:0;bottom:0;height:8px;cursor:ns-resize;background:linear-gradient(transparent,#555);"></div>
                         </div>
                     [% END %]
-                    <div id="hermes-run-section" style="margin-top:10px;border-top:1px solid #444;padding-top:8px;">
+                    <div id="hermes-run-section" style="margin-top:10px;border-top:1px solid #444;padding-top:8px;flex:0 0 auto;">
                       <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa;">HERMES CLI ONESHOT</h4>
                       <p style="font-size:11px;color:#888;margin:0 0 6px;">CLI oneshot when Desktop is down — does not replace the dashboard above.</p>
                     </div>

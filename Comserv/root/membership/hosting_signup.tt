@@ -169,6 +169,7 @@
                 { key = 'helpdesk',    label = '🎫 HelpDesk',               hint = 'Ticket system for your members' },
                 { key = 'foraging',    label = '🌿 Foraging',               hint = 'Forager community tools and plant/mushroom database' },
                 { key = 'ency',        label = '📖 ENCY',                    hint = 'Encyclopedia of biological life — herbs, animals, insects' },
+                { key = 'healthkitchen', label = '🥗 Health Kitchen',         hint = 'Personal pantry, ENCY-linked foods, wellness menus from symptoms' },
                 { key = 'ecommerce',   label = '🛒 Shop / Price List',       hint = 'Inventory price list and cart' },
                 { key = 'membership',  label = '👥 Membership Plans',        hint = 'Paid membership tiers for your site' },
                 { key = 'accounting',  label = '💰 Accounting / Bookkeeping', hint = 'Double-entry ledger, invoicing, COA, and supplier management' },

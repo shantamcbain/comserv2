@@ -326,6 +326,7 @@
         // Keep the Auto option, then add one per eligible agent
         sel.innerHTML = '<option value="auto">⚡ Auto</option>';
         Object.entries(agents).forEach(function([key, agent]) {
+            if (agent && (agent.hidden || agent.alias_of)) return;
             if (!_agentAllowed(agent)) return;
             var opt = document.createElement('option');
             opt.value = key;
@@ -344,6 +345,7 @@
         // URL-based match always wins over saved preference (so navigating to /ENCY
         // always gets the ency agent even if the user last selected "coding").
         var saved = localStorage.getItem('ai_widget_agent');
+        if (saved === 'todo' || saved === 'projects' || saved === 'project') saved = 'planning';
         var urlAgent = selectAgentForPage();
         if (urlAgent && urlAgent.id && sel.querySelector('option[value="' + urlAgent.id + '"]')) {
             sel.value = urlAgent.id;
@@ -571,6 +573,7 @@
         // an admin-only / non-public agent (that lands on Access denied).
         for (const [agentKey, agent] of Object.entries(agents)) {
             if (!agent.url_patterns) continue;
+            if (agent.hidden || agent.alias_of) continue;
             if (agent.editor_only && !isAi2EditorContext()) continue;
             if (agent.local_only && !state.isDevMode) continue;
             if (!_agentAllowed(agent)) continue;
@@ -2141,10 +2144,10 @@
             const selProvider = document.getElementById('ai-provider');
             const provider = (selProvider && selProvider.value) || 'ollama';
 
-            fetch('/ai/generate', {
+            fetch('/ai2/chat', {
                 method: 'POST', credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider, skip_role_prompt: true, use_search: useSearch })
+                body: JSON.stringify({ prompt: desc, system: SYSTEM, model: provider, agent_id: 'general', skip_role_prompt: true, use_search: useSearch })
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {

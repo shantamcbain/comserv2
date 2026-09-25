@@ -7,6 +7,7 @@ use Comserv::Util::AdminAuth;
 use Comserv::Model::AccountingDB;
 use Comserv::Model::CoaTemplate;
 use Comserv::Util::Accounting::CoaAiGenerate;
+use Comserv::Util::Accounting::Migrator;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -148,6 +149,18 @@ sub _status {
         if ($@) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_status',
                 "PG chart count failed for '$sitename': $@");
+        }
+        eval {
+            my $ver = Comserv::Util::Accounting::Migrator->instance
+                          ->schema_version_status($c, $sitename);
+            $st{schema_version}  = $ver->{version};
+            $st{schema_state}    = $ver->{state};
+            $st{schema_expected} = $ver->{expected};
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_status',
+                "schema_version_status failed for '$sitename': $@");
+            $st{schema_state} = 'unknown';
         }
     }
 

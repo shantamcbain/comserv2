@@ -184,7 +184,7 @@
      git-dashboard.js so ComservGitDiff exists when bindFileDiff() runs. -->
 <script src="/static/js/git-diff-viewer.js?v=[% cv %]" defer></script>
 <link rel="stylesheet" href="/static/css/components/git-diff-viewer.css?v=[% cv %]">
-<script src="/static/js/git-dashboard.js?v=[% cv %]" defer></script>
+<script src="/static/js/git-dashboard.js?v=[% cv %]-h9101d" defer></script>
 <script>
     // Give the git dashboard the same canonical catalog (with price_* / tier)
     // so model-select.js uses the fast path and shows real per-token cost,

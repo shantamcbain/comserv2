@@ -1151,7 +1151,20 @@ sub generate :Local :Args(0) {
         $agent_name = $c->request->params->{agent_name} || 'AI Assistant';
         $conversation_id = $c->request->params->{conversation_id};  # May be undef if new conversation
     }
-    
+
+    # Normalize pipe-delimited model value (v2 format "provider|model_name")
+    # This lets the v1 generate endpoint accept model dropdown values like
+    # "openrouter|google/gemma-4-31b-it:free" or "ollama|phi4:14b"
+    if ($model && $model =~ /^([^|]+)\|(.+)$/) {
+        my $pipe_provider = lc($1);
+        my $pipe_model    = $2;
+        # Only override provider if it's still the default 'ollama'
+        $provider = $pipe_provider if lc($provider) eq 'ollama';
+        $model    = $pipe_model;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+            'generate', "Pipe-delimited model detected: provider=$pipe_provider, model=$pipe_model");
+    }
+
     # Fall back to session-stored conversation_id if not provided in request
     unless ($conversation_id) {
         $conversation_id = $c->session->{current_conversation_id};
@@ -1604,6 +1617,54 @@ sub generate :Local :Args(0) {
             }
             
             $model_used = $response->{model} || $grok->model;
+        } elsif (lc($provider) eq 'openrouter') {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'generate', "Using OpenRouter provider for query, user_id: $user_id");
+
+            # Require login for external AI models
+            if ($is_guest) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'generate', "Guest user attempted to use OpenRouter — login required");
+                die "Please log in to use external AI models (OpenRouter).";
+            }
+
+            # Only admins/editors may select external models
+            unless ($can_select_model_gen) {
+                die "Only administrators and editors may use external AI models.";
+            }
+
+            my $or = $c->model('AI2::Provider::OpenRouter');
+            unless ($or && $or->can('chat') && $or->can('_resolve_api_key')) {
+                die "OpenRouter provider is not configured";
+            }
+
+            my $or_api_key = $or->_resolve_api_key($c);
+            unless ($or_api_key) {
+                die "No OpenRouter API key found. Please add your API key at /ai/manage_api_keys";
+            }
+
+            my $or_response = $or->chat($c,
+                model    => $model,
+                messages => [
+                    ($system ? { role => 'system', content => $system } : ()),
+                    { role => 'user', content => $prompt },
+                ],
+                api_key  => $or_api_key,
+            );
+
+            unless ($or_response && $or_response->{success}) {
+                my $or_error = $or_response->{error} || $or->last_error || 'Unknown error';
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'generate', "OpenRouter query failed: $or_error");
+                die "OpenRouter query failed: $or_error";
+            }
+
+            $response  = {
+                response => $or_response->{response},
+                model    => $or_response->{model} || $model,
+                usage    => $or_response->{usage} || {},
+            };
+            $model_used = $response->{model};
         } else {
             # Default to Ollama
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
@@ -2758,6 +2819,11 @@ sub chat :Local :Args(0) {
     # Get parameters from JSON or fallback to form params
     my $prompt = $json_data->{prompt} || $c->request->params->{prompt} || '';
     my $model = $json_data->{model} || $c->request->params->{model} || '';
+    # CSC-20260914-0477: AI Editor / model picker often send the wire value in
+    # `provider` ("openrouter|org/model") and omit `model`. Old chat() ignored
+    # provider and treated every non-grok* request as Ollama — so the literal
+    # provider name "openrouter" was used as an Ollama model id (hard UI errors).
+    my $provider = $json_data->{provider} || $c->request->params->{provider} || '';
     my $history = $json_data->{history} || [];
     my $conversation_id = $json_data->{conversation_id} || $c->request->params->{conversation_id};
     my $use_search_chat = $json_data->{use_search} ? 1 : 0;
@@ -2768,6 +2834,33 @@ sub chat :Local :Args(0) {
     my $chat_page_content = $json_data->{page_content}  || $c->request->params->{page_content}  || '';
     my $project_id        = $json_data->{project_id}    || $c->request->params->{project_id}    || undef;
     my $task_id           = $json_data->{task_id}       || $c->request->params->{task_id}       || undef;
+
+    # Normalize "provider|model" from either field (same contract as generate()/ai2).
+    if (!$model && $provider && $provider =~ /^\s*([^|]+)\|(.+?)\s*$/) {
+        $provider = lc($1);
+        $model    = $2;
+    }
+    elsif ($model && $model =~ /^\s*([^|]+)\|(.+?)\s*$/) {
+        my $pipe_provider = lc($1);
+        my $pipe_model    = $2;
+        $provider = $pipe_provider if !$provider || lc($provider) eq 'ollama';
+        $model    = $pipe_model;
+    }
+    # CSC-20260914-4380: also accept accidental "provider/model" for first-party
+    # providers (OpenRouter-style slash). Do NOT treat org/model (anthropic/...)
+    # as a provider prefix — only known service names.
+    elsif ($model && $model =~ /^\s*(supergrok|grok-oauth|grok|ollama|openrouter|external)\/(.+?)\s*$/i) {
+        my $slash_provider = lc($1);
+        my $slash_model    = $2;
+        $provider = $slash_provider if !$provider || lc($provider) eq 'ollama';
+        $model    = $slash_model;
+    }
+    $provider = lc($provider // '');
+    # Bare provider token without a model must never become an Ollama model id.
+    if ($model && $model =~ /^(openrouter|external|supergrok|grok|openai|ollama)$/i) {
+        $provider = lc($model) if !$provider || $provider eq 'ollama';
+        $model = '';
+    }
 
     # Record structured page_links if the client sent them (from extractPageLinks JS helper).
     # Complements the content-based extraction. (safe)
@@ -2867,11 +2960,22 @@ sub chat :Local :Args(0) {
         $can_select_model_perm = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_chat;
     }
 
-    # Detect if selected model is a Grok (xAI) model
-    my $is_grok_model = ($model && $model =~ /^grok/i) ? 1 : 0;
+    # Detect provider: grok / openrouter(external) / ollama.
+    # Prefer explicit provider; fall back to model-name heuristics (legacy clients).
+    my $is_openrouter = ($provider =~ /^(openrouter|external)$/) ? 1 : 0;
+    my $is_grok_model = (
+        $provider =~ /^(grok|supergrok|xai)$/
+        || (!$is_openrouter && $model && $model =~ /^(?:x-ai\/)?grok/i)
+    ) ? 1 : 0;
+    # OpenRouter model ids are org/model (or :free). Do not let them fall into Ollama.
+    if (!$is_openrouter && !$is_grok_model && $model && $model =~ m{/}) {
+        $is_openrouter = 1;
+        $provider = 'openrouter';
+    }
+    my $chat_provider_label = $is_openrouter ? 'openrouter' : ($is_grok_model ? 'grok' : 'ollama');
 
     # Role-based capability injection into messages (insert as system message)
-    my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $is_grok_model ? 'grok' : 'ollama', $chat_page_path, $chat_page_title);
+    my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $chat_provider_label, $chat_page_path, $chat_page_title);
 
     # Inject agent-specific system prompts
     if (lc($chat_agent_id) eq 'helpdesk' && !$chat_agent_system) {
@@ -2983,8 +3087,8 @@ sub chat :Local :Args(0) {
         $username, $is_guest ? 'guest' : 'authenticated',
         $c->stash->{SiteName} || $c->session->{SiteName} || 'unknown',
         $chat_page_path || '(unknown)');
-    push @chat_trace, sprintf("🤖 Agent: %s | Provider: %s",
-        $chat_agent_id || 'general', $is_grok_model ? 'grok' : 'ollama');
+    push @chat_trace, sprintf("🤖 Agent: %s | Provider: %s | Model: %s",
+        $chat_agent_id || 'general', $chat_provider_label, $model || '(default)');
     push @chat_trace, sprintf("💬 Prompt (%d chars) | History: %d prior messages",
         length($prompt), scalar(@$history));
     push @chat_trace, $module_data   ? "🗂️ DB data injected" : "🗂️ No DB data injected (prompt didn't match todo/project/ENCY keywords)";
@@ -2997,13 +3101,13 @@ sub chat :Local :Args(0) {
     $use_search_chat = 0 unless $can_select_model_perm;
 
     # Require login for external AI models - check before entering try block
-    if ($is_grok_model && $is_guest) {
+    if (($is_grok_model || $is_openrouter) && $is_guest) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-            'chat', "Guest user attempted to use Grok model - login required");
+            'chat', "Guest user attempted to use external model ($chat_provider_label) - login required");
         $c->response->status(401);
         $c->response->body(encode_json({
             success => JSON::false,
-            error => 'Please log in to use external AI models (Grok/xAI). Click the login link above.'
+            error => 'Please log in to use external AI models (Grok/OpenRouter). Click the login link above.'
         }));
         return;
     }
@@ -3164,10 +3268,64 @@ sub chat :Local :Args(0) {
             push @chat_trace, sprintf("✅ Grok responded — model=%s %d chars%s", $model_used, length($ai_response),
                 $response_eval_count ? " ($response_eval_count tokens)" : '');
 
+        } elsif ($is_openrouter) {
+            # CSC-20260914-0477: route OpenRouter explicitly (do not fall into Ollama).
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'chat', "Routing to OpenRouter for model: " . ($model || '(required)') . ", user_id: $user_id");
+            push @chat_trace, sprintf("📡 Calling OpenRouter — model=%s", $model || '(none)');
+
+            unless ($can_select_model_perm) {
+                die "Only administrators and editors may use external AI models (OpenRouter).";
+            }
+            unless ($model && length $model) {
+                die "OpenRouter requires an explicit model id (got provider name only). Pick a real model such as cohere/north-mini-code:free.";
+            }
+            if ($model =~ /^(openrouter|external)$/i) {
+                die "Invalid OpenRouter model id '$model' — that is a provider name, not a model. Pick org/model from the dropdown.";
+            }
+
+            my $or = $c->model('AI2::Provider::OpenRouter');
+            unless ($or && $or->can('chat') && $or->can('_resolve_api_key')) {
+                die "OpenRouter provider is not configured";
+            }
+            my $or_api_key = $or->_resolve_api_key($c);
+            unless ($or_api_key) {
+                die "No OpenRouter API key found. Please add your API key at /ai/manage_api_keys";
+            }
+
+            my @or_messages = @messages;
+            if ($combined_system_prompt) {
+                unshift @or_messages, { role => 'system', content => $combined_system_prompt };
+            }
+
+            my $or_response = $or->chat($c,
+                model    => $model,
+                messages => \@or_messages,
+                api_key  => $or_api_key,
+            );
+            unless ($or_response && $or_response->{success}) {
+                my $or_error = $or_response->{error} || $or->last_error || 'Unknown error';
+                die "OpenRouter query failed: $or_error";
+            }
+
+            $ai_response = $or_response->{response} // '';
+            $model_used  = $or_response->{model} || $model;
+            $response = { response => $ai_response, model => $model_used, usage => $or_response->{usage} };
+            $response_eval_count = ($or_response->{usage} && $or_response->{usage}{total_tokens})
+                ? $or_response->{usage}{total_tokens} : 0;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'chat', "OpenRouter chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response));
+            push @chat_trace, sprintf("✅ OpenRouter responded — model=%s %d chars", $model_used, length($ai_response));
+
         } else {
             # ── Ollama 3-Tier Escalation ──────────────────────────────────────
             # Tier 1: small/fast model → if quality poor, Tier 2: large model
             # → if still poor AND user has Grok, return web-search consent flag.
+
+            # Final guard: never pass a provider token to Ollama as a model name.
+            if ($model && $model =~ /^(openrouter|external|supergrok|grok|openai)$/i) {
+                die "Refusing to call Ollama with provider name '$model' as the model id (CSC-20260914-0477). Select a real local or OpenRouter model.";
+            }
 
             my $ollama = $c->model('Ollama');
             unless ($ollama) {
@@ -3570,7 +3728,7 @@ sub chat :Local :Args(0) {
         my $chat_pt = $response->{prompt_eval_count} // 0;
         my $chat_ct = $response_eval_count // $response->{eval_count} // 0;
         my $chat_tt = $response->{usage} && $response->{usage}{total_tokens} ? $response->{usage}{total_tokens} : ($chat_pt + $chat_ct);
-        my $chat_provider = $is_grok_model ? 'grok' : 'ollama';
+        my $chat_provider = $chat_provider_label;
         $self->_log_ai_usage($c,
             user_id           => $user_id,
             site_id           => $c->session->{SiteID},
@@ -3690,7 +3848,7 @@ sub chat :Local :Args(0) {
 
         # === AI USAGE LOG (chat error path) ===
         my $chat_err_ms = int( (time() - $chat_trace_start) * 1000 );
-        my $chat_err_provider = $is_grok_model ? 'grok' : 'ollama';
+        my $chat_err_provider = $chat_provider_label;
         $self->_log_ai_usage($c,
             user_id           => $user_id,
             site_id           => $c->session->{SiteID},
@@ -5336,8 +5494,8 @@ Small = tinyllama or smallest by name; Large = llama3.1 or largest by name.
 # a formatted context string ready to inject into the model prompt.
 #
 # Provider priority (per agent):
-#   ency / bmaster  →  brave (if key) → searxng (if configured) → ddg
-#   all others      →  ollama-cloud (if key) → ddg → brave → searxng
+#   all agents      →  searxng (AI2::Search) → brave → ddg → ollama-cloud
+#   (ollama cloud often 401; DDG Instant Answer often empty; SearXNG local is reliable)
 #
 # Returns: (context_string, provider_used) or ('', '') on failure.
 # ──────────────────────────────────────────────────────────────────────────────
@@ -5377,15 +5535,14 @@ sub _do_web_search {
     };
 
     # ── determine provider order ──
-    my $is_precise_agent = ($agent_id && $agent_id =~ /^(ency|bmaster|bmast|usbm|accounting)$/i) ? 1 : 0;
-    my @order = $is_precise_agent
-        ? ('brave', 'searxng', 'ollama_cloud', 'ddg')
-        : ('ollama_cloud', 'ddg', 'brave', 'searxng');
+    # Agent-specific order removed: SearXNG-first for all (incl. ency/bmaster).
+    my @order = ('searxng', 'brave', 'ddg', 'ollama_cloud');
 
     for my $provider (@order) {
 
         # ── Brave Search ───────────────────────────────────────────────────
         if ($provider eq 'brave' && $keys{brave}) {
+            my ($br_ctx, $br_prov);
             eval {
                 my $url  = 'https://api.search.brave.com/res/v1/web/search?q='
                          . URI::Escape::uri_escape($query) . '&count=5';
@@ -5403,45 +5560,91 @@ sub _do_web_search {
                     } } @{ $data->{web}{results} || [] };
                     if (@results) {
                         push @$trace_ref, sprintf("🌐 Brave search: %d results", scalar @results);
-                        my ($ctx, $p) = $format_results->(\@results, 'Brave');
-                        return ($ctx, $p);
+                        ($br_ctx, $br_prov) = $format_results->(\@results, 'Brave');
                     }
                 } else {
                     push @$trace_ref, "⚠️ Brave search HTTP " . $resp->code;
                 }
             };
             push @$trace_ref, "⚠️ Brave search error: $@" if $@;
+            return ($br_ctx, $br_prov) if defined $br_ctx && length $br_ctx;
             next;
         }
 
         # ── SearXNG ────────────────────────────────────────────────────────
+        # Canonical path: Model::AI2::Search (services.json POST JSON).
+        # Legacy comserv.conf GET is fallback only; skip HTML responses.
         if ($provider eq 'searxng') {
-            my $cfg      = $c->config->{SearXNG} || {};
-            my $host     = $cfg->{host} || '';
-            next unless $host;
+            my $used_ai2 = 0;
+            my ($sx_ctx, $sx_prov);
             eval {
-                require URI::Escape;
-                my $url  = "$host/search?q=" . URI::Escape::uri_escape($query)
-                         . '&format=json&categories=general&language=en';
-                my $req  = HTTP::Request->new(GET => $url);
-                my $resp = $ua->request($req);
-                if ($resp->is_success) {
-                    my $data    = JSON::decode_json($resp->decoded_content);
-                    my @results = map { {
-                        title   => $_->{title}   || '',
-                        url     => $_->{url}     || '',
-                        snippet => $_->{content} || '',
-                    } } @{ $data->{results} || [] }[0..4];
-                    if (@results) {
-                        push @$trace_ref, sprintf("🌐 SearXNG: %d results", scalar @results);
-                        my ($ctx, $p) = $format_results->(\@results, 'SearXNG');
-                        return ($ctx, $p);
-                    }
-                } else {
-                    push @$trace_ref, "⚠️ SearXNG HTTP " . $resp->code;
+                require Comserv::Model::AI2::Search;
+                my $svc = eval { $c->model('AI2::Search') } || Comserv::Model::AI2::Search->new;
+                my $r = $svc->query($c, query => $query);
+                $used_ai2 = 1;
+                if ($r && $r->{success} && @{$r->{results}||[]}) {
+                    my @results = map {
+                        { title => $_->{title}, url => $_->{url}, snippet => $_->{content} }
+                    } @{$r->{results}}[0..4];
+                    # Drop undef holes if results < 5
+                    @results = grep { $_ && $_->{url} } @results;
+                    push @$trace_ref, sprintf('🌐 SearXNG(AI2::Search): %d results', scalar @results);
+                    ($sx_ctx,$sx_prov) = $format_results->(\@results, 'SearXNG');
                 }
+                push @$trace_ref, '⚠️ SearXNG: '.($r->{error}||'no results') if $r && !($sx_ctx && length $sx_ctx);
             };
             push @$trace_ref, "⚠️ SearXNG error: $@" if $@;
+            # return outside eval — return inside eval BLOCK only exits the eval (Perl)
+            return ($sx_ctx, $sx_prov) if defined $sx_ctx && length $sx_ctx;
+            # Legacy GET fallback only if AI2::Search path did not run / was disabled
+            if (!$used_ai2) {
+                my $host = '';
+                eval {
+                    require Comserv::Model::AI2::Search;
+                    my $svc = Comserv::Model::AI2::Search->_cfg($c) || {};
+                    if ($svc->{enabled} && $svc->{url}) {
+                        $host = $svc->{url};
+                    }
+                };
+                if (!$host) {
+                    my $cfg = $c->config->{SearXNG} || {};
+                    $host = $cfg->{host} || '';
+                }
+                $host =~ s{/+$}{} if $host;
+                if ($host) {
+                    eval {
+                        require URI::Escape;
+                        my $url  = "$host/search?q=" . URI::Escape::uri_escape($query)
+                                 . '&format=json&categories=general&language=en';
+                        my $req  = HTTP::Request->new(GET => $url);
+                        $req->header('Accept' => 'application/json');
+                        my $resp = $ua->request($req);
+                        if ($resp->is_success) {
+                            my $ctype = $resp->header('Content-Type') // '';
+                            my $body = $resp->decoded_content // '';
+                            if ($ctype =~ /html/i || $body =~ /^\s*</) {
+                                push @$trace_ref, "⚠️ SearXNG returned HTML (skip JSON decode) at $host";
+                            } else {
+                                my $data    = JSON::decode_json($body);
+                                my @results = map { {
+                                    title   => $_->{title}   || '',
+                                    url     => $_->{url}     || '',
+                                    snippet => $_->{content} || '',
+                                } } @{ $data->{results} || [] }[0..4];
+                                if (@results) {
+                                    push @$trace_ref, sprintf("🌐 SearXNG: %d results", scalar @results);
+                                    my ($ctx, $p) = $format_results->(\@results, 'SearXNG');
+                                    return ($ctx, $p);
+                                }
+                                push @$trace_ref, "⚠️ SearXNG: 0 results";
+                            }
+                        } else {
+                            push @$trace_ref, "⚠️ SearXNG HTTP " . $resp->code;
+                        }
+                    };
+                    push @$trace_ref, "⚠️ SearXNG legacy error: $@" if $@;
+                }
+            }
             next;
         }
 
@@ -12522,6 +12725,27 @@ Supports basic filtering for billing reports and capacity planning (anticipate o
 Access: any authenticated user sees their site's usage; admins see more.
 =cut
 
+sub _usage_is_operator {
+    my ($self, $c) = @_;
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+    my $roles    = $c->session->{roles} || [];
+    $roles = [ split /,/, $roles ] unless ref $roles eq 'ARRAY';
+    my $is_admin = grep { /^(admin|developer)$/i } @$roles;
+    return ($is_local || $is_admin) ? 1 : 0;
+}
+
+sub _usage_org {
+    my ($self, $c) = @_;
+    require Comserv::Model::AI2::UsageMonitor;
+    my $days   = $c->req->param('days') || 14;
+    my $prov_f = $c->req->param('provider') || '';
+    my $site_f = $c->req->param('site_id')  || '';
+    my $model_f= $c->req->param('model') || '';
+    return Comserv::Model::AI2::UsageMonitor->new->org_summary($c,
+        days => $days, provider => $prov_f, site_id => $site_f, model => $model_f);
+}
+
 sub usage :Local :Args(0) {
     my ($self, $c) = @_;
 
@@ -12530,91 +12754,128 @@ sub usage :Local :Args(0) {
     my $site_id  = $c->session->{SiteID};
     my $roles    = $c->session->{roles} || [];
     $roles = [split /,/, $roles] unless ref $roles eq 'ARRAY';
-
     my $is_admin = grep { /^admin$/i } @$roles;
 
-    # Filters from query
-    my $days       = $c->req->param('days') || 30;
-    my $prov_f     = $c->req->param('provider') || '';
-    my $site_f     = $c->req->param('site_id')  || ($is_admin ? '' : $site_id);
-    my $model_f    = $c->req->param('model') || '';
+    my $days   = $c->req->param('days') || 14;
+    my $prov_f = $c->req->param('provider') || '';
+    my $site_f = $c->req->param('site_id')  || ($is_admin ? '' : $site_id);
+    my $model_f= $c->req->param('model') || '';
 
-    my $schema = eval { $c->model('DBEncy')->schema };
-    my @logs;
-    my %summary = ( total_calls => 0, total_tokens => 0, total_cost => 0, by_provider => {}, by_site => {} );
-
-    if ($schema) {
-        my $rs = $schema->resultset('AiUsageLog');
-        my $since = DateTime->now->subtract(days => $days)->ymd . ' 00:00:00';
-
-        my $cond = { created_at => { '>=' => $since } };
-        $cond->{provider} = $prov_f if $prov_f;
-        $cond->{site_id}  = $site_f if $site_f;
-        $cond->{model}    = { 'like' => "%$model_f%" } if $model_f;
-
-        # Limit rows for UI
-        @logs = $rs->search($cond, { order_by => { -desc => 'created_at' }, rows => 200 })->all;
-
-        # Compute aggregates (simple, in-mem for now; for high volume add SQL GROUP BY)
-        foreach my $log (@logs) {
-            $summary{total_calls}++;
-            $summary{total_tokens} += $log->total_tokens || 0;
-            $summary{total_cost}   += $log->estimated_cost_usd || 0;
-
-            my $p = $log->provider || 'unknown';
-            $summary{by_provider}{$p}{calls}  += 1;
-            $summary{by_provider}{$p}{tokens} += $log->total_tokens || 0;
-            $summary{by_provider}{$p}{cost}   += $log->estimated_cost_usd || 0;
-
-            my $s = $log->site_id || 0;
-            $summary{by_site}{$s}{calls}  += 1;
-            $summary{by_site}{$s}{tokens} += $log->total_tokens || 0;
-            $summary{by_site}{$s}{cost}   += $log->estimated_cost_usd || 0;
-
-            # Track quota info for display
-            if ($log->plan_ai_requests_per_day) {
-                $summary{by_site}{$s}{plan_quota} = $log->plan_ai_requests_per_day;
-            }
-            if (defined $log->within_free_quota) {
-                $summary{by_site}{$s}{free_calls} += ($log->within_free_quota ? 1 : 0);
-                $summary{by_site}{$s}{overage_calls} += ($log->within_free_quota ? 0 : 1);
-            }
-        }
-        $summary{total_cost} = sprintf('%.4f', $summary{total_cost});
-    }
-
+    my $org = $self->_usage_org($c);
     my $usage_m = eval { $c->model('AI')->usage };
-    my $daily_models = [];
-    my $provider_status = {};
-    if ($usage_m) {
-        $daily_models = $usage_m->daily_model_summary($c, $days) || [];
-        $provider_status = $usage_m->snapshot_provider_status($c) || {};
-    }
+    my $provider_status = $usage_m ? ($usage_m->snapshot_provider_status($c) || {}) : {};
 
-    # For filter dropdowns: recent distinct providers/sites (lightweight)
-    my @providers = qw(ollama grok supergrok openrouter openai);
+    my @providers = qw(ollama grok supergrok openrouter openai hermes xai-oauth opencode-free);
     my @sites;
+    my $schema = eval { $c->model('DBEncy')->schema };
     if ($is_admin && $schema) {
         eval {
-            @sites = map { { id => $_->id, name => $_->name || $_->site_display_name || 'Site '.$_->id } }
+            @sites = map { { id => $_->id, name => $_->name || 'Site '.$_->id } }
                      $schema->resultset('Site')->search({}, { rows => 50, order_by => 'name' })->all;
         };
     }
 
     $c->stash(
-        template    => 'ai/usage.tt',
-        page_title  => 'AI Usage & Billing Monitor',
-        logs        => \@logs,
-        summary     => \%summary,
-        daily_models=> $daily_models,
-        provider_status => $provider_status,
-        filters     => { days => $days, provider => $prov_f, site_id => $site_f, model => $model_f },
-        providers   => \@providers,
-        sites       => \@sites,
-        is_admin    => $is_admin ? 1 : 0,
-        current_site=> $site_id,
-        username    => $username,
+        template         => 'ai/usage.tt',
+        page_title       => 'AI Usage & Activity Monitor',
+        org              => $org,
+        provider_status  => $provider_status,
+        filters          => { days => $days, provider => $prov_f, site_id => $site_f, model => $model_f },
+        providers        => \@providers,
+        sites            => \@sites,
+        is_admin         => $is_admin ? 1 : 0,
+        current_site     => $site_id,
+        username         => $username,
     );
+}
+
+sub usage_live :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    unless ($self->_usage_is_operator($c) || $c->session->{user_id}) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'login required' }));
+        return;
+    }
+    my $org = eval { $self->_usage_org($c) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'usage_live', "$@");
+        $c->response->body(encode_json({ success => JSON::false, error => 'summary failed' }));
+        return;
+    }
+    $c->response->body(encode_json({ success => JSON::true, org => $org }));
+}
+
+sub usage_kill :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    unless ($self->_usage_is_operator($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'operator only' }));
+        return;
+    }
+    require Comserv::Model::AI2::KillSwitch;
+    my $ks = Comserv::Model::AI2::KillSwitch->new;
+    my $action   = $c->req->param('action') || 'kill';
+    my $provider = $c->req->param('provider') || '';
+    my $model    = $c->req->param('model') || '';
+    my $result;
+    if ($action eq 'unkill') {
+        $result = $ks->unkill($c, provider => $provider, model => $model);
+    } else {
+        $result = $ks->kill($c,
+            provider => $provider,
+            model    => $model,
+            reason   => $c->req->param('reason') || 'other',
+            notes    => $c->req->param('notes') || '',
+            by       => $c->session->{username} || 'operator',
+        );
+        eval {
+            $c->model('AI')->log_usage($c,
+                provider      => $provider,
+                model         => $model,
+                request_type  => 'kill_switch',
+                status        => 'killed',
+                error_message => ($c->req->param('reason') || 'other') . ': ' . ($c->req->param('notes') || ''),
+                metadata      => { action => 'kill' },
+            );
+        };
+    }
+    $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'usage_kill',
+        "action=$action $provider/$model ok=" . ($result->{ok} ? 1 : 0));
+    $c->response->body(encode_json({
+        success => $result->{ok} ? JSON::true : JSON::false,
+        error   => $result->{error},
+        killed  => $result->{killed} || [],
+    }));
+}
+
+sub usage_ingest :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    unless ($self->_usage_is_operator($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'operator / LAN only' }));
+        return;
+    }
+    my $body = {};
+    if (($c->req->content_type || '') =~ /json/i) {
+        $body = eval { decode_json($c->req->body_data ? encode_json($c->req->body_data) : ($c->req->body || '{}')) } || {};
+        if (ref $c->req->body_data eq 'HASH') { $body = $c->req->body_data; }
+    }
+    $body = {} unless ref $body eq 'HASH';
+    my %args;
+    for my $k (qw(source request_type provider model prompt_tokens completion_tokens
+                  total_tokens estimated_cost_usd status error_message user_id site_id evaluation)) {
+        $args{$k} = $body->{$k} // $c->req->param($k);
+    }
+    if (ref $body->{metadata} eq 'HASH') { $args{metadata} = $body->{metadata}; }
+    require Comserv::Model::AI2::UsageMonitor;
+    my $r = Comserv::Model::AI2::UsageMonitor->new->ingest($c, %args);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'usage_ingest',
+        "source=" . ($args{source}||'?') . " model=" . ($args{model}||'?') . " ok=" . ($r->{ok} ? 1 : 0));
+    $c->response->body(encode_json({
+        success => $r->{ok} ? JSON::true : JSON::false,
+        error   => $r->{error},
+        source  => $r->{source},
+    }));
 }
 
 =head2 grok_balance
