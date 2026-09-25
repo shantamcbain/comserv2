@@ -100,6 +100,36 @@
             .forEach(function (card) { lazyLoadCards(card.closest('.admin-section')); });
     }
 
+    function fireSystemNotifications() {
+        var banners = document.querySelectorAll('.banner-hosting[data-notify-level="danger"]');
+        if (!banners.length || typeof Notification === 'undefined') return;
+        var msgs = [];
+        banners.forEach(function (b) {
+            var t = b.querySelector('.banner-hosting-title');
+            if (t) msgs.push(String(t.textContent || '').replace(/\s+/g, ' ').trim());
+        });
+        if (!msgs.length) return;
+        var sig = msgs.join('|');
+        try {
+            if (sessionStorage.getItem('comserv_admin_sys_notify') === sig) return;
+        } catch (e) { /* ignore */ }
+        var show = function () {
+            msgs.forEach(function (m) {
+                try {
+                    new Notification('Comserv admin', { body: m, tag: 'comserv-admin-danger' });
+                } catch (err) { /* ignore */ }
+            });
+            try { sessionStorage.setItem('comserv_admin_sys_notify', sig); } catch (e) { /* ignore */ }
+        };
+        if (Notification.permission === 'granted') {
+            show();
+        } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission().then(function (p) {
+                if (p === 'granted') show();
+            });
+        }
+    }
+
     function expandFromHash() {
         var hash = window.location.hash;
         if (hash) {
@@ -138,6 +168,10 @@
 
         // Lazy-load any card already expanded on initial render
         lazyLoadOpenCards();
+
+        // #2197 system path: OS Notification for danger banners (in-app is the
+        // .banner-hosting list). Once per session signature; never spam.
+        fireSystemNotifications();
     });
 
     // Also handle hash changes (back/forward nav)
