@@ -61,6 +61,21 @@ sub pantry_ready {
     return $self->table_ready( $c, 'HealthKitchen::UserPantryQty' );
 }
 
+sub map_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, 'HealthKitchen::InventoryEncyMap' );
+}
+
+sub symptom_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, 'HealthKitchen::UserActiveSymptom' );
+}
+
+sub profile_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, 'HealthKitchen::UserHealthProfile' );
+}
+
 sub recipe_ready {
     my ( $self, $c ) = @_;
     return $self->table_ready( $c, 'Recipe' )
@@ -106,6 +121,7 @@ sub list_pantry {
                 "list_pantry overlay failed: $_" );
         };
     }
+    $self->_attach_ency_maps( $c, \@rows );
     return \@rows;
 }
 
@@ -172,6 +188,266 @@ sub _pantry_row_hash {
         inventory_item_id => $row->inventory_item_id,
         notes             => $row->notes,
     };
+}
+
+sub _attach_ency_maps {
+    my ( $self, $c, $rows ) = @_;
+    return unless $rows && @$rows && $self->map_ready($c);
+    my @ids = grep { $_ } map { $_->{inventory_item_id} } @$rows;
+    return unless @ids;
+    my %by_item;
+    try {
+        my $rs = $c->model('DBEncy')->resultset('HealthKitchen::InventoryEncyMap')->search(
+            {
+                sitename          => $self->sitename($c),
+                inventory_item_id => { -in => \@ids },
+            }
+        );
+        while ( my $m = $rs->next ) {
+            $by_item{ $m->inventory_item_id } = {
+                herb_id     => $m->herb_id,
+                organism_id => $m->organism_id,
+                animal_id   => $m->animal_id,
+                insect_id   => $m->insect_id,
+                formula_id  => $m->formula_id,
+            };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, '_attach_ency_maps',
+            "map attach failed: $_" );
+    };
+    for my $row (@$rows) {
+        my $m = $by_item{ $row->{inventory_item_id} || 0 } || {};
+        $row->{$_} = $m->{$_} for qw(herb_id organism_id animal_id insect_id formula_id);
+    }
+}
+
+sub upsert_ency_map {
+    my ( $self, $c, $args ) = @_;
+    return { ok => 0, error => 'ENCY map table is not created yet. Run schema-compare.' }
+        unless $self->map_ready($c);
+    my $item_id = $args->{inventory_item_id};
+    return { ok => 0, error => 'Inventory item id is required to link ENCY.' }
+        unless $item_id && $item_id =~ /^\d+$/;
+    my $clear = $args->{unlink} ? 1 : 0;
+    my $row;
+    try {
+        my $rs = $c->model('DBEncy')->resultset('HealthKitchen::InventoryEncyMap');
+        $row = $rs->search(
+            { inventory_item_id => $item_id, sitename => $self->sitename($c) }
+        )->single;
+        my %vals = (
+            inventory_item_id => $item_id,
+            sitename          => $self->sitename($c),
+            herb_id           => $clear ? undef : $self->_opt_id( $args->{herb_id} ),
+            organism_id       => $clear ? undef : $self->_opt_id( $args->{organism_id} ),
+            animal_id         => $clear ? undef : $self->_opt_id( $args->{animal_id} ),
+            insect_id         => $clear ? undef : $self->_opt_id( $args->{insect_id} ),
+            formula_id        => $clear ? undef : $self->_opt_id( $args->{formula_id} ),
+        );
+        if ($row) {
+            $row->update( \%vals );
+        }
+        else {
+            $row = $rs->create( \%vals );
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'upsert_ency_map',
+            "upsert_ency_map failed: $_" );
+        $row = undef;
+    };
+    return { ok => 0, error => 'Could not save ENCY link.' } unless $row;
+    return { ok => 1 };
+}
+
+sub _opt_id {
+    my ( $self, $v ) = @_;
+    return undef unless defined $v && $v =~ /^\d+$/;
+    return 0 + $v;
+}
+
+sub list_ency_symptoms {
+    my ( $self, $c ) = @_;
+    my @out;
+    try {
+        my $rs = $c->model('DBEncy')->resultset('Ency::Symptom')->search(
+            {},
+            { order_by => 'name', rows => 400, columns => [qw(record_id name common_name)] }
+        );
+        while ( my $s = $rs->next ) {
+            push @out, {
+                id          => $s->record_id,
+                name        => $s->name,
+                common_name => $s->common_name,
+            };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, 'list_ency_symptoms',
+            "list_ency_symptoms failed: $_" );
+    };
+    return \@out;
+}
+
+sub list_active_symptoms {
+    my ( $self, $c ) = @_;
+    return [] unless $self->symptom_ready($c);
+    my @out;
+    try {
+        my $rs = $c->model('DBEncy')->resultset('HealthKitchen::UserActiveSymptom')->search(
+            {
+                user_id  => $c->session->{user_id},
+                sitename => $self->sitename($c),
+                status   => 'active',
+            },
+            { order_by => 'id', prefetch => 'symptom' }
+        );
+        while ( my $row = $rs->next ) {
+            my $sym = eval { $row->symptom };
+            push @out, {
+                id         => $row->id,
+                symptom_id => $row->symptom_id,
+                name       => $sym ? ( $sym->name || $sym->common_name ) : '',
+                severity   => $row->severity,
+                status     => $row->status,
+            };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'list_active_symptoms',
+            "list_active_symptoms failed: $_" );
+    };
+    return \@out;
+}
+
+sub active_symptom_ids {
+    my ( $self, $c ) = @_;
+    return [ map { $_->{symptom_id} } @{ $self->list_active_symptoms($c) } ];
+}
+
+sub set_active_symptom {
+    my ( $self, $c, $args ) = @_;
+    return { ok => 0, error => 'Symptom table is not created yet. Run schema-compare.' }
+        unless $self->symptom_ready($c);
+    my $sid = $self->_opt_id( $args->{symptom_id} );
+    return { ok => 0, error => 'Pick a symptom.' } unless $sid;
+    my $row;
+    try {
+        my $rs = $c->model('DBEncy')->resultset('HealthKitchen::UserActiveSymptom');
+        $row = $rs->search(
+            {
+                user_id    => $c->session->{user_id},
+                sitename   => $self->sitename($c),
+                symptom_id => $sid,
+            }
+        )->single;
+        if ($row) {
+            $row->update(
+                {
+                    status      => 'active',
+                    severity    => $args->{severity},
+                    resolved_at => undef,
+                }
+            );
+        }
+        else {
+            $row = $rs->create(
+                {
+                    user_id    => $c->session->{user_id},
+                    sitename   => $self->sitename($c),
+                    symptom_id => $sid,
+                    severity   => $args->{severity},
+                    status     => 'active',
+                }
+            );
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'set_active_symptom',
+            "set_active_symptom failed: $_" );
+        $row = undef;
+    };
+    return { ok => 0, error => 'Could not save symptom.' } unless $row;
+    return { ok => 1 };
+}
+
+sub resolve_symptom {
+    my ( $self, $c, $id ) = @_;
+    return { ok => 0, error => 'Symptom table is not created yet. Run schema-compare.' }
+        unless $self->symptom_ready($c);
+    $id = $self->_opt_id($id);
+    return { ok => 0, error => 'Missing symptom row.' } unless $id;
+    my $ok;
+    try {
+        my $row = $c->model('DBEncy')->resultset('HealthKitchen::UserActiveSymptom')->search(
+            {
+                id       => $id,
+                user_id  => $c->session->{user_id},
+                sitename => $self->sitename($c),
+            }
+        )->single;
+        if ($row) {
+            $row->update( { status => 'resolved', resolved_at => strftime( '%Y-%m-%d %H:%M:%S', gmtime ) } );
+            $ok = 1;
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'resolve_symptom',
+            "resolve_symptom failed: $_" );
+    };
+    return { ok => 0, error => 'Could not resolve symptom.' } unless $ok;
+    return { ok => 1 };
+}
+
+sub save_profile {
+    my ( $self, $c, $args ) = @_;
+    return { ok => 0, error => 'Profile table is not created yet. Run schema-compare.' }
+        unless $self->profile_ready($c);
+    my $row;
+    try {
+        $row = $c->model('DBEncy')->resultset('HealthKitchen::UserHealthProfile')->update_or_create(
+            {
+                user_id    => $c->session->{user_id},
+                sitename   => $self->sitename($c),
+                diet_flags => $args->{diet_flags},
+                allergies  => $args->{allergies},
+                goals      => $args->{goals},
+            },
+            { key => 'hk_profile_user_site' }
+        );
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'save_profile',
+            "save_profile failed: $_" );
+        $row = undef;
+    };
+    return { ok => 0, error => 'Could not save profile.' } unless $row;
+    return { ok => 1 };
+}
+
+sub get_profile {
+    my ( $self, $c ) = @_;
+    return {} unless $self->profile_ready($c);
+    my $h = {};
+    try {
+        my $row = $c->model('DBEncy')->resultset('HealthKitchen::UserHealthProfile')->search(
+            { user_id => $c->session->{user_id}, sitename => $self->sitename($c) }
+        )->single;
+        if ($row) {
+            $h = {
+                diet_flags => $row->diet_flags,
+                allergies  => $row->allergies,
+                goals      => $row->goals,
+            };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, 'get_profile',
+            "get_profile failed: $_" );
+    };
+    return $h;
 }
 
 sub add_pantry_item {
@@ -602,6 +878,233 @@ sub _ensure_inventory_sku {
             "SKU $ln->{sku} not created (inventory optional): $_" );
     };
     return $item_id;
+}
+
+# relationship_type values that mean "do not use for this symptom"
+my %_SKIP_REL = map { $_ => 1 } qw(
+    contra contraindicated contraindication avoid worsens aggravates caution
+    do_not_use not_for
+);
+
+sub _rel_skip {
+    my ( $self, $type ) = @_;
+    return 0 unless defined $type && length $type;
+    my $lc = lc $type;
+    $lc =~ s/[\s\-]+/_/g;
+    return 1 if $_SKIP_REL{$lc};
+    return 1 if $lc =~ /contra|avoid|worsen|aggravat/;
+    return 0;
+}
+
+sub _id_set {
+    my ( $self, $list ) = @_;
+    my %set;
+    for my $v ( @{ $list || [] } ) {
+        next unless defined $v && $v =~ /^\d+$/;
+        $set{ 0 + $v } = 1;
+    }
+    return \%set;
+}
+
+# Pure matcher (no Catalyst, no LLM). Inject a dataset for tests.
+# Required: pantry_herb_ids. Empty pantry → empty result (never invent stock).
+sub match_candidates {
+    my ( $self, $data ) = @_;
+    $data ||= {};
+    my $pantry = $self->_id_set( $data->{pantry_herb_ids} );
+    my $syms   = $self->_id_set( $data->{symptom_ids} );
+    my $drugs  = $self->_id_set( $data->{user_drug_ids} );
+    my $herbs  = $data->{herbs} || {};
+
+    my @herb_out;
+    my %ok_herb;
+    for my $link ( @{ $data->{herb_symptoms} || [] } ) {
+        next unless ref $link eq 'HASH';
+        my $hid = $link->{herb_id};
+        my $sid = $link->{symptom_id};
+        next unless $hid && $sid && $pantry->{ 0 + $hid } && $syms->{ 0 + $sid };
+        next if $self->_rel_skip( $link->{relationship_type} );
+        my $h = $herbs->{$hid} || $herbs->{ 0 + $hid } || {};
+        if ( my $term = $data->{user_contra_term} ) {
+            my $ci = $h->{contra_indications} // '';
+            next if length $ci && index( lc($ci), lc($term) ) >= 0;
+        }
+        my $blocked;
+        for my $dh ( @{ $data->{drug_herb} || [] } ) {
+            next unless ref $dh eq 'HASH';
+            next unless $dh->{herb_id} && ( 0 + $dh->{herb_id} ) == ( 0 + $hid );
+            next unless $dh->{drug_id} && $drugs->{ 0 + $dh->{drug_id} };
+            $blocked = 1;
+            last;
+        }
+        next if $blocked;
+        next if $ok_herb{ 0 + $hid };
+        $ok_herb{ 0 + $hid } = 1;
+        push @herb_out, {
+            herb_id            => 0 + $hid,
+            name               => $h->{name} || $h->{common_names} || $h->{botanical_name} || '',
+            symptom_id         => 0 + $sid,
+            relationship_type  => $link->{relationship_type},
+            contra_indications => $h->{contra_indications} || '',
+        };
+    }
+
+    my @formula_out;
+    for my $f ( @{ $data->{formulas} || [] } ) {
+        next unless ref $f eq 'HASH';
+        my @fherbs = grep { defined $_ && $_ =~ /^\d+$/ } @{ $f->{herb_ids} || [] };
+        next unless @fherbs;
+        my $all_in = 1;
+        for my $hid (@fherbs) {
+            unless ( $pantry->{ 0 + $hid } && $ok_herb{ 0 + $hid } ) {
+                $all_in = 0;
+                last;
+            }
+        }
+        next unless $all_in;
+        push @formula_out, {
+            formula_id => $f->{id} || $f->{formula_id},
+            name       => $f->{name} || '',
+            herb_ids   => [ map { 0 + $_ } @fherbs ],
+        };
+    }
+
+    return {
+        herbs    => \@herb_out,
+        formulas => \@formula_out,
+    };
+}
+
+# Live DB path. Returns empty sets if tables or pantry mapping are missing.
+sub match_for_symptoms {
+    my ( $self, $c, $opts ) = @_;
+    $opts ||= {};
+    return $self->match_candidates( $opts->{dataset} ) if $opts->{dataset};
+
+    my $symptom_ids = $opts->{symptom_ids} || [];
+    $symptom_ids = [$symptom_ids] unless ref $symptom_ids eq 'ARRAY';
+    unless (@$symptom_ids) {
+        return { herbs => [], formulas => [], error => 'no_symptoms' };
+    }
+
+    my $dataset = {
+        symptom_ids       => $symptom_ids,
+        pantry_herb_ids   => $self->_pantry_herb_ids($c),
+        user_drug_ids     => $opts->{user_drug_ids} || [],
+        user_contra_term  => $opts->{user_contra_term},
+        herb_symptoms     => [],
+        herbs             => {},
+        formulas          => [],
+        drug_herb         => [],
+    };
+    unless ( @{ $dataset->{pantry_herb_ids} } ) {
+        return { herbs => [], formulas => [] };
+    }
+
+    my $schema = eval { $c->model('DBEncy') };
+    return { herbs => [], formulas => [], error => 'no_schema' } unless $schema;
+
+    try {
+        if ( $self->source_ok( $schema, 'Ency::HerbSymptom' ) ) {
+            my $rs = $schema->resultset('Ency::HerbSymptom')->search(
+                { symptom_id => { -in => $symptom_ids } }
+            );
+            while ( my $row = $rs->next ) {
+                push @{ $dataset->{herb_symptoms} }, {
+                    herb_id           => $row->herb_id,
+                    symptom_id        => $row->symptom_id,
+                    relationship_type => $row->relationship_type,
+                };
+            }
+        }
+        my @hids = map { $_->{herb_id} } @{ $dataset->{herb_symptoms} };
+        if ( @hids && $self->source_ok( $schema, 'Ency::Herb' ) ) {
+            my $hrs = $schema->resultset('Ency::Herb')->search(
+                { record_id => { -in => \@hids } }
+            );
+            while ( my $h = $hrs->next ) {
+                $dataset->{herbs}{ $h->record_id } = {
+                    name               => $h->common_names || $h->botanical_name,
+                    botanical_name     => $h->botanical_name,
+                    common_names       => $h->common_names,
+                    contra_indications => $h->contra_indications,
+                };
+            }
+        }
+        if ( $self->source_ok( $schema, 'Ency::FormulaHerb' )
+            && $self->source_ok( $schema, 'Ency::Formula' ) )
+        {
+            my %by_f;
+            my $frs = $schema->resultset('Ency::FormulaHerb')->search({});
+            while ( my $fh = $frs->next ) {
+                next unless $fh->herb_id;
+                push @{ $by_f{ $fh->formula_id } }, $fh->herb_id;
+            }
+            if (%by_f) {
+                my $forms = $schema->resultset('Ency::Formula')->search(
+                    { record_id => { -in => [ keys %by_f ] } }
+                );
+                while ( my $f = $forms->next ) {
+                    my $fid = $f->can('record_id') ? $f->record_id : $f->id;
+                    push @{ $dataset->{formulas} }, {
+                        id       => $fid,
+                        name     => $f->name,
+                        herb_ids => $by_f{$fid} || $by_f{ $f->id } || [],
+                    };
+                }
+            }
+        }
+        if ( @{ $dataset->{user_drug_ids} }
+            && $self->source_ok( $schema, 'Ency::DrugHerbInteraction' ) )
+        {
+            my $drs = $schema->resultset('Ency::DrugHerbInteraction')->search(
+                { drug_id => { -in => $dataset->{user_drug_ids} } }
+            );
+            while ( my $d = $drs->next ) {
+                push @{ $dataset->{drug_herb} }, {
+                    herb_id => $d->herb_id,
+                    drug_id => $d->drug_id,
+                };
+            }
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'match_for_symptoms',
+            "match_for_symptoms load failed: $_" );
+    };
+
+    return $self->match_candidates($dataset);
+}
+
+sub _pantry_herb_ids {
+    my ( $self, $c ) = @_;
+    my %ids;
+    my $schema = eval { $c->model('DBEncy') };
+    return [] unless $schema;
+    try {
+        my @item_ids;
+        for my $row ( @{ $self->list_pantry($c) } ) {
+            push @item_ids, $row->{inventory_item_id} if $row->{inventory_item_id};
+            push @item_ids, $row->{herb_id}           if $row->{herb_id};
+            $ids{ 0 + $row->{herb_id} } = 1 if $row->{herb_id};
+        }
+        if ( @item_ids && $self->source_ok( $schema, 'HealthKitchen::InventoryEncyMap' ) ) {
+            my $rs = $schema->resultset('HealthKitchen::InventoryEncyMap')->search(
+                {
+                    sitename          => $self->sitename($c),
+                    inventory_item_id => { -in => \@item_ids },
+                }
+            );
+            while ( my $m = $rs->next ) {
+                $ids{ 0 + $m->herb_id } = 1 if $m->herb_id;
+            }
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, '_pantry_herb_ids',
+            "pantry herb map failed: $_" );
+    };
+    return [ sort { $a <=> $b } keys %ids ];
 }
 
 __PACKAGE__->meta->make_immutable;
