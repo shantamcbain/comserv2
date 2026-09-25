@@ -17,6 +17,8 @@
             <a href="[% c.uri_for('/healthkitchen') %]">Health Kitchen</a>
             ·
             <a href="[% c.uri_for('/healthkitchen/recipes') %]">Recipes</a>
+            ·
+            <a href="[% c.uri_for('/healthkitchen/symptoms') %]">Symptoms</a>
         </p>
     </div>
 
@@ -47,7 +49,7 @@
 
         [% IF hk_pantry && hk_pantry.size %]
             <table class="table">
-                <tr><th>Name</th><th>Qty</th><th>Unit</th><th>Reorder</th><th>Source</th><th>SKU</th></tr>
+                <tr><th>Name</th><th>Qty</th><th>Unit</th><th>Reorder</th><th>Source</th><th>SKU</th><th>ENCY</th></tr>
                 [% FOREACH p IN hk_pantry %]
                     <tr>
                         <td>[% p.name | html %]</td>
@@ -56,6 +58,27 @@
                         <td>[% p.reorder_point | html %]</td>
                         <td>[% p.via | html %]</td>
                         <td>[% p.sku || p.inventory_item_id || '—' | html %]</td>
+                        <td>
+                            [% IF p.herb_id %]<a href="[% c.uri_for('/ENCY/Herb') %]/[% p.herb_id %]">herb #[% p.herb_id %]</a>[% END %]
+                            [% IF p.organism_id %] organism #[% p.organism_id %][% END %]
+                            [% IF p.animal_id %] <a href="[% c.uri_for('/ENCY/Animal') %]">animal #[% p.animal_id %]</a>[% END %]
+                            [% IF p.insect_id %] insect #[% p.insect_id %][% END %]
+                            [% IF p.formula_id %] <a href="[% c.uri_for('/ENCY/Formula') %]">formula #[% p.formula_id %]</a>[% END %]
+                            [% IF p.inventory_item_id && hk_map_ready %]
+                                <form method="post" action="[% c.uri_for('/healthkitchen/pantry_map') %]">
+                                    <input type="hidden" name="inventory_item_id" value="[% p.inventory_item_id %]" />
+                                    <label>herb <input type="number" name="herb_id" value="[% p.herb_id %]" /></label>
+                                    <label>organism <input type="number" name="organism_id" value="[% p.organism_id %]" /></label>
+                                    <label>animal <input type="number" name="animal_id" value="[% p.animal_id %]" /></label>
+                                    <label>insect <input type="number" name="insect_id" value="[% p.insect_id %]" /></label>
+                                    <label>formula <input type="number" name="formula_id" value="[% p.formula_id %]" /></label>
+                                    <button type="submit" class="btn btn-sm btn-primary">Link</button>
+                                    <button type="submit" name="unlink" value="1" class="btn btn-sm btn-secondary">Unlink</button>
+                                </form>
+                            [% ELSIF !p.inventory_item_id %]
+                                <span class="doc-muted">Add an inventory SKU id to link ENCY.</span>
+                            [% END %]
+                        </td>
                     </tr>
                 [% END %]
             </table>

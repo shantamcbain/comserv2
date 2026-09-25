@@ -1577,7 +1577,18 @@ sub get_recent_activity {
 # Get system notifications for the admin dashboard
 sub get_system_notifications {
     my ($self, $c) = @_;
-    
+    # #2197: one brain — AdminDashboard already builds this list. Duplicate
+    # inline copy here drifted from the dashboard util and the stash was never
+    # rendered on admin/index.tt.
+    my $from_dash = eval {
+        Comserv::Util::AdminDashboard->new->system_notifications($c);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'get_system_notifications', "AdminDashboard notifications failed: $@");
+    }
+    return $from_dash if $from_dash && ref($from_dash) eq 'ARRAY';
+
     my @notifications = ();
     
     # Check for pending user registrations

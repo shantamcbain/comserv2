@@ -99,8 +99,12 @@ __PACKAGE__->register_class('GlEntryLine',       'Comserv::Model::Schema::Ency::
 # Health Kitchen pantry map (create tables via Admin schema-compare)
 __PACKAGE__->register_class('HealthKitchen::InventoryEncyMap', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::InventoryEncyMap');
 __PACKAGE__->register_class('HealthKitchen::UserPantryQty',    'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserPantryQty');
+__PACKAGE__->register_class('HealthKitchen::UserHealthProfile', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserHealthProfile');
+__PACKAGE__->register_class('HealthKitchen::UserActiveSymptom', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserActiveSymptom');
 __PACKAGE__->register_class('InventoryEncyMap',                'Comserv::Model::Schema::Ency::Result::HealthKitchen::InventoryEncyMap');
 __PACKAGE__->register_class('UserPantryQty',                   'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserPantryQty');
+__PACKAGE__->register_class('UserHealthProfile',               'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserHealthProfile');
+__PACKAGE__->register_class('UserActiveSymptom',               'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserActiveSymptom');
 
 # Register Inventory system classes
 __PACKAGE__->register_class('InventoryItem', 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItem');
