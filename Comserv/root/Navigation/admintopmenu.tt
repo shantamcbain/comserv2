@@ -7,7 +7,7 @@
    category = 'developer'
    tags = 'server, development, cpanfile, dependencies, perlbrew'
 %]
-[% PageVersion = 'admintopmenu.tt,v 0.7 2026/09/12 shanta Exp shanta ' %]
+[% PageVersion = 'admintopmenu.tt,v 0.9 2026/09/25 shanta Exp shanta ' %]
 [% IF debug == 1 %]
     [%# PageVersion %]
     [% #INCLUDE 'debug.tt' %]
@@ -91,7 +91,10 @@
                 [% IF c.session.roles.grep('admin').size %]
                     <div class="submenu-section">
                         <span class="submenu-section-title">Admin</span>
-                        <a href="/admin/ai/configure"><i class="icon-config"></i>AI Configuration</a>
+                        <a href="[% c.uri_for('/ai/usage') %]"><i class="icon-stats"></i>Usage &amp; Activity Monitor</a>
+                        <a href="[% c.uri_for('/ai/models') %]"><i class="icon-model"></i>Model Management</a>
+                        <a href="[% c.uri_for('/ai/admin/agents') %]"><i class="icon-ai"></i>Agent Management</a>
+                        <a href="[% c.uri_for('/ai/manage_api_keys') %]"><i class="icon-key"></i>API Keys</a>
                         <a href="/chat/admin" id="nav-support-chat-link"><i class="icon-chat"></i>Support Chat <span id="nav-support-badge" style="display:none;background:#e55;color:#fff;border-radius:10px;padding:1px 7px;font-size:.75em;margin-left:4px;vertical-align:middle;"></span></a>
                     </div>
                 [% END %]
