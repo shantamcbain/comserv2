@@ -1249,14 +1249,18 @@ sub auto :Private {
         $c->stash->{ai_role_tier} = Comserv::Util::ModelCatalog->_role_tier($c);
         $c->stash->{ai_is_guest} = Comserv::Util::ModelCatalog->is_guest_tier($c) ? 1 : 0;
         $c->stash->{ai_can_select_model} = $c->stash->{ai_is_priv};
-        $c->stash->{ai_chat_page} ||= $c->request->path;
+        my $ai_page = eval {
+            my $r = $c->model('AI2::Router');
+            $r && $r->can('infer_page') ? $r->infer_page($c->request->path) : 'chat';
+        } || 'chat';
+        $c->stash->{ai_chat_page} ||= $ai_page;
         # Pre-selected model. Guests/members get a FREE OpenRouter model (no cost,
         # and no load on the already-saturated workstation GPU); privileged users
         # on a coding surface get the pinned coding model. Without this the
         # browser just selects the first option alphabetically, which silently
         # sent every guest to a local Ollama model.
         $c->stash->{ai_default_model}
-            = Comserv::Util::ModelCatalog->default_for($c, page => 'chat');
+            = Comserv::Util::ModelCatalog->default_for($c, page => $ai_page);
 
         return 1; # Continue processing
     };

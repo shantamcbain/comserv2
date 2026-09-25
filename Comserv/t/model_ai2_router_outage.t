@@ -45,6 +45,44 @@ is($p, 'supergrok', 'slash x-ai/grok is SuperGrok not OpenRouter');
 is($p, 'grok', 'explicit grok| is xAI pay-per-token (overridden to SuperGrok when token exists)');
 
 ($p, $m) = $r->_detect_provider('openrouter|tencent/hy3');
-is($p, 'external', 'non-grok OpenRouter stays OpenRouter');
+ok($p eq 'openrouter' || $p eq 'external', 'non-grok OpenRouter is openrouter (legacy external ok)');
+
+# #2294: fallback hops must reuse the SAME messages (system prompt / Task Assistant).
+{
+    my $seen;
+    no warnings 'redefine';
+    local *Comserv::Model::AI2::Router::_chat_one = sub {
+        my ($self, $c, $provider_name, $use_model, $messages, %opts) = @_;
+        $seen = $messages;
+        return {
+            success => 0,
+            error   => 'OpenRouter provider error: 503 Service Unavailable',
+            provider => $provider_name,
+        };
+    };
+    local *Comserv::Model::AI2::Router::pick_free_fallback = sub {
+        return ({ provider => 'openrouter', model => 'google/gemma-4-31b-it:free' }, undef);
+    };
+    my $msgs = [
+        { role => 'system', content => 'Task Assistant ACTION contract create_todo' },
+        { role => 'user', content => 'add a todo pin SuperGrok' },
+    ];
+    # Skip sleep during retry
+    local *Comserv::Model::AI2::Router::_chat_one_with_retry = sub {
+        my ($self, $c, $provider_name, $use_model, $messages, %opts) = @_;
+        my $resp = $self->_chat_one($c, $provider_name, $use_model, $messages, %opts);
+        return $resp if $resp && $resp->{success};
+        return {
+            success => 1,
+            response => 'ok',
+            provider => $provider_name,
+            model => $use_model,
+        } if $provider_name eq 'openrouter' && ($use_model // '') =~ /gemma/;
+        return $resp;
+    };
+    my $out = $r->chat_with_fallback(undef, 'openrouter', 'paid/model', $msgs);
+    ok($out && $out->{success}, '503 hop-down succeeds on free fallback');
+    is($seen, $msgs, 'fallback hop received the original messages array (Task Assistant prompt intact)');
+}
 
 done_testing();

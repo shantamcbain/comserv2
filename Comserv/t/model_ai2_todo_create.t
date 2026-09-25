@@ -82,4 +82,20 @@ ok($m->detect_create_intent('add a todo to fix helpdesk ticket create'),
 ok($m->detect_create_intent('create a todo for the helpdesk ticket create bug'),
     'explicit create-todo for ticket bug still matches');
 
+ok($m->detect_create_intent('can you add a todo to wire chat ACTION contract'),
+    'can-you add-a-todo is create intent');
+ok($m->detect_create_intent('I need a todo for the editor SuperGrok picker'),
+    'need-a-todo is create intent');
+ok($m->detect_create_intent('put this on the todo list: pin SuperGrok in editor'),
+    'put-on-todo-list is create intent');
+ok(!$m->detect_create_intent('analyze the code and mention todos in the plan'),
+    'analysis mentioning todos is not create intent');
+
+require Comserv::Model::AI2::ChatIntent;
+ok(Comserv::Model::AI2::ChatIntent::is_editor_agent('programming'), 'programming is editor');
+ok(!Comserv::Model::AI2::ChatIntent::looks_like_todo_create('plan the refactor and create todos later'),
+    'plan-create-todos-later is not explicit');
+ok(Comserv::Model::AI2::ChatIntent::looks_like_todo_create('add a todo pin SuperGrok'),
+    'explicit add-a-todo still matches in editor context');
+
 done_testing();
