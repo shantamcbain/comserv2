@@ -71,10 +71,12 @@ sub _detect_provider {
         return ('grok', $bare);
     }
     if ($prefix eq 'openrouter' || $prefix eq 'external' || $bare =~ m{/}) {
-        return ('external', $bare);
+        # AIMPS #2036: report the concrete provider, not the generic bucket
+        # "external". Legacy wire prefix "external|" still means OpenRouter.
+        return ('openrouter', $bare);
     }
     if ($requested_model =~ m{/}) {
-        return ('external', $requested_model);
+        return ('openrouter', $requested_model);
     }
     # Ollama tags are name:tag (llama3.1:8b, phi4:14b). OpenRouter ids use
     # org/model. The old /^(llama3|...)/i match sent local llama3* tags to
@@ -83,7 +85,7 @@ sub _detect_provider {
         return ('ollama', $bare);
     }
     if ($requested_model =~ /^(gpt|claude|mixtral|groq|openrouter|or-|tencent)/i) {
-        return ('external', $requested_model);
+        return ('openrouter', $requested_model);
     }
     return ('ollama', $requested_model);
 }
@@ -198,7 +200,8 @@ sub _external_default_available {
 #   $ctx keys: agent_id, page_context, requested_model, can_select,
 #              installed_models (array of names/hashes), default_model
 #
-# Returns ($provider, $model) — provider is one of ollama|grok|external.
+# Returns ($provider, $model) — provider is one of
+# ollama|grok|supergrok|openrouter (never the generic bucket "external").
 # -------------------------------------------------------------------
 sub select_model {
     my ($self, $c, %ctx) = @_;
@@ -507,7 +510,7 @@ sub chat_with_fallback {
         next unless $hop;
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
             "$provider_name failed ($err); falling back to $hop->{provider} $hop->{model}");
-        my $retry = $self->_chat_one_with_retry($c, $hop->{provider}, $hop->{model}, $messages);
+        my $retry = $self->_chat_one_with_retry($c, $hop->{provider}, $hop->{model}, $messages, %opts);
         if ($retry && $retry->{success}) {
             $retry->{provider}       = $hop->{provider};
             $retry->{fallback}       = 1;
@@ -524,6 +527,7 @@ sub chat_with_fallback {
     $resp ||= { success => 0, error => $err, provider => $provider_name };
     $resp->{provider} ||= $provider_name;
     $resp->{error} = $err;
+    eval { Comserv::Util::ModelCatalog->invalidate };
     return $resp;
 }
 
@@ -543,6 +547,18 @@ sub dispatch_chat {
         requested_model => $requested_model, can_select => $can_select);
 
     return $self->chat_with_fallback($c, $provider_name, $use_model, $messages);
+}
+
+# #2380 — live failover list for diagnostics / auto-sync (no hardcoded slugs).
+sub failover_snapshot {
+    my ($self, $c) = @_;
+    my ($free, $local) = $self->pick_free_fallback($c);
+    return {
+        free_openrouter => $free,
+        ollama          => $local,
+        cache_gen       => $Comserv::Util::ModelCatalog::CACHE_GEN,
+        cache_age_s     => time() - ($Comserv::Util::ModelCatalog::CACHE_AT || 0),
+    };
 }
 
 # -------------------------------------------------------------------
@@ -863,6 +879,119 @@ sub route_request {
     my ($self, $c, %args) = @_;
     my ($prov, $model) = $self->select_model($c, %args);
     return { success => 1, provider => $prov, model => $model };
+}
+
+# -------------------------------------------------------------------
+# AIMPS W1.1 (#2026/#2028/#2029) — page-class shortlists.
+# One brain: every picker asks the Router. No per-page model arrays.
+# Classes are capability patterns, never a hardcoded slug list.
+# -------------------------------------------------------------------
+sub infer_page {
+    my ($self, $path) = @_;
+    $path = lc($path // '');
+    $path =~ s{^https?://[^/]+}{};
+    return 'editor'   if $path =~ /editor|ai2editor|\/ai2\/edit/;
+    return 'git'      if $path =~ /\/git(\/|$)|admin\/git/;
+    return 'planning' if $path =~ /planning|\/todo/;
+    return 'herb'     if $path =~ /herb|ency|content|documentation/;
+    return 'chat';
+}
+
+sub page_class_for {
+    my ($self, $page) = @_;
+    $page = lc($page // '');
+    $page =~ s{^/+}{};
+    return 'coding'  if $page =~ /^(editor|git|code|ai2editor)\b/;
+    return 'coding'  if $page =~ /editor|ai2editor/;
+    return 'general';
+}
+
+sub classify_model {
+    my ($self, $m) = @_;
+    return 'unknown' unless $m && ref($m) eq 'HASH';
+    my $svc  = lc($m->{provider} // '');
+    my $name = $m->{name} // $m->{id} // $m->{value} // '';
+    $name =~ s/^[^|]+\|//;
+    # SuperGrok is the prepaid coding stack (AISYSTEM W1.0). Never treat it as
+    # "general" or the editor shortlist hides every grok-* option.
+    return 'coding' if $svc eq 'supergrok' || $m->{prepaid};
+    return 'coding' if $name =~ /coder|code|hy3|north-mini|starcoder|deepseek-v|qwen3-coder|qwen2\.5-coder|grok-build|grok-code/i;
+    return 'general';
+}
+
+# Filter an already-built catalog (raw Router or flattened ModelCatalog shape).
+# coding  → coding-class models (fallback to general if none matched)
+# general → non-coding chat models, capped so herb/planning are not 397 long
+sub shortlist_models {
+    my ($self, $models, %opts) = @_;
+    return [] unless $models && ref($models) eq 'ARRAY';
+    my $page  = $opts{page} || 'chat';
+    return [ grep { $_ && ref($_) eq 'HASH' } @$models ] if $page eq 'all';
+    my $class = $opts{class} || $self->page_class_for($page);
+    my $max   = $opts{max};
+    $max = ($class eq 'coding' ? 40 : 24) unless defined $max;
+
+    my @kept;
+    for my $m (@$models) {
+        next unless $m && ref($m) eq 'HASH';
+        next if $m->{disabled} || $m->{needs_key} || $m->{unreachable};
+        my $mc = $self->classify_model($m);
+        if ($class eq 'coding') {
+            push @kept, $m if $mc eq 'coding';
+        }
+        else {
+            push @kept, $m if $mc eq 'general';
+        }
+    }
+    if ($class eq 'coding' && !@kept) {
+        @kept = grep {
+            $_ && ref($_) eq 'HASH'
+            && !$_->{disabled} && !$_->{needs_key} && !$_->{unreachable}
+        } @$models;
+    }
+
+    my $is_sg = sub {
+        my ($m) = @_;
+        return 1 if lc($m->{provider} // '') eq 'supergrok';
+        return 1 if $m->{prepaid};
+        my $id = $m->{value} // $m->{name} // '';
+        return $id =~ /^supergrok\|/i ? 1 : 0;
+    };
+    my $cost_of = sub {
+        my ($m) = @_;
+        my $pp = ($m->{price_prompt}     // 0) + 0;
+        my $pc = ($m->{price_completion} // 0) + 0;
+        return ($pp > $pc) ? $pp : $pc;
+    };
+    my $is_free = sub {
+        my ($m) = @_;
+        my $n = $m->{name} // $m->{value} // $m->{id} // '';
+        return 1 if $m->{free} || $n =~ /:free$/i;
+        return 1 if !$m->{local} && $cost_of->($m) == 0 && !($m->{price_tier} // '');
+        return 0;
+    };
+    my @sg   = grep { $is_sg->($_) } @kept;
+    my @rest = grep { !$is_sg->($_) } @kept;
+    my @sorted_rest = sort {
+        my $af = $is_free->($a) ? 0 : 1;
+        my $bf = $is_free->($b) ? 0 : 1;
+        return $af <=> $bf if $af != $bf;
+        my $ca = $cost_of->($a);
+        my $cb = $cost_of->($b);
+        return $ca <=> $cb if $ca != $cb;
+        my $ac = ($self->classify_model($a) eq 'coding') ? 0 : 1;
+        my $bc = ($self->classify_model($b) eq 'coding') ? 0 : 1;
+        return $ac <=> $bc if $ac != $bc;
+        my $an = lc($a->{name} // $a->{value} // '');
+        my $bn = lc($b->{name} // $b->{value} // '');
+        return $an cmp $bn;
+    } @rest;
+    my $rest_max = $max - scalar(@sg);
+    $rest_max = 0 if $rest_max < 0;
+    if (@sorted_rest > $rest_max) {
+        @sorted_rest = @sorted_rest[ 0 .. $rest_max - 1 ];
+    }
+    return [ @sg, @sorted_rest ];
 }
 
 __PACKAGE__->meta->make_immutable;
