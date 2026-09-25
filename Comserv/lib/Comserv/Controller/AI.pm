@@ -12725,6 +12725,27 @@ Supports basic filtering for billing reports and capacity planning (anticipate o
 Access: any authenticated user sees their site's usage; admins see more.
 =cut
 
+sub _usage_is_operator {
+    my ($self, $c) = @_;
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+    my $roles    = $c->session->{roles} || [];
+    $roles = [ split /,/, $roles ] unless ref $roles eq 'ARRAY';
+    my $is_admin = grep { /^(admin|developer)$/i } @$roles;
+    return ($is_local || $is_admin) ? 1 : 0;
+}
+
+sub _usage_org {
+    my ($self, $c) = @_;
+    require Comserv::Model::AI2::UsageMonitor;
+    my $days   = $c->req->param('days') || 14;
+    my $prov_f = $c->req->param('provider') || '';
+    my $site_f = $c->req->param('site_id')  || '';
+    my $model_f= $c->req->param('model') || '';
+    return Comserv::Model::AI2::UsageMonitor->new->org_summary($c,
+        days => $days, provider => $prov_f, site_id => $site_f, model => $model_f);
+}
+
 sub usage :Local :Args(0) {
     my ($self, $c) = @_;
 
@@ -12733,91 +12754,128 @@ sub usage :Local :Args(0) {
     my $site_id  = $c->session->{SiteID};
     my $roles    = $c->session->{roles} || [];
     $roles = [split /,/, $roles] unless ref $roles eq 'ARRAY';
-
     my $is_admin = grep { /^admin$/i } @$roles;
 
-    # Filters from query
-    my $days       = $c->req->param('days') || 30;
-    my $prov_f     = $c->req->param('provider') || '';
-    my $site_f     = $c->req->param('site_id')  || ($is_admin ? '' : $site_id);
-    my $model_f    = $c->req->param('model') || '';
+    my $days   = $c->req->param('days') || 14;
+    my $prov_f = $c->req->param('provider') || '';
+    my $site_f = $c->req->param('site_id')  || ($is_admin ? '' : $site_id);
+    my $model_f= $c->req->param('model') || '';
 
-    my $schema = eval { $c->model('DBEncy')->schema };
-    my @logs;
-    my %summary = ( total_calls => 0, total_tokens => 0, total_cost => 0, by_provider => {}, by_site => {} );
-
-    if ($schema) {
-        my $rs = $schema->resultset('AiUsageLog');
-        my $since = DateTime->now->subtract(days => $days)->ymd . ' 00:00:00';
-
-        my $cond = { created_at => { '>=' => $since } };
-        $cond->{provider} = $prov_f if $prov_f;
-        $cond->{site_id}  = $site_f if $site_f;
-        $cond->{model}    = { 'like' => "%$model_f%" } if $model_f;
-
-        # Limit rows for UI
-        @logs = $rs->search($cond, { order_by => { -desc => 'created_at' }, rows => 200 })->all;
-
-        # Compute aggregates (simple, in-mem for now; for high volume add SQL GROUP BY)
-        foreach my $log (@logs) {
-            $summary{total_calls}++;
-            $summary{total_tokens} += $log->total_tokens || 0;
-            $summary{total_cost}   += $log->estimated_cost_usd || 0;
-
-            my $p = $log->provider || 'unknown';
-            $summary{by_provider}{$p}{calls}  += 1;
-            $summary{by_provider}{$p}{tokens} += $log->total_tokens || 0;
-            $summary{by_provider}{$p}{cost}   += $log->estimated_cost_usd || 0;
-
-            my $s = $log->site_id || 0;
-            $summary{by_site}{$s}{calls}  += 1;
-            $summary{by_site}{$s}{tokens} += $log->total_tokens || 0;
-            $summary{by_site}{$s}{cost}   += $log->estimated_cost_usd || 0;
-
-            # Track quota info for display
-            if ($log->plan_ai_requests_per_day) {
-                $summary{by_site}{$s}{plan_quota} = $log->plan_ai_requests_per_day;
-            }
-            if (defined $log->within_free_quota) {
-                $summary{by_site}{$s}{free_calls} += ($log->within_free_quota ? 1 : 0);
-                $summary{by_site}{$s}{overage_calls} += ($log->within_free_quota ? 0 : 1);
-            }
-        }
-        $summary{total_cost} = sprintf('%.4f', $summary{total_cost});
-    }
-
+    my $org = $self->_usage_org($c);
     my $usage_m = eval { $c->model('AI')->usage };
-    my $daily_models = [];
-    my $provider_status = {};
-    if ($usage_m) {
-        $daily_models = $usage_m->daily_model_summary($c, $days) || [];
-        $provider_status = $usage_m->snapshot_provider_status($c) || {};
-    }
+    my $provider_status = $usage_m ? ($usage_m->snapshot_provider_status($c) || {}) : {};
 
-    # For filter dropdowns: recent distinct providers/sites (lightweight)
-    my @providers = qw(ollama grok supergrok openrouter openai);
+    my @providers = qw(ollama grok supergrok openrouter openai hermes xai-oauth opencode-free);
     my @sites;
+    my $schema = eval { $c->model('DBEncy')->schema };
     if ($is_admin && $schema) {
         eval {
-            @sites = map { { id => $_->id, name => $_->name || $_->site_display_name || 'Site '.$_->id } }
+            @sites = map { { id => $_->id, name => $_->name || 'Site '.$_->id } }
                      $schema->resultset('Site')->search({}, { rows => 50, order_by => 'name' })->all;
         };
     }
 
     $c->stash(
-        template    => 'ai/usage.tt',
-        page_title  => 'AI Usage & Billing Monitor',
-        logs        => \@logs,
-        summary     => \%summary,
-        daily_models=> $daily_models,
-        provider_status => $provider_status,
-        filters     => { days => $days, provider => $prov_f, site_id => $site_f, model => $model_f },
-        providers   => \@providers,
-        sites       => \@sites,
-        is_admin    => $is_admin ? 1 : 0,
-        current_site=> $site_id,
-        username    => $username,
+        template         => 'ai/usage.tt',
+        page_title       => 'AI Usage & Activity Monitor',
+        org              => $org,
+        provider_status  => $provider_status,
+        filters          => { days => $days, provider => $prov_f, site_id => $site_f, model => $model_f },
+        providers        => \@providers,
+        sites            => \@sites,
+        is_admin         => $is_admin ? 1 : 0,
+        current_site     => $site_id,
+        username         => $username,
     );
+}
+
+sub usage_live :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    unless ($self->_usage_is_operator($c) || $c->session->{user_id}) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'login required' }));
+        return;
+    }
+    my $org = eval { $self->_usage_org($c) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'usage_live', "$@");
+        $c->response->body(encode_json({ success => JSON::false, error => 'summary failed' }));
+        return;
+    }
+    $c->response->body(encode_json({ success => JSON::true, org => $org }));
+}
+
+sub usage_kill :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    unless ($self->_usage_is_operator($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'operator only' }));
+        return;
+    }
+    require Comserv::Model::AI2::KillSwitch;
+    my $ks = Comserv::Model::AI2::KillSwitch->new;
+    my $action   = $c->req->param('action') || 'kill';
+    my $provider = $c->req->param('provider') || '';
+    my $model    = $c->req->param('model') || '';
+    my $result;
+    if ($action eq 'unkill') {
+        $result = $ks->unkill($c, provider => $provider, model => $model);
+    } else {
+        $result = $ks->kill($c,
+            provider => $provider,
+            model    => $model,
+            reason   => $c->req->param('reason') || 'other',
+            notes    => $c->req->param('notes') || '',
+            by       => $c->session->{username} || 'operator',
+        );
+        eval {
+            $c->model('AI')->log_usage($c,
+                provider      => $provider,
+                model         => $model,
+                request_type  => 'kill_switch',
+                status        => 'killed',
+                error_message => ($c->req->param('reason') || 'other') . ': ' . ($c->req->param('notes') || ''),
+                metadata      => { action => 'kill' },
+            );
+        };
+    }
+    $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'usage_kill',
+        "action=$action $provider/$model ok=" . ($result->{ok} ? 1 : 0));
+    $c->response->body(encode_json({
+        success => $result->{ok} ? JSON::true : JSON::false,
+        error   => $result->{error},
+        killed  => $result->{killed} || [],
+    }));
+}
+
+sub usage_ingest :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    unless ($self->_usage_is_operator($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'operator / LAN only' }));
+        return;
+    }
+    my $body = {};
+    if (($c->req->content_type || '') =~ /json/i) {
+        $body = eval { decode_json($c->req->body_data ? encode_json($c->req->body_data) : ($c->req->body || '{}')) } || {};
+        if (ref $c->req->body_data eq 'HASH') { $body = $c->req->body_data; }
+    }
+    $body = {} unless ref $body eq 'HASH';
+    my %args;
+    for my $k (qw(source request_type provider model prompt_tokens completion_tokens
+                  total_tokens estimated_cost_usd status error_message user_id site_id evaluation)) {
+        $args{$k} = $body->{$k} // $c->req->param($k);
+    }
+    if (ref $body->{metadata} eq 'HASH') { $args{metadata} = $body->{metadata}; }
+    require Comserv::Model::AI2::UsageMonitor;
+    my $r = Comserv::Model::AI2::UsageMonitor->new->ingest($c, %args);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'usage_ingest',
+        "source=" . ($args{source}||'?') . " model=" . ($args{model}||'?') . " ok=" . ($r->{ok} ? 1 : 0));
+    $c->response->body(encode_json({
+        success => $r->{ok} ? JSON::true : JSON::false,
+        error   => $r->{error},
+        source  => $r->{source},
+    }));
 }
 
 =head2 grok_balance
