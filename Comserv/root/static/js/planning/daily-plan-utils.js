@@ -500,8 +500,8 @@
     // NOTE: no _ensureSession pre-call. Server-side close_log / done_with_log
     // (Comserv::Util::TodoLog) are self-sufficient: close is graceful when no
     // log is open, and done inserts a completed log if none was open. Calling
-    // open_log first would now TOGGLE-stop an active session (open_log is a
-    // start/stop toggle), which is not what Close/Done mean.
+    // open_log first is wrong: Start now REPORTS already_active when status
+    // is 5 (being worked) instead of toggle-stopping. Stop = close_log only.
 
     function startWorkTodoCard(btn, recordId) {
         btn.disabled = true;
@@ -513,6 +513,8 @@
             body: JSON.stringify({ record_id: recordId })
         }).then(function(r) { return r.json(); }).then(function(d) {
             if (d.ok) {
+                // Fresh open OR stale page on an already-status-5 todo:
+                // sync the button to Stop without killing the running log.
                 _todoCardSetActive(btn, recordId);
             } else {
                 btn.disabled = false;
