@@ -4,16 +4,16 @@
     roles = "admin"
     TemplateType = "Documentation"
     category = "Accounting"
-    page_version = "1.00"
-    last_updated = "2026-04-17"
+    page_version = "1.01"
+    last_updated = "2026-09-24"
     site_specific = "false"
 %]
-[% PageVersion = 'Documentation/Accounting/index.tt v1.00 2026-04-17' %]
+[% PageVersion = 'Documentation/Accounting/index.tt v1.01 2026-09-24' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container">
     <h1 style="color:var(--text-color);font-family:var(--header-font)">Accounting System — Administrator Guide</h1>
-    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Administrators &amp; Accounting</div>
+    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-09-24 | Version: 1.01 | Audience: Administrators &amp; Accounting</div>
 
     <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:rgba(255,255,255,0.15);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
         <div class="col-100">
@@ -112,12 +112,14 @@
     <div id="setup" class="row">
         <div class="col-100">
             <h2 style="color:var(--text-color);font-family:var(--header-font)">4. First-Time Setup</h2>
-            <ol style="color:var(--text-color);font-family:var(--body-font)">
-                <li>Go to <a href="/Accounting" style="color:var(--link-color)">/Accounting</a></li>
-                <li>Click <strong>"Seed Default Accounts"</strong> — creates a standard set of COA accounts (Assets, Liabilities, Equity, Income, COGS). This is idempotent — safe to run multiple times.</li>
-                <li>Review the accounts at <a href="/Accounting/coa" style="color:var(--link-color)">/Accounting/coa</a></li>
-                <li>Edit inventory items to assign the 4 COA fields per item</li>
-                <li>You are now ready to record supplier invoices with full GL posting</li>
+            <ol class="doc-body">
+                <li>On the target SiteName, enable Accounting at <a class="doc-link" href="[% c.uri_for('/membership/addons') %]">/membership/addons</a> and save.</li>
+                <li>Run <a class="doc-link" href="[% c.uri_for('/Accounting/setup') %]">/Accounting/setup</a> — module, provision PG, then chart.</li>
+                <li><strong>Path A (live):</strong> AI chart at <a class="doc-link" href="[% c.uri_for('/Accounting/setup') %]?ai=1">/Accounting/setup?ai=1</a> — review, then commit. No GL from generate.</li>
+                <li><strong>Path B:</strong> import chart from PDF/image — not built (#1806).</li>
+                <li><strong>Path C:</strong> master data / history import — not built (#1807/#1808).</li>
+                <li>Maria <a class="doc-link" href="[% c.uri_for('/Accounting/coa') %]">/Accounting/coa</a> is still the live CoA page until PG cutover.</li>
+                <li>Owner guide: <a class="doc-link" href="[% c.uri_for('/Documentation/AccountingOnboarding') %]">AccountingOnboarding</a>.</li>
             </ol>
             <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
         </div>

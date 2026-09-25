@@ -45,6 +45,8 @@
     var _ctx = 'chat';            // context of the active select
     var _pinnedValue = null;      // value pinned to top (e.g. openrouter|cohere/north-mini-code:free)
     var _ollamaOnly = false;      // when true, render only Ollama models (skip xAI/OpenRouter)
+    var _showAll = false;         // AIMPS #2024: premium hidden unless user opts in
+    var _rawCatalog = null;       // unfiltered live list; _catalogCache is the shortlist
 
     // NOTE: there is intentionally NO static fallback model list. The catalog
     // comes only from the live sources (window.ComservConfig.models /
@@ -158,6 +160,81 @@
         return ' — cost not published';
     }
 
+    function isPremiumModel(m) {
+        if (!m) return false;
+        if (m.free || /(^|:)(free)$/i.test(String(m.value || ''))) return false;
+        if (String(m.price_tier || '') === 'premium') return true;
+        var p = Math.max(Number(m.price_prompt) || 0, Number(m.price_completion) || 0);
+        return p > 5;
+    }
+
+    function isCodingModel(m) {
+        var v = String((m && m.value) || '');
+        var svc = (m && m.provider) || v.split('|')[0] || '';
+        if (svc === 'supergrok' || m.prepaid) return true;
+        return /coder|code|hy3|north-mini|starcoder|deepseek-v|qwen3-coder|qwen2\.5-coder|grok-build|grok-code/i.test(v);
+    }
+
+    // AIMPS #2024/#2025: collapse premium; cap chat list; free/cheap first already
+    // happens in render(). Show-all bypasses the cap.
+    function applyShortlist(models, context) {
+        if (!models || !models.length) return models || [];
+        if (_showAll) return models;
+        var coding = (context === 'code' || context === 'editor' || context === 'git');
+        var kept = models.filter(function (m) {
+            if (isPremiumModel(m)) return false;
+            if (coding) return isCodingModel(m);
+            return true;
+        });
+        if (coding && !kept.length) {
+            kept = models.filter(function (m) { return !isPremiumModel(m); });
+        }
+        var max = coding ? 40 : 24;
+        if (kept.length > max) kept = kept.slice(0, max);
+        return kept;
+    }
+
+    function readShowAllPref() {
+        try { return localStorage.getItem('comserv_show_all_models') === '1'; } catch (e) { return false; }
+    }
+
+    function writeShowAllPref(on) {
+        try { localStorage.setItem('comserv_show_all_models', on ? '1' : '0'); } catch (e) { /* ignore */ }
+    }
+
+    function ensureShowAllToggle(selectEl) {
+        if (!selectEl || !selectEl.parentNode) return;
+        var id = 'ai-model-show-all';
+        var el = document.getElementById(id);
+        if (!el) {
+            var lab = document.createElement('label');
+            lab.setAttribute('for', id);
+            lab.style.fontSize = '0.8em';
+            lab.style.marginLeft = '0.5em';
+            lab.style.whiteSpace = 'nowrap';
+            el = document.createElement('input');
+            el.type = 'checkbox';
+            el.id = id;
+            lab.appendChild(el);
+            lab.appendChild(document.createTextNode(' Show all models'));
+            selectEl.parentNode.insertBefore(lab, selectEl.nextSibling);
+        }
+        el.checked = !!_showAll;
+        if (el._wired) return;
+        el._wired = true;
+        el.addEventListener('change', function () {
+            _showAll = !!el.checked;
+            writeShowAllPref(_showAll);
+            // page=chat/editor already shortlists on the server. Show-all must
+            // drop the cache and refetch page=all (or reuse the full global).
+            _catalogCache = null;
+            _catalogPromise = null;
+            fetchCatalog().then(function () {
+                if (_lastSelectEl) render(_lastSelectEl, _ctx, _pinnedValue || true);
+            }).catch(function () { /* keep current options */ });
+        });
+    }
+
     // ---- catalog normalization --------------------------------------------
     // Turn any known source shape into the internal flat list.
     function fromFlat(flat) {
@@ -228,7 +305,8 @@
         var globalModels = (window.ComservConfig && window.ComservConfig.models) || [];
         var flat = fromFlat(globalModels);
         if (flat && flat.length) {
-            _catalogCache = flat;
+            _rawCatalog = flat;
+            _catalogCache = applyShortlist(flat, _ctx);
             return Promise.resolve(_catalogCache);
         }
 
@@ -241,7 +319,9 @@
                 done = true;
                 reject(new Error('providers request timed out'));
             }, 6000);
-            fetch('/ai2/providers', { method: 'GET', credentials: 'include' })
+            var page = _showAll ? 'all'
+                : ((_ctx === 'code' || _ctx === 'editor' || _ctx === 'git') ? 'editor' : 'chat');
+            fetch('/ai2/providers?page=' + encodeURIComponent(page), { method: 'GET', credentials: 'include' })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     if (done) return;
@@ -257,7 +337,8 @@
                 });
         })
             .then(function (models) {
-                _catalogCache = models;
+                _rawCatalog = models;
+                _catalogCache = applyShortlist(models, _ctx);
                 _catalogPromise = null;
                 return _catalogCache;
             })
@@ -340,22 +421,31 @@
                     .sort(function (a, b) {
                         return modelSizeScore(a.value) - modelSizeScore(b.value);
                     });
-            } else if (svc === 'openrouter') {
-                // Lowest cost first: free models at the very top, then by prompt
-                // price ascending (completion as tie-breaker), alphabetical last
-                // resort when prices are equal/missing.
+            } else {
+                // #2025: cost then capability, not alpha. Free first, then
+                // prompt/completion price, then coding-ness / size, then name.
                 var priceOf = function (m) {
                     return Math.max(Number(m.price_prompt) || 0, Number(m.price_completion) || 0);
+                };
+                var capOf = function (m) {
+                    var n = 0;
+                    if (isCodingModel(m)) n += 8;
+                    n += modelSizeScore(m.value);
+                    return n;
                 };
                 list.sort(function (a, b) {
                     var fa = m_free(a), fb = m_free(b);
                     if (fa !== fb) return fa ? -1 : 1;
                     var pa = priceOf(a), pb = priceOf(b);
                     if (pa !== pb) return pa - pb;
+                    var ca = capOf(a), cb = capOf(b);
+                    if (ca !== cb) return cb - ca;
                     return String(a.value).localeCompare(String(b.value));
                 });
                 function m_free(m) {
-                    return !!(m.free || /(^|:)(free)$/i.test(m.value));
+                    var p = priceOf(m);
+                    return !!(m.free || /(^|:)(free)$/i.test(m.value)
+                        || (!m.local && p === 0 && !m.price_tier));
                 }
             }
 
@@ -427,9 +517,11 @@
         _ctx = opts.context || 'chat';
         _lastSelectEl = selectEl;
         _ollamaOnly = !!opts.ollamaOnly;
+        _showAll = readShowAllPref();
 
         return fetchCatalog().then(function () {
             render(selectEl, _ctx, opts.pinModel);
+            ensureShowAllToggle(selectEl);
             if (typeof opts.onReady === 'function') opts.onReady(_catalogCache);
             _emit(selectEl ? selectEl.value : null);
         }).catch(function (err) {
