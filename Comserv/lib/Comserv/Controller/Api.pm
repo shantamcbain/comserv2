@@ -2011,10 +2011,60 @@ sub _api_log_unauthorized {
     $c->detach();
 }
 
+=head2 api_todo_work_status
+
+GET /api/todo/work_status              — all todos currently being worked (status 5 / open log)
+GET /api/todo/work_status?record_id=N  — one todo's work-status report
+
+Read-only. Status 5 = being worked. Used by agents before Start/Stop/Done and
+to recover a leftover open log. Same payload shape as open_log already_active.
+
+=cut
+
+sub api_todo_work_status :Path('todo/work_status') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    unless (($c->req->method || '') =~ /^(GET|HEAD)$/i) {
+        $c->res->status(405);
+        $c->res->body(encode_json({ success => 0, error => 'GET only' }));
+        return;
+    }
+
+    my $record_id = $c->req->query_parameters->{record_id}
+                 || $c->req->params->{record_id};
+
+    my $res = eval {
+        Comserv::Util::TodoLog->work_status($c,
+            record_id => ($record_id ? $record_id : undef),
+        );
+    };
+    if ($@ || !$res || !$res->{success}) {
+        my $err = $@ || ($res && $res->{message}) || 'unknown error';
+        unless ($res && $res->{graceful}) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_todo_work_status',
+                "Failed work_status" . ($record_id ? " for todo $record_id" : '') . ": $err");
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_todo_work_status',
+                "work_status graceful" . ($record_id ? " for todo $record_id" : '') . ": $err");
+        }
+        $c->res->body(encode_json({ success => 0, error => "$err", graceful => ($res && $res->{graceful}) ? 1 : 0 }));
+        return;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_work_status',
+        $record_id
+            ? "work_status todo $record_id status=" . ($res->{todo_status} // '') . " active=" . ($res->{active} // 0)
+            : "work_status list count=" . ($res->{count} // 0));
+    $c->res->body(encode_json($res));
+}
+
 =head2 api_todo_open_log
 
 POST /api/todo/open_log  { record_id, actor?, username?, notes? }
 Opens a work log for a todo (status -> 5). Mirrors Todo::open_log SQL.
+If the todo is already being worked (status 5 / open log), returns
+already_active=1 and does NOT stop the session.
 
 IDENTITY CONTRACT: the caller MUST self-identify via C<actor> (legacy alias C<username>).
 The default is the neutral string C<api> so no single agent (Hermes, the in-app AI editor,
@@ -2057,16 +2107,20 @@ sub api_todo_open_log :Path('todo/open_log') :Args(0) {
         $c->res->body(encode_json({ success => 0, error => "$err" }));
         return;
     }
-    if ($res->{action} eq 'stopped') {
+    if (($res->{action} // '') eq 'already_active' || $res->{already_active}) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_open_log',
-            "Start toggle stopped active log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
-        $c->res->body(encode_json({ success => 1, stopped => 1, log_id => ($res->{log_id}//0),
-                                    duration_mins => ($res->{duration_mins}//0) }));
+            "Start skipped — todo $record_id already being worked (status 5, log_id=" . ($res->{log_id}//0) . ")");
+        $c->res->body(encode_json({
+            success => 1, already_active => 1, todo_status => ($res->{todo_status} // 5),
+            log_id => ($res->{log_id}//0), actor => ($res->{actor}//''),
+            start_time => ($res->{start_time}//''), subject => ($res->{subject}//''),
+        }));
         return;
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_open_log',
         "Log opened for todo $record_id by $username (log_id=$res->{log_id})");
-    $c->res->body(encode_json({ success => 1, log_id => ($res->{log_id} // 0) }));
+    $c->res->body(encode_json({ success => 1, log_id => ($res->{log_id} // 0),
+                                todo_status => ($res->{todo_status} // 5), already_active => 0 }));
 }
 
 =head2 api_todo_close_log
@@ -2116,8 +2170,12 @@ sub api_todo_close_log :Path('todo/close_log') :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_close_log',
-        "Closed log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
-    $c->res->body(encode_json({ success => 1, duration_mins => ($res->{duration_mins} // 0) }));
+        $res->{recovered}
+            ? "Recovered stuck status 5 -> 2 for todo $record_id (no open log)"
+            : "Closed log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
+    $c->res->body(encode_json({ success => 1, duration_mins => ($res->{duration_mins} // 0),
+                                todo_status => ($res->{todo_status} // 2),
+                                recovered => ($res->{recovered} ? 1 : 0) }));
 }
 
 =head2 api_todo_done_with_log
@@ -2161,7 +2219,12 @@ sub api_todo_done_with_log :Path('todo/done_with_log') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_done_with_log',
         "Todo $record_id marked done (log closed if open)");
-    $c->res->body(encode_json({ success => 1, log_closed => ($res->{log_closed} ? 1 : 0) }));
+    $c->res->body(encode_json({
+        success => 1,
+        log_closed => ($res->{log_closed} ? 1 : 0),
+        todo_status => ($res->{todo_status} // 3),
+        already_done => ($res->{already_done} ? 1 : 0),
+    }));
 }
 
 =head2 _api_json_body
