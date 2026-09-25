@@ -859,7 +859,7 @@ function ensureThinkingStyles(doc) {
             'Contract:',
             '0) clarify — ask only for missing facts; do not analyze code deeply yet.',
             'A) analyze — cost-effective analysis; no ## FIX / large rewrites.',
-            'B) plan — short plan for user verify; MAY include docs/planning/todo updates before code; end by asking for "approve plan".',
+            'B) plan — short plan for user verify; docs/changelog notes only as text; do not create todos; end by asking for "approve plan".',
             'C) implement — code suggestion only after plan approval (or explicit implement request).'
         ];
         if (agentId === 'analyze') {
@@ -867,7 +867,7 @@ function ensureThinkingStyles(doc) {
         } else if (agentId === 'documentation') {
             lines.push('You are in documentation mode: prefer docs/changelog/planning guidance; do not emit code file rewrites unless asked.');
         } else {
-            lines.push('You are in programming mode: do NOT divert to FocusTune todo ranking; stay on code/docs/plan for this file.');
+            lines.push('You are in programming mode: do NOT divert to FocusTune; never create todos or emit [ACTION: create_todo]; stay on code/docs/plan for this file.');
         }
         if (phase === 'clarify') {
             lines.push('Current phase CLARIFY: ask 2–4 short questions about missing context only. No root-cause essay.');
@@ -1030,6 +1030,7 @@ function ensureThinkingStyles(doc) {
                         prompt: fullPrompt,
                         model: model,
                         agent_id: agentId,
+                        phase: phase,
                         page_path: filePath || (files[0] && files[0].path) || '',
                         page_title: filePath ? filePath.split('/').pop() : '',
                         page_content: (files[0] && files[0].content) || fileContent || ''

@@ -1,0 +1,180 @@
+[% META
+        title = "Accounting onboarding for site owners"
+   description = "How a SiteName owner enables Accounting, provisions the site PG database, and chooses a chart. Path A (AI) is live; Path B and Path C are not built."
+   roles = "admin,site_admin,accounting"
+   TemplateType = "Documentation"
+   category = "Accounting"
+   page_version = "1.00"
+   last_updated = "Thu Sep 24 2026"
+   site_specific = "false"
+   project_id = "233"
+   project_code = "ACCON"
+%]
+[% PageVersion = 'Documentation/AccountingOnboarding.tt,v 1.00 2026/09/24 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'Accounting onboarding for site owners'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <div class="doc-navrow">
+                <a href="#overview" class="doc-navlink">Overview</a>
+                <a href="#steps" class="doc-navlink">Owner steps</a>
+                <a href="#paths" class="doc-navlink">Chart intake</a>
+                <a href="#live" class="doc-navlink">What is live</a>
+                <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
+                <a href="#see-also" class="doc-navlink">See Also</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h1 class="doc-h1">Accounting onboarding for site owners</h1>
+            <p class="doc-muted">Last Updated | Version 1.00 | ACCON #233</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-info">
+                <p class="doc-body"><strong>Tracking.</strong>
+                    <a href="[% c.uri_for('/project/details') %]?project_id=233" class="doc-link">Project ACCON #233</a>
+                    · <a href="[% c.uri_for('/todo') %]?project_id=233" class="doc-link">ACCON todos</a>
+                    · <a href="[% c.uri_for('/project') %]" class="doc-link">All projects</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" class="doc-h2">1. Overview</h2>
+            <p class="doc-body">Each SiteName that wants books must opt in, provision its own PostgreSQL accounting database, then choose a chart of accounts. CSC admin is not a substitute for enabling the add-on on the target site. Maria <code class="doc-code">/Accounting/coa</code> is still the live CoA page until PG cutover.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="steps" class="doc-h2">2. Owner steps</h2>
+            <ol class="doc-body">
+                <li>Work on the SiteName you own (not CSC unless the books are CSC).</li>
+                <li>Log in as that site’s owner or admin.</li>
+                <li>Open <a href="[% c.uri_for('/membership/addons') %]" class="doc-link">/membership/addons</a>, turn Accounting on, Save.</li>
+                <li>Hard-refresh <a href="[% c.uri_for('/admin') %]" class="doc-link">/admin</a> — the Accounting card should be full, not “add package”.</li>
+                <li>Run <a href="[% c.uri_for('/Accounting/setup') %]" class="doc-link">/Accounting/setup</a>: module → provision PG → chart.</li>
+            </ol>
+            <div class="doc-warning">
+                <p class="doc-body">Toggling add-ons from CSC updates <code class="doc-code">sitename=CSC</code> only. Enable Accounting while you are on the target site.</p>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="paths" class="doc-h2">3. Chart intake (three paths)</h2>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Path</th>
+                    <th class="doc-th">What</th>
+                    <th class="doc-th">Built?</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">A — AI chart</td>
+                    <td class="doc-td">Wizard drafts a chart from industry + overlays. Human review, then commit. Generate does not post GL. Hitch: <a href="[% c.uri_for('/Accounting/setup') %]?ai=1" class="doc-link">/Accounting/setup?ai=1</a> (also <code class="doc-code">/Accounting/setup/ai_generate</code> after reload).</td>
+                    <td class="doc-td">Live</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">B — PDF / image</td>
+                    <td class="doc-td">Import an existing chart from a scan. Do not upload statements to setup.</td>
+                    <td class="doc-td">Not built (<a href="[% c.uri_for('/todo/details') %]?record_id=1806" class="doc-link">#1806</a>)</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">C — master / history</td>
+                    <td class="doc-td">Import opening balances or full history.</td>
+                    <td class="doc-td">Not built (<a href="[% c.uri_for('/todo/details') %]?record_id=1807" class="doc-link">#1807</a>, <a href="[% c.uri_for('/todo/details') %]?record_id=1808" class="doc-link">#1808</a>)</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="live" class="doc-h2">4. What is live vs Maria</h2>
+            <ul class="doc-body">
+                <li>Dashboard <a href="[% c.uri_for('/Accounting') %]" class="doc-link">/Accounting</a> still reads Maria CoA/GL counts.</li>
+                <li>Setup step 2 shows PG schema version when the site DB is reachable.</li>
+                <li>Purchase orders and inventory remain Maria Ency until ACCPG D2 is decided.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" class="doc-h2">5. Project Tracking</h2>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Step</th>
+                    <th class="doc-th">Todo</th>
+                    <th class="doc-th">Gate</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Plan sign-off</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=1802" class="doc-link">#1802</a></td>
+                    <td class="doc-td">User sign-off</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Path A AI generate</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=1804" class="doc-link">#1804</a></td>
+                    <td class="doc-td">Three models, two jurisdictions</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Path B PDF</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=1806" class="doc-link">#1806</a></td>
+                    <td class="doc-td">Not built</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">This owner guide</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=1809" class="doc-link">#1809</a></td>
+                    <td class="doc-td">Docs match built behaviour</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="doc-success">
+                <h2 class="doc-h3">6. See Also</h2>
+                <ul class="doc-body">
+                    <li><a href="[% c.uri_for('/Documentation/Accounting') %]" class="doc-link">Accounting administrator guide</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/SchemaComparePostgresPlan') %]" class="doc-link">Schema-compare PostgreSQL (D2)</a></li>
+                    <li><a href="[% c.uri_for('/Accounting/setup') %]" class="doc-link">Setup wizard</a></li>
+                </ul>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>ACCON project 233. Docs describe code as of 2026-09-24, not intended future Path B/C.</p>
+            </div>
+        </div>
+    </div>
+</div>

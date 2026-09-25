@@ -399,7 +399,12 @@
             All hardware rows: <code>show_in_shop=0</code>, <code>list_in_marketplace=0</code>.</p>
             <p class="doc-body">Created via the live Inventory UI (/Inventory/item/add) under sitename=3d;
             BOM lines added under INT-HDRY-001 (base unit) and the later add-on module parent. Tracked by
-            todo #2309; PO for these rows is blocking todo #2310 (multi-supplier aware).</p>
+            todo #2309. <strong>PO flow is live (#2310):</strong>
+            <a href="/Inventory/purchase">/Inventory/purchase</a> (low-stock grouped by preferred
+            <code>InventoryItemSupplier</code>) → create draft PO →
+            <a href="/Inventory/po">/Inventory/po</a> mark sent (bumps <code>quantity_on_order</code>) →
+            receive on the PO view (stock in, on_order down, no GL).
+            API: <code>POST /Inventory/api/po/create</code>, <code>POST /Inventory/api/po/receive</code>.</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>

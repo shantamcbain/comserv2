@@ -1577,7 +1577,18 @@ sub get_recent_activity {
 # Get system notifications for the admin dashboard
 sub get_system_notifications {
     my ($self, $c) = @_;
-    
+    # #2197: one brain — AdminDashboard already builds this list. Duplicate
+    # inline copy here drifted from the dashboard util and the stash was never
+    # rendered on admin/index.tt.
+    my $from_dash = eval {
+        Comserv::Util::AdminDashboard->new->system_notifications($c);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'get_system_notifications', "AdminDashboard notifications failed: $@");
+    }
+    return $from_dash if $from_dash && ref($from_dash) eq 'ARRAY';
+
     my @notifications = ();
     
     # Check for pending user registrations
@@ -7873,6 +7884,25 @@ sub branch_server_action :Path('/admin/branch_server_action') :Args(0) {
         my $res = $ctrl->open_or_start($branch, $port);
         $c->response->body(encode_json($res));
     }
+    elsif ($action eq 'hermes') {
+        my $res = eval { $ctrl->open_or_start_hermes($branch, $port) };
+        if ($@ || !$res) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'branch_server_action', "hermes start failed branch=$branch: $@");
+            $c->response->body(encode_json({ ok => 0, error => "$@"}));
+            return;
+        }
+        if (!$res->{ok}) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'branch_server_action', "hermes start refused branch=$branch: " . ($res->{error} // ''));
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'branch_server_action',
+                "hermes branch=$branch port=" . ($res->{hermes_port} // '') .
+                " started=" . ($res->{started} // 0) . " cwd=" . ($res->{cwd} // ''));
+        }
+        $c->response->body(encode_json($res));
+    }
     else {
         $c->response->body(encode_json({ok=>0, error=>'Unknown action'}));
     }
@@ -7890,11 +7920,16 @@ sub branch_server_log :Path('/admin/branch_server_log') :Args(0) {
 
     my $file = $c->req->param('file') || '';
     my $branch = $c->req->param('branch') || '';
+    my $kind = $c->req->param('kind') || '';
 
-    # Resolve to /tmp/branch-<branch>.log. Prefer the branch param; if a full file
-    # path was supplied, only honor it when it matches the locked pattern.
+    # Resolve to /tmp/branch-<branch>.log (or hermes-dash when kind=hermes).
+    # Prefer the branch param; if a full file path was supplied, only honor it
+    # when it matches the locked pattern.
     my $path;
-    if ($branch =~ m{^[A-Za-z0-9._/-]+$} && $branch !~ m{\.\./} && $branch !~ m{^/}) {
+    if ($kind eq 'hermes' && $branch =~ m{^[A-Za-z0-9._-]+$}) {
+        $path = "/tmp/hermes-dash-$branch.log";
+    }
+    elsif ($branch =~ m{^[A-Za-z0-9._/-]+$} && $branch !~ m{\.\./} && $branch !~ m{^/}) {
         $path = "/tmp/branch-$branch.log";
     }
     elsif ($file =~ m{^/tmp/branch-[A-Za-z0-9._-]+\.log$}) {
