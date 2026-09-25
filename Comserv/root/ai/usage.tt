@@ -109,6 +109,11 @@
     </tbody>
   </table>
 
+  [%# Ledger / Golden Data monitor — admin only (AI.pm usage stashes ledger_monitor for admins) %]
+  [% IF is_admin && ledger_monitor %][% INCLUDE 'ai/usage_ledger.tt' %][% END %]
+  [%# Daily AI Eval Reports summary card — admin only; full pages on /ai/eval %]
+  [% IF is_admin && eval_summary %][% INCLUDE 'ai/usage_eval_card.tt' %][% END %]
+
   <!-- Live xAI / Grok balance check -->
   <div class="card" style="margin:16px 0;">
     <div class="card-header">xAI prepaid (declare only)</div>

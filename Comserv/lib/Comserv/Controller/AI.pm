@@ -12794,6 +12794,29 @@ sub usage :Local :Args(0) {
         $provider_status = $usage_m->snapshot_provider_status($c) || {};
     }
 
+    # Ledger / Golden Data monitor (admin only) — Model::AI2::UsageMonitor.
+    my $ledger_monitor;
+    if ($is_admin) {
+        $ledger_monitor = eval {
+            require Comserv::Model::AI2::UsageMonitor;
+            Comserv::Model::AI2::UsageMonitor->new->ledger_summary($c, days => 14);
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
+            "Ledger monitor failed: $@") if $@;
+    }
+
+    # Daily AI Eval Reports summary card (admin only) — full pages on /ai/eval
+    # (Controller::AI::Eval, Model::AI2::EvalReports).
+    my $eval_summary;
+    if ($is_admin) {
+        $eval_summary = eval {
+            require Comserv::Model::AI2::EvalReports;
+            Comserv::Model::AI2::EvalReports->new->latest_summary($c);
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
+            "Eval summary failed: $@") if $@;
+    }
+
     # For filter dropdowns: recent distinct providers/sites (lightweight)
     my @providers = qw(ollama grok supergrok openrouter openai);
     my @sites;
@@ -12817,6 +12840,8 @@ sub usage :Local :Args(0) {
         is_admin    => $is_admin ? 1 : 0,
         current_site=> $site_id,
         username    => $username,
+        ledger_monitor => $ledger_monitor,
+        eval_summary   => $eval_summary,
     );
 }
 

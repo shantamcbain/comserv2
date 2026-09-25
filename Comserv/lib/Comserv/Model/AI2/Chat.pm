@@ -453,6 +453,24 @@ sub process {
     unshift @$messages, { role => 'system', content => $system_prompt }
         if $system_prompt;
 
+    # ── Golden Data / Anti-Hallucination hook (Model::AI2::Grounding) ──────
+    # Default 'shadow' (root/config/ai_grounding.json): this turn is unchanged
+    # and the Ledger records grounded=0. 'enforce' (config, or request
+    # {"grounding":"enforce"}) on a factual question: payload = glossary +
+    # policy + labelled GROUNDING; auto_enrich skipped (retrieval already ran);
+    # empty Grounding Context returns the fixed fallback with no model call.
+    my $grounding = eval { require Comserv::Model::AI2::Grounding; Comserv::Model::AI2::Grounding->new };
+    my $gturn = $grounding
+        ? eval { $grounding->prepare_turn($c, prompt => $prompt, args => \%args, thinking => \@thinking) }
+        : undef;
+    if ($gturn && $gturn->{enforce}) {
+        return $grounding->miss_reply($c, $gturn, args => \%args,
+            duration_ms => _aimps_elapsed_ms($t0), thinking => \@thinking) if $gturn->{miss};
+        $messages = $gturn->{messages} if $gturn->{messages};
+        $args{_auto_enrich_done} = 1;
+        delete $args{use_search};   # no unlabelled provider-side search in a grounded turn
+    }
+
     # Select provider+model (v2 Router)
     my ($provider_name, $use_model) = $self->select_provider_and_model($c,
         $args{model}, $can_select,
@@ -495,6 +513,7 @@ sub process {
                 request_type      => 'chat',
                 duration_ms       => _aimps_elapsed_ms($t0),
                 metadata          => $self->_aimps_meta($c, \%args),
+                grounding         => ($gturn ? $gturn->{ledger} : undef),   # Ledger grounding fields
             );
         };
         if ($@) {
@@ -570,6 +589,10 @@ sub process {
         }
     }
 
+    # Grounding post-check (enforce only): cite-or-strip + Candidate Data label.
+    if ($gturn && $gturn->{enforce} && $resp && $resp->{success}) {
+        $resp->{response} = $grounding->finish_turn($c, $gturn, $resp->{response} // '', \@thinking);
+    }
 
     # ── Auto-enrich when in-app context is insufficient (Shanta 2026-09-14) ──
     # Public web search AND/OR same-origin linked pages (site nav audit).
@@ -913,6 +936,12 @@ sub process {
             conversation_id   => $conversation_id,
             status            => 'success',
             duration_ms       => _aimps_elapsed_ms($t0),
+            # Ledger grounding fields. Shadow turns: grounded=0 (Ungrounded
+            # Generation); candidate_hit_count = unlabelled auto_enrich citations.
+            grounding         => ($gturn && $gturn->{ledger} ? {
+                %{ $gturn->{ledger} },
+                ($gturn->{enforce} ? () : (candidate_hit_count => scalar(@{ $citations || [] }))),
+            } : undef),
             metadata          => $self->_aimps_meta($c, \%args, {
                 thinking_steps => scalar(@thinking),
                 ($resp->{fallback} ? (
@@ -944,6 +973,7 @@ sub process {
         thinking        => \@thinking,
         files_read      => \@files_read,
         citations       => $citations || [],
+        grounding       => ($grounding && $gturn ? $grounding->summary($gturn) : undef),
     };
 }
 

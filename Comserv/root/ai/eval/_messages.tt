@@ -1,0 +1,11 @@
+[%# Flash messages + table-missing notice shared by ai/eval pages. %]
+[% IF ai_eval_msg %]<div class="alert alert-success" role="status">[% ai_eval_msg | html %]</div>[% END %]
+[% IF ai_eval_err %]<div class="alert alert-error" role="alert">[% ai_eval_err | html %]</div>[% END %]
+[% IF table_missing %]
+  <div class="doc-warning" role="alert">
+    <p class="doc-body"><strong>Table not created yet — run schema compare.</strong>
+      Open <a href="/admin/schema_compare">/admin/schema_compare</a> → “Result files without tables” →
+      <code>AiEvalReport</code> → Create Table, then <code>AiEvalProposal</code> → Create Table (ency database).
+      Until then reports cannot be stored and <code>POST /ai/eval/ingest</code> answers 503 <code>table_missing</code>.</p>
+  </div>
+[% END %]

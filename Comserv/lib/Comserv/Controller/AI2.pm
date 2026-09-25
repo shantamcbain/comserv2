@@ -1166,6 +1166,8 @@ sub chat :Local :Args(0) {
             skip_app_writes    => $editor_skip_writes ? 1 : 0,
             surface            => $editor_skip_writes ? 'editor' : 'chat',
             phase              => $editor_phase,
+            grounding          => $json_data->{grounding},   # off|shadow|enforce (Model::AI2::Grounding)
+            creative           => $json_data->{creative} ? 1 : 0,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
@@ -1191,6 +1193,7 @@ sub chat :Local :Args(0) {
         todo_action      => $result->{todo_action},
         files_read       => $result->{files_read} || [],
         citations        => $result->{citations} || [],
+        grounding        => $result->{grounding},
     }));
 }
 
