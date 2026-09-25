@@ -1,0 +1,29 @@
+[% META title = 'Classification Results' %]
+[% IF debug_mode == 1 %][% PageVersion = '/CSC/mail/mail.classify_results.tt,v 0.01 2026/09/12 shanta Exp shanta ' %][% END %]
+
+<div class="classification-results">
+    <h1>Classification Results</h1>
+    
+    [% IF classification_result %]
+        <div class="alert alert-success">
+            Classification complete. <strong>[% classification_result.metadata.total_messages_scanned %]</strong> messages scanned.
+        </div>
+        
+        <div class="category-summary">
+            [% FOREACH cat IN classification_result.categories.keys %]
+                <div class="category-badge" style="background-color: var(--primary-color);">
+                    [% classification_result.categories.$cat.label %]: [% classification_result.categories.$cat.count %]
+                </div>
+            [% END %]
+        </div>
+    [% ELSE %]
+        <div class="alert alert-warning">No results.</div>
+    [% END %]
+    
+    <p><a href="[% c.uri_for('/mail/invoice/api') %]">View Classified Invoices</a></p>
+    <form method="post" action="[% c.uri_for('/Inventory/api/invoice/draft_from_mail') %]" style="margin-top:1em;">
+        <input type="hidden" name="sitename" value="[% c.stash.SiteName || c.session.SiteName || 'CSC' %]">
+        <button type="submit" class="btn btn-primary">Create draft AP invoices from classified mail</button>
+        <span style="color:var(--text-muted-color,#888);font-size:0.9em;"> No GL post. Skips unmatched/personal.</span>
+    </form>
+</div>

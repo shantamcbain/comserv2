@@ -2,7 +2,7 @@ package Comserv::Controller::Cart;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
-use POSIX qw(strftime);
+use Comserv::Util::AppTime;
 use JSON qw(encode_json decode_json);
 
 has 'logging' => (
@@ -27,11 +27,11 @@ sub _schema {
 }
 
 sub _now {
-    return strftime('%Y-%m-%d %H:%M:%S', localtime);
+    return Comserv::Util::AppTime->now_utc;
 }
 
 sub _today {
-    return strftime('%Y-%m-%d', localtime);
+    return Comserv::Util::AppTime->today_utc_ymd;
 }
 
 # Get session cart as a hashref: { item_id => { name, sku, qty, unit_price, options } }
@@ -61,7 +61,7 @@ sub _cart_total {
 
 sub _generate_invoice_number {
     my ($self, $c) = @_;
-    my $date = strftime('%Y%m%d', localtime);
+    my $date = Comserv::Util::AppTime->today_utc_ymd_compact;
     my $seq  = int(rand(9000)) + 1000;
     my $schema = $self->_schema($c);
     my $count;
@@ -156,6 +156,18 @@ sub add_to_cart :Path('/Cart/add') :Args(0) {
     my $workshop_id = $params->{workshop_id};
     my $qty         = $params->{quantity} || 1;
     my $options     = $params->{options}  || '';
+    unless ($options) {
+        my @bits;
+        for my $k (sort keys %$params) {
+            next unless $k =~ /^option_(\d+)$/;
+            my $v = $params->{$k};
+            next unless defined $v && "$v" ne '';
+            $v = $v->[0] if ref($v) eq 'ARRAY';
+            next unless defined $v && "$v" ne '';
+            push @bits, "$v";
+        }
+        $options = join('; ', @bits) if @bits;
+    }
 
     unless ($item_id || $workshop_id) {
         $c->flash->{error_msg} = 'No item specified';
