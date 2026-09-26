@@ -196,6 +196,14 @@ sub _normalize_debug_msg {
 sub auto :Private {
     my ($self, $c) = @_;
 
+    # Cheap assets and probe URLs must not run site/DB auto (~1s+). One HTML
+    # page pulls many /static/js files; on a single worker that serializes into
+    # minutes when mixed with WAN scanners.
+    my $path = $c->req->path // '';
+    if ($path =~ m{^(?:static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
+        return 1;
+    }
+
     # External monitoring trigger endpoints (hardware_monitor run/watchdog/
     # report_down/report_error/ingest) are called by the cron script on proxmox720
     # (and other nodes) WITHOUT a browser session, so they MUST skip the admin-role
@@ -2521,6 +2529,9 @@ sub begin :Private {
     # Skip all site/session setup for health check endpoints.
     # Health checks run every 30s from Docker — no DB, no session, no logging needed.
     if ($c->req->path =~ m{^/?health(?:/|$)}) {
+        return;
+    }
+    if (($c->req->path // '') =~ m{^(?:static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
         return;
     }
 
