@@ -7,7 +7,7 @@
    category = 'developer'
    tags = 'server, development, cpanfile, dependencies, perlbrew'
 %]
-[% PageVersion = 'admintopmenu.tt,v 0.9 2026/09/25 shanta Exp shanta ' %]
+[% PageVersion = 'admintopmenu.tt,v 0.10 2026/09/25 shanta Exp shanta ' %]
 [% IF debug == 1 %]
     [%# PageVersion %]
     [% #INCLUDE 'debug.tt' %]
@@ -78,7 +78,10 @@
             <div class="submenu">
                 <a href="/ai"><i class="icon-chat"></i>AI Chat Interface</a>
                 <a href="/ai/conversations"><i class="icon-history"></i>Chat History</a>
-                <a href="/ai/usage"><i class="icon-stats"></i>Usage &amp; Billing Monitor</a>
+                <a href="[% c.uri_for('/ai/usage') %]"><i class="icon-stats"></i>Usage &amp; Billing Monitor</a>
+                [% IF c.session.roles.grep('admin').size %]
+                <a href="[% c.uri_for('/ai/eval') %]"><i class="icon-stats"></i>Daily AI Eval Reports</a>
+                [% END %]
                 <a href="/ai/manage_api_keys"><i class="icon-key"></i>Manage API Keys</a>
                 <a href="/ai/check_status"><i class="icon-status"></i>Check AI Status</a>
                 <a href="/ai/models"><i class="icon-model"></i>Model Management</a>
@@ -92,6 +95,7 @@
                     <div class="submenu-section">
                         <span class="submenu-section-title">Admin</span>
                         <a href="[% c.uri_for('/ai/usage') %]"><i class="icon-stats"></i>Usage &amp; Activity Monitor</a>
+                        <a href="[% c.uri_for('/ai/eval') %]"><i class="icon-stats"></i>Daily AI Eval Reports</a>
                         <a href="[% c.uri_for('/ai/models') %]"><i class="icon-model"></i>Model Management</a>
                         <a href="[% c.uri_for('/ai/admin/agents') %]"><i class="icon-ai"></i>Agent Management</a>
                         <a href="[% c.uri_for('/ai/manage_api_keys') %]"><i class="icon-key"></i>API Keys</a>

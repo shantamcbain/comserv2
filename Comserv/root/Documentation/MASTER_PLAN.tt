@@ -522,7 +522,7 @@ DailyPlanSystem.tt ────────────────────�
         · Todos: <a href="[% c.uri_for('/todo') %]?project_id=280" class="doc-link" target="_blank" rel="noopener" title="Lists every todo attached to project #280.">under #280</a>
         · In-chat Todo-create: <a href="[% c.uri_for('/todo/details') %]?record_id=2217" class="doc-link" target="_blank" rel="noopener" title="Todo #2217 — WRITE path is code now.">#2217 code</a>
         · Scheduler: <a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-link" target="_blank" rel="noopener" title="Todo #2218 — Scheduler specified, not built.">#2218 specified</a>
-        (child of #114; waves #281–284). Orders AIMPS + Hermes focus + AGENTS. W1.0 delivered: SuperGrok is its own prepaid provider (not xAI). Do not start W3 agents before the W2 gate.</li>
+        (child of #114; waves #281–284). Orders AIMPS + Hermes focus + AGENTS. W1.0 delivered: SuperGrok is its own weekly-subscription provider (not xAI). 2026-09-25 Now: grok.com Usage via Firefox add-on; Hermes daily guard until reset 2026-10-01 10:31 PDT. Do not start W3 agents before the W2 gate.</li>
     <li><strong>AI Model Presentation &amp; Selection</strong> — <a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]\">/Documentation/AIModelPresentationPlan</a> (proj <a href="/project/details?project_id=252">#252 AIMPS</a>; phases P1–P5 = #253–257, P5 = v2 migration sync). Next execution is AISYSTEM W1.</li>
     <li><strong>Point System</strong> — proj <a href="/project/details?project_id=193">#193 PointSystem</a> (phases: Ledger #194, Currency #195, PayPal #196, Spend #197, Crypto #198).</li>
     <li><strong>3D Printing System</strong> —

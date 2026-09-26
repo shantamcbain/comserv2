@@ -1,0 +1,103 @@
+[%# Daily AI Eval Report — detail (admin only). Controller::AI::Eval::report.
+  # All actions are plain HTML POST forms with the per-session csrf_token. No JS. %]
+[% d = eval_detail; rep = d.report %]
+<div class="ai-eval-page" style="max-width:1200px;margin:0 auto;padding:1rem;">
+  <p><a href="/ai/eval">← All eval reports</a> · <a href="/ai/usage#ledger-grounding">AI Usage monitor</a></p>
+  [% table_missing = d.table_missing %]
+  [% INCLUDE 'ai/eval/_messages.tt' %]
+  [% IF d.error %]<div class="alert alert-error">Could not read report: [% d.error | html %]</div>[% END %]
+  [% IF d.not_found %]<h1>Report not found</h1>[% END %]
+
+  [% IF rep %]
+  <h1>Daily AI Eval Report — [% rep.report_date | html %]</h1>
+  <p class="doc-muted">Source: [% rep.source | html %] · created by [% rep.created_by || '—' | html %] ·
+    created [% rep.created_at | html %] UTC · updated [% rep.updated_at | html %] UTC</p>
+
+  [% IF rep.summary %]
+  <div class="card" style="margin:16px 0;">
+    <div class="card-header">Summary</div>
+    <div class="card-body"><p class="doc-body" style="white-space:pre-wrap;">[% rep.summary | html %]</p></div>
+  </div>
+  [% END %]
+
+  <div class="card" style="margin:16px 0;">
+    <div class="card-header">Metrics</div>
+    <div class="card-body">
+      <table class="data-table">
+        <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+        <tbody>
+        [% FOREACH kv IN rep.metrics_flat %]
+          <tr><td><code>[% kv.0 | html %]</code></td><td>[% kv.1 | html %]</td></tr>
+        [% END %]
+        [% IF ! rep.metrics_flat.size %]<tr><td colspan="2" class="doc-muted">No metrics in this report.</td></tr>[% END %]
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin:16px 0;" id="proposals">
+    <div class="card-header">Proposals ([% d.proposals.size %])</div>
+    <div class="card-body">
+      <p class="doc-muted">Nothing auto-applies. Approve/Reject any proposal. <strong>Apply</strong> appears only on approved
+        <em>config</em> proposals whose target is allow-listed; <strong>Revert</strong> only on applied ones. Approving a
+        code / workstation / other proposal creates a todo in project AISYSTEM instead.</p>
+      [% FOREACH p IN d.proposals %]
+      <div id="proposal-[% p.id | html %]" class="card" style="margin:12px 0;">
+        <div class="card-header">#[% p.id | html %] · [% p.title | html %]
+          · <strong>[% p.status | html %]</strong> · [% p.change_type | html %]</div>
+        <div class="card-body">
+          [% IF p.rationale %]<p class="doc-body" style="white-space:pre-wrap;">[% p.rationale | html %]</p>[% END %]
+          <table class="data-table">
+            <tbody>
+              <tr><th>Target</th><td><code>[% p.target || '—' | html %]</code>
+                [% IF p.change_type == 'config' %][% IF p.target_allowed %](allow-listed)[% ELSE %]<strong>(not allow-listed — cannot be applied)</strong>[% END %][% END %]</td></tr>
+              <tr><th>Payload</th><td><pre style="margin:0;white-space:pre-wrap;">[% p.payload_pretty | html %]</pre></td></tr>
+              [% IF p.approved_by %]<tr><th>Approved</th><td>[% p.approved_by | html %] at [% p.approved_at | html %] UTC</td></tr>[% END %]
+              [% IF p.applied_by %]<tr><th>Applied</th><td>[% p.applied_by | html %] at [% p.applied_at | html %] UTC</td></tr>[% END %]
+              [% IF p.before_value %]<tr><th>Before value</th><td><code>[% p.before_value | html %]</code></td></tr>[% END %]
+              [% IF p.todo_id %]<tr><th>Todo</th><td><a href="/todo/details?record_id=[% p.todo_id | uri %]">#[% p.todo_id | html %]</a></td></tr>[% END %]
+              [% IF p.result %]<tr><th>Result / audit</th><td><pre style="margin:0;white-space:pre-wrap;">[% p.result | html %]</pre></td></tr>[% END %]
+            </tbody>
+          </table>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+            [% FOREACH act IN ['approve', 'reject', 'apply', 'revert'] %]
+              [% can = 'can_' _ act %]
+              [% IF p.$can %]
+              <form method="post" action="/ai/eval/proposal/[% p.id | uri %]/[% act %]">
+                <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+                <input type="hidden" name="report_id" value="[% rep.id | html %]">
+                <button type="submit" class="btn [% act == 'reject' || act == 'revert' ? 'btn-secondary' : 'btn-primary' %]">[% act | ucfirst %]</button>
+              </form>
+              [% END %]
+            [% END %]
+          </div>
+        </div>
+      </div>
+      [% END %]
+      [% IF ! d.proposals.size %]<p class="doc-muted">No proposals in this report.</p>[% END %]
+    </div>
+  </div>
+
+  <div class="card" style="margin:16px 0;" id="notes">
+    <div class="card-header">Admin notes / tuning</div>
+    <div class="card-body">
+      <form method="post" action="/ai/eval/report/[% rep.id | uri %]/notes">
+        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+        <textarea name="admin_notes" rows="6" style="width:100%;">[% rep.admin_notes | html %]</textarea>
+        <p class="doc-muted">Kept across re-ingest of the same report (ingest never overwrites admin notes).</p>
+        <button type="submit" class="btn btn-primary">Save notes</button>
+      </form>
+    </div>
+  </div>
+
+  [% IF rep.markdown %]
+  <div class="card" style="margin:16px 0;">
+    <div class="card-header">Full report</div>
+    <div class="card-body ai-eval-markdown">[% rep.markdown_html %]</div>
+    <details style="margin:8px 16px;"><summary>Raw markdown</summary><pre style="white-space:pre-wrap;">[% rep.markdown | html %]</pre></details>
+  </div>
+  [% END %]
+
+  [% INCLUDE 'ai/eval/_allowlist.tt' %]
+  [% END %]
+</div>

@@ -127,9 +127,60 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
         documentation => 'free, overage, billable, or paid_provider',
     },
+    # Ledger grounding fields (Golden Data / Anti-Hallucination, 2026-09-24).
+    # Added to the DB by an admin via schema-compare (field sync) — never hand DDL.
+    # Until then Comserv::Util::AI::Ledger skips them and mirrors the values
+    # into metadata.grounding instead.
+    grounded => {
+        data_type => 'tinyint',
+        size => 1,
+        is_nullable => 1,
+        documentation => '1 = Grounding Context attached to the model call, 0 = Ungrounded Generation, NULL = not recorded',
+    },
+    golden_hit_count => {
+        data_type => 'integer',
+        is_nullable => 1,
+        documentation => 'Golden Data snippets (status=golden) in the Grounding Context',
+    },
+    candidate_hit_count => {
+        data_type => 'integer',
+        is_nullable => 1,
+        documentation => 'Candidate Data snippets (unverified, incl. web hits) in the Grounding Context',
+    },
+    snippet_ids => {
+        data_type => 'varchar',
+        size => 1000,
+        is_nullable => 1,
+        documentation => 'Comma list of Grounding Context ids, e.g. G:12,C:web-3',
+    },
+    flagged_count => {
+        data_type => 'integer',
+        is_nullable => 1,
+        documentation => 'Uncited factual sentences flagged/stripped by the grounding post-check',
+    },
+    feature => {
+        data_type => 'varchar',
+        size => 50,
+        is_nullable => 1,
+        documentation => 'Calling feature, e.g. ai2_chat',
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
+
+# Default SELECT = the pre-2026-09-24 columns only, so existing pages keep
+# working while the Ledger grounding columns above are not yet in the DB.
+# Readers that need them ask explicitly (columns => [...]) after
+# Comserv::Util::AI::Ledger->columns_present confirms they exist.
+__PACKAGE__->resultset_attributes({
+    columns => [qw(
+        id created_at user_id site_id guest_session_id provider model
+        prompt_tokens completion_tokens total_tokens estimated_cost_usd currency
+        duration_ms request_type conversation_id status error_message ip_address
+        ollama_host metadata plan_id plan_ai_requests_per_day within_free_quota
+        billing_status
+    )],
+});
 
 # Indexes for common queries (billing, monitoring)
 # Note: added via ensure/create or migrations; here for documentation
