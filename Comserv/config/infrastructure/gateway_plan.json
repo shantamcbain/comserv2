@@ -1,17 +1,19 @@
 {
-  "version": "1.1",
-  "updated": "2026-06-15",
-  "summary": "Policy templates + live hosting_accounts drive routing. Customer subdomains are not stored here — they are generated when accounts are active.",
+  "version": "1.2",
+  "updated": "2026-09-26",
+  "summary": "Policy templates + live hosting_accounts drive routing. Customer subdomains are not stored here — they are generated when accounts are active. Starman :3001 is LAN/ZT only.",
   "dev_policy": {
-    "rule": "Every dev.{domain} is served by the workstation (Starman). Never production.",
+    "rule": "Every dev.{domain} is served by the workstation (Starman). Never production. Hostname policy only — never WAN DNAT of 3001.",
     "workstation_lan": "192.168.1.199",
     "workstation_zt": "172.30.131.126",
     "forbidden_targets": ["192.168.1.126", "172.30.50.206"],
     "csc_portless_unbound": "192.168.1.1",
     "csc_backend_port": 3001,
     "default_starman_port": 3001,
-    "hosts_note": "Paste /etc/hosts lines from the gateway dashboard. dev.csc uses gateway IP for portless HTTP; all other dev.* use workstation LAN.",
-    "https_note": "https://dev.csc needs Cloudflare → gateway WAN (proxied), not workstation ZT IP. OPNsense HAProxy :443 ACME + dev ACL → :3001. Until then use http:// with LAN DNS 192.168.1.1."
+    "no_wan_dnat_3001": true,
+    "no_public_zt_a_default": true,
+    "hosts_note": "Hosts file is optional. Devices without it use Unbound (DHCP DNS 192.168.1.1) or mDNS workstation.local. Remote devices without ZeroTier need a named HTTPS front door on 443, not a ZT IP in public DNS.",
+    "https_note": "Do not orange-cloud dev.* at the public WAN IP:3001. LAN: http://dev.computersystemconsulting.ca/ via HAProxy :80. Remote without ZT: Tunnel+Access or HAProxy :443 with auth (work item). Until that exists, use LAN Unbound or ZeroTier names."
   },
   "targets": {
     "gateway_lan": "192.168.1.1",
@@ -26,16 +28,28 @@
   "zero_naming": {
     "pattern": "zero.{domain}",
     "example": "zero.computersystemconsulting.ca",
-    "not": "A single zero hostname on the OPNsense gateway IP"
+    "not": "A single zero hostname on the OPNsense gateway IP",
+    "audience": "ZeroTier members only. Not a substitute for public DNS or hosts-file-less remote access."
   },
-  "dns_precedence": "dev.* → workstation always (any DNS source). Unbound: dev beats wildcard *. Hosts: workstation LAN (dev.csc → gateway for portless). Cloudflare: dev A → workstation ZT IP.",
+  "dns_precedence": "LAN Unbound: specific dev beats wildcard *. dev.csc → gateway :80 (HAProxy → :3001). Other dev.* → workstation LAN :3001. Do not publish workstation ZT IPs in Cloudflare. Remote named access is a 443 front door (work item), not WAN:3001.",
+  "nameless_device_access": {
+    "problem": "Phones, tablets, and guest laptops have no /etc/hosts and often no ZeroTier. They still need a name to reach the app.",
+    "lan": [
+      "DHCP DNS 192.168.1.1 (Unbound)",
+      "http://dev.computersystemconsulting.ca/ (portless via HAProxy)",
+      "http://workstation.local:3001/ (mDNS)",
+      "http://192.168.1.199:3001/ (IP)"
+    ],
+    "remote_without_zerotier": "Named HTTPS on 443 with Access/IdP/client-cert, origin 192.168.1.199:3001 on LAN. Do not use public A=172.30.131.126 or WAN DNAT 3001.",
+    "status": "LAN partial; remote not built"
+  },
   "provision_order": [
     "Site + SiteDomain (Comserv DB)",
-    "Cloudflare A record (public DNS)",
-    "OPNsense Unbound (only if dev, apex, or non-wildcard zone)",
-    "HAProxy/NPM SSL (production HTTPS)",
-    "OPNsense firewall/NAT (WAN or private VM)",
-    "Private VM (dedicated plan — Phase 4)"
+    "Cloudflare A record (public DNS for production names only — not workstation ZT, not :3001)",
+    "OPNsense Unbound (dev, apex, or non-wildcard zone) so LAN clients need no hosts file",
+    "HAProxy LAN :80 for dev.csc; production HTTPS on a separate frontend",
+    "OPNsense firewall LAN/ZT pass to workstation :3001 — never WAN DNAT of 3001",
+    "Remote 443 front door (Tunnel+Access) when clients have no ZT and no hosts file"
   ],
   "policy_rules": [
     {
@@ -55,7 +69,8 @@
       "ssl": "haproxy_lan_http",
       "priority": 10,
       "phase": "active",
-      "notes": "Unbound → gateway :80; HAProxy forwards to workstation Starman :3001 (no :3001 in URL)."
+      "status": "active",
+      "notes": "Unbound → gateway :80; HAProxy (LAN frontend) forwards to workstation Starman :3001. No :3001 in the URL. No WAN publish of 3001."
     },
     {
       "id": "dev-beemaster",
@@ -69,9 +84,11 @@
       "port": 3001,
       "backend_port": 3001,
       "dns_layer": "unbound",
+      "public_dns": null,
       "priority": 20,
       "phase": "active",
-      "notes": "Unbound → workstation; Starman :3001 (same as all dev.* except dev.csc portless via gateway :80)."
+      "status": "active",
+      "notes": "Unbound → workstation :3001 for LAN clients with no hosts file. Do not Cloudflare A this to ZT. Remote no-ZT access is the 443 front-door work item."
     },
     {
       "id": "prod-csc-wildcard",
@@ -88,30 +105,43 @@
       "ssl": "haproxy_acme",
       "priority": 100,
       "phase": "active",
+      "status": "active",
       "notes": "Shared prod subdomains (coop.csc, etc.) use this — no per-site Unbound row needed. Keep last (lowest precedence)."
     },
     {
-      "id": "zero-csc-public",
+      "id": "zero-csc-overlay",
       "source": "policy",
-      "label": "ZeroTier entry — CSC (public)",
+      "label": "ZeroTier entry — CSC (overlay members)",
       "hostname": "zero",
       "domain": "computersystemconsulting.ca",
       "fqdn": "zero.computersystemconsulting.ca",
       "lan_ip": null,
       "zt_ip": "172.30.50.206",
       "port": 5000,
-      "dns_layer": "cloudflare",
+      "dns_layer": "zerotier",
       "phase": "active",
-      "notes": "Per-domain zero hostname in Application DNS."
+      "status": "active",
+      "notes": "For ZeroTier members. Not the path for devices with no hosts file and no ZT."
     }
   ],
   "tool_roles": [
     {"tool": "hosting_accounts DB", "role": "Source of customer hostnames (dynamic rules at runtime)"},
-    {"tool": "Site Provisioning", "role": "Site + Cloudflare + gateway Unbound on approve"},
-    {"tool": "OPNsense Unbound", "role": "LAN DNS — dev overrides and non-wildcard zones only"},
-    {"tool": "Cloudflare (Application DNS)", "role": "Public DNS for all customer subdomains"},
-    {"tool": "OPNsense HAProxy + ACME", "role": "WAN HTTPS termination and health failover"},
+    {"tool": "Site Provisioning", "role": "Site + production Cloudflare + gateway Unbound on approve"},
+    {"tool": "OPNsense Unbound", "role": "LAN DNS so devices without hosts files resolve dev.* and production names"},
+    {"tool": "OPNsense HAProxy (LAN)", "role": "dev.csc :80 → workstation :3001. Never a WAN listener for Starman."},
+    {"tool": "OPNsense HAProxy + ACME (WAN)", "role": "Production HTTPS only — not workstation Starman"},
+    {"tool": "Cloudflare (Application DNS)", "role": "Public DNS for production names. Do not publish workstation ZT or :3001."},
     {"tool": "NPM (172.30.159.100)", "role": "Per-container reverse proxy and certs"},
-    {"tool": "Gateway audit", "role": "Flags wildcard shadowing, wrong IPs, missing SiteDomain"}
+    {"tool": "Tunnel + Access / client cert", "role": "Remote named access without ZeroTier or hosts; machine API identity"},
+    {"tool": "Gateway audit", "role": "Flags wildcard shadowing, wrong IPs, missing SiteDomain, and WAN publish of 3001"}
+  ],
+  "work_items": [
+    {"id": "wan-3001-closed", "status": "done", "gate": "No Port Forward/UPnP/1:1 to .199:3001"},
+    {"id": "audit-public-starman", "status": "open", "gate": "Admin page errors if 3001 is on WAN"},
+    {"id": "stop-cf-zt-a", "status": "open", "gate": "Fix all dev does not write Cloudflare A to 172.30.131.126"},
+    {"id": "lan-names-no-hosts", "status": "partial", "gate": "Phone on office Wi-Fi opens http://dev.computersystemconsulting.ca/ via DHCP DNS only"},
+    {"id": "remote-named-access", "status": "open", "gate": "Hostname on 443 with auth reaches :3001; documented URL; no WAN:3001"},
+    {"id": "machine-client-certs", "status": "open", "gate": "HAProxy or app verifies certs for AI/ingest"},
+    {"id": "no-wan-port-forward-default", "status": "open", "gate": "Opnsense.pm does not default WAN DNAT 3001 for Comserv dev"}
   ]
 }

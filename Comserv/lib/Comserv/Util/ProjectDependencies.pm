@@ -21,7 +21,8 @@ sub todo_is_done {
     my ($todo) = @_;
     return 0 unless $todo;
     my $st = eval { $todo->status } // '';
-    return 1 if $st == 3 || $st == 4;
+    my $stn = ($st =~ /^-?\d+$/) ? 0+$st : -1;
+    return 1 if $stn == 3 || $stn == 4;
     return 1 if $st =~ /^(done|completed|closed)$/i;
     return 0;
 }

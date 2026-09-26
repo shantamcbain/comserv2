@@ -61,8 +61,14 @@ __PACKAGE__->config(
     # Relative paths resolve against the application home directory (FindBin/..)
     # Works on host (/home/.../Comserv/root) and in Docker (/opt/comserv/root)
     'Plugin::Static::Simple' => {
+        # Request path is appended to include_path. Pages use /static/css and
+        # /static/js, so include_path must be 'root' (file = root/static/...).
+        # include_path => ['root/static'] looked for root/static/static/js and
+        # 404'd every asset. Restrict with dirs, not a nested include_path.
         include_path => [ 'root' ],
-        dirs         => [ 'static', 'LegacyStaticPages' ],
+        dirs => [ 'static', 'LegacyStaticPages' ],
+        ignore_dirs => [ 'config' ],
+        ignore => [ qr{^config/} ],
     },
     # Force-disable stack traces in production even if CATALYST_DEBUG is accidentally set
     'Plugin::StackTrace' => { enable => $ENV{CATALYST_DEBUG} // 0 ? 1 : 0 },
