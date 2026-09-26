@@ -1,0 +1,6 @@
+<div id="2026-09-26-gateway-plan-edge-rules" class="cl-entry">
+<h3>2026-09-26 — Gateway plan: no WAN :3001, named access without hosts</h3>
+<p class="doc-body"><strong>What.</strong> Rewrote the CSC Gateway Plan and <code>gateway_plan.json</code> after WAN DNAT of workstation :3001 let scanners hang single-thread Starman. Policy is hostname-only: <code>dev.*</code> never production, never a public Starman port. Devices with no <code>/etc/hosts</code> use Unbound or <code>workstation.local</code> on the LAN; remote without ZeroTier is a named 443 front door (work item), not a public ZeroTier A record.</p>
+<p class="doc-body"><strong>Why.</strong> The June 15 plan said <code>dev.*</code> from any DNS source and Cloudflare A → ZT IP, which mixed with a WAN port forward. Phones and guest laptops cannot use hosts or ZeroTier.</p>
+<p class="doc-body"><strong>Files.</strong> <code>root/Documentation/system/GatewayPlan.tt</code>, <code>config/infrastructure/gateway_plan.json</code>, <code>root/admin/infrastructure/opnsense.tt</code>, <code>root/admin/infrastructure/index.tt</code>, <code>root/Documentation/MASTER_PLAN.tt</code>, <code>root/Documentation/DockerMasterPlan.tt</code></p>
+</div>

@@ -447,7 +447,7 @@ DailyPlanSystem.tt ────────────────────�
     <li><a href="[% c.uri_for('/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY') %]">Docker &amp; Kubernetes Migration Strategy</a></li>
     <li><a href="[% c.uri_for('/Documentation/DockerMasterPlan') %]">Docker &amp; Kubernetes Plans — Coordinator</a> (project #271 DOCKER-SYS — indexes every Docker/K8s plan below)</li>
     <li><a href="[% c.uri_for('/Documentation/CREDENTIALS_AUDIT_AND_PLAN') %]">Credentials Audit &amp; Unified Management Plan</a></li>
-    <li><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">CSC Gateway Plan</a></li>
+    <li><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">CSC Gateway Plan</a> (proj #87 v1.2 — no WAN :3001; named access without hosts file)</li>
     <li><a href="[% c.uri_for('/Documentation/SchemaMasterPlan') %]">Schema Master Plan</a> (consolidates Result-file-first authority, Maria↔Postgres split, clone pipeline, naming, ACCENT, connections; flags missing ACCPG/ACCON)</li>
     <li><a href="[% c.uri_for('/Documentation/SchemaSystemPlan') %]">Schema System Plan (W0.1)</a> — G0–G5 detail owned by the schema branch</li>
     <li><a href="[% c.uri_for('/Documentation/SchemaNamingStandardizationPlan') %]">Schema Naming Standardization Plan</a></li>
@@ -644,7 +644,7 @@ V2 MIG   V2MIG (#259) + P1-P5 (#260-264) ─ own top-level project; P4 = Plannin
         <tr><td class="doc-td">Docker &amp; K8s Migration Strategy</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY') %]">/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td"><strong>Docker &amp; Kubernetes Plans — Coordinator</strong> (proj #271 DOCKER-SYS)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DockerMasterPlan') %]">/Documentation/DockerMasterPlan</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Credentials Audit &amp; Plan</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/CREDENTIALS_AUDIT_AND_PLAN') %]">/Documentation/CREDENTIALS_AUDIT_AND_PLAN</a></td><td class="doc-td">—</td></tr>
-        <tr><td class="doc-td">Gateway Plan</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">/Documentation/GatewayPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Gateway Plan (proj #87, v1.2 — no WAN :3001; named access without hosts)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">/Documentation/GatewayPlan</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Schema Naming Standardization</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/SchemaNamingStandardizationPlan') %]">/Documentation/SchemaNamingStandardizationPlan</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Canonical Deploy Workflow</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]">/Documentation/DEPLOY_WORKFLOW</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Development Plans index</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DevelopmentPlans') %]">/Documentation/DevelopmentPlans</a></td><td class="doc-td">—</td></tr>
