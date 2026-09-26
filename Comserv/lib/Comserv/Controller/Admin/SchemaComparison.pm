@@ -1029,6 +1029,33 @@ sub create_result_from_table :Path('/schema-comparison/create_result_from_table'
     $c->forward('View::JSON');
 }
 
+# Live schema objects freeze at process start. Nested Result classes
+# (HealthKitchen::*, Accounting::*) can be require'd but still missing from
+# $schema->source() until restart. Attach them on this instance so Create
+# Table works without bouncing :4006.
+sub _ensure_result_source {
+    my ($self, $c, $schema, $result_path, $class_name) = @_;
+    my @try = ($result_path);
+    (my $short = $result_path) =~ s/.*:://;
+    push @try, $short if length $short && $short ne $result_path;
+
+    for my $name (@try) {
+        my $src = eval { $schema->source($name) };
+        return $src if $src;
+    }
+
+    die "$class_name has no result_source_instance"
+        unless $class_name->can('result_source_instance');
+    my $rsi = $class_name->result_source_instance;
+    $schema->register_source($result_path, $rsi);
+    if (length $short && $short ne $result_path) {
+        eval { $schema->register_source($short, $rsi) };
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_ensure_result_source',
+        "Registered missing source '$result_path' from $class_name on live schema");
+    return eval { $schema->source($result_path) };
+}
+
 sub create_table_from_result :Path('/schema-comparison/create_table_from_result') :Args(0) {
     my ($self, $c) = @_;
     
@@ -1154,9 +1181,9 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         if (!$table_exists) {
             # Create the table using deployment_statements
             try {
-                my $source = $schema->source($result_path);
+                my $source = $self->_ensure_result_source($c, $schema, $result_path, $class_name);
                 unless ($source) {
-                    die "Could not find source '$result_path' in schema";
+                    die "Could not find source '$result_path' in schema after require $class_name";
                 }
 
                 my @statements = $schema->deployment_statements('MySQL');

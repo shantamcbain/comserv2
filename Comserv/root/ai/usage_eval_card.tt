@@ -2,7 +2,7 @@
   # Data: Model::AI2::EvalReports->latest_summary. Full list/detail on /ai/eval. %]
 [% es = eval_summary %]
 <div id="eval-reports" class="card" style="margin:16px 0;">
-  <div class="card-header">Daily AI Eval Reports (admin) — <a href="/ai/eval">open /ai/eval</a></div>
+  <div class="card-header">Daily AI Eval Reports (admin) — <a href="[% c.uri_for('/ai/eval') %]">open Daily AI Eval Reports</a></div>
   <div class="card-body">
     [% IF es.table_missing %]
       <p class="doc-muted">Table not created yet — run schema compare (<a href="/admin/schema_compare">/admin/schema_compare</a> →

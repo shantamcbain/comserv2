@@ -1,0 +1,41 @@
+{
+  "report_date": "2026-09-24",
+  "source": "Grok Bot",
+  "created_by": "Grok Bot (read from local persistence, not live API)",
+  "summary": "Daily AI eval ~7:00 AM PT Thu Sep 24. Bot 43% left; Super Grok still 0% spoken but Hermes ran grok-4.6 overnight; reset ~10:31 AM PT. Chat :3001 still shows Ollama 0-token success and 404s.",
+  "markdown": "Daily AI eval — ~7:00 AM PT (Thu Sep 24)\n\n**Budget**\nGrok Bot last spoken **43%** left (Sep 23 ~8:00 AM; eval also had 42% from Sep 22). Soft remaining about **10%/day** to Mon Sep 28 ~8:00 AM PT. OpenRouter: balance ≈ **$19.49**; day/week ≈ **$0**; month **$40.43** — under soft caps.\n\n**Super Grok — urgent**\nLast spoken meter was still **0% used**, but Hermes ran a large **`grok-4.6`** coding session yesterday (Health Kitchen / pantry work into ~12:36 AM PT). **Reset is today ~10:31 AM PT** (~3.5 hours). Keep burning hard code via Hermes until then — not thrash, not flash for that work.\n\n**What landed yesterday**\n- Hermes on Super Grok for coding (your correction).\n- Chat on `:4006` (`fix-ai-generate-pipe-model`): member enrich ACL, SearXNG sources (yarrow smoke PASS), OpenRouter/SuperGrok routing fixes — bots paused for your test/commit.\n- Error Audit on main: **#2430** `ai_skills`, **#2447/#2348** watchdog, **#2448/#2449** closed. `:3001` health ok; prefer `:5000` for health too.\n\n**Still open**\nChat `:3001` ai_usage still shows stalls (Ollama 0-token “success”, some 404s). Hermes `OPENROUTER` key still commented; `max_tokens` still 4096. HelpDesk ticket cluster from Sep 14 still the backlog after your `:4006` pass.\n\n**Recommend:** Before ~10:31 AM PT — Hermes Super Grok on remaining hard code. After reset — Super Grok for programming, flash for idle; Bot within soft ~10%/day. When `:4006` tests look good, you commit/merge.\n",
+  "metrics": {
+    "bot": {
+      "percent_left": 43,
+      "soft_pct_per_day": 10
+    },
+    "openrouter": {
+      "balance_usd": 19.49,
+      "day_usd": 0,
+      "week_usd": 0,
+      "month_usd": 40.43
+    },
+    "super_grok": {
+      "percent_used": 0,
+      "reset_local": "2026-09-24T10:31:00-07:00",
+      "note": "Hermes used grok-4.6 overnight despite 0% spoken meter"
+    },
+    "hermes": {
+      "sessions": null,
+      "model": "grok-4.6"
+    },
+    "chat": {}
+  },
+  "proposals": [
+    {
+      "title": "After Super Grok reset: flash for idle, Super Grok for programming",
+      "change_type": "workstation",
+      "target": "hermes.default_model",
+      "rationale": "Morning eval: keep Super Grok for hard code until 10:31 AM PT reset, then flash when idle.",
+      "payload": {
+        "idle": "flash",
+        "coding": "grok-4.6"
+      }
+    }
+  ]
+}

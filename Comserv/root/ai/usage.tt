@@ -1,328 +1,189 @@
-[% PageVersion = 'ai/usage.tt,v 0.06 2026/09/25 shanta Exp shanta ' %]
+[% PageVersion = 'ai/usage.tt,v 0.12 2026/09/25 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 [%
   META
     title = 'AI Usage & Activity Monitor'
-    description = 'Org-wide tokens, cost, model effectiveness, anomalies, and kill switch'
+    description = 'SuperGrok five-number overview; four agent cards; charts start closed'
     category = 'AI'
     TemplateType = 'ApplicationTtTemplate'
     last_updated = '2026-09-25'
-    page_version = '0.06'
+    page_version = '0.12'
 %]
 
-<div class="ai-usage-page" style="max-width:1200px;margin:0 auto;padding:1rem;color:var(--text-color);">
-  <h1 style="color:var(--primary-color);">AI Usage &amp; Activity Monitor</h1>
-  <p class="doc-muted">Live org view: app chat (<code>ai_usage_logs</code>) plus Hermes sessions (<code>state.db</code>). Grok bot / daily eval POST to <code>/ai/usage_ingest</code>.</p>
-  <p id="usage-live-stamp" class="doc-muted" data-usage-live="1">Loading live totals…</p>
+<div class="ai-usage-page" style="max-width:960px;margin:0 auto;padding:1rem;color:var(--text-color);">
+  <h1 style="color:var(--primary-color);">AI Usage</h1>
+  <p id="usage-live-stamp" class="doc-muted" data-usage-live="1">Loading…</p>
 
-  [% IF org.errors.size %]
-    [% FOREACH e IN org.errors %]
-      <div class="doc-warning" role="alert">[% e | html %]</div>
-    [% END %]
-  [% END %]
+  <nav aria-label="On this page" style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;">
+    <a href="#usage-overview" style="color:var(--link-color);">Overview</a>
+    <a href="#usage-agents" style="color:var(--link-color);">Agents</a>
+    <a href="#usage-tunnel" style="color:var(--link-color);">Focus</a>
+    <a href="#usage-charts" style="color:var(--link-color);">Charts</a>
+    <a href="#usage-more" style="color:var(--link-color);">More</a>
+  </nav>
 
-  [% IF org.anomalies.size %]
-  <div class="doc-warning" role="alert">
-    <strong>Anomalies</strong>
-    <ul>
-      [% FOREACH a IN org.anomalies %]
-        <li>
-          <strong>[% a.severity %]</strong> [% a.text | html %]
-          [% IF a.provider && a.model %]
-            <button type="button" class="btn btn-secondary" data-kill-model="1"
-                    data-provider="[% a.provider | html %]" data-model="[% a.model | html %]"
-                    data-reason="[% a.kind %]">Kill</button>
+  <section id="usage-overview" aria-label="SuperGrok this week">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+      <div class="card" style="flex:1;min-width:120px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">Build % used</div>
+        <div id="usage-kpi-build" style="font-size:1.8em;font-weight:600;">—</div>
+      </div>
+      <div class="card" style="flex:1;min-width:120px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">Remaining</div>
+        <div id="usage-kpi-remaining" style="font-size:1.8em;font-weight:600;">—</div>
+      </div>
+      <div class="card" style="flex:1;min-width:120px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">Daily cap</div>
+        <div id="usage-kpi-cap" style="font-size:1.8em;font-weight:600;">—</div>
+      </div>
+      <div class="card" style="flex:1;min-width:120px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">Used today</div>
+        <div id="usage-kpi-used-today" style="font-size:1.8em;font-weight:600;">—</div>
+      </div>
+      <div class="card" style="flex:1;min-width:120px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">Days to reset</div>
+        <div id="usage-kpi-days" style="font-size:1.8em;font-weight:600;">—</div>
+      </div>
+    </div>
+    <p id="usage-sg-status" class="doc-muted">SuperGrok status loading…</p>
+  </section>
+
+  <section id="usage-agents" aria-label="Active agents">
+    <h2 style="font-size:1.1em;">Agents</h2>
+    <div id="usage-agent-cards" style="display:flex;flex-wrap:wrap;gap:10px;">
+      <button type="button" class="card" data-tunnel="hermes"
+              style="flex:1;min-width:160px;text-align:left;cursor:pointer;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;color:var(--text-color);">
+        <strong>Hermes</strong>
+        <div class="doc-muted" data-agent-status="hermes">…</div>
+        <div data-agent-detail="hermes">Click to focus</div>
+      </button>
+      <button type="button" class="card" data-tunnel="chat"
+              style="flex:1;min-width:160px;text-align:left;cursor:pointer;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;color:var(--text-color);">
+        <strong>AI Chat</strong>
+        <div class="doc-muted" data-agent-status="chat">…</div>
+        <div data-agent-detail="chat">Click to focus</div>
+      </button>
+      <button type="button" class="card" data-tunnel="grok_bot"
+              style="flex:1;min-width:160px;text-align:left;cursor:pointer;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;color:var(--text-color);">
+        <strong>Grok Bot</strong>
+        <div class="doc-muted" data-agent-status="grok_bot">…</div>
+        <div data-agent-detail="grok_bot">Click to focus</div>
+      </button>
+      <button type="button" class="card" data-tunnel="editor"
+              style="flex:1;min-width:160px;text-align:left;cursor:pointer;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;color:var(--text-color);">
+        <strong>AI Editor</strong>
+        <div class="doc-muted" data-agent-status="editor">…</div>
+        <div data-agent-detail="editor">Click to focus</div>
+      </button>
+    </div>
+  </section>
+
+  <section id="usage-tunnel" class="card" style="margin:16px 0;border:1px solid var(--border-color);padding:12px;background:var(--card-bg, var(--bg-color));">
+    <h2 style="margin-top:0;font-size:1.1em;">Focus</h2>
+    <p id="usage-tunnel-empty" class="doc-muted">Click an agent. Only that slice opens here.</p>
+    <div id="usage-tunnel-body" hidden></div>
+  </section>
+
+  <details id="usage-charts">
+    <summary style="cursor:pointer;color:var(--link-color);">14-day token and API-call charts</summary>
+    <p class="doc-muted">Empty days are zero. Same colours as the legend. Default is bar; choice is kept on refresh.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
+      <button type="button" class="btn btn-secondary" data-chart-type="bar">Bar</button>
+      <button type="button" class="btn btn-secondary" data-chart-type="line">Line</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <canvas id="usage-tokens-chart" width="880" height="220" data-usage-chart="tokens"></canvas>
+    </div>
+    <div id="usage-source-legend" style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 16px;"></div>
+    <div style="overflow-x:auto;">
+      <canvas id="usage-calls-chart" width="880" height="180" data-usage-chart="calls"></canvas>
+    </div>
+  </details>
+  <script type="application/json" id="usage-chart-data">{"source_days":[]}</script>
+
+  <details id="usage-more">
+    <summary style="cursor:pointer;color:var(--link-color);">More (14-day totals, grok.com paste, admin)</summary>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;">
+      <div class="card" style="flex:1;min-width:140px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">API calls (14d)</div>
+        <div id="usage-kpi-calls" style="font-size:1.4em;font-weight:600;">[% org.org_totals.hermes_calls || org.org_totals.calls || 0 %]</div>
+        <div id="usage-kpi-calls-sub" class="doc-muted">Hermes + app</div>
+      </div>
+      <div class="card" style="flex:1;min-width:140px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">Tokens (14d)</div>
+        <div id="usage-kpi-tokens" style="font-size:1.4em;font-weight:600;">[% org.hermes.totals.tokens || 0 %]</div>
+        <div id="usage-kpi-tokens-sub" class="doc-muted">incl. cache / reasoning</div>
+      </div>
+      <div class="card" style="flex:1;min-width:140px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">OpenRouter</div>
+        <div id="usage-kpi-or" style="font-size:1.4em;font-weight:600;">
+          [% IF provider_status.openrouter.ok && provider_status.openrouter.remaining.defined %]
+            $[% provider_status.openrouter.remaining %] left
+          [% ELSIF provider_status.openrouter.ok %]
+            used $[% provider_status.openrouter.usage || 0 %]
+          [% ELSE %]
+            …
           [% END %]
-        </li>
-      [% END %]
-    </ul>
-  </div>
-  [% END %]
+        </div>
+        <div id="usage-kpi-or-sub" class="doc-muted">
+          [% IF provider_status.openrouter.ok %]
+            live from OpenRouter key · add money when empty
+          [% ELSE %]
+            [% provider_status.openrouter.error || 'fetched on page load (admin session)' %]
+          [% END %]
+        </div>
+      </div>
+    </div>
+    <p class="doc-muted" style="margin:8px 0;"><a href="https://grok.com/" target="_blank" rel="noopener noreferrer" style="color:var(--link-color);">Open grok.com</a> → Settings → Usage if the Firefox add-on is not writing numbers.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+      <label class="doc-muted">Build %<br>
+        <input type="number" id="declare-grokcom-build" min="0" max="100" step="1" placeholder="38" style="width:4.5em;">
+      </label>
+      <label class="doc-muted">Chat %<br>
+        <input type="number" id="declare-grokcom-chat" min="0" max="100" step="1" placeholder="1" style="width:4.5em;">
+      </label>
+      <button type="button" class="btn btn-secondary" data-declare-grokcom="1">Save grok.com %</button>
+    </div>
 
-  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
-    <div class="card" style="flex:1;min-width:160px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
-      <div class="doc-muted">Org calls (app + Hermes)</div>
-      <div style="font-size:1.8em;font-weight:600;">[% org.org_totals.calls || 0 %]</div>
-      <div class="doc-muted">app [% org.org_totals.app_calls || 0 %] · hermes [% org.org_totals.hermes_calls || 0 %]</div>
-    </div>
-    <div class="card" style="flex:1;min-width:160px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
-      <div class="doc-muted">Tokens (app ledger)</div>
-      <div style="font-size:1.8em;font-weight:600;">[% org.totals.tokens || 0 %]</div>
-      <div class="doc-muted">Hermes [% org.hermes.totals.tokens || 0 %]</div>
-    </div>
-    <div class="card" style="flex:1;min-width:160px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
-      <div class="doc-muted">Est. cost USD</div>
-      <div style="font-size:1.8em;font-weight:600;color:var(--primary-color);">$[% org.org_totals.cost || '0.0000' %]</div>
-      <div class="doc-muted">app $[% org.totals.cost || 0 %] · hermes $[% org.hermes.totals.cost || 0 %]</div>
-    </div>
-    <div class="card" style="flex:1;min-width:160px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
-      <div class="doc-muted">App success / error</div>
-      <div style="font-size:1.8em;font-weight:600;">[% org.totals.ok || 0 %] / [% org.totals.errors || 0 %]</div>
-    </div>
-  </div>
-
-  <div class="row" style="display:flex;gap:16px;flex-wrap:wrap;">
-    <div style="flex:1;min-width:320px;">
-      <h3>Tokens by day</h3>
-      <canvas id="usage-tokens-chart" width="560" height="180" data-usage-chart="tokens"></canvas>
-    </div>
-    <div style="flex:1;min-width:320px;">
-      <h3>Cost by day (USD)</h3>
-      <canvas id="usage-cost-chart" width="560" height="180" data-usage-chart="cost"></canvas>
-    </div>
-  </div>
-  <script type="application/json" id="usage-chart-data">{
-    "app_days": [
-      [% FOREACH r IN org.by_day %]{"day":"[% r.day %]","tokens":[% r.tokens || 0 %],"cost":[% r.cost || 0 %],"calls":[% r.calls || 0 %]}[% UNLESS loop.last %],[% END %][% END %]
-    ],
-    "hermes_days": [
-      [% FOREACH r IN org.hermes.by_day %]{"day":"[% r.day %]","tokens":[% r.tokens || 0 %],"cost":[% r.cost || 0 %],"calls":[% r.calls || 0 %]}[% UNLESS loop.last %],[% END %][% END %]
-    ]
-  }</script>
-
-  [% IF provider_status.supergrok.over_threshold %]
-  <div class="doc-warning" role="alert">
-    SuperGrok is at [% provider_status.supergrok.pct %]% of this month's allowance.
-  </div>
-  [% END %]
-
-  <h3>Kill switch</h3>
-  <p class="doc-muted">Stops Router from calling a leaking, hallucinating, or thrashing model. Live — no server restart.</p>
-  [% IF org.kill_switch.killed.size %]
-  <table class="data-table">
-    <thead><tr><th>Provider</th><th>Model</th><th>Reason</th><th>By</th><th></th></tr></thead>
-    <tbody>
-    [% FOREACH k IN org.kill_switch.killed %]
-      <tr>
-        <td>[% k.provider | html %]</td>
-        <td>[% k.model | html %]</td>
-        <td>[% k.reason | html %]</td>
-        <td>[% k.by | html %]</td>
-        <td><button type="button" class="btn" data-unkill-model="1"
-                    data-provider="[% k.provider | html %]" data-model="[% k.model | html %]">Restore</button></td>
-      </tr>
-    [% END %]
-    </tbody>
-  </table>
-  [% ELSE %]
-  <p class="doc-muted">No models killed.</p>
-  [% END %]
-  <form id="usage-kill-form" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin:8px 0;">
-    <label>Provider<br><input name="provider" type="text" placeholder="grok" required></label>
-    <label>Model<br><input name="model" type="text" placeholder="grok-4.6" required></label>
-    <label>Reason<br>
-      <select name="reason">
-        <option value="leak">Sensitive data leak</option>
-        <option value="hallucinate">Hallucinating</option>
-        <option value="thrash">Thrashing</option>
-        <option value="other">Other</option>
-      </select>
-    </label>
-    <label>Notes<br><input name="notes" type="text" placeholder="optional"></label>
-    <button type="submit" class="btn btn-primary">Kill model</button>
-  </form>
-  <div id="usage-kill-result" class="doc-muted"></div>
-
-  [%# Ledger / Golden Data monitor — admin only (AI.pm usage stashes ledger_monitor for admins) %]
-  [% IF is_admin && ledger_monitor %][% INCLUDE 'ai/usage_ledger.tt' %][% END %]
-  [%# Daily AI Eval Reports summary card — admin only; full pages on /ai/eval %]
-  [% IF is_admin && eval_summary %][% INCLUDE 'ai/usage_eval_card.tt' %][% END %]
-
-  <!-- Live xAI / Grok balance check -->
-  <div class="card" style="margin:16px 0;">
-    <div class="card-header">xAI prepaid (declare only)</div>
-    <div class="card-body">
-    <p class="doc-muted">xAI does not return remaining SuperGrok or prepaid credits on the chat key. Paste a number from console.x.ai if you want an estimate. OpenRouter remaining above is live.</p>
-    <button type="button" class="btn btn-primary" data-check-grok="1">Check Live xAI Balance / Usage</button>
-    <div style="margin-top:8px;">
-      <input type="number" id="declare-xai-balance" class="form-control" step="0.01" placeholder="e.g. 42.50" style="width:120px;display:inline-block;" />
-      <button type="button" class="btn btn-secondary" data-declare-grok="1">Declare current balance from console.x.ai &amp; refresh</button>
-    </div>
-    <div id="grok-live-result" class="doc-code" style="margin-top:10px;white-space:pre-wrap;"></div>
-    </div>
-  </div>
-
-  <h3>Grok bot daily evaluation</h3>
-  [% IF org.daily_eval %]
-    <p class="doc-muted">Last ingest: [% org.daily_eval.created_at %] · [% org.daily_eval.provider %]/[% org.daily_eval.model %]</p>
-    <pre class="doc-code" style="white-space:pre-wrap;color:var(--text-color);">[% org.daily_eval.evaluation | html %]</pre>
-  [% ELSE %]
-    <p class="doc-muted">None yet. Grok bot (LAN) POST JSON to <code>/ai/usage_ingest</code>:</p>
-    <pre class="doc-code">{ "source":"daily_eval", "provider":"grok", "model":"grok-bot", "evaluation":"…" }</pre>
-  [% END %]
-
-  <form method="GET" class="ai-usage-filters" style="background:var(--card-bg, var(--bg-color));padding:12px;border:1px solid var(--border-color);border-radius:6px;margin:12px 0;display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
-    <div>
-      <label>Days</label><br>
-      <select name="days">
-        [% FOREACH d IN [7,14,30,60,90] %]
-          <option value="[% d %]" [% IF filters.days == d %]selected[% END %]>[% d %] days</option>
-        [% END %]
-      </select>
-    </div>
-    <div>
-      <label>Provider</label><br>
-      <select name="provider">
-        <option value="">All</option>
-        [% FOREACH p IN providers %]
-          <option value="[% p %]" [% IF filters.provider == p %]selected[% END %]>[% p %]</option>
-        [% END %]
-      </select>
-    </div>
     [% IF is_admin %]
-    <div>
-      <label>Site</label><br>
-      <select name="site_id">
-        <option value="">All sites</option>
-        [% FOREACH s IN sites %]
-          <option value="[% s.id %]" [% IF filters.site_id == s.id %]selected[% END %]>[% s.name %] (#[% s.id %])</option>
-        [% END %]
-      </select>
-    </div>
+    <p><a href="[% c.uri_for('/ai/eval') %]" style="color:var(--link-color);">Daily AI Eval</a></p>
     [% END %]
-    <div>
-      <label>Model contains</label><br>
-      <input type="text" name="model" value="[% filters.model | html %]">
-    </div>
-    <div>
-      <button type="submit" class="btn">Filter</button>
-      <a href="[% c.uri_for('/ai/usage') %]" class="btn btn-secondary">Reset</a>
-    </div>
-  </form>
 
-  <h3>App ledger — model effectiveness</h3>
-  <table class="data-table">
-    <thead><tr><th>Provider</th><th>Model</th><th>Calls</th><th>OK</th><th>Err</th><th>OK%</th><th>Tokens</th><th>Avg tok</th><th>USD</th><th>USD/OK</th><th></th></tr></thead>
-    <tbody>
-    [% FOREACH r IN org.by_model %]
-      <tr>
-        <td>[% r.provider %]</td>
-        <td>[% r.model %]</td>
-        <td>[% r.calls %]</td>
-        <td>[% r.ok %]</td>
-        <td>[% r.errors %]</td>
-        <td>[% r.ok_rate %]</td>
-        <td>[% r.tokens %]</td>
-        <td>[% r.avg_tokens %]</td>
-        <td>$[% r.cost %]</td>
-        <td>$[% r.cost_per_ok %]</td>
-        <td><button type="button" class="btn btn-secondary" data-kill-model="1"
-                    data-provider="[% r.provider | html %]" data-model="[% r.model | html %]" data-reason="other">Kill</button></td>
-      </tr>
+    [% IF org.kill_switch.killed.size %]
+    <table class="data-table">
+      <thead><tr><th>Provider</th><th>Model</th><th></th></tr></thead>
+      <tbody>
+      [% FOREACH k IN org.kill_switch.killed %]
+        <tr>
+          <td>[% k.provider | html %]</td><td>[% k.model | html %]</td>
+          <td><button type="button" class="btn" data-unkill-model="1"
+                      data-provider="[% k.provider | html %]" data-model="[% k.model | html %]">Restore</button></td>
+        </tr>
+      [% END %]
+      </tbody>
+    </table>
     [% END %]
-    [% IF ! org.by_model.size %]<tr><td colspan="11" class="doc-muted">No app ledger rows in this window.</td></tr>[% END %]
-    </tbody>
-  </table>
-
-  [% IF org.combinations.size %]
-  <h3>Model combinations (fallbacks)</h3>
-  <table class="data-table">
-    <thead><tr><th>Combo</th><th>Calls</th><th>OK</th><th>Err</th><th>OK%</th></tr></thead>
-    <tbody>
-    [% FOREACH r IN org.combinations %]
-      <tr><td>[% r.combo | html %]</td><td>[% r.calls %]</td><td>[% r.ok %]</td><td>[% r.errors %]</td><td>[% r.ok_rate %]</td></tr>
-    [% END %]
-    </tbody>
-  </table>
-  [% END %]
-
-  <h3>By user</h3>
-  <table class="data-table">
-    <thead><tr><th>User</th><th>Calls</th><th>OK</th><th>Tokens</th><th>USD</th></tr></thead>
-    <tbody>
-    [% FOREACH r IN org.by_user %]
-      <tr><td>[% r.username | html %]</td><td>[% r.calls %]</td><td>[% r.ok %]</td><td>[% r.tokens %]</td><td>$[% r.cost %]</td></tr>
-    [% END %]
-    [% IF ! org.by_user.size %]<tr><td colspan="5" class="doc-muted">No per-user rows.</td></tr>[% END %]
-    </tbody>
-  </table>
-
-  [% IF is_admin %]
-  <h3>By sitename</h3>
-  <table class="data-table">
-    <thead><tr><th>Site</th><th>Calls</th><th>OK</th><th>Tokens</th><th>USD</th></tr></thead>
-    <tbody>
-    [% FOREACH r IN org.by_site %]
-      <tr>
-        <td><a href="[% c.uri_for('/ai/usage') %]?site_id=[% r.site_id %]" style="color:var(--link-color);">[% r.sitename | html %]</a></td>
-        <td>[% r.calls %]</td><td>[% r.ok %]</td><td>[% r.tokens %]</td><td>$[% r.cost %]</td>
-      </tr>
-    [% END %]
-    [% IF ! org.by_site.size %]<tr><td colspan="5" class="doc-muted">No per-site rows.</td></tr>[% END %]
-    </tbody>
-  </table>
-  [% END %]
-
-  <h3>By source (app request_type)</h3>
-  <table class="data-table">
-    <thead><tr><th>Source</th><th>Calls</th><th>Tokens</th><th>USD</th></tr></thead>
-    <tbody>
-    [% FOREACH r IN org.by_source %]
-      <tr><td>[% r.request_type || '(unset)' %]</td><td>[% r.calls %]</td><td>[% r.tokens %]</td><td>$[% r.cost %]</td></tr>
-    [% END %]
-    </tbody>
-  </table>
-
-  <h3>Hermes (live from state.db)</h3>
-  [% IF org.hermes.ok %]
-  <p class="doc-muted">[% org.hermes.totals.calls %] sessions · [% org.hermes.totals.tokens %] tokens · $[% org.hermes.totals.cost %] · last [% org.hermes.days %] days. Not copied into MySQL (avoids double-count).</p>
-  <table class="data-table">
-    <thead><tr><th>Provider</th><th>Model</th><th>Sessions</th><th>Tokens</th><th>USD</th></tr></thead>
-    <tbody>
-    [% FOREACH r IN org.hermes.by_model %]
-      <tr>
-        <td>[% r.provider %]</td><td>[% r.model %]</td><td>[% r.calls %]</td><td>[% r.tokens %]</td><td>$[% r.cost %]</td>
-      </tr>
-    [% END %]
-    </tbody>
-  </table>
-  <h4>Hermes channel</h4>
-  <table class="data-table">
-    <thead><tr><th>Source</th><th>Sessions</th><th>Tokens</th><th>USD</th></tr></thead>
-    <tbody>
-    [% FOREACH r IN org.hermes.by_source %]
-      <tr><td>[% r.request_type %]</td><td>[% r.calls %]</td><td>[% r.tokens %]</td><td>$[% r.cost %]</td></tr>
-    [% END %]
-    </tbody>
-  </table>
-  [% ELSE %]
-  <p class="doc-muted">Hermes overlay unavailable: [% org.hermes.error || 'no state.db' %]</p>
-  [% END %]
-
-  <h3>Recent app calls</h3>
-  <table class="data-table">
-    <thead><tr><th>When</th><th>Provider / Model</th><th>User/Site</th><th>Tokens</th><th>Cost</th><th>Status</th><th>Type</th></tr></thead>
-    <tbody>
-    [% FOREACH log IN org.recent %]
-      <tr>
-        <td>[% log.created_at %]</td>
-        <td><strong>[% log.provider %]</strong><br><small>[% log.model %]</small></td>
-        <td>u:[% log.user_id || 'guest' %]<br><small>s:[% log.site_id || '-' %]</small></td>
-        <td>[% log.prompt_tokens %]/[% log.completion_tokens %] ([% log.total_tokens %])</td>
-        <td>$[% log.cost %]</td>
-        <td>[% log.status %]</td>
-        <td>[% log.request_type %]</td>
-      </tr>
-    [% END %]
-    [% IF ! org.recent.size %]<tr><td colspan="7" class="doc-muted">No recent app rows.</td></tr>[% END %]
-    </tbody>
-  </table>
-
-  <div class="card" style="margin:16px 0;border:1px solid var(--border-color);padding:12px;">
-    <div class="card-header">xAI prepaid (declare only)</div>
-    <p class="doc-muted">xAI does not return remaining SuperGrok on the chat key. OpenRouter remaining is live from their API.</p>
-    <button type="button" class="btn btn-primary" data-check-grok="1">Check Live xAI Balance / Usage</button>
-    <div style="margin-top:8px;">
-      <input type="number" id="declare-xai-balance" class="form-control" step="0.01" placeholder="e.g. 42.50" style="width:120px;display:inline-block;" />
-      <button type="button" class="btn btn-secondary" data-declare-grok="1">Declare current balance from console.x.ai</button>
-    </div>
+    <form id="usage-kill-form" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin:8px 0;">
+      <label>Provider<br><input name="provider" type="text" placeholder="grok" required></label>
+      <label>Model<br><input name="model" type="text" placeholder="grok-4.6" required></label>
+      <label>Reason<br>
+        <select name="reason">
+          <option value="other">Other</option>
+          <option value="leak">Leak</option>
+          <option value="hallucinate">Hallucinate</option>
+          <option value="thrash">Thrash</option>
+        </select>
+      </label>
+      <button type="submit" class="btn btn-primary">Kill model</button>
+    </form>
+    <div id="usage-kill-result" class="doc-muted"></div>
+    <button type="button" class="btn btn-secondary" data-check-grok="1">Check xAI (optional)</button>
+    <input type="number" id="declare-xai-balance" class="form-control" step="0.01" placeholder="declare USD" style="width:120px;display:inline-block;" />
+    <button type="button" class="btn btn-secondary" data-declare-grok="1">Declare</button>
     <div id="grok-live-result" class="doc-code" style="margin-top:10px;white-space:pre-wrap;"></div>
-  </div>
-
-  <p class="doc-muted">
-    App chat already writes <code>ai_usage_logs</code>. Hermes is read live from <code>~/.hermes/state.db</code>.
-    Grok bot: <code>POST /ai/usage_ingest</code> with <code>source=grok_bot</code> or <code>daily_eval</code> (LAN / operator).
-    <a href="[% c.uri_for('/ai') %]" style="color:var(--link-color);">AI Chat</a>
-    · <a href="[% c.uri_for('/ai/conversations') %]" style="color:var(--link-color);">History</a>
-  </p>
+    [% IF is_admin && ledger_monitor %]
+    <details><summary style="cursor:pointer;">Golden Data ledger</summary>[% INCLUDE 'ai/usage_ledger.tt' %]</details>
+    [% END %]
+    [% IF is_admin && eval_summary %][% INCLUDE 'ai/usage_eval_card.tt' %][% END %]
+  </details>
 </div>

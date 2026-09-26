@@ -6112,6 +6112,7 @@ sub _build_navigation_command_guide {
             [ 'Manage AI models',           '/ai/models'                ],
             [ 'AI server status',           '/ai/check_status'          ],
             [ 'AI Usage & Billing Monitor', '/ai/usage'                 ],
+            [ 'Daily AI Eval Reports',      '/ai/eval'                  ],
             [ 'Support chat admin',         '/chat/admin'               ],
         ]],
         # ── Common sections ───────────────────────────────────────────────────
@@ -12813,95 +12814,6 @@ sub usage :Local :Args(0) {
         ledger_monitor   => $ledger_monitor,
         eval_summary     => $eval_summary,
     );
-}
-
-sub usage_live :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json; charset=utf-8');
-    unless ($self->_usage_is_operator($c) || $c->session->{user_id}) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'login required' }));
-        return;
-    }
-    my $org = eval { $self->_usage_org($c) };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'usage_live', "$@");
-        $c->response->body(encode_json({ success => JSON::false, error => 'summary failed' }));
-        return;
-    }
-    $c->response->body(encode_json({ success => JSON::true, org => $org }));
-}
-
-sub usage_kill :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json; charset=utf-8');
-    unless ($self->_usage_is_operator($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'operator only' }));
-        return;
-    }
-    require Comserv::Model::AI2::KillSwitch;
-    my $ks = Comserv::Model::AI2::KillSwitch->new;
-    my $action   = $c->req->param('action') || 'kill';
-    my $provider = $c->req->param('provider') || '';
-    my $model    = $c->req->param('model') || '';
-    my $result;
-    if ($action eq 'unkill') {
-        $result = $ks->unkill($c, provider => $provider, model => $model);
-    } else {
-        $result = $ks->kill($c,
-            provider => $provider,
-            model    => $model,
-            reason   => $c->req->param('reason') || 'other',
-            notes    => $c->req->param('notes') || '',
-            by       => $c->session->{username} || 'operator',
-        );
-        eval {
-            $c->model('AI')->log_usage($c,
-                provider      => $provider,
-                model         => $model,
-                request_type  => 'kill_switch',
-                status        => 'killed',
-                error_message => ($c->req->param('reason') || 'other') . ': ' . ($c->req->param('notes') || ''),
-                metadata      => { action => 'kill' },
-            );
-        };
-    }
-    $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'usage_kill',
-        "action=$action $provider/$model ok=" . ($result->{ok} ? 1 : 0));
-    $c->response->body(encode_json({
-        success => $result->{ok} ? JSON::true : JSON::false,
-        error   => $result->{error},
-        killed  => $result->{killed} || [],
-    }));
-}
-
-sub usage_ingest :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json; charset=utf-8');
-    unless ($self->_usage_is_operator($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'operator / LAN only' }));
-        return;
-    }
-    my $body = {};
-    if (($c->req->content_type || '') =~ /json/i) {
-        $body = eval { decode_json($c->req->body_data ? encode_json($c->req->body_data) : ($c->req->body || '{}')) } || {};
-        if (ref $c->req->body_data eq 'HASH') { $body = $c->req->body_data; }
-    }
-    $body = {} unless ref $body eq 'HASH';
-    my %args;
-    for my $k (qw(source request_type provider model prompt_tokens completion_tokens
-                  total_tokens estimated_cost_usd status error_message user_id site_id evaluation)) {
-        $args{$k} = $body->{$k} // $c->req->param($k);
-    }
-    if (ref $body->{metadata} eq 'HASH') { $args{metadata} = $body->{metadata}; }
-    require Comserv::Model::AI2::UsageMonitor;
-    my $r = Comserv::Model::AI2::UsageMonitor->new->ingest($c, %args);
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'usage_ingest',
-        "source=" . ($args{source}||'?') . " model=" . ($args{model}||'?') . " ok=" . ($r->{ok} ? 1 : 0));
-    $c->response->body(encode_json({
-        success => $r->{ok} ? JSON::true : JSON::false,
-        error   => $r->{error},
-        source  => $r->{source},
-    }));
 }
 
 =head2 grok_balance

@@ -1628,6 +1628,42 @@ sub hermes_start_desktop :Local :Args(0) {
     }));
 }
 
+# -------------------------------------------------------------------------
+# Org usage JSON — lives here so Starman -r can reload it. Controller::AI.pm
+# is too large to reload; Controller::AI::Usage is a new file the current
+# :4006 process never loaded. Canonical home remains AI::Usage; this Local
+# action is the live bridge. Do not add more usage HTML to this file.
+#   GET /ai2/usage_live
+# -------------------------------------------------------------------------
+sub usage_live :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+    unless ($is_local || $c->session->{user_id}) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'login required' }));
+        return;
+    }
+    my $org = eval {
+        require Comserv::Model::AI2::UsageMonitor;
+        my $days    = $c->req->param('days') || 14;
+        my $prov_f  = $c->req->param('provider') || '';
+        my $site_f  = $c->req->param('site_id')  || '';
+        my $model_f = $c->req->param('model') || '';
+        Comserv::Model::AI2::UsageMonitor->new->org_summary($c,
+            days => $days, provider => $prov_f, site_id => $site_f, model => $model_f);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'usage_live', "$@");
+        $c->response->body(encode_json({ success => JSON::false, error => 'summary failed' }));
+        return;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'usage_live',
+        'org_calls=' . (($org->{org_totals} || {})->{calls} // 0)
+        . ' hermes_tokens=' . ((($org->{hermes} || {})->{totals} || {})->{tokens} // 0));
+    $c->response->body(encode_json({ success => JSON::true, org => $org }));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
