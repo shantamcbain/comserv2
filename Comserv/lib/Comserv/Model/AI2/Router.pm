@@ -8,6 +8,9 @@ use JSON qw(encode_json decode_json);
 
 use Comserv::Util::Logging;
 use Comserv::Util::ModelCatalog;
+use Comserv::Util::AI::ModelChains;
+use Comserv::Util::AI::ModelHealth;
+use Time::HiRes ();
 
 extends 'Catalyst::Model';
 
@@ -328,6 +331,9 @@ sub _transient_outage {
 sub _user_facing_error {
     my ($self, $error) = @_;
     $error = '' unless defined $error;
+    # Honest message when every chain step failed or was blocked (§5e).
+    return $Comserv::Model::AI2::Router::ALL_EXHAUSTED_MSG
+        if $error eq ($Comserv::Model::AI2::Router::ALL_EXHAUSTED_MSG // "\0");
     if ($self->_transient_outage($error) || $error =~ /can'?t connect|\btimed? ?out\b/i) {
         return 'The selected model is temporarily unavailable. Retrying another model if possible — try Send again if this persists.';
     }
@@ -455,8 +461,417 @@ sub _model_is_killed {
     return $hit;
 }
 
+# ===================================================================
+# Model failover (AISYSTEM plan §5e). chat_with_fallback walks:
+#   requested model -> data/ai_model_chains.json chain for the purpose
+#   (watch-verdict models demoted, replace-verdict models excluded)
+#   -> live tail (first live :free + first Ollama chat tag).
+# Each candidate is skipped when: operator kill switch, chain `removed`,
+# effectiveness verdict "replace", Super Grok guard lock, OpenRouter soft
+# caps / per-model / per-chain caps (paid failover only), OpenRouter credits
+# at 0, or its circuit is open (Util::AI::ModelHealth). A call fails over on
+# 404/410/429/402/5xx/timeout/unreachable/auth, empty output, explicit
+# 0-token output, or a grounding post-check strip that leaves nothing.
+# Every failed attempt is written to the Ledger with metadata.fallover;
+# when nothing answers the caller gets $ALL_EXHAUSTED_MSG (no invented
+# content) and a router/all_exhausted Ledger row.
+# ===================================================================
+
+our $ALL_EXHAUSTED_MSG = 'No AI model is available right now (all options failed or are over budget). Please try again later.';
+our $SIGNALS_TTL_S = 120;
+our $SPEND_TTL_S   = 60;
+my (%SIGNALS_CACHE, %SPEND_CACHE);
+
+# failure_reason($error_text, $resp) -> reason code
+sub failure_reason {
+    my ($self, $error, $resp) = @_;
+    my $e = defined $error ? "$error" : '';
+    return 'unreachable' if $resp && ref $resp eq 'HASH' && $resp->{unreachable};
+    return 'timeout'     if $e =~ /timed?[ -]?out|timeout/i;
+    return 'unreachable' if $e =~ /can'?t connect|connection (?:refused|reset)|name or service not known|temporary failure in name resolution|no client available|returned nothing/i;
+    return 'http_404'    if $e =~ /\b404\b|no endpoints found|not a valid model|model[_ ]not[_ ]found|model .*does not exist/i;
+    return 'http_410'    if $e =~ /\b410\b|\bgone\b/i;
+    return 'http_429'    if $e =~ /\b429\b|too many requests|rate.?limit/i;
+    return 'http_402'    if $e =~ /\b402\b|payment.?required|insufficient credit|out of credits?|credit.?balance|can only afford|prepaid credit|spending.?limit|personal-team-blocked|quota|usage limit|limit_remaining|no auto-fill|add credits|remaining credits are 0/i;
+    return 'http_5xx'    if $e =~ /\b5\d\d\b|service unavailable|bad gateway|internal server error/i;
+    return 'auth'        if $e =~ /\b40[13]\b|login expired|auth_failed|unauthenticated|bad-credentials|invalid.?token|token could not be validated|no active \S+ (?:api key|credential)|api key found/i;
+    return 'empty_output' if $e =~ /empty (?:content|response)/i;
+    return 'bad_request' if $e =~ /\b400\b/;
+    return 'provider_error';
+}
+
+# classify_result($resp, $provider, \%knobs) -> ($ok, $reason, \%flags)
+# Success needs non-empty text. Explicit 0 completion tokens = failure
+# (zero_tokens). A provider that does not report tokens (config
+# tokens_unreported_providers, default ollama — Provider::Ollama returns
+# usage {}), or a response with no token counts at all, is a success when
+# the text is non-empty and is flagged tokens_unreported for the Ledger.
+sub classify_result {
+    my ($self, $resp, $provider, $k) = @_;
+    my %f;
+    return (0, 'provider_error', \%f) unless $resp && ref $resp eq 'HASH';
+    unless ($resp->{success}) {
+        return (0, $self->failure_reason($resp->{error}, $resp), \%f);
+    }
+    my $text = $resp->{response} // '';
+    (my $t = $text) =~ s/^\s+|\s+$//g;
+    my $u = ref $resp->{usage} eq 'HASH' ? $resp->{usage} : {};
+    my $has = (defined $u->{completion_tokens} || defined $u->{total_tokens}) ? 1 : 0;
+    my $zero = $has && (defined $u->{completion_tokens} ? ($u->{completion_tokens} || 0) == 0
+                                                         : ($u->{total_tokens} || 0) == 0);
+    unless (length $t) {
+        return (0, ($zero ? 'zero_tokens_empty' : 'empty_output'), \%f);
+    }
+    my @unrep = @{ ($k && $k->{tokens_unreported_providers}) || ['ollama'] };
+    if (!$has || grep { $_ eq ($provider // '') } @unrep) {
+        $f{tokens_unreported} = 1;
+        return (1, undef, \%f);
+    }
+    return (0, 'zero_tokens', \%f) if $zero;
+    return (1, undef, \%f);
+}
+
+sub _is_paid_candidate {
+    my ($self, $cand) = @_;
+    return 0 unless ($cand->{provider} // '') =~ /^(openrouter|external)$/;
+    return (($cand->{model} // '') =~ /:free$/) ? 0 : 1;
+}
+
+sub _failover_knobs {
+    my ($self, $ld) = @_;
+    my %k = map { $_ => Comserv::Util::AI::ModelChains->knob($ld, $_) }
+            keys %Comserv::Util::AI::ModelChains::KNOB_DEFAULTS;
+    my $d = $ld->{data} || {};
+    $k{tokens_unreported_providers} = $d->{tokens_unreported_providers} || ['ollama'];
+    $k{model_caps_usd_per_day} = $d->{model_caps_usd_per_day} || {};
+    $k{chain_caps_usd_per_day} = $d->{chain_caps_usd_per_day} || {};
+    return \%k;
+}
+
+# health_signals($c, \%knobs, $health) -> { verdicts => {slug => {verdict, why}}, anomalies => [] }
+# Reuses UsageMonitor (effectiveness verdicts + _anomalies); cached briefly;
+# anomalies are applied to the circuit breaker on refresh.
+sub health_signals {
+    my ($self, $c, $k, $health) = @_;
+    return { verdicts => {}, anomalies => [] } unless $c && ref $c && $c->can('model');
+    my $now = time;
+    if ($SIGNALS_CACHE{at} && $now - $SIGNALS_CACHE{at} < $SIGNALS_TTL_S) {
+        return $SIGNALS_CACHE{data};
+    }
+    my $sig = try {
+        require Comserv::Model::AI2::UsageMonitor;
+        Comserv::Model::AI2::UsageMonitor->new->model_health_signals($c);
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'health_signals', "signals failed: $_");
+        undef;
+    };
+    $sig ||= { verdicts => {}, anomalies => [] };
+    if ($health && @{ $sig->{anomalies} || [] }) {
+        my $opened = try { $health->apply_anomalies($sig->{anomalies}, %$k) } catch { [] };
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'health_signals',
+            'Circuit opened from usage anomaly: ' . join(', ', @$opened)) if $opened && @$opened;
+    }
+    %SIGNALS_CACHE = (at => $now, data => $sig);
+    return $sig;
+}
+
+sub clear_failover_caches { %SIGNALS_CACHE = (); %SPEND_CACHE = (); return 1 }
+
+# openrouter_spend($c, \%knobs) -> { ok, day, week, month, by_model_day => {slug => usd} }
+# Paid OpenRouter spend from ai_usage_logs via DBIx::Class. :free models are
+# excluded (the rough estimator prices them at the OpenRouter default rate).
+sub openrouter_spend {
+    my ($self, $c) = @_;
+    my $now = time;
+    return $SPEND_CACHE{data} if $SPEND_CACHE{at} && $now - $SPEND_CACHE{at} < $SPEND_TTL_S;
+    my $out = { ok => 0, day => 0, week => 0, month => 0, by_model_day => {},
+                ledger => {}, key_snapshot => {}, basis => 'max(ledger, key_snapshot_delta)' };
+    try {
+        my $schema = $c->model('DBEncy')->schema or die "no schema\n";
+        require DateTime;
+        # Windows are PT calendar day / week / month; ai_usage_logs.created_at is
+        # stored in UTC (verified 2026-09-28), so boundaries are converted to UTC.
+        my $dt = DateTime->now(time_zone => 'local');
+        my %start = (
+            day   => $dt->clone->truncate(to => 'day'),
+            week  => $dt->clone->truncate(to => 'week'),
+            month => $dt->clone->truncate(to => 'month'),
+        );
+        my %utc = map { $_ => $start{$_}->clone->set_time_zone('UTC')->strftime('%Y-%m-%d %H:%M:%S') } keys %start;
+        my $rs = $schema->resultset('AiUsageLog');
+        my %paid = (
+            'me.provider' => { -in => [qw(openrouter external)] },
+            -and => [
+                { 'me.model' => { -not_like => '%:free' } },
+                { 'me.model' => { -not_in => [qw(_api_snapshot xai-usage-check)] } },
+                { 'me.model' => { -not_like => '\_alert\_%' } },
+            ],
+        );
+        for my $w (qw(day week month)) {
+            my $sum = $rs->search({ %paid, 'me.created_at' => { '>=' => $utc{$w} } },
+                { select => [ { sum => 'me.estimated_cost_usd' } ], as => ['usd'] })->get_column('usd')->next;
+            $out->{ledger}{$w} = 0 + ($sum || 0);
+        }
+        my $bym = $rs->search({ %paid, 'me.created_at' => { '>=' => $utc{day} } },
+            { select => [ 'me.model', { sum => 'me.estimated_cost_usd', -as => 'usd' } ],
+              as => [qw(model usd)], group_by => ['me.model'] });
+        while (my $r = $bym->next) {
+            $out->{by_model_day}{ 'openrouter|' . ($r->get_column('model') // '') } += 0 + ($r->get_column('usd') || 0);
+        }
+        # Account-wide: _api_snapshot rows hold the key's cumulative usage (USD),
+        # which also covers Hermes / workstation calls that never hit the Ledger.
+        my $snap = $rs->search({ 'me.provider' => 'openrouter', 'me.model' => '_api_snapshot' });
+        my $latest = $snap->search({}, { order_by => { -desc => 'me.created_at' }, rows => 1 })->single;
+        if ($latest) {
+            my $cur = 0 + ($latest->estimated_cost_usd || 0);
+            for my $w (qw(day week month)) {
+                my $base = $snap->search({ 'me.created_at' => { '<' => $utc{$w} } },
+                    { order_by => { -desc => 'me.created_at' }, rows => 1 })->single;
+                my $partial = 0;
+                unless ($base) {
+                    $base = $snap->search({ 'me.created_at' => { '>=' => $utc{$w} } },
+                        { order_by => { -asc => 'me.created_at' }, rows => 1 })->single;
+                    $partial = 1;
+                }
+                next unless $base;
+                my $d = $cur - (0 + ($base->estimated_cost_usd || 0));
+                $d = 0 if $d < 0;
+                $out->{key_snapshot}{$w} = 0 + sprintf('%.4f', $d);
+                $out->{key_snapshot}{"${w}_partial"} = 1 if $partial;
+            }
+        }
+        for my $w (qw(day week month)) {
+            my $l = $out->{ledger}{$w} || 0;
+            my $k = $out->{key_snapshot}{$w} || 0;
+            $out->{$w} = $l > $k ? $l : $k;
+            $out->{ledger}{$w} = 0 + sprintf('%.4f', $l);
+        }
+        $out->{window_start_utc} = \%utc;
+        $out->{ok} = 1;
+    } catch {
+        $out->{error} = "$_";
+    };
+    $out->{$_} = 0 + sprintf('%.4f', $out->{$_}) for qw(day week month);
+    %SPEND_CACHE = (at => $now, data => $out) if $out->{ok};
+    return $out;
+}
+
+# supergrok_guard($c) -> { locked, reason, checked, stale }
+# The workstation guard (~/.hermes/scripts/supergrok_daily_guard.py) writes
+# root/static/ai/supergrok_guard.json: off_today / mode=free / used_today >=
+# daily_cap = locked. Readings older than 36h are treated as unknown (not locked).
+sub supergrok_guard {
+    my ($self, $c) = @_;
+    my $path = $ENV{COMSERV_SUPERGROK_GUARD_FILE}
+        || (try { $c && ref $c && $c->can('path_to') ? $c->path_to('root', 'static', 'ai', 'supergrok_guard.json') . '' : undef } catch { undef });
+    my $out = { locked => 0, reason => '', path => $path };
+    return $out unless $path && -f $path;
+    my $g = try {
+        open my $fh, '<:raw', $path or die "$!\n";
+        my $raw = do { local $/; <$fh> };
+        close $fh;
+        decode_json($raw);
+    } catch { undef };
+    return { %$out, error => 'unreadable' } unless ref $g eq 'HASH';
+    $out->{checked} = $g->{checked};
+    if ($g->{checked} && $g->{checked} =~ /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)/) {
+        my $age = try {
+            require Time::Local;
+            time - Time::Local::timelocal(0, $5, $4, $3, $2 - 1, $1);
+        } catch { 0 };
+        if ($age > 36 * 3600) { $out->{stale} = 1; return $out }
+    }
+    my @why;
+    push @why, ($g->{lock_reason} || 'off today') if $g->{off_today};
+    push @why, 'mode=free' if ($g->{mode} // '') eq 'free' && !$g->{off_today};
+    push @why, "used_today $g->{used_today}% >= daily_cap $g->{daily_cap}%"
+        if defined $g->{daily_cap} && defined $g->{used_today} && $g->{daily_cap} > 0 && $g->{used_today} >= $g->{daily_cap};
+    if (@why) { $out->{locked} = 1; $out->{reason} = join('; ', @why) }
+    return $out;
+}
+
+# failover_candidates($c, $provider, $model, %o) -> ordered candidate list
+# o: chains (loaded), purpose, verdicts, failover (0 = requested only)
+sub failover_candidates {
+    my ($self, $c, $provider, $model, %o) = @_;
+    my $ld = $o{chains} || Comserv::Util::AI::ModelChains->load($c);
+    my $purpose = $o{purpose} || 'chat';
+    my $verdicts = $o{verdicts} || {};
+    my $k = $o{knobs} || $self->_failover_knobs($ld);
+    my (@main, @watch, %seen);
+    my $mk = sub {
+        my ($prov, $mod, $step, $src) = @_;
+        return undef unless defined $prov && length $prov && defined $mod && length $mod;
+        $prov = 'openrouter' if $prov eq 'external';
+        my $bare = $self->_bare_model($mod);
+        my $slug = Comserv::Util::AI::ModelHealth->normalize_slug($prov, $bare);
+        return undef if $seen{$slug}++;
+        return { provider => $prov, model => $bare, slug => $slug, step => $step, source => $src,
+                 verdict => ($verdicts->{$slug} ? $verdicts->{$slug}{verdict} : undef) };
+    };
+    my $req = $mk->($provider, $model, 0, 'requested');
+    return ($req ? ($req) : ()) if defined $o{failover} && !$o{failover};
+    my $i = 0;
+    for my $s (Comserv::Util::AI::ModelChains->chain($ld, $purpose)) {
+        $i++;
+        if ($s eq $Comserv::Util::AI::ModelChains::OLLAMA_AUTO) {
+            push @main, { placeholder => 'ollama_auto', step => $i, source => 'chain', slug => $s };
+            next;
+        }
+        my ($p, $m) = split /\|/, $s, 2;
+        my $cand = $mk->($p, $m, $i, 'chain') or next;
+        if ($k->{demote_watch_verdict} && ($cand->{verdict} // '') eq 'watch') { push @watch, $cand }
+        else { push @main, $cand }
+    }
+    return (($req ? ($req) : ()), @main, @watch,
+            { placeholder => 'live_tail', step => $i + 1, source => 'live_tail', slug => 'live_tail' });
+}
+
+sub _expand_placeholder {
+    my ($self, $c, $ph, $seen) = @_;
+    my ($free, $local) = $self->pick_free_fallback($c);
+    my @out;
+    for my $hop ($ph->{placeholder} eq 'ollama_auto' ? ($local) : ($free, $local)) {
+        next unless $hop && ref $hop eq 'HASH';
+        my $prov = $hop->{provider} eq 'external' ? 'openrouter' : $hop->{provider};
+        my $bare = $self->_bare_model($hop->{model});
+        my $slug = Comserv::Util::AI::ModelHealth->normalize_slug($prov, $bare);
+        next if $seen->{$slug}++;
+        push @out, { provider => $prov, model => $bare, slug => $slug,
+                     step => $ph->{step}, source => $ph->{placeholder} };
+    }
+    return @out;
+}
+
+# _skip_reason(...) -> undef (try it) or a reason string. Circuit check is
+# last: it may claim the single half-open probe.
+sub _skip_reason {
+    my ($self, $c, $cand, %a) = @_;
+    my ($k, $ld, $health) = @a{qw(knobs chains health)};
+    my $slug = $cand->{slug};
+    if ($cand->{source} ne 'requested' && $self->_model_is_killed($c, $cand->{provider}, $cand->{model})) {
+        return 'kill_switch';
+    }
+    return 'removed' if Comserv::Util::AI::ModelChains->is_removed($ld, $slug);
+    return 'effectiveness_replace'
+        if $k->{exclude_replace_verdict} && ($cand->{verdict} // '') eq 'replace';
+    if ($cand->{provider} eq 'supergrok' && $k->{supergrok_respect_guard}) {
+        my $g = $a{guard} || $self->supergrok_guard($c);
+        return 'supergrok_locked' if $g->{locked};
+    }
+    if ($self->_is_paid_candidate($cand)) {
+        my $is_failover = ${ $a{attempt_no_ref} } > 0 || $cand->{source} ne 'requested';
+        if ($is_failover) {
+            my $sp = $a{spend} || ($c && ref $c && $c->can('model') ? $self->openrouter_spend($c) : { ok => 0 });
+            return 'budget_unknown' unless $sp->{ok};
+            return 'budget_cap_day'   if $sp->{day}   >= ($k->{openrouter_soft_cap_day_usd}   // 1.65);
+            return 'budget_cap_week'  if $sp->{week}  >= ($k->{openrouter_soft_cap_week_usd}  // 11.50);
+            return 'budget_cap_month' if $sp->{month} >= ($k->{openrouter_soft_cap_month_usd} // 50);
+            my $mcap = $k->{model_caps_usd_per_day}{$slug};
+            return 'model_cap' if defined $mcap && ($sp->{by_model_day}{$slug} || 0) >= $mcap;
+            my $ccap = $k->{chain_caps_usd_per_day}{ $a{purpose} // 'chat' };
+            if (defined $ccap) {
+                my %in = map { $_ => 1 } Comserv::Util::AI::ModelChains->chain($ld, $a{purpose});
+                my $used = 0;
+                $used += $sp->{by_model_day}{$_} || 0 for grep { $in{$_} } keys %{ $sp->{by_model_day} || {} };
+                return 'chain_cap' if $used >= $ccap;
+            }
+        }
+        unless ($a{spend}) {   # tests inject spend and skip the live credit probe
+            my $st = try { $c && ref $c && $c->can('model') ? $c->model('AI')->usage->fetch_openrouter_status($c) : undef } catch { undef };
+            return 'credits_exhausted' if $st && $st->{ok} && defined $st->{remaining} && $st->{remaining} <= 0;
+        }
+    }
+    my $chk = $health->check($slug);
+    unless ($chk->{allow}) {
+        return ($chk->{reason} // '') eq 'probe_in_flight' ? 'circuit_probe_in_flight' : 'circuit_open';
+    }
+    $cand->{probe} = $chk->{probe} ? 1 : 0;
+    return undef;
+}
+
+# Ledger rows for failed attempts, written after the walk so each row
+# carries the final model. Needs $c (skipped in unit tests without one).
+sub _ledger_failover {
+    my ($self, $c, $failed, $final, %o) = @_;
+    return unless $c && ref $c && $c->can('model');
+    return if defined $o{ledger} && !$o{ledger};
+    my $final_slug = $final ? $final->{slug} : 'none';
+    my $prev;
+    for my $att (@$failed) {
+        my $fo = {
+            attempt_no      => $att->{attempt_no},
+            fallback_reason => $att->{reason},
+            ($prev ? (fallback_from => $prev->{slug}) : ()),
+            chain_step      => $att->{step},
+            chain_source    => $att->{source},
+            purpose         => $o{purpose},
+            final_model     => $final_slug,
+            outcome         => 'failed',
+            ($att->{probe} ? (probe => 1) : ()),
+        };
+        try {
+            $c->model('AI')->log_usage($c,
+                provider      => $att->{provider},
+                model         => $att->{model},
+                status        => 'error',
+                error_message => substr(($att->{error} // $att->{reason} // 'failed'), 0, 1000),
+                request_type  => $o{request_type} || 'chat',
+                duration_ms   => $att->{duration_ms},
+                metadata      => { %{ $o{ledger_meta} || {} }, fallover => $fo },
+            );
+        } catch {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_ledger_failover', "ledger write failed: $_");
+        };
+        $prev = $att;
+    }
+    if (!$final && $o{all_exhausted}) {
+        try {
+            $c->model('AI')->log_usage($c,
+                provider      => 'router',
+                model         => 'all_exhausted',
+                status        => 'all_exhausted',
+                error_message => $ALL_EXHAUSTED_MSG,
+                request_type  => $o{request_type} || 'chat',
+                metadata      => { %{ $o{ledger_meta} || {} }, fallover => {
+                    fallback_reason => 'all_exhausted', reason => 'all_exhausted',
+                    attempt_no => scalar(@$failed), purpose => $o{purpose},
+                    requested => $o{requested}, final_model => 'none',
+                    ($prev ? (fallback_from => $prev->{slug}) : ()),
+                    attempts => [ map { "$_->{slug}:$_->{reason}" } @$failed ],
+                    skipped  => [ map { "$_->{slug}:$_->{reason}" } @{ $o{skipped} || [] } ],
+                } },
+            );
+        } catch {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_ledger_failover', "all_exhausted ledger write failed: $_");
+        };
+    }
+}
+
 sub chat_with_fallback {
     my ($self, $c, $provider_name, $use_model, $messages, %opts) = @_;
+
+    # Refuse before any hop, including the free/Ollama fallback. A miss here
+    # would send the same prompt to the next provider.
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::scan_messages($messages);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'chat_with_fallback',
+            "HarmRefusal failed closed: $@");
+        return {
+            success => 0,
+            refused => 1,
+            error   => 'Chat safety check failed. The question was not sent.',
+        };
+    }
+    if ($harm) {
+        my $uid = eval { $c->session->{user_id} };
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, $uid));
+        return Comserv::Util::AI::HarmRefusal::reply_hash($harm);
+    }
 
     if (my $killed = $self->_model_is_killed($c, $provider_name, $use_model)) {
         my $why = (ref $killed eq 'HASH' && $killed->{reason}) ? $killed->{reason} : 'operator';
@@ -471,87 +886,150 @@ sub chat_with_fallback {
         };
     }
 
-    my $skip_paid = 0;
-    my $pre_err;
-    if ($self->_provider_needs_credit_fallback($provider_name)) {
-        if ($provider_name =~ /^(openrouter|external)$/) {
-            my $st = try { $c->model('AI')->usage->fetch_openrouter_status($c) } catch { undef };
-            if ($st && $st->{ok} && defined $st->{remaining} && $st->{remaining} <= 0) {
-                $skip_paid = 1;
-                $pre_err = 'OpenRouter remaining credits are 0 (no auto-fill)';
-                $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
-                    $pre_err);
+    my $ld      = $opts{chains} || Comserv::Util::AI::ModelChains->load($c);
+    my $k       = $self->_failover_knobs($ld);
+    my $health  = $opts{health} || Comserv::Util::AI::ModelHealth->new(
+                      path => Comserv::Util::AI::ModelHealth->default_path($c));
+    my $signals = $opts{signals} || $self->health_signals($c, $k, $health);
+    my $purpose = $opts{purpose} || 'chat';
+    my %pass    = ($opts{use_search} ? (use_search => 1) : ());
+
+    my %seen;
+    my @queue = $self->failover_candidates($c, $provider_name, $use_model,
+        chains => $ld, purpose => $purpose, verdicts => $signals->{verdicts}, knobs => $k,
+        (exists $opts{failover} ? (failover => $opts{failover}) : ()));
+    $seen{ $_->{slug} } = 1 for grep { !$_->{placeholder} } @queue;
+
+    my (@attempts, @failed, @skipped, $postcheck_keep, %down);
+    my $attempt_no = 0;
+    while (my $cand = shift @queue) {
+        if ($cand->{placeholder}) {
+            unshift @queue, $self->_expand_placeholder($c, $cand, \%seen);
+            next;
+        }
+        # A provider that just proved unreachable (e.g. Ollama host down) is
+        # not retried with another of its models in the same turn.
+        if ($down{ $cand->{provider} }) {
+            push @skipped, { slug => $cand->{slug}, step => $cand->{step}, reason => 'provider_unreachable' };
+            next;
+        }
+        my $skip = $self->_skip_reason($c, $cand, knobs => $k, chains => $ld, health => $health,
+            purpose => $purpose, attempt_no_ref => \$attempt_no,
+            ($opts{spend} ? (spend => $opts{spend}) : ()), ($opts{guard} ? (guard => $opts{guard}) : ()));
+        if ($skip) {
+            push @skipped, { slug => $cand->{slug}, step => $cand->{step}, reason => $skip };
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'chat_with_fallback',
+                "failover skip $cand->{slug} (step $cand->{step}): $skip");
+            next;
+        }
+        $attempt_no++;
+        my $t0 = Time::HiRes::time();
+        my $resp = $self->_chat_one_with_retry($c, $cand->{provider}, $cand->{model}, $messages, %pass);
+        my ($ok, $reason, $flags) = $self->classify_result($resp, $cand->{provider}, $k);
+        if ($ok && $opts{postcheck} && ref $opts{postcheck} eq 'CODE') {
+            my ($text, $emptied) = $opts{postcheck}->($resp->{response});
+            if ($emptied) {
+                $ok = 0;
+                $reason = 'postcheck_empty';
+                $postcheck_keep ||= { %$resp, response => $text, postchecked => 1,
+                                      provider => $cand->{provider}, _cand => $cand };
+            } else {
+                $resp->{response} = $text;
+                $resp->{postchecked} = 1;
             }
         }
-    }
+        my $att = {
+            attempt_no => $attempt_no, provider => $cand->{provider}, model => $cand->{model},
+            slug => $cand->{slug}, step => $cand->{step}, source => $cand->{source},
+            ok => $ok ? 1 : 0, reason => $reason, probe => $cand->{probe},
+            error => ($ok ? undef : (($resp && $resp->{error}) || $reason)),
+            duration_ms => int((Time::HiRes::time() - $t0) * 1000),
+            ($flags->{tokens_unreported} ? (tokens_unreported => 1) : ()),
+        };
+        push @attempts, $att;
 
-    my $resp;
-    unless ($skip_paid) {
-        $resp = $self->_chat_one_with_retry($c, $provider_name, $use_model, $messages, %opts);
-        if ($resp && $resp->{success}) {
-            my $body = $resp->{response} // '';
-            $body =~ s/^\s+|\s+$//g;
-            if (length $body) {
-                return $resp;
-            }
-            # CSC-20260914-5166: HTTP success with blank text looks like a hang.
-            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
-                "Provider $provider_name returned empty content (model="
-                . ($use_model // '?') . "); treating as failure");
-            $resp = {
-                success  => 0,
-                error    => 'Provider returned empty content',
-                provider => $provider_name,
-                model    => $resp->{model} || $use_model,
+        if ($ok) {
+            $health->record_success($cand->{slug});
+            my $prev = $failed[-1];
+            $resp->{provider} = $cand->{provider};
+            $resp->{model}  ||= $cand->{model};
+            $resp->{attempts} = \@attempts;
+            $resp->{fallover} = {
+                attempt_no   => $attempt_no,
+                chain_step   => $cand->{step},
+                chain_source => $cand->{source},
+                purpose      => $purpose,
+                final_model  => $cand->{slug},
+                ($prev ? (fallback_from => $prev->{slug}, fallback_reason => $prev->{reason}) : ()),
+                (@skipped ? (skipped => [ map { "$_->{slug}:$_->{reason}" } @skipped ]) : ()),
+                ($cand->{probe} ? (probe => 1) : ()),
+                ($flags->{tokens_unreported} ? (tokens_unreported => 1) : ()),
             };
+            if ($cand->{source} ne 'requested') {
+                # Legacy fields read by Chat.pm / FocusTune / TodoRank.
+                $resp->{fallback}       = 1;
+                $resp->{fallback_from}  = $provider_name;
+                $resp->{original_error} = @failed ? $failed[0]{error} : 'skipped: ' . join(', ', map { $_->{reason} } @skipped);
+                $resp->{original_model} = $use_model;
+                $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
+                    "failover answered by $cand->{slug} (attempt $attempt_no, step $cand->{step}) after "
+                    . join(', ', map { "$_->{slug}:$_->{reason}" } @failed, @skipped));
+            }
+            $self->_ledger_failover($c, \@failed, $cand, purpose => $purpose, %opts);
+            $resp->{attempts_logged} = 1;
+            return $resp;
         }
-    }
 
-    my $err = $pre_err || ($resp && $resp->{error}) || 'AI provider error';
-    # Credit-exhaustion on paid providers OR a dead Ollama hop (docker cannot
-    # reach host:11434 — CSC-20260831-1585) should fall through to a free
-    # OpenRouter model instead of leaving the UI on Thinking… forever.
-    # Also fall through on empty content (CSC-20260914-5166).
-    my $do_fallback = (
-        $self->_provider_needs_credit_fallback($provider_name)
-            && ($skip_paid || $self->_credits_exhausted($err) || $err =~ /empty content/i)
-    ) || (
-        ($provider_name // '') eq 'ollama'
-            && ($resp && $resp->{unreachable} || $self->_credits_exhausted($err))
-    );
-
-    unless ($do_fallback) {
-        $resp ||= { success => 0, error => $err, provider => $provider_name };
-        $resp->{provider} ||= $provider_name;
-        return $resp;
-    }
-
-    my ($free, $local) = $self->pick_free_fallback($c, $provider_name, $use_model);
-    # When Ollama itself is the failing hop, do not retry another Ollama tag.
-    $local = undef if ($provider_name // '') eq 'ollama';
-    for my $hop ($free, $local) {
-        next unless $hop;
-        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
-            "$provider_name failed ($err); falling back to $hop->{provider} $hop->{model}");
-        my $retry = $self->_chat_one_with_retry($c, $hop->{provider}, $hop->{model}, $messages, %opts);
-        if ($retry && $retry->{success}) {
-            $retry->{provider}       = $hop->{provider};
-            $retry->{fallback}       = 1;
-            $retry->{fallback_from}  = $provider_name;
-            $retry->{original_error} = $err;
-            $retry->{original_model} = $use_model;
-            return $retry;
+        unless ($reason eq 'postcheck_empty') {
+            my $hr = $health->record_failure($cand->{slug}, $reason, %$k);
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
+                "attempt $attempt_no $cand->{slug} failed ($reason)"
+                . ($hr && $hr->{opened} ? '; circuit OPEN' : '') . ': ' . ($att->{error} // ''));
         }
-        my $hop_err = ($retry && $retry->{error}) || 'fallback hop failed';
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'chat_with_fallback',
-            "Fallback hop $hop->{provider}/$hop->{model} failed: $hop_err");
+        $down{ $cand->{provider} } = 1 if $reason eq 'unreachable' && $cand->{provider} eq 'ollama';
+        push @failed, $att;
     }
 
-    $resp ||= { success => 0, error => $err, provider => $provider_name };
-    $resp->{provider} ||= $provider_name;
-    $resp->{error} = $err;
+    # Grounded turn where every answer was stripped to nothing: the post-check
+    # already produced the honest Golden Data fallback text — return that.
+    if ($postcheck_keep) {
+        my $cand = delete $postcheck_keep->{_cand};
+        $postcheck_keep->{success}  = 1;
+        $postcheck_keep->{attempts} = \@attempts;
+        $postcheck_keep->{fallover} = {
+            attempt_no => $attempt_no, chain_step => $cand->{step}, purpose => $purpose,
+            final_model => $cand->{slug}, outcome => 'postcheck_empty_all',
+            fallback_reason => 'postcheck_empty',
+        };
+        my @others = grep { $_->{slug} ne $cand->{slug} || $_->{reason} ne 'postcheck_empty' } @failed;
+        $self->_ledger_failover($c, \@others, $cand, purpose => $purpose, %opts);
+        $postcheck_keep->{attempts_logged} = 1;
+        return $postcheck_keep;
+    }
+
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'chat_with_fallback',
+        "all_exhausted for $provider_name/" . ($use_model // '?') . " purpose=$purpose: "
+        . join(', ', map { "$_->{slug}:$_->{reason}" } @failed, @skipped));
+    $self->_ledger_failover($c, \@failed, undef, purpose => $purpose, all_exhausted => 1,
+        skipped => \@skipped, requested => "$provider_name|" . ($use_model // ''), %opts);
     eval { Comserv::Util::ModelCatalog->invalidate };
-    return $resp;
+    return {
+        success         => 0,
+        all_exhausted   => 1,
+        error           => $ALL_EXHAUSTED_MSG,
+        detail          => join('; ', map { "$_->{slug}: " . ($_->{error} // $_->{reason}) } @failed),
+        provider        => $provider_name,
+        model           => $use_model,
+        attempts        => \@attempts,
+        skipped         => \@skipped,
+        attempts_logged => 1,
+        fallover        => {
+            reason => 'all_exhausted', fallback_reason => 'all_exhausted', purpose => $purpose,
+            attempt_no => $attempt_no, final_model => 'none',
+            attempts => [ map { "$_->{slug}:$_->{reason}" } @failed ],
+            skipped  => [ map { "$_->{slug}:$_->{reason}" } @skipped ],
+        },
+    };
 }
 
 # -------------------------------------------------------------------
@@ -565,11 +1043,13 @@ sub chat_with_fallback {
 sub dispatch_chat {
     my ($self, $c, $requested_model, $messages, %opts) = @_;
 
-    my $can_select = $opts{can_select} // 1;
+    my $can_select = delete $opts{can_select} // 1;
     my ($provider_name, $use_model) = $self->select_model($c,
         requested_model => $requested_model, can_select => $can_select);
 
-    return $self->chat_with_fallback($c, $provider_name, $use_model, $messages);
+    # Remaining opts (purpose, failover => 0, request_type, ...) go to the
+    # failover walk (AISYSTEM plan §5e).
+    return $self->chat_with_fallback($c, $provider_name, $use_model, $messages, %opts);
 }
 
 # #2380 — live failover list for diagnostics / auto-sync (no hardcoded slugs).
@@ -675,16 +1155,22 @@ sub get_available_models {
 # an explicit refresh pulls the live list.
 sub _default_free_catalog {
     my ($self, $c) = @_;
+    # §5e: free OpenRouter slugs come from data/ai_model_chains.json (all
+    # purposes, removals applied). The hard-coded trio below is only the
+    # last-resort default when the chains yield nothing.
+    my @slugs = eval {
+        my $ld = Comserv::Util::AI::ModelChains->load($c);
+        my %s;
+        grep { !$s{$_}++ }
+        map  { my ($p, $m) = split /\|/, $_, 2; $m }
+        grep { /^(?:openrouter|external)\|.+:free$/ }
+        map  { Comserv::Util::AI::ModelChains->chain($ld, $_) } @Comserv::Util::AI::ModelChains::PURPOSES;
+    };
+    @slugs = ('google/gemma-4-31b-it:free', 'google/gemma-4-26b-a4b-it:free',
+              'nvidia/nemotron-3-nano-30b-a3b:free') unless @slugs;
     return (
-        { name => 'google/gemma-4-31b-it:free', provider => 'openrouter',
-          label => 'OpenRouter: google/gemma-4-31b-it:free', local => 0, free => 1,
-          price_prompt => 0, price_completion => 0 },
-        { name => 'google/gemma-4-26b-a4b-it:free', provider => 'openrouter',
-          label => 'OpenRouter: google/gemma-4-26b-a4b-it:free', local => 0, free => 1,
-          price_prompt => 0, price_completion => 0 },
-        { name => 'nvidia/nemotron-3-nano-30b-a3b:free', provider => 'openrouter',
-          label => 'OpenRouter: nvidia/nemotron-3-nano-30b-a3b:free', local => 0, free => 1,
-          price_prompt => 0, price_completion => 0 },
+        (map { { name => $_, provider => 'openrouter', label => "OpenRouter: $_", local => 0, free => 1,
+                 price_prompt => 0, price_completion => 0 } } @slugs),
         { name => 'ollama_unreachable', provider => 'ollama',
           label => 'Ollama (refresh to see local models)', local => 1,
           unreachable => 1, disabled => 1 },

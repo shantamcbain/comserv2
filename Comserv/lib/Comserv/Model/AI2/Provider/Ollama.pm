@@ -125,6 +125,20 @@ sub chat {
     my ($self, $c, %args) = @_;
 
     my $messages = $args{messages} || [];
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::scan_messages($messages);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ollama_chat',
+            "HarmRefusal failed closed: $@");
+        return { success => 0, refused => 1, error => 'Chat safety check failed. The question was not sent.' };
+    }
+    if ($harm) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'ollama_chat',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, eval { $c->session->{user_id} }));
+        return Comserv::Util::AI::HarmRefusal::reply_hash($harm);
+    }
     my $model    = $args{model}    || 'phi4:14b';
     my ($rhost, $rport, $reachable) = $self->resolve_host($c);
     my $host     = $args{host}     || $rhost;

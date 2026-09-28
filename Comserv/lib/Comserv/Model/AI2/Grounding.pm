@@ -738,6 +738,10 @@ sub finish_turn {
 
     $turn->{ledger}{flagged_count} = $pc->{flagged_count} // 0;
     $turn->{ledger}{cited_ids}     = join(',', @{$pc->{cited_ids} // []});
+    # Model failover (AISYSTEM plan §5e): a strip that leaves nothing means
+    # this model gave no usable grounded answer; the Router may try the next
+    # chain step. The returned text is still the honest fixed fallback.
+    $turn->{postcheck_emptied} = $pc->{emptied} ? 1 : 0;
 
     push @$thinking, "Post-check: flagged=" . ($pc->{flagged_count} // 0) . " cited=" . scalar(@{$pc->{cited_ids} // []});
 

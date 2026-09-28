@@ -1,0 +1,11 @@
+<div id="2026-09-28-model-failover" class="cl-entry">
+<h3>2026-09-28 — Real model failover (ordered chains, circuit breaker, budget guards)</h3>
+<p class="doc-body"><strong>What.</strong> The AI2 Router walks an ordered, purpose-scoped model chain on 404/410/429/402/5xx, timeout, empty, 0-token-empty, and grounding post-check empty. Circuits open after consecutive failures or an error_spike/dead_model anomaly, cool down, then half-open with one probe. Free→paid failover refuses past the OpenRouter soft caps ($1.65/day, $11.50/week, $50/month) and the Super Grok guard lock. Exhaustion returns an honest message and a Ledger <code>all_exhausted</code> row. Chain order and knobs live in <code>data/ai_model_chains.json</code> (not under <code>root/</code>); health state in <code>data/ai_model_health.json</code>. Admins tune chains from /ai/eval via new allow-listed keys, with before-value and revert. /ai/usage#fallover and usage_live <code>org.fallover</code> expose rate, step, open circuits, and Hermes hops. Hermes keeps its own native <code>fallback_providers</code>; a proposed config is staged next to <code>~/.hermes/config.yaml</code> (live file untouched).</p>
+<p class="doc-body"><strong>Why.</strong> Eval data showed the old hard-coded free preference was not a real failover: free nemotron 404s, free gemma 429 on 7/7 (error_spike), Ollama 0-token "success", and Hermes mid-session hops that left work unfinished. The eval page could not tune the order.</p>
+<p class="doc-body"><strong>Files.</strong>
+<code>Util/AI/ModelChains.pm</code>, <code>Util/AI/ModelHealth.pm</code>, <code>Model/AI2/Router.pm</code>, <code>Model/AI2/Chat.pm</code>, <code>Model/AI2/Grounding.pm</code>, <code>Model/AI2/UsageMonitor.pm</code>, <code>Model/AI2/EvalReports.pm</code>, <code>Model/AI2/FocusTune.pm</code>, <code>Model/AI/Usage.pm</code>, <code>Util/ModelCatalog.pm</code>, <code>Util/AI/EvalAllowList.pm</code>, <code>Util/AI/Glossary.pm</code>,
+<code>Controller/AI.pm</code>, <code>Controller/AI2.pm</code>, <code>Controller/AI/Usage.pm</code>,
+<code>data/ai_model_chains.json</code>, <code>data/ai_model_health.json</code>,
+<code>root/ai/usage_fallover_card.tt</code>, <code>root/ai/usage.tt</code>,
+<code>root/Documentation/AISYSTEMPlan.tt</code> §5e, <code>t/ai_model_failover.t</code>.</p>
+</div>

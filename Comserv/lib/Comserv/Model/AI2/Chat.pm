@@ -252,6 +252,26 @@ sub process {
 
     my $prompt = $args{prompt} // '';
     return { success => 0, error => 'Prompt is required' } unless $prompt && length $prompt;
+
+    # Before agents, logs, and the provider. Do not log the body.
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::classify_turn($prompt, $args{history});
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+            "HarmRefusal failed closed: $@");
+        return { success => 0, refused => 1, error => 'Chat safety check failed. The question was not sent.' };
+    }
+    if ($harm) {
+        my $uid = eval { $c->session->{user_id} };
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'process',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, $uid));
+        my $reply = Comserv::Util::AI::HarmRefusal::reply_hash($harm);
+        $reply->{thinking} = ['Local harm refusal; prompt was not sent to a provider'];
+        return $reply;
+    }
+
     my $t0 = [gettimeofday];
 
     my @thinking;
@@ -487,12 +507,28 @@ sub process {
     # xAI grok auto-fills — not the same provider as SuperGrok.
     my $router = $c->model('AI2::Router');
     push @thinking, 'Calling provider (chat_with_fallback)...';
+    # Model failover (AISYSTEM plan §5e): purpose picks the chain in
+    # data/ai_model_chains.json; failed attempts are written to the Ledger by
+    # the Router (metadata.fallover); an enforce-mode grounding strip that
+    # leaves nothing fails over to the next chain step.
+    my $purpose = ($gturn && $gturn->{enforce}) ? 'docs'
+                : ($code_read || $args{skip_app_writes} || $args{phase}) ? 'coding'
+                : 'chat';
+    my $postcheck = ($gturn && $gturn->{enforce}) ? sub {
+        my ($text) = @_;
+        my $out = $grounding->finish_turn($c, $gturn, $text // '', \@thinking);
+        return ($out, $gturn->{postcheck_emptied});
+    } : undef;
     my $resp = try {
         # use_search must be threaded to the provider: it is set by the widget
         # (local-chat.js) and parsed in AI2.pm, but was never forwarded past
         # this point, so Grok's search_parameters (Grok.pm) never fired.
         $router->chat_with_fallback($c, $provider_name, $use_model, $messages,
-            ($args{use_search} ? (use_search => 1) : ()));
+            ($args{use_search} ? (use_search => 1) : ()),
+            purpose      => $purpose,
+            request_type => 'chat',
+            ledger_meta  => $self->_aimps_meta($c, \%args),
+            ($postcheck ? (postcheck => $postcheck) : ()));
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
             "Provider $provider_name threw: $_");
@@ -500,10 +536,25 @@ sub process {
         undef;
     };
 
+    if ($resp && $resp->{refused}) {
+        push @thinking, 'Local harm refusal; not sent to a provider';
+        return {
+            success  => $resp->{success} ? 1 : 0,
+            refused  => 1,
+            response => $resp->{response} // '',
+            error    => $resp->{error},
+            provider => 'local-refusal',
+            model    => 'harm-refusal',
+            thinking => \@thinking,
+        };
+    }
+
     unless ($resp && $resp->{success}) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
             "Provider $provider_name failed: " . ($resp->{error} // 'AI provider error')
             . " (model=" . ($use_model // '?') . ", user=$username)");
+        # The Router already wrote one Ledger row per failed attempt plus a
+        # router/all_exhausted row (§5e); only log here when it did not.
         eval {
             $c->model('AI')->log_usage($c,
                 provider          => $provider_name,
@@ -515,7 +566,7 @@ sub process {
                 metadata          => $self->_aimps_meta($c, \%args),
                 grounding         => ($gturn ? $gturn->{ledger} : undef),   # Ledger grounding fields
             );
-        };
+        } unless $resp && $resp->{attempts_logged};
         if ($@) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
                 "Failed to record AI usage (error path): $@");
@@ -535,6 +586,7 @@ sub process {
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'process',
             "Fell back from $resp->{fallback_from} ($resp->{original_error}) to "
             . ($resp->{provider} // '') . '/' . ($resp->{model} // ''));
+        # Failed attempts are already in the Ledger (Router, metadata.fallover).
         eval {
             $c->model('AI')->log_usage($c,
                 provider          => $resp->{fallback_from} || $provider_name,
@@ -547,7 +599,7 @@ sub process {
                     fallback_to => $resp->{provider},
                 }),
             );
-        };
+        } unless $resp->{attempts_logged};
         if ($@) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
                 "Failed to record AI usage (fallback path): $@");
@@ -590,7 +642,8 @@ sub process {
     }
 
     # Grounding post-check (enforce only): cite-or-strip + Candidate Data label.
-    if ($gturn && $gturn->{enforce} && $resp && $resp->{success}) {
+    # Skipped when the Router already ran it as the failover post-check.
+    if ($gturn && $gturn->{enforce} && $resp && $resp->{success} && !$resp->{postchecked}) {
         $resp->{response} = $grounding->finish_turn($c, $gturn, $resp->{response} // '', \@thinking);
     }
 
@@ -949,6 +1002,9 @@ sub process {
                     fallback_from => $resp->{fallback_from},
                 ) : ()),
             }),
+            # §5e: attempt_no / fallback_from / fallback_reason / final model.
+            (ref $resp->{fallover} eq 'HASH' ? (fallover => $resp->{fallover}) : ()),
+            response_text     => $resp->{response} // '',
         );
         # SuperGrok ≠ xAI grok. Only SuperGrok (prepaid, no auto-fill) trips the 80% alert.
         my $from = $resp->{fallback_from} || $provider_name || '';
@@ -965,7 +1021,7 @@ sub process {
         success         => 1,
         response        => $resp->{response} // '',
         model           => $resp->{model} || $use_model,
-        provider        => $provider_name,
+        provider        => $resp->{provider} || $provider_name,
         usage           => $resp->{usage} || {},
         conversation_id => $conversation_id,
         title           => $saved_title,
@@ -974,6 +1030,12 @@ sub process {
         files_read      => \@files_read,
         citations       => $citations || [],
         grounding       => ($grounding && $gturn ? $grounding->summary($gturn) : undef),
+        fallover        => $resp->{fallover},
+        fallback        => $resp->{fallback},
+        fallback_from   => $resp->{fallback_from},
+        original_model  => $resp->{original_model},
+        original_error  => $resp->{original_error},
+        all_exhausted   => $resp->{all_exhausted},
     };
 }
 

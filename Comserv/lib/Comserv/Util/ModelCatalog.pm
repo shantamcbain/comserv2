@@ -285,6 +285,30 @@ our @FREE_PREFERENCE = (
 
 our $CODING_DEFAULT = 'openrouter|cohere/north-mini-code:free';
 
+# AISYSTEM plan §5e: the ordered lists now live in data/ai_model_chains.json
+# (admin-tunable from /ai/eval). @FREE_PREFERENCE / $CODING_DEFAULT above are
+# only the last-resort default when that file is missing or invalid
+# (Comserv::Util::AI::ModelChains logs when it falls back).
+sub free_preference {
+    my ($class, $c) = @_;
+    my @out = eval {
+        require Comserv::Util::AI::ModelChains;
+        my $ld = Comserv::Util::AI::ModelChains->load($c);
+        grep { /^(?:openrouter|external)\|/ } Comserv::Util::AI::ModelChains->chain($ld, 'chat');
+    };
+    return @out ? @out : @FREE_PREFERENCE;
+}
+
+sub coding_default {
+    my ($class, $c) = @_;
+    my $first = eval {
+        require Comserv::Util::AI::ModelChains;
+        my $ld = Comserv::Util::AI::ModelChains->load($c);
+        (grep { !/\|auto$/ } Comserv::Util::AI::ModelChains->chain($ld, 'coding'))[0];
+    };
+    return $first || $CODING_DEFAULT;
+}
+
 sub default_for {
     my ($class, $c, %opts) = @_;
     my $page = $opts{page} || '';
@@ -303,14 +327,16 @@ sub default_for {
         $page_class = $router->page_class_for($page) if $router && $router->can('page_class_for');
         1;
     };
-    if ($page_class eq 'coding' && $have{$CODING_DEFAULT} && $class->_is_priv($c)) {
-        return $CODING_DEFAULT;
+    my $coding_default = $class->coding_default($c);
+    if ($page_class eq 'coding' && $have{$coding_default} && $class->_is_priv($c)) {
+        return $coding_default;
     }
+    my @free_pref = $class->free_preference($c);
 
     # Guests and members: first available FREE OpenRouter model. Never Ollama —
     # local models consume the workstation GPU (user: guest default must be a
     # free, available OpenRouter agent for nav / helpdesk / general questions).
-    for my $v (@FREE_PREFERENCE) {
+    for my $v (@free_pref) {
         return $v if $have{$v};
     }
     for my $m (@$cat) {
@@ -318,14 +344,14 @@ sub default_for {
         return $m->{value} if $m->{free};
     }
     if ($tier eq 'guest' || $tier eq 'member') {
-        return $FREE_PREFERENCE[0];
+        return $free_pref[0];
     }
 
     # Privileged: any remaining free, then coding default, then local.
     for my $m (@$cat) {
         return $m->{value} if $m->{free};
     }
-    return $CODING_DEFAULT if $have{$CODING_DEFAULT} && $class->_is_priv($c);
+    return $coding_default if $have{$coding_default} && $class->_is_priv($c);
     for my $m (@$cat) {
         return $m->{value} if $m->{local};
     }
