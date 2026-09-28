@@ -2,12 +2,12 @@
    "models" : {
       "openrouter|cohere/north-mini-code:free" : {
          "consecutive_failures" : 0,
-         "last_success_at" : 1790614126,
+         "last_success_at" : 1790617772,
          "state" : "closed",
          "total_failures" : 0,
-         "total_successes" : 2
+         "total_successes" : 4
       }
    },
-   "updated_at" : 1790614126,
+   "updated_at" : 1790617772,
    "version" : 1
 }
