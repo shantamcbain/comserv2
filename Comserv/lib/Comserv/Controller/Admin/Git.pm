@@ -709,6 +709,11 @@ sub index :Path('/admin/git') :Args(0) {
     $c->stash(
         repo_path       => $self->repo_path($c),
         current_branch  => $self->get_current_branch($c),
+        # current_worktree = registry key from app_workflow (path-based worktree dir name under ~/.comserv/worktrees/).
+        # Used to highlight the matching row in Develop Servers / Branch Servers list (b.name).
+        # This can differ from current_branch (live git) if a feature branch was checked out inside a worktree slot.
+        # The list itself is registry-driven; highlighting marks "this running server".
+        current_worktree => $c->stash->{app_workflow} || 'main',
         local_branches  => $self->get_local_branches($c),
         branch_details  => $self->git_service->get_branch_details($c),
         recent_commits  => $self->get_recent_commits($c),

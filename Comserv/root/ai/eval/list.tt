@@ -6,7 +6,7 @@
   <p class="doc-muted">Admin review of the AI usage monitor's daily report. Approve or reject each proposal;
     only approved, allow-listed config changes can be applied, and only when you press Apply.
     Code / workstation proposals become todos in project AISYSTEM. Back to
-    <a href="/ai/usage#ledger-grounding">AI Usage monitor</a>.</p>
+    <a href="[% c.uri_for('/ai/usage') %]#agent-effectiveness">AI Usage monitor</a>.</p>
 
   [% table_missing = el.table_missing %]
   [% INCLUDE 'ai/eval/_messages.tt' %]

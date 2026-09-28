@@ -1056,6 +1056,109 @@ sub _ensure_result_source {
     return eval { $schema->source($result_path) };
 }
 
+# A live schema freezes at process start. Create Table used to call
+# $schema->deployment_statements, which walks every source, then fell through
+# to $schema->deploy(), which deploys the whole schema. One unregistered
+# relationship (Can't find source for AiModelPolicyHistory) aborted the
+# request. Generate SQL for this source only. If source() names a missing
+# class, register it on this instance and retry. Never deploy the schema.
+sub _create_sql_for_source {
+    my ($self, $c, $schema, $namespace, $result_path, $class_name, $table_name) = @_;
+
+    my $source = $self->_ensure_result_source($c, $schema, $result_path, $class_name);
+    die "Could not register source '$result_path' from $class_name" unless $source;
+    $self->_ensure_related_sources($c, $schema, $namespace, $source);
+
+    require SQL::Translator;
+    my %tried;
+    my $last_err = '';
+    for my $attempt (1 .. 8) {
+        my $moniker = eval { $source->source_name } || $result_path;
+        my $tr = SQL::Translator->new(
+            parser => 'SQL::Translator::Parser::DBIx::Class',
+            parser_args => {
+                dbic_schema => $schema,
+                sources     => [$moniker],
+            },
+            producer => 'MySQL',
+            producer_args => { no_comments => 1 },
+        );
+        my $sql = eval { $tr->translate };
+        my $err = $@ || '';
+        $err ||= $tr->error if !$sql;
+        if ($sql && $sql =~ /CREATE TABLE\s+`?\Q$table_name\E`?/i) {
+            return $sql;
+        }
+        $last_err = $err || "SQL::Translator produced no CREATE TABLE for '$table_name'";
+        my ($missing) = $last_err =~ /Can't find source for (\S+)/;
+        last unless $missing;
+        $missing =~ s/['"]//g;
+        $missing =~ s/\s+at\b.*//s;
+        die "Could not register missing source '$missing': $last_err" if $tried{$missing}++;
+        my $ok = $self->_register_result_class($c, $schema, $namespace, $missing);
+        die "Could not register missing source '$missing': $last_err" unless $ok;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_sql_for_source',
+            "Registered missing source '$missing' and retrying CREATE for '$table_name'");
+        $source = eval { $schema->source($moniker) } || $source;
+    }
+    die $last_err;
+}
+
+# Load and attach a Result class the live schema does not know yet.
+# $source_name may be a moniker (AiModelPolicy) or a full class name.
+# Returns 1 on success. Does not die — the caller decides.
+sub _register_result_class {
+    my ($self, $c, $schema, $namespace, $source_name) = @_;
+    return 1 if eval { $schema->source($source_name) };
+    return 0 unless defined $source_name && $source_name =~ /\A[A-Za-z0-9:]+\z/;
+
+    my $class = $source_name;
+    unless ($class =~ /^Comserv::/) {
+        $class = "Comserv::Model::Schema::${namespace}::Result::${class}";
+    }
+    my $load_err = do { local $@; eval "require $class"; $@ };
+    if ($load_err) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_register_result_class',
+            "Could not load Result class for source '$source_name': $load_err");
+        return 0;
+    }
+    (my $path = $class) =~ s/^Comserv::Model::Schema::\Q$namespace\E::Result:://;
+    my $src = eval { $self->_ensure_result_source($c, $schema, $path, $class) };
+    if ($@ || !$src) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_register_result_class',
+            "Could not register source '$source_name': " . ($@ || 'no source'));
+        return 0;
+    }
+    # _ensure_result_source already attaches the moniker. DBIC also indexes the
+    # class name. A second register_source replaces that and warns.
+    return 1 if eval { $schema->source($source_name) };
+    eval { $schema->register_source($source_name, $src) };
+    return eval { $schema->source($source_name) } ? 1 : 0;
+}
+
+# Register belongs_to / has_many targets so a frozen schema can resolve them.
+# A missing cousin class is a warning, not a failed CREATE — FKs are stripped.
+sub _ensure_related_sources {
+    my ($self, $c, $schema, $namespace, $source, $seen) = @_;
+    $seen ||= {};
+    return unless $source;
+    my $name = eval { $source->source_name } || return;
+    return if $seen->{$name}++;
+    for my $rel (eval { $source->relationships }) {
+        my $info = eval { $source->relationship_info($rel) } || next;
+        my $rel_class = $info->{class} || next;
+        next if $seen->{$rel_class};
+        my $rel_src = eval { $source->related_source($rel) };
+        if (!$rel_src) {
+            $self->_register_result_class($c, $schema, $namespace, $rel_class);
+            $rel_src = eval { $schema->source($rel_class) };
+            (my $short = $rel_class) =~ s/.*:://;
+            $rel_src ||= eval { $schema->source($short) };
+        }
+        $self->_ensure_related_sources($c, $schema, $namespace, $rel_src, $seen) if $rel_src;
+    }
+}
+
 sub create_table_from_result :Path('/schema-comparison/create_table_from_result') :Args(0) {
     my ($self, $c) = @_;
     
@@ -1179,34 +1282,18 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         }
 
         if (!$table_exists) {
-            # Create the table using deployment_statements
+            # SQL for this table only. Do not call deployment_statements or deploy.
             try {
-                my $source = $self->_ensure_result_source($c, $schema, $result_path, $class_name);
-                unless ($source) {
-                    die "Could not find source '$result_path' in schema after require $class_name";
-                }
-
-                my @statements = $schema->deployment_statements('MySQL');
-                my @table_statements = grep { /CREATE TABLE\s+`?\Q$table_name\E`?/i } @statements;
-
-                if (@table_statements) {
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=0');
-                    foreach my $statement (@table_statements) {
-                        ($statement) = ($statement =~ /(CREATE\s+TABLE\b.*)/si);
-                        next unless $statement;
-                        my $safe_statement = _strip_fk_constraints($statement);
-                        $dbh->do($safe_statement);
-                    }
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=1');
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                        "Successfully created table '$table_name' from Result class '$class_name'");
-                } else {
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=0');
-                    $schema->deploy();
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=1');
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                        "Deployed table '$table_name' via schema->deploy()");
-                }
+                my $sql = $self->_create_sql_for_source(
+                    $c, $schema, $namespace, $result_path, $class_name, $table_name);
+                my ($statement) = ($sql =~ /(CREATE\s+TABLE\s+`?\Q$table_name\E`?\b.*)/si);
+                die "Could not isolate CREATE TABLE for '$table_name'" unless $statement;
+                $dbh->do('SET FOREIGN_KEY_CHECKS=0');
+                my $safe_statement = _strip_fk_constraints($statement);
+                $dbh->do($safe_statement);
+                $dbh->do('SET FOREIGN_KEY_CHECKS=1');
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
+                    "Successfully created table '$table_name' from Result class '$class_name'");
             } catch {
                 my $deploy_error = $_;
                 eval { $dbh->do('SET FOREIGN_KEY_CHECKS=1') };

@@ -22,6 +22,17 @@ has 'golden_store_override' => ( is => 'rw', default => undef );
 use constant EXCLUDED_REQUEST_TYPES => qw(grok_balance_check provider_snapshot);
 use constant METADATA_SCAN_ROWS     => 2000;
 
+# Agent-effectiveness verdict thresholds. Deliberately few and explicit: a
+# pairing is only called out when there is enough evidence to act on it, and the
+# card states the rule so a call-out is never a black box. Tune here, not in the
+# template. These must be declared before first use (strict subs resolves the
+# bareword at compile time), hence their position at the top of the file.
+use constant EFF_MIN_CALLS_FOR_VERDICT => 10;    # below this, do not judge
+use constant EFF_OK_RATE_REPLACE       => 80;    # % of calls that succeeded
+use constant EFF_OK_RATE_WATCH         => 95;
+use constant EFF_FLAG_PER_CALL_WATCH   => 0.01;  # flagged sentences per call
+use constant EFF_FLAG_PER_CALL_REPLACE => 0.50;
+
 sub _schema {
     my ($self, $c) = @_;
     return $self->schema_override if $self->schema_override;
@@ -178,9 +189,323 @@ sub org_summary {
 
 sub _effectiveness {
     my ($self, $out) = @_;
-    for my $r (@{ $out->{by_model} }) {
-        $r->{avg_tokens} = $r->{calls} ? int(($r->{tokens} || 0) / $r->{calls}) : 0;
+    for my $r (@{ $out->{by_model} || [] }) {
+        my $calls = $r->{calls} || 0;
+        my $cost  = $r->{cost}  || 0;
+        $r->{avg_tokens} = $calls ? int(($r->{tokens} || 0) / $calls) : 0;
+        $r->{error_rate} = $calls
+            ? sprintf('%.1f', 100 * ($r->{errors} || 0) / $calls)
+            : '0.0';
+        # Money per successful call — the cost-effectiveness headline. A cheap
+        # model that fails half its calls is worse than a dear one that works,
+        # and raw totals hide that. undef when nothing succeeded (no ratio).
+        $r->{cost_per_ok} = ($r->{ok} || 0) ? sprintf('%.4f', $cost / $r->{ok}) : undef;
     }
+    return $out;
+}
+
+=head2 agent_effectiveness($c, %a)
+
+Per-agent cost-effectiveness: which model is doing what work, for which
+agent, at what cost, at what speed, and how often it fails.
+
+The ledger's C<by_model> answers "what did each model cost"; this answers
+"is that agent+model pairing worth keeping", which is the question a model
+switch decision actually needs:
+
+  calls / ok / errors / error_rate   quality + reliability
+  cost / cost_per_ok                 money, normalised per success
+  avg_tokens                         prompt weight
+  avg_ms                             time (NULL-safe: averaged over the
+                                     calls that recorded a duration only)
+
+The agent dimension is C<feature> (the true calling feature, e.g. ai2_chat)
+when schema-compare has added it, else C<request_type> which is always in the
+AiUsageLog default SELECT. C<source> in the result says which was used, so a
+reader can tell whether the agent column is exact or approximate.
+
+=cut
+
+sub agent_effectiveness {
+    my ($self, $c, %a) = @_;
+    my ($days, $since) = $self->_since($a{days});
+    my $out = {
+        days => $days, since => $since, source => 'request_type',
+        by_agent => [], worst => [], totals => {}, errors => [],
+    };
+
+    try {
+        my ($agent_col, $src) = $self->_agent_column($c);
+        $out->{source} = $src;
+
+        my $rs   = $self->_base_rs($c, $since);
+        my $rows = $self->_eff_rows($rs, $agent_col);
+
+        # Quality (grounded / flagged) is recorded per call, so it is folded in
+        # as a second grouping rather than as extra metrics on the first query.
+        my $qual = $self->_eff_quality($c, $rs, $agent_col);
+        $out->{quality_source} = $qual->{source};
+
+        my %agent;
+        my @pairs;
+        my $tot = { calls => 0, ok => 0, errors => 0, tokens => 0, cost => 0,
+                    ms => 0, ms_n => 0, flagged => 0, recorded => 0,
+                    grounded => 0, golden_hits => 0 };
+        for my $k (keys %$rows) {
+            my $raw = $rows->{$k};
+            my $q = $qual->{by_pair}{$k};
+            if ($q) {
+                $raw->{$_} = $q->{$_} || 0 for qw(recorded grounded flagged golden_hits);
+            }
+            my $a = $agent{ $raw->{agent} } ||= {
+                agent => $raw->{agent}, calls => 0, ok => 0, errors => 0,
+                tokens => 0, cost => 0, ms => 0, ms_n => 0, flagged => 0,
+                recorded => 0, grounded => 0, golden_hits => 0, models => [],
+            };
+            $self->_eff_add($a,   $raw);
+            $self->_eff_add($tot, $raw);
+            my $calc = $self->_eff_calc($raw);
+            push @{ $a->{models} }, $calc;
+            push @pairs, $calc;
+        }
+
+        for my $a (values %agent) {
+            my $calc = $self->_eff_calc($a);
+            $calc->{models} = [ sort { ($b->{ok} || 0) <=> ($a->{ok} || 0) }
+                                @{ $a->{models} } ];
+            push @{ $out->{by_agent} }, $calc;
+        }
+        $out->{by_agent} = [ sort { ($b->{calls} || 0) <=> ($a->{calls} || 0) }
+                             @{ $out->{by_agent} } ];
+
+        # "Which combinations are wasting our time and money" — pairs worth
+        # acting on, worst first. cost_wasted is real spend that bought a failed
+        # call (a failure still burns tokens), so it is a number, not a label.
+        $out->{worst} = [
+            sort { ($b->{cost_wasted} || 0) <=> ($a->{cost_wasted} || 0)
+                   || ($b->{calls} || 0) <=> ($a->{calls} || 0) }
+            grep { $_->{verdict} eq 'replace' || $_->{verdict} eq 'watch' }
+            grep { ($_->{calls} || 0) >= EFF_MIN_CALLS_FOR_VERDICT }
+            @pairs
+        ];
+        $out->{totals} = $self->_eff_calc($tot);
+    } catch {
+        push @{ $out->{errors} }, "Agent effectiveness failed: $_";
+        $self->_log($c, 'error', 'agent_effectiveness', "Agent effectiveness failed: $_");
+    };
+
+    return $out;
+}
+
+# Grounded / flagged tallies per agent x provider x model, from whichever
+# source is available: the Ledger columns once schema-compare has added them,
+# else a bounded newest-first scan of metadata.grounding — the same dual-source
+# approach as grounding_summary, so the card works before and after migration.
+# Never dies: on failure the pairs carry no quality data and the verdict falls
+# back to reliability + cost alone.
+sub _eff_quality {
+    my ($self, $c, $rs, $agent_col) = @_;
+    my %by_pair;
+    my $source = 'none';
+
+    try {
+        require Comserv::Util::AI::Ledger;
+        if (Comserv::Util::AI::Ledger->columns_present($self->_schema($c))) {
+            my $q = $rs->search({ 'me.grounded' => { '!=' => undef } }, {
+                select   => [ $agent_col, 'me.provider', 'me.model', 'me.grounded',
+                              { count => 'me.id',              -as => 'n' },
+                              { sum   => 'me.flagged_count',    -as => 'fl' },
+                              { sum   => 'me.golden_hit_count', -as => 'gh' } ],
+                as       => [qw(agent provider model grounded n fl gh)],
+                group_by => [ $agent_col, 'me.provider', 'me.model', 'me.grounded' ],
+            });
+            while (my $r = $q->next) {
+                my $key = join("\t",
+                    $r->get_column('agent')    // '(none)',
+                    $r->get_column('provider') // '',
+                    $r->get_column('model')    // '');
+                my $p = $by_pair{$key}
+                     ||= { recorded => 0, grounded => 0, flagged => 0, golden_hits => 0 };
+                # Each group row is one (agent,provider,model,grounded) bucket.
+                # recorded/grounded must be call counts, not bucket counts —
+                # otherwise a pair with both grounded=0 and grounded=1 reads as
+                # recorded=2 regardless of how many calls it actually had.
+                my $n = $r->get_column('n') || 0;
+                $p->{recorded}    += $n;
+                $p->{grounded}    += $r->get_column('grounded') ? $n : 0;
+                $p->{flagged}     += $r->get_column('fl') || 0;
+                $p->{golden_hits} += $r->get_column('gh') || 0;
+            }
+            $source = 'columns';
+        }
+        else {
+            # Pre-migration: tally metadata.grounding, bounded scan newest first.
+            my $q = $rs->search({ 'me.metadata' => { -like => '%"grounding"%' } }, {
+                columns  => [ $agent_col, 'me.provider', 'me.model', 'me.metadata' ],
+                order_by => { -desc => 'me.id' },
+                rows     => METADATA_SCAN_ROWS,
+            });
+            while (my $r = $q->next) {
+                my $m = eval { decode_json($r->get_column('metadata') // '') } or next;
+                my $gr = ref $m eq 'HASH' ? $m->{grounding} : undef;
+                next unless ref $gr eq 'HASH';
+                my $key = join("\t",
+                    $r->get_column('agent')    // '(none)',
+                    $r->get_column('provider') // '',
+                    $r->get_column('model')    // '');
+                my $p = $by_pair{$key}
+                     ||= { recorded => 0, grounded => 0, flagged => 0, golden_hits => 0 };
+                $p->{recorded}++;
+                $p->{grounded}    += $gr->{grounded}           ? 1 : 0;
+                $p->{flagged}     += $gr->{flagged_count}      || 0;
+                $p->{golden_hits} += $gr->{golden_hit_count}   || 0;
+            }
+            $source = 'metadata';
+        }
+    } catch {
+        $self->_log($c, 'warn', '_eff_quality', "Quality tally failed: $_");
+    };
+
+    return { source => $source, by_pair => \%by_pair };
+}
+
+sub _eff_add {
+    my ($self, $into, $from) = @_;
+    $into->{$_} += $from->{$_} || 0
+        for qw(calls ok errors tokens cost ms ms_n flagged recorded grounded golden_hits);
+    return $into;
+}
+
+# Verdict thresholds live at the top of the file (strict subs needs the
+# barewords declared before first use).
+
+sub _eff_calc {
+    my ($self, $r) = @_;
+    my $calls = $r->{calls} || 0;
+    my $cost  = $r->{cost}  || 0;
+    my $ok    = $r->{ok}    || 0;
+    my $errors= $r->{errors}|| 0;
+    my $ok_rate = $calls ? sprintf('%.1f', 100 * $ok / $calls) : '0.0';
+    my $flag_pc = ($r->{recorded} && $r->{flagged})
+        ? sprintf('%.3f', $r->{flagged} / $r->{recorded}) : undef;
+
+    my $out = {
+        %$r,
+        ok_rate      => $ok_rate,
+        error_rate   => $calls ? sprintf('%.1f', 100 * $errors / $calls) : '0.0',
+        avg_tokens   => $calls ? int(($r->{tokens} || 0) / $calls) : 0,
+        avg_ms       => ($r->{ms_n} || 0) ? int(($r->{ms} || 0) / $r->{ms_n}) : undef,
+        cost         => sprintf('%.4f', $cost),
+        # Money per successful call: the value-for-money headline. undef when
+        # nothing succeeded — there is no ratio to quote.
+        cost_per_ok  => $ok ? sprintf('%.4f', $cost / $ok) : undef,
+        # Spend that bought a failure. A failed call still burns tokens.
+        cost_wasted  => sprintf('%.4f', $calls ? $cost * $errors / $calls : 0),
+        flagged_per_call => $flag_pc,
+        grounded_rate    => $r->{recorded}
+            ? sprintf('%.1f', 100 * ($r->{grounded} || 0) / $r->{recorded}) : undef,
+    };
+    my ($verdict, $why) = $self->_eff_verdict($out);
+    $out->{verdict} = $verdict;
+    $out->{why}     = $why;
+    return $out;
+}
+
+# Turn the numbers into a decision. Only three outcomes, and every one is
+# explained in words so the page says WHY a pairing is called out.
+sub _eff_verdict {
+    my ($self, $r) = @_;
+    return ('unknown', 'too few calls to judge')
+        if ($r->{calls} || 0) < EFF_MIN_CALLS_FOR_VERDICT;
+
+    my $sev = 0;   # 0 = keep, 1 = watch, 2 = replace
+    my @why;
+
+    my $ok_rate = $r->{ok_rate} + 0;
+    if ($ok_rate < EFF_OK_RATE_REPLACE) {
+        $sev = 2;
+        push @why, sprintf('only %.1f%% of calls succeeded', $ok_rate);
+    }
+    elsif ($ok_rate < EFF_OK_RATE_WATCH) {
+        $sev = 1 if $sev < 1;
+        push @why, sprintf('%.1f%% of calls succeeded', $ok_rate);
+    }
+
+    if (defined $r->{flagged_per_call}) {
+        my $f = $r->{flagged_per_call} + 0;
+        if ($f >= EFF_FLAG_PER_CALL_REPLACE) {
+            $sev = 2;
+            push @why, sprintf('%.2f uncited sentences flagged per call (hallucination)', $f);
+        }
+        elsif ($f >= EFF_FLAG_PER_CALL_WATCH) {
+            $sev = 1 if $sev < 1;
+            push @why, sprintf('%.2f uncited sentences flagged per call', $f);
+        }
+    }
+
+    return ('keep', 'no reliability or grounding problem found') unless $sev;
+    return ('watch', join('; ', @why)) if $sev == 1;
+    return ('replace', join('; ', @why));
+}
+
+# Prefer the Ledger `feature` column (true calling feature). It ships in the
+# later-added group alongside the grounding columns and is NOT in the
+# AiUsageLog default SELECT, so probe it rather than assuming — grouping on a
+# column that isn't in the DB yet would throw and blank the whole card.
+sub _agent_column {
+    my ($self, $c) = @_;
+    my $has_feature = eval {
+        $self->_schema($c)->resultset('AiUsageLog')
+             ->search({}, { columns => ['me.feature'], rows => 1 })->first;
+        1;
+    } ? 1 : 0;
+    return $has_feature ? ('me.feature', 'feature') : ('me.request_type', 'request_type');
+}
+
+# Group agent x provider x model x status, summing the raw measures. duration_ms
+# is NULLable, so it is counted separately (count ignores NULLs) to keep avg_ms
+# honest instead of dividing by every call.
+sub _eff_rows {
+    my ($self, $rs, $agent_col) = @_;
+    my %row;
+    try {
+        my $q = $rs->search({}, {
+            select => [
+                $agent_col, 'me.provider', 'me.model', 'me.status',
+                { count => 'me.id',                 -as => 'calls' },
+                { sum   => 'me.total_tokens',       -as => 'tokens' },
+                { sum   => 'me.estimated_cost_usd', -as => 'cost' },
+                { sum   => 'me.duration_ms',        -as => 'ms' },
+                { count => 'me.duration_ms',        -as => 'ms_n' },
+            ],
+            as       => [qw(agent provider model status calls tokens cost ms ms_n)],
+            group_by => [ $agent_col, 'me.provider', 'me.model', 'me.status' ],
+        });
+        while (my $r = $q->next) {
+            my $key = join("\t",
+                $r->get_column('agent')    // '(none)',
+                $r->get_column('provider') // '',
+                $r->get_column('model')    // '',
+            );
+            my $e = $row{$key} ||= {
+                agent    => $r->get_column('agent')    // '(none)',
+                provider => $r->get_column('provider') // '',
+                model    => $r->get_column('model')    // '',
+                calls => 0, ok => 0, errors => 0,
+                tokens => 0, cost => 0, ms => 0, ms_n => 0,
+            };
+            my $calls = $r->get_column('calls') || 0;
+            $e->{calls}  += $calls;
+            $e->{tokens} += $r->get_column('tokens') || 0;
+            $e->{cost}   += $r->get_column('cost')   || 0;
+            $e->{ms}     += $r->get_column('ms')     || 0;
+            $e->{ms_n}   += $r->get_column('ms_n')   || 0;
+            (($r->get_column('status') // '') eq 'success')
+                ? ($e->{ok} += $calls)
+                : ($e->{errors} += $calls);
+        }
+    };
+    return \%row;
 }
 
 sub _by_user {
@@ -347,6 +672,8 @@ sub _anomalies {
     my @a;
     for my $r (@{ $out->{by_model} }) {
         next unless ($r->{calls} || 0) >= 5;
+        # router/all_exhausted rows (model failover, §5e) are not a model.
+        next if ($r->{provider} // '') eq 'router';
         my $err_rate = 100 * ($r->{errors} || 0) / $r->{calls};
         if ($err_rate >= 30) {
             push @a, {
@@ -811,9 +1138,14 @@ sub ledger_summary {
                 errors => [] };
 
     my $day_fn = { date => 'me.created_at' };
+    # Rows the Ledger flagged tokens_unreported (non-empty text from a
+    # provider that reports no tokens, e.g. Ollama) are verified answers, not
+    # suspect 0-token successes. Empty "successes" are now written as errors.
     my $zero_cond = { 'me.status' => 'success',
                       'me.provider' => { '!=' => 'ai2-grounding' },
-                      -or => [ { 'me.total_tokens' => 0 }, { 'me.total_tokens' => undef } ] };
+                      -or => [ { 'me.total_tokens' => 0 }, { 'me.total_tokens' => undef } ],
+                      -and => [ -or => [ { 'me.metadata' => undef },
+                                         { 'me.metadata' => { -not_like => '%"tokens_unreported"%' } } ] ] };
     my $c404_cond = { 'me.status' => { '!=' => 'success' }, 'me.error_message' => { -like => '%404%' } };
 
     try {
@@ -868,6 +1200,10 @@ sub ledger_summary {
 
     $out->{grounding}    = $self->grounding_summary($c, $since);
     $out->{golden_store} = $self->golden_store_counts($c);
+    # Agent x model cost-effectiveness. Answers "is this agent+model pairing
+    # worth keeping" (cost per success, error rate, avg latency), which by_model
+    # alone cannot — it has no agent dimension.
+    $out->{agent_effectiveness} = $self->agent_effectiveness($c, days => $days);
     return $out;
 }
 
@@ -959,4 +1295,241 @@ sub golden_store_counts {
 
 
 __PACKAGE__->meta->make_immutable;
+
+# ===================================================================
+# Model failover support (AISYSTEM plan §5e)
+# ===================================================================
+
+=head2 model_health_signals($c, hours => 24, verdict_days => 7)
+
+What the Router failover needs from the monitor, computed with the SAME code
+the usage page uses: C<_anomalies> (error_spike / dead_model) over the last
+C<hours>, and the effectiveness verdict (C<_eff_calc> / C<_eff_verdict>)
+per provider|model over C<verdict_days>, all agents summed. Returns
+C<< { anomalies => [...], verdicts => { 'provider|model' => {verdict, why, calls, ok_rate} } } >>.
+Provider C<external> is folded into C<openrouter>; router/all_exhausted rows
+are ignored.
+
+=cut
+
+sub _fo_slug {
+    my ($provider, $model) = @_;
+    $provider = lc($provider // '');
+    $provider = 'openrouter' if $provider eq 'external';
+    return "$provider|" . ($model // '');
+}
+
+sub model_health_signals {
+    my ($self, $c, %a) = @_;
+    my $hours = ($a{hours} && $a{hours} =~ /^\d+$/) ? $a{hours} : 24;
+    my $vdays = ($a{verdict_days} && $a{verdict_days} =~ /^\d+$/) ? $a{verdict_days} : 7;
+    my $out = { anomalies => [], verdicts => {}, window_hours => $hours, verdict_days => $vdays };
+    try {
+        my $since = DateTime->now->subtract(hours => $hours)->strftime('%Y-%m-%d %H:%M:%S');
+        my $rs = $self->_base_rs($c, $since, { 'me.provider' => { '!=' => 'router' } });
+        my $by_pm = $self->_grouped($rs, [ 'me.provider', 'me.model', 'me.status' ], [qw(provider model status)]);
+        my %m;
+        for my $r (@$by_pm) {
+            my $k = _fo_slug($r->{provider}, $r->{model});
+            my ($p, $mod) = split /\|/, $k, 2;
+            my $row = $m{$k} ||= { provider => $p, model => $mod, calls => 0, ok => 0, errors => 0 };
+            $row->{calls} += $r->{calls} || 0;
+            (($r->{status} // '') eq 'success') ? ($row->{ok} += $r->{calls}) : ($row->{errors} += $r->{calls});
+        }
+        $out->{anomalies} = [ grep { ($_->{kind} // '') =~ /^(error_spike|dead_model)$/ }
+            @{ $self->_anomalies($c, { by_model => [ values %m ], by_day => [] }, $rs) } ];
+    } catch {
+        $self->_log($c, 'warn', 'model_health_signals', "anomaly window failed: $_");
+    };
+    try {
+        my (undef, $vsince) = $self->_since($vdays);
+        my $rs = $self->_base_rs($c, $vsince, { 'me.provider' => { '!=' => 'router' } });
+        my ($agent_col) = $self->_agent_column($c);
+        my $rows = $self->_eff_rows($rs, $agent_col);
+        my $qual = $self->_eff_quality($c, $rs, $agent_col);
+        my %agg;
+        for my $k (keys %$rows) {
+            my $raw = $rows->{$k};
+            if (my $q = $qual->{by_pair}{$k}) { $raw->{$_} = $q->{$_} || 0 for qw(recorded grounded flagged golden_hits) }
+            my $slug = _fo_slug($raw->{provider}, $raw->{model});
+            my $a = $agg{$slug} ||= { calls => 0, ok => 0, errors => 0, tokens => 0, cost => 0,
+                                      ms => 0, ms_n => 0, flagged => 0, recorded => 0, grounded => 0, golden_hits => 0 };
+            $self->_eff_add($a, $raw);
+        }
+        for my $slug (keys %agg) {
+            my $calc = $self->_eff_calc($agg{$slug});
+            $out->{verdicts}{$slug} = { verdict => $calc->{verdict}, why => $calc->{why},
+                                        calls => $calc->{calls}, ok_rate => $calc->{ok_rate} };
+        }
+    } catch {
+        $self->_log($c, 'warn', 'model_health_signals', "verdicts failed: $_");
+    };
+    return $out;
+}
+
+=head2 fallover_summary($c, days => 14)
+
+The "Fallover" section on /ai/usage (#fallover, admin) and the C<fallover>
+key of /ai/usage_live. Shape (documented in AISYSTEMPlan §5e):
+
+  { window_days, source => 'metadata.fallover',
+    turns, answered_first, answered_after_failover, fallover_rate_pct,
+    failed_attempts, failed_by_reason => { http_429 => n, ... },
+    by_step  => [ { step, count } ], by_final_model => [ { model, count } ],
+    all_exhausted => n, recent_all_exhausted => [ { id, created_at, purpose, attempts, skipped } ],
+    recent_failovers => [ { id, created_at, final_model, attempt_no, fallback_from, fallback_reason } ],
+    circuits => { open => [...], half_open => [...], closed_tracked => n },
+    chains => { source, path, reason, chat => [...], docs => [...], coding => [...], title => [...], removed => [...] },
+    caps => { openrouter_soft_cap_day_usd, ..._week_usd, ..._month_usd },
+    spend => { ok, day, week, month },
+    supergrok_guard => { locked, reason, checked, stale },
+    hermes => { model_hops => [ { session_id, models => [...] } ], guard => {...} },
+    errors => [] }
+
+=cut
+
+sub fallover_summary {
+    my ($self, $c, %a) = @_;
+    my ($days, $since) = $self->_since($a{days});
+    my $out = {
+        window_days => $days, since => $since, source => 'metadata.fallover',
+        turns => 0, answered_first => 0, answered_after_failover => 0, fallover_rate_pct => '0.0',
+        failed_attempts => 0, failed_by_reason => {}, by_step => [], by_final_model => [],
+        all_exhausted => 0, recent_all_exhausted => [], recent_failovers => [],
+        circuits => { open => [], half_open => [], closed_tracked => 0 },
+        errors => [],
+    };
+    try {
+        my $rs = $self->_base_rs($c, $since, { 'me.metadata' => { -like => '%"fallover"%' } });
+        my $q = $rs->search({}, {
+            columns  => [qw(id created_at provider model status metadata)],
+            order_by => { -desc => 'me.id' },
+            rows     => METADATA_SCAN_ROWS,
+        });
+        my (%step, %final);
+        while (my $r = $q->next) {
+            my $m = eval { decode_json($r->get_column('metadata') // '') } or next;
+            my $fo = ref $m eq 'HASH' ? $m->{fallover} : undef;
+            next unless ref $fo eq 'HASH';
+            my $ts = $r->get_column('created_at') // '';
+            my $st = $r->get_column('status') // '';
+            if (($r->get_column('provider') // '') eq 'router' || ($fo->{reason} // '') eq 'all_exhausted') {
+                $out->{all_exhausted}++;
+                push @{ $out->{recent_all_exhausted} }, {
+                    id => $r->get_column('id'), created_at => "$ts", purpose => $fo->{purpose},
+                    requested => $fo->{requested}, attempts => $fo->{attempts} || [], skipped => $fo->{skipped} || [],
+                } if @{ $out->{recent_all_exhausted} } < 20;
+                next;
+            }
+            if (($fo->{outcome} // '') eq 'failed' || $st ne 'success') {
+                $out->{failed_attempts}++;
+                $out->{failed_by_reason}{ $fo->{fallback_reason} // 'unknown' }++;
+                next;
+            }
+            $out->{turns}++;
+            my $n = $fo->{attempt_no} || 1;
+            ($n > 1 || ($fo->{chain_step} || 0) > 0) ? $out->{answered_after_failover}++ : $out->{answered_first}++;
+            $step{ $fo->{chain_step} // 0 }++;
+            $final{ $fo->{final_model} // _fo_slug($r->get_column('provider'), $r->get_column('model')) }++;
+            push @{ $out->{recent_failovers} }, {
+                id => $r->get_column('id'), created_at => "$ts", final_model => $fo->{final_model},
+                attempt_no => $n, chain_step => $fo->{chain_step}, purpose => $fo->{purpose},
+                fallback_from => $fo->{fallback_from}, fallback_reason => $fo->{fallback_reason},
+            } if ($n > 1 || ($fo->{chain_step} || 0) > 0) && @{ $out->{recent_failovers} } < 20;
+        }
+        $out->{fallover_rate_pct} = $out->{turns}
+            ? sprintf('%.1f', 100 * $out->{answered_after_failover} / $out->{turns}) : '0.0';
+        $out->{by_step} = [ map { { step => $_ + 0, count => $step{$_} } } sort { $a <=> $b } keys %step ];
+        $out->{by_final_model} = [ map { { model => $_, count => $final{$_} } }
+                                   sort { $final{$b} <=> $final{$a} || $a cmp $b } keys %final ];
+    } catch {
+        push @{ $out->{errors} }, "fallover ledger scan failed: $_";
+        $self->_log($c, 'warn', 'fallover_summary', "ledger scan failed: $_");
+    };
+
+    try {
+        require Comserv::Util::AI::ModelHealth;
+        my $h = Comserv::Util::AI::ModelHealth->new(path => Comserv::Util::AI::ModelHealth->default_path($c));
+        for my $row (@{ $h->snapshot }) {
+            if    ($row->{state} eq 'open')      { push @{ $out->{circuits}{open} }, $row }
+            elsif ($row->{state} eq 'half_open') { push @{ $out->{circuits}{half_open} }, $row }
+            else                                 { $out->{circuits}{closed_tracked}++ }
+        }
+    } catch { push @{ $out->{errors} }, "circuit state unreadable: $_" };
+
+    try {
+        require Comserv::Util::AI::ModelChains;
+        my $ld = Comserv::Util::AI::ModelChains->load($c);
+        $out->{chains} = { source => $ld->{source}, path => $ld->{path}, reason => $ld->{reason},
+                           removed => $ld->{data}{removed} || [] };
+        $out->{chains}{$_} = [ Comserv::Util::AI::ModelChains->chain($ld, $_) ]
+            for @Comserv::Util::AI::ModelChains::PURPOSES;
+        $out->{caps} = { map { $_ => Comserv::Util::AI::ModelChains->knob($ld, $_) }
+            qw(openrouter_soft_cap_day_usd openrouter_soft_cap_week_usd openrouter_soft_cap_month_usd
+               circuit_failure_threshold circuit_cooldown_minutes circuit_dead_cooldown_hours) };
+    } catch { push @{ $out->{errors} }, "chains unreadable: $_" };
+
+    try {
+        my $router = $c->model('AI2::Router');
+        my $sp = $router->openrouter_spend($c);
+        $out->{spend} = { ok => $sp->{ok} ? 1 : 0, day => $sp->{day}, week => $sp->{week}, month => $sp->{month} };
+        $out->{supergrok_guard} = $router->supergrok_guard($c);
+        delete $out->{supergrok_guard}{path};
+    } catch { push @{ $out->{errors} }, "spend/guard unavailable: $_" };
+
+    $out->{hermes} = $self->hermes_fallover($c, days => $days);
+    return $out;
+}
+
+=head2 hermes_fallover($c, days => 14)
+
+Hermes model hops read from ~/.hermes/state.db session_model_usage (a
+session with more than one model = the Hermes fallback chain or a manual
+/model switch fired mid-session), plus the SuperGrok guard state
+(~/.hermes/supergrok_guard_state.json). Read-only.
+
+=cut
+
+sub hermes_fallover {
+    my ($self, $c, %a) = @_;
+    my $days = ($a{days} && $a{days} =~ /^\d+$/) ? $a{days} : 14;
+    my $out = { ok => 0, model_hops => [], sessions_with_hops => 0 };
+    my $db = $ENV{HERMES_STATE_DB} || '/home/shanta/.hermes/state.db';
+    if (-r $db) {
+        try {
+            require DBI;
+            my $dbh = DBI->connect("dbi:SQLite:dbname=$db", '', '', { RaiseError => 1, PrintError => 0, ReadOnly => 1 });
+            my $sth = $dbh->prepare(q{SELECT session_id, model, COALESCE(billing_provider,'') AS provider,
+                                             COALESCE(api_call_count,0) AS api_calls, first_seen
+                                      FROM session_model_usage WHERE last_seen >= ?
+                                      ORDER BY session_id, first_seen});
+            $sth->execute(time() - $days * 86400);
+            my (%by, @order);
+            while (my $r = $sth->fetchrow_hashref) {
+                push @order, $r->{session_id} unless $by{ $r->{session_id} };
+                push @{ $by{ $r->{session_id} } }, { model => $r->{model}, provider => $r->{provider}, api_calls => 0 + $r->{api_calls} };
+            }
+            $dbh->disconnect;
+            for my $sid (reverse @order) {
+                next unless @{ $by{$sid} } > 1;
+                $out->{sessions_with_hops}++;
+                push @{ $out->{model_hops} }, { session_id => $sid, models => $by{$sid} }
+                    if @{ $out->{model_hops} } < 20;
+            }
+            $out->{ok} = 1;
+        } catch { $out->{error} = "$_" };
+    } else {
+        $out->{error} = "Hermes state.db not readable at $db";
+    }
+    my $gf = ($ENV{HOME} || '/home/shanta') . '/.hermes/supergrok_guard_state.json';
+    if (-r $gf && open my $fh, '<:raw', $gf) {
+        my $g = eval { decode_json(do { local $/; <$fh> }) };
+        close $fh;
+        $out->{guard} = { map { $_ => $g->{$_} } qw(mode off_today lock_reason daily_cap used_today checked last_switch) }
+            if ref $g eq 'HASH';
+    }
+    return $out;
+}
+
+
 1;
