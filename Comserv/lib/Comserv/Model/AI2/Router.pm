@@ -20,8 +20,7 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance },
 );
 
-# ===================================================================
-# AI2::Router — OpenRouter-style automatic model/provider switching.
+# ============================================================# AI2::Router — OpenRouter-style automatic model/provider switching.
 #
 # Single brain that decides, for a given request, which provider + model
 # to use. Logic ported from v1 (Model::AI::Chat::_select_provider_and_model,
@@ -32,8 +31,7 @@ has 'logging' => (
 # a context-appropriate default, then a generic fallback — preferring local
 # Ollama when available to keep cost at zero, escalating to x.ai/OpenRouter
 # for capability gaps.
-# ===================================================================
-
+# ============================================================
 # -------------------------------------------------------------------
 # Provider detection from a requested model name
 # -------------------------------------------------------------------
@@ -351,7 +349,99 @@ sub _provider_needs_credit_fallback {
     return ($provider_name // '') =~ /^(supergrok|openrouter|external)$/ ? 1 : 0;
 }
 
+# Vendor prefix of an OpenRouter slug (google/gemma-… → google). Used to
+# avoid spending the first fallback hop on a sibling in the same upstream
+# rate-limit pool (both Gemma :free models 429 together).
+sub _vendor_family {
+    my ($self, $name) = @_;
+    return '' unless defined $name && $name =~ m{^([^/]+)/};
+    return lc $1;
+}
+
+# Different-family free models first, same-family free models next, Ollama
+# last. Cap free hops so a shared-pool 429 cannot walk the whole catalog.
+sub _order_fallback_hops {
+    my ($self, $failed_model, $hops) = @_;
+    my $fam = $self->_vendor_family($failed_model);
+    my (@diff, @same, @local, %seen);
+    for my $h (@{ $hops || [] }) {
+        next unless $h && ref $h eq 'HASH' && ($h->{model} // '') ne '';
+        my $key = ($h->{provider} // '') . '|' . $h->{model};
+        next if $seen{$key}++;
+        if (($h->{provider} // '') eq 'ollama') {
+            push @local, $h;
+            next;
+        }
+        my $hf = $self->_vendor_family($h->{model});
+        if ($fam ne '' && $hf eq $fam) {
+            push @same, $h;
+        }
+        else {
+            push @diff, $h;
+        }
+    }
+    my @free = (@diff, @same);
+    splice(@free, 4) if @free > 4;
+    return (@free, @local);
+}
+
+# Live catalog for a failed turn. include_ollama is required: the cheap
+# catalog used by page render (and by pick_free_fallback) omits Ollama, so
+# a 429 used to die after one other :free sibling and never reach a local
+# model. Caller logs; this returns () on failure.
+sub _catalog_fallback_hops {
+    my ($self, $c, $skip_provider, $skip_model) = @_;
+    return () unless $c;
+    my $catalog = try {
+        $self->get_available_models($c, include_ollama => 1);
+    } catch {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+            'fallback_hops', "Catalog for fallback hops failed: $_");
+        [];
+    };
+    $catalog = [] unless $catalog && ref($catalog) eq 'ARRAY';
+    my (@hops, $local);
+    for my $m (@$catalog) {
+        next unless ref $m eq 'HASH';
+        next if $m->{disabled} || $m->{needs_key} || $m->{unreachable};
+        my $name = $m->{name} // '';
+        my $svc  = $m->{provider} || '';
+        next unless length $name;
+        next if $name =~ /^(?:ollama_unreachable|ollama_empty)$/;
+        next if $name =~ /grok/i || $name =~ /^x-ai\//i;
+        next if $svc eq ($skip_provider // '') && $name eq ($skip_model // '');
+        next if $self->_model_is_killed($c, $svc, $name);
+        my $is_free  = $m->{free} || ($name =~ /:free$/);
+        my $is_local = $m->{local} || ($svc eq 'ollama');
+        if ($is_free && $svc =~ /^(openrouter|external)$/) {
+            push @hops, { provider => 'openrouter', model => $name };
+        }
+        if (!$local && $is_local && $svc eq 'ollama' && $self->_is_chat_model($name)
+            && ($skip_provider // '') ne 'ollama') {
+            $local = { provider => 'ollama', model => $name };
+        }
+    }
+    push @hops, $local if $local;
+    return @hops;
+}
+
+# Ordered hops for chat_with_fallback. With a request context, walk the
+# live catalog (other free families, then same-family, then Ollama).
+# Without one (unit tests), honor pick_free_fallback including stubs.
+sub fallback_hops {
+    my ($self, $c, $skip_provider, $skip_model) = @_;
+    if ($c) {
+        my @from_cat = $self->_catalog_fallback_hops($c, $skip_provider, $skip_model);
+        return $self->_order_fallback_hops($skip_model, \@from_cat) if @from_cat;
+    }
+    my ($free, $local) = $self->pick_free_fallback($c, $skip_provider, $skip_model);
+    $local = undef if ($skip_provider // '') eq 'ollama';
+    return $self->_order_fallback_hops($skip_model, [ grep { $_ } ($free, $local) ]);
+}
+
 # First live OpenRouter :free model, then first chat-capable Ollama tag.
+# Snapshot/diagnostics only — chat failover uses fallback_hops, which also
+# tries later free models and requests include_ollama.
 # No hardcoded model slugs — catalog is the source of truth.
 sub pick_free_fallback {
     my ($self, $c, $skip_provider, $skip_model) = @_;
@@ -461,8 +551,7 @@ sub _model_is_killed {
     return $hit;
 }
 
-# ===================================================================
-# Model failover (AISYSTEM plan §5e). chat_with_fallback walks:
+# ============================================================# Model failover (AISYSTEM plan §5e). chat_with_fallback walks:
 #   requested model -> data/ai_model_chains.json chain for the purpose
 #   (watch-verdict models demoted, replace-verdict models excluded)
 #   -> live tail (first live :free + first Ollama chat tag).
@@ -475,8 +564,7 @@ sub _model_is_killed {
 # Every failed attempt is written to the Ledger with metadata.fallover;
 # when nothing answers the caller gets $ALL_EXHAUSTED_MSG (no invented
 # content) and a router/all_exhausted Ledger row.
-# ===================================================================
-
+# ============================================================
 our $ALL_EXHAUSTED_MSG = 'No AI model is available right now (all options failed or are over budget). Please try again later.';
 our $SIGNALS_TTL_S = 120;
 our $SPEND_TTL_S   = 60;
