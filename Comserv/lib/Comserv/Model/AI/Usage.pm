@@ -39,6 +39,9 @@ Required/important args:
 
 Optional:
     guest_session_id, estimated_cost_usd
+    grounding (hashref from Comserv::Model::AI2::Grounding::ledger_fields —
+      grounded, golden_hit_count, candidate_hit_count, snippet_ids,
+      flagged_count, feature; see Comserv::Util::AI::Ledger)
 
 This method also reads the current membership plan and writes:
     plan_id, plan_ai_requests_per_day, within_free_quota, billing_status
@@ -68,6 +71,12 @@ sub log {
         my $ollama_host = $args{ollama_host};
         my $ip          = $c->request ? $c->request->address : undef;
         my $meta        = $args{metadata} || {};
+
+        # Ledger grounding fields (Golden Data / Anti-Hallucination). Always
+        # mirrored into metadata.grounding; real columns only once schema-compare
+        # has added them to ai_usage_logs (see Comserv::Util::AI::Ledger).
+        require Comserv::Util::AI::Ledger;
+        my $ledger_cols = Comserv::Util::AI::Ledger->prepare($schema, $args{grounding}, $meta);
 
         $pt  += 0; $ct += 0; $tot += 0;
 
@@ -130,11 +139,13 @@ sub log {
             within_free_quota        => $within_free,
             billing_status           => $bill_status,
             metadata                 => (ref($meta) ? encode_json($meta) : $meta),
+            %$ledger_cols,
         });
 
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'log',
             sprintf("Logged AI usage: provider=%s model=%s tokens=%s/%s cost=%.6f site=%s user=%s status=%s",
-                $provider, $model, $pt, $ct, $cost, $site_id//'-', $user_id//'-', $status));
+                $provider, $model, $pt, $ct, $cost, $site_id//'-', $user_id//'-', $status)
+            . Comserv::Util::AI::Ledger->log_suffix($args{grounding}));
     };
     if ($@) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'log',

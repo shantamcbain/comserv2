@@ -199,7 +199,8 @@ sub score_todo {
         if ($blocker) {
             $h->{blocker_subject} = $blocker->{subject};
             my $bs = $blocker->{status} // '';
-            $h->{blocker_done} = ($bs == 3 || $bs =~ /^(done|completed|closed)$/i) ? 1 : 0;
+            my $bsn = ($bs =~ /^-?\d+$/) ? 0+$bs : -1;
+            $h->{blocker_done} = ($bsn == 3 || $bsn == 4 || $bs =~ /^(done|completed|closed)$/i) ? 1 : 0;
         }
     }
 

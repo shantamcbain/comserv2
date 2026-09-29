@@ -157,14 +157,11 @@
                                   [% IF plan.currency_bonus > 0 %]
                                   <br><small class="text-muted">+ <strong>[% plan.currency_bonus %] bonus coins</strong> credited on activation</small>
                                   [% END %]
-                                  [% END %]
                                 [% ELSE %]
                                   <span class="text-muted">Not included</span>
                                 [% END %]
                               </td>
                             </tr>
-                            [% NEW %]
-                            [% NEW %]
                             [%# Joining Bonus %]
                             <tr>
                               <td><strong>Welcome Bonus</strong></td>
@@ -176,7 +173,6 @@
                                 [% END %]
                               </td>
                             </tr>
-                            [% END %]
                             [%# Add-on Services %]
               <tr>
                 <td><strong>Add-on Services</strong></td>

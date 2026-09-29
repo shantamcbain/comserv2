@@ -1198,6 +1198,8 @@ function ensureThinkingStyles(doc) {
     //     the admin's in-progress edits. Updates the status-bar timestamp. ---
     let _dirty = false;
     let _autoTimer = null;
+    let _checksumInFlight = false;
+    let _changeWired = false;
 
     function markDirty() { _dirty = true; }
     function markClean() { _dirty = false; }
@@ -1206,6 +1208,10 @@ function ensureThinkingStyles(doc) {
         const filePath = currentFilePath();
         const lastModEl = document.getElementById('last-modified');
         const statusEl = document.getElementById('auto-refresh-status');
+        if (_autoTimer) {
+            clearInterval(_autoTimer);
+            _autoTimer = null;
+        }
         if (statusEl) statusEl.textContent = 'Auto-refresh: ON (4s)';
         if (!filePath) {
             if (statusEl) statusEl.textContent = 'Auto-refresh: off (no file)';
@@ -1213,31 +1219,39 @@ function ensureThinkingStyles(doc) {
         }
 
         const editor = getEditor();
-        if (editor) {
+        if (editor && !_changeWired) {
+            _changeWired = true;
             editor.session.on('change', function () { _dirty = true; });
         }
 
         _autoTimer = setInterval(function () {
-            if (_dirty) return;   // don't overwrite unsaved work
+            if (_dirty) return;
+            if (_checksumInFlight) return;
+            if (typeof document.hidden === 'boolean' && document.hidden) return;
+            if (!window.AI2EditorCore || typeof window.AI2EditorCore.getFileMtime !== 'function') return;
+            _checksumInFlight = true;
             window.AI2EditorCore.getFileMtime(filePath).then(function (mtime) {
                 if (!mtime) return;
                 const last = initAutoRefresh._lastMtime || 0;
                 initAutoRefresh._lastMtime = mtime;
                 if (last && mtime !== last) {
-                    // File changed on disk — reload it
-                    window.AI2EditorCore.loadFileContent(filePath).then(function (data) {
+                    return window.AI2EditorCore.loadFileContent(filePath).then(function (data) {
                         if (data && data.content !== undefined) {
                             const ed = getEditor();
                             if (ed) { ed.setValue(data.content, -1); ed.clearSelection(); }
                             if (lastModEl) lastModEl.textContent = 'updated ' + new Date().toLocaleTimeString();
                             setStatus('Reloaded (external change)');
                         }
-                    }).catch(function () {});
-                } else if (!last) {
+                    });
+                }
+                if (!last) {
                     initAutoRefresh._lastMtime = mtime;
                     if (lastModEl) lastModEl.textContent = 'loaded ' + new Date().toLocaleTimeString();
                 }
-            }).catch(function () {});
+            }).catch(function () {
+            }).then(function () {
+                _checksumInFlight = false;
+            });
         }, 4000);
     }
 

@@ -1,0 +1,48 @@
+{
+  "report_date": "2026-09-25",
+  "source": "Grok Bot",
+  "created_by": "Grok Bot (read from local persistence, not live API)",
+  "summary": "Morning AI check Sep 25. Spending under budget. Chat answers still poor. Hermes still default Super Grok (should be flash when idle). Bot last spoken 78% left. :3001 health OK at 6:35 AM after overnight hang recovered without restart.",
+  "markdown": "Here's the morning AI check. Spending is under budget, but Chat answers are still poor, and **Hermes is still set to Super Grok by default**, which it shouldn't be for idle work.\n\n**Grok Bot.** You last said 78% left (yesterday at 1:08 PM PT). The number rose from 43%, but I'm treating that as just what the meter showed, not as usage coming back. The lowest figure you gave this week means about 22% used since Monday's reset, which works out to about 5.6% a day. Spreading 78% over the roughly 3 days until Mon Sep 28 at 8 AM PT would allow about 25% a day. Because the meter has jumped around, I'm going by the actual burn rate and keeping Bot turns short.\n\n**OpenRouter.** The balance is about $19.49. This month's total is $40.43, and today and this week are only fractions of a cent. That's under all your soft limits ($1.65 a day, $11.50 a week, $50 a month).\n\n**Super Grok.** I don't have a used percentage since yesterday's 10:31 AM reset, and I won't guess one. The last cycle hit about 93% used before it reset.\n\n**What worked.** Hermes ran 18 Super Grok sessions yesterday and got real code done:\n- The aisystem chat widget now goes through `/ai2/chat`.\n- Inventory reserve and merge.\n- The 3D printer files page.\n- Several ENCY tickets were closed.\n- The grounding module for Golden Data.\n\nThe only OpenRouter cost was DeepSeek flash writing session titles, about $0.0005.\n\n**What wasted effort.**\n- Some Super Grok time went to the wrong worktree or Hermes attaching to the wrong session.\n- The Hermes dashboard on `:9119` is down, and there are stray dashboards running on `:9101` and `:9103`.\n- The CSC developer is still stuck on connection and firewall issues that need sudo on the workstation.\n\n**Chat quality.** On `:3001` yesterday, only 1 of 7 Chat calls gave a usable answer (the free Cohere model). Three Ollama calls counted as \"success\" but returned zero tokens. Two calls to the free Nemotron model failed with \"not found\" errors because that model needs the paid version. Those failures are already covered by the open CSC-20260914 HelpDesk tickets, so I didn't file new ones.\n\n**`:3001` is answering again.** Its health check was OK at 6:35 AM. That means it came back on its own overnight without a restart, and we don't know what caused the hang, so it could happen again. If it hangs again, I'll ask you before anyone restarts it.\n\nMy recommendations:\n- Switch Hermes to flash when it's idle and save Super Grok for real coding.\n- Keep Bot turns short.\n- Test Chat Q&A on `:4006` once the Golden Data changes are tested and the table is created.\n\nThe CSC mailbox watch stays paused. Full Bot sandbox write-up was `/workspace/daily-ai-eval-2026-09-25.md`.\n",
+  "metrics": {
+    "bot": {
+      "percent_left": 78,
+      "spoken_at": "2026-09-24T20:08:00Z",
+      "implied_used_since_monday_pct": 22,
+      "implied_pct_per_day": 5.6
+    },
+    "openrouter": {
+      "balance_usd": 19.49,
+      "day_usd": 0.0005,
+      "week_usd": 0.0005,
+      "month_usd": 40.43
+    },
+    "super_grok": {
+      "percent_used": null,
+      "last_cycle_peak_used_pct": 93
+    },
+    "hermes": {
+      "sessions": 18,
+      "model": "grok-4.6",
+      "default_should_be": "flash-when-idle"
+    },
+    "chat": {
+      "calls": 7,
+      "usable": 1,
+      "zero_token_ok": 3,
+      "http_404": 2
+    }
+  },
+  "proposals": [
+    {
+      "title": "Hermes idle default: flash, not Super Grok",
+      "change_type": "workstation",
+      "target": "hermes.default_model",
+      "rationale": "Morning eval: Hermes still Super Grok by default; save it for real coding.",
+      "payload": {
+        "idle": "flash",
+        "coding": "grok-4.6"
+      }
+    }
+  ]
+}

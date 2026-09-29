@@ -4,13 +4,13 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "planning,ai"
-   page_version = "1.03"
-   last_updated = "2026-08-26"
+   page_version = "1.05"
+   last_updated = "2026-09-25"
    site_specific = "false"
    project_id = "280"
    project_code = "AISYSTEM"
 %]
-[% PageVersion = 'Documentation/AISYSTEMPlan.tt,v 1.03 2026/08/26 hermes-agent Exp - SuperGrok first, invoice chat, 503 retry' %]
+[% PageVersion = 'Documentation/AISYSTEMPlan.tt,v 1.05 2026/09/25 hermes-agent Exp - usage overview + daily Grok lock' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container">
@@ -28,6 +28,7 @@
             <h2 class="doc-h2">Quick Navigation</h2>
             <p class="doc-muted">Jump to section:</p>
             <div class="doc-navrow">
+                <a href="#now" class="doc-navlink">Now</a>
                 <a href="#overview" class="doc-navlink">Overview</a>
                 <a href="#audit" class="doc-navlink">Audit</a>
                 <a href="#order" class="doc-navlink">Wave order</a>
@@ -39,6 +40,8 @@
                 <a href="#providers" class="doc-navlink">In-app providers</a>
                 <a href="#park" class="doc-navlink">Parked work</a>
                 <a href="#skills-search" class="doc-navlink">Skills &amp; web search</a>
+                <a href="#golden-data" class="doc-navlink" title="Golden Data store, glossary and the anti-hallucination policy.">Golden Data / Anti-Hallucination</a>
+                <a href="#eval-reports" class="doc-navlink" title="Daily AI eval reports, review-first proposals and allow-listed apply.">Daily AI Eval Reports</a>
                 <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
                 <a href="#see-also" class="doc-navlink">See Also</a>
             </div>
@@ -67,6 +70,16 @@
                     <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-navlink" title="Returns to the Master Plan coordinator, which indexes every active plan including this one.">Master Plan (index of all plans)</a>
                 </div>
             </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="now" class="doc-h2">Now (2026-09-25 — aisystem worktree)</h2>
+            <p class="doc-body"><strong>Current.</strong> <code>/ai/usage</code> is a five-number SuperGrok overview (Build % used, remaining, daily cap, used today, days to reset) plus four agent cards; charts and the rest start closed. Daily guard no longer treats the first grok.com reading today as <code>day_start</code>. It measures yesterday + today from <code>grokcom_usage_history.jsonl</code> against remaining÷days until <strong>2026-10-01 10:31 PDT</strong>. If either day is over cap (or week Build ≥ 90%), SuperGrok is off for the rest of today; new Hermes sessions go to OpenRouter <code>cohere/north-mini-code:free</code>. Restore <code>grok-build-0.1</code> next PDT day only if week &lt; 90%. This chat stays on its current model until a new session. Chart bar/line toggle persists in localStorage (default bar).</p>
+            <p class="doc-body"><strong>Blocked.</strong> Do not restart <code>:4006</code>. grok.com ≠ x.ai; no cookies; no Grok Bot API; no <code>opencode-free</code>. Do not grow <code>AI.pm</code>. Live path is templates/JS + <code>/static/ai/grokcom_usage.json</code> + <code>supergrok_guard.json</code>.</p>
+            <p class="doc-body"><strong>Next.</strong> Hard-refresh <code>/ai/usage</code>. Keep grok.com Usage tab open. Start a new Hermes chat to pick up the free default. Handoff: <code>.hermes/plans/2026-09-25-aisystem-usage-grokcom-guard.md</code>.</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
@@ -284,6 +297,7 @@
         <div class="col-100">
             <h2 id="hermes" class="doc-h2">4. Hermes focus settings (W0 — applied 2026-08-19)</h2>
             <p class="doc-body">Settings live in <code>~/.hermes/config.yaml</code> via <code>hermes config set</code> (never hand-edit). Secrets stay in <code>~/.hermes/.env</code>.</p>
+            <p class="doc-info">2026-09-25: SuperGrok weekly % is <strong>not</strong> an xAI API. grok.com Settings → Usage is scraped in-tab by add-on <code>grokcom-usage@comserv.local</code> (Downloads copy for Snap file picker). Writes <code>root/static/ai/grokcom_usage.json</code>. Guard script <code>~/.hermes/scripts/supergrok_daily_guard.py</code> every 15 min (user crontab). Reset anchor <strong>2026-10-01 10:31 PDT</strong>. Cap = remaining Build % ÷ days until reset. Off → <code>openrouter/cohere/north-mini-code:free</code>. On → <code>xai-oauth/grok-build-0.1</code>. Applies to <strong>new</strong> Hermes sessions only. <code>opencode-free</code> is dead — never put it in the chain.</p>
             <table class="doc-table">
                 <tr>
                     <th class="doc-th">Role</th>
@@ -292,16 +306,28 @@
                     <th class="doc-th">When</th>
                 </tr>
                 <tr>
-                    <td class="doc-td">Coding (this agent)</td>
-                    <td class="doc-td"><code>code</code></td>
-                    <td class="doc-td"><code>xai-oauth/grok-4.6</code> (also the session default)</td>
-                    <td class="doc-td">Comserv edits, plans, audits</td>
+                    <td class="doc-td">This session (2026-09-25)</td>
+                    <td class="doc-td">default</td>
+                    <td class="doc-td"><code>xai-oauth/grok-4.6</code></td>
+                    <td class="doc-td">Does not follow the guard until a new chat</td>
                 </tr>
                 <tr class="doc-tr-alt">
-                    <td class="doc-td">Cheap / local / delegate</td>
-                    <td class="doc-td"><code>cheap</code> <code>local</code> <code>delegate</code></td>
-                    <td class="doc-td">Ollama <code>qwen2.5-coder:14b</code></td>
-                    <td class="doc-td">Subagents, triage, summaries. <code>delegation.model</code> already this.</td>
+                    <td class="doc-td">Coding (budget SuperGrok)</td>
+                    <td class="doc-td"><code>code</code></td>
+                    <td class="doc-td"><code>xai-oauth/grok-build-0.1</code></td>
+                    <td class="doc-td">When the guard is ON SuperGrok</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Daily/week cap hit</td>
+                    <td class="doc-td">default</td>
+                    <td class="doc-td"><code>openrouter/cohere/north-mini-code:free</code></td>
+                    <td class="doc-td">Spread the SuperGrok week; OpenRouter cash only if free hops fail</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Cheap / local</td>
+                    <td class="doc-td"><code>cheap</code> <code>local</code></td>
+                    <td class="doc-td">Ollama <code>gemma4-64k</code> / <code>qwen2.5-coder:14b</code></td>
+                    <td class="doc-td">True $0. Check live aliases; do not assume.</td>
                 </tr>
             </table>
             <p class="doc-body">Also on this machine (not aliased): <code>qwen2.5:72b</code>, <code>gemma4-64k</code>, <code>phi4:14b</code>. Use 72b only when a local deep-read beats a paid call. In-session: <code>/model code</code> or <code>/model cheap</code>.</p>
@@ -328,10 +354,10 @@
                     <td class="doc-td">Live Ollama on the host</td>
                 </tr>
                 <tr class="doc-tr-alt">
-                    <td class="doc-td">SuperGrok (prepaid)</td>
+                    <td class="doc-td">SuperGrok (weekly subscription %)</td>
                     <td class="doc-td"><code>supergrok|grok-4.6</code> first</td>
                     <td class="doc-td">admin / developer / editor only</td>
-                    <td class="doc-td"><code>/run/secrets/supergrok_oauth</code>, mounted <code>/home/comserv/.comserv/secrets/supergrok_oauth</code>, env <code>SUPERGROK_OAUTH_TOKEN</code>, or Ency <code>UserApiKeys</code> service <code>supergrok</code>. Sync from Hermes: <code>perl script/sync_supergrok_token.pl</code>. Host <code>~/.hermes/auth.json</code> is last-resort workstation-only.</td>
+                    <td class="doc-td">Lowest Grok subscription — do not add money. Meter is grok.com Settings → Usage (Build / Chat %), not x.ai and not an API. Live numbers: Firefox add-on → <code>/static/ai/grokcom_usage.json</code>. Next reset 2026-10-01 10:31 PDT. OAuth token still used for Hermes chat; it cannot read that bar.</td>
                 </tr>
                 <tr>
                     <td class="doc-td">xAI (Grok)</td>
@@ -396,6 +422,165 @@
                 Full design:
                 <a href="[% c.uri_for('/Documentation/AiSkillsAndWebSearch') %]" class="doc-link">/Documentation/AiSkillsAndWebSearch</a>
             </p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="golden-data" class="doc-h2">5c. Golden Data / Anti-Hallucination (code in aisystem 2026-09-24 — not committed)</h2>
+            <div class="doc-warning">
+                <p class="doc-body"><strong>Honest status:</strong> the Golden Data store is <strong>EMPTY / NOT YET QUALIFIED</strong>.
+                    No existing corpus is golden. The <code>ai_golden_data</code> table is <strong>pending schema-compare</strong>
+                    (Result <code>AiGoldenData</code> exists; an admin creates the table in-app — never hand DDL).</p>
+            </div>
+            <p class="doc-body"><strong>Glossary</strong> (one canonical copy): <code>lib/Comserv/Util/AI/Glossary.pm</code>
+                (+ <code>Glossary.md</code>). <em>Golden Data</em> = organization-agreed truth fed to AI models, from corporate policy,
+                verified research in our databases, and verified documentation of how the app runs. A record is golden only once it is
+                agreed/verified (<code>status=golden</code>); existing in the DB is not enough. <em>Candidate Data</em> = records, docs,
+                notes or retrieval hits that have not passed review.</p>
+            <h3 class="doc-h3">Intended golden pipeline</h3>
+            <ul class="doc-body">
+                <li><strong>Sources:</strong> (1) corporate policy (<code>domain=policy</code>), (2) verified research in our DBs
+                    (<code>domain=research</code>, e.g. <code>ency.ency_herb_tb</code>), (3) verified app documentation
+                    (<code>domain=app_docs</code>). Also <code>todo</code>, <code>customer</code>; other domains accepted.</li>
+                <li><strong>Flow:</strong> <code>candidate</code> &rarr; <code>in_review</code> &rarr; human-agreed <code>golden</code>
+                    (or <code>rejected</code> / <code>stale</code>). Code only ever writes <code>candidate</code>. No auto-promotion.</li>
+                <li><strong>Review-first queue</strong> (not imported yet): existing policy docs, research tables such as
+                    <code>ency.ency_herb_tb</code>, and app documentation. Nothing was bulk-imported in this change.</li>
+                <li><strong>source_ref convention:</strong> <code>policy:&lt;doc&gt;</code>, <code>research:ency_herb_tb:4</code>,
+                    <code>app_docs:Documentation/X</code>, <code>web:searxng:&lt;url&gt;</code>.</li>
+            </ul>
+            <h3 class="doc-h3">Policy (enforced in code — <code>Model::AI2::Grounding</code>)</h3>
+            <ul class="doc-body">
+                <li>Factual turns retrieve first: Golden Data, then Candidate Data (store candidates, prior web hits, live SearXNG),
+                    each labelled <code>[GOLDEN]</code> or <code>[CANDIDATE — unverified]</code> with id + source + retrieved_at
+                    (max 6 snippets / 6000 chars).</li>
+                <li>Payload: glossary + "answer ONLY from GROUNDING" + cite ids (<code>[G:12]</code>, <code>[C:web-3]</code>).
+                    Post-check strips uncited factual sentences and records <code>flagged_count</code>.</li>
+                <li>Nothing retrieved: no model call; the user sees exactly
+                    <em>"I don't have golden data for this yet, so I can't give you a verified answer."</em></li>
+                <li><strong>Web / SearXNG hits are Candidate Data</strong> — answers built only from them are prefixed
+                    "Unverified — Candidate Data only".</li>
+                <li><strong>Flag:</strong> <code>root/config/ai_grounding.json</code> <code>mode</code> = off | <strong>shadow (default)</strong> | enforce.
+                    Shadow leaves live Chat unchanged and records grounded=0 in the Ledger. A request can opt in with
+                    <code>{"grounding":"enforce"}</code> or out with <code>{"creative":1}</code> / <code>{"grounding":"off"}</code>.</li>
+                <li><strong>Ledger:</strong> existing <code>ai_usage_logs</code> gains grounded, golden_hit_count, candidate_hit_count,
+                    snippet_ids, flagged_count, feature (Result updated; columns pending schema-compare; mirrored in metadata.grounding meanwhile).
+                    Admin monitor: <a href="[% c.uri_for('/ai/usage') %]#ledger-grounding" class="doc-link">/ai/usage</a>.</li>
+                <li><strong>Tests:</strong> <code>t/ai_golden_grounding.t</code> (stubs; no DB, no model).</li>
+            </ul>
+            <h3 class="doc-h3">Next steps</h3>
+            <ul class="doc-body">
+                <li>Admin: create <code>ai_golden_data</code> and sync the six Ledger columns via <code>/admin/schema_compare</code>.</li>
+                <li>Human review UI for the review-first queue (later). No auto-promotion, no training / fine-tuning.</li>
+                <li>Decide when to switch <code>mode</code> from shadow to enforce (after reviewed golden rows exist).</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="eval-reports" class="doc-h2">5d. Daily AI Eval Reports (code in aisystem 2026-09-25 — not committed)</h2>
+            <div class="doc-warning">
+                <p class="doc-body"><strong>Status:</strong> the tables <code>ai_eval_report</code> and <code>ai_eval_proposal</code> are
+                    <strong>pending schema-compare</strong>. Until an admin creates them, the pages say "Table not created yet — run schema compare"
+                    and ingest answers <code>503 {"ok":0,"error":"table_missing"}</code>.</p>
+            </div>
+            <p class="doc-body">The AI usage monitor's daily report lives in the app so admins can review it, tune it, and approve changes.
+                It extends the usage monitor: a summary card on <a href="[% c.uri_for('/ai/usage') %]#eval-reports" class="doc-link">/ai/usage</a>
+                links to the admin-only pages <code>/ai/eval</code> (list, newest first) and <code>/ai/eval/report/&lt;id&gt;</code> (detail).
+                Code: <code>Controller::AI::Eval</code>, <code>Model::AI2::EvalReports</code>, <code>Util::AI::EvalAllowList</code>,
+                Results <code>AiEvalReport</code> / <code>AiEvalProposal</code>. Terms: <em>Eval Report</em>, <em>Eval Proposal</em>,
+                <em>Allow-listed Config Change</em> (<code>Util/AI/Glossary.pm</code>).</p>
+
+            <h3 class="doc-h3">Schema compare (admin, once)</h3>
+            <ol class="doc-body">
+                <li><code>/admin/schema_compare</code> → ency → "Result files without tables" → <code>AiEvalReport</code> → Create Table.</li>
+                <li>Then <code>AiEvalProposal</code> → Create Table.</li>
+                <li>Backfill: on <code>/ai/eval</code> press <strong>Import inbox</strong> (reads <code>data/ai_eval_inbox/*.json</code>;
+                    the 2026-09-25 seed is there), or run <code>perl script/ai_eval_ingest.pl --inbox</code> with the token set.</li>
+            </ol>
+
+            <h3 class="doc-h3">Ingest contract</h3>
+            <ul class="doc-body">
+                <li><strong>URL / method:</strong> <code>POST /ai/eval/ingest</code> (dev: <code>http://127.0.0.1:4006/ai/eval/ingest</code>). Other methods → 405.</li>
+                <li><strong>Headers:</strong> <code>Content-Type: application/json</code> (else 415) and
+                    <code>Authorization: Bearer &lt;token&gt;</code>. Body max 2 MB (413).</li>
+                <li><strong>Token:</strong> env <code>AI_EVAL_INGEST_TOKEN</code> on the server, else the first line of
+                    <code>~/.comserv/secrets/ai_eval_ingest_token</code> (outside the repo; Docker: <code>/home/comserv/.comserv/secrets/</code>).
+                    Minimum 16 characters. Never hard-coded. No token configured → every Bearer / anonymous call gets
+                    <code>403 {"ok":0,"error":"ingest_token_not_configured"}</code>; wrong token → <code>403 {"ok":0,"error":"forbidden"}</code>.</li>
+                <li><strong>Admin session</strong> also works (browser/fetch) with header <code>X-CSRF-Token</code> = the token in the /ai/eval forms; missing → <code>403 {"error":"csrf"}</code>.</li>
+                <li><strong>Upsert</strong> by (<code>report_date</code>, <code>source</code>). Re-posting updates summary / markdown / metrics, never touches
+                    <code>admin_notes</code>, and never duplicates proposals (dedupe by title within the report, case- and space-insensitive).
+                    New proposals are stored as <code>proposed</code>.</li>
+            </ul>
+<pre class="doc-code">{
+  "report_date": "2026-09-25",              // required, YYYY-MM-DD
+  "source": "AI usage monitor",             // optional (default), max 100
+  "created_by": "AI usage monitor",         // optional
+  "summary": "Bot 90% left ...",            // optional text
+  "markdown": "# Daily AI Eval Report ...", // optional, max 1,000,000 chars
+  "metrics": {                              // optional JSON object (or "metrics_json": "&lt;string&gt;")
+    "bot":        { "percent_left": 90, "previous_percent_left": 78, "soft_allowance_pct_per_day": 29, "burn_estimate_pct_per_day": 5.6 },
+    "openrouter": { "balance_usd": 19.49, "day_usd": 0.0001, "week_usd": 0.0006, "month_usd": 40.43,
+                    "caps": { "day_usd": 1.65, "week_usd": 11.5, "month_usd": 50 } },
+    "supergrok":  { "spoken_pct": null, "last_reset": "2026-09-24T10:31:00-07:00", "prior_cycle_used_pct": 93 },
+    "hermes":     { "sessions": 18, "default_model": "grok-4.6", "dashboard_9119": "down" },
+    "chat":       { "host": ":3001", "window_days": 1, "calls": 7, "usable": 1, "zero_token_ok": 3, "http_404": 2 },
+    "helpdesk":   { "note": "No figures reported" }
+  },
+  "proposals": [                            // optional, max 50
+    { "title": "Enforce grounding",         // required, max 255, dedupe key
+      "change_type": "config",              // config | code | workstation | other (default other)
+      "target": "ai_grounding.json:mode",   // config targets must be allow-listed to be applicable
+      "rationale": "why",
+      "payload": { "value": "enforce" } }   // config: {"value": ...}; others: any JSON
+  ]
+}</pre>
+            <ul class="doc-body">
+                <li><strong>200</strong> <code>{"ok":1,"report_id":7,"created":1,"proposals_created":3,"proposals_skipped":0,"warnings":[]}</code>
+                    (warnings list config proposals whose target/value is not applicable; they are stored but cannot be applied).</li>
+                <li><strong>400</strong> <code>{"ok":0,"error":"bad_json"}</code> or <code>{"ok":0,"error":"validation","errors":["report_date is required (YYYY-MM-DD)"]}</code></li>
+                <li><strong>403</strong> <code>ingest_token_not_configured</code> | <code>forbidden</code> | <code>csrf</code>;
+                    <strong>405</strong> <code>method_not_allowed</code>; <strong>413</strong> <code>too_large</code>; <strong>415</strong> <code>unsupported_media_type</code></li>
+                <li><strong>503</strong> <code>{"ok":0,"error":"table_missing","detail":"..."}</code>; <strong>500</strong> <code>{"ok":0,"error":"internal"}</code> (details in the app log).</li>
+            </ul>
+
+            <h3 class="doc-h3">Review / apply flow (review-first, like Golden Data)</h3>
+            <ul class="doc-body">
+                <li><code>proposed</code> → <strong>Approve</strong> / <strong>Reject</strong> (rejected / reverted can be re-approved). All buttons are POST forms, admin-only (same check as <code>/ai/usage</code>), with a per-session CSRF token.</li>
+                <li><strong>Apply</strong> shows only on <code>approved</code> + <code>change_type=config</code> + allow-listed target. It reads the current value into
+                    <code>before_value</code> (<code>{"present":1,"value":...}</code>), validates the new value, writes the JSON atomically (temp file + rename, same key order,
+                    2-space format), sets <code>applied</code> + <code>applied_by/at</code>, and logs to the app log and to <code>result</code>.</li>
+                <li><strong>Revert</strong> (applied only) restores <code>before_value</code> exactly (removes the key if it was absent), sets <code>reverted</code>, and notes drift if the value changed since apply.</li>
+                <li><code>code</code> / <code>workstation</code> / <code>other</code> are never applied. Approving creates a todo in project <code>AISYSTEM</code>
+                    through <code>AI2::TodoCreate</code>'s insert path (no LLM rank hand-off) and stores <code>todo_id</code>; if it fails the reason goes into <code>result</code>.</li>
+                <li>Admin notes / tuning form per report (kept across re-ingest).</li>
+            </ul>
+
+            <h3 class="doc-h3">Allow-list (<code>Util/AI/EvalAllowList.pm</code> <code>%ALLOW</code>, files in <code>root/config/</code>)</h3>
+            <table class="doc-table">
+                <thead><tr><th>Target</th><th>Allowed</th></tr></thead>
+                <tbody>
+                    <tr><td><code>ai_grounding.json:mode</code></td><td>off | shadow | enforce</td></tr>
+                    <tr><td><code>ai_grounding.json:max_snippets</code></td><td>int 1..20</td></tr>
+                    <tr><td><code>ai_grounding.json:max_total_chars</code></td><td>int 500..20000</td></tr>
+                    <tr><td><code>ai_grounding.json:postcheck_action</code></td><td>strip | flag</td></tr>
+                    <tr><td><code>ai_grounding.json:web_search</code></td><td>0 | 1</td></tr>
+                    <tr><td><code>ai_usage.json:alert_percent</code></td><td>int 1..100</td></tr>
+                    <tr><td><code>ai_usage.json:supergrok_monthly_limit_usd</code></td><td>number 0..500</td></tr>
+                    <tr><td><code>ai_usage.json:supergrok_monthly_request_limit</code></td><td>int 0..100000</td></tr>
+                </tbody>
+            </table>
+            <p class="doc-body">Anything else is rejected. <strong>Routing:</strong> there is no router config file. Free-model preference is
+                <code>@FREE_PREFERENCE</code> in <code>Util/ModelCatalog.pm</code>, the startup catalog is <code>_default_free_catalog</code> in
+                <code>Model/AI2/Router.pm</code>, and <code>pick_free_fallback</code> walks the live catalog. So routing proposals are <code>code</code> and become todos.
+                <strong>Caps:</strong> only <code>ai_usage.json</code> holds caps (SuperGrok USD / requests / alert %). The OpenRouter soft caps ($1.65/day, $11.50/week, $50/month)
+                are not in any app config. The <code>xai_auto_fill</code> / <code>openrouter_auto_fill</code> billing flags are intentionally not allow-listed.</p>
+            <p class="doc-body"><strong>Tests:</strong> <code>t/ai_eval_reports.t</code> (in-memory SQLite + temp config copies; no live DB, no real config).</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>

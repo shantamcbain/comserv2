@@ -1,0 +1,33 @@
+{
+  "manifest_version": 2,
+  "name": "Comserv grok.com usage",
+  "version": "1.1.0",
+  "description": "Watch grok.com Settings → Usage and record SuperGrok Build/Chat % as the page changes. Numbers only — no cookies.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "grokcom-usage@comserv.local",
+      "strict_min_version": "115.0"
+    }
+  },
+  "permissions": [
+    "nativeMessaging",
+    "storage",
+    "https://grok.com/*",
+    "https://*.grok.com/*"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+  "browser_action": {
+    "default_title": "grok.com usage",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://grok.com/*", "https://*.grok.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
