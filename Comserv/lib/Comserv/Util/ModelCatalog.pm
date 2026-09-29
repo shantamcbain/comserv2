@@ -277,7 +277,7 @@ Returns a "provider|model" string, or '' when the catalog is empty.
 our @FREE_PREFERENCE = (
     'openrouter|google/gemma-4-31b-it:free',           # 31B IT, 256k ctx, free
     'openrouter|google/gemma-4-26b-a4b-it:free',
-    'openrouter|nvidia/nemotron-3-nano-30b-a3b:free',
+    'openrouter|nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',  # successor to nano-30b-a3b (dropped from free tier 2026-09-24)
     'openrouter|nvidia/nemotron-nano-9b-v2:free',
     'openrouter|nvidia/nemotron-3.5-lightning:free',
     'openrouter|stealth/ox-alpha',                     # 0/0 priced, no :free suffix

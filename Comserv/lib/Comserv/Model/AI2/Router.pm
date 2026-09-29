@@ -1255,7 +1255,7 @@ sub _default_free_catalog {
         map  { Comserv::Util::AI::ModelChains->chain($ld, $_) } @Comserv::Util::AI::ModelChains::PURPOSES;
     };
     @slugs = ('google/gemma-4-31b-it:free', 'google/gemma-4-26b-a4b-it:free',
-              'nvidia/nemotron-3-nano-30b-a3b:free') unless @slugs;
+              'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free') unless @slugs;
     return (
         (map { { name => $_, provider => 'openrouter', label => "OpenRouter: $_", local => 0, free => 1,
                  price_prompt => 0, price_completion => 0 } } @slugs),
