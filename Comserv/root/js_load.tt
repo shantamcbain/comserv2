@@ -256,6 +256,10 @@
 <script src="/static/js/file/convert.js?v=[% cv %]" defer></script>
 [% END %]
 
+[% IF c.request.uri.match('CustomerOrder') %]
+<script src="/static/js/CustomerOrder/order-form.js?v=[% cv %]" defer></script>
+[% END %]
+
 <!-- Docker container management pages -->
 [% IF c.request.uri.match('/admin/docker-containers-working') %]
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />

@@ -199,10 +199,26 @@ sub control :Path('/3d/printer_lan/control') :Args(0) {
         $c->detach;
     }
     my $adapter = Comserv::Util::Printing3d::Adapter::Anycubic->new;
-    my $state = $adapter->fetch_state($c, $host, 18910);
+    my $state = $adapter->fetch_state($c, $host, 18910, { ace => 1 });
+    my $storage = lc($c->req->params->{storage} || 'local');
+    $storage = 'local' unless $storage eq 'udisk';
+    my $path = $c->req->params->{path} || '/';
+    my $listing = $adapter->list_files($c, $host, 18910, { storage => $storage, path => $path });
+    $state->{file_rows}     = $listing->{files} || [];
+    $state->{file_storage}  = $listing->{storage};
+    $state->{file_path}     = $listing->{path};
+    $state->{file_error}    = $listing->{error};
+    $state->{local_files}   = $listing->{names} || [];
+    my $parent = $listing->{path} || '/';
+    $parent =~ s{/[^/]+$}{};
+    $parent = '/' if $parent eq '';
+    $state->{file_parent} = $parent;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'control',
         "printer_id=" . $row->id . " mqtt_ok=" . ($state->{mqtt_ok} ? 1 : 0)
-        . " print_state=" . ($state->{print_state} || ''));
+        . " print_state=" . ($state->{print_state} || '')
+        . " ace=" . ($state->{ace_ok} ? 1 : 0)
+        . " files=" . scalar(@{ $state->{file_rows} || [] })
+        . " storage=$storage");
     if (($c->req->params->{format} || '') eq 'json'
         || ($c->req->header('Accept') || '') =~ /json/) {
         $c->res->content_type('application/json');
@@ -217,7 +233,7 @@ sub control :Path('/3d/printer_lan/control') :Args(0) {
     );
 }
 
-# POST /3d/printer_lan/command  printer_id + cmd=pause|resume|stop
+# POST /3d/printer_lan/command  printer_id + cmd=pause|resume|stop|drying_start|drying_stop|start_print|camera_start|camera_stop
 sub command :Path('/3d/printer_lan/command') :Args(0) {
     my ($self, $c) = @_;
     unless (uc($c->req->method || '') eq 'POST') {
@@ -242,14 +258,68 @@ sub command :Path('/3d/printer_lan/command') :Args(0) {
         $c->res->redirect($c->uri_for('/3d/printer_lan/control', { printer_id => $row->id }));
         $c->detach;
     }
+    if ($cmd eq 'start_print' && ($c->req->params->{confirm_start} || '') ne '1') {
+        $c->flash->{error_msg} = 'Start was refused — tick “start this file” first.';
+        $c->res->redirect($c->uri_for('/3d/printer_lan/control', { printer_id => $row->id }));
+        $c->detach;
+    }
+    if (($cmd eq 'delete_local' || $cmd eq 'delete_udisk')
+        && ($c->req->params->{confirm_delete} || '') ne '1') {
+        $c->flash->{error_msg} = 'Delete was refused — tick “delete this file” first.';
+        $c->res->redirect($c->uri_for('/3d/printer_lan/control', {
+            printer_id => $row->id,
+            storage    => ($cmd eq 'delete_udisk' ? 'udisk' : 'local'),
+        }));
+        $c->detach;
+    }
+
     my $adapter = Comserv::Util::Printing3d::Adapter::Anycubic->new;
-    my $res = $adapter->send_command($c, $host, 18910, $cmd);
+    if ($cmd eq 'start_print') {
+        my $st = $adapter->fetch_state($c, $host, 18910);
+        my $ps = lc($st->{print_state} || '');
+        if ($ps && $ps ne 'free' && $ps ne 'finished' && $ps ne 'stoped' && $ps ne 'stopped') {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'command',
+                "start_print refused printer_id=" . $row->id . " state=$ps");
+            $c->flash->{error_msg} = "Printer is not idle (state=$ps). Stop or wait before starting another file.";
+            $c->res->redirect($c->uri_for('/3d/printer_lan/control', { printer_id => $row->id }));
+            $c->detach;
+        }
+    }
+
+    my %opts;
+    if ($cmd eq 'drying_start') {
+        $opts{target_temp} = $c->req->params->{target_temp};
+        $opts{duration}    = $c->req->params->{duration};
+    }
+    if ($cmd eq 'start_print') {
+        $opts{filename} = $c->req->params->{filename};
+        $opts{path}     = $c->req->params->{path};
+    }
+    if ($cmd eq 'delete_local' || $cmd eq 'delete_udisk') {
+        $opts{filename} = $c->req->params->{filename};
+        $opts{path}     = $c->req->params->{path};
+    }
+
+    my $res = $adapter->send_command($c, $host, 18910, $cmd, \%opts);
     if ($res->{ok}) {
-        $c->flash->{success_msg} = "Sent $cmd to " . ($row->name || 'printer') . '.';
+        my $msg = "Sent $cmd to " . ($row->name || 'printer') . '.';
+        if ($cmd eq 'camera_start') {
+            $msg .= ' Stream is HTTP-FLV at http://' . $host
+                . ':18088/flv — open in VLC/mpv. A browser tab will not play it.';
+        }
+        $c->flash->{success_msg} = $msg;
     } else {
         $c->flash->{error_msg} = "Command $cmd failed: " . ($res->{error} || 'unknown');
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'command',
+            "cmd=$cmd printer_id=" . $row->id . " err=" . ($res->{error} || 'unknown'));
     }
-    $c->res->redirect($c->uri_for('/3d/printer_lan/control', { printer_id => $row->id }));
+    my $back_storage = 'local';
+    $back_storage = 'udisk' if $cmd eq 'delete_udisk' || ($c->req->params->{storage} || '') eq 'udisk';
+    $c->res->redirect($c->uri_for('/3d/printer_lan/control', {
+        printer_id => $row->id,
+        storage    => $back_storage,
+        path       => ($c->req->params->{path} || '/'),
+    }));
     $c->detach;
 }
 
