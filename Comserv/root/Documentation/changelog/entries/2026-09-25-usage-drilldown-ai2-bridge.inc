@@ -1,0 +1,6 @@
+<div id="2026-09-25-usage-drilldown-ai2-bridge" class="cl-entry">
+<h3>2026-09-25 — Usage drill-down + AI2 live JSON bridge</h3>
+<p class="doc-body"><strong>What.</strong> <code>/ai/usage</code> is no longer a wall of tables: overview KPIs, four agent rows you can tunnel into, and collapsed <code>details</code> sections for Hermes/app/kill/xAI. Live numbers come from <code>GET /ai2/usage_live</code> (already-loaded thin controller) because new <code>Controller::AI::Usage</code> is not in the running :4006 process. JS also fills KPIs from that JSON so historical Hermes tokens show even when the old <code>AI.pm usage()</code> stash is zeros. Satellite HTML also at <code>/ai/usage_org</code> after the process next loads <code>AI/Usage.pm</code>.</p>
+<p class="doc-body"><strong>Why.</strong> Huge <code>AI.pm</code> never reloads under <code>-r</code>; a second <code>:4006</code> listener is forbidden (address already in use). Humans cannot scan long model/user/recent lists — they need containers and a single-agent focus.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Controller/AI2.pm</code>, <code>Controller/AI/Usage.pm</code>, <code>root/ai/usage.tt</code>, <code>root/static/js/ai/usage-monitor.js</code></p>
+</div>

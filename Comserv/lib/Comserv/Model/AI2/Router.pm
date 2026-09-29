@@ -40,7 +40,14 @@ sub _detect_provider {
 
     my $bare = $requested_model;
     my $prefix = '';
-    if ($bare =~ s/^([^|]+)\|//) {
+    # Wire format is normally "provider|model". Also accept "provider/model"
+    # for first-party provider names — OpenRouter-style slash otherwise leaks
+    # "supergrok/grok-4.6" into the external hop as a literal model id
+    # (CSC-20260914-4380 → OpenRouter 400 invalid model).
+    if ($bare =~ s/^(supergrok|grok-oauth|grok|ollama|openrouter|external)[|\/]//i) {
+        $prefix = lc($1);
+    }
+    elsif ($bare =~ s/^([^|]+)\|//) {
         $prefix = lc($1);
     }
     if ($prefix eq 'supergrok' || $prefix eq 'grok-oauth') {
@@ -64,10 +71,12 @@ sub _detect_provider {
         return ('grok', $bare);
     }
     if ($prefix eq 'openrouter' || $prefix eq 'external' || $bare =~ m{/}) {
-        return ('external', $bare);
+        # AIMPS #2036: report the concrete provider, not the generic bucket
+        # "external". Legacy wire prefix "external|" still means OpenRouter.
+        return ('openrouter', $bare);
     }
     if ($requested_model =~ m{/}) {
-        return ('external', $requested_model);
+        return ('openrouter', $requested_model);
     }
     # Ollama tags are name:tag (llama3.1:8b, phi4:14b). OpenRouter ids use
     # org/model. The old /^(llama3|...)/i match sent local llama3* tags to
@@ -76,7 +85,7 @@ sub _detect_provider {
         return ('ollama', $bare);
     }
     if ($requested_model =~ /^(gpt|claude|mixtral|groq|openrouter|or-|tencent)/i) {
-        return ('external', $requested_model);
+        return ('openrouter', $requested_model);
     }
     return ('ollama', $requested_model);
 }
@@ -150,7 +159,10 @@ sub _is_chat_model {
 sub _bare_model {
     my ($self, $model) = @_;
     return $model unless defined $model;
-    $model =~ s/^[^|]+\|//;   # drop leading "provider|"
+    # Drop leading "provider|" or accidental "provider/" for first-party names
+    # (CSC-20260914-4380: "supergrok/grok-4.6" must become bare "grok-4.6").
+    $model =~ s/^(?:supergrok|grok-oauth|grok|ollama|openrouter|external)[|\/]//i;
+    $model =~ s/^[^|]+\|//;   # drop any other leading "provider|"
     return $model;
 }
 
@@ -188,7 +200,8 @@ sub _external_default_available {
 #   $ctx keys: agent_id, page_context, requested_model, can_select,
 #              installed_models (array of names/hashes), default_model
 #
-# Returns ($provider, $model) — provider is one of ollama|grok|external.
+# Returns ($provider, $model) — provider is one of
+# ollama|grok|supergrok|openrouter (never the generic bucket "external").
 # -------------------------------------------------------------------
 sub select_model {
     my ($self, $c, %ctx) = @_;
@@ -294,6 +307,10 @@ sub _credits_exhausted {
     # "personal-team-blocked:spending-limit". Router must read that as "this
     # hop is down" and fall through, not dead-end (todo #2374).
     return 1 if $error =~ /spending.?limit|personal-team-blocked|out of credits|add credits|upgrade at/i;
+    # Auth expiry / rejected OAuth: fall through to free/local instead of
+    # dead-ending the turn (CSC-20260914-4380). Do not force a re-login UI —
+    # Provider::Grok already includes the hermes re-auth hint in the error.
+    return 1 if $error =~ /login expired|auth_failed|unauthenticated|bad-credentials|invalid.?token|token could not be validated/i;
     return 1 if $self->_transient_outage($error);
     return 0;
 }
@@ -317,6 +334,9 @@ sub _user_facing_error {
     if ($error =~ /402\b|insufficient credit|out of credit|quota|usage limit/i) {
         return 'That paid model is out of credit. Falling back to a free or local model.';
     }
+    if ($error =~ /login expired|unauthenticated|bad-credentials|invalid.?token/i) {
+        return 'SuperGrok/xAI login expired or invalid. Falling back to a free or local model when possible.';
+    }
     return 'The AI provider did not complete this turn. Try again or pick another model.';
 }
 
@@ -325,7 +345,99 @@ sub _provider_needs_credit_fallback {
     return ($provider_name // '') =~ /^(supergrok|openrouter|external)$/ ? 1 : 0;
 }
 
+# Vendor prefix of an OpenRouter slug (google/gemma-… → google). Used to
+# avoid spending the first fallback hop on a sibling in the same upstream
+# rate-limit pool (both Gemma :free models 429 together).
+sub _vendor_family {
+    my ($self, $name) = @_;
+    return '' unless defined $name && $name =~ m{^([^/]+)/};
+    return lc $1;
+}
+
+# Different-family free models first, same-family free models next, Ollama
+# last. Cap free hops so a shared-pool 429 cannot walk the whole catalog.
+sub _order_fallback_hops {
+    my ($self, $failed_model, $hops) = @_;
+    my $fam = $self->_vendor_family($failed_model);
+    my (@diff, @same, @local, %seen);
+    for my $h (@{ $hops || [] }) {
+        next unless $h && ref $h eq 'HASH' && ($h->{model} // '') ne '';
+        my $key = ($h->{provider} // '') . '|' . $h->{model};
+        next if $seen{$key}++;
+        if (($h->{provider} // '') eq 'ollama') {
+            push @local, $h;
+            next;
+        }
+        my $hf = $self->_vendor_family($h->{model});
+        if ($fam ne '' && $hf eq $fam) {
+            push @same, $h;
+        }
+        else {
+            push @diff, $h;
+        }
+    }
+    my @free = (@diff, @same);
+    splice(@free, 4) if @free > 4;
+    return (@free, @local);
+}
+
+# Live catalog for a failed turn. include_ollama is required: the cheap
+# catalog used by page render (and by pick_free_fallback) omits Ollama, so
+# a 429 used to die after one other :free sibling and never reach a local
+# model. Caller logs; this returns () on failure.
+sub _catalog_fallback_hops {
+    my ($self, $c, $skip_provider, $skip_model) = @_;
+    return () unless $c;
+    my $catalog = try {
+        $self->get_available_models($c, include_ollama => 1);
+    } catch {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+            'fallback_hops', "Catalog for fallback hops failed: $_");
+        [];
+    };
+    $catalog = [] unless $catalog && ref($catalog) eq 'ARRAY';
+    my (@hops, $local);
+    for my $m (@$catalog) {
+        next unless ref $m eq 'HASH';
+        next if $m->{disabled} || $m->{needs_key} || $m->{unreachable};
+        my $name = $m->{name} // '';
+        my $svc  = $m->{provider} || '';
+        next unless length $name;
+        next if $name =~ /^(?:ollama_unreachable|ollama_empty)$/;
+        next if $name =~ /grok/i || $name =~ /^x-ai\//i;
+        next if $svc eq ($skip_provider // '') && $name eq ($skip_model // '');
+        next if $self->_model_is_killed($c, $svc, $name);
+        my $is_free  = $m->{free} || ($name =~ /:free$/);
+        my $is_local = $m->{local} || ($svc eq 'ollama');
+        if ($is_free && $svc =~ /^(openrouter|external)$/) {
+            push @hops, { provider => 'openrouter', model => $name };
+        }
+        if (!$local && $is_local && $svc eq 'ollama' && $self->_is_chat_model($name)
+            && ($skip_provider // '') ne 'ollama') {
+            $local = { provider => 'ollama', model => $name };
+        }
+    }
+    push @hops, $local if $local;
+    return @hops;
+}
+
+# Ordered hops for chat_with_fallback. With a request context, walk the
+# live catalog (other free families, then same-family, then Ollama).
+# Without one (unit tests), honor pick_free_fallback including stubs.
+sub fallback_hops {
+    my ($self, $c, $skip_provider, $skip_model) = @_;
+    if ($c) {
+        my @from_cat = $self->_catalog_fallback_hops($c, $skip_provider, $skip_model);
+        return $self->_order_fallback_hops($skip_model, \@from_cat) if @from_cat;
+    }
+    my ($free, $local) = $self->pick_free_fallback($c, $skip_provider, $skip_model);
+    $local = undef if ($skip_provider // '') eq 'ollama';
+    return $self->_order_fallback_hops($skip_model, [ grep { $_ } ($free, $local) ]);
+}
+
 # First live OpenRouter :free model, then first chat-capable Ollama tag.
+# Snapshot/diagnostics only — chat failover uses fallback_hops, which also
+# tries later free models and requests include_ollama.
 # No hardcoded model slugs — catalog is the source of truth.
 sub pick_free_fallback {
     my ($self, $c, $skip_provider, $skip_model) = @_;
@@ -344,6 +456,7 @@ sub pick_free_fallback {
         next unless length $name;
         next if $name =~ /grok/i || $name =~ /^x-ai\//i;
         next if $svc eq ($skip_provider // '') && $name eq ($skip_model // '');
+        next if $self->_model_is_killed($c, $svc, $name);
         my $is_free  = $m->{free} || ($name =~ /:free$/);
         my $is_local = $m->{local} || ($svc eq 'ollama');
         if (!$free && $is_free && $svc =~ /^(openrouter|external)$/) {
@@ -425,8 +538,30 @@ sub _chat_one_with_retry {
 # Paid OpenRouter (no auto-fill) and SuperGrok (prepaid, no remaining-quota
 # API) fall back to free OpenRouter then Ollama. xAI grok auto-fills — do
 # not steal the turn away from grok on a credit error.
+sub _model_is_killed {
+    my ($self, $c, $provider, $model) = @_;
+    my $hit = try {
+        require Comserv::Model::AI2::KillSwitch;
+        Comserv::Model::AI2::KillSwitch->new->is_killed($c, $provider, $model);
+    } catch { 0 };
+    return $hit;
+}
+
 sub chat_with_fallback {
     my ($self, $c, $provider_name, $use_model, $messages, %opts) = @_;
+
+    if (my $killed = $self->_model_is_killed($c, $provider_name, $use_model)) {
+        my $why = (ref $killed eq 'HASH' && $killed->{reason}) ? $killed->{reason} : 'operator';
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
+            "Kill switch blocked $provider_name/$use_model ($why)");
+        return {
+            success  => 0,
+            killed   => 1,
+            error    => "Model $provider_name/$use_model is stopped ($why). Unkill it on /ai/usage.",
+            provider => $provider_name,
+            model    => $use_model,
+        };
+    }
 
     my $skip_paid = 0;
     my $pre_err;
@@ -446,7 +581,21 @@ sub chat_with_fallback {
     unless ($skip_paid) {
         $resp = $self->_chat_one_with_retry($c, $provider_name, $use_model, $messages, %opts);
         if ($resp && $resp->{success}) {
-            return $resp;
+            my $body = $resp->{response} // '';
+            $body =~ s/^\s+|\s+$//g;
+            if (length $body) {
+                return $resp;
+            }
+            # CSC-20260914-5166: HTTP success with blank text looks like a hang.
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
+                "Provider $provider_name returned empty content (model="
+                . ($use_model // '?') . "); treating as failure");
+            $resp = {
+                success  => 0,
+                error    => 'Provider returned empty content',
+                provider => $provider_name,
+                model    => $resp->{model} || $use_model,
+            };
         }
     }
 
@@ -454,9 +603,10 @@ sub chat_with_fallback {
     # Credit-exhaustion on paid providers OR a dead Ollama hop (docker cannot
     # reach host:11434 — CSC-20260831-1585) should fall through to a free
     # OpenRouter model instead of leaving the UI on Thinking… forever.
+    # Also fall through on empty content (CSC-20260914-5166).
     my $do_fallback = (
         $self->_provider_needs_credit_fallback($provider_name)
-            && ($skip_paid || $self->_credits_exhausted($err))
+            && ($skip_paid || $self->_credits_exhausted($err) || $err =~ /empty content/i)
     ) || (
         ($provider_name // '') eq 'ollama'
             && ($resp && $resp->{unreachable} || $self->_credits_exhausted($err))
@@ -468,14 +618,15 @@ sub chat_with_fallback {
         return $resp;
     }
 
-    my ($free, $local) = $self->pick_free_fallback($c, $provider_name, $use_model);
-    # When Ollama itself is the failing hop, do not retry another Ollama tag.
-    $local = undef if ($provider_name // '') eq 'ollama';
-    for my $hop ($free, $local) {
-        next unless $hop;
+    # Other free families first (not the sibling in the same 429 pool), then
+    # same-family :free, then one Ollama tag. A single hop 429 is a warning;
+    # error only if every hop fails (that is what files an audit todo).
+    my @hops = $self->fallback_hops($c, $provider_name, $use_model);
+    my @hop_notes;
+    for my $hop (@hops) {
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
             "$provider_name failed ($err); falling back to $hop->{provider} $hop->{model}");
-        my $retry = $self->_chat_one_with_retry($c, $hop->{provider}, $hop->{model}, $messages);
+        my $retry = $self->_chat_one_with_retry($c, $hop->{provider}, $hop->{model}, $messages, %opts);
         if ($retry && $retry->{success}) {
             $retry->{provider}       = $hop->{provider};
             $retry->{fallback}       = 1;
@@ -485,13 +636,20 @@ sub chat_with_fallback {
             return $retry;
         }
         my $hop_err = ($retry && $retry->{error}) || 'fallback hop failed';
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'chat_with_fallback',
+        push @hop_notes, "$hop->{provider}/$hop->{model}: $hop_err";
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
             "Fallback hop $hop->{provider}/$hop->{model} failed: $hop_err");
+    }
+    if (@hop_notes) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'chat_with_fallback',
+            "All fallback hops failed after $provider_name/" . ($use_model // '?')
+            . " ($err): " . join('; ', @hop_notes));
     }
 
     $resp ||= { success => 0, error => $err, provider => $provider_name };
     $resp->{provider} ||= $provider_name;
     $resp->{error} = $err;
+    eval { Comserv::Util::ModelCatalog->invalidate };
     return $resp;
 }
 
@@ -511,6 +669,18 @@ sub dispatch_chat {
         requested_model => $requested_model, can_select => $can_select);
 
     return $self->chat_with_fallback($c, $provider_name, $use_model, $messages);
+}
+
+# #2380 — live failover list for diagnostics / auto-sync (no hardcoded slugs).
+sub failover_snapshot {
+    my ($self, $c) = @_;
+    my ($free, $local) = $self->pick_free_fallback($c);
+    return {
+        free_openrouter => $free,
+        ollama          => $local,
+        cache_gen       => $Comserv::Util::ModelCatalog::CACHE_GEN,
+        cache_age_s     => time() - ($Comserv::Util::ModelCatalog::CACHE_AT || 0),
+    };
 }
 
 # -------------------------------------------------------------------
@@ -831,6 +1001,119 @@ sub route_request {
     my ($self, $c, %args) = @_;
     my ($prov, $model) = $self->select_model($c, %args);
     return { success => 1, provider => $prov, model => $model };
+}
+
+# -------------------------------------------------------------------
+# AIMPS W1.1 (#2026/#2028/#2029) — page-class shortlists.
+# One brain: every picker asks the Router. No per-page model arrays.
+# Classes are capability patterns, never a hardcoded slug list.
+# -------------------------------------------------------------------
+sub infer_page {
+    my ($self, $path) = @_;
+    $path = lc($path // '');
+    $path =~ s{^https?://[^/]+}{};
+    return 'editor'   if $path =~ /editor|ai2editor|\/ai2\/edit/;
+    return 'git'      if $path =~ /\/git(\/|$)|admin\/git/;
+    return 'planning' if $path =~ /planning|\/todo/;
+    return 'herb'     if $path =~ /herb|ency|content|documentation/;
+    return 'chat';
+}
+
+sub page_class_for {
+    my ($self, $page) = @_;
+    $page = lc($page // '');
+    $page =~ s{^/+}{};
+    return 'coding'  if $page =~ /^(editor|git|code|ai2editor)\b/;
+    return 'coding'  if $page =~ /editor|ai2editor/;
+    return 'general';
+}
+
+sub classify_model {
+    my ($self, $m) = @_;
+    return 'unknown' unless $m && ref($m) eq 'HASH';
+    my $svc  = lc($m->{provider} // '');
+    my $name = $m->{name} // $m->{id} // $m->{value} // '';
+    $name =~ s/^[^|]+\|//;
+    # SuperGrok is the prepaid coding stack (AISYSTEM W1.0). Never treat it as
+    # "general" or the editor shortlist hides every grok-* option.
+    return 'coding' if $svc eq 'supergrok' || $m->{prepaid};
+    return 'coding' if $name =~ /coder|code|hy3|north-mini|starcoder|deepseek-v|qwen3-coder|qwen2\.5-coder|grok-build|grok-code/i;
+    return 'general';
+}
+
+# Filter an already-built catalog (raw Router or flattened ModelCatalog shape).
+# coding  → coding-class models (fallback to general if none matched)
+# general → non-coding chat models, capped so herb/planning are not 397 long
+sub shortlist_models {
+    my ($self, $models, %opts) = @_;
+    return [] unless $models && ref($models) eq 'ARRAY';
+    my $page  = $opts{page} || 'chat';
+    return [ grep { $_ && ref($_) eq 'HASH' } @$models ] if $page eq 'all';
+    my $class = $opts{class} || $self->page_class_for($page);
+    my $max   = $opts{max};
+    $max = ($class eq 'coding' ? 40 : 24) unless defined $max;
+
+    my @kept;
+    for my $m (@$models) {
+        next unless $m && ref($m) eq 'HASH';
+        next if $m->{disabled} || $m->{needs_key} || $m->{unreachable};
+        my $mc = $self->classify_model($m);
+        if ($class eq 'coding') {
+            push @kept, $m if $mc eq 'coding';
+        }
+        else {
+            push @kept, $m if $mc eq 'general';
+        }
+    }
+    if ($class eq 'coding' && !@kept) {
+        @kept = grep {
+            $_ && ref($_) eq 'HASH'
+            && !$_->{disabled} && !$_->{needs_key} && !$_->{unreachable}
+        } @$models;
+    }
+
+    my $is_sg = sub {
+        my ($m) = @_;
+        return 1 if lc($m->{provider} // '') eq 'supergrok';
+        return 1 if $m->{prepaid};
+        my $id = $m->{value} // $m->{name} // '';
+        return $id =~ /^supergrok\|/i ? 1 : 0;
+    };
+    my $cost_of = sub {
+        my ($m) = @_;
+        my $pp = ($m->{price_prompt}     // 0) + 0;
+        my $pc = ($m->{price_completion} // 0) + 0;
+        return ($pp > $pc) ? $pp : $pc;
+    };
+    my $is_free = sub {
+        my ($m) = @_;
+        my $n = $m->{name} // $m->{value} // $m->{id} // '';
+        return 1 if $m->{free} || $n =~ /:free$/i;
+        return 1 if !$m->{local} && $cost_of->($m) == 0 && !($m->{price_tier} // '');
+        return 0;
+    };
+    my @sg   = grep { $is_sg->($_) } @kept;
+    my @rest = grep { !$is_sg->($_) } @kept;
+    my @sorted_rest = sort {
+        my $af = $is_free->($a) ? 0 : 1;
+        my $bf = $is_free->($b) ? 0 : 1;
+        return $af <=> $bf if $af != $bf;
+        my $ca = $cost_of->($a);
+        my $cb = $cost_of->($b);
+        return $ca <=> $cb if $ca != $cb;
+        my $ac = ($self->classify_model($a) eq 'coding') ? 0 : 1;
+        my $bc = ($self->classify_model($b) eq 'coding') ? 0 : 1;
+        return $ac <=> $bc if $ac != $bc;
+        my $an = lc($a->{name} // $a->{value} // '');
+        my $bn = lc($b->{name} // $b->{value} // '');
+        return $an cmp $bn;
+    } @rest;
+    my $rest_max = $max - scalar(@sg);
+    $rest_max = 0 if $rest_max < 0;
+    if (@sorted_rest > $rest_max) {
+        @sorted_rest = @sorted_rest[ 0 .. $rest_max - 1 ];
+    }
+    return [ @sg, @sorted_rest ];
 }
 
 __PACKAGE__->meta->make_immutable;

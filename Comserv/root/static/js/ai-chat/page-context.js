@@ -224,11 +224,20 @@
         .catch(function() { return ''; });
     }
 
+    function _pageDocument() {
+        try {
+            if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed && window.opener.document) {
+                return window.opener.document;
+            }
+        } catch (e) {}
+        return document;
+    }
     function extractPageContent() {
+        const rootDoc = _pageDocument();
         const skipSelectors = '#local-chat-widget, #chat-panel, script, style, nav, footer, .navbar, header';
         const contentSelectors = ['main', '.main-content', '#content', '.content-area', '.page-content', 'article', '.container'];
         for (const sel of contentSelectors) {
-            const el = document.querySelector(sel);
+            const el = rootDoc.querySelector(sel);
             if (!el) continue;
             const clone = el.cloneNode(true);
             clone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
@@ -238,13 +247,15 @@
             }
         }
         // Fallback: body text
-        const bodyClone = document.body.cloneNode(true);
+        if (!rootDoc.body) return '';
+        const bodyClone = rootDoc.body.cloneNode(true);
         bodyClone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
         const bodyText = bodyClone.textContent.replace(/\s+/g, ' ').trim();
         return bodyText.substring(0, 4000);
     }
 
     function extractPageLinks() {
+        const rootDoc = _pageDocument();
         const seen = new Set();
         const navLinks = [];
         const contentLinks = [];
@@ -262,7 +273,7 @@
         // 1. Navigation menu and header links (always include these for link auditing)
         const navSelectors = ['nav', 'header nav', '.navbar', '#main-menu', '#nav', '.nav-menu', '.site-nav', '.menu', 'header'];
         navSelectors.forEach(function(sel) {
-            const el = document.querySelector(sel);
+            const el = rootDoc.querySelector(sel);
             if (!el) return;
             // Exclude the chat widget itself
             if (el.closest('#local-chat-widget, #chat-panel')) return;
@@ -276,13 +287,13 @@
             '.tabs a', '.tab-links a', '[data-tab] a'
         ];
         prioritySelectors.forEach(function(sel) {
-            document.querySelectorAll(sel).forEach(function(a) { collectLink(a, contentLinks); });
+            rootDoc.querySelectorAll(sel).forEach(function(a) { collectLink(a, contentLinks); });
         });
 
         // 3. General content-area links
         const contentSelectors = ['main', '.main-content', '#content', '.content-area', '.page-content', 'article'];
         contentSelectors.forEach(function(sel) {
-            const el = document.querySelector(sel);
+            const el = rootDoc.querySelector(sel);
             if (!el) return;
             el.querySelectorAll('a[href]').forEach(function(a) { collectLink(a, contentLinks); });
         });
@@ -294,22 +305,63 @@
         return result; // array of sections
     }
 
-    function detectPageContext() {
-        // In PAGE_MODE (detached popup), honour the originating page URL so the
-        // same agent and context are used as on the page the widget was on.
-        let pathname = window.HELPDESK_PRESCREEN_PAGE_PATH || window.location.pathname;
-        let pageTitle = window.HELPDESK_PRESCREEN_PAGE_TITLE || document.title || 'Unknown Page';
-        if ((PAGE_MODE || window.AI_WIDGET_POPUP) && (state.detachedFromPath || window.AI_DETACHED_FROM_PATH)) {
-            pathname  = state.detachedFromPath  || window.AI_DETACHED_FROM_PATH  || pathname;
-            pageTitle = state.detachedFromTitle || window.AI_DETACHED_FROM_TITLE || pageTitle;
+
+    // Originating page for detached /ai/widget popup (CSC-20260914-8057).
+    // Never report the widget URL itself as page_path, and never append the
+    // widget's ?from_path= query onto the origin path.
+    function _isWidgetPath(path) {
+        path = (path || '').split('?')[0];
+        return path === '/ai/widget' || path.indexOf('/ai/widget/') === 0
+            || path === '/ai' || path === '/ai/';
+    }
+    function _openerPathname() {
+        try {
+            if (window.opener && !window.opener.closed && window.opener.location) {
+                var op = window.opener.location.pathname || '';
+                if (op && !_isWidgetPath(op)) return op;
+            }
+        } catch (e) {}
+        return '';
+    }
+    function _originatingPathname() {
+        var det = (state && state.detachedFromPath) || window.AI_DETACHED_FROM_PATH || '';
+        var here = window.location.pathname || '';
+        var onWidget = !!(window.AI_WIDGET_POPUP || PAGE_MODE || _isWidgetPath(here));
+        if (onWidget) {
+            if (det && !_isWidgetPath(det)) return det;
+            var fromOpener = _openerPathname();
+            if (fromOpener) return fromOpener;
+            if (_isWidgetPath(here)) return (det && det !== here) ? det : '/';
         }
+        return window.HELPDESK_PRESCREEN_PAGE_PATH || here;
+    }
+    function _originatingTitle(fallback) {
+        var det = (state && state.detachedFromTitle) || window.AI_DETACHED_FROM_TITLE || '';
+        var here = window.location.pathname || '';
+        if ((window.AI_WIDGET_POPUP || PAGE_MODE || here === '/ai/widget') && det) {
+            return det;
+        }
+        return window.HELPDESK_PRESCREEN_PAGE_TITLE || fallback || document.title || 'Unknown Page';
+    }
+    function _originatingSearch() {
+        var here = window.location.pathname || '';
+        if (window.AI_WIDGET_POPUP || PAGE_MODE || here === '/ai/widget' || here.indexOf('/ai/widget') === 0) {
+            return '';
+        }
+        return window.location.search || '';
+    }
+
+    function detectPageContext() {
+        // Detached /ai/widget: honour originating page (CSC-20260914-8057).
+        let pathname = _originatingPathname();
+        let pageTitle = _originatingTitle();
         
         // Try to load and select agent from config
         const selectedAgent = _selectAgentForPage ? _selectAgentForPage() : null;
         state.currentAgent = selectedAgent;
         
         let context = {
-            page_path: pathname + (window.location.search || ''),
+            page_path: pathname + _originatingSearch(),
             page_title: pageTitle,
             page_url: window.AI_WIDGET_POPUP
                 ? (window.location.origin + pathname)
@@ -329,8 +381,12 @@
             context.agent_id = selectedAgent.id;
             context.agent_name = selectedAgent.display_name;
             context.system_prompt = selectedAgent.system_prompt
-                + '\nDo NOT invent file paths, documentation URLs, or system details not explicitly provided.'
+                + '\nDo NOT invent file paths, documentation URLs, or system details. Use only page content/docs and any Web search section included in this prompt.'
                 + '\nCurrent page: "' + pageTitle + '" at URL: ' + pathname
+                + ((window.AI_WIDGET_POPUP || PAGE_MODE)
+                    ? ('\nIMPORTANT: The chat UI may load from /ai/widget, but the user\'s page is '
+                       + pathname + '. Never say the current page is /ai/widget.')
+                    : '')
                 + (pageContent ? '\n\nPage content:\n' + pageContent : '')
                 + linksSection;
             context.capabilities = selectedAgent.capabilities;
@@ -340,9 +396,13 @@
             context.page_type = 'general';
             context.agent_id = 'general';
             context.system_prompt = 'You are a helpful AI assistant for the Comserv web application. '
-                + 'You can only answer based on information explicitly provided to you here. '
+                + 'Prefer answers from the application page content and docs provided here. If the answer is not in that material, say clearly that it is not in the application context (so a follow-up web search can run). '
                 + 'Do NOT invent file paths, documentation URLs, or system details not shown below.\n\n'
                 + 'Current page: "' + pageTitle + '" at URL: ' + pathname
+                + ((window.AI_WIDGET_POPUP || PAGE_MODE)
+                    ? ('\nIMPORTANT: The chat UI may load from /ai/widget, but the user\'s page is '
+                       + pathname + '. Never say the current page is /ai/widget.')
+                    : '')
                 + (pageContent ? '\n\nPage content:\n' + pageContent : '')
                 + linksSection;
         }

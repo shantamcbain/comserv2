@@ -1,0 +1,519 @@
+[% META
+   title = "Health Kitchen Plan"
+   description = "User-enableable Health Kitchen: pantry inventory, ENCY herb/food knowledge, symptom-based menus and daily activity plans, AI-assisted."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "plans"
+   page_version = "0.03"
+   last_updated = "Wed Sep 23 2026"
+   site_specific = "false"
+   project_id = "296"
+   project_code = "HEALTHKITCHEN"
+%]
+[% PageVersion = 'Documentation/HealthKitchenPlan.tt,v 0.03 2026/09/23 hermes-agent Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'Health Kitchen Plan'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <p class="doc-muted">Jump to section:</p>
+            <div class="doc-navrow">
+                <a href="#now" class="doc-navlink">Now</a>
+                <a href="#overview" class="doc-navlink">Overview</a>
+                <a href="#existing" class="doc-navlink">What already exists</a>
+                <a href="#prerequisites" class="doc-navlink">Prerequisites</a>
+                <a href="#features" class="doc-navlink">Key Features</a>
+                <a href="#architecture" class="doc-navlink">Architecture</a>
+                <a href="#workstreams" class="doc-navlink">Workstreams</a>
+                <a href="#first-drink" class="doc-navlink">First drink</a>
+                <a href="#schema" class="doc-navlink">Schema</a>
+                <a href="#safety" class="doc-navlink">Safety</a>
+                <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
+                <a href="#decisions" class="doc-navlink">Decisions</a>
+                <a href="#see-also" class="doc-navlink">See Also</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h1 class="doc-h1">Health Kitchen Plan</h1>
+            <p class="doc-muted">Last Updated | Version 0.02 | Status: DECISIONS LOCKED — tracking live on #296</p>
+            <p class="doc-body">
+                Working checklist (not served by Documentation):
+                <code class="doc-code">.hermes/plans/2026-09-23_100015-health-kitchen.md</code>
+                in the ency worktree git root.
+            </p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="now" class="doc-h2">Now</h2>
+            <div class="doc-info">
+                <ul class="doc-body">
+                    <li><strong>Current.</strong> D1–D5 decided. Project
+                        <a href="[% c.uri_for('/project/details') %]?project_id=296" class="doc-link">#296 HEALTHKITCHEN</a>
+                        is live under #227. No Health Kitchen routes or tables yet.</li>
+                    <li><strong>Blocked by.</strong> Nothing on decisions. Next work is HK-ENABLE.0 ROLE EVAL
+                        <a href="[% c.uri_for('/todo/details') %]?record_id=2450" class="doc-link">todo #2450</a>.</li>
+                    <li><strong>Next.</strong> Start #2450, then catalog key + member self-serve grant.</li>
+                    <li><strong>Do not confuse.</strong>
+                        <a href="[% c.uri_for('/project/details') %]?project_id=199" class="doc-link">#199 HEALTH-PLAN</a>
+                        is server/application monitoring, not human health.</li>
+                </ul>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" class="doc-h2">1. Overview</h2>
+            <p class="doc-body">
+                Any logged-in user can add Health Kitchen to their account the same way they add
+                ENCY or beekeeping. The feature uses the inventory system as a pantry of foods and herbs,
+                ENCY rows as the scientific/culinary detail for each item, and the v2 AI stack to build
+                menus and daily activity plans from the symptoms that are <strong>active right now</strong>.
+                Recipes are constrained to what is actually in the pantry and to current ENCY data,
+                optionally augmented by AI learning and net search (trust-tiered, never auto-authoritative).
+            </p>
+            <p class="doc-body">
+                Branch of record: <code class="doc-code">ency</code> (worktree port 4011).
+                Schema materialization belongs on the <code class="doc-code">schema</code> branch.
+                Inventory category work belongs on InventoryAccounting.
+                AI prompt/recall/search extensions belong on <code class="doc-code">aisystem</code>
+                if they cannot be done as thin additions here — raise, do not absorb.
+            </p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="existing" class="doc-h2">2. What already exists (summarized, then mapped)</h2>
+            <p class="doc-body">This section states the live code first, then the mapping. Mapping-only would pretend these files were not read.</p>
+
+            <h3 class="doc-h3">2.1 Membership / add-ons</h3>
+            <p class="doc-body">
+                <code class="doc-code">Comserv::Controller::Admin::SiteModules</code>
+                <code class="doc-code">_default_addon_catalog</code> already lists
+                <code class="doc-code">ency</code> (Encyclopedia &amp; Herbal Database, route <code class="doc-code">/ency</code>)
+                and <code class="doc-code">beekeeping</code> (BMaster, route <code class="doc-code">/apiary</code>).
+                Access is <code class="doc-code">MembershipHelper::can_access($module)</code>:
+                (1) <code class="doc-code">membership_service_access</code> per-user override,
+                (2) plan_benefits, (3) legacy plan flags such as <code class="doc-code">has_beekeeping</code>.
+                Site enablement is <code class="doc-code">SiteModule</code> plus hosting
+                <code class="doc-code">requested_addons</code> in <code class="doc-code">Pages.pm</code>.
+                Nav catalog already gates Beekeeping with <code class="doc-code">requires_module =&gt; 'beekeeping'</code>.
+            </p>
+            <p class="doc-body"><strong>Mapping:</strong> add catalog key <code class="doc-code">healthkitchen</code> (D2), reuse the same three-layer access check, add a member-facing enable action so it is not admin-only, gate new nav the same way.</p>
+
+            <h3 class="doc-h3">2.2 ENCY knowledge graph</h3>
+            <p class="doc-body">
+                Live tables (Result classes under <code class="doc-code">Model/Schema/Ency/Result/Ency/</code>):
+            </p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Result / table</th>
+                    <th class="doc-th">What it already holds</th>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code class="doc-code">Herb</code> / <code class="doc-code">ency_herb_tb</code></td>
+                    <td class="doc-td">Botanical identity, culinary, therapeutic_action, medical_uses, dosage, contra_indications, formulas, constituents, pollinator fields</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code class="doc-code">Symptom</code> / <code class="doc-code">ency_symptom_tb</code></td>
+                    <td class="doc-td">Named symptoms, body_system, severity, host_type</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code class="doc-code">HerbSymptom</code> / <code class="doc-code">herb_symptom</code></td>
+                    <td class="doc-td">Herb ↔ symptom with relationship_type + notes</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code class="doc-code">Formula</code> / <code class="doc-code">usbm_formula_tb</code></td>
+                    <td class="doc-td">Named formulas/recipes; nav alias <code class="doc-code">/ENCY/recipes</code> already redirects here. Linked via FormulaHerb</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Drug / Disease junctions</td>
+                    <td class="doc-td">Drug–herb interactions, herb–disease; planner must consult these before suggesting an item</td>
+                </tr>
+            </table>
+            <p class="doc-body"><strong>Mapping (D3):</strong> do not invent a parallel food CMS. Link each pantry SKU to Herb, Organism, Animal, Insect, and/or Formula so birds/animals/insects can be foods too. User “active symptoms” reference <code class="doc-code">ency_symptom_tb.record_id</code>.</p>
+
+            <h3 class="doc-h3">2.3 Inventory</h3>
+            <p class="doc-body">
+                <code class="doc-code">inventory_items</code> is sitename-scoped with
+                <code class="doc-code">category</code>, <code class="doc-code">item_origin</code>,
+                <code class="doc-code">unit_of_measure</code>, <code class="doc-code">is_consumable</code>,
+                stock fields. There is no food/herb category and no FK to ENCY on this branch.
+            </p>
+            <p class="doc-body"><strong>Mapping:</strong> pantry reads available qty from inventory (or a user overlay — D1). Junction table <code class="doc-code">inventory_ency_map</code> owned here; category list change is raised on InventoryAccounting.</p>
+
+            <h3 class="doc-h3">2.4 AI</h3>
+            <p class="doc-body">
+                v2 prompts live in <code class="doc-code">Comserv::Model::AI2::Prompts</code>
+                (bmaster already ported). <code class="doc-code">agents.json</code> is picker/permissions only.
+                <code class="doc-code">AI2::KnowledgeRecall</code> injects trust-tiered prior knowledge
+                (<code class="doc-code">VERIFIED</code> / <code class="doc-code">UNVERIFIED</code> / <code class="doc-code">INTERNAL</code>).
+                <code class="doc-code">AI2::Search</code> is SearXNG, <strong>disabled by default</strong>
+                in <code class="doc-code">root/config/services.json</code>.
+                ENCY controller already has herb/symptom AI editor workflows.
+            </p>
+            <p class="doc-body"><strong>Mapping:</strong> add <code class="doc-code">build_healthkitchen</code>. Planner first runs a deterministic Util (pantry ∩ herb_symptom). LLM only composes the menu/activity text and may propose ENCY edits as unverified staging. Search never overwrites contra_indications.</p>
+
+            <h3 class="doc-h3">2.5 Projects already in the DB</h3>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Id</th>
+                    <th class="doc-th">Code</th>
+                    <th class="doc-th">Role in this plan</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">108</td>
+                    <td class="doc-td">ENCY</td>
+                    <td class="doc-td">Parent encyclopedia project</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">109</td>
+                    <td class="doc-td">formulas</td>
+                    <td class="doc-td">Existing recipe/formula system — Health Kitchen consumes it, does not fork it</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">227</td>
+                    <td class="doc-td">HealthManagementSystem.</td>
+                    <td class="doc-td">Empty Requested child of 108; this plan attaches here (D5). Zero todos today</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">199</td>
+                    <td class="doc-td">HEALTH-PLAN</td>
+                    <td class="doc-td">Server health — out of scope</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-50">
+            <h2 id="prerequisites" class="doc-h2">3. Prerequisites</h2>
+            <ul class="doc-body">
+                <li>Logged-in user; membership or service-access grant</li>
+                <li>Site may enable <code class="doc-code">ency</code> (knowledge) independently of Health Kitchen</li>
+                <li>Inventory items exist (or user overlay, D1)</li>
+                <li>Schema-compare available on schema branch for new tables</li>
+                <li>AI2 chat on the ency worktree server (port 4011)</li>
+            </ul>
+        </div>
+        <div class="col-50">
+            <h2 id="features" class="doc-h2">4. Key Features</h2>
+            <ul class="doc-body">
+                <li><strong>Opt-in add-on</strong> — same catalog as ENCY / beekeeping</li>
+                <li><strong>Pantry</strong> — foods/herbs with qty, linked to ENCY detail</li>
+                <li><strong>Active symptoms</strong> — user-owned, FK to ENCY symptoms</li>
+                <li><strong>Menus + activity plans</strong> — constrained to pantry ∩ knowledge</li>
+                <li><strong>AI compose</strong> — v2 agent; knowledge + optional search, trust-tiered</li>
+            </ul>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="architecture" class="doc-h2">5. Architecture</h2>
+            <div class="doc-codebox"><pre>User enable (membership_service_access / plan_benefits)
+        -&gt; HealthKitchen controller (thin)
+            -&gt; Util::HealthKitchen (deterministic match)
+            -&gt; inventory_items (+ overlay if D1)
+            -&gt; inventory_ency_map -&gt; ency_herb_tb / usbm_formula_tb
+            -&gt; user_active_symptom -&gt; ency_symptom_tb / herb_symptom
+            -&gt; AI2::Prompts::build_healthkitchen
+                 + KnowledgeRecall + Search (optional, UNVERIFIED)
+            -&gt; persist UserHealthPlan / meal slots / activities
+ENCY editors still own herb/formula truth; AI only stages suggestions.</pre></div>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">What we gain</th>
+                    <th class="doc-th">What we give up</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">One pantry + one encyclopedia instead of a third food CMS</td>
+                    <td class="doc-td">No automatic clinical advice; no silent wiki overwrites from the web</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Same enablement UX as beekeeping/ENCY</td>
+                    <td class="doc-td">New tables wait on schema-compare; ency cannot CREATE TABLE in prod</td>
+                </tr>
+            </table>
+            <p class="doc-warning">Biggest loss if we skip the Util and go LLM-only: recipes that mention foods the user does not have, and suggestions that ignore contra_indications. The deterministic intersect is the load-bearing gate; the model only writes prose around it.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="workstreams" class="doc-h2">6. Workstreams (named sub-projects, not “Phase N”)</h2>
+            <p class="doc-body">Each workstream becomes a <strong>sub-project</strong> of HEALTHKITCHEN (or of #227 if D5 keeps this doc on 227). Steps become todos. Gate is observable.</p>
+
+            <h3 id="ws-enable" class="doc-h3">HK-ENABLE — add-on + nav</h3>
+            <p class="doc-body">Catalog key, MembershipHelper, member self-serve grant, TopDropListENCY (or Member) links. <strong>GATE:</strong> user without grant cannot see <code class="doc-code">/healthkitchen</code>; user with grant can.</p>
+
+            <h3 id="ws-pantry" class="doc-h3">HK-PANTRY — inventory link</h3>
+            <p class="doc-body">Junction Result + pantry UI + InventoryAccounting category ticket. <strong>GATE:</strong> a stocked SKU shows its ENCY herb page and is visible to the planner as available.</p>
+            <p class="doc-body"><strong>Stock in:</strong> sitename inventory is filled by the existing AP receive path (<code class="doc-code">/Inventory/invoice</code>). Coop purchase-invoice <em>emails</em> are already classified on the InventoryAccounting worktree (<code class="doc-code">MailInvoiceClassifier</code> → <code class="doc-code">/mail/classify_invoices</code> → JSON). That classifier does <em>not</em> yet parse line items into <code class="doc-code">inventory_items</code>. Health Kitchen must not fork a second receive pipeline: when email→AP lines exist, pantry qty follows stock receive. Until then, seed SKUs + UserPantryQty overlay for personal use.</p>
+
+            <h3 id="first-drink" class="doc-h3">First daily drink (user 2026-09-23) — seed recipe, not coded yet</h3>
+            <p class="doc-body">Morning pot: 4 demitasse; half the usual coffee dose; drink 2 cups. This is a <code class="doc-code">usbm_formula_tb</code> recipe whose components are inventory SKUs (some ENCY herbs). Votes Coffee is a supplier, not the coop.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Ingredient</th>
+                    <th class="doc-th">Source / notes</th>
+                    <th class="doc-th">ENCY / pantry</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Coffee beans</td>
+                    <td class="doc-td">Votes Coffee, Vernon — CAD 65 / 5 lb bag</td>
+                    <td class="doc-td">Purchased SKU + supplier; organism (coffee plant) optional</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Turmeric</td>
+                    <td class="doc-td">Coop invoice line when present</td>
+                    <td class="doc-td">Herb (culinary + therapeutic)</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Ceylon cinnamon</td>
+                    <td class="doc-td">Coop invoice line when present</td>
+                    <td class="doc-td">Herb — distinct from cassia</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Black pepper</td>
+                    <td class="doc-td">Pinch ground now; later whole pepper + mill</td>
+                    <td class="doc-td">Herb; two SKUs (ground vs whole) when mill lands</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Chia seed</td>
+                    <td class="doc-td">Small amount; coop when present</td>
+                    <td class="doc-td">Organism / seed food, not herb-only</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Organika enhanced collagen protein</td>
+                    <td class="doc-td">Scoop; coop or other vendor</td>
+                    <td class="doc-td">Purchased SKU (food, not a medication)</td>
+                </tr>
+            </table>
+            <p class="doc-muted">Planner treats this as a breakfast/tea slot formula. Do not auto-write ENCY contra_indications from web search. Collagen is food, not a drug; never suggest stopping prescriptions.</p>
+
+            <h3 id="ws-symptoms" class="doc-h3">HK-SYMPTOMS — active set</h3>
+            <p class="doc-body">Profile + active-symptom rows FK to ENCY. <strong>GATE:</strong> resolving a symptom removes it from the next plan generation input.</p>
+
+            <h3 id="ws-planner" class="doc-h3">HK-PLANNER — menus and daily activity</h3>
+            <p class="doc-body">Deterministic Util first; then <code class="doc-code">build_healthkitchen</code>; persist plan; dashboard. Daily activity = sleep/movement/hydration/forage-prep style tasks stored on <code class="doc-code">user_health_activity</code> — not CSC planning todos. <strong>GATE:</strong> generated menu contains only pantry-available, non-contraindicated items for the active symptom set.</p>
+
+            <h3 id="ws-knowledge" class="doc-h3">HK-KNOWLEDGE — augment, do not overwrite</h3>
+            <p class="doc-body">Search/learning writes staging notes with source URL + UNVERIFIED. Editor applies to herb/formula. <strong>GATE:</strong> running refresh does not change <code class="doc-code">contra_indications</code> until an editor saves.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="schema" class="doc-h2">7. Proposed Result classes (schema branch creates tables)</h2>
+            <p class="doc-body">Source of truth = Result files on ency; DDL only via in-app schema-compare on schema. Never hand SQL.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Class / table</th>
+                    <th class="doc-th">Purpose</th>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code class="doc-code">InventoryEncyMap</code></td>
+                    <td class="doc-td">inventory_item_id; nullable herb_id, organism_id, animal_id, insect_id, formula_id; sitename</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code class="doc-code">UserHealthProfile</code></td>
+                    <td class="doc-td">user_id, sitename, diet flags, allergies (text), goals</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code class="doc-code">UserActiveSymptom</code></td>
+                    <td class="doc-td">user_id, symptom_id, severity, status active/resolved, started_at</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code class="doc-code">UserHealthPlan</code></td>
+                    <td class="doc-td">generated plan header, source (util/ai), trust summary, JSON body</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code class="doc-code">UserMealSlot</code></td>
+                    <td class="doc-td">plan_id, date, slot (breakfast/lunch/dinner/tea), formula_id or free text, inventory ids used</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code class="doc-code">UserHealthActivity</code></td>
+                    <td class="doc-td">plan_id, date, activity text, done flag</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code class="doc-code">UserPantryQty</code> (D1 — required)</td>
+                    <td class="doc-td">user_id, inventory_item_id, qty, unit — personal overlay; sitename inventory is separate household stock</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="safety" class="doc-h2">8. Safety (non-negotiable)</h2>
+            <ul class="doc-body">
+                <li>This is a <strong>wellness and kitchen planner</strong>, not diagnosis or treatment.</li>
+                <li>Every generated plan page shows a disclaimer and a link to ENCY contra_indications / drug–herb rows used.</li>
+                <li>Never suggest stopping a prescribed drug. If a drug–herb row exists, exclude or warn.</li>
+                <li>Do not promote medications that interfere with health (D4).</li>
+                <li>Web/AI text is labelled UNVERIFIED until an editor prefixes VERIFIED.</li>
+                <li>Public users never see INTERNAL knowledge (KnowledgeRecall rule).</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" class="doc-h2">9. Project Tracking</h2>
+            <div class="doc-success">
+                <p class="doc-body">
+                    Owning project:
+                    <a href="[% c.uri_for('/project/details') %]?project_id=296" class="doc-link">#296 (HEALTHKITCHEN)</a>
+                    — parent
+                    <a href="[% c.uri_for('/project/details') %]?project_id=227" class="doc-link">#227 HealthManagementSystem.</a>
+                    — grandparent
+                    <a href="[% c.uri_for('/project/details') %]?project_id=108" class="doc-link">#108 ENCY</a>.
+                    Todos:
+                    <a href="[% c.uri_for('/todo') %]?project_id=296" class="doc-link">#296</a>.
+                    All projects:
+                    <a href="[% c.uri_for('/project') %]" class="doc-link">/project</a>.
+                </p>
+            </div>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Workstream (sub-project)</th>
+                    <th class="doc-th">Tracking</th>
+                    <th class="doc-th">Gate / done-when</th>
+                </tr>
+                <tr>
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=297" class="doc-link">#297 HK-ENABLE</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2450" class="doc-link">#2450</a> ROLE EVAL → <a href="[% c.uri_for('/todo/details') %]?record_id=2453" class="doc-link">#2453</a> grant</td>
+                    <td class="doc-td">Grant on → page visible; grant off → hidden</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=298" class="doc-link">#298 HK-PANTRY</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2457" class="doc-link">#2457</a> map/overlay; <a href="[% c.uri_for('/todo/details') %]?record_id=2458" class="doc-link">#2458</a> InventoryAccounting</td>
+                    <td class="doc-td">Personal overlay qty + ENCY link used by planner</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=299" class="doc-link">#299 HK-SYMPTOMS</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2462" class="doc-link">#2462</a> → <a href="[% c.uri_for('/todo/details') %]?record_id=2463" class="doc-link">#2463</a></td>
+                    <td class="doc-td">Resolved symptoms leave planner input</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=300" class="doc-link">#300 HK-PLANNER</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2467" class="doc-link">#2467</a> Util; <a href="[% c.uri_for('/todo/details') %]?record_id=2468" class="doc-link">#2468</a> AI</td>
+                    <td class="doc-td">Menu ⊆ pantry; no meds that interfere with health</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=301" class="doc-link">#301 HK-KNOWLEDGE</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2472" class="doc-link">#2472</a></td>
+                    <td class="doc-td">Search does not mutate herb/animal/insect truth</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">ROUTINE re-audit (RULE P2)</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2475" class="doc-link">todo #2475</a> (set recurrence in Todo UI if API dropped it)</td>
+                    <td class="doc-td">Plan still matches code</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="decisions" class="doc-h2">10. Decisions</h2>
+            <p class="doc-body">Locked 2026-09-23 from the user’s answers. Cost of each choice is named.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">#</th>
+                    <th class="doc-th">Decision</th>
+                    <th class="doc-th">Resolution</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">D1</td>
+                    <td class="doc-td">Pantry ownership</td>
+                    <td class="doc-td">DECIDED 2026-09-23 — both. Personal per-user overlay so any member can have a private kitchen (including a one-username site — still truly personal). Sitename inventory remains for household/site stock. Cost: extra UserPantryQty table and UI to show overlay vs site stock.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">D2</td>
+                    <td class="doc-td">Module catalog key</td>
+                    <td class="doc-td">DECIDED 2026-09-23 — <code class="doc-code">healthkitchen</code>.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">D3</td>
+                    <td class="doc-td">Culinary foods in ENCY</td>
+                    <td class="doc-td">DECIDED 2026-09-23 — no ency_food_tb. Reuse Herb + culinary + Organism, and allow pantry links to the wider ENCY graph (animals, birds, insects, organisms) so foods are not herb-only. Cost: InventoryEncyMap has nullable FKs beyond herb_id.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">D4</td>
+                    <td class="doc-td">Clinical scope</td>
+                    <td class="doc-td">DECIDED 2026-09-23 — wellness/culinary planner only. Do not promote medications that interfere with health. Never suggest stopping prescribed drugs. Cost: planner will omit or warn on drug–herb conflicts rather than “treat” them.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">D5</td>
+                    <td class="doc-td">Tracking project</td>
+                    <td class="doc-td">DECIDED 2026-09-23 — child HEALTHKITCHEN #296 under #227. Cost: one more project row; #227 stays the domain parent.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">D6</td>
+                    <td class="doc-td">Accounting optional</td>
+                    <td class="doc-td">DECIDED 2026-09-23 — Health Kitchen does not require the accounting package. Member-only: personal pantry + Health Kitchen need-buy list. Site with inventory enabled (Shanta test): Mark recipe as made deducts inventory_items (transaction_type use) so the inventory short list can reorder. Mail invoice classifier stays on InventoryAccounting and is never shown to pantry-only users. Reuse ency_recipe / ency_recipe_line (food_recipe), do not add a second recipe table.</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="doc-success">
+                <h2 class="doc-h3">11. See Also</h2>
+                <ul class="doc-body">
+                    <li><a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">MASTER_PLAN</a> — coordinator (index link to raise on Documentation branch)</li>
+                    <li><a href="[% c.uri_for('/Documentation/PlanningLanguageStandard') %]" class="doc-link">Planning Language Standard</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/DocumentationTtTemplate') %]" class="doc-link">DocumentationTtTemplate</a></li>
+                    <li><a href="[% c.uri_for('/ENCY') %]" class="doc-link">ENCY home</a></li>
+                    <li><a href="[% c.uri_for('/membership/addons') %]" class="doc-link">Site add-ons</a></li>
+                </ul>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Tracked as HEALTHKITCHEN #296 under #227 / #108 ENCY on the ency worktree. Cross-plan inventory and schema work is raised on those owners.</p>
+            </div>
+        </div>
+    </div>
+</div>
+[%# ai-plan-sync created todo_ids: 2450,2451,2452,2453,2454,2455,2456,2457,2458,2459,2460,2461,2462,2463,2464,2465,2466,2467,2468,2469,2470,2471,2472,2473,2474,2475 under project_id=296 %]

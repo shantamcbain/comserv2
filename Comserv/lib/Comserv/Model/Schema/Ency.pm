@@ -28,6 +28,9 @@ __PACKAGE__->register_class('AiConversation', 'Comserv::Model::Schema::Ency::Res
 __PACKAGE__->register_class('AiMessage', 'Comserv::Model::Schema::Ency::Result::AiMessage');
 __PACKAGE__->register_class('AiUsageLog', 'Comserv::Model::Schema::Ency::Result::AiUsageLog');
 __PACKAGE__->register_class('AiSkill', 'Comserv::Model::Schema::Ency::Result::AiSkill');
+__PACKAGE__->register_class('AiGoldenData', 'Comserv::Model::Schema::Ency::Result::AiGoldenData');
+__PACKAGE__->register_class('AiEvalReport', 'Comserv::Model::Schema::Ency::Result::AiEvalReport');
+__PACKAGE__->register_class('AiEvalProposal', 'Comserv::Model::Schema::Ency::Result::AiEvalProposal');
 __PACKAGE__->register_class('AiNavigationShortcut', 'Comserv::Model::Schema::Ency::Result::AiNavigationShortcut');
 __PACKAGE__->register_class('ProjectDocumentationMapping', 'Comserv::Model::Schema::Ency::Result::ProjectDocumentationMapping');
 __PACKAGE__->register_class('ApiToken', 'Comserv::Model::Schema::Ency::Result::ApiToken');
@@ -95,6 +98,16 @@ __PACKAGE__->register_class('CoaAccountHeading', 'Comserv::Model::Schema::Ency::
 __PACKAGE__->register_class('CoaAccount',        'Comserv::Model::Schema::Ency::Result::Accounting::CoaAccount');
 __PACKAGE__->register_class('GlEntry',           'Comserv::Model::Schema::Ency::Result::Accounting::GlEntry');
 __PACKAGE__->register_class('GlEntryLine',       'Comserv::Model::Schema::Ency::Result::Accounting::GlEntryLine');
+
+# Health Kitchen pantry map (create tables via Admin schema-compare)
+__PACKAGE__->register_class('HealthKitchen::InventoryEncyMap', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::InventoryEncyMap');
+__PACKAGE__->register_class('HealthKitchen::UserPantryQty',    'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserPantryQty');
+__PACKAGE__->register_class('HealthKitchen::UserHealthProfile', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserHealthProfile');
+__PACKAGE__->register_class('HealthKitchen::UserActiveSymptom', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserActiveSymptom');
+__PACKAGE__->register_class('InventoryEncyMap',                'Comserv::Model::Schema::Ency::Result::HealthKitchen::InventoryEncyMap');
+__PACKAGE__->register_class('UserPantryQty',                   'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserPantryQty');
+__PACKAGE__->register_class('UserHealthProfile',               'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserHealthProfile');
+__PACKAGE__->register_class('UserActiveSymptom',               'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserActiveSymptom');
 
 # Register Inventory system classes
 __PACKAGE__->register_class('InventoryItem', 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItem');

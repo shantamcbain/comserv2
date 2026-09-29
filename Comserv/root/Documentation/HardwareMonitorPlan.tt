@@ -1,16 +1,16 @@
 [% META
    title = "Hardware Monitor & Watchdog Plan"
-   description = "Architecture (why two crons/scripts), file/cron/log/DB locations, current monitored hosts, and plans for full equipment coverage + Add Server page."
+   description = "Architecture (why two crons/scripts), file/cron/log/DB locations, monitored devices, and plans for full equipment coverage + Add Server page."
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "infrastructure,monitoring"
-   page_version = "1.1"
-   last_updated = "2026-09-05 (v1.1 — two-script explanation + current status + expansion plan)"
+   page_version = "1.2"
+   last_updated = "2026-09-19 (v1.2 — device_agent deployed to all 5 hosts, NFS cleanup, stale DBI scripts replaced)"
    project_id = 258
    project_code = "HWMON"
    site_specific = "false"
 %]
-[% PageVersion = 'Documentation/HardwareMonitorPlan.tt,v 1.1 2026/09/05 shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/HardwareMonitorPlan.tt,v 1.2 2026/09/19 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container masterplan">
@@ -76,20 +76,51 @@ and the remaining work to roll the fix out to the production containers.</p>
 <code>ok:1, missed:0, age_sec:&lt;real seconds&gt;, last_run:&lt;epoch&gt;</code> instead of
 <code>age=1000000000s</code>. The cron command runs clean under <code>dash</code> (exit 0).</p>
 
-<h2 id="remaining">3. Remaining work (rollout to prod)</h2>
+<h2 id="identity-alias-2026-09-23">2b. Identity alias fix (2026-09-23) — false CRITICAL #2447</h2>
+<p><strong>Root cause:</strong> cron heartbeats hit Docker <code>:5000</code> which wrote
+<code>system_identifier=workstation.computersystemconsulting.ca</code> (from
+<code>SYSTEM_IDENTIFIER</code>), while Standalone <code>:3001</code> watchdog queried bare
+<code>workstation</code>. Exact-key match → false missed-window CRITICAL even though
+cron was alive (<code>:5000</code> watchdog <code>missed:0</code>).</p>
+<p><strong>Fix (main tree, no Docker deploy / no :3001 restart required for the code change):</strong></p>
 <ul>
-    <li><strong>Stability watch (local).</strong> Confirm the audit error count stops climbing on :3001 for
-        24&ndash;48h now that the cron reliably triggers <code>run</code>. Close audit todo #2065 once the
-        watchdog stays green.</li>
-    <li><strong>Rebuild prod container.</strong> <code>comserv2-web-prod</code> on :5000 is behind this code and
-        returns 302 on <code>run</code>/<code>watchdog</code> (no token bypass). Rebuild it from current code so
-        the bypass + <code>decimal(15,3)</code> deploy there. (Per standing rule: no container rebuild without
-        explicit approval.)</li>
-    <li><strong>Prod nodes in cron.</strong> After rebuild, the cron line's <code>:199:5000</code> /
-        <code>:126:5000</code> nodes will start returning 200; verify <code>monitor_heartbeat</code> rows for
-        those nodes appear on the primary Ency.</li>
-    <li><strong>Mirror to other fleet hosts.</strong> Apply the same schema widen + cron pattern to
-        proxmox720 / production1 per the established &ldquo;prove local first, then mirror&rdquo; workflow.</li>
+    <li><code>_canonicalize_node_key</code> / <code>_node_identity</code> always use the short host
+        (<code>workstation</code>, <code>production1</code>).</li>
+    <li>Watchdog searches alias keys (<code>workstation</code>, <code>.local</code>, FQDN) so a peer
+        runtime heartbeat under the other name counts as fresh.</li>
+    <li><code>Logging::get_system_identifier</code> normalizes FQDN <code>SYSTEM_IDENTIFIER</code> to short
+        before appending runtime tag/port (takes effect in Docker after a future deploy).</li>
+</ul>
+<p><strong>Ops note:</strong> Prefer polling <code>:5000 /admin/hardware_monitor/watchdog</code> (or
+<code>run</code>) for smoke checks. Avoid casually hitting <code>:3001 /watchdog</code> on the old
+process — it still logs CRITICAL + spawns a probe until that Standalone process reloads this code.</p>
+
+<h2 id="remaining">3. Current status (2026-09-19)</h2>
+<ul>
+    <li><strong>device_agent.sh deployed to all 5 monitoring targets:</strong>
+        workstation (.199), proxmox720 (.2), gateway/proxmoxt210 (.3),
+        comserv (.198), nfs/sunfire (.175). Each runs a 5-min cron collecting
+        disk, CPU, memory, temp, uptime and POSTing to the ingest endpoint.</li>
+    <li><strong>Old DBI scripts replaced on .2 and .198:</strong> Both were running
+        ~12KB legacy scripts that tried to connect to the DB directly and generated
+        cron mail errors. Replaced with the thin trigger + shared token.</li>
+    <li><strong>Workstation crontab fixed:</strong> /usr/local/etc/comserv/hw_ingest_token
+        seeded from NFS. Cron reads NFS token first, local fallback.</li>
+    <li><strong>Watchdog verified green:</strong> Returns <code>missed:0, ok:1</code>
+        with real <code>age_sec</code> values. Heartbeats writing on every
+        <code>run</code> call.</li>
+    <li><strong>NFS cleaned:</strong> Removed ~63G of old log archives
+        (workshop 37G, app logs 17G, catalyst errors 8.9G).</li>
+    <li><strong>Health controller bug closed:</strong> <code>Comserv->json->encode()</code>
+        replaced with <code>encode_json()</code> in commit 2eb488568.</li>
+</ul>
+
+<p><strong>What remains:</strong></p>
+<ul>
+    <li>Add Server UI page (planned: form to register new hosts and generate ready-to-paste cron lines).</li>
+    <li>Dashboard improvements: show known hosts even when stale with "last reported" timestamps.</li>
+    <li>Centralize token management in the Add Server UI.</li>
+    <li>Potentially merge the two scripts for pure-cron hosts (device_agent could also call run).</li>
 </ul>
 
 <h2 id="architecture">5. Current Architecture — Why Two Crons/Scripts</h2>
@@ -129,27 +160,28 @@ and the remaining work to roll the fix out to the production containers.</p>
     <li><strong>App endpoints</strong>: <code>/admin/hardware_monitor/run</code> (trigger), <code>/ingest</code> (agent posts), <code>/watchdog</code>, <code>/disk_health</code> etc. (see <code>lib/Comserv/Controller/Admin/HardwareMonitor.pm</code> and <code>Util/HardwareAgent.pm</code>).</li>
 </ul>
 
-<h3>Currently Monitored Hosts (as of 2026-09-05)</h3>
-<p>The dashboard (<code>/admin/hardware_monitor</code>) only shows hosts that have recent rows in <code>hardware_metrics</code> (within the time filter window, default 2h). Old/stale hosts disappear from view until they report again.</p>
+<h3>Currently Monitored Devices (as of 2026-09-19)</h3>
+<p>The dashboard (<code>/admin/hardware_monitor</code>) shows all hosts with recent rows in <code>hardware_metrics</code> (default 2h window). All 5 targets below are actively reporting via <code>device_agent.sh</code> every 5 minutes.</p>
 
-<p>Known / recently active or configured:</p>
+<table class="doc-table">
+<tr class="doc-th"><th>Device</th><th>IP</th><th>Role</th><th>Scripts</th><th>SSH user</th></tr>
+<tr><td>workstation</td><td>.199</td><td>Dev server + Docker host</td><td>hw_monitor.pl (root) + device_agent.sh</td><td>root</td></tr>
+<tr><td>comserv</td><td>.198</td><td>Legacy DB server / host</td><td>hw_monitor.pl + device_agent.sh</td><td>shanta</td></tr>
+<tr><td>proxmox720</td><td>.2</td><td>Proxmox hypervisor</td><td>hw_monitor.pl + device_agent.sh</td><td>root</td></tr>
+<tr><td>gateway (proxmoxt210)</td><td>.3</td><td>Gateway / cron host</td><td>hw_monitor.pl + device_agent.sh</td><td>root</td></tr>
+<tr><td>nfs (sunfire)</td><td>.175</td><td>NFS file server</td><td>device_agent.sh</td><td>shanta</td></tr>
+</table>
+
+<h3>App nodes (trigger targets)</h3>
+<p>The <code>hardware_monitor.pl</code> thin trigger on each host curls these app instances to call <code>/admin/hardware_monitor/run</code>:</p>
 <ul>
-    <li>workstation (.199)</li>
-    <li>production1 / comservproduction1 (.126, and references to old .198 DB location)</li>
-    <li>gateway / proxmoxt210 (.3 and recently .1 with the trigger cron)</li>
-    <li>NFS server (192.168.1.175)</li>
-    <li>DB server (.20)</li>
-    <li>proxmox hosts (proxmox720, .2 and others just added)</li>
+    <li><strong>production1</strong> — 192.168.1.126:5000 (Docker container)</li>
+    <li><strong>workstation Docker</strong> — 192.168.1.199:5000 (Docker container)</li>
 </ul>
+<p>Both return HTTP 200 with the shared token. The <code>run</code> endpoint writes <code>monitor_heartbeat</code> rows for the bare hostname (<code>workstation</code>, <code>production1</code>) via the <code>_node_identity()</code> helper.</p>
 
-<p>The "Hardware Monitor" view has looked stale for a long time (only showing workstation + production1) because:</p>
-<ul>
-    <li>Not all hosts were running the collector agent.</li>
-    <li>Old DB references (.198) and limited recent data in the query window.</li>
-    <li>The gateway trigger was updated recently but the collector (device_agent) was not yet deployed on it or the new proxmox nodes.</li>
-</ul>
-
-<p>The trigger cron on the gateway is now active and successfully hitting the app (HTTP 200s). The collector is still missing on most non-app hosts.</p>
+<h3>db_ency (primary Ency)</h3>
+<p>All hardware metrics are stored in <code>Ency.hardware_metrics</code> on the PRIMARY Ency at 192.168.1.20:3307. Rows use <code>hostname</code> for the device name and <code>system_identifier</code> for the ingress path. Query via the dashboard at <code>/admin/hardware_monitor</code>.</p>
 
 <h2 id="expansion">6. Plans — Get All Equipment Reporting + Add Server Page</h2>
 

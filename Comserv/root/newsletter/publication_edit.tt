@@ -8,12 +8,85 @@
                 <a href="[% c.uri_for('/mail/newsletters') %]">Newsletters</a> &rsaquo; Edit Publication
             </nav>
         </div>
-        <a href="[% c.uri_for('/mail/newsletter/issue/create', { pub => publication.id }) %]" class="btn btn-primary">+ New Issue</a>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <a href="[% c.uri_for('/mail/newsletter/edit', 'lumby-wed-2026-09-23') %]" class="btn btn-primary" style="font-size:1.05em;padding:10px 16px;">
+                Edit Lumby issue (see what it looks like) →
+            </a>
+            <a href="[% c.uri_for('/mail/newsletter/send', 43) %]" class="btn btn-success" style="font-size:1.05em;padding:10px 16px;">
+                Send: recipients + exact email →
+            </a>
+            <a href="[% c.uri_for('/mail/newsletter/issue/create', { pub => publication.id }) %]" class="btn btn-secondary">+ New Issue</a>
+        </div>
+    </div>
+    <div style="margin:12px 0 16px;padding:14px 16px;background:#e3f2fd;border:2px solid #1565c0;border-radius:8px;">
+        <strong>Mailout is not this form.</strong>
+        Click <em>Review recipients &amp; email preview</em> above (or open
+        <a href="[% c.uri_for('/mail/newsletter/send', 43) %]"><code>/mail/newsletter/send/43</code></a>)
+        to see who gets the email, tick names, add addresses, and preview the exact outgoing message.
     </div>
 
     [% IF error_msg %]
         <div class="alert alert-danger">[% error_msg | html %]</div>
     [% END %]
+
+
+    <div style="margin:0 0 18px;padding:14px 16px;background:#e3f2fd;border:2px solid #1565c0;border-radius:8px;">
+        <h2 style="margin:0 0 10px;font-size:1.15em;">Issue body — edit like a document</h2>
+        <p style="margin:0 0 12px;font-size:0.9em;color:var(--text-muted-color);">
+            This is the same visual page editor used for site documents. What you edit here is what readers see on the issue page.
+            Publication settings (name, list link) stay in the form further down.
+        </p>
+        [% IF pub_issues && pub_issues.size %]
+            [% SET edit_issue = pub_issues.0 %]
+            <div style="margin:0 0 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;">
+                <div>
+                    <strong>[% edit_issue.title | html %]</strong>
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">
+                        · [% edit_issue.status | html %] · /page/[% edit_issue.page_code | html %]
+                    </span>
+                </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <a class="btn btn-secondary" href="[% c.uri_for('/page', edit_issue.page_code) %]" target="_blank">Open live page</a>
+                    <a class="btn btn-success" href="[% c.uri_for('/mail/newsletter/send', edit_issue.id) %]">Send / email preview</a>
+                </div>
+            </div>
+            <form method="POST" action="[% c.uri_for('/mail/newsletter/edit', edit_issue.page_code) %]" id="nl-pub-issue-body-form" class="admin-card" style="padding:12px;background:#fff;">
+                <input type="hidden" name="title" value="[% edit_issue.title | html %]">
+                <input type="hidden" name="description" value="[% edit_issue.description | html %]">
+                <input type="hidden" name="status" value="[% edit_issue.status | html %]">
+                <input type="hidden" name="roles" value="[% edit_issue.roles | html %]">
+                <input type="hidden" name="share_with" value="[% edit_issue.share_with | html %]">
+                <input type="hidden" name="nl_series" value="[% edit_issue.nl_series | html %]">
+                <input type="hidden" name="nl_version" value="[% edit_issue.nl_version | html %]">
+                <input type="hidden" name="save_only" value="1">
+                <input type="hidden" name="return_pub_code" value="[% publication.page_code | html %]">
+                [% PROCESS 'pages/partials/insert_chars_assets.tt' %]
+                [% PROCESS 'pages/partials/html_editor.tt'
+                   body_content    = edit_issue.body
+                   body_label      = 'Newsletter issue body'
+                   body_required   = 1
+                   preview_url     = c.uri_for('/page', edit_issue.page_code)
+                   preview_sitename = publication.sitename
+                %]
+                <div class="form-actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;">
+                    <button type="submit" class="btn btn-primary">Save issue body</button>
+                    <a class="btn btn-success" href="[% c.uri_for('/mail/newsletter/send', edit_issue.id) %]">Send / email preview →</a>
+                </div>
+            </form>
+            [% IF pub_issues.size > 1 %]
+            <div style="margin-top:12px;font-size:0.9em;">
+                <strong>Other issues:</strong>
+                [% FOREACH issue IN pub_issues %][% UNLESS loop.first %]
+                    <a href="[% c.uri_for('/mail/newsletter/edit', issue.page_code) %]">[% issue.title | html %]</a>[% UNLESS loop.last %] · [% END %]
+                [% END %][% END %]
+            </div>
+            [% END %]
+        [% ELSE %]
+            <p style="margin:0;color:#c00;">No issues linked yet.
+                <a href="[% c.uri_for('/mail/newsletter/issue/create', { pub => publication.id }) %]">+ New Issue</a>
+            </p>
+        [% END %]
+    </div>
 
     <div class="admin-card">
         <form method="POST" action="[% c.uri_for('/mail/newsletter/publication/edit', publication.page_code) %]">
@@ -68,6 +141,15 @@
 
             <fieldset class="form-group" style="border:1px solid var(--border-color,#ddd);border-radius:8px;padding:14px 16px;">
                 <legend style="font-weight:bold;padding:0 6px;">Subscription mailing list</legend>
+                <div style="margin:0 0 14px;padding:12px 14px;background:#fff3cd;border:2px solid #f0ad4e;border-radius:6px;">
+                    <strong>This screen only links a Subscribe list.</strong>
+                    It does <em>not</em> show who gets a mailout or the email preview.
+                    To pick names, add one-off addresses, and see the outgoing email, open the
+                    <strong>issue</strong> and click <strong>Send Newsletter</strong>
+                    (URL like <code>/mail/newsletter/send/&lt;issue-id&gt;</code> —
+                    Lumby Wed is <code>/mail/newsletter/send/43</code>).
+                </div>
+
                 [% IF mailing_list_link.linked %]
                 <div style="margin-bottom:12px;padding:10px 12px;border-radius:6px;
                     [% IF mailing_list_link.is_public %]background:#e8f5e9;border:1px solid #a5d6a7;
@@ -115,6 +197,11 @@
                     <input type="text" name="subscription_list_name" id="subscription_list_name" class="form-control"
                            value="[% publication.title | html %]">
                 </div>
+                <p style="font-size:0.9em;margin:10px 0 8px;padding:10px 12px;background:#f0f4ff;border:1px solid #c5d0e8;border-radius:6px;">
+                    To pick or add <strong>individual addresses for one send</strong> (without creating a new list),
+                    open the issue and use <strong>Send Newsletter</strong> — the send page has a live roster with Remove and “Add to this send”.
+                    This section only chooses which subscription list is linked for signups.
+                </p>
                 <p style="font-size:0.85em;color:var(--text-muted-color);margin:8px 0 0;">
                     <a href="[% c.uri_for('/mail/lists') %]">Manage mailing lists</a>
                     &middot;

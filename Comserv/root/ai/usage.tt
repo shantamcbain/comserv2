@@ -1,295 +1,189 @@
-[%# AI Usage Monitor - for customer billing and system usage anticipation
-   # Shows provider breakdown (grok vs ollama etc), tokens, estimated costs, per-site
-   # so operators can bill AI-enabled customers and plan capacity (local GPU load vs paid API spend).
+[% PageVersion = 'ai/usage.tt,v 0.12 2026/09/25 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[%
+  META
+    title = 'AI Usage & Activity Monitor'
+    description = 'SuperGrok five-number overview; four agent cards; charts start closed'
+    category = 'AI'
+    TemplateType = 'ApplicationTtTemplate'
+    last_updated = '2026-09-25'
+    page_version = '0.12'
 %]
-[%- 
-  # simple number format helper
-  MACRO fmt_num(n) BLOCK; n | format('%d'); END;
-  MACRO fmt_cost(c) BLOCK; c | format('%.4f'); END;
--%]
 
-<div class="ai-usage-page" style="max-width:1200px;margin:0 auto;padding:1rem;">
-  <h1>🤖 AI Usage Monitor</h1>
-  <p class="muted">Track usage for billing customers with AI enabled + anticipate load on providers (local Ollama hosts vs xAI/Grok/OpenAI).</p>
+<div class="ai-usage-page" style="max-width:960px;margin:0 auto;padding:1rem;color:var(--text-color);">
+  <h1 style="color:var(--primary-color);">AI Usage</h1>
+  <p id="usage-live-stamp" class="doc-muted" data-usage-live="1">Loading…</p>
 
-  [% IF error %]<div class="alert alert-error">[% error %]</div>[% END %]
-  [% IF success_msg %]<div class="alert alert-success">[% success_msg %]</div>[% END %]
+  <nav aria-label="On this page" style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;">
+    <a href="#usage-overview" style="color:var(--link-color);">Overview</a>
+    <a href="#usage-agents" style="color:var(--link-color);">Agents</a>
+    <a href="#usage-tunnel" style="color:var(--link-color);">Focus</a>
+    <a href="#usage-charts" style="color:var(--link-color);">Charts</a>
+    <a href="#usage-more" style="color:var(--link-color);">More</a>
+  </nav>
 
-  [% IF provider_status.supergrok.over_threshold %]
-  <div class="doc-warning" role="alert">
-    SuperGrok is at [% provider_status.supergrok.pct %]% of this month's allowance
-    ($[% provider_status.supergrok.spend_usd %] / $[% provider_status.supergrok.limit_usd %],
-    [% provider_status.supergrok.calls %] requests). A system error was logged — review spend before more SuperGrok calls.
-    Chat will fall back to free OpenRouter then Ollama.
-  </div>
-  [% END %]
-  [% IF provider_status.openrouter.exhausted %]
-  <div class="doc-warning" role="alert">
-    OpenRouter credits are empty (no auto-fill). Paid OpenRouter calls fall back to a <code>:free</code> model then Ollama.
-  </div>
-  [% END %]
-
-  <p class="doc-muted">xAI (pay-per-token, auto-fill) is <strong>not</strong> SuperGrok (prepaid OAuth). OpenRouter does not auto-fill. Compare models below by estimated USD per successful call.</p>
-
-  <div class="row">
-    <div class="col-33">
-      <div class="card">
-        <div class="card-header">SuperGrok (prepaid OAuth)</div>
-        <div class="card-body">
-          [% IF provider_status.supergrok.ok %]
-          <p class="doc-body">Logged SuperGrok turns this month:
-            <strong>[% provider_status.supergrok.calls %]</strong> calls,
-            [% provider_status.supergrok.tokens || 0 %] tokens,
-            est. $[% provider_status.supergrok.spend_usd %] from our log.</p>
-          <p class="doc-muted">Not the grok.com 43% bar. xAI does not publish SuperGrok remaining %. Check grok.com → Settings → Usage for that. These numbers are only turns we logged as provider=supergrok.</p>
-          [% ELSE %]
-          <p class="doc-muted">[% provider_status.supergrok.error || 'No SuperGrok rows in our log yet. Pick SuperGrok in the Model list, then a turn will appear here.' %]</p>
-          [% END %]
-        </div>
+  <section id="usage-overview" aria-label="SuperGrok this week">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+      <div class="card" style="flex:1;min-width:120px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">Build % used</div>
+        <div id="usage-kpi-build" style="font-size:1.8em;font-weight:600;">—</div>
+      </div>
+      <div class="card" style="flex:1;min-width:120px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">Remaining</div>
+        <div id="usage-kpi-remaining" style="font-size:1.8em;font-weight:600;">—</div>
+      </div>
+      <div class="card" style="flex:1;min-width:120px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">Daily cap</div>
+        <div id="usage-kpi-cap" style="font-size:1.8em;font-weight:600;">—</div>
+      </div>
+      <div class="card" style="flex:1;min-width:120px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">Used today</div>
+        <div id="usage-kpi-used-today" style="font-size:1.8em;font-weight:600;">—</div>
+      </div>
+      <div class="card" style="flex:1;min-width:120px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">Days to reset</div>
+        <div id="usage-kpi-days" style="font-size:1.8em;font-weight:600;">—</div>
       </div>
     </div>
-    <div class="col-33">
-      <div class="card">
-        <div class="card-header">xAI Grok API (auto-fill)</div>
-        <div class="card-body">
-          [% IF provider_status.grok.ok %]
-          <p class="doc-body">This month from our log: <strong>$[% provider_status.grok.spend_usd %]</strong>
-            — [% provider_status.grok.calls %] calls,
-            [% provider_status.grok.tokens || 0 %] tokens.</p>
-          <p class="doc-muted">Pay-per-token at console.x.ai. Auto-fill is ON — we do not fall back on xAI credit errors. Not SuperGrok.</p>
+    <p id="usage-sg-status" class="doc-muted">SuperGrok status loading…</p>
+  </section>
+
+  <section id="usage-agents" aria-label="Active agents">
+    <h2 style="font-size:1.1em;">Agents</h2>
+    <div id="usage-agent-cards" style="display:flex;flex-wrap:wrap;gap:10px;">
+      <button type="button" class="card" data-tunnel="hermes"
+              style="flex:1;min-width:160px;text-align:left;cursor:pointer;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;color:var(--text-color);">
+        <strong>Hermes</strong>
+        <div class="doc-muted" data-agent-status="hermes">…</div>
+        <div data-agent-detail="hermes">Click to focus</div>
+      </button>
+      <button type="button" class="card" data-tunnel="chat"
+              style="flex:1;min-width:160px;text-align:left;cursor:pointer;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;color:var(--text-color);">
+        <strong>AI Chat</strong>
+        <div class="doc-muted" data-agent-status="chat">…</div>
+        <div data-agent-detail="chat">Click to focus</div>
+      </button>
+      <button type="button" class="card" data-tunnel="grok_bot"
+              style="flex:1;min-width:160px;text-align:left;cursor:pointer;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;color:var(--text-color);">
+        <strong>Grok Bot</strong>
+        <div class="doc-muted" data-agent-status="grok_bot">…</div>
+        <div data-agent-detail="grok_bot">Click to focus</div>
+      </button>
+      <button type="button" class="card" data-tunnel="editor"
+              style="flex:1;min-width:160px;text-align:left;cursor:pointer;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;color:var(--text-color);">
+        <strong>AI Editor</strong>
+        <div class="doc-muted" data-agent-status="editor">…</div>
+        <div data-agent-detail="editor">Click to focus</div>
+      </button>
+    </div>
+  </section>
+
+  <section id="usage-tunnel" class="card" style="margin:16px 0;border:1px solid var(--border-color);padding:12px;background:var(--card-bg, var(--bg-color));">
+    <h2 style="margin-top:0;font-size:1.1em;">Focus</h2>
+    <p id="usage-tunnel-empty" class="doc-muted">Click an agent. Only that slice opens here.</p>
+    <div id="usage-tunnel-body" hidden></div>
+  </section>
+
+  <details id="usage-charts">
+    <summary style="cursor:pointer;color:var(--link-color);">14-day token and API-call charts</summary>
+    <p class="doc-muted">Empty days are zero. Same colours as the legend. Default is bar; choice is kept on refresh.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
+      <button type="button" class="btn btn-secondary" data-chart-type="bar">Bar</button>
+      <button type="button" class="btn btn-secondary" data-chart-type="line">Line</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <canvas id="usage-tokens-chart" width="880" height="220" data-usage-chart="tokens"></canvas>
+    </div>
+    <div id="usage-source-legend" style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 16px;"></div>
+    <div style="overflow-x:auto;">
+      <canvas id="usage-calls-chart" width="880" height="180" data-usage-chart="calls"></canvas>
+    </div>
+  </details>
+  <script type="application/json" id="usage-chart-data">{"source_days":[]}</script>
+
+  <details id="usage-more">
+    <summary style="cursor:pointer;color:var(--link-color);">More (14-day totals, grok.com paste, admin)</summary>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;">
+      <div class="card" style="flex:1;min-width:140px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">API calls (14d)</div>
+        <div id="usage-kpi-calls" style="font-size:1.4em;font-weight:600;">[% org.org_totals.hermes_calls || org.org_totals.calls || 0 %]</div>
+        <div id="usage-kpi-calls-sub" class="doc-muted">Hermes + app</div>
+      </div>
+      <div class="card" style="flex:1;min-width:140px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">Tokens (14d)</div>
+        <div id="usage-kpi-tokens" style="font-size:1.4em;font-weight:600;">[% org.hermes.totals.tokens || 0 %]</div>
+        <div id="usage-kpi-tokens-sub" class="doc-muted">incl. cache / reasoning</div>
+      </div>
+      <div class="card" style="flex:1;min-width:140px;border:1px solid var(--border-color);background:var(--card-bg, var(--bg-color));padding:12px;">
+        <div class="doc-muted">OpenRouter</div>
+        <div id="usage-kpi-or" style="font-size:1.4em;font-weight:600;">
+          [% IF provider_status.openrouter.ok && provider_status.openrouter.remaining.defined %]
+            $[% provider_status.openrouter.remaining %] left
+          [% ELSIF provider_status.openrouter.ok %]
+            used $[% provider_status.openrouter.usage || 0 %]
           [% ELSE %]
-          <p class="doc-muted">[% provider_status.grok.error || 'No xAI grok rows yet.' %]</p>
+            …
           [% END %]
         </div>
-      </div>
-    </div>
-    <div class="col-33">
-      <div class="card">
-        <div class="card-header">OpenRouter (no auto-fill)</div>
-        <div class="card-body">
+        <div id="usage-kpi-or-sub" class="doc-muted">
           [% IF provider_status.openrouter.ok %]
-          <p class="doc-body">Used: <strong>$[% provider_status.openrouter.usage %]</strong>
-            [% IF provider_status.openrouter.limit.defined %]
-            of $[% provider_status.openrouter.limit %]
-            ([% provider_status.openrouter.pct %]%)
-            [% END %]
-            [% IF provider_status.openrouter.remaining.defined %]
-            — remaining $[% provider_status.openrouter.remaining %]
-            [% END %]
-          </p>
-          <p class="doc-muted">Live from GET openrouter.ai/api/v1/auth/key (real remaining credits). Empty → :free then Ollama.</p>
+            live from OpenRouter key · add money when empty
           [% ELSE %]
-          <p class="doc-muted">[% provider_status.openrouter.error || 'No OpenRouter key / status.' %]</p>
+            [% provider_status.openrouter.error || 'fetched on page load (admin session)' %]
           [% END %]
         </div>
       </div>
     </div>
-  </div>
+    <p class="doc-muted" style="margin:8px 0;"><a href="https://grok.com/" target="_blank" rel="noopener noreferrer" style="color:var(--link-color);">Open grok.com</a> → Settings → Usage if the Firefox add-on is not writing numbers.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+      <label class="doc-muted">Build %<br>
+        <input type="number" id="declare-grokcom-build" min="0" max="100" step="1" placeholder="38" style="width:4.5em;">
+      </label>
+      <label class="doc-muted">Chat %<br>
+        <input type="number" id="declare-grokcom-chat" min="0" max="100" step="1" placeholder="1" style="width:4.5em;">
+      </label>
+      <button type="button" class="btn btn-secondary" data-declare-grokcom="1">Save grok.com %</button>
+    </div>
 
-  <h3>Daily usage by model (cost vs volume)</h3>
-  <p class="doc-muted">From our API call log (ai_usage_logs). Use USD/OK to compare how much coding you got per dollar.</p>
-  <table class="data-table">
-    <thead><tr><th>Day</th><th>Provider</th><th>Model</th><th>Calls</th><th>OK</th><th>Tokens</th><th>Est. USD</th><th>USD/OK</th></tr></thead>
-    <tbody>
-    [% FOREACH r IN daily_models %]
-      <tr>
-        <td>[% r.day %]</td>
-        <td>[% r.provider %]</td>
-        <td>[% r.model %]</td>
-        <td>[% r.calls %]</td>
-        <td>[% r.ok %]</td>
-        <td>[% r.tokens %]</td>
-        <td>$[% r.cost %]</td>
-        <td>$[% r.cost_per_ok %]</td>
-      </tr>
-    [% END %]
-    [% IF ! daily_models.size %]
-      <tr><td colspan="8" class="doc-muted">No per-model rows yet. New v2 chat calls now write this log.</td></tr>
-    [% END %]
-    </tbody>
-  </table>
-
-  <!-- Live xAI / Grok balance check -->
-  <div class="card" style="margin:16px 0;">
-    <div class="card-header">xAI prepaid (declare only)</div>
-    <div class="card-body">
-    <p class="doc-muted">xAI does not return remaining SuperGrok or prepaid credits on the chat key. Paste a number from console.x.ai if you want an estimate. OpenRouter remaining above is live.</p>
-    <button type="button" class="btn btn-primary" data-check-grok="1">Check Live xAI Balance / Usage</button>
-    <div style="margin-top:8px;">
-      <input type="number" id="declare-xai-balance" class="form-control" step="0.01" placeholder="e.g. 42.50" style="width:120px;display:inline-block;" />
-      <button type="button" class="btn btn-secondary" data-declare-grok="1">Declare current balance from console.x.ai &amp; refresh</button>
-    </div>
-    <div id="grok-live-result" class="doc-code" style="margin-top:10px;white-space:pre-wrap;"></div>
-    </div>
-  </div>
-
-  <!-- Filters -->
-  <form method="GET" class="ai-usage-filters" style="background:#f8f9fa;padding:12px;border-radius:6px;margin:12px 0;display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
-    <div>
-      <label>Days</label><br>
-      <select name="days">
-        [% FOREACH d IN [7,14,30,60,90] %]
-          <option value="[% d %]" [% IF filters.days == d %]selected[% END %]>[% d %] days</option>
-        [% END %]
-      </select>
-    </div>
-    <div>
-      <label>Provider</label><br>
-      <select name="provider">
-        <option value="">All</option>
-        [% FOREACH p IN providers %]
-          <option value="[% p %]" [% IF filters.provider == p %]selected[% END %]>[% p %]</option>
-        [% END %]
-      </select>
-    </div>
     [% IF is_admin %]
-    <div>
-      <label>Site / Customer</label><br>
-      <select name="site_id">
-        <option value="">All sites</option>
-        [% FOREACH s IN sites %]
-          <option value="[% s.id %]" [% IF filters.site_id == s.id %]selected[% END %]>[% s.name %] (#[% s.id %])</option>
-        [% END %]
-      </select>
-    </div>
+    <p><a href="[% c.uri_for('/ai/eval') %]" style="color:var(--link-color);">Daily AI Eval</a></p>
     [% END %]
-    <div>
-      <label>Model contains</label><br>
-      <input type="text" name="model" value="[% filters.model | html %]" placeholder="grok-3, llama...">
-    </div>
-    <div>
-      <button type="submit" class="btn">Filter</button>
-      <a href="?" class="btn btn-secondary" style="margin-left:4px;">Reset</a>
-    </div>
-    <div style="margin-left:auto;font-size:0.9em;color:#555;">
-      Showing up to 200 recent records for the period.
-    </div>
-  </form>
 
-  <!-- Summary cards -->
-  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
-    <div style="flex:1;min-width:180px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:12px;">
-      <div style="font-size:0.85em;color:#666;">Total Calls</div>
-      <div style="font-size:1.8em;font-weight:600;">[% summary.total_calls %]</div>
-    </div>
-    <div style="flex:1;min-width:180px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:12px;">
-      <div style="font-size:0.85em;color:#666;">Total Tokens</div>
-      <div style="font-size:1.8em;font-weight:600;">[% summary.total_tokens %]</div>
-    </div>
-    <div style="flex:1;min-width:180px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:12px;">
-      <div style="font-size:0.85em;color:#666;">Est. External Cost (USD)</div>
-      <div style="font-size:1.8em;font-weight:600;color:#0a0;">$[% summary.total_cost %]</div>
-      <div style="font-size:0.75em;color:#888;">(local/ollama = $0; paid providers only)</div>
-    </div>
-  </div>
-
-  <!-- By Provider breakdown -->
-  <h3 style="margin-top:0;">By Provider (for anticipating paid vs local spend/load)</h3>
-  <table class="table" style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-    <thead><tr style="background:#f0f0f0;"><th>Provider</th><th>Calls</th><th>Tokens</th><th>Est. Cost USD</th></tr></thead>
-    <tbody>
-    [% FOREACH p IN summary.by_provider.keys.sort %]
-      <tr>
-        <td><strong>[% p %]</strong></td>
-        <td>[% summary.by_provider.$p.calls %]</td>
-        <td>[% summary.by_provider.$p.tokens %]</td>
-        <td>$[% fmt_cost(summary.by_provider.$p.cost) %]</td>
-      </tr>
+    [% IF org.kill_switch.killed.size %]
+    <table class="data-table">
+      <thead><tr><th>Provider</th><th>Model</th><th></th></tr></thead>
+      <tbody>
+      [% FOREACH k IN org.kill_switch.killed %]
+        <tr>
+          <td>[% k.provider | html %]</td><td>[% k.model | html %]</td>
+          <td><button type="button" class="btn" data-unkill-model="1"
+                      data-provider="[% k.provider | html %]" data-model="[% k.model | html %]">Restore</button></td>
+        </tr>
+      [% END %]
+      </tbody>
+    </table>
     [% END %]
-    [% IF ! summary.by_provider.size %]<tr><td colspan="4" class="muted">No data for filters.</td></tr>[% END %]
-    </tbody>
-  </table>
-
-  [% IF is_admin %]
-  <!-- By Site / Customer (billing view) -->
-  <h3>By Site / Customer (for billing AI-enabled accounts + free quota harmony)</h3>
-  <p style="font-size:0.9em;color:#555;">Free daily calls come from the site's active MembershipPlan.ai_requests_per_day (the "included with AI addon" allowance). Local Ollama calls primarily consume the free quota. Paid providers (grok etc.) are tracked for cost even when under quota.</p>
-  <table class="table" style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-    <thead><tr style="background:#f0f0f0;"><th>Site ID</th><th>Plan Free/Day</th><th>Calls (free / over)</th><th>Tokens</th><th>Est. Cost</th></tr></thead>
-    <tbody>
-    [% FOREACH sid IN summary.by_site.keys.sort %]
-      <tr>
-        <td><a href="/ai/usage?site_id=[% sid %]">[% sid %]</a></td>
-        <td>[% summary.by_site.$sid.plan_quota || '—' %]</td>
-        <td>
-          [% summary.by_site.$sid.calls %]
-          [% IF summary.by_site.$sid.free_calls OR summary.by_site.$sid.overage_calls %]
-            <br><small>(free: [% summary.by_site.$sid.free_calls || 0 %] / over: [% summary.by_site.$sid.overage_calls || 0 %])</small>
-          [% END %]
-        </td>
-        <td>[% summary.by_site.$sid.tokens %]</td>
-        <td>$[% fmt_cost(summary.by_site.$sid.cost) %]</td>
-      </tr>
+    <form id="usage-kill-form" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin:8px 0;">
+      <label>Provider<br><input name="provider" type="text" placeholder="grok" required></label>
+      <label>Model<br><input name="model" type="text" placeholder="grok-4.6" required></label>
+      <label>Reason<br>
+        <select name="reason">
+          <option value="other">Other</option>
+          <option value="leak">Leak</option>
+          <option value="hallucinate">Hallucinate</option>
+          <option value="thrash">Thrash</option>
+        </select>
+      </label>
+      <button type="submit" class="btn btn-primary">Kill model</button>
+    </form>
+    <div id="usage-kill-result" class="doc-muted"></div>
+    <button type="button" class="btn btn-secondary" data-check-grok="1">Check xAI (optional)</button>
+    <input type="number" id="declare-xai-balance" class="form-control" step="0.01" placeholder="declare USD" style="width:120px;display:inline-block;" />
+    <button type="button" class="btn btn-secondary" data-declare-grok="1">Declare</button>
+    <div id="grok-live-result" class="doc-code" style="margin-top:10px;white-space:pre-wrap;"></div>
+    [% IF is_admin && ledger_monitor %]
+    <details><summary style="cursor:pointer;">Golden Data ledger</summary>[% INCLUDE 'ai/usage_ledger.tt' %]</details>
     [% END %]
-    [% IF ! summary.by_site.size %]<tr><td colspan="5" class="muted">No per-site data.</td></tr>[% END %]
-    </tbody>
-  </table>
-  [% END %]
-
-  <!-- Recent logs table -->
-  <h3>Recent AI Calls (latest 200)</h3>
-  <table class="table ai-usage-table" style="width:100%;font-size:0.9em;border-collapse:collapse;">
-    <thead>
-      <tr style="background:#f0f0f0;">
-        <th>When</th>
-        <th>Provider / Model</th>
-        <th>User/Site</th>
-        <th style="text-align:right;">Tokens (in/out/total)</th>
-        <th style="text-align:right;">Cost</th>
-        <th>Dur</th>
-        <th>Status</th>
-        <th>Type</th>
-      </tr>
-    </thead>
-    <tbody>
-    [% FOREACH log IN logs %]
-      <tr style="border-bottom:1px solid #eee;[% IF log.status != 'success' %]background:#fff3f3;[% END %]">
-        <td>[% log.created_at.strftime('%Y-%m-%d %H:%M') IF log.created_at %]</td>
-        <td>
-          <strong>[% log.provider %]</strong><br>
-          <small>[% log.model %]</small>
-          [% IF log.ollama_host %]<br><small style="color:#666;">@ [% log.ollama_host %]</small>[% END %]
-        </td>
-        <td>
-          u:[% log.user_id || 'guest' %]<br>
-          <small>s:[% log.site_id || '-' %] [% IF log.guest_session_id %]<span title="guest">g</span>[% END %]</small>
-        </td>
-        <td style="text-align:right;white-space:nowrap;">
-          [% log.prompt_tokens || 0 %] / [% log.completion_tokens || 0 %]<br>
-          <strong>[% log.total_tokens || 0 %]</strong>
-        </td>
-        <td style="text-align:right;">$[% fmt_cost(log.estimated_cost_usd) %]</td>
-        <td>[% log.duration_ms ? (log.duration_ms / 1000) _ 's' : '-' %]</td>
-        <td>
-          [% IF log.status == 'success' %]
-            <span style="color:#0a0;">✓</span>
-          [% ELSE %]
-            <span style="color:#c00;" title="[% log.error_message | html %]">✗ [% log.status %]</span>
-          [% END %]
-        </td>
-        <td><small>[% log.request_type %]</small></td>
-      </tr>
-    [% END %]
-    [% IF ! logs.size %]
-      <tr><td colspan="8" class="muted" style="padding:20px;text-align:center;">No AI usage records match the current filters.</td></tr>
-    [% END %]
-    </tbody>
-  </table>
-
-  <div style="margin-top:20px;font-size:0.85em;color:#666;">
-    Notes: 
-    <ul>
-      <li>Local Ollama usage is tracked for capacity planning (your GPU/CPU hosts). Cost is always $0.</li>
-      <li>External providers (grok/xAI etc.) show rough estimated cost based on current token pricing — use for customer billing quotes and actual invoices.</li>
-      <li>Customers with AI enabled are those whose MembershipPlan includes ai_* services or ai_models_allowed.</li>
-      <li>For full exports / heavy reporting, query the <code>ai_usage_logs</code> table directly or extend this page.</li>
-    </ul>
-    <p><a href="/ai">← Back to AI Chat</a> &nbsp; | &nbsp; <a href="/ai/conversations">Chat History</a> &nbsp; | &nbsp; <a href="/membership/admin">Membership / Plans (AI enablement)</a></p>
-  </div>
+    [% IF is_admin && eval_summary %][% INCLUDE 'ai/usage_eval_card.tt' %][% END %]
+  </details>
 </div>
-
-<style>
-.ai-usage-page .table td, .ai-usage-page .table th { padding: 6px 8px; vertical-align: top; }
-.ai-usage-page .muted { color:#888; }
-.ai-usage-page select, .ai-usage-page input { padding:4px 6px; }
-</style>

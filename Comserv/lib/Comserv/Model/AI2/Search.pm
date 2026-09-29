@@ -27,6 +27,7 @@ use warnings;
 use JSON qw(encode_json decode_json);
 use Try::Tiny;
 use LWP::UserAgent;
+use HTTP::Request;
 
 my $SERVICE_KEY = 'search';
 
@@ -99,17 +100,15 @@ sub query {
     my $ua = LWP::UserAgent->new(timeout => $timeout);
     $ua->agent('Comserv-AI/1.0');
 
+    # SearXNG returns HTML for JSON POST bodies on our build; use form GET + format=json.
     my $res = try {
-        $ua->post(
-            "$url/search",
-            'Content-Type' => 'application/json',
-            'Accept'       => 'application/json',
-            Content        => encode_json({
-                q      => $q,
-                format => 'json',
-                ($args{language} ? (language => $args{language}) : ()),
-            }),
-        );
+        require URI::Escape;
+        my $lang = $args{language} ? '&language=' . URI::Escape::uri_escape($args{language}) : '';
+        my $get = "$url/search?q=" . URI::Escape::uri_escape($q)
+                . '&format=json&categories=general' . $lang;
+        my $req = HTTP::Request->new(GET => $get);
+        $req->header('Accept' => 'application/json');
+        $ua->request($req);
     } catch {
         $self->_log($c, 'error', "search request failed: $_");
         undef;
@@ -118,7 +117,13 @@ sub query {
     return { success => 0, error => 'search request failed' }
         unless $res && $res->is_success;
 
-    my $data = try { decode_json($res->decoded_content) } catch { undef };
+    my $body = $res->decoded_content // '';
+    my $ctype = $res->header('Content-Type') // '';
+    if ($ctype =~ /html/i || $body =~ /^\s*</) {
+        return { success => 0, error => 'search service returned HTML (expected JSON)' };
+    }
+
+    my $data = try { decode_json($body) } catch { undef };
     return { success => 0, error => 'bad JSON from search service' }
         unless $data && ref $data eq 'HASH';
 

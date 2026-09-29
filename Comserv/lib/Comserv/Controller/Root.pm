@@ -196,6 +196,14 @@ sub _normalize_debug_msg {
 sub auto :Private {
     my ($self, $c) = @_;
 
+    # Cheap assets and probe URLs must not run site/DB auto (~1s+). One HTML
+    # page pulls many /static/js files; on a single worker that serializes into
+    # minutes when mixed with WAN scanners.
+    my $path = $c->req->path // '';
+    if ($path =~ m{^(?:static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
+        return 1;
+    }
+
     # External monitoring trigger endpoints (hardware_monitor run/watchdog/
     # report_down/report_error/ingest) are called by the cron script on proxmox720
     # (and other nodes) WITHOUT a browser session, so they MUST skip the admin-role
@@ -1249,14 +1257,18 @@ sub auto :Private {
         $c->stash->{ai_role_tier} = Comserv::Util::ModelCatalog->_role_tier($c);
         $c->stash->{ai_is_guest} = Comserv::Util::ModelCatalog->is_guest_tier($c) ? 1 : 0;
         $c->stash->{ai_can_select_model} = $c->stash->{ai_is_priv};
-        $c->stash->{ai_chat_page} ||= $c->request->path;
+        my $ai_page = eval {
+            my $r = $c->model('AI2::Router');
+            $r && $r->can('infer_page') ? $r->infer_page($c->request->path) : 'chat';
+        } || 'chat';
+        $c->stash->{ai_chat_page} ||= $ai_page;
         # Pre-selected model. Guests/members get a FREE OpenRouter model (no cost,
         # and no load on the already-saturated workstation GPU); privileged users
         # on a coding surface get the pinned coding model. Without this the
         # browser just selects the first option alphabetically, which silently
         # sent every guest to a local Ollama model.
         $c->stash->{ai_default_model}
-            = Comserv::Util::ModelCatalog->default_for($c, page => 'chat');
+            = Comserv::Util::ModelCatalog->default_for($c, page => $ai_page);
 
         return 1; # Continue processing
     };
@@ -2517,6 +2529,9 @@ sub begin :Private {
     # Skip all site/session setup for health check endpoints.
     # Health checks run every 30s from Docker — no DB, no session, no logging needed.
     if ($c->req->path =~ m{^/?health(?:/|$)}) {
+        return;
+    }
+    if (($c->req->path // '') =~ m{^(?:static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
         return;
     }
 

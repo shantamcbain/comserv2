@@ -1,0 +1,17 @@
+[%# Allow-list (Comserv::Util::AI::EvalAllowList::%ALLOW) — the only config Apply may change. %]
+<div class="card" style="margin:16px 0;">
+  <div class="card-header">Allow-listed config changes (Apply may only touch these)</div>
+  <div class="card-body">
+    <table class="data-table">
+      <thead><tr><th>Target</th><th>Allowed values</th><th>What it does</th></tr></thead>
+      <tbody>
+      [% FOREACH a IN allow_list %]
+        <tr><td><code>[% a.target | html %]</code></td><td>[% a.allowed | html %]</td><td>[% a.help | html %]</td></tr>
+      [% END %]
+      </tbody>
+    </table>
+    <p class="doc-muted">Files live in <code>root/config/</code>; writes are atomic (temp file + rename) and logged, and Revert restores the exact before-value.
+      Model/provider routing has no config file today (it is Perl code in <code>Util/ModelCatalog.pm</code> / <code>Model/AI2/Router.pm</code>),
+      so routing proposals are <em>code</em> and become todos. OpenRouter soft caps are not stored in app config.</p>
+  </div>
+</div>

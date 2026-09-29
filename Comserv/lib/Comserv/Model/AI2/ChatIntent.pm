@@ -8,8 +8,9 @@ use Exporter 'import';
 
 our @EXPORT_OK = qw(is_editor_agent looks_like_todo_create looks_like_helpdesk_ticket_create);
 
-# AI Editor agents plan/analyze code; their prompts often say "create todos"
-# without meaning the TodoCreate short-circuit. Chat-with-AI must not edit code.
+# AI Editor agents plan/analyze/implement code. Their buffers and phase
+# contracts mention "todo" constantly; intercepts must never fire (#2423).
+# Chat-with-AI (non-editor) is the only surface that creates todos from chat.
 sub is_editor_agent {
     my ($agent_id) = @_;
     return (lc($agent_id // '') =~ /^(?:programming|coding|code|documentation|analyze)$/) ? 1 : 0;
@@ -21,7 +22,12 @@ sub looks_like_todo_create {
     return 0 unless defined $prompt && $prompt =~ /\S/;
     my $p = $prompt;
     $p =~ s/^\s+|\s+$//g;
-    return 1 if $p =~ /\b(?:add|create|make|track)\s+(?:me\s+)?(?:a\s+|an\s+|new\s+)*(?:todos?|tasks?|to-dos?|to\s+dos?)(?:\s+item)?\b/i;
+    return 0 if $p =~ /^(how\s+(do\s+i|to)|what\s+is|explain|where\s+(is|do))\b/i;
+    return 0 if $p =~ /\b(?:does\s+not|doesn'?t|do\s+not|don'?t|never|not|without)\s+(?:creating|create|adding|add|making|make|tracking|track)\b/i;
+    return 1 if $p =~ /\b(?:add|create|make|track|log)\s+(?:me\s+)?(?:a|an|new|this|the)\s+(?:todos?|tasks?|to-dos?|to\s+dos?)(?:\s+item)?\b/i;
+    return 1 if $p =~ /\b(?:can you|could you|would you|please)\s+(?:add|create|make|track)\b.{0,60}\b(?:todos?|tasks?|to-dos?)\b/i;
+    return 1 if $p =~ /\b(?:need|want)\s+(?:a|an|new)\s+(?:todos?|tasks?)\b/i;
+    return 1 if $p =~ /\bput\s+(?:this|it|that)\s+on\s+(?:the\s+)?(?:todo|task)\s+list\b/i;
     return 0;
 }
 

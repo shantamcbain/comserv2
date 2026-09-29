@@ -1,0 +1,24 @@
+[%# Daily AI Eval Reports summary card (admin only) — included from ai/usage.tt.
+  # Data: Model::AI2::EvalReports->latest_summary. Full list/detail on /ai/eval. %]
+[% es = eval_summary %]
+<div id="eval-reports" class="card" style="margin:16px 0;">
+  <div class="card-header">Daily AI Eval Reports (admin) — <a href="[% c.uri_for('/ai/eval') %]">open Daily AI Eval Reports</a></div>
+  <div class="card-body">
+    [% IF es.table_missing %]
+      <p class="doc-muted">Table not created yet — run schema compare (<a href="/admin/schema_compare">/admin/schema_compare</a> →
+        <code>AiEvalReport</code> and <code>AiEvalProposal</code> → Create Table).</p>
+    [% ELSIF es.latest %]
+      [% l = es.latest %]
+      <p class="doc-body">Latest: <a href="/ai/eval/report/[% l.id | uri %]"><strong>[% l.report_date | html %]</strong></a>
+        ([% l.source | html %]) —
+        Bot [% l.key.bot_pct_left.defined ? l.key.bot_pct_left _ '%' : '—' | html %] left ·
+        OpenRouter balance [% l.key.openrouter_balance.defined ? '$' _ l.key.openrouter_balance : '—' | html %] ·
+        Chat usable [% l.key.chat_usable.defined ? l.key.chat_usable : '—' | html %]/[% l.key.chat_calls.defined ? l.key.chat_calls : '—' | html %].
+        Open proposals: <strong>[% es.open %]</strong> · reports stored: [% es.total_reports %].</p>
+      [% IF l.summary %]<p class="doc-muted">[% l.summary | truncate(240) | html %]</p>[% END %]
+    [% ELSE %]
+      <p class="doc-muted">No eval reports yet. The AI usage monitor posts to <code>POST /ai/eval/ingest</code>.</p>
+    [% END %]
+    [% IF es.error %]<p class="doc-muted">Eval summary error: [% es.error | html %]</p>[% END %]
+  </div>
+</div>

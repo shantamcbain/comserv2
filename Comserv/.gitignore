@@ -53,3 +53,4 @@ config/dev_tls/
 /root/session/documentation_config/scan_state.json
 /root/session/documentation_config/*.bak
 /root/session/documentation_config/*.tmp
+Comserv/root/data/

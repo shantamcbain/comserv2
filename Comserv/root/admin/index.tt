@@ -1,5 +1,5 @@
 [% META title = 'Admin Dashboard' %]
-[% PageVersion = 'admin/index.tt,v 0.02 2025/09/10 shanta Exp shanta ' %]
+[% PageVersion = 'admin/index.tt,v 0.06 2026/09/25 shanta Exp shanta ' %]
 
 <div class="admin-dashboard">
     <div class="dashboard-header">
@@ -63,6 +63,20 @@
       <a href="[% c.uri_for('/Inventory/invoice/view/' _ inv.id) %]" class="banner-invoice-link">
         View &amp; Pay →
       </a>
+    </div>
+    [% END %]
+    [% END %]
+
+    [% # ── In-app system notifications (#2197) ──────────────────────── %]
+    [% IF notifications && notifications.size %]
+    [% FOREACH n IN notifications %]
+    <div class="banner-hosting" data-notify-level="[% n.type | html %]">
+      <div>
+        <strong class="banner-hosting-title">[% IF n.type == 'danger' %]&#9888; [% ELSIF n.type == 'success' %]&#10003; [% ELSE %]&#9432; [% END %][% n.message | html %]</strong>
+      </div>
+      [% IF n.link %]
+      <a href="[% n.link %]" class="banner-hosting-link">Open →</a>
+      [% END %]
     </div>
     [% END %]
     [% END %]
@@ -230,6 +244,16 @@
                         <i class="fas fa-clipboard-list"></i>
                         <span>Manufacturing Traveler</span>
                     </a>
+                    [% IF c.session.roles.grep('admin').size %]
+                    <a href="[% c.uri_for('/mail/invoice/api') %]" class="admin-link">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>Mail Invoice Classification</span>
+                    </a>
+                    <a href="[% c.uri_for('/mail/invoice/sort') %]" class="admin-link">
+                        <i class="fas fa-sort"></i>
+                        <span>Sort Invoices by Site</span>
+                    </a>
+                    [% END %]
                     [% ELSE %]
                     <a href="[% c.uri_for('/membership/addons') %]" class="admin-link">
                         <i class="fas fa-plus-circle"></i>
@@ -486,13 +510,37 @@
 
         <div id="section-ai" class="admin-section theme-section">
             <div class="section-header">
-                <h3><i class="fas fa-robot"></i> AI Configuration</h3>
+                <h3><i class="fas fa-robot"></i> AI System</h3>
             </div>
             <div class="section-content">
                 <div class="admin-links">
-                    <a href="[% c.uri_for('/admin/ai/configure') %]" class="admin-link">
+                    <a href="[% c.uri_for('/ai/usage') %]" class="admin-link">
+                        <i class="fas fa-chart-line"></i>
+                        <span>AI Usage &amp; Activity Monitor</span>
+                    </a>
+                    <a href="[% c.uri_for('/ai/eval') %]" class="admin-link">
+                        <i class="fas fa-clipboard-list"></i>
+                        <span>Daily AI Eval Reports</span>
+                    </a>
+                    <a href="[% c.uri_for('/ai/models') %]" class="admin-link">
                         <i class="fas fa-cogs"></i>
-                        <span>AI Model Configuration</span>
+                        <span>Model Management</span>
+                    </a>
+                    <a href="[% c.uri_for('/ai/admin/agents') %]" class="admin-link">
+                        <i class="fas fa-robot"></i>
+                        <span>Agent Management</span>
+                    </a>
+                    <a href="[% c.uri_for('/ai/manage_api_keys') %]" class="admin-link">
+                        <i class="fas fa-key"></i>
+                        <span>API Keys</span>
+                    </a>
+                    <a href="[% c.uri_for('/ai2') %]" class="admin-link">
+                        <i class="fas fa-comments"></i>
+                        <span>AI2 Chat</span>
+                    </a>
+                    <a href="[% c.uri_for('/ai/conversations') %]" class="admin-link">
+                        <i class="fas fa-history"></i>
+                        <span>Chat History</span>
                     </a>
                 </div>
             </div>

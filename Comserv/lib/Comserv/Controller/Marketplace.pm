@@ -2,7 +2,7 @@ package Comserv::Controller::Marketplace;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
-use POSIX qw(strftime);
+use Comserv::Util::AppTime;
 
 has 'logging' => (
     is      => 'ro',
@@ -12,7 +12,7 @@ has 'logging' => (
 BEGIN { extends 'Catalyst::Controller'; }
 
 sub _schema  { return $_[1]->model('DBEncy') }
-sub _now     { return strftime('%Y-%m-%d %H:%M:%S', localtime) }
+sub _now     { return Comserv::Util::AppTime->now_utc }
 sub _is_admin {
     my ($self, $c) = @_;
     return $c->stash->{is_admin} || (($c->session->{username} // '') eq 'Shanta');
