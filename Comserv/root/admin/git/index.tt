@@ -356,12 +356,14 @@
                                             data-open-branch="[% b.name | html %]" data-port="[% b.port %]"
                                             data-url="http://[% bh | html %]:[% b.port %][% b.url | html %]"
                                             data-cmd="[% b.cmd | html %]">Open</button>
-                                    <button type="button" class="admin-btn admin-btn-sm"
+                                    <a class="admin-btn admin-btn-sm"
+                                            href="http://[% bh | html %]:[% hp %]"
+                                            target="_blank" rel="noopener noreferrer"
                                             data-hermes-branch="[% b.name | html %]"
                                             data-port="[% b.port %]"
                                             data-hermes-port="[% hp %]"
                                             data-hermes-cwd="[% hcwd | html %]"
-                                            data-hermes-cmd="[% b.hermes_cmd | html %]">Hermes</button>
+                                            data-hermes-cmd="[% b.hermes_cmd | html %]">Hermes</a>
                                     <button type="button" class="admin-btn admin-btn-sm admin-btn-danger"
                                             data-branch-action="stop" data-branch="[% b.name | html %]" data-port="[% b.port %]">Stop</button>
                                     <button type="button" class="admin-btn admin-btn-sm"

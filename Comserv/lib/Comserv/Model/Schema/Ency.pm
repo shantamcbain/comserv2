@@ -32,6 +32,7 @@ __PACKAGE__->register_class('AiGoldenData', 'Comserv::Model::Schema::Ency::Resul
 __PACKAGE__->register_class('AiEvalReport', 'Comserv::Model::Schema::Ency::Result::AiEvalReport');
 __PACKAGE__->register_class('AiEvalProposal', 'Comserv::Model::Schema::Ency::Result::AiEvalProposal');
 __PACKAGE__->register_class('AiNavigationShortcut', 'Comserv::Model::Schema::Ency::Result::AiNavigationShortcut');
+__PACKAGE__->register_class('AiSkill', 'Comserv::Model::Schema::Ency::Result::AiSkill');
 __PACKAGE__->register_class('ProjectDocumentationMapping', 'Comserv::Model::Schema::Ency::Result::ProjectDocumentationMapping');
 __PACKAGE__->register_class('ApiToken', 'Comserv::Model::Schema::Ency::Result::ApiToken');
 __PACKAGE__->register_class('UserApiKeys', 'Comserv::Model::Schema::Ency::Result::UserApiKeys');
