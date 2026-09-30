@@ -106,10 +106,74 @@
                     </div>
                 </div>
                 <div class="comparison-detail">
-                    <div class="loading-indicator">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        <span>Loading result schema...</span>
+                    [% IF result_file.fields && result_file.fields.size %]
+                    <div class="table-container orphan-fields-wrap">
+                        <table class="data-table orphan-fields-table" style="margin: 0; font-size: 0.9em;">
+                            <thead>
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Type</th>
+                                    <th>Size</th>
+                                    <th>Nullable</th>
+                                    <th>Default</th>
+                                    <th>Flags / Docs</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH field IN result_file.fields %]
+                                <tr>
+                                    <td><code>[% field.name | html %]</code></td>
+                                    <td>[% field.data_type | html %]</td>
+                                    <td>[% IF field.size.defined %][% field.size %][% ELSE %]—[% END %]</td>
+                                    <td>[% IF field.is_nullable %]<span class="prop nullable">NULL</span>[% ELSE %]<span class="prop not-null">NOT NULL</span>[% END %]</td>
+                                    <td><code>[% IF field.default_value.defined %][% field.default_value | html %][% ELSE %]—[% END %]</code></td>
+                                    <td>
+                                        [% IF field.is_primary_key %]<span class="prop primary">PK</span> [% END %]
+                                        [% IF field.is_auto_increment %]<span class="prop">AI</span> [% END %]
+                                        [% IF field.docs %]<span class="text-muted">[% field.docs | html %]</span>[% END %]
+                                    </td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
                     </div>
+                    [% ELSIF result_file.columns %]
+                    <div class="table-container orphan-fields-wrap">
+                        <table class="data-table orphan-fields-table" style="margin: 0; font-size: 0.9em;">
+                            <thead>
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Type</th>
+                                    <th>Size</th>
+                                    <th>Nullable</th>
+                                    <th>Default</th>
+                                    <th>Flags / Docs</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH col_name IN result_file.columns.keys.sort %]
+                                [% SET field = result_file.columns.$col_name %]
+                                <tr>
+                                    <td><code>[% col_name | html %]</code></td>
+                                    <td>[% field.data_type | html %]</td>
+                                    <td>[% IF field.size.defined %][% field.size %][% ELSE %]—[% END %]</td>
+                                    <td>[% IF field.is_nullable %]<span class="prop nullable">NULL</span>[% ELSE %]<span class="prop not-null">NOT NULL</span>[% END %]</td>
+                                    <td><code>[% IF field.default_value.defined %][% field.default_value | html %][% ELSE %]—[% END %]</code></td>
+                                    <td>
+                                        [% IF field.is_primary_key %]<span class="prop primary">PK</span> [% END %]
+                                        [% IF field.is_auto_increment %]<span class="prop">AI</span> [% END %]
+                                    </td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                    [% ELSE %]
+                    <div class="loading-indicator">
+                        <i class="fas fa-info-circle"></i>
+                        <span>No column definitions available for this Result file.</span>
+                    </div>
+                    [% END %]
                 </div>
             </div>
         [% END %]
