@@ -5,12 +5,12 @@
    TemplateType = "Documentation"
    category = "planning,ai"
    page_version = "1.05"
-   last_updated = "2026-09-28"
+   last_updated = "2026-09-30"
    site_specific = "false"
    project_id = "280"
    project_code = "AISYSTEM"
 %]
-[% PageVersion = 'Documentation/AISYSTEMPlan.tt,v 1.06 2026/09/28 hermes-agent Exp - model failover §5e' %]
+[% PageVersion = 'Documentation/AISYSTEMPlan.tt,v 1.07 2026/09/30 hermes-agent Exp - ollama systemone 5f decision models' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container">
@@ -43,6 +43,7 @@
                 <a href="#golden-data" class="doc-navlink" title="Golden Data store, glossary and the anti-hallucination policy.">Golden Data / Anti-Hallucination</a>
                 <a href="#eval-reports" class="doc-navlink" title="Daily AI eval reports, review-first proposals and allow-listed apply.">Daily AI Eval Reports</a>
                 <a href="#model-failover" class="doc-navlink" title="Ordered model chains, circuit breaker, budget guards, Ledger fallover.">Model Failover</a>
+                <a href="#local-decision" class="doc-navlink" title="Ollama 0.35+ System One / Jev for triage, routing, classification with probabilities.">Local Decision Models (Ollama System One)</a>
                 <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
                 <a href="#see-also" class="doc-navlink">See Also</a>
             </div>
@@ -779,5 +780,49 @@ org.fallover = {
             </div>
         </div>
     </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="local-decision" class="doc-h2">5f. Local Decision Models — Ollama System One / Jev (new 2026-09-30)</h2>
+            <p class="doc-body">Ollama 0.35+ adds the <strong>System One API</strong> (<code>POST /v1/systemone</code>) based on TypeSafe’s Jev. Send <code>state</code> (text or structured) + named <code>questions</code> (choice, noul/yes-no, score/rubric). Returns selected label + full <code>probabilities</code> per option + <code>confidence</code>. Runs 100% locally on small decision models: <strong>nimble</strong> (9B, Bespoke Labs), <strong>tev1</strong> (4B) and <strong>tev1:0.8b</strong> (Together AI). Zero cost, low latency, calibrated probs for thresholding. Requires Ollama 0.35+.</p>
+
+            <h3 class="doc-h3">Why this fits the AI2 system</h3>
+            <ul class="doc-body">
+                <li>Perfect for meta-decisions: ticket triage, model routing choices, content classification, eval scoring, sub-agent dispatch.</li>
+                <li>Complements existing Router preference for local Ollama and "ollama|auto". Enables true dynamic, task-specific routing (user request: sub-agents classify/read/evaluate then hand off to best model for the job).</li>
+                <li>Replaces brittle prompt+parse JSON in places like ErrorAudit with reliable structured output + probabilities.</li>
+                <li>Keeps expensive hops (SuperGrok, paid OpenRouter) only for actual generation work.</li>
+            </ul>
+
+            <h3 class="doc-h3">Integration points (current code)</h3>
+            <ul class="doc-body">
+                <li><code>Model::AI2::Router</code> + <code>Util/AI/ModelChains</code> — routing decisions.</li>
+                <li><code>Util/ErrorAudit.pm</code> — already prompts Ollama for triage JSON; upgrade here first.</li>
+                <li><code>Model::AI2::TodoRank</code>, <code>FocusTune</code> — batch classification/scoring of todos.</li>
+                <li><code>Model::AI2::EvalReports</code>, UsageMonitor — rubric scoring of model outputs.</li>
+                <li>Invoice/mail classifiers, Chat sub-agents, guards.</li>
+                <li><code>Model::Ollama</code> + <code>Provider::Ollama</code> (currently /api/chat, /api/generate); <code>script/sync_ollama_models.sh</code>.</li>
+            </ul>
+
+            <h3 class="doc-h3">Implementation steps (these become todos on project #280 AISYSTEM)</h3>
+            1. Upgrade Ollama to 0.35+ on workstation (and hosts that reach it via docker/host.docker.internal or LAN). Run ollama pull nimble, ollama pull tev1, ollama pull tev1:0.8b. Verify with curl example from Ollama blog/docs. Update any version checks.
+            2. Add SystemOne support to Comserv::Model::Ollama (new role or method in Chat.pm/Connection: POST to /v1/systemone, handle {model, state, questions}, return parsed answers with probabilities/confidence).
+            3. Extend Provider::Ollama with a systemone or decide wrapper. Add decision-tier models to ModelCatalog.pm and Router detection.
+            4. Update script/sync_ollama_models.sh RECOMMENDED list and Ollama::list_models / running_models to surface decision models. Add ollama|nimble etc. handling or ollama|decision-auto.
+            5. Wire first consumer: refactor ErrorAudit.pm triage to use structured systemone call (priority, category, is_critical, etc.). Keep fallback for older Ollama.
+            6. Pilot in Router::select_model: use local decision model for quick context questions before/inside chain walk (e.g. is_coding_task?, needs_high_capability?). Add decision_chain support to ai_model_chains.json if useful.
+            7. Integrate with TodoRank, FocusTune, Eval for classification and rubric scoring. Add usage in AI eval reports.
+            8. Update tests (t/ai_model_failover.t etc.), ai_model_chains.json example, docs, and expose decision models in /ai picker or admin if appropriate.
+            9. Document the new capability in this plan, /Documentation/models/Ollama, and any agent prompts. Add to daily eval if it improves routing effectiveness.
+            10. Verify end-to-end on :4006 (curl API or chat widget); measure latency/cost win vs chat prompts.
+
+            <p class="doc-body"><strong>Next after basics:</strong> Use decision models for sub-agent orchestration (one tiny model classifies the request → routes to the right specialist or main model). Update Hermes fallback chains and app catalog to prefer local decision tier for meta work.</p>
+
+            <p class="doc-body">Documentation link: <a href="[% c.uri_for('/Documentation/AISYSTEMPlan') %]#local-decision" class="doc-link">/Documentation/AISYSTEMPlan#local-decision</a></p>
+            <p class="doc-body">Started first todo: <a href="[% c.uri_for('/todo/details') %]?record_id=2528" class="doc-link">Todo #2528 (Upgrade Ollama + pull nimble/tev1 — In Progress, start_date 2026-09-30)</a> on project #280. See full list under <a href="[% c.uri_for('/todo') %]?project_id=280" class="doc-link">/todo?project_id=280</a>.</p>
+
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
 </div>
-[%# ai-plan-sync created todo_ids: 2191,2192,2193,2194,2195,2196,2197,2198,2199,2200,2201 under project_id=280 %]
+[%# ai-plan-sync created todo_ids: 2191,2192,2193,2194,2195,2196,2197,2198,2199,2200,2201,2528,2529 under project_id=280 %]
