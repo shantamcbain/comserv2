@@ -4145,14 +4145,35 @@ sub find_orphaned_result_files_v2 {
                 $result_schema = $self->parse_result_file_schema($c, $result_info->{result_path});
             };
             
+            my $columns = $result_schema->{columns} || {};
+            my @pks = @{ $result_schema->{primary_keys} || [] };
+            my %pk_lookup = map { $_ => 1 } @pks;
+            my @fields;
+            foreach my $cname (sort keys %$columns) {
+                my $cinfo = $columns->{$cname} || {};
+                $cinfo->{is_primary_key} = 1 if $pk_lookup{$cname};
+                push @fields, {
+                    name => $cname,
+                    data_type => $cinfo->{data_type} // '',
+                    size => $cinfo->{size},
+                    is_nullable => defined $cinfo->{is_nullable} ? $cinfo->{is_nullable} : 1,
+                    is_auto_increment => $cinfo->{is_auto_increment} ? 1 : 0,
+                    is_primary_key => $cinfo->{is_primary_key} ? 1 : 0,
+                    default_value => $cinfo->{default_value},
+                    docs => $cinfo->{docs} // $cinfo->{documentation} // $cinfo->{comment} // '',
+                };
+                $columns->{$cname} = $cinfo;
+            }
             push @orphaned_results, {
                 result_name => $result_info->{result_name},
                 result_path => $result_info->{result_path},
                 expected_table_name => $table_name,
                 actual_table_name => $table_name,
                 last_modified => $result_info->{last_modified},
-                columns => $result_schema->{columns},
-                primary_keys => $result_schema->{primary_keys} || [],
+                columns => $columns,
+                fields => [ @fields ],
+                field_count => scalar(@fields),
+                primary_keys => [ @pks ],
                 relationships => $result_schema->{relationships} || {},
                 raw_package_calls => $result_schema->{raw_package_calls} || []
             };

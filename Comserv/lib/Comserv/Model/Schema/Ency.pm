@@ -37,6 +37,7 @@ __PACKAGE__->register_class('AiModelPolicy', 'Comserv::Model::Schema::Ency::Resu
 __PACKAGE__->register_class('AiModelPolicyRule', 'Comserv::Model::Schema::Ency::Result::AiModelPolicyRule');
 __PACKAGE__->register_class('AiModelPolicyHistory', 'Comserv::Model::Schema::Ency::Result::AiModelPolicyHistory');
 __PACKAGE__->register_class('AiNavigationShortcut', 'Comserv::Model::Schema::Ency::Result::AiNavigationShortcut');
+__PACKAGE__->register_class('AiSkill', 'Comserv::Model::Schema::Ency::Result::AiSkill');
 __PACKAGE__->register_class('ProjectDocumentationMapping', 'Comserv::Model::Schema::Ency::Result::ProjectDocumentationMapping');
 __PACKAGE__->register_class('ApiToken', 'Comserv::Model::Schema::Ency::Result::ApiToken');
 __PACKAGE__->register_class('UserApiKeys', 'Comserv::Model::Schema::Ency::Result::UserApiKeys');

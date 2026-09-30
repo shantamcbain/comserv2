@@ -1,8 +1,15 @@
 [% PageVersion = 'CSC/HelpDesk/ticket_view.tt,v 0.02 2026/04/27' %]
 
 [% IF c.session.debug_mode == 1 %]<br>[% PageVersion %]</br>[% END %]
+<<<<<<< HEAD
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+=======
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+>>>>>>> schema
 <div class="helpdesk-container">
 
 
@@ -280,7 +287,6 @@
             </div>
 
 </div>
-
 
         [% IF ticket.resolution %]
 
