@@ -243,6 +243,9 @@
                     </form>
                     <a href="/3d/job/filament/[% job.id %]"
                        class="btn-action btn-assign">Change filament</a>
+                    [% IF job.model_id %]
+                    [% INCLUDE '3d/_labour_log_form.tt' %]
+                    [% END %]
                 </td>
             </tr>
             [% END %]
@@ -321,6 +324,9 @@
                     <button type="submit" class="btn-action btn-assign"
                         title="Undo a mis-clicked complete/cancel — back to queued">↩ Reopen</button>
                 </form>
+                [% IF job.model_id %]
+                [% INCLUDE '3d/_labour_log_form.tt' %]
+                [% END %]
             </td>
         </tr>
         [% END %]
