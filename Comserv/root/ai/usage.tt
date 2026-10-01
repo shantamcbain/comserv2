@@ -1,4 +1,4 @@
-[% PageVersion = 'ai/usage.tt,v 0.15 2026/09/28 shanta Exp shanta ' %]
+[% PageVersion = 'ai/usage.tt,v 0.16 2026/10/01 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 [%
   META
@@ -6,13 +6,14 @@
     description = 'SuperGrok five-number overview; agent cost-effectiveness (visible, not buried); window selector; Daily AI Eval link'
     category = 'AI'
     TemplateType = 'ApplicationTtTemplate'
-    last_updated = '2026-09-28'
-    page_version = '0.15'
+    last_updated = '2026-10-01'
+    page_version = '0.16'
 %]
 
 <div class="ai-usage-page" style="max-width:960px;margin:0 auto;padding:1rem;color:var(--text-color);">
   <h1 style="color:var(--primary-color);">AI Usage</h1>
   <p id="usage-live-stamp" class="doc-muted" data-usage-live="1">Loading…</p>
+  [% IF is_admin %][% INCLUDE 'ai/_ai_admin_banner.tt' %][% INCLUDE 'ai/_admin_eval_links.tt' %][% END %]
 
   <nav aria-label="On this page" style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;">
     <a href="#usage-overview" style="color:var(--link-color);">Overview</a>
@@ -22,6 +23,9 @@
     <a href="#agent-effectiveness" style="color:var(--link-color);">Effectiveness</a>
     <a href="#fallover" style="color:var(--link-color);">Fallover</a>
     <a href="[% c.uri_for('/ai/eval') %]" style="color:var(--link-color);">Eval reports</a>
+    <a href="[% c.uri_for('/ai/eval/latest') %]" style="color:var(--link-color);font-weight:bold;">Latest eval report</a>
+    <a href="#ai-health" style="color:var(--link-color);">Health &amp; preflight</a>
+    <a href="#all-ai-usage" style="color:var(--link-color);">All AI usage</a>
     [% END %]
     <a href="#usage-charts" style="color:var(--link-color);">Charts</a>
     <a href="#usage-more" style="color:var(--link-color);">More</a>
@@ -113,6 +117,7 @@
   [% IF is_admin && eval_summary %][% INCLUDE 'ai/usage_eval_card.tt' %][% END %]
   [%# Model failover (AISYSTEM plan §5e) — admin only; controller only builds it for admins. %]
   [% IF is_admin && fallover %][% INCLUDE 'ai/usage_fallover_card.tt' %][% END %]
+  [% IF is_admin && ai_health %][% INCLUDE 'ai/usage_health_card.tt' %][% INCLUDE 'ai/usage_unified_card.tt' %][% END %]
 
   <details id="usage-charts">
     <summary style="cursor:pointer;color:var(--link-color);">14-day token and API-call charts</summary>

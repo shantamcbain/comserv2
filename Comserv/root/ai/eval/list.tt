@@ -7,6 +7,11 @@
     only approved, allow-listed config changes can be applied, and only when you press Apply.
     Code / workstation proposals become todos in project AISYSTEM. Back to
     <a href="[% c.uri_for('/ai/usage') %]#agent-effectiveness">AI Usage monitor</a>.</p>
+  <p style="display:flex;gap:10px;flex-wrap:wrap;">
+    [% IF latest_eval.latest %]<a class="btn btn-primary" href="/ai/eval/report/[% latest_eval.latest.id | uri %]">Open latest report ([% latest_eval.latest.report_date | html %], #[% latest_eval.latest.id | html %])</a>[% END %]
+    <a class="btn btn-secondary" href="#auto-changes">Auto-changes</a>
+    <a class="btn btn-secondary" href="/ai/usage">AI Usage</a>
+  </p>
 
   [% table_missing = el.table_missing %]
   [% INCLUDE 'ai/eval/_messages.tt' %]
@@ -51,6 +56,8 @@
       </form>
     </div>
   </div>
+
+  [% INCLUDE 'ai/eval/_auto_changes.tt' %]
 
   [% INCLUDE 'ai/eval/_allowlist.tt' %]
 </div>

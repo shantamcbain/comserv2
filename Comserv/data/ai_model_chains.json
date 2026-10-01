@@ -1,8 +1,8 @@
 {
   "_comment": "AI2 Router model failover chains (AISYSTEM plan 5e). Not public (data/). Change via /ai/eval allow-listed keys (approve, apply, revert). Perl lists in Util/ModelCatalog.pm are only the last-resort default when this file is missing or invalid. Seeded 2026-09-28 from @FREE_PREFERENCE minus slugs that are 404/absent on openrouter.ai/api/v1/models.",
   "version": 1,
-  "chain_chat": ["openrouter|google/gemma-4-31b-it:free","openrouter|nvidia/nemotron-3.5-lightning:free","openrouter|cohere/north-mini-code:free","ollama|auto"],
-  "chain_docs": ["openrouter|google/gemma-4-31b-it:free","openrouter|nvidia/nemotron-3.5-lightning:free","openrouter|cohere/north-mini-code:free","ollama|auto"],
+  "chain_chat": ["openrouter|cohere/north-mini-code:free","openrouter|nvidia/nemotron-3.5-lightning:free","openrouter|google/gemma-4-31b-it:free","ollama|auto"],
+  "chain_docs": ["openrouter|nvidia/nemotron-3.5-lightning:free","openrouter|cohere/north-mini-code:free","openrouter|google/gemma-4-31b-it:free","ollama|auto"],
   "chain_coding": ["openrouter|cohere/north-mini-code:free","openrouter|google/gemma-4-31b-it:free","openrouter|nvidia/nemotron-3.5-lightning:free","ollama|qwen2.5-coder:14b"],
   "chain_title": ["openrouter|nvidia/nemotron-3.5-lightning:free","openrouter|cohere/north-mini-code:free","ollama|auto"],
   "removed": ["openrouter|nvidia/nemotron-3-nano-30b-a3b:free","openrouter|nvidia/nemotron-nano-9b-v2:free","openrouter|stealth/ox-alpha","openrouter|google/gemma-3-27b-it:free","openrouter|google/gemma-4-26b-a4b-it:free"],

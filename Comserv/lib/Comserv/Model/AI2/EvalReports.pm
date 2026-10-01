@@ -39,6 +39,8 @@ has 'inbox_dir_override'  => ( is => 'rw', default => undef );
 has 'data_dir_override'   => ( is => 'rw', default => undef );   # tests: temp copy of data/ (ai_model_chains.json)
 has 'known_slugs_override'=> ( is => 'rw', default => undef );   # tests: arrayref of known provider|model slugs
 has 'todo_creator'        => ( is => 'rw', default => undef );   # coderef($c, %args) -> {ok, todo_id|error}
+has 'now_override'        => ( is => 'rw', default => undef );   # tests: epoch for auto_plan
+has 'health_override'     => ( is => 'rw', default => undef );   # tests: { slug => health entry }
 has 'token_override'      => ( is => 'rw', default => undef );   # tests: expected ingest token ('' = none)
 
 use constant STATUSES      => qw(proposed approved rejected applied reverted);
@@ -713,6 +715,241 @@ sub _do_revert {
     $p->update({ status => 'reverted', result => $self->_append_result($p, $line) });
     $self->_log($c, 'info', 'revert', 'AI eval proposal ' . $p->id . ": $line");
     return { ok => 1, message => "Reverted: $target" };
+}
+
+# -------------------------------------------------------------------
+# Auto-improver (AISYSTEM plan §5d/§5e). Applies only SAFE, allow-listed
+# config changes without a click, through the same ingest -> approve ->
+# apply path as the page (so before_value is recorded and the change shows
+# on /ai/eval with the normal one-click Revert):
+#   * chain_<purpose>: a pure re-ordering of the current chain (same slugs,
+#     none added or dropped) - e.g. demote a model whose circuit is open or
+#     that keeps returning 429 to the end of its chain;
+#   * caps (numbers and caps maps): only LOWER than the current value, never
+#     a new key, never higher.
+# Anything else is refused by auto_safe_check. A proposal title is unique per
+# day, so a change Shanta reverts is not silently re-applied the same day.
+# Every auto change is also appended to data/ai_auto_changes.jsonl.
+# -------------------------------------------------------------------
+use constant AUTO_SOURCE  => 'auto-improver';
+use constant AUTO_LOG     => 'ai_auto_changes.jsonl';
+use constant AUTO_429_MIN => 3;   # consecutive 429s that count as "repeated"
+use constant AUTO_RECENT_S => 6 * 3600;
+
+sub _canon { _json()->encode($_[0]) }
+
+# auto_safe_check($c, $target, $value) -> (1, '') | (0, $why)
+sub auto_safe_check {
+    my ($self, $c, $target, $value) = @_;
+    my $al = $self->allow_list($c);
+    return (0, 'target not allow-listed') unless $al->is_allowed($target // '');
+    my ($ok, $norm) = $al->validate($target, $value);
+    return (0, "invalid: $norm") unless $ok;
+    my $rule = $al->allow->{$target} || {};
+    my $cur  = $al->current($target);
+    my $t    = $rule->{type} // '';
+    if ($t eq 'chain') {
+        return (0, 'chain not present yet; auto only re-orders an existing chain') unless $cur->{present} && ref $cur->{value} eq 'ARRAY';
+        my @a = sort @{ $cur->{value} };
+        my @b = sort @$norm;
+        return (0, 'not a pure re-ordering (slugs added or removed)') unless _canon(\@a) eq _canon(\@b);
+        return (0, 'no change') if _canon($cur->{value}) eq _canon($norm);
+        return (1, '');
+    }
+    if ($t eq 'number' || $t eq 'int') {
+        return (0, 'cap not present; auto never adds a cap') unless $cur->{present};
+        return (0, 'caps can only be lowered') unless $norm < $cur->{value};
+        return (1, '');
+    }
+    if ($t eq 'caps_map') {
+        return (0, 'caps map not present') unless $cur->{present} && ref $cur->{value} eq 'HASH';
+        my $lower = 0;
+        for my $k (keys %$norm) {
+            return (0, "new cap key $k (auto never adds)") unless exists $cur->{value}{$k};
+            return (0, "cap for $k would rise") if $norm->{$k} > $cur->{value}{$k};
+            $lower++ if $norm->{$k} < $cur->{value}{$k};
+        }
+        return (0, 'caps can only be lowered (a key would be dropped)') if grep { !exists $norm->{$_} } keys %{ $cur->{value} };
+        return (0, 'no change') unless $lower;
+        return (1, '');
+    }
+    return (0, "type '$t' is never auto-applied (needs a human click)");
+}
+
+sub _health_models {
+    my ($self, $c) = @_;
+    return $self->health_override if $self->health_override;
+    require Comserv::Util::AI::ModelHealth;
+    my $path = $self->data_dir_override ? $self->data_dir_override . '/ai_model_health.json'
+                                        : Comserv::Util::AI::ModelHealth->default_path($c);
+    my $d = eval { Comserv::Util::AI::ModelHealth->new(path => $path)->state_all } || {};
+    return $d->{models} || {};
+}
+
+# auto_plan($c) -> [ { target, value, title, rationale, demoted => [...] } ]
+sub auto_plan {
+    my ($self, $c) = @_;
+    my $hm = $self->_health_models($c);
+    my %bad;
+    my $now = $self->now_override // time;
+    for my $slug (keys %$hm) {
+        my $h = $hm->{$slug} || {};
+        # Only CURRENT trouble: an open circuit still in cooldown, or 3+
+        # consecutive 429s in the last 6 hours. An old, expired circuit is
+        # left alone (the Router's half-open probe decides).
+        my $recent = ($h->{last_failure_at} // 0) >= $now - AUTO_RECENT_S;
+        if (($h->{state} // '') eq 'open' && (($h->{cooldown_until} // 0) > $now)) {
+            $bad{$slug} = 'circuit open' . ($h->{open_reason} ? " ($h->{open_reason})" : '');
+        } elsif ($recent && ($h->{last_failure_reason} // '') =~ /429/ && ($h->{consecutive_failures} // 0) >= AUTO_429_MIN) {
+            $bad{$slug} = "repeated 429 ($h->{consecutive_failures} in a row)";
+        }
+    }
+    my $al = $self->allow_list($c);
+    my @plan;
+    for my $purpose (@Comserv::Util::AI::EvalAllowList::PURPOSES) {
+        my $target = "data/ai_model_chains.json:chain_$purpose";
+        next unless $al->is_allowed($target);
+        my $cur = $al->current($target);
+        next unless $cur->{present} && ref $cur->{value} eq 'ARRAY';
+        my @chain = @{ $cur->{value} };
+        my @dem = grep { $bad{$_} } @chain;
+        next unless @dem;
+        my @new = ((grep { !$bad{$_} } @chain), @dem);
+        next if _canon(\@new) eq _canon(\@chain);
+        push @plan, {
+            target    => $target,
+            value     => \@new,
+            demoted   => \@dem,
+            title     => "Auto: demote " . join(', ', map { (my $s = $_) =~ s/^[^|]+\|//; $s } @dem) . " to end of $purpose chain",
+            rationale => join('; ', map { "$_: $bad{$_}" } @dem)
+                         . ". Same slugs, re-ordered only (safe auto-change). Revert on /ai/eval.",
+        };
+    }
+    return \@plan;
+}
+
+sub _auto_log {
+    my ($self, $c, $row) = @_;
+    my $dir = $self->data_dir($c) or return;
+    eval {
+        open my $fh, '>>:encoding(UTF-8)', "$dir/" . AUTO_LOG or die "$!";
+        print {$fh} JSON->new->canonical->allow_nonref->encode($row), "\n";
+        close $fh;
+        1;
+    } or $self->_log($c, 'warn', 'auto_log', "could not append " . AUTO_LOG . ": $@");
+}
+
+=head2 auto_apply($c, dry_run => 0|1, changes => [...]?, reason => '...', by => '...')
+
+Plans (auto_plan) or takes C<changes>, keeps only auto_safe_check passes,
+upserts a report (source C<auto-improver>) and approves + applies each
+proposal with C<by = "auto: <reason>">. Returns
+C<< { ok, report_id, applied => [...], skipped => [...], planned => [...] } >>.
+
+=cut
+
+sub auto_apply {
+    my ($self, $c, %o) = @_;
+    my $plan = $o{changes} || $self->auto_plan($c);
+    my (@safe, @skipped);
+    for my $p (@$plan) {
+        my ($ok, $why) = $self->auto_safe_check($c, $p->{target}, $p->{value});
+        if ($ok) { push @safe, $p } else { push @skipped, { %$p, why => $why } }
+    }
+    my $out = { ok => 1, applied => [], skipped => \@skipped, planned => \@safe, dry_run => ($o{dry_run} ? 1 : 0) };
+    return $out if $o{dry_run} || !@safe;
+
+    my $today = substr($self->_now, 0, 10);
+    my $ing = $self->ingest($c, {
+        report_date => $today,
+        source      => AUTO_SOURCE,
+        created_by  => 'auto',
+        summary     => 'Safe auto-changes (re-order chains / lower caps only). Each one can be reverted on /ai/eval.',
+        proposals   => [ map { +{ title => $_->{title}, change_type => 'config', target => $_->{target},
+                                  payload => { value => $_->{value} }, rationale => $_->{rationale} } } @safe ],
+    }, by => 'auto');
+    return { %$out, ok => 0, error => ($ing->{error} // 'ingest failed') } unless $ing->{ok};
+    $out->{report_id} = $ing->{report_id};
+
+    my $schema = $self->_schema($c);
+    my %want = map { _title_key($_->{title}) => $_ } @safe;
+    my @props = $schema->resultset('AiEvalProposal')->search(
+        { report_id => $ing->{report_id}, status => 'proposed' }, { order_by => 'id' })->all;
+    my $by = substr('auto: ' . ($o{reason} || $o{by} || 'auto-improver'), 0, 100);
+    my %handled;
+    for my $p (@props) {
+        my $src = $want{ _title_key($p->title) } or next;
+        my $a1 = $self->approve($c, $p->id, $by);
+        my $a2 = $a1->{ok} ? $self->apply($c, $p->id, $by) : $a1;
+        my $row = { at => $self->_now . ' UTC', who => $by, proposal_id => 0 + $p->id, report_id => 0 + $ing->{report_id},
+                    target => $p->target, why => $p->rationale, before => $a2->{before}, after => $a2->{after},
+                    ok => ($a2->{ok} ? 1 : 0), error => $a2->{error} };
+        $self->_auto_log($c, $row);
+        $handled{ $p->target } = 1;
+        if ($a2->{ok}) { push @{ $out->{applied} }, $row } else { push @skipped, { %$src, why => $a2->{error} } }
+    }
+    # Titles already present today (e.g. reverted by an admin) are not re-applied.
+    for my $s (@safe) {
+        push @skipped, { %$s, why => 'already proposed today (reverted or pending) - not re-applied' }
+            unless $handled{ $s->{target} };
+    }
+    $self->_log($c, 'info', 'auto_apply', sprintf('auto-improver: %d applied, %d skipped (report %s)',
+        scalar @{ $out->{applied} }, scalar @skipped, $ing->{report_id}));
+    return $out;
+}
+
+=head2 approve_apply_as($c, $pid, $by)
+
+Approve then apply one allow-listed config proposal as C<$by> (used for
+changes Shanta already approved in a report, logged as auto/approved).
+
+=cut
+
+sub approve_apply_as {
+    my ($self, $c, $pid, $by) = @_;
+    my $p = $self->_find_proposal($c, $pid) or return { ok => 0, error => 'proposal not found' };
+    my ($has, $value) = $self->_payload_value($p);
+    my $a1 = ($p->status // '') eq 'approved' ? { ok => 1 } : $self->approve($c, $pid, $by);
+    return $a1 unless $a1->{ok};
+    my $a2 = $self->apply($c, $pid, $by);
+    $self->_auto_log($c, { at => $self->_now . ' UTC', who => $by, proposal_id => 0 + $pid,
+        report_id => 0 + $p->get_column('report_id'), target => $p->target, why => $p->title,
+        before => $a2->{before}, after => $a2->{after}, ok => ($a2->{ok} ? 1 : 0), error => $a2->{error} });
+    return $a2;
+}
+
+=head2 auto_changes($c, limit => 30)
+
+Proposals applied or reverted by an C<auto...> actor, newest first, for the
+"Auto-changes" section on /ai/eval: who / what / why / before / after +
+the normal revert button (can_revert).
+
+=cut
+
+sub auto_changes {
+    my ($self, $c, %a) = @_;
+    my $limit = ($a{limit} && $a{limit} =~ /^\d+$/ && $a{limit} <= 200) ? $a{limit} : 30;
+    my $out = { rows => [] };
+    try {
+        my $al = $self->allow_list($c);
+        my @p = $self->_schema($c)->resultset('AiEvalProposal')->search(
+            { approved_by => { -like => 'auto%' } },
+            { order_by => { -desc => 'id' }, rows => $limit })->all;
+        my $dec = JSON->new->allow_nonref;
+        for my $p (@p) {
+            my $h = $self->_proposal_hash($p, $al);
+            my $b = defined $h->{before_value} ? eval { $dec->decode($h->{before_value}) } : undef;
+            my ($has, $v) = $self->_payload_value($p);
+            $h->{before_text} = ref $b eq 'HASH' ? ($b->{present} ? _canon($b->{value}) : '(absent)') : '';
+            $h->{after_text}  = $has ? _canon($v) : '';
+            push @{ $out->{rows} }, $h;
+        }
+    } catch {
+        my $e = "$_";
+        $out->{table_missing} = 1 if $self->_is_missing_error($e);
+        $out->{error} = $e unless $out->{table_missing};
+    };
+    return $out;
 }
 
 # Todo for code / workstation / other proposals, via the existing

@@ -305,6 +305,15 @@ sub index :Path :Args(0) {
         task_todo => $task_todo,
         ai_quota_warning => $c->stash->{ai_quota_warning},
     );
+    # Admin banner on /ai: SuperGrok guard switch + stale AI meters (no network).
+    {
+        my $r = $c->session->{roles} || [];
+        $r = [ split /,/, $r ] unless ref $r eq 'ARRAY';
+        if (grep { /^admin$/i } @$r) {
+            my $b = eval { require Comserv::Model::AI2::UsageMonitor; Comserv::Model::AI2::UsageMonitor->new->ai_banner($c) };
+            $c->stash(ai_admin_banner => $b) if $b;
+        }
+    }
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
         'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
@@ -12887,6 +12896,18 @@ sub usage :Local :Args(0) {
             "Fallover summary failed: $@") if $@;
     }
 
+    # Health & preflight card #ai-health + admin banners (guard switch,
+    # stale meters) - Model::AI2::UsageMonitor::ai_health.
+    my $ai_health;
+    if ($is_admin) {
+        $ai_health = eval {
+            require Comserv::Model::AI2::UsageMonitor;
+            Comserv::Model::AI2::UsageMonitor->new->ai_health($c, days => $days);
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
+            "ai_health failed: $@") if $@;
+    }
+
     # For filter dropdowns: recent distinct providers/sites (lightweight)
     my @providers = qw(ollama grok supergrok openrouter openai hermes xai-oauth opencode-free);
     my @sites;
@@ -12912,6 +12933,7 @@ sub usage :Local :Args(0) {
         ledger_monitor   => $ledger_monitor,
         eval_summary     => $eval_summary,
         fallover         => $fallover,
+        ai_health        => $ai_health,
     );
 }
 

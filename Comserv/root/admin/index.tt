@@ -522,6 +522,10 @@
                         <i class="fas fa-clipboard-list"></i>
                         <span>Daily AI Eval Reports</span>
                     </a>
+                    <a href="[% c.uri_for('/ai/eval/latest') %]" class="admin-link">
+                        <i class="fas fa-clipboard-check"></i>
+                        <span>Latest AI Eval Report</span>
+                    </a>
                     <a href="[% c.uri_for('/ai/models') %]" class="admin-link">
                         <i class="fas fa-cogs"></i>
                         <span>Model Management</span>
