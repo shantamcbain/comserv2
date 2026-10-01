@@ -259,19 +259,10 @@
                         + ' && hermes dashboard --isolated --host 0.0.0.0 --port '
                         + hport + ' --no-open --skip-build'
                     );
-                    var dashUrl = window.location.protocol + '//' + window.location.hostname
-                        + ':' + hport + '/chat';
-                    var tab = null;
-                    (function () {
-                        var a = document.createElement('a');
-                        a.href = dashUrl;
-                        a.target = '_blank';
-                        a.rel = 'noopener noreferrer';
-                        tab = window.open ? window.open(dashUrl, '_blank') : null;
-                        if (!tab || tab.closed !== false) {
-                            try { a.click(); } catch (e) { window.open(dashUrl, '_blank'); }
-                        }
-                    })();
+                    var tab = window.open('about:blank', 'hermes-' + hermesBranch);
+                    if (tab && !tab.closed) {
+                        try { tab.document.write('<p>Starting Hermes on :' + hport + '…</p>'); } catch (e1) {}
+                    }
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         navigator.clipboard.writeText(hcmd);
                     }
@@ -281,11 +272,7 @@
                             + ':' + port + '/chat';
                         if (devOpenLink) { devOpenLink.href = url; devOpenLink.style.display = ''; }
                         if (tab && !tab.closed) { tab.location = url; }
-                        else {
-                            var a = document.createElement('a');
-                            a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
-                            try { a.click(); } catch (e) { window.open(url, '_blank'); }
-                        }
+                        else { window.open(url, 'hermes-' + hermesBranch); }
                     }
                     function waitReady(port) {
                         var n = 0;
@@ -310,9 +297,12 @@
                         .then(function (res) {
                             var port = String((res && res.hermes_port) || hport);
                             if (hermesBranch !== 'main' && port === '9119') { port = hport; }
-                            if (!res || !res.running) { waitReady(port); }
+                            if (res && res.running) { goHermes(port); }
+                            else { waitReady(port); }
                         })
-                        .catch(function () {});
+                        .catch(function () {
+                            if (tab && !tab.closed) { tab.close(); }
+                        });
                     return;
                 }
                 var action = el.getAttribute('data-branch-action');

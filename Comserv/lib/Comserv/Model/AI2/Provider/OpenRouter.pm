@@ -128,6 +128,21 @@ sub chat {
     return { success => 0, error => 'No messages provided' }
         unless ref($messages) eq 'ARRAY' && @$messages;
 
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::scan_messages($messages);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'openrouter_chat',
+            "HarmRefusal failed closed: $@");
+        return { success => 0, refused => 1, error => 'Chat safety check failed. The question was not sent.' };
+    }
+    if ($harm) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'openrouter_chat',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, eval { $c->session->{user_id} }));
+        return Comserv::Util::AI::HarmRefusal::reply_hash($harm);
+    }
+
     my $model = $args{model};
     $model =~ s/^[^|]+\|// if $model;   # drop any "provider|" prefix
     unless ($model) {

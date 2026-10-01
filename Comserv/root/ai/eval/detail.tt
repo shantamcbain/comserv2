@@ -2,7 +2,7 @@
   # All actions are plain HTML POST forms with the per-session csrf_token. No JS. %]
 [% d = eval_detail; rep = d.report %]
 <div class="ai-eval-page" style="max-width:1200px;margin:0 auto;padding:1rem;">
-  <p><a href="/ai/eval">← All eval reports</a> · <a href="/ai/usage#ledger-grounding">AI Usage monitor</a></p>
+  <p><a href="[% c.uri_for('/ai/eval') %]">← All eval reports</a> · <a href="[% c.uri_for('/ai/usage') %]#agent-effectiveness">AI Usage monitor</a></p>
   [% table_missing = d.table_missing %]
   [% INCLUDE 'ai/eval/_messages.tt' %]
   [% IF d.error %]<div class="alert alert-error">Could not read report: [% d.error | html %]</div>[% END %]

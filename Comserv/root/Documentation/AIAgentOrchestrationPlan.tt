@@ -12,6 +12,8 @@
 %]
 
 <div class="container">
+
+    [% INCLUDE 'ai/_admin_eval_links.tt' %]
     <h1 class="doc-h1">AI Agent Orchestration + Notification Recovery</h1>
 
     <div class="last-updated" doc-muted>

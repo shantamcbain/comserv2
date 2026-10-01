@@ -1,0 +1,70 @@
+{
+  "report_date": "2026-09-30",
+  "source": "ai-usage-monitor-routing",
+  "created_by": "AI usage monitor",
+  "summary": "Routing proposal (review-first, manual): no flash/free models for runtime cross-service debugging; evidence Hermes session 20260929_153046_f3cacd (deepseek-v4-flash, 122 API calls, $0.5410, unfixed).",
+  "markdown": "# Daily AI Eval — 2026-09-30 routing addendum (America/Vancouver)\n\nSeparate source from this morning's `AI usage monitor` report so it does not overwrite it.\n\n## Proposals\n\n1. **No flash/free models for runtime cross-service debugging** — status pending / review-first. **manual: Hermes/router config** (not in EvalAllowList; approving creates a todo, no setting changes).\n\ntask_class runtime_cross_service_debug. It matches symptoms that involve a running port, process, button-to-server-to-spawn chain, 'works on X not Y' across branches or worktrees, dashboards, proxies or tabs, or earlier failed attempts. Deny deepseek-v4-flash, deepseek-flash-latest, *-flash free models and nemotron-*-free. Allow Super Grok grok-4.6/4.7 first, with deepseek-v4-pro as the paid fallback only. Required preflight before any edit: (1) find the PID serving the page with ss, its cwd and start time, and compare them with the files' mtimes and the last merge; (2) reproduce the failing request with curl and capture the response or alert; (3) confirm the edit target is the checkout that process serves. Escalate after 2 unverified 'fixed' claims, 40 tool calls, or 1 iteration-cap hit: hand off to a stronger model in a fresh session with a written summary. Forbid manually starting the service the button should start as a 'fix'. Evidence: Hermes session 20260929_153046_f3cacd on deepseek-v4-flash made 122 API calls costing $0.5410 on Sep 29 and never fixed the 3d Hermes dashboard button. The root cause was that the :4003 server was stale since Sep 24 12:45 PT, restart-on-change (-r) had not reloaded, and branch_server_action returned 'Unknown action'. The flash edits went into the main checkout, not the 3d worktree. grok-4.6 diagnosed the identical failure on :4001 on Sep 24. Not EvalAllowList (Hermes/router task-class routing is not an allow-listed Comserv config key) - manual: approving creates a todo, no setting changes.\n",
+  "proposals": [
+    {
+      "title": "No flash/free models for runtime cross-service debugging",
+      "change_type": "workstation",
+      "target": "manual: Hermes/router config",
+      "rationale": "task_class runtime_cross_service_debug. It matches symptoms that involve a running port, process, button-to-server-to-spawn chain, 'works on X not Y' across branches or worktrees, dashboards, proxies or tabs, or earlier failed attempts. Deny deepseek-v4-flash, deepseek-flash-latest, *-flash free models and nemotron-*-free. Allow Super Grok grok-4.6/4.7 first, with deepseek-v4-pro as the paid fallback only. Required preflight before any edit: (1) find the PID serving the page with ss, its cwd and start time, and compare them with the files' mtimes and the last merge; (2) reproduce the failing request with curl and capture the response or alert; (3) confirm the edit target is the checkout that process serves. Escalate after 2 unverified 'fixed' claims, 40 tool calls, or 1 iteration-cap hit: hand off to a stronger model in a fresh session with a written summary. Forbid manually starting the service the button should start as a 'fix'. Evidence: Hermes session 20260929_153046_f3cacd on deepseek-v4-flash made 122 API calls costing $0.5410 on Sep 29 and never fixed the 3d Hermes dashboard button. The root cause was that the :4003 server was stale since Sep 24 12:45 PT, restart-on-change (-r) had not reloaded, and branch_server_action returned 'Unknown action'. The flash edits went into the main checkout, not the 3d worktree. grok-4.6 diagnosed the identical failure on :4001 on Sep 24. Not EvalAllowList (Hermes/router task-class routing is not an allow-listed Comserv config key) - manual: approving creates a todo, no setting changes.",
+      "payload": {
+        "status": "pending",
+        "review_first": true,
+        "applicable_from_page": false,
+        "apply_mode": "manual: Hermes/router config",
+        "allow_list_note": "EvalAllowList only covers ai_grounding.json, ai_usage.json and data/ai_model_chains.json keys (chains per purpose chat|docs|coding|title, removed, caps, circuits); no task_class routing / preflight / escalation key exists, so change_type=workstation -> approve creates an AISYSTEM todo.",
+        "task_class": "runtime_cross_service_debug",
+        "match_symptoms": [
+          "running port or process",
+          "button -> server -> spawn chain",
+          "works on X not Y across branches or worktrees",
+          "works on X not Y across dashboards, proxies or tabs",
+          "earlier failed attempts"
+        ],
+        "deny_models": [
+          "deepseek-v4-flash",
+          "deepseek-flash-latest",
+          "*-flash free models",
+          "nemotron-*-free"
+        ],
+        "allow_models": {
+          "first": [
+            "supergrok grok-4.6",
+            "supergrok grok-4.7"
+          ],
+          "paid_fallback_only": [
+            "deepseek-v4-pro"
+          ]
+        },
+        "required_preflight_before_edit": [
+          "find the PID serving the page with ss, its cwd and start time; compare with the files' mtimes and the last merge",
+          "reproduce the failing request with curl and capture the response or alert",
+          "confirm the edit target is the checkout that process serves"
+        ],
+        "escalate_after": {
+          "unverified_fixed_claims": 2,
+          "tool_calls": 40,
+          "iteration_cap_hits": 1,
+          "action": "hand off to a stronger model in a fresh session with a written summary"
+        },
+        "forbid": [
+          "manually starting the service the button should start, as a 'fix'"
+        ],
+        "evidence": {
+          "session": "20260929_153046_f3cacd",
+          "model": "deepseek-v4-flash",
+          "date": "2026-09-29",
+          "api_calls": 122,
+          "cost_usd": 0.541,
+          "outcome": "never fixed the 3d Hermes dashboard button",
+          "root_cause": ":4003 server stale since 2026-09-24 12:45 PT; restart-on-change (-r) had not reloaded; branch_server_action returned 'Unknown action'",
+          "misdirected_edits": "flash edits went into the main checkout, not the 3d worktree",
+          "counterexample": "grok-4.6 diagnosed the identical failure on :4001 on 2026-09-24"
+        }
+      }
+    }
+  ]
+}

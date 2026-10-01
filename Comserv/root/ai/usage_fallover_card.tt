@@ -1,0 +1,165 @@
+[%# Model failover (admin only) — included from ai/usage.tt, anchor #fallover.
+  # AISYSTEM plan §5e. Data: UsageMonitor->fallover_summary (Ledger
+  # metadata.fallover via DBIx::Class, circuit state data/ai_model_health.json,
+  # chains data/ai_model_chains.json). Same shape as usage_live org.fallover.
+  # No JS, no CDNs. %]
+[% fo = fallover %]
+<section id="fallover" class="card" style="margin:16px 0;">
+  <div class="card-header">Model failover (admin) — last [% fo.window_days %] days</div>
+  <div class="card-body">
+    [% FOREACH e IN fo.errors %]<div class="doc-warning" role="alert">[% e | html %]</div>[% END %]
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+      <div class="card" style="flex:1;min-width:140px;padding:10px;">
+        <div class="doc-muted">Fallover rate</div>
+        <div style="font-size:1.5em;font-weight:600;">[% fo.fallover_rate_pct %]%</div>
+        <div class="doc-muted">[% fo.answered_after_failover %] of [% fo.turns %] answered turns</div>
+      </div>
+      <div class="card" style="flex:1;min-width:140px;padding:10px;">
+        <div class="doc-muted">Failed attempts</div>
+        <div style="font-size:1.5em;font-weight:600;">[% fo.failed_attempts %]</div>
+        <div class="doc-muted">[% FOREACH r IN fo.failed_by_reason.keys.sort %][% r | html %]=[% fo.failed_by_reason.$r %] [% END %]</div>
+      </div>
+      <div class="card" style="flex:1;min-width:140px;padding:10px;">
+        <div class="doc-muted">All exhausted</div>
+        <div style="font-size:1.5em;font-weight:600;">[% fo.all_exhausted %]</div>
+        <div class="doc-muted">turns with no model available</div>
+      </div>
+      <div class="card" style="flex:1;min-width:140px;padding:10px;">
+        <div class="doc-muted">Open circuits</div>
+        <div style="font-size:1.5em;font-weight:600;">[% fo.circuits.open.size %]</div>
+        <div class="doc-muted">[% fo.circuits.half_open.size %] half-open</div>
+      </div>
+    </div>
+    [%# Item 7: waste on failed attempts + OpenRouter day/week/month/balance + per-type ok rates. %]
+    [% w = fo.waste %][% orx = fo.openrouter %][% rt = fo.rates %]
+    <div style="display:flex;flex-wrap:wrap;gap:16px;margin:10px 0;">
+      <div style="min-width:220px;">
+        <div class="doc-muted">Wasted on failed attempts</div>
+        <div style="font-size:1.3em;font-weight:600;">[% w.minutes || '0.0' %] min · [% w.retries || 0 %] retries</div>
+        <div class="doc-muted">[% w.failed || 0 %] failed ([% w.free_failed || 0 %] on :free, [% w.free_minutes || '0.0' %] min) ·
+          402: [% w.http_402 || 0 %] · 429: [% w.http_429 || 0 %] ([% w.free_429 || 0 %] free) ·
+          no-credit related: <strong>[% w.credit_related || 0 %]</strong>[% IF w.no_credit_now %] (balance ≤ $0 now)[% END %]</div>
+      </div>
+      <div style="min-width:220px;">
+        <div class="doc-muted">OpenRouter (API)</div>
+        [% IF orx.ok %]
+        <div style="font-size:1.3em;font-weight:600;">balance [% orx.balance_usd.defined ? '$' _ orx.balance_usd : '—' %]</div>
+        <div class="doc-muted">day $[% orx.day_usd.defined ? orx.day_usd | format('%.2f') : '—' %] · week $[% orx.week_usd.defined ? orx.week_usd | format('%.2f') : '—' %] · month $[% orx.month_usd.defined ? orx.month_usd | format('%.2f') : '—' %]
+          [% IF orx.exhausted %]<strong>· credits exhausted</strong>[% END %]</div>
+        [% ELSE %]<div class="doc-muted">unavailable[% IF orx.error %]: [% orx.error | html %][% END %]</div>[% END %]
+      </div>
+      <div style="min-width:220px;">
+        <div class="doc-muted">OK rate by type (title &amp; Focus-Tune not in Chat)</div>
+        <div class="doc-muted">
+        [% FOREACH k IN ['chat', 'focustune', 'ai_editor', 'title', 'other'] %][% IF rt.$k %]
+          [% k == 'focustune' ? 'Focus-Tune' : (k == 'ai_editor' ? 'AI editor' : k) | html %]: <strong>[% rt.$k.pct %]%</strong> ([% rt.$k.ok %]/[% rt.$k.calls %])<br>
+        [% END %][% END %]</div>
+      </div>
+    </div>
+    [% IF w.by_model.size %]
+    <details><summary>Failed attempts by model (time and retries wasted)</summary>
+      <table class="data-table"><thead><tr><th>Model</th><th>Failed</th><th>Seconds</th><th>Retries</th></tr></thead><tbody>
+      [% FOREACH m IN w.by_model %]<tr><td>[% m.model | html %]</td><td>[% m.failed %]</td><td>[% m.ms / 1000 | format('%.1f') %]</td><td>[% m.retries %]</td></tr>[% END %]
+      </tbody></table>
+    </details>
+    [% END %]
+
+    <h4>Which chain step answered</h4>
+    [% IF fo.by_step.size %]
+      <table class="data-table">
+        <thead><tr><th>Step</th><th style="text-align:right;">Turns</th></tr></thead>
+        <tbody>
+        [% FOREACH s IN fo.by_step %]
+          <tr><td>[% IF s.step == 0 %]0 (requested model)[% ELSE %][% s.step %][% END %]</td>
+              <td style="text-align:right;">[% s.count %]</td></tr>
+        [% END %]
+        </tbody>
+      </table>
+      <table class="data-table" style="margin-top:6px;">
+        <thead><tr><th>Final model</th><th style="text-align:right;">Turns</th></tr></thead>
+        <tbody>
+        [% FOREACH m IN fo.by_final_model %]<tr><td><code>[% m.model | html %]</code></td><td style="text-align:right;">[% m.count %]</td></tr>[% END %]
+        </tbody>
+      </table>
+    [% ELSE %]
+      <p class="doc-muted">No routed turns recorded with failover data in this window yet.</p>
+    [% END %]
+
+    <h4>Open circuits</h4>
+    [% IF fo.circuits.open.size || fo.circuits.half_open.size %]
+      <table class="data-table">
+        <thead><tr><th>Model</th><th>State</th><th>Reason</th><th style="text-align:right;">Cooldown left</th><th style="text-align:right;">Consecutive fails</th></tr></thead>
+        <tbody>
+        [% FOREACH r IN fo.circuits.open.merge(fo.circuits.half_open) %]
+          <tr>
+            <td><code>[% r.slug | html %]</code></td>
+            <td>[% r.state | html %][% IF r.probe_due %] (probe due)[% END %]</td>
+            <td>[% (r.open_reason || r.last_failure_reason) | html %]</td>
+            <td style="text-align:right;">[% IF r.cooldown_remaining_s > 3600 %][% r.cooldown_remaining_s div 3600 %]h [% (r.cooldown_remaining_s mod 3600) div 60 %]m[% ELSE %][% r.cooldown_remaining_s div 60 %]m [% r.cooldown_remaining_s mod 60 %]s[% END %]</td>
+            <td style="text-align:right;">[% r.consecutive_failures %]</td>
+          </tr>
+        [% END %]
+        </tbody>
+      </table>
+    [% ELSE %]
+      <p class="doc-muted">No open circuits. [% fo.circuits.closed_tracked %] model(s) tracked closed.</p>
+    [% END %]
+
+    <h4>Recent failovers</h4>
+    [% IF fo.recent_failovers.size %]
+      <table class="data-table">
+        <thead><tr><th>Ledger #</th><th>When <span class="doc-muted" title="ai_usage_logs.created_at is stored as UTC"> (DB UTC)</span></th><th>Purpose</th><th>From</th><th>Reason</th><th>Answered by</th><th style="text-align:right;">Attempt</th></tr></thead>
+        <tbody>
+        [% FOREACH r IN fo.recent_failovers %]
+          <tr><td>[% r.id %]</td><td>[% r.created_at | html %]</td><td>[% r.purpose | html %]</td>
+              <td><code>[% r.fallback_from | html %]</code></td><td>[% r.fallback_reason | html %]</td>
+              <td><code>[% r.final_model | html %]</code></td><td style="text-align:right;">[% r.attempt_no %]</td></tr>
+        [% END %]
+        </tbody>
+      </table>
+    [% ELSE %]
+      <p class="doc-muted">No failovers in this window.</p>
+    [% END %]
+
+    <h4>Recent all-exhausted events</h4>
+    [% IF fo.recent_all_exhausted.size %]
+      <table class="data-table">
+        <thead><tr><th>Ledger #</th><th>When <span class="doc-muted" title="ai_usage_logs.created_at is stored as UTC"> (DB UTC)</span></th><th>Purpose</th><th>Attempts</th><th>Skipped</th></tr></thead>
+        <tbody>
+        [% FOREACH r IN fo.recent_all_exhausted %]
+          <tr><td>[% r.id %]</td><td>[% r.created_at | html %]</td><td>[% r.purpose | html %]</td>
+              <td>[% r.attempts.join(', ') | html %]</td><td>[% r.skipped.join(', ') | html %]</td></tr>
+        [% END %]
+        </tbody>
+      </table>
+    [% ELSE %]
+      <p class="doc-muted">None — every turn found a model.</p>
+    [% END %]
+
+    <details style="margin-top:8px;">
+      <summary style="cursor:pointer;">Chains, caps and guards</summary>
+      <p class="doc-muted">Chains source: <strong>[% fo.chains.source | html %]</strong>[% IF fo.chains.reason %] ([% fo.chains.reason | html %])[% END %].
+        Change them from <a href="[% c.uri_for('/ai/eval') %]">/ai/eval</a> (allow-listed keys <code>data/ai_model_chains.json:*</code>).</p>
+      <table class="data-table">
+        <tbody>
+        [% FOREACH p IN ['chat', 'docs', 'coding', 'title'] %]
+          <tr><th>[% p %]</th><td>[% fo.chains.$p.join(' → ') | html %]</td></tr>
+        [% END %]
+          <tr><th>removed</th><td>[% fo.chains.removed.join(', ') | html %]</td></tr>
+          <tr><th>OpenRouter paid spend</th><td>
+            day $[% fo.spend.day %] / $[% fo.caps.openrouter_soft_cap_day_usd %] ·
+            week $[% fo.spend.week %] / $[% fo.caps.openrouter_soft_cap_week_usd %] ·
+            month $[% fo.spend.month %] / $[% fo.caps.openrouter_soft_cap_month_usd %]
+            [% UNLESS fo.spend.ok %](spend unknown — paid failover blocked)[% END %]</td></tr>
+          <tr><th>Circuit</th><td>open after [% fo.caps.circuit_failure_threshold %] consecutive failures;
+            cooldown [% fo.caps.circuit_cooldown_minutes %] min (404/410 / dead_model: [% fo.caps.circuit_dead_cooldown_hours %] h), then one half-open probe</td></tr>
+          <tr><th>SuperGrok guard</th><td>[% IF fo.supergrok_guard.locked %]<strong>locked</strong>: [% fo.supergrok_guard.reason | html %][% ELSIF fo.supergrok_guard.stale %]stale reading (ignored)[% ELSE %]open[% END %]
+            [% IF fo.supergrok_guard.checked %]<span class="doc-muted">(checked [% fo.supergrok_guard.checked | html %])</span>[% END %]</td></tr>
+          <tr><th>Hermes model hops</th><td>[% fo.hermes.sessions_with_hops || 0 %] session(s) switched model mid-session
+            [% IF fo.hermes.guard %]· guard mode [% fo.hermes.guard.mode | html %][% IF fo.hermes.guard.lock_reason %] ([% fo.hermes.guard.lock_reason | html %])[% END %][% END %]</td></tr>
+        </tbody>
+      </table>
+    </details>
+  </div>
+</section>

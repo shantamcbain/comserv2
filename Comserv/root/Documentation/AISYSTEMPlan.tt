@@ -5,15 +5,17 @@
    TemplateType = "Documentation"
    category = "planning,ai"
    page_version = "1.05"
-   last_updated = "2026-09-25"
+   last_updated = "2026-10-01"
    site_specific = "false"
    project_id = "280"
    project_code = "AISYSTEM"
 %]
-[% PageVersion = 'Documentation/AISYSTEMPlan.tt,v 1.05 2026/09/25 hermes-agent Exp - usage overview + daily Grok lock' %]
+[% PageVersion = 'Documentation/AISYSTEMPlan.tt,v 1.08 2026/10/01 shanta Exp - auto-improver, supergrok switch, health' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container">
+
+    [% INCLUDE 'ai/_admin_eval_links.tt' %]
     [% INCLUDE 'admin/documentation/_doc_header.tt'
         page_title   = 'AI System Use — coordinator plan'
         site_name    = site_name
@@ -29,6 +31,7 @@
             <p class="doc-muted">Jump to section:</p>
             <div class="doc-navrow">
                 <a href="#now" class="doc-navlink">Now</a>
+                <a href="#auto-improve-1001" class="doc-navlink" title="Auto-improver, Super Grok switch, health, preflight (2026-10-01)">Auto-improve 10-01</a>
                 <a href="#overview" class="doc-navlink">Overview</a>
                 <a href="#audit" class="doc-navlink">Audit</a>
                 <a href="#order" class="doc-navlink">Wave order</a>
@@ -42,6 +45,8 @@
                 <a href="#skills-search" class="doc-navlink">Skills &amp; web search</a>
                 <a href="#golden-data" class="doc-navlink" title="Golden Data store, glossary and the anti-hallucination policy.">Golden Data / Anti-Hallucination</a>
                 <a href="#eval-reports" class="doc-navlink" title="Daily AI eval reports, review-first proposals and allow-listed apply.">Daily AI Eval Reports</a>
+                <a href="#model-failover" class="doc-navlink" title="Ordered model chains, circuit breaker, budget guards, Ledger fallover.">Model Failover</a>
+                <a href="#local-decision" class="doc-navlink" title="Ollama 0.35+ System One / Jev for triage, routing, classification with probabilities.">Local Decision Models (Ollama System One)</a>
                 <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
                 <a href="#see-also" class="doc-navlink">See Also</a>
             </div>
@@ -71,6 +76,14 @@
                 </div>
             </div>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="auto-improve-1001" class="doc-h2">Auto-improve, Super Grok switch, health (2026-10-01)</h2>
+            <p class="doc-body"><strong>Where.</strong> Latest report: <a href="/ai/eval/latest">/ai/eval/latest</a> · auto-changes with Revert: <a href="/ai/eval#auto-changes">/ai/eval#auto-changes</a> · health &amp; stale-server preflight: <a href="/ai/usage#ai-health">/ai/usage#ai-health</a> · all AI usage: <a href="/ai/usage#all-ai-usage">/ai/usage#all-ai-usage</a>.</p>
+            <p class="doc-body"><strong>Rules.</strong> The auto-improver only re-orders chains (same slugs) and lowers caps; anything else needs a click. A reverted change is not re-applied the same day. Super Grok locked → coding on <code>openrouter/deepseek/deepseek-v4-pro</code> (app Router <code>guard_switch</code> step + Hermes <code>model.default</code>), flash only for idle/title; the guard switches back after the reset. Run <code>perl script/stale_preflight.pl --all</code> before any AI debugging.</p>
         </div>
     </div>
 
@@ -585,6 +598,60 @@
         </div>
     </div>
 
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="model-failover" class="doc-h2">5e. Model Failover (code in aisystem 2026-09-28 — not committed)</h2>
+            <p class="doc-body">Real ordered failover for in-app chat / docs / coding / title. Extends
+                <code>Model::AI2::Router</code>, the Ledger, <a href="[% c.uri_for('/ai/usage') %]#fallover" class="doc-link">/ai/usage#fallover</a>,
+                and the allow-list used by <a href="[% c.uri_for('/ai/eval') %]" class="doc-link">/ai/eval</a>.
+                Terms: <em>Failover Chain</em>, <em>Circuit Breaker</em>, <em>All Exhausted</em>
+                (<code>Util/AI/Glossary.pm</code>).</p>
+
+            <h3 class="doc-h3">Chains config (not public)</h3>
+            <ul class="doc-body">
+                <li>File: <code>data/ai_model_chains.json</code> (under <code>data/</code>, never <code>root/</code>). Health state: <code>data/ai_model_health.json</code>.</li>
+                <li>Keys: <code>chain_chat</code>, <code>chain_docs</code>, <code>chain_coding</code>, <code>chain_title</code> (ordered <code>provider|model</code> slugs),
+                    <code>removed</code>, per-model / per-chain USD/day caps, circuit threshold / cooldown / dead cooldown,
+                    OpenRouter soft caps ($1.65 / $11.50 / $50), Super Grok / effectiveness toggles.</li>
+                <li>Missing or invalid file → Perl lists in <code>Util::ModelCatalog</code> / <code>Router::_default_free_catalog</code> (logged once).</li>
+                <li>Admins approve and apply from /ai/eval (before-value + Revert). Unknown slugs are rejected when the allow-list has a known-slug set.</li>
+            </ul>
+
+            <h3 class="doc-h3">Failure, circuit, budget</h3>
+            <ul class="doc-body">
+                <li>Failover on 404/410/429/402/5xx, timeout, empty text, 0-token empty, and grounding post-check that leaves nothing.</li>
+                <li>Ollama always reports 0 tokens: non-empty text = success + <code>tokens_unreported</code>; empty text = failure.</li>
+                <li>Circuit per provider|model: open after N consecutive failures (default 3) or on <code>error_spike</code>/<code>dead_model</code> anomalies from UsageMonitor;
+                    cooldown (15 min; 24 h for 404/410); half-open single probe; success closes, failure reopens.</li>
+                <li>Effectiveness card "replace" excluded, "watch" demoted (same verdict code, not recomputed).</li>
+                <li>Never free→paid past the soft caps (spend from <code>ai_usage_logs</code> via DBIx::Class, excluding <code>_api_snapshot</code>); Super Grok guard lock respected.</li>
+                <li>Everything exhausted → honest message, Ledger status <code>all_exhausted</code>, reason <code>all_exhausted</code>. No invented content.</li>
+            </ul>
+
+            <h3 class="doc-h3">Ledger and usage_live</h3>
+            <p class="doc-body">Every attempt writes <code>metadata.fallover</code> with <code>attempt_no</code>, <code>fallback_from</code>,
+                <code>fallback_reason</code>, <code>final_model</code>, <code>chain_step</code>, <code>purpose</code>. No new required columns
+                (schema-compare not needed). Admin card: <code>/ai/usage#fallover</code>. Live JSON (admin / LAN operator only):</p>
+<pre class="doc-code">GET /ai/usage_live?days=N   (also /ai2/usage_live)
+org.fallover = {
+  window_days, since, source: "metadata.fallover",
+  turns, answered_first, answered_after_failover, fallover_rate_pct,
+  failed_attempts, failed_by_reason, by_step, by_final_model,
+  all_exhausted, recent_all_exhausted[], recent_failovers[],
+  circuits: { open[{slug, cooldown_remaining_s, open_reason}], half_open, closed_tracked },
+  chains: { source, path, reason, chat, docs, coding, title, removed },
+  caps, spend: { ok, day, week, month, ledger{}, key_snapshot{} },
+  supergrok_guard: { locked, reason, checked },
+  hermes: { model_hops[{session_id, models[]}], sessions_with_hops, guard },
+  errors[]
+}
+</pre>
+            <p class="doc-body"><strong>Tests:</strong> <code>t/ai_model_failover.t</code> (mocked providers; no live model calls).</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
     <div class="row">
         <div class="col-100">
             <h2 id="project-tracking" class="doc-h2">6. Project Tracking</h2>
@@ -724,5 +791,49 @@
             </div>
         </div>
     </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="local-decision" class="doc-h2">5f. Local Decision Models — Ollama System One / Jev (new 2026-09-30)</h2>
+            <p class="doc-body">Ollama 0.35+ adds the <strong>System One API</strong> (<code>POST /v1/systemone</code>) based on TypeSafe’s Jev. Send <code>state</code> (text or structured) + named <code>questions</code> (choice, noul/yes-no, score/rubric). Returns selected label + full <code>probabilities</code> per option + <code>confidence</code>. Runs 100% locally on small decision models: <strong>nimble</strong> (9B, Bespoke Labs), <strong>tev1</strong> (4B) and <strong>tev1:0.8b</strong> (Together AI). Zero cost, low latency, calibrated probs for thresholding. Requires Ollama 0.35+.</p>
+
+            <h3 class="doc-h3">Why this fits the AI2 system</h3>
+            <ul class="doc-body">
+                <li>Perfect for meta-decisions: ticket triage, model routing choices, content classification, eval scoring, sub-agent dispatch.</li>
+                <li>Complements existing Router preference for local Ollama and "ollama|auto". Enables true dynamic, task-specific routing (user request: sub-agents classify/read/evaluate then hand off to best model for the job).</li>
+                <li>Replaces brittle prompt+parse JSON in places like ErrorAudit with reliable structured output + probabilities.</li>
+                <li>Keeps expensive hops (SuperGrok, paid OpenRouter) only for actual generation work.</li>
+            </ul>
+
+            <h3 class="doc-h3">Integration points (current code)</h3>
+            <ul class="doc-body">
+                <li><code>Model::AI2::Router</code> + <code>Util/AI/ModelChains</code> — routing decisions.</li>
+                <li><code>Util/ErrorAudit.pm</code> — already prompts Ollama for triage JSON; upgrade here first.</li>
+                <li><code>Model::AI2::TodoRank</code>, <code>FocusTune</code> — batch classification/scoring of todos.</li>
+                <li><code>Model::AI2::EvalReports</code>, UsageMonitor — rubric scoring of model outputs.</li>
+                <li>Invoice/mail classifiers, Chat sub-agents, guards.</li>
+                <li><code>Model::Ollama</code> + <code>Provider::Ollama</code> (currently /api/chat, /api/generate); <code>script/sync_ollama_models.sh</code>.</li>
+            </ul>
+
+            <h3 class="doc-h3">Implementation steps (these become todos on project #280 AISYSTEM)</h3>
+            1. Upgrade Ollama to 0.35+ on workstation (and hosts that reach it via docker/host.docker.internal or LAN). Run ollama pull nimble, ollama pull tev1, ollama pull tev1:0.8b. Verify with curl example from Ollama blog/docs. Update any version checks.
+            2. Add SystemOne support to Comserv::Model::Ollama (new role or method in Chat.pm/Connection: POST to /v1/systemone, handle {model, state, questions}, return parsed answers with probabilities/confidence).
+            3. Extend Provider::Ollama with a systemone or decide wrapper. Add decision-tier models to ModelCatalog.pm and Router detection.
+            4. Update script/sync_ollama_models.sh RECOMMENDED list and Ollama::list_models / running_models to surface decision models. Add ollama|nimble etc. handling or ollama|decision-auto.
+            5. Wire first consumer: refactor ErrorAudit.pm triage to use structured systemone call (priority, category, is_critical, etc.). Keep fallback for older Ollama.
+            6. Pilot in Router::select_model: use local decision model for quick context questions before/inside chain walk (e.g. is_coding_task?, needs_high_capability?). Add decision_chain support to ai_model_chains.json if useful.
+            7. Integrate with TodoRank, FocusTune, Eval for classification and rubric scoring. Add usage in AI eval reports.
+            8. Update tests (t/ai_model_failover.t etc.), ai_model_chains.json example, docs, and expose decision models in /ai picker or admin if appropriate.
+            9. Document the new capability in this plan, /Documentation/models/Ollama, and any agent prompts. Add to daily eval if it improves routing effectiveness.
+            10. Verify end-to-end on :4006 (curl API or chat widget); measure latency/cost win vs chat prompts.
+
+            <p class="doc-body"><strong>Next after basics:</strong> Use decision models for sub-agent orchestration (one tiny model classifies the request → routes to the right specialist or main model). Update Hermes fallback chains and app catalog to prefer local decision tier for meta work.</p>
+
+            <p class="doc-body">Documentation link: <a href="[% c.uri_for('/Documentation/AISYSTEMPlan') %]#local-decision" class="doc-link">/Documentation/AISYSTEMPlan#local-decision</a></p>
+            <p class="doc-body">Started first todo: <a href="[% c.uri_for('/todo/details') %]?record_id=2528" class="doc-link">Todo #2528 (Upgrade Ollama + pull nimble/tev1 — In Progress, start_date 2026-09-30)</a> on project #280. See full list under <a href="[% c.uri_for('/todo') %]?project_id=280" class="doc-link">/todo?project_id=280</a>.</p>
+
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
 </div>
-[%# ai-plan-sync created todo_ids: 2191,2192,2193,2194,2195,2196,2197,2198,2199,2200,2201 under project_id=280 %]
+[%# ai-plan-sync created todo_ids: 2191,2192,2193,2194,2195,2196,2197,2198,2199,2200,2201,2528,2529 under project_id=280 %]

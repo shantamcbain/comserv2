@@ -154,6 +154,7 @@ AI_CONTROLLER_IMPLEMENTATION_SUMMARY.md
 /current_session.md
 /Comserv/data/ency_offline.db
 /Comserv/data/forager_offline.db
+/Comserv/data/ai_model_health.json
 /config/dbi_config.json
 deploy-logs/
 .aider*

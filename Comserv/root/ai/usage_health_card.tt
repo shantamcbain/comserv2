@@ -1,0 +1,72 @@
+[%# Health & preflight (admin) — included from ai/usage.tt.
+  # Data: Model::AI2::UsageMonitor->ai_health (StalePreflight, HealthChecks).
+  # Times are PT. No JS. %]
+[% h = ai_health %]
+<section id="ai-health" class="card" style="margin:16px 0;">
+  <div class="card-header">Health &amp; preflight (admin)</div>
+  <div class="card-body">
+    <h3 style="font-size:1em;">Stale-server preflight</h3>
+    <p class="doc-muted">Run this before AI debugging: a server started before the newest file or commit in its worktree is serving old code.
+      CLI for any port / worktree: <code>perl script/stale_preflight.pl --all</code> or <code>--port 4003 --worktree /path</code>.</p>
+    <table class="data-table">
+      <thead><tr><th>Target</th><th>Status</th><th>Process start</th><th>Newest file</th><th>Latest commit</th><th>pid</th></tr></thead>
+      <tbody>
+      [% FOREACH r IN h.preflight %]
+        <tr>
+          <td>[% r.label | html %]<br><span class="doc-muted">[% r.worktree | html %]</span></td>
+          <td><strong>[% r.status | html %]</strong>[% IF r.reasons.size %]<br><span class="doc-muted">[% r.reasons.join("; ") | html %]</span>[% END %]</td>
+          <td>[% r.proc_start_pt | html %]</td>
+          <td>[% r.newest_mtime_pt | html %][% IF r.newest_file %]<br><span class="doc-muted">[% r.newest_file | html %]</span>[% END %]</td>
+          <td>[% r.commit_pt | html %][% IF r.head_short %] <code>[% r.head_short | html %]</code>[% END %][% IF r.branch %]<br><span class="doc-muted">[% r.branch | html %]</span>[% END %]</td>
+          <td>[% r.pid | html %]</td>
+        </tr>
+      [% END %]
+      </tbody>
+    </table>
+
+    <h3 style="font-size:1em;margin-top:14px;">Meters (alert when older than [% h.meters.alert_after_h %] h)</h3>
+    <table class="data-table"><thead><tr><th>Meter</th><th>Last reading</th><th>Age</th><th>Status</th><th>Note</th></tr></thead><tbody>
+    [% FOREACH m IN h.meters.rows %]
+      <tr><td>[% m.name | html %]</td><td>[% m.at_pt || 'never' | html %]</td><td>[% m.age_h.defined ? m.age_h _ ' h' : '—' %]</td>
+        <td><strong>[% m.stale ? 'STALE' : 'OK' %]</strong></td><td>[% m.note | html %]</td></tr>
+    [% END %]
+    </tbody></table>
+
+    [% e = h.supergrok_estimate %]
+    <h3 style="font-size:1em;margin-top:14px;">Own usage estimate (no grok.com meter needed)</h3>
+    <p class="doc-body">SuperGrok weekly Build ≈ <strong>[% e.build_est.defined ? e.build_est _ '%' : '—' %]</strong> used
+      ([% e.remaining_est.defined ? e.remaining_est _ '% left' : '—' %]) =
+      last grok.com reading [% e.meter_build.defined ? e.meter_build _ '%' : '—' %] at [% e.meter_at_pt || '—' | html %][% IF e.meter_before_cycle %] (before this cycle → counted as 0)[% END %]
+      + [% e.calls_since.defined ? e.calls_since : '?' %] Hermes xai-oauth calls since [% e.since_pt | html %] × [% e.pct_per_call %]%.
+      Cycle [% e.cycle_start_pt | html %] → reset [% e.reset_pt | html %].
+      [% IF e.error %]<span class="doc-muted">([% e.error | html %])</span>[% END %]
+      Grok Bot / browser use of SuperGrok is not visible here, so this is a floor, not a ceiling.</p>
+    [% o = h.openrouter %]
+    <p class="doc-body">OpenRouter: [% IF o.ok %]balance <strong>[% o.balance_usd.defined ? '$' _ o.balance_usd : '—' %]</strong> · day $[% o.day_usd | format('%.2f') %] · week $[% o.week_usd | format('%.2f') %] · month $[% o.month_usd | format('%.2f') %][% IF o.exhausted %] · <strong>credits exhausted</strong>[% END %][% ELSE %]unavailable [% o.error | html %][% END %]
+      <span class="doc-muted">(also org.openrouter / org.health in <code>/ai/usage_live</code>)</span></p>
+
+    <h3 style="font-size:1em;margin-top:14px;">SuperGrok guard</h3>
+    [% g = h.guard %]
+    <p class="doc-body">[% IF g.locked %]<strong>Locked</strong> — coding on [% g.switch_provider || 'openrouter' | html %]/[% g.switch_model || 'deepseek/deepseek-v4-pro' | html %] until [% g.reset_at | html %]. [% g.reason | html %]
+      [% ELSIF g.stale %]Guard reading stale (ignored).[% ELSE %]Open (SuperGrok allowed).[% END %]
+      [% IF h.hermes_notice %]<br>Hermes notice: <code>[% h.hermes_notice | html %]</code>[% END %]</p>
+    [% IF h.guard_events.size %]
+    <table class="data-table"><thead><tr><th>When (PT)</th><th>From → to</th><th>Reason</th></tr></thead><tbody>
+    [% FOREACH ev IN h.guard_events %]<tr><td>[% ev.at_pt | html %]</td><td>[% ev.from | html %] → [% ev.to | html %]</td><td>[% ev.reason | html %]</td></tr>[% END %]
+    </tbody></table>
+    [% END %]
+
+    [% ol = h.ollama %]
+    <h3 style="font-size:1em;margin-top:14px;">Ollama (Today's Focus)</h3>
+    <p class="doc-body"><strong>[% ol.ok ? 'OK' : 'PROBLEM' %]</strong> — [% ol.up ? 'API up, v' _ ol.version : 'API down' | html %] ·
+      llama-server [% ol.llama_server_ok ? 'present' : 'MISSING' %] (<code>[% ol.llama_server | html %]</code>) ·
+      Focus models [% ol.focus_models.join(', ') | html %][% IF ol.missing_models.size %] — missing: <strong>[% ol.missing_models.join(', ') | html %]</strong>[% END %] ·
+      loaded now: [% ol.loaded.size ? ol.loaded.join(', ') : 'none' | html %]</p>
+    [% FOREACH pr IN ol.problems %]<p class="doc-warning">[% pr | html %]</p>[% END %]
+    [% IF ol.recent_errors.size %]
+    <details><summary>Ollama journal, last 24 h[% IF ol.errors_resolved %] — "llama-server binary not found" (Sep 30 0.35.0 upgrade; fixed by re-extracting lib/ollama, binary present now)[% END %]</summary>
+      <pre style="white-space:pre-wrap;font-size:0.8em;">[% ol.recent_errors.join("\n") | html %]</pre></details>
+    [% END %]
+    [% IF h.errors.size %]<p class="doc-muted">Errors: [% h.errors.join('; ') | html %]</p>[% END %]
+  </div>
+</section>

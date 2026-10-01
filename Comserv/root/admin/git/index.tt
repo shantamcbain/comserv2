@@ -304,6 +304,8 @@
             </div>
 
             [%# ==================== Develop Servers (zenflow worktree registry) ==================== %]
+            [%# Highlight uses current_worktree (from app_workflow = worktree dir key) to mark the active server row.
+               This matches b.name even when live git branch (current_branch) differs (e.g. feature branch in a named worktree slot). #]
             [%# Single source of truth = stash.worktree_list (Comserv::Util::Git->build_worktree_list,\n               which reads root/config/worktrees.json). Mirrors the planning tab's "Branch Servers"\n               panel. Open/Stop/Restart buttons POST to /admin/branch_server_action (handled in\n               git-dashboard.js). No inline <script>. #]
             [% IF worktree_list && worktree_list.size %]
             <details class="git-collapse git-dev-servers">
@@ -320,10 +322,10 @@
                         </thead>
                         <tbody>
                             [% FOREACH b IN worktree_list %]
-                            <tr[% IF b.name == current_branch %] class="git-dev-current"[% END %]>
+                            <tr[% IF b.name == current_worktree %] class="git-dev-current"[% END %]>
                                 <td>
                                     <code>[% b.label | html %]</code>
-                                    [% IF b.name == current_branch %]<span class="status-badge">current</span>[% END %]
+                                    [% IF b.name == current_worktree %]<span class="status-badge">current</span>[% END %]
                                 </td>
                                 <td><code>:[% b.port %]</code></td>
                                 <td>
@@ -356,14 +358,12 @@
                                             data-open-branch="[% b.name | html %]" data-port="[% b.port %]"
                                             data-url="http://[% bh | html %]:[% b.port %][% b.url | html %]"
                                             data-cmd="[% b.cmd | html %]">Open</button>
-                                    <a class="admin-btn admin-btn-sm"
-                                            href="http://[% bh | html %]:[% hp %]"
-                                            target="_blank" rel="noopener noreferrer"
+                                    <button type="button" class="admin-btn admin-btn-sm"
                                             data-hermes-branch="[% b.name | html %]"
                                             data-port="[% b.port %]"
                                             data-hermes-port="[% hp %]"
                                             data-hermes-cwd="[% hcwd | html %]"
-                                            data-hermes-cmd="[% b.hermes_cmd | html %]">Hermes</a>
+                                            data-hermes-cmd="[% b.hermes_cmd | html %]">Hermes</button>
                                     <button type="button" class="admin-btn admin-btn-sm admin-btn-danger"
                                             data-branch-action="stop" data-branch="[% b.name | html %]" data-port="[% b.port %]">Stop</button>
                                     <button type="button" class="admin-btn admin-btn-sm"

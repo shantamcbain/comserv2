@@ -305,6 +305,15 @@ sub index :Path :Args(0) {
         task_todo => $task_todo,
         ai_quota_warning => $c->stash->{ai_quota_warning},
     );
+    # Admin banner on /ai: SuperGrok guard switch + stale AI meters (no network).
+    {
+        my $r = $c->session->{roles} || [];
+        $r = [ split /,/, $r ] unless ref $r eq 'ARRAY';
+        if (grep { /^admin$/i } @$r) {
+            my $b = eval { require Comserv::Model::AI2::UsageMonitor; Comserv::Model::AI2::UsageMonitor->new->ai_banner($c) };
+            $c->stash(ai_admin_banner => $b) if $b;
+        }
+    }
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
         'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
@@ -605,6 +614,34 @@ sub grok_cli :Local :Args(0) {
     if (length($prompt) > 200_000) {
         $c->response->status(400);
         $c->response->body(encode_json({ success => JSON::false, error => 'prompt too large (max 200k)' }));
+        return;
+    }
+
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::classify($prompt);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'grok_cli',
+            "HarmRefusal failed closed: $@");
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            refused => JSON::true,
+            error   => 'Chat safety check failed. The question was not sent.',
+        }));
+        return;
+    }
+    if ($harm) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'grok_cli',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, $c->session->{user_id}));
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            refused  => JSON::true,
+            response => Comserv::Util::AI::HarmRefusal::refusal_text($harm),
+            provider => 'local-refusal',
+            model    => 'harm-refusal',
+        }));
         return;
     }
 
@@ -1204,6 +1241,35 @@ sub generate :Local :Args(0) {
     if (!$is_guest && $prompt =~ /^\s*(good\s+night|end\s+day|finish\s+day|end\s+of\s+day)\s*[!.]?\s*$/i) {
         my $kw_resp = $c->controller("Planning")->_daily_log_action($c, 'end', $username, $user_id);
         $c->response->body(encode_json($kw_resp));
+        return;
+    }
+
+    # Refuse before the prompt preview is logged and before any provider call.
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::classify_turn($prompt, $history_items);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'generate',
+            "HarmRefusal failed closed: $@");
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            refused => JSON::true,
+            error   => 'Chat safety check failed. The question was not sent.',
+        }));
+        return;
+    }
+    if ($harm) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'generate',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, $user_id));
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            refused  => JSON::true,
+            response => Comserv::Util::AI::HarmRefusal::refusal_text($harm),
+            provider => 'local-refusal',
+            model    => 'harm-refusal',
+        }));
         return;
     }
 
@@ -2889,6 +2955,34 @@ sub chat :Local :Args(0) {
         });
         $c->response->body($error_response);
         $c->response->status(400);
+        return;
+    }
+
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::classify_turn($prompt, $history);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'chat',
+            "HarmRefusal failed closed: $@");
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            refused => JSON::true,
+            error   => 'Chat safety check failed. The question was not sent.',
+        }));
+        return;
+    }
+    if ($harm) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, $user_id));
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            refused  => JSON::true,
+            response => Comserv::Util::AI::HarmRefusal::refusal_text($harm),
+            provider => 'local-refusal',
+            model    => 'harm-refusal',
+        }));
         return;
     }
 
@@ -12771,7 +12865,9 @@ sub usage :Local :Args(0) {
     if ($is_admin) {
         $ledger_monitor = eval {
             require Comserv::Model::AI2::UsageMonitor;
-            Comserv::Model::AI2::UsageMonitor->new->ledger_summary($c, days => 14);
+            # Honor the requested window ($days read above); this was pinned to
+            # 14 days, which is why no view could show less than two weeks.
+            Comserv::Model::AI2::UsageMonitor->new->ledger_summary($c, days => $days);
         };
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
             "Ledger monitor failed: $@") if $@;
@@ -12787,6 +12883,29 @@ sub usage :Local :Args(0) {
         };
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
             "Eval summary failed: $@") if $@;
+    }
+
+    # Model failover section #fallover (admin only) — AISYSTEM plan §5e.
+    my $fallover;
+    if ($is_admin) {
+        $fallover = eval {
+            require Comserv::Model::AI2::UsageMonitor;
+            Comserv::Model::AI2::UsageMonitor->new->fallover_summary($c, days => $days);
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
+            "Fallover summary failed: $@") if $@;
+    }
+
+    # Health & preflight card #ai-health + admin banners (guard switch,
+    # stale meters) - Model::AI2::UsageMonitor::ai_health.
+    my $ai_health;
+    if ($is_admin) {
+        $ai_health = eval {
+            require Comserv::Model::AI2::UsageMonitor;
+            Comserv::Model::AI2::UsageMonitor->new->ai_health($c, days => $days);
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
+            "ai_health failed: $@") if $@;
     }
 
     # For filter dropdowns: recent distinct providers/sites (lightweight)
@@ -12813,6 +12932,8 @@ sub usage :Local :Args(0) {
         username         => $username,
         ledger_monitor   => $ledger_monitor,
         eval_summary     => $eval_summary,
+        fallover         => $fallover,
+        ai_health        => $ai_health,
     );
 }
 

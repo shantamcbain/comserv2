@@ -61,7 +61,32 @@ sub live :Path('/ai/usage_live') :Args(0) {
         $c->response->body(encode_json({ success => JSON::false, error => 'summary failed' }));
         return;
     }
+    # Model failover (AISYSTEM plan §5e) under org.fallover — admin/developer
+    # sessions, or the LAN operator path with no logged-in user (the AI usage
+    # monitor's daily eval). A logged-in member never gets it.
+    if ($self->_can_see_fallover($c)) {
+        $org->{fallover} = eval {
+            Comserv::Model::AI2::UsageMonitor->new->fallover_summary($c, days => ($c->req->param('days') || 14));
+        } || { errors => [ "fallover summary failed: " . ($@ || 'unknown') ] };
+        # Health: guard switch, meter staleness, own SuperGrok estimate,
+        # Ollama, stale-server preflight (org.health); unified usage stays
+        # on the page only.
+        $org->{health} = eval {
+            my $h = Comserv::Model::AI2::UsageMonitor->new->ai_health($c, days => ($c->req->param('days') || 14));
+            delete $h->{unified};
+            $h;
+        } || { errors => [ "ai_health failed: " . ($@ || 'unknown') ] };
+    }
     $c->response->body(encode_json({ success => JSON::true, org => $org }));
+}
+
+sub _can_see_fallover {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    $roles = [ split /,/, $roles ] unless ref $roles eq 'ARRAY';
+    return 1 if grep { /^(admin|developer)$/i } @$roles;
+    return 0 if $c->session->{user_id};
+    return $self->_is_operator($c) ? 1 : 0;
 }
 
 =head2 ingest
@@ -93,6 +118,11 @@ sub ingest :Path('/ai/usage_ingest') :Args(0) {
         $args{$k} = $body->{$k} // $c->req->param($k);
     }
     $args{metadata} = $body->{metadata} if ref $body->{metadata} eq 'HASH';
+    # Form posts (supergrok_daily_guard.py) send metadata as a JSON string.
+    if (!$args{metadata} && defined(my $m = $c->req->param('metadata'))) {
+        my $d = eval { decode_json($m) };
+        $args{metadata} = $d if ref $d eq 'HASH';
+    }
     my $r = Comserv::Model::AI2::UsageMonitor->new->ingest($c, %args);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ingest',
         "source=" . ($args{source}||'?') . " model=" . ($args{model}||'?') . " ok=" . ($r->{ok} ? 1 : 0));
@@ -171,7 +201,9 @@ sub page :Path('/ai/usage_org') :Args(0) {
     my $eval_summary;
     if ($is_admin) {
         $ledger_monitor = eval {
-            Comserv::Model::AI2::UsageMonitor->new->ledger_summary($c, days => 14);
+            # Honor the requested window. This was pinned to 14 days, which is
+            # why no view could show less than two weeks.
+            Comserv::Model::AI2::UsageMonitor->new->ledger_summary($c, days => $days);
         };
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'page',
             "Ledger monitor failed: $@") if $@;
@@ -182,6 +214,8 @@ sub page :Path('/ai/usage_org') :Args(0) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'page',
             "Eval summary failed: $@") if $@;
     }
+    my $ai_health = $is_admin ? eval { Comserv::Model::AI2::UsageMonitor->new->ai_health($c, days => $days) } : undef;
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'page', "ai_health failed: $@") if $is_admin && $@;
     my @providers = qw(ollama grok supergrok openrouter openai hermes xai-oauth opencode-free);
     my @sites;
     if ($is_admin) {
@@ -203,6 +237,7 @@ sub page :Path('/ai/usage_org') :Args(0) {
         username         => $username,
         ledger_monitor   => $ledger_monitor,
         eval_summary     => $eval_summary,
+        ai_health        => $ai_health,
     );
 }
 
