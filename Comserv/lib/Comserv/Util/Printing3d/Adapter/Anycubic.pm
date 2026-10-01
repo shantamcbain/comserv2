@@ -22,7 +22,8 @@ Comserv::Util::Printing3d::Adapter::Anycubic
 Stock Anycubic Kobra 3 family LAN Mode (not cloud, not Moonraker).
 GET http://HOST:18910/info then signed POST /ctrl then MQTTS :9883.
 Do not log token, password, cert, or upload secrets.
-Do not send a print job from here.
+ACE dryer is MQTT multiColorBox on this printer — not a farm row.
+Local start-print is a file already on the machine (confirm in UI). No gcode upload here.
 
 =cut
 
@@ -193,7 +194,8 @@ sub handshake {
 }
 
 sub fetch_state {
-    my ($self, $c, $host, $port) = @_;
+    my ($self, $c, $host, $port, $opts) = @_;
+    $opts ||= {};
     my $hs = $self->handshake($c, $host, $port);
     my $out = {
         ok          => $hs->{ok} ? 1 : 0,
@@ -205,13 +207,24 @@ sub fetch_state {
         ctrl_type   => $hs->{ctrl_type} || '',
         camera_url  => $hs->{camera_url} || '',
         mqtt_ok     => 0,
+        ace_ok      => 0,
+        local_files => [],
+        ace_slots   => [],
     };
     return $out unless $hs->{ok};
-    my $reports = $self->_mqtt_roundtrip($c, $hs, [
+    my @msgs = (
         { type => 'info',      action => 'query' },
         { type => 'tempature', action => 'query' },
         { type => 'print',     action => 'query' },
-    ], 4);
+    );
+    if ($opts->{ace}) {
+        push @msgs, { type => 'multiColorBox', action => 'getInfo' };
+    }
+    if ($opts->{files}) {
+        push @msgs, { type => 'file', action => 'listLocal', data => { path => '/' } };
+    }
+    my $wait = ($opts->{ace} || $opts->{files}) ? 6 : 4;
+    my $reports = $self->_mqtt_roundtrip($c, $hs, \@msgs, $wait);
     $out->{mqtt_ok} = $reports->{ok} ? 1 : 0;
     $out->{error} = $reports->{error} if $reports->{error};
     my $info = $reports->{by_type}{info} || {};
@@ -230,28 +243,128 @@ sub fetch_state {
     $out->{bed_temp}       = _first_defined($temp->{curr_hotbed_temp}, $info->{temp}{curr_hotbed_temp});
     $out->{target_nozzle}  = _first_defined($temp->{target_nozzle_temp}, $info->{temp}{target_nozzle_temp});
     $out->{target_bed}     = _first_defined($temp->{target_hotbed_temp}, $info->{temp}{target_hotbed_temp});
+    _fill_ace($out, $reports->{by_type}{multiColorBox}) if $opts->{ace};
+    _fill_files($out, $reports->{by_type}{file}) if $opts->{files};
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_state',
         "host=$out->{host} mqtt_ok=$out->{mqtt_ok} state=" . ($out->{print_state} || '')
-        . " progress=" . ($out->{progress} eq '' ? '-' : $out->{progress}));
+        . " progress=" . ($out->{progress} eq '' ? '-' : $out->{progress})
+        . " ace=" . ($out->{ace_ok} ? 1 : 0)
+        . " files=" . scalar(@{ $out->{local_files} || [] }));
     return $out;
 }
 
 sub send_command {
-    my ($self, $c, $host, $port, $cmd) = @_;
+    my ($self, $c, $host, $port, $cmd, $opts) = @_;
     $cmd = lc($cmd || '');
-    unless ($cmd =~ /\A(pause|resume|stop)\z/) {
+    $opts ||= {};
+    unless ($cmd =~ /\A(pause|resume|stop|drying_start|drying_stop|start_print|camera_start|camera_stop|delete_local|delete_udisk)\z/) {
         return { ok => 0, error => 'Unknown command' };
     }
     my $hs = $self->handshake($c, $host, $port);
     return $hs unless $hs->{ok};
-    my $payload = {
-        type      => 'print',
-        action    => $cmd,
-        timestamp => int(time() * 1000),
-        msgid     => _rand_alnum(16),
-        data      => { taskid => '-1' },
-    };
-    my $reports = $self->_mqtt_roundtrip($c, $hs, [$payload], 3);
+
+    my $payload;
+    if ($cmd =~ /\A(pause|resume|stop)\z/) {
+        $payload = {
+            type      => 'print',
+            action    => $cmd,
+            timestamp => int(time() * 1000),
+            msgid     => _rand_alnum(16),
+            data      => { taskid => '-1' },
+        };
+    }
+    elsif ($cmd eq 'drying_start') {
+        my $temp = $opts->{target_temp};
+        my $dur  = $opts->{duration};
+        $temp = 45 unless defined $temp && $temp =~ /\A\d+\z/;
+        $dur  = 240 unless defined $dur && $dur =~ /\A\d+\z/;
+        $temp = 35 if $temp < 35;
+        $temp = 85 if $temp > 85;
+        $dur  = 10 if $dur < 10;
+        $dur  = 1440 if $dur > 1440;
+        my $box = $opts->{box_id};
+        $box = 0 unless defined $box && $box =~ /\A\d+\z/;
+        $payload = {
+            type      => 'multiColorBox',
+            action    => 'setDry',
+            timestamp => int(time() * 1000),
+            msgid     => _rand_alnum(16),
+            data      => {
+                multi_color_box => [{
+                    id            => 0 + $box,
+                    drying_status => {
+                        status      => 1,
+                        target_temp => 0 + $temp,
+                        duration    => 0 + $dur,
+                    },
+                }],
+            },
+        };
+    }
+    elsif ($cmd eq 'drying_stop') {
+        my $box = $opts->{box_id};
+        $box = 0 unless defined $box && $box =~ /\A\d+\z/;
+        $payload = {
+            type      => 'multiColorBox',
+            action    => 'setDry',
+            timestamp => int(time() * 1000),
+            msgid     => _rand_alnum(16),
+            data      => {
+                multi_color_box => [{
+                    id            => 0 + $box,
+                    drying_status => { status => 0 },
+                }],
+            },
+        };
+    }
+    elsif ($cmd eq 'start_print') {
+        my $fn = _safe_filename($opts->{filename});
+        unless ($fn) {
+            return { ok => 0, error => 'Filename must be a gcode/3mf already on the printer' };
+        }
+        my $path = _safe_path($opts->{path}) || '/';
+        $payload = {
+            type      => 'print',
+            action    => 'start',
+            timestamp => int(time() * 1000),
+            msgid     => _rand_alnum(16),
+            data      => {
+                filename => $fn,
+                filepath => $path,
+                taskid   => '-1',
+                filetype => 1,
+            },
+        };
+    }
+    elsif ($cmd eq 'delete_local' || $cmd eq 'delete_udisk') {
+        my $fn = _safe_filename($opts->{filename});
+        unless ($fn) {
+            return { ok => 0, error => 'Need a safe filename to delete' };
+        }
+        my $path = _safe_path($opts->{path}) || '/';
+        $payload = {
+            type      => 'file',
+            action    => ($cmd eq 'delete_udisk' ? 'deleteUdisk' : 'deleteLocal'),
+            timestamp => int(time() * 1000),
+            msgid     => _rand_alnum(16),
+            data      => {
+                filename => $fn,
+                path     => $path,
+                filetype => -1,
+            },
+        };
+    }
+    elsif ($cmd eq 'camera_start' || $cmd eq 'camera_stop') {
+        $payload = {
+            type      => 'video',
+            action    => ($cmd eq 'camera_start' ? 'startCapture' : 'stopCapture'),
+            timestamp => int(time() * 1000),
+            msgid     => _rand_alnum(16),
+            data      => undef,
+        };
+    }
+
+    my $reports = $self->_mqtt_roundtrip($c, $hs, [$payload], 4);
     $self->logging->log_with_details($c, $reports->{ok} ? 'info' : 'error', __FILE__, __LINE__,
         'send_command', "cmd=$cmd mqtt_ok=" . ($reports->{ok} ? 1 : 0)
         . ($reports->{error} ? " err=$reports->{error}" : ''));
@@ -260,6 +373,47 @@ sub send_command {
         error => $reports->{error},
         cmd   => $cmd,
     };
+}
+
+# Local storage or USB. Separate MQTT roundtrip so telemetry is not stalled.
+sub list_files {
+    my ($self, $c, $host, $port, $opts) = @_;
+    $opts ||= {};
+    my $storage = lc($opts->{storage} || 'local');
+    $storage = 'local' unless $storage eq 'udisk';
+    my $path = _safe_path($opts->{path}) || '/';
+    my $hs = $self->handshake($c, $host, $port);
+    my $out = {
+        ok       => $hs->{ok} ? 1 : 0,
+        error    => $hs->{error},
+        storage  => $storage,
+        path     => $path,
+        files    => [],
+        names    => [],
+    };
+    return $out unless $hs->{ok};
+    my $action = $storage eq 'udisk' ? 'listUdisk' : 'listLocal';
+    my $reports = $self->_mqtt_roundtrip($c, $hs, [{
+        type   => 'file',
+        action => $action,
+        data   => { path => $path },
+    }], 8);
+    $out->{ok} = $reports->{ok} ? 1 : 0;
+    $out->{error} = $reports->{error} if $reports->{error};
+    my $data = $reports->{by_type}{file};
+    my $rows = _parse_file_rows($data);
+    $out->{files} = $rows;
+    for my $row (@$rows) {
+        my $base = $path;
+        $base = '' if $base eq '/';
+        $row->{open_path} = $base . '/' . ($row->{name} || '');
+    }
+    $out->{names} = [ map { $_->{name} } grep { !$_->{is_dir} } @$rows ];
+    my $keys = ($data && ref($data) eq 'HASH') ? join(',', sort keys %$data) : '';
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'list_files',
+        "storage=$storage path=$path n=" . scalar(@$rows) . " keys=$keys"
+        . ($reports->{empty} ? ' empty_mqtt=1' : ''));
+    return $out;
 }
 
 # Probe TCP 18910 then GET /info. subnet e.g. 192.168.2.0/24 (caller may override).
@@ -425,13 +579,29 @@ sub _mqtt_roundtrip {
         next unless $obj && ref($obj) eq 'HASH';
         next if (($obj->{action} || '') eq 'query' && !defined $obj->{data} && !exists $obj->{state});
         my $mt = $obj->{type} || '';
-        if (defined $obj->{data}) {
+        if ($mt eq 'file') {
+            my $d = defined $obj->{data} ? $obj->{data} : $obj;
+            $by_type{file} = $d if _file_payload_has_list($d) || (ref($d) eq 'HASH' && keys %$d);
+        }
+        elsif (defined $obj->{data}) {
             $by_type{$mt} = $obj->{data} if $mt;
         }
         elsif ($mt eq 'print' || $mt eq 'info') {
             $by_type{$mt} ||= $obj;
         }
-        last if $by_type{info};
+        my $ready = 1;
+        for my $m (@$messages) {
+            my $need = $m->{type} or next;
+            unless ($by_type{$need}) {
+                $ready = 0;
+                last;
+            }
+            if ($need eq 'file' && !_file_payload_has_list($by_type{file})) {
+                $ready = 0;
+                last;
+            }
+        }
+        last if $ready;
     }
     eval { _mqtt_send($sock, 0xE0, ''); 1 };
     close $sock;
@@ -544,6 +714,106 @@ sub _rand_did {
     my ($n) = @_;
     my @c = ('A'..'Z', 0..9);
     return join '', map { $c[int(rand @c)] } 1 .. $n;
+}
+
+sub _fill_ace {
+    my ($out, $data) = @_;
+    return unless $data && ref($data) eq 'HASH';
+    my $boxes = $data->{multi_color_box};
+    return unless $boxes && ref($boxes) eq 'ARRAY' && @$boxes;
+    my $box = $boxes->[0] || {};
+    my $dry = $box->{drying_status} || {};
+    $out->{ace_ok} = 1;
+    $out->{ace_temp} = $box->{temp};
+    $out->{ace_humidity} = defined $box->{humidity} ? $box->{humidity} : $dry->{humidity};
+    $out->{ace_loaded_slot} = $box->{loaded_slot};
+    $out->{drying_active} = ($dry->{status} || 0) ? 1 : 0;
+    $out->{drying_target} = $dry->{target_temp};
+    $out->{drying_duration} = $dry->{duration};
+    $out->{drying_remain} = $dry->{remain_time};
+    my @slots;
+    for my $s (@{ $box->{slots} || [] }) {
+        next unless $s && ref($s) eq 'HASH';
+        push @slots, {
+            index => $s->{index},
+            type  => $s->{type} || '',
+            pct   => $s->{consumables_percent},
+        };
+    }
+    $out->{ace_slots} = \@slots;
+}
+
+sub _fill_files {
+    my ($out, $data) = @_;
+    my $rows = _parse_file_rows($data);
+    $out->{file_rows} = $rows;
+    $out->{local_files} = [ map { $_->{name} } grep { !$_->{is_dir} } @$rows ];
+}
+
+sub _parse_file_rows {
+    my ($data) = @_;
+    return [] unless $data && ref($data) eq 'HASH';
+    my $recs = $data->{records} || $data->{file_lists} || $data->{files}
+        || $data->{filelist} || $data->{list} || [];
+    $recs = [] unless ref($recs) eq 'ARRAY';
+    my @rows;
+    my %seen;
+    for my $r (@$recs) {
+        my $n;
+        my $is_dir = 0;
+        my $size;
+        my $child_path;
+        if (ref($r) eq 'HASH') {
+            $n = $r->{filename} || $r->{name} || $r->{file_name} || $r->{fn};
+            $is_dir = 1 if ($r->{is_dir} || $r->{isdir} || $r->{type} || '') =~ /dir|folder/i;
+            $is_dir = 1 if ($r->{filetype} || 0) == 0 && ($r->{size} || 0) == 0 && ($n && $n !~ /\./);
+            $size = $r->{size} || $r->{filesize};
+            $child_path = $r->{path};
+        }
+        else {
+            $n = $r;
+        }
+        next unless defined $n && length $n;
+        $n =~ s{.*/}{};
+        next if $seen{$n}++;
+        push @rows, {
+            name   => $n,
+            is_dir => $is_dir ? 1 : 0,
+            size   => $size,
+            path   => $child_path,
+        };
+    }
+    return \@rows;
+}
+
+sub _file_payload_has_list {
+    my ($d) = @_;
+    return 0 unless $d && ref($d) eq 'HASH';
+    for my $k (qw(records file_lists files filelist list)) {
+        return 1 if ref($d->{$k}) eq 'ARRAY';
+    }
+    return 0;
+}
+
+sub _safe_filename {
+    my ($fn) = @_;
+    $fn = '' unless defined $fn;
+    $fn =~ s/^\s+|\s+$//g;
+    return if $fn eq '' || $fn eq '.' || $fn eq '..';
+    return if $fn =~ m{[\\/]};
+    return unless $fn =~ /\A[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,200}\z/;
+    return $fn;
+}
+
+sub _safe_path {
+    my ($p) = @_;
+    $p = '/' unless defined $p && length $p;
+    $p =~ s/\\/\//g;
+    return if $p =~ /\.\./;
+    return unless $p =~ /\A\/[A-Za-z0-9._\/()-]{0,200}\z/;
+    $p =~ s{/+}{/}g;
+    $p = '/' if $p eq '';
+    return $p;
 }
 
 sub _first_defined {

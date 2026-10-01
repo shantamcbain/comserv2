@@ -131,7 +131,11 @@
 .filament-pick p { margin: 0 0 0.8em 0; color: #222; }
 </style>
 
-<p><a href="/3d/browse">&larr; Back to Browse</a></p>
+<nav aria-label="Breadcrumb" style="font-size:0.85em;margin-bottom:0.8em;">
+    <a href="/3d">3D Printing</a> &rsaquo;
+    <a href="/3d/browse">Browse Models</a> &rsaquo;
+    <span>[% model.name | html %]</span>
+</nav>
 
 <div class="model-detail-header">
     <div class="model-detail-thumb">
@@ -156,13 +160,19 @@
         [% IF model.source_url %]
         <p><a href="[% model.source_url | html %]" target="_blank" rel="noopener">Original source &rarr;</a></p>
         [% END %]
-        [% IF c.session.user_id && model.nfs_path %]
+        [% IF c.session.user_id %]
         <p style="margin-top:0.8em;">
+            [% IF model.nfs_path %]
             <a href="/3d/model_download/[% model.id %]"
                style="display:inline-block;padding:0.45em 1.1em;background:var(--button-bg,var(--accent-color,#007bff));color:var(--button-text,white);border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;"
                title="Download [% model.file_type | upper | html %] file to open in your slicer">
                 ⬇ Download [% model.file_type | upper | html %] File
             </a>
+            [% ELSE %]
+            <span style="display:inline-block;padding:0.45em 1.1em;background:var(--secondary-color,#eee);color:var(--muted-color,var(--text-color));border:1px dashed var(--border-color);border-radius:4px;font-size:0.9em;font-weight:bold;">
+                ⚠ No STL linked — file missing or not yet uploaded
+            </span>
+            [% END %]
             <form method="post" action="/3d/model_upload/[% model.id %]" enctype="multipart/form-data" style="display:inline;margin-left:0.4em;">
                 <label for="mdl_up_[% model.id %]"
                    style="display:inline-block;padding:0.45em 1.1em;background:var(--secondary-color, #eee);color:var(--link-color,#007bff);border:1px solid var(--border-color);border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;cursor:pointer;"
@@ -177,6 +187,13 @@
             </a>
             [% END %]
             <small style="color:var(--muted-color,var(--text-color));margin-left:0.6em;">Open in Bambu Studio, PrusaSlicer, Cura, etc.</small>
+            [% IF inv_item %]
+            <a href="/Inventory/item/view/[% inv_item.id %]"
+               style="display:inline-block;padding:0.45em 1.1em;background:var(--secondary-color,#eee);color:var(--link-color,#007bff);border:1px solid var(--border-color);border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;margin-left:0.4em;"
+               title="Open the inventory item and its bill of materials for this part">
+                📦 View in Inventory / BOM
+            </a>
+            [% END %]
         </p>
         [% END %]
         [% IF model.source == 'sign_generator' %]
