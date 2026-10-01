@@ -215,6 +215,107 @@ sub sync_models {
     return { success => 1, models => [] };
 }
 
+# Local decision call (Ollama 0.35+ POST /v1/systemone) — typed answers with
+# probabilities/confidence, no free text, $0 and no external hop. Use this when
+# the call exists ONLY to produce a value the code branches on (triage, routing,
+# classification, rubric scoring); use chat() when the answer is prose.
+#
+#   $self->decide($c,
+#       state     => "Our checkout has 500'd since 9am",   # text | hashref | arrayref
+#       questions => {
+#           label       => { type=>'choice', instructions=>'Which label fits?',
+#                            criteria=>{ billing=>'Payments', bug=>'Software errors' } },
+#           is_critical => { type=>'noul', instructions=>'Is this a critical outage?' },
+#           urgency     => { type=>'score',  instructions=>'How urgent?',
+#                            criteria=>['Routine','Soon','Immediate'] },
+#       },
+#       model => 'tev1:0.8b',   # default; nimble is sharper but ~56s cold
+#   );
+# -> { success=>1, answers=>{...}, usage=>{...}, model=>'...' }
+# -> { success=>0, error=>'...' }               (also unreachable=>1 when the host is dead)
+#
+# Cold start dominates latency (nimble 56s, tev1:0.8b 3.8s measured on this
+# workstation), so the cold timeout is generous by default.
+sub decide {
+    my ($self, $c, %args) = @_;
+
+    my $model = $args{model} || $args{default_model} || 'tev1:0.8b';
+
+    my ($rhost, $rport, $reachable) = $self->resolve_host($c);
+    my $host = $args{host} || $rhost;
+    my $port = $args{port} || $rport;
+
+    # Same fail-fast contract as chat(): never sit on a 900s timeout against a dead host.
+    if (defined $reachable && !$reachable && !$args{host}) {
+        my $err = "Can't connect to Ollama at $host:$port (timed out). "
+                . 'Pick an external/free model, or fix docker→host Ollama '
+                . '(compose extra_hosts + host firewall / OLLAMA_HOST).';
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'ollama_decide', $err);
+        return { success => 0, error => $err, unreachable => 1 };
+    }
+    unless ($self->check_connection($c, $host, $port)) {
+        my $err = "Can't connect to Ollama at $host:$port (timed out). "
+                . 'Pick an external/free model, or fix docker→host Ollama networking.';
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'ollama_decide', $err);
+        return { success => 0, error => $err, unreachable => 1 };
+    }
+
+    my $ollama = try {
+        Comserv::Model::Ollama->new(host => $host, port => $port);
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'ollama_decide', "Failed to build Ollama model: $_");
+        undef;
+    };
+    return { success => 0, error => 'Ollama client unavailable' } unless $ollama;
+
+    $ollama->model($model);
+
+    my $is_cold = 1;
+    try {
+        my $running = $ollama->get_running_models() || [];
+        $is_cold = 0 if grep {
+            (ref $_ ? ($_->{name} // '') : $_ // '') eq $model
+        } @$running;
+    };
+    my $timeout = $args{timeout}
+        || ($is_cold ? $Comserv::Model::Ollama::Decision::DECISION_TIMEOUT_COLD : 120);
+    $ollama->timeout($timeout);
+
+    my $r = try {
+        $ollama->systemone(
+            model     => $model,
+            state     => $args{state},
+            questions => $args{questions},
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'ollama_decide', "SystemOne threw: $_");
+        undef;
+    };
+
+    unless ($r) {
+        my $err = $ollama->last_error || 'SystemOne returned no answers';
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'ollama_decide', "systemone model=$model failed: $err");
+        return { success => 0, error => $err };
+    }
+
+    # Never log `state` — it is caller-supplied user text. Summary carries the
+    # model, the question keys and token usage only.
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+        'ollama_decide', $ollama->systemone_summary($r, $model));
+
+    return {
+        success => 1,
+        answers => $r->{answers},
+        usage   => $r->{usage} || {},
+        model   => $r->{model} || $model,
+    };
+}
+
 # Return the list of models currently RESIDENT in the Ollama server (loaded in
 # RAM/VRAM), newest-first by nothing in particular — just what /api/ps reports.
 # Used to prefer an already-warm model and avoid a cold weight-load when the

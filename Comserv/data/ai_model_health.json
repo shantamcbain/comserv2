@@ -4,20 +4,20 @@
          "consecutive_failures" : 0,
          "last_failure_at" : 1790783270,
          "last_failure_reason" : "unreachable",
-         "last_success_at" : 1790785177,
+         "last_success_at" : 1790867133,
          "state" : "closed",
          "total_failures" : 1,
-         "total_successes" : 7
+         "total_successes" : 8
       },
       "openrouter|google/gemma-4-31b-it:free" : {
-         "consecutive_failures" : 3,
-         "cooldown_until" : 1790784150,
-         "last_failure_at" : 1790783250,
-         "last_failure_reason" : "unreachable",
-         "open_reason" : "consecutive_failures:unreachable",
-         "opened_at" : 1790783250,
+         "consecutive_failures" : 5,
+         "cooldown_until" : 1790798590,
+         "last_failure_at" : 1790797690,
+         "last_failure_reason" : "http_429",
+         "open_reason" : "probe_failed:http_429",
+         "opened_at" : 1790797690,
          "state" : "open",
-         "total_failures" : 3,
+         "total_failures" : 5,
          "total_successes" : 0
       },
       "openrouter|nvidia/nemotron-3.5-lightning:free" : {
@@ -37,6 +37,6 @@
          "total_successes" : 1
       }
    },
-   "updated_at" : 1790785177,
+   "updated_at" : 1790867133,
    "version" : 1
 }
