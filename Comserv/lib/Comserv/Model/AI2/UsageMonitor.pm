@@ -859,7 +859,7 @@ sub hermes_summary {
             qq{SELECT id, source, model, billing_provider, started_at, last_activity_at,
                      COALESCE(api_call_count,0) AS api_calls,
                      ($HERMES_TOKEN_SQL) AS tokens
-              FROM sessions WHERE ended_at IS NULL
+              FROM sessions WHERE ended_at IS NULL AND COALESCE(archived,0) = 0
               ORDER BY COALESCE(last_activity_at, started_at) DESC LIMIT 20}
         );
         $sth->execute();
@@ -1088,6 +1088,9 @@ sub ingest {
     my $meta = $a{metadata};
     $meta = {} unless ref $meta eq 'HASH';
     $meta->{source} = $source;
+    # Keep the caller's finer request type (e.g. guard_switch) in metadata.
+    $meta->{event} = $a{request_type}
+        if defined $a{request_type} && $a{request_type} =~ /^[a-z_]{1,40}$/ && $a{request_type} ne $source;
     $meta->{evaluation} = $a{evaluation} if defined $a{evaluation};
     $usage->log($c,
         provider          => $a{provider} || ($source eq 'grok_bot' ? 'grok' : 'hermes'),
@@ -1402,11 +1405,13 @@ sub fallover_summary {
     try {
         my $rs = $self->_base_rs($c, $since, { 'me.metadata' => { -like => '%"fallover"%' } });
         my $q = $rs->search({}, {
-            columns  => [qw(id created_at provider model status metadata)],
+            columns  => [qw(id created_at provider model status metadata duration_ms error_message)],
             order_by => { -desc => 'me.id' },
             rows     => METADATA_SCAN_ROWS,
         });
         my (%step, %final);
+        my $w = $out->{waste} = { failed => 0, free_failed => 0, ms => 0, free_ms => 0, retries => 0,
+                                  http_402 => 0, http_429 => 0, free_429 => 0, by_model => {} };
         while (my $r = $q->next) {
             my $m = eval { decode_json($r->get_column('metadata') // '') } or next;
             my $fo = ref $m eq 'HASH' ? $m->{fallover} : undef;
@@ -1424,6 +1429,21 @@ sub fallover_summary {
             if (($fo->{outcome} // '') eq 'failed' || $st ne 'success') {
                 $out->{failed_attempts}++;
                 $out->{failed_by_reason}{ $fo->{fallback_reason} // 'unknown' }++;
+                # Waste accounting (§5e item 7): time and retries burned on
+                # failed attempts, split out for :free models and for the
+                # 402 / 429 answers OpenRouter gives when there is no credit.
+                my $mdl  = $r->get_column('model') // '';
+                my $free = $mdl =~ /:free$/ ? 1 : 0;
+                my $txt  = join ' ', ($fo->{fallback_reason} // ''), ($r->get_column('error_message') // '');
+                my $ms   = $r->get_column('duration_ms') || 0;
+                $w->{failed}++;
+                $w->{ms} += $ms;
+                $w->{retries} += $fo->{retries} || 0;
+                $w->{http_402}++ if $txt =~ /\b402\b|insufficient|credit/i;
+                if ($txt =~ /\b429\b|rate.?limit/i) { $w->{http_429}++; $w->{free_429}++ if $free }
+                if ($free) { $w->{free_failed}++; $w->{free_ms} += $ms }
+                my $bm = $w->{by_model}{ _fo_slug($r->get_column('provider'), $mdl) } ||= { failed => 0, ms => 0, retries => 0 };
+                $bm->{failed}++; $bm->{ms} += $ms; $bm->{retries} += $fo->{retries} || 0;
                 next;
             }
             $out->{turns}++;
@@ -1477,7 +1497,58 @@ sub fallover_summary {
         delete $out->{supergrok_guard}{path};
     } catch { push @{ $out->{errors} }, "spend/guard unavailable: $_" };
 
+    # OpenRouter day / week / month / balance (GET /api/v1/key + /credits,
+    # cached 60 s) - also under org.openrouter in /ai/usage_live.
+    my $or = $self->openrouter_live($c);
+    $out->{openrouter} = { map { ($_ => $or->{$_}) } grep { exists $or->{$_} }
+        qw(ok day_usd week_usd month_usd balance_usd total_credits total_usage exhausted fetched_at error) };
+    if (my $w = $out->{waste}) {
+        $w->{by_model} = [ map { +{ model => $_, %{ $w->{by_model}{$_} } } }
+                           sort { $w->{by_model}{$b}{failed} <=> $w->{by_model}{$a}{failed} } keys %{ $w->{by_model} } ];
+        $w->{minutes} = sprintf('%.1f', $w->{ms} / 60000);
+        $w->{free_minutes} = sprintf('%.1f', $w->{free_ms} / 60000);
+        # No credit: OpenRouter answers 402 on paid models and throttles
+        # :free models with 429 while the balance is <= 0.
+        my $no_credit = (defined $or->{balance_usd} && $or->{balance_usd} <= 0) ? 1 : 0;
+        $w->{no_credit_now} = $no_credit;
+        $w->{credit_related} = $w->{http_402} + ($no_credit ? $w->{free_429} : 0);
+    }
+    $out->{rates}  = $self->app_rates($c, days => $days);
     $out->{hermes} = $self->hermes_fallover($c, days => $days);
+    return $out;
+}
+
+=head2 app_rates($c, days => 14)
+
+OK-rate per app request type from the ledger, so Focus-Tune runs
+(request_type C<focustune>) and title generation are NOT mixed into the Chat
+ok rate. C<< { chat => {calls, ok, pct}, focustune => {...}, title => {...}, other => {...} } >>.
+
+=cut
+
+sub app_rates {
+    my ($self, $c, %a) = @_;
+    my ($days, $since) = $self->_since($a{days});
+    my $out = { window_days => $days };
+    try {
+        my $rs = $self->_schema($c)->resultset('AiUsageLog')->search({
+            'me.created_at' => { '>=' => $since },
+            'me.provider'   => { '!=' => 'router' },
+        });
+        my $n = $self->_count_by($rs, {}, [qw(me.request_type me.status)], [qw(request_type status)]);
+        for my $k (keys %$n) {
+            my ($rt, $st) = split /\t/, $k, 2;
+            my $bucket = $rt eq 'chat' ? 'chat' : $rt eq 'focustune' ? 'focustune'
+                       : ($rt =~ /title/ ? 'title' : $rt eq 'generate' ? 'ai_editor' : 'other');
+            my $b = $out->{$bucket} ||= { calls => 0, ok => 0 };
+            $b->{calls} += $n->{$k};
+            $b->{ok}    += $n->{$k} if $st eq 'success';
+        }
+        for my $b (grep { ref $out->{$_} eq 'HASH' } keys %$out) {
+            my $h = $out->{$b};
+            $h->{pct} = $h->{calls} ? sprintf('%.1f', 100 * $h->{ok} / $h->{calls}) : '0.0';
+        }
+    } catch { $out->{error} = "$_" };
     return $out;
 }
 
@@ -1493,19 +1564,28 @@ session with more than one model = the Hermes fallback chain or a manual
 sub hermes_fallover {
     my ($self, $c, %a) = @_;
     my $days = ($a{days} && $a{days} =~ /^\d+$/) ? $a{days} : 14;
-    my $out = { ok => 0, model_hops => [], sessions_with_hops => 0 };
+    my $out = { ok => 0, model_hops => [], sessions_with_hops => 0, aux_calls => {},
+                note => 'auxiliary tasks (title_generation, compression) are not counted as hops' };
     my $db = $ENV{HERMES_STATE_DB} || '/home/shanta/.hermes/state.db';
     if (-r $db) {
         try {
             require DBI;
             my $dbh = DBI->connect("dbi:SQLite:dbname=$db", '', '', { RaiseError => 1, PrintError => 0, ReadOnly => 1 });
+            # Auxiliary tasks (title_generation, compression, vision ...) run on
+            # their own model inside the same session; they are not hops.
+            my $has_task = eval { $dbh->selectrow_array(q{SELECT COUNT(task) FROM session_model_usage LIMIT 1}); 1 };
             my $sth = $dbh->prepare(q{SELECT session_id, model, COALESCE(billing_provider,'') AS provider,
-                                             COALESCE(api_call_count,0) AS api_calls, first_seen
-                                      FROM session_model_usage WHERE last_seen >= ?
+                                             COALESCE(api_call_count,0) AS api_calls, first_seen}
+                                    . ($has_task ? q{, COALESCE(task,'') AS task} : q{, '' AS task})
+                                    . q{ FROM session_model_usage WHERE last_seen >= ?
                                       ORDER BY session_id, first_seen});
             $sth->execute(time() - $days * 86400);
             my (%by, @order);
             while (my $r = $sth->fetchrow_hashref) {
+                if (length $r->{task}) {
+                    $out->{aux_calls}{ $r->{task} } += $r->{api_calls};
+                    next;
+                }
                 push @order, $r->{session_id} unless $by{ $r->{session_id} };
                 push @{ $by{ $r->{session_id} } }, { model => $r->{model}, provider => $r->{provider}, api_calls => 0 + $r->{api_calls} };
             }
@@ -1531,5 +1611,151 @@ sub hermes_fallover {
     return $out;
 }
 
+
+
+=head2 unified_usage($c, days => 14)
+
+All AI usage in one table (AISYSTEM item 4): app ledger rows (chat, AI
+editor = request_type generate, Focus-Tune, Ollama, Hermes ingests) and
+Hermes state.db sessions, each tagged with branch, sitename and user, plus
+the Today's Focus decision organizer. Read-only.
+C<< { rows => [ {source, branch, sitename, user, calls, ok, tokens, cost} ], organizer => {...}, errors => [] } >>
+
+=cut
+
+sub unified_usage {
+    my ($self, $c, %a) = @_;
+    my ($days, $since) = $self->_since($a{days});
+    my $out = { window_days => $days, rows => [], errors => [] };
+    my %agg;
+    my $add = sub {
+        my ($src, $br, $site, $user, $n, $ok, $tok, $cost) = @_;
+        my $k = join "\t", map { defined $_ && length $_ ? $_ : '-' } $src, $br, $site, $user;
+        my $r = $agg{$k} ||= { calls => 0, ok => 0, tokens => 0, cost => 0 };
+        $r->{calls} += $n; $r->{ok} += $ok; $r->{tokens} += $tok || 0; $r->{cost} += $cost || 0;
+    };
+    try {
+        my %site = map { $_->id => ($_->name || 'site ' . $_->id) }
+                   eval { $self->_schema($c)->resultset('Site')->search({}, { columns => [qw(id name)], rows => 500 })->all };
+        my $q = $self->_base_rs($c, $since)->search({}, {
+            columns  => [qw(id request_type provider status total_tokens estimated_cost_usd user_id site_id metadata)],
+            order_by => { -desc => 'me.id' }, rows => METADATA_SCAN_ROWS * 2,
+        });
+        while (my $r = $q->next) {
+            my $m  = eval { decode_json($r->get_column('metadata') // '{}') } || {};
+            $m = {} unless ref $m eq 'HASH';
+            my $rt = $r->get_column('request_type') // '';
+            my $pv = $r->get_column('provider') // '';
+            next if $pv eq 'router';
+            my $src = $rt eq 'generate'  ? 'AI editor'
+                    : $rt eq 'focustune' ? 'Focus-Tune'
+                    : $rt =~ /title/     ? 'App title'
+                    : ($rt eq 'hermes' || ($m->{source} // '') eq 'hermes') ? 'Hermes (ledger ingest)'
+                    : $rt eq 'grok_bot'  ? 'Grok Bot (ingest)'
+                    : $pv eq 'ollama'    ? 'Ollama (app)'
+                    : 'App ' . ($rt || 'chat');
+            my $sid = $r->get_column('site_id');
+            $add->($src, $m->{branch}, ($m->{sitename} // (defined $sid ? $site{$sid} : undef)),
+                   ($m->{username} // (defined $r->get_column('user_id') ? 'uid ' . $r->get_column('user_id') : undef)),
+                   1, (($r->get_column('status') // '') eq 'success' ? 1 : 0),
+                   $r->get_column('total_tokens'), $r->get_column('estimated_cost_usd'));
+        }
+    } catch { push @{ $out->{errors} }, "ledger scan failed: $_" };
+
+    my $db = $ENV{HERMES_STATE_DB} || '/home/shanta/.hermes/state.db';
+    if (-r $db) {
+        try {
+            require DBI;
+            my $dbh = DBI->connect("dbi:SQLite:dbname=$db", '', '', { RaiseError => 1, PrintError => 0, ReadOnly => 1 });
+            my $sth = $dbh->prepare(qq{
+                SELECT COALESCE(git_branch,''), COALESCE(user_id,''), COALESCE(billing_provider,''),
+                       COUNT(*), COALESCE(SUM(COALESCE(api_call_count,0)),0), COALESCE(SUM($HERMES_TOKEN_SQL),0),
+                       COALESCE(SUM(COALESCE(actual_cost_usd, estimated_cost_usd, 0)),0)
+                  FROM sessions WHERE started_at >= ?
+                 GROUP BY 1, 2, 3});
+            $sth->execute(DateTime->now->subtract(days => $days)->epoch);
+            while (my @r = $sth->fetchrow_array) {
+                $add->('Hermes ' . ($r[2] || 'session'), $r[0], 'workstation', ($r[1] || 'shanta'),
+                       $r[4] || $r[3], $r[4] || $r[3], $r[5], $r[6]);
+            }
+            $dbh->disconnect;
+        } catch { push @{ $out->{errors} }, "hermes state.db: $_" };
+    }
+
+    try {
+        require Comserv::Util::AI::HealthChecks;
+        my $org = Comserv::Util::AI::HealthChecks::organizer_state(app_root => eval { $c->path_to('') . '' } // '.');
+        $out->{organizer} = $org;
+        for my $b (@{ $org->{branches} }) {
+            $add->("Ollama organizer ($b->{model})", $b->{branch}, 'workstation', 'decision rank',
+                   $b->{asked} || 0, $b->{answered} || 0, $b->{input_tokens}, 0);
+        }
+    } catch { push @{ $out->{errors} }, "organizer: $_" };
+
+    $out->{rows} = [ map {
+        my ($s, $b, $si, $u) = split /\t/, $_, 4;
+        +{ source => $s, branch => $b, sitename => $si, user => $u, %{ $agg{$_} },
+           cost => sprintf('%.4f', $agg{$_}{cost}) }
+    } sort { $agg{$b}{calls} <=> $agg{$a}{calls} || $a cmp $b } keys %agg ];
+    return $out;
+}
+
+=head2 ai_health($c, days => 14)
+
+Everything the "Health & preflight" card and the admin banners need:
+stale-server preflight, meter staleness (alert > 6 h, logged hourly), our
+own SuperGrok estimate, the SuperGrok guard switch banner, Ollama health
+(Today's Focus), last guard events and the unified usage table.
+
+=cut
+
+sub ai_health {
+    my ($self, $c, %a) = @_;
+    require Comserv::Util::AI::HealthChecks;
+    require Comserv::Util::AI::StalePreflight;
+    my $H = 'Comserv::Util::AI::HealthChecks';
+    my $root = eval { $c->path_to('') . '' } // '.';
+    $root =~ s{/$}{};
+    my $out = { errors => [] };
+    my $or = $self->openrouter_live($c);
+    $out->{openrouter} = { map { ($_ => $or->{$_}) } grep { exists $or->{$_} }
+        qw(ok day_usd week_usd month_usd balance_usd total_credits total_usage exhausted fetched_at error) };
+    $out->{meters} = Comserv::Util::AI::HealthChecks::meters(app_root => $root, openrouter => $or);
+    Comserv::Util::AI::HealthChecks::log_stale_meters($out->{meters}, sub { $self->_log($c, $_[0], 'ai_health', $_[1]) });
+    $out->{supergrok_estimate} = Comserv::Util::AI::HealthChecks::supergrok_estimate(app_root => $root);
+    try {
+        my $g = $c->model('AI2::Router')->supergrok_guard($c);
+        delete $g->{path};
+        $out->{guard} = $g;
+        $out->{guard_banner} = Comserv::Util::AI::HealthChecks::guard_banner($g);
+    } catch { push @{ $out->{errors} }, "guard: $_" };
+    $out->{ollama} = Comserv::Util::AI::HealthChecks::ollama_health(journal => 1);
+    $out->{preflight} = eval { Comserv::Util::AI::StalePreflight::check_all() } || [];
+    push @{ $out->{errors} }, "preflight: $@" if $@;
+    my $ev = ($ENV{HOME} || '/home/shanta') . '/.hermes/supergrok_guard_events.jsonl';
+    if (open my $fh, '<', $ev) {
+        my @l = <$fh>; close $fh;
+        $out->{guard_events} = [ reverse grep { $_ } map { my $d = eval { decode_json($_) }; $d ? { %$d, at_pt => Comserv::Util::AI::HealthChecks::pt(Comserv::Util::AI::HealthChecks::iso_epoch($d->{at})) } : undef } @l[ ($#l > 4 ? $#l - 4 : 0) .. $#l ] ];
+    }
+    my $nf = ($ENV{HOME} || '/home/shanta') . '/.hermes/supergrok_notice.txt';
+    if (open my $fh, '<', $nf) { local $/; ($out->{hermes_notice} = <$fh> // '') =~ s/\s+$//; close $fh }
+    $out->{unified} = $self->unified_usage($c, days => $a{days});
+    return $out;
+}
+
+# Small, fast subset for the admin banner on /ai (no network, no journal).
+sub ai_banner {
+    my ($self, $c) = @_;
+    require Comserv::Util::AI::HealthChecks;
+    my $root = eval { $c->path_to('') . '' } // '.';
+    my $out = {};
+    try {
+        my $g = $c->model('AI2::Router')->supergrok_guard($c);
+        $out->{guard_banner} = Comserv::Util::AI::HealthChecks::guard_banner($g);
+    } catch {};
+    my $m = Comserv::Util::AI::HealthChecks::meters(app_root => $root);
+    $out->{stale_meters} = $m->{stale};
+    return $out;
+}
 
 1;

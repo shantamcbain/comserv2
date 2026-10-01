@@ -23,6 +23,7 @@
     </script>
 
     <!-- Top control bar -->
+    [% IF ai_admin_banner %][% INCLUDE 'ai/_ai_admin_banner.tt' %][% END %]
     <div class="ai-topbar">
         <div class="ai-topbar-left">
             <span class="ai-topbar-title">AI Assistant</span>
@@ -62,6 +63,7 @@
             <a href="[% c.uri_for('/ai/usage') %]" class="ai-topbar-btn" title="Usage and cost by model">📊 Usage</a>
             [% IF is_admin %]
             <a href="[% c.uri_for('/ai/eval') %]" class="ai-topbar-btn" title="Daily AI eval reports">📋 Eval</a>
+            <a href="[% c.uri_for('/ai/eval/latest') %]" class="ai-topbar-btn" title="Latest daily AI eval report">🆕 Latest eval</a>
             [% END %]
             <a href="/ai/conversations" class="ai-topbar-btn" title="View conversation history">📋 History</a>
             <a href="/ai/manage_api_keys" class="ai-topbar-btn" title="Manage API keys">🔑</a>

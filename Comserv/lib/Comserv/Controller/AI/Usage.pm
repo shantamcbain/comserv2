@@ -68,6 +68,14 @@ sub live :Path('/ai/usage_live') :Args(0) {
         $org->{fallover} = eval {
             Comserv::Model::AI2::UsageMonitor->new->fallover_summary($c, days => ($c->req->param('days') || 14));
         } || { errors => [ "fallover summary failed: " . ($@ || 'unknown') ] };
+        # Health: guard switch, meter staleness, own SuperGrok estimate,
+        # Ollama, stale-server preflight (org.health); unified usage stays
+        # on the page only.
+        $org->{health} = eval {
+            my $h = Comserv::Model::AI2::UsageMonitor->new->ai_health($c, days => ($c->req->param('days') || 14));
+            delete $h->{unified};
+            $h;
+        } || { errors => [ "ai_health failed: " . ($@ || 'unknown') ] };
     }
     $c->response->body(encode_json({ success => JSON::true, org => $org }));
 }
@@ -110,6 +118,11 @@ sub ingest :Path('/ai/usage_ingest') :Args(0) {
         $args{$k} = $body->{$k} // $c->req->param($k);
     }
     $args{metadata} = $body->{metadata} if ref $body->{metadata} eq 'HASH';
+    # Form posts (supergrok_daily_guard.py) send metadata as a JSON string.
+    if (!$args{metadata} && defined(my $m = $c->req->param('metadata'))) {
+        my $d = eval { decode_json($m) };
+        $args{metadata} = $d if ref $d eq 'HASH';
+    }
     my $r = Comserv::Model::AI2::UsageMonitor->new->ingest($c, %args);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ingest',
         "source=" . ($args{source}||'?') . " model=" . ($args{model}||'?') . " ok=" . ($r->{ok} ? 1 : 0));
@@ -201,6 +214,8 @@ sub page :Path('/ai/usage_org') :Args(0) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'page',
             "Eval summary failed: $@") if $@;
     }
+    my $ai_health = $is_admin ? eval { Comserv::Model::AI2::UsageMonitor->new->ai_health($c, days => $days) } : undef;
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'page', "ai_health failed: $@") if $is_admin && $@;
     my @providers = qw(ollama grok supergrok openrouter openai hermes xai-oauth opencode-free);
     my @sites;
     if ($is_admin) {
@@ -222,6 +237,7 @@ sub page :Path('/ai/usage_org') :Args(0) {
         username         => $username,
         ledger_monitor   => $ledger_monitor,
         eval_summary     => $eval_summary,
+        ai_health        => $ai_health,
     );
 }
 

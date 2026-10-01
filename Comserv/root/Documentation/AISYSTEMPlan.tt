@@ -5,15 +5,17 @@
    TemplateType = "Documentation"
    category = "planning,ai"
    page_version = "1.05"
-   last_updated = "2026-09-30"
+   last_updated = "2026-10-01"
    site_specific = "false"
    project_id = "280"
    project_code = "AISYSTEM"
 %]
-[% PageVersion = 'Documentation/AISYSTEMPlan.tt,v 1.07 2026/09/30 hermes-agent Exp - ollama systemone 5f decision models' %]
+[% PageVersion = 'Documentation/AISYSTEMPlan.tt,v 1.08 2026/10/01 shanta Exp - auto-improver, supergrok switch, health' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container">
+
+    [% INCLUDE 'ai/_admin_eval_links.tt' %]
     [% INCLUDE 'admin/documentation/_doc_header.tt'
         page_title   = 'AI System Use — coordinator plan'
         site_name    = site_name
@@ -29,6 +31,7 @@
             <p class="doc-muted">Jump to section:</p>
             <div class="doc-navrow">
                 <a href="#now" class="doc-navlink">Now</a>
+                <a href="#auto-improve-1001" class="doc-navlink" title="Auto-improver, Super Grok switch, health, preflight (2026-10-01)">Auto-improve 10-01</a>
                 <a href="#overview" class="doc-navlink">Overview</a>
                 <a href="#audit" class="doc-navlink">Audit</a>
                 <a href="#order" class="doc-navlink">Wave order</a>
@@ -73,6 +76,14 @@
                 </div>
             </div>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="auto-improve-1001" class="doc-h2">Auto-improve, Super Grok switch, health (2026-10-01)</h2>
+            <p class="doc-body"><strong>Where.</strong> Latest report: <a href="/ai/eval/latest">/ai/eval/latest</a> · auto-changes with Revert: <a href="/ai/eval#auto-changes">/ai/eval#auto-changes</a> · health &amp; stale-server preflight: <a href="/ai/usage#ai-health">/ai/usage#ai-health</a> · all AI usage: <a href="/ai/usage#all-ai-usage">/ai/usage#all-ai-usage</a>.</p>
+            <p class="doc-body"><strong>Rules.</strong> The auto-improver only re-orders chains (same slugs) and lowers caps; anything else needs a click. A reverted change is not re-applied the same day. Super Grok locked → coding on <code>openrouter/deepseek/deepseek-v4-pro</code> (app Router <code>guard_switch</code> step + Hermes <code>model.default</code>), flash only for idle/title; the guard switches back after the reset. Run <code>perl script/stale_preflight.pl --all</code> before any AI debugging.</p>
         </div>
     </div>
 

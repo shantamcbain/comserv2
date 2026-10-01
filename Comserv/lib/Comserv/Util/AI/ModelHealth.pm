@@ -265,7 +265,7 @@ Comserv::Util::AI::ModelHealth - per provider+model circuit breaker (data/ai_mod
 =head1 SYNOPSIS
 
     my $h = Comserv::Util::AI::ModelHealth->new(path => Comserv::Util::AI::ModelHealth->default_path($c));
-    my $chk = $h->check('openrouter|google/gemma-4-26b-a4b-it:free');   # {allow, state, probe}
+    my $chk = $h->check('openrouter|google/gemma-4-31b-it:free');   # {allow, state, probe}
     $h->record_failure($slug, 'http_429', circuit_failure_threshold => 3, circuit_cooldown_minutes => 15);
     $h->record_success($slug);
 

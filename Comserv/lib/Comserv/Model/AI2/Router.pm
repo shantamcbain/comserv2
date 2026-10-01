@@ -527,6 +527,7 @@ sub _chat_one_with_retry {
     my $resp;
     for my $attempt (1 .. 3) {
         $resp = $self->_chat_one($c, $provider_name, $use_model, $messages, %opts);
+        $resp->{retries} = $attempt - 1 if ref $resp eq 'HASH';
         return $resp if $resp && $resp->{success};
         my $err = ($resp && $resp->{error}) || '';
         last unless $self->_transient_outage($err);
@@ -770,8 +771,10 @@ sub supergrok_guard {
         if ($age > 36 * 3600) { $out->{stale} = 1; return $out }
     }
     my @why;
+    $out->{$_} = $g->{$_} for grep { exists $g->{$_} }
+        qw(mode reset_at daily_cap used_today remaining switch_provider switch_model meter_stale meter_age_h estimate);
     push @why, ($g->{lock_reason} || 'off today') if $g->{off_today};
-    push @why, 'mode=free' if ($g->{mode} // '') eq 'free' && !$g->{off_today};
+    push @why, "mode=$g->{mode}" if ($g->{mode} // 'grok') ne 'grok' && !$g->{off_today};
     push @why, "used_today $g->{used_today}% >= daily_cap $g->{daily_cap}%"
         if defined $g->{daily_cap} && defined $g->{used_today} && $g->{daily_cap} > 0 && $g->{used_today} >= $g->{daily_cap};
     if (@why) { $out->{locked} = 1; $out->{reason} = join('; ', @why) }
@@ -799,6 +802,15 @@ sub failover_candidates {
     };
     my $req = $mk->($provider, $model, 0, 'requested');
     return ($req ? ($req) : ()) if defined $o{failover} && !$o{failover};
+    # Super Grok daily cap reached: coding turns (and turns that asked for Super
+    # Grok) go to the configured paid coder before the free chain.
+    my $sw = $k->{supergrok_locked_coding_model} // '';
+    if ($sw =~ /\|/ && $o{guard} && $o{guard}{locked}
+        && ($purpose eq 'coding' || ($provider // '') =~ /^(?:supergrok|grok)$/)) {
+        my ($sp, $sm) = split /\|/, $sw, 2;
+        my $g = $mk->($sp, $sm, 0, 'guard_switch');
+        push @main, $g if $g;
+    }
     my $i = 0;
     for my $s (Comserv::Util::AI::ModelChains->chain($ld, $purpose)) {
         $i++;
@@ -867,7 +879,8 @@ sub _skip_reason {
         }
         unless ($a{spend}) {   # tests inject spend and skip the live credit probe
             my $st = try { $c && ref $c && $c->can('model') ? $c->model('AI')->usage->fetch_openrouter_status($c) : undef } catch { undef };
-            return 'credits_exhausted' if $st && $st->{ok} && defined $st->{remaining} && $st->{remaining} <= 0;
+            return 'credits_exhausted' if $st && $st->{ok}
+                && ((defined $st->{remaining} && $st->{remaining} <= 0) || (defined $st->{balance_usd} && $st->{balance_usd} <= 0));
         }
     }
     my $chk = $health->check($slug);
@@ -896,6 +909,7 @@ sub _ledger_failover {
             purpose         => $o{purpose},
             final_model     => $final_slug,
             outcome         => 'failed',
+            retries         => $att->{retries} || 0,
             ($att->{probe} ? (probe => 1) : ()),
         };
         try {
@@ -982,9 +996,11 @@ sub chat_with_fallback {
     my $purpose = $opts{purpose} || 'chat';
     my %pass    = ($opts{use_search} ? (use_search => 1) : ());
 
+    my $guard   = $opts{guard} || $self->supergrok_guard($c);
     my %seen;
     my @queue = $self->failover_candidates($c, $provider_name, $use_model,
         chains => $ld, purpose => $purpose, verdicts => $signals->{verdicts}, knobs => $k,
+        guard => $guard,
         (exists $opts{failover} ? (failover => $opts{failover}) : ()));
     $seen{ $_->{slug} } = 1 for grep { !$_->{placeholder} } @queue;
 
@@ -1003,7 +1019,7 @@ sub chat_with_fallback {
         }
         my $skip = $self->_skip_reason($c, $cand, knobs => $k, chains => $ld, health => $health,
             purpose => $purpose, attempt_no_ref => \$attempt_no,
-            ($opts{spend} ? (spend => $opts{spend}) : ()), ($opts{guard} ? (guard => $opts{guard}) : ()));
+            ($opts{spend} ? (spend => $opts{spend}) : ()), guard => $guard);
         if ($skip) {
             push @skipped, { slug => $cand->{slug}, step => $cand->{step}, reason => $skip };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'chat_with_fallback',
@@ -1032,6 +1048,7 @@ sub chat_with_fallback {
             ok => $ok ? 1 : 0, reason => $reason, probe => $cand->{probe},
             error => ($ok ? undef : (($resp && $resp->{error}) || $reason)),
             duration_ms => int((Time::HiRes::time() - $t0) * 1000),
+            retries => (ref $resp eq 'HASH' ? ($resp->{retries} || 0) : 0),
             ($flags->{tokens_unreported} ? (tokens_unreported => 1) : ()),
         };
         push @attempts, $att;
@@ -1052,6 +1069,7 @@ sub chat_with_fallback {
                 (@skipped ? (skipped => [ map { "$_->{slug}:$_->{reason}" } @skipped ]) : ()),
                 ($cand->{probe} ? (probe => 1) : ()),
                 ($flags->{tokens_unreported} ? (tokens_unreported => 1) : ()),
+                ($cand->{source} eq 'guard_switch' ? (guard_switch => 'supergrok_daily_cap') : ()),
             };
             if ($cand->{source} ne 'requested') {
                 # Legacy fields read by Chat.pm / FocusTune / TodoRank.
@@ -1093,6 +1111,22 @@ sub chat_with_fallback {
         $self->_ledger_failover($c, \@others, $cand, purpose => $purpose, %opts);
         $postcheck_keep->{attempts_logged} = 1;
         return $postcheck_keep;
+    }
+
+    # Single-model callers (Focus-Tune, failover => 0) whose model was skipped
+    # before any call (open circuit, guard, budget): no all_exhausted row - it
+    # is a skip, not an outage, and must not drag the Chat ok rate down.
+    if (defined $opts{failover} && !$opts{failover} && !@failed && @skipped) {
+        my $why = join(', ', map { $_->{reason} } @skipped);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'chat_with_fallback',
+            "single-model call skipped $provider_name/" . ($use_model // '?') . " ($why)");
+        return {
+            success => 0, skipped_only => 1,
+            error   => "Skipped $provider_name/" . ($use_model // '?') . ": $why",
+            provider => $provider_name, model => $use_model, skipped => \@skipped, attempts_logged => 1,
+            fallover => { reason => 'skipped', purpose => $purpose, final_model => 'none',
+                          skipped => [ map { "$_->{slug}:$_->{reason}" } @skipped ] },
+        };
     }
 
     $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'chat_with_fallback',
@@ -1254,7 +1288,7 @@ sub _default_free_catalog {
         grep { /^(?:openrouter|external)\|.+:free$/ }
         map  { Comserv::Util::AI::ModelChains->chain($ld, $_) } @Comserv::Util::AI::ModelChains::PURPOSES;
     };
-    @slugs = ('google/gemma-4-31b-it:free', 'google/gemma-4-26b-a4b-it:free',
+    @slugs = ('cohere/north-mini-code:free', 'nvidia/nemotron-3.5-lightning:free',
               'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free') unless @slugs;
     return (
         (map { { name => $_, provider => 'openrouter', label => "OpenRouter: $_", local => 0, free => 1,

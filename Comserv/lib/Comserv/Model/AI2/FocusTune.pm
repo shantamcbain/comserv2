@@ -262,7 +262,7 @@ sub run_one {
            # Focus-Tune scores THIS model: never let failover answer with
            # another one (AISYSTEM plan §5e). Failures still hit the Ledger
            # and the circuit breaker.
-           failover => 0, purpose => 'title');
+           failover => 0, purpose => 'title', request_type => 'focustune');
         1;
     } or do {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'focustune_run_one',

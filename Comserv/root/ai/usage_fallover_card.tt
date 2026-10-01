@@ -31,6 +31,39 @@
         <div class="doc-muted">[% fo.circuits.half_open.size %] half-open</div>
       </div>
     </div>
+    [%# Item 7: waste on failed attempts + OpenRouter day/week/month/balance + per-type ok rates. %]
+    [% w = fo.waste %][% orx = fo.openrouter %][% rt = fo.rates %]
+    <div style="display:flex;flex-wrap:wrap;gap:16px;margin:10px 0;">
+      <div style="min-width:220px;">
+        <div class="doc-muted">Wasted on failed attempts</div>
+        <div style="font-size:1.3em;font-weight:600;">[% w.minutes || '0.0' %] min · [% w.retries || 0 %] retries</div>
+        <div class="doc-muted">[% w.failed || 0 %] failed ([% w.free_failed || 0 %] on :free, [% w.free_minutes || '0.0' %] min) ·
+          402: [% w.http_402 || 0 %] · 429: [% w.http_429 || 0 %] ([% w.free_429 || 0 %] free) ·
+          no-credit related: <strong>[% w.credit_related || 0 %]</strong>[% IF w.no_credit_now %] (balance ≤ $0 now)[% END %]</div>
+      </div>
+      <div style="min-width:220px;">
+        <div class="doc-muted">OpenRouter (API)</div>
+        [% IF orx.ok %]
+        <div style="font-size:1.3em;font-weight:600;">balance [% orx.balance_usd.defined ? '$' _ orx.balance_usd : '—' %]</div>
+        <div class="doc-muted">day $[% orx.day_usd.defined ? orx.day_usd | format('%.2f') : '—' %] · week $[% orx.week_usd.defined ? orx.week_usd | format('%.2f') : '—' %] · month $[% orx.month_usd.defined ? orx.month_usd | format('%.2f') : '—' %]
+          [% IF orx.exhausted %]<strong>· credits exhausted</strong>[% END %]</div>
+        [% ELSE %]<div class="doc-muted">unavailable[% IF orx.error %]: [% orx.error | html %][% END %]</div>[% END %]
+      </div>
+      <div style="min-width:220px;">
+        <div class="doc-muted">OK rate by type (title &amp; Focus-Tune not in Chat)</div>
+        <div class="doc-muted">
+        [% FOREACH k IN ['chat', 'focustune', 'ai_editor', 'title', 'other'] %][% IF rt.$k %]
+          [% k == 'focustune' ? 'Focus-Tune' : (k == 'ai_editor' ? 'AI editor' : k) | html %]: <strong>[% rt.$k.pct %]%</strong> ([% rt.$k.ok %]/[% rt.$k.calls %])<br>
+        [% END %][% END %]</div>
+      </div>
+    </div>
+    [% IF w.by_model.size %]
+    <details><summary>Failed attempts by model (time and retries wasted)</summary>
+      <table class="data-table"><thead><tr><th>Model</th><th>Failed</th><th>Seconds</th><th>Retries</th></tr></thead><tbody>
+      [% FOREACH m IN w.by_model %]<tr><td>[% m.model | html %]</td><td>[% m.failed %]</td><td>[% m.ms / 1000 | format('%.1f') %]</td><td>[% m.retries %]</td></tr>[% END %]
+      </tbody></table>
+    </details>
+    [% END %]
 
     <h4>Which chain step answered</h4>
     [% IF fo.by_step.size %]
