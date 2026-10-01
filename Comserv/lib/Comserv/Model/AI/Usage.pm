@@ -80,6 +80,23 @@ sub log {
 
         $pt  += 0; $ct += 0; $tot += 0;
 
+        # Model failover (AISYSTEM plan §5e): attempt/fallback facts ride in
+        # metadata.fallover, like metadata.grounding.
+        $meta->{fallover} = $args{fallover} if ref $args{fallover} eq 'HASH';
+        # A "success" with no text is not a success (Ollama and some
+        # providers answer 200 with nothing). With text but 0 tokens the
+        # provider just did not report usage: keep success, flag it.
+        if ($status eq 'success' && exists $args{response_text}) {
+            (my $txt = $args{response_text} // '') =~ s/^\s+|\s+$//g;
+            if (!length $txt) {
+                $status  = 'error';
+                $err_msg = $err_msg || 'empty_output: provider returned success with no text';
+                $meta->{empty_output} = 1;
+            } elsif (!$tot) {
+                $meta->{tokens_unreported} = 1;
+            }
+        }
+
         my $cost = $args{estimated_cost_usd};
         unless (defined $cost) {
             $cost = $self->_estimate_cost_usd($provider, $model, $pt, $ct);

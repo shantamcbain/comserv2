@@ -6,13 +6,15 @@ package Comserv::Util::AI::EvalAllowList;
 # rejected. Each entry: file (under root/config), key (top-level JSON key),
 # and a validator (enum | int range | number range | bool | slug_list).
 #
-# Router: model/provider routing preferences are NOT in any config file today
-# (FREE_PREFERENCE in Util/ModelCatalog.pm and _default_free_catalog in
-# Model/AI2/Router.pm are Perl code), so no routing key is allow-listed —
-# routing proposals are change_type=code and become todos.
-# Token/spend caps: only root/config/ai_usage.json has caps (SuperGrok
-# monthly USD / request limits + alert %). OpenRouter soft caps
-# ($1.65/day, $11.50/week, $50/month) are not stored in any app config.
+# Router failover (AISYSTEM plan §5e): model chains, removals, caps, circuit
+# thresholds and the OpenRouter soft caps live in data/ai_model_chains.json
+# (NOT under root/ — root/ is public). Those targets are written
+# "data/ai_model_chains.json:<key>" and resolve against data_dir. Chain /
+# removal slugs must be known (catalog or existing chain-file entries) when
+# the caller supplies known_slugs (apply time); at ingest time only the
+# provider|model grammar is checked. OpenRouter soft caps may be lowered
+# from /ai/eval but never raised above $1.65/day, $11.50/week, $50/month.
+# SuperGrok caps: root/config/ai_usage.json.
 #
 # Writes are atomic (temp file in the same dir + rename) and keep the file's
 # top-level key order and 2-space pretty formatting.
@@ -58,14 +60,68 @@ our %ALLOW = (
         type => 'int', min => 0, max => 100000,
         help => 'SuperGrok monthly request cap used by the usage monitor',
     },
+    # ── Model failover (data/ai_model_chains.json, AISYSTEM plan §5e) ──
+    (map { ("data/ai_model_chains.json:chain_$_" => {
+        type => 'chain', min_items => 1, max_items => 12,
+        help => "Ordered failover chain for purpose '$_' (provider|model; ollama|auto = first Ollama chat tag)",
+    }) } qw(chat docs coding title)),
+    'data/ai_model_chains.json:removed' => {
+        type => 'slug_set', max_items => 50,
+        help => 'Slugs removed from every chain (dead / fabricating models)',
+    },
+    'data/ai_model_chains.json:model_caps_usd_per_day' => {
+        type => 'caps_map', key_kind => 'slug', min => 0, max => 1.65,
+        help => 'Per-model paid failover cap, USD/day ({"openrouter|vendor/model": 0.25})',
+    },
+    'data/ai_model_chains.json:chain_caps_usd_per_day' => {
+        type => 'caps_map', key_kind => 'purpose', min => 0, max => 1.65,
+        help => 'Per-chain paid failover cap, USD/day ({"coding": 0.50})',
+    },
+    'data/ai_model_chains.json:circuit_failure_threshold' => {
+        type => 'int', min => 1, max => 20,
+        help => 'Consecutive failures that open a model circuit',
+    },
+    'data/ai_model_chains.json:circuit_cooldown_minutes' => {
+        type => 'int', min => 1, max => 1440,
+        help => 'Open-circuit cooldown before the half-open probe (minutes)',
+    },
+    'data/ai_model_chains.json:circuit_dead_cooldown_hours' => {
+        type => 'int', min => 1, max => 168,
+        help => 'Cooldown for 404/410 and dead_model circuits (hours)',
+    },
+    'data/ai_model_chains.json:openrouter_soft_cap_day_usd' => {
+        type => 'number', min => 0, max => 1.65,
+        help => 'OpenRouter paid failover soft cap, USD/day (max 1.65)',
+    },
+    'data/ai_model_chains.json:openrouter_soft_cap_week_usd' => {
+        type => 'number', min => 0, max => 11.50,
+        help => 'OpenRouter paid failover soft cap, USD/week (max 11.50)',
+    },
+    'data/ai_model_chains.json:openrouter_soft_cap_month_usd' => {
+        type => 'number', min => 0, max => 50,
+        help => 'OpenRouter paid failover soft cap, USD/month (max 50)',
+    },
+    'data/ai_model_chains.json:supergrok_respect_guard' => {
+        type => 'bool', help => 'Skip SuperGrok while the workstation daily guard is locked (0/1)',
+    },
+    'data/ai_model_chains.json:exclude_replace_verdict' => {
+        type => 'bool', help => 'Skip models the effectiveness card marks "replace" (0/1)',
+    },
+    'data/ai_model_chains.json:demote_watch_verdict' => {
+        type => 'bool', help => 'Move models marked "watch" to the end of the chain (0/1)',
+    },
 );
+
+our $SLUG_RE  = qr/^(?:openrouter|external|supergrok|grok|ollama)\|[A-Za-z0-9._:\/~+\-]+$/;
+our @PURPOSES = qw(chat docs coding title);
 
 sub new {
     my ($class, %a) = @_;
     my $self = bless {
-        config_dir => $a{config_dir},            # required for apply/revert
+        config_dir => $a{config_dir},            # required for apply/revert (root/config)
+        data_dir   => $a{data_dir},              # required for data/*.json targets
         allow      => $a{allow} || \%ALLOW,      # tests may inject
-        known_slugs => $a{known_slugs},          # arrayref for slug_list
+        known_slugs => $a{known_slugs},          # arrayref for slug_list / chain / slug_set
     }, $class;
     return $self;
 }
@@ -83,6 +139,9 @@ sub describe {
                     : $r->{type} eq 'bool'   ? '0 | 1'
                     : $r->{type} =~ /^(int|number)$/ ? "$r->{type} $r->{min}..$r->{max}"
                     : $r->{type} eq 'slug_list' ? 'list of known model slugs'
+                    : $r->{type} eq 'chain'     ? "ordered list of $r->{min_items}..$r->{max_items} known provider|model slugs, no duplicates"
+                    : $r->{type} eq 'slug_set'  ? 'list of known provider|model slugs (may be empty)'
+                    : $r->{type} eq 'caps_map'  ? "{ " . ($r->{key_kind} eq 'purpose' ? join('|', @PURPOSES) : 'provider|model') . " : USD $r->{min}..$r->{max} }"
                     : $r->{type};
         push @out, { target => $t, file => $file, key => $key, type => $r->{type},
                      allowed => $allowed, help => $r->{help} // '' };
@@ -98,9 +157,10 @@ sub validate {
     return (0, 'target is not allow-listed: ' . ($target // '(none)')) unless $self->is_allowed($target);
     my $r = $self->{allow}{$target};
     my ($file, $key) = split /:/, $target, 2;
-    return (0, "bad target format: $target") unless defined $key && length $key && $file =~ /^[A-Za-z0-9_.-]+\.json$/;
+    return (0, "bad target format: $target") unless defined $key && length $key && $file =~ /^(?:data\/)?[A-Za-z0-9_.-]+\.json$/;
     return (0, 'value is required') unless defined $value;
-    return (0, 'value must be a scalar') if ref $value && !JSON::is_bool($value) && $r->{type} ne 'slug_list';
+    return (0, 'value must be a scalar') if ref $value && !JSON::is_bool($value)
+        && $r->{type} !~ /^(?:slug_list|chain|slug_set|caps_map)$/;
     my $t = $r->{type};
     if ($t eq 'enum') {
         my %ok = map { $_ => 1 } @{ $r->{values} };
@@ -130,11 +190,50 @@ sub validate {
         }
         return (1, [ @$value ]);
     }
+    if ($t eq 'chain' || $t eq 'slug_set') {
+        return (0, 'value must be a list of provider|model slugs') unless ref $value eq 'ARRAY';
+        my $min = $t eq 'chain' ? ($r->{min_items} // 1) : 0;
+        my $max = $r->{max_items} // 50;
+        return (0, "list must have $min..$max entries") if @$value < $min || @$value > $max;
+        my $known = $self->{known_slugs} ? { map { $_ => 1 } @{ $self->{known_slugs} } } : undef;
+        my %seen;
+        for my $s (@$value) {
+            return (0, 'slug must be a string') if ref $s || !defined $s;
+            return (0, "bad slug (want provider|model): $s") unless $s =~ $SLUG_RE;
+            return (0, "duplicate slug: $s") if $seen{$s}++;
+            return (0, "unknown model slug: $s") if $known && !$known->{$s};
+        }
+        return (1, [ @$value ]);
+    }
+    if ($t eq 'caps_map') {
+        return (0, 'value must be an object') unless ref $value eq 'HASH';
+        return (0, 'too many entries (max 50)') if keys %$value > 50;
+        my $known = $self->{known_slugs} ? { map { $_ => 1 } @{ $self->{known_slugs} } } : undef;
+        my %purpose = map { $_ => 1 } @PURPOSES;
+        my %out;
+        for my $k (sort keys %$value) {
+            if (($r->{key_kind} // 'slug') eq 'purpose') {
+                return (0, "unknown chain purpose: $k (want " . join('|', @PURPOSES) . ')') unless $purpose{$k};
+            } else {
+                return (0, "bad slug (want provider|model): $k") unless $k =~ $SLUG_RE;
+                return (0, "unknown model slug: $k") if $known && !$known->{$k};
+            }
+            my $n = $value->{$k};
+            return (0, "cap for $k is not a number") if ref $n || !defined $n || !looks_like_number("$n") || "$n" =~ /inf|nan/i;
+            return (0, "cap for $k out of range $r->{min}..$r->{max}") if $n < $r->{min} || $n > $r->{max};
+            $out{$k} = 0 + $n;
+        }
+        return (1, \%out);
+    }
     return (0, "unsupported validator type: $t");
 }
 
 sub _path {
     my ($self, $file) = @_;
+    if ($file =~ m{^data/([A-Za-z0-9_.-]+\.json)$} && $1 !~ /\.\./) {
+        die "data_dir not set\n" unless $self->{data_dir};
+        return "$self->{data_dir}/$1";
+    }
     die "config_dir not set\n" unless $self->{config_dir};
     die "bad file name\n" unless $file =~ /^[A-Za-z0-9_.-]+\.json$/ && $file !~ /\.\./;
     return "$self->{config_dir}/$file";
@@ -258,7 +357,9 @@ Comserv::Util::AI::EvalAllowList - allow-listed config changes for Daily AI Eval
 
 =head1 SYNOPSIS
 
-    my $al = Comserv::Util::AI::EvalAllowList->new(config_dir => $c->path_to('root','config'));
+    my $al = Comserv::Util::AI::EvalAllowList->new(config_dir => $c->path_to('root','config'),
+                                                  data_dir   => $c->path_to('data'),
+                                                  known_slugs => \@catalog_and_chain_slugs);
     my ($ok, $v_or_err) = $al->validate('ai_grounding.json:mode', 'enforce');
     my $r = $al->apply('ai_grounding.json:mode', 'enforce');   # { ok, before, after }
     $al->restore('ai_grounding.json:mode', $r->{before});

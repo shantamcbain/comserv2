@@ -27,10 +27,13 @@ RECOMMENDED=(
     "gemma4:12b"
     "gemma4:4b"
     "llama3.1:latest"
+    "nimble:latest"
     "phi4:14b"
     "phi4-mini:3.8b"
     "mistral:latest"
     "qwen2.5:7b"
+    "tev1:latest"
+    "tev1:0.8b"
 )
 
 DEPRECATED=(

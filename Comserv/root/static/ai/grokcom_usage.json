@@ -1,9 +1,9 @@
 {
   "ok": true,
   "source": "firefox-extension",
-  "build": 46,
+  "build": 89,
   "chat": 1,
-  "at": "2026-09-26T18:31:30.868Z",
+  "at": "2026-09-30T15:07:40.142Z",
   "reason": "page",
   "href": "https://grok.com/"
 }

@@ -36,6 +36,8 @@ has 'logger' => (
 has 'schema_override'     => ( is => 'rw', default => undef );   # tests / scripts
 has 'config_dir_override' => ( is => 'rw', default => undef );   # tests: temp copy of root/config
 has 'inbox_dir_override'  => ( is => 'rw', default => undef );
+has 'data_dir_override'   => ( is => 'rw', default => undef );   # tests: temp copy of data/ (ai_model_chains.json)
+has 'known_slugs_override'=> ( is => 'rw', default => undef );   # tests: arrayref of known provider|model slugs
 has 'todo_creator'        => ( is => 'rw', default => undef );   # coderef($c, %args) -> {ok, todo_id|error}
 has 'token_override'      => ( is => 'rw', default => undef );   # tests: expected ingest token ('' = none)
 
@@ -89,9 +91,44 @@ sub inbox_dir {
     return $c->path_to('data', 'ai_eval_inbox') . '';
 }
 
+sub data_dir {
+    my ($self, $c) = @_;
+    return $self->data_dir_override if $self->data_dir_override;
+    my $d = eval { $c->path_to('data') . '' };
+    return $d;   # undef without a Catalyst context: data/ targets then fail with "data_dir not set"
+}
+
+# Known provider|model slugs for chain / removal / cap validation (§5e):
+# the role-filtered model catalog (admins see everything) plus every slug the
+# chains file (or its Perl default) already mentions.
+sub known_slugs {
+    my ($self, $c) = @_;
+    return $self->known_slugs_override if $self->known_slugs_override;
+    my %s = ('ollama|auto' => 1);
+    eval {
+        require Comserv::Util::ModelCatalog;
+        my $cat = Comserv::Util::ModelCatalog->catalog($c) || [];
+        for my $m (@$cat) { $s{ $m->{value} } = 1 if ref $m eq 'HASH' && $m->{value} && $m->{value} =~ /\|/ }
+        1;
+    } or $self->_log($c, 'warn', 'known_slugs', "catalog for known slugs failed: $@");
+    eval {
+        require Comserv::Util::AI::ModelChains;
+        my $path = $self->data_dir_override ? $self->data_dir_override . '/ai_model_chains.json' : undef;
+        my $ld = Comserv::Util::AI::ModelChains->load($c, ($path ? (path => $path) : ()));
+        $s{$_} = 1 for Comserv::Util::AI::ModelChains->all_slugs($ld);
+        $s{$_} = 1 for Comserv::Util::AI::ModelChains->all_slugs(Comserv::Util::AI::ModelChains->perl_default);
+        1;
+    };
+    return [ sort keys %s ];
+}
+
 sub allow_list {
     my ($self, $c) = @_;
-    return Comserv::Util::AI::EvalAllowList->new(config_dir => $self->config_dir($c));
+    return Comserv::Util::AI::EvalAllowList->new(
+        config_dir  => $self->config_dir($c),
+        data_dir    => $self->data_dir($c),
+        known_slugs => $self->known_slugs($c),
+    );
 }
 
 # -------------------------------------------------------------------
@@ -265,7 +302,7 @@ sub ingest {
         my $schema = $self->_schema($c);
         $schema->txn_do(sub {
             my $rs = $schema->resultset('AiEvalReport');
-            my $rep = $rs->search({ report_date => $r->{report_date}, source => $r->{source} }, { rows => 1 })->single;
+            my $rep = $rs->find({ report_date => $r->{report_date}, source => $r->{source} });
             my $created = 0;
             my %cols = map { exists $r->{$_} ? ($_ => $r->{$_}) : () } qw(summary markdown metrics_json);
             if ($rep) {

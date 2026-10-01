@@ -59,7 +59,10 @@
         </div>
         <div class="ai-topbar-right">
             [% IF username && !username.match('^Guest-') %]
-            <a href="/ai/usage" class="ai-topbar-btn" title="Usage and cost by model">📊 Usage</a>
+            <a href="[% c.uri_for('/ai/usage') %]" class="ai-topbar-btn" title="Usage and cost by model">📊 Usage</a>
+            [% IF is_admin %]
+            <a href="[% c.uri_for('/ai/eval') %]" class="ai-topbar-btn" title="Daily AI eval reports">📋 Eval</a>
+            [% END %]
             <a href="/ai/conversations" class="ai-topbar-btn" title="View conversation history">📋 History</a>
             <a href="/ai/manage_api_keys" class="ai-topbar-btn" title="Manage API keys">🔑</a>
             <a href="/ai/models" class="ai-topbar-btn" title="Manage models">⚙️</a>

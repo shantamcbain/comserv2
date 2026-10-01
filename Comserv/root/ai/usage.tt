@@ -1,13 +1,13 @@
-[% PageVersion = 'ai/usage.tt,v 0.12 2026/09/25 shanta Exp shanta ' %]
+[% PageVersion = 'ai/usage.tt,v 0.15 2026/09/28 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 [%
   META
     title = 'AI Usage & Activity Monitor'
-    description = 'SuperGrok five-number overview; four agent cards; charts start closed'
+    description = 'SuperGrok five-number overview; agent cost-effectiveness (visible, not buried); window selector; Daily AI Eval link'
     category = 'AI'
     TemplateType = 'ApplicationTtTemplate'
-    last_updated = '2026-09-25'
-    page_version = '0.12'
+    last_updated = '2026-09-28'
+    page_version = '0.15'
 %]
 
 <div class="ai-usage-page" style="max-width:960px;margin:0 auto;padding:1rem;color:var(--text-color);">
@@ -18,9 +18,30 @@
     <a href="#usage-overview" style="color:var(--link-color);">Overview</a>
     <a href="#usage-agents" style="color:var(--link-color);">Agents</a>
     <a href="#usage-tunnel" style="color:var(--link-color);">Focus</a>
+    [% IF is_admin %]
+    <a href="#agent-effectiveness" style="color:var(--link-color);">Effectiveness</a>
+    <a href="#fallover" style="color:var(--link-color);">Fallover</a>
+    <a href="[% c.uri_for('/ai/eval') %]" style="color:var(--link-color);">Eval reports</a>
+    [% END %]
     <a href="#usage-charts" style="color:var(--link-color);">Charts</a>
     <a href="#usage-more" style="color:var(--link-color);">More</a>
   </nav>
+
+  [%# Window selector. The controller always read ?days= but no control ever
+    # submitted it, and the ledger was additionally pinned to 14 days, so no
+    # view could show less than two weeks. Plain GET form: no inline JS.
+    # action MUST be c.uri_for(c.action) — c.req.path has no leading slash, so
+    # a bare path resolves relative to the current dir and doubles the segment
+    # (/ai/usage -> /ai/ai/usage). %]
+  <form method="get" action="[% c.uri_for(c.action) | html %]" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px;">
+    <label for="usage-days" class="doc-muted">Window</label>
+    <select id="usage-days" name="days" class="form-control" style="width:auto;">
+      [% FOREACH d IN [1, 3, 7, 14, 30, 90] %]
+        <option value="[% d %]"[% IF filters.days == d %] selected[% END %]>last [% d %] day[% IF d != 1 %]s[% END %]</option>
+      [% END %]
+    </select>
+    <button type="submit" class="btn btn-secondary">Apply</button>
+  </form>
 
   <section id="usage-overview" aria-label="SuperGrok this week">
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
@@ -84,6 +105,15 @@
     <div id="usage-tunnel-body" hidden></div>
   </section>
 
+  [%# Effectiveness + Daily Eval must be visible without opening More.
+      Buried in a collapsed details they were never seen this session. %]
+  [% IF is_admin && ledger_monitor %]
+  [% INCLUDE 'ai/usage_effectiveness_card.tt' %]
+  [% END %]
+  [% IF is_admin && eval_summary %][% INCLUDE 'ai/usage_eval_card.tt' %][% END %]
+  [%# Model failover (AISYSTEM plan §5e) — admin only; controller only builds it for admins. %]
+  [% IF is_admin && fallover %][% INCLUDE 'ai/usage_fallover_card.tt' %][% END %]
+
   <details id="usage-charts">
     <summary style="cursor:pointer;color:var(--link-color);">14-day token and API-call charts</summary>
     <p class="doc-muted">Empty days are zero. Same colours as the legend. Default is bar; choice is kept on refresh.</p>
@@ -146,7 +176,8 @@
     </div>
 
     [% IF is_admin %]
-    <p><a href="[% c.uri_for('/ai/eval') %]" style="color:var(--link-color);">Daily AI Eval</a></p>
+    <p><a href="[% c.uri_for('/ai/eval') %]" style="color:var(--link-color);">Daily AI Eval Reports</a>
+       · <a href="#agent-effectiveness" style="color:var(--link-color);">Agent effectiveness (this page)</a></p>
     [% END %]
 
     [% IF org.kill_switch.killed.size %]
@@ -184,6 +215,5 @@
     [% IF is_admin && ledger_monitor %]
     <details><summary style="cursor:pointer;">Golden Data ledger</summary>[% INCLUDE 'ai/usage_ledger.tt' %]</details>
     [% END %]
-    [% IF is_admin && eval_summary %][% INCLUDE 'ai/usage_eval_card.tt' %][% END %]
   </details>
 </div>

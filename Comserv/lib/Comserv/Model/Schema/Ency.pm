@@ -31,6 +31,11 @@ __PACKAGE__->register_class('AiSkill', 'Comserv::Model::Schema::Ency::Result::Ai
 __PACKAGE__->register_class('AiGoldenData', 'Comserv::Model::Schema::Ency::Result::AiGoldenData');
 __PACKAGE__->register_class('AiEvalReport', 'Comserv::Model::Schema::Ency::Result::AiEvalReport');
 __PACKAGE__->register_class('AiEvalProposal', 'Comserv::Model::Schema::Ency::Result::AiEvalProposal');
+# Model usage policy (2026-09-27): identity/state, extensible criteria, audit.
+# Criteria are rows in AiModelPolicyRule, so a new criterion needs no migration.
+__PACKAGE__->register_class('AiModelPolicy', 'Comserv::Model::Schema::Ency::Result::AiModelPolicy');
+__PACKAGE__->register_class('AiModelPolicyRule', 'Comserv::Model::Schema::Ency::Result::AiModelPolicyRule');
+__PACKAGE__->register_class('AiModelPolicyHistory', 'Comserv::Model::Schema::Ency::Result::AiModelPolicyHistory');
 __PACKAGE__->register_class('AiNavigationShortcut', 'Comserv::Model::Schema::Ency::Result::AiNavigationShortcut');
 __PACKAGE__->register_class('AiSkill', 'Comserv::Model::Schema::Ency::Result::AiSkill');
 __PACKAGE__->register_class('ProjectDocumentationMapping', 'Comserv::Model::Schema::Ency::Result::ProjectDocumentationMapping');

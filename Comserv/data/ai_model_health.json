@@ -1,0 +1,42 @@
+{
+   "models" : {
+      "openrouter|cohere/north-mini-code:free" : {
+         "consecutive_failures" : 0,
+         "last_failure_at" : 1790783270,
+         "last_failure_reason" : "unreachable",
+         "last_success_at" : 1790867133,
+         "state" : "closed",
+         "total_failures" : 1,
+         "total_successes" : 8
+      },
+      "openrouter|google/gemma-4-31b-it:free" : {
+         "consecutive_failures" : 5,
+         "cooldown_until" : 1790798590,
+         "last_failure_at" : 1790797690,
+         "last_failure_reason" : "http_429",
+         "open_reason" : "probe_failed:http_429",
+         "opened_at" : 1790797690,
+         "state" : "open",
+         "total_failures" : 5,
+         "total_successes" : 0
+      },
+      "openrouter|nvidia/nemotron-3.5-lightning:free" : {
+         "consecutive_failures" : 0,
+         "last_failure_at" : 1790783230,
+         "last_failure_reason" : "provider_error",
+         "last_success_at" : 1790782765,
+         "state" : "closed",
+         "total_failures" : 1,
+         "total_successes" : 2
+      },
+      "openrouter|tencent/hy3" : {
+         "consecutive_failures" : 0,
+         "last_success_at" : 1790698417,
+         "state" : "closed",
+         "total_failures" : 0,
+         "total_successes" : 1
+      }
+   },
+   "updated_at" : 1790867133,
+   "version" : 1
+}

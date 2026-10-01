@@ -258,7 +258,11 @@ sub run_one {
         $resp = $router->dispatch_chat($c, $model, [
             { role => 'system', content => $system },
             { role => 'user',   content => $user_prompt },
-        ], can_select => ($can_select // 1));
+        ], can_select => ($can_select // 1),
+           # Focus-Tune scores THIS model: never let failover answer with
+           # another one (AISYSTEM plan §5e). Failures still hit the Ledger
+           # and the circuit breaker.
+           failover => 0, purpose => 'title');
         1;
     } or do {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'focustune_run_one',

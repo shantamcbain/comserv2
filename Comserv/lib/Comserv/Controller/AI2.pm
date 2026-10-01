@@ -1194,6 +1194,12 @@ sub chat :Local :Args(0) {
         files_read       => $result->{files_read} || [],
         citations        => $result->{citations} || [],
         grounding        => $result->{grounding},
+        fallover         => $result->{fallover},
+        fallback         => $result->{fallback},
+        fallback_from    => $result->{fallback_from},
+        original_model   => $result->{original_model},
+        original_error   => $result->{original_error},
+        all_exhausted    => $result->{all_exhausted},
     }));
 }
 
@@ -1661,6 +1667,13 @@ sub usage_live :Local :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'usage_live',
         'org_calls=' . (($org->{org_totals} || {})->{calls} // 0)
         . ' hermes_tokens=' . ((($org->{hermes} || {})->{totals} || {})->{tokens} // 0));
+    # Same org.fallover key and access rule as /ai/usage_live (AISYSTEM plan §5e).
+    my $uc = eval { $c->controller('AI::Usage') };
+    if ($uc && $uc->can('_can_see_fallover') && $uc->_can_see_fallover($c)) {
+        $org->{fallover} = eval {
+            Comserv::Model::AI2::UsageMonitor->new->fallover_summary($c, days => ($c->req->param('days') || 14));
+        } || { errors => [ 'fallover summary failed: ' . ($@ || 'unknown') ] };
+    }
     $c->response->body(encode_json({ success => JSON::true, org => $org }));
 }
 
