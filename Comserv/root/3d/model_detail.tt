@@ -212,6 +212,64 @@
     </div>
 </div>
 
+[% IF c.session.user_id %]
+<form method="get" action="/3d/model/[% model.id %]" style="margin-bottom:1em;display:flex;align-items:center;gap:0.5em;">
+    <label style="cursor:pointer;font-size:0.9em;color:var(--text-color);display:flex;align-items:center;gap:0.4em;">
+        <input type="checkbox" name="similar" value="1"
+               onchange="this.form.submit()"
+               [% IF similar %]checked[% END %]>
+        Show similar models (web search)
+    </label>
+</form>
+[% END %]
+
+[% IF similar %]
+<div style="margin-bottom:1.5em;padding:1em;background:var(--secondary-color);border:1px solid var(--border-color);border-radius:6px;">
+    <h3 style="margin:0 0 0.6em 0;color:var(--heading-color,var(--text-color));">Similar Models</h3>
+
+    [% IF similar_models && similar_models.size %]
+    <div class="model-grid" style="margin-bottom:1em;">
+        [% FOREACH m IN similar_models %]
+        <div class="model-card">
+            <div class="model-thumb" style="width:100%;height:100px;border-radius:4px;margin-bottom:0.5em;
+                 background:var(--secondary-color);display:flex;align-items:center;justify-content:center;
+                 color:var(--muted-color,#888);font-size:2em;overflow:hidden;">
+            [% IF m.thumbnail_url %]
+            [% SET ts = m.thumbnail_url.replace('\\.svg$', '.png') %]
+            <img src="[% ts | html %]" alt="[% m.name | html %]" loading="lazy"
+                 style="width:100%;height:100%;object-fit:cover;border-radius:4px;"
+                 onerror="this.style.display='none';this.parentElement.innerHTML='&#9673;';">
+            [% ELSE %]
+            &#9673;
+            [% END %]
+            </div>
+            <h3 style="font-size:0.9em;">[% m.name | html %]</h3>
+            <p style="font-size:0.8em;">[% m.description | truncate(80) | html %]</p>
+            <a href="/3d/model/[% m.id %]" class="btn-sm" style="font-size:0.8em;">View</a>
+        </div>
+        [% END %]
+    </div>
+    [% ELSE %]
+    <p style="color:var(--muted-color);">No similar local models found.</p>
+    [% END %]
+
+    [% IF similar_web && similar_web.size %]
+    <h4 style="margin:0.8em 0 0.4em 0;color:var(--heading-color,var(--text-color));font-size:0.95em;">
+        Web results[% IF similar_provider %] via [% similar_provider | html %][% END %]
+    </h4>
+    <div class="model-grid">
+        [% FOREACH r IN similar_web %]
+        <div class="model-card">
+            <h3 style="font-size:0.9em;">[% r.title | html %]</h3>
+            <p style="font-size:0.8em;">[% r.snippet | html %]</p>
+            <a href="[% r.url | html %]" target="_blank" rel="noopener" class="btn-sm secondary" style="font-size:0.8em;">Open &rarr;</a>
+        </div>
+        [% END %]
+    </div>
+    [% END %]
+</div>
+[% END %]
+
 [% SET two_colour = (inv_item && inv_item.is_assemblable) || (model.source == 'sign_generator') %]
 
 [% IF c.session.user_id %]
