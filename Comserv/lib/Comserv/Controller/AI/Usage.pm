@@ -74,6 +74,7 @@ sub live :Path('/ai/usage_live') :Args(0) {
         $org->{health} = eval {
             my $h = Comserv::Model::AI2::UsageMonitor->new->ai_health($c, days => ($c->req->param('days') || 14));
             delete $h->{unified};
+            delete $h->{estimator}{csrf} if ref $h->{estimator} eq 'HASH';
             $h;
         } || { errors => [ "ai_health failed: " . ($@ || 'unknown') ] };
     }
@@ -239,6 +240,49 @@ sub page :Path('/ai/usage_org') :Args(0) {
         eval_summary     => $eval_summary,
         ai_health        => $ai_health,
     );
+}
+
+
+=head2 reading
+
+POST /ai/usage_reading — admin-only manual usage reading (consumer, value,
+used/left, timestamp, source) for the usage estimator. Stored as spoken in
+data/ai_usage_readings.jsonl (no new table). CSRF: session ai_eval_csrf.
+
+=cut
+
+sub reading :Path('/ai/usage_reading') :Args(0) {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    $roles = [ split /,/, $roles ] unless ref $roles eq 'ARRAY';
+    my $back = '/ai/usage';
+    unless ($c->session->{username} && grep { /^admin$/i } @$roles) {
+        $c->response->status(403);
+        $c->response->body('Admin only');
+        return;
+    }
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body('POST only');
+        return;
+    }
+    my $want = $c->session->{ai_eval_csrf} // '';
+    my $got  = $c->req->body_params->{csrf_token} // '';
+    unless (length $want && length $got && $got eq $want) {
+        $c->response->status(403);
+        $c->response->body('Bad or missing CSRF token — reload /ai/usage and try again');
+        return;
+    }
+    require Comserv::Util::AI::UsageEstimator;
+    my %p = map { ($_ => scalar $c->req->body_params->{$_}) } qw(consumer value kind at reset_at reset_in_hours source note);
+    my ($rd, $err) = Comserv::Util::AI::UsageEstimator::make_reading(%p, entered_by => $c->session->{username});
+    my $root = $c->path_to('') . '';
+    $root =~ s{/$}{};
+    $err ||= Comserv::Util::AI::UsageEstimator::append_reading($root, $rd) if $rd;
+    $self->logging->log_with_details($c, $err ? 'warn' : 'info', __FILE__, __LINE__, 'reading',
+        $err ? "reading rejected: $err" : "reading $rd->{consumer}=$rd->{value} $rd->{kind} at $rd->{at_pt} by " . ($c->session->{username} // '?'));
+    require URI::Escape;
+    $c->response->redirect($back . ($err ? '?reading_error=' . URI::Escape::uri_escape($err) : '?reading=saved') . '#usage-estimator');
 }
 
 __PACKAGE__->meta->make_immutable;

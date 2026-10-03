@@ -674,11 +674,18 @@ function ensureThinkingStyles(doc) {
 
 
     // --- Agent + phase (clarify → analyze → plan → verify → implement) ---
-    // Budget: clarify + most analyze/plan stay on free models; implement uses a free
-    // code model by default. Header model select still overrides when set.
+    // Router (server) now classifies the question using agent + phase + prompt content
+    // (rule-based + optional cheap local Ollama eval model) to map to:
+    //   SuperGrok (if daily allotment not exhausted per guard) > available paid OR >
+    //   free model sufficient for the job.
+    // Header model select wins if user explicitly picked. Otherwise we send a hint
+    // (or empty for full router decision) so initial "analyze" evaluation can use
+    // a better model than the weakest free coder.
+    // Agent dropdown (analyze/programming/documentation) is respected server-side
+    // for system prompt, intercepts, context, and tier mapping.
     const CLARIFY_MODEL = 'openrouter|google/gemma-4-31b-it:free';
-    const ANALYZE_MODEL = 'openrouter|google/gemma-4-31b-it:free';
-    const IMPLEMENT_MODEL = 'openrouter|cohere/north-mini-code:free';
+    const ANALYZE_MODEL = 'openrouter|google/gemma-4-31b-it:free';  // hint; router may upgrade
+    const IMPLEMENT_MODEL = 'openrouter|cohere/north-mini-code:free'; // hint; router decides
     let _editorPhase = 'analyze'; // clarify | analyze | plan | implement
     let _planApproved = false;
     // Pending clarify session: original vague ask + gap questions awaiting answers.
@@ -711,18 +718,12 @@ function ensureThinkingStyles(doc) {
         const picked = (window.ComservChat && ComservChat.modelSelect)
             ? ComservChat.modelSelect.getSelectedValue()
             : '';
-        if (phase === 'clarify') {
-            return picked || CLARIFY_MODEL;
-        }
-        // Analyze worker stays on the cheap analyze model unless user overrides.
-        if (currentEditorAgentId() === 'analyze') {
-            return picked || ANALYZE_MODEL;
-        }
-        if (phase === 'implement') {
-            return picked || IMPLEMENT_MODEL;
-        }
-        // analyze / plan: prefer cheap free model; keep user pick if set
-        return picked || ANALYZE_MODEL;
+        if (picked) return picked;
+        // No explicit pick: send empty model so server Router classifies the full
+        // prompt + agent + phase (using local Ollama eval if available) and picks
+        // Supergrok (if daily allotment OK), paid, or sufficient free.
+        // Do not send the old cheap default hints.
+        return '';
     }
 
     // Local gap detection — no tokens. Used before any clarify/analyze model call.
@@ -1028,12 +1029,12 @@ function ensureThinkingStyles(doc) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         prompt: fullPrompt,
-                        model: model,
                         agent_id: agentId,
                         phase: phase,
                         page_path: filePath || (files[0] && files[0].path) || '',
                         page_title: filePath ? filePath.split('/').pop() : '',
-                        page_content: (files[0] && files[0].content) || fileContent || ''
+                        page_content: (files[0] && files[0].content) || fileContent || '',
+                        ...(model ? { model: model } : {})
                     })
                 });
             });

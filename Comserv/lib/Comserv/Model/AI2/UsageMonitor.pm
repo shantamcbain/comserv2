@@ -19,7 +19,7 @@ has 'schema_override'       => ( is => 'rw', default => undef );
 has 'golden_store_override' => ( is => 'rw', default => undef );
 
 # Diagnostic rows that are not user AI calls (same exclusions as Usage.pm).
-use constant EXCLUDED_REQUEST_TYPES => qw(grok_balance_check provider_snapshot);
+use constant EXCLUDED_REQUEST_TYPES => qw(grok_balance_check provider_snapshot openrouter_call);
 use constant METADATA_SCAN_ROWS     => 2000;
 
 # Agent-effectiveness verdict thresholds. Deliberately few and explicit: a
@@ -1729,6 +1729,11 @@ sub ai_health {
         $out->{guard} = $g;
         $out->{guard_banner} = Comserv::Util::AI::HealthChecks::guard_banner($g);
     } catch { push @{ $out->{errors} }, "guard: $_" };
+    eval {
+        require Comserv::Util::AI::HermesOverrunGuard;
+        $out->{overrun} = Comserv::Util::AI::HermesOverrunGuard->status;
+        $out->{overrun_banner} = Comserv::Util::AI::HermesOverrunGuard::banner($out->{overrun});
+    };
     $out->{ollama} = Comserv::Util::AI::HealthChecks::ollama_health(journal => 1);
     $out->{preflight} = eval { Comserv::Util::AI::StalePreflight::check_all() } || [];
     push @{ $out->{errors} }, "preflight: $@" if $@;
@@ -1740,6 +1745,20 @@ sub ai_health {
     my $nf = ($ENV{HOME} || '/home/shanta') . '/.hermes/supergrok_notice.txt';
     if (open my $fh, '<', $nf) { local $/; ($out->{hermes_notice} = <$fh> // '') =~ s/\s+$//; close $fh }
     $out->{unified} = $self->unified_usage($c, days => $a{days});
+    $out->{estimator} = eval {
+        my $e = $self->usage_estimator($c);
+        my $roles = eval { $c->session->{roles} } || [];
+        $roles = [ split /,/, $roles ] unless ref $roles eq 'ARRAY';
+        if (eval { $c->session->{username} } && grep { /^admin$/i } @$roles) {
+            require Digest::SHA;
+            $c->session->{ai_eval_csrf} ||= Digest::SHA::sha256_hex(time() . rand() . $$);
+            $e->{csrf} = $c->session->{ai_eval_csrf};
+        }
+        require POSIX;
+        { local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset(); $e->{now_pt_input} = POSIX::strftime('%Y-%m-%d %H:%M', localtime); }
+        POSIX::tzset();
+        $e;
+    } || { errors => [ "usage_estimator: $@" ], consumers => [] };
     return $out;
 }
 
@@ -1755,7 +1774,206 @@ sub ai_banner {
     } catch {};
     my $m = Comserv::Util::AI::HealthChecks::meters(app_root => $root);
     $out->{stale_meters} = $m->{stale};
+    eval {
+        require Comserv::Util::AI::HermesOverrunGuard;
+        $out->{overrun} = Comserv::Util::AI::HermesOverrunGuard->status;
+        $out->{overrun_banner} = Comserv::Util::AI::HermesOverrunGuard::banner($out->{overrun});
+    };
     return $out;
+}
+
+
+=head2 usage_estimator($c)
+
+One usage estimator for every AI consumer (Grok Bot, Super Grok, OpenRouter,
+Ollama): app-side estimate from the Ledger (DBIx::Class) + Hermes state.db,
+normalized against manual readings (data/ai_usage_readings.jsonl, admin form
+on /ai/usage#usage-estimator), the grok.com add-on and the OpenRouter API.
+Pure maths in Comserv::Util::AI::UsageEstimator.
+
+=cut
+
+sub usage_estimator {
+    my ($self, $c, %a) = @_;
+    require Comserv::Util::AI::UsageEstimator;
+    require Comserv::Util::AI::HealthChecks;
+    my $E   = 'Comserv::Util::AI::UsageEstimator';
+    my $now = $a{now} // time;
+    my $root = eval { $c->path_to('') . '' } // '.';
+    $root =~ s{/$}{};
+    my $out = { consumers => [], errors => [], readings_file => 'data/ai_usage_readings.jsonl' };
+    my $all = Comserv::Util::AI::UsageEstimator::read_readings($root);
+    my %by; push @{ $by{ $_->{consumer} } }, $_ for @$all;
+    $out->{recent_readings} = [ reverse @$all[ ($#$all > 9 ? $#$all - 9 : 0) .. $#$all ] ] if @$all;
+
+    my $utc = sub { my @t = gmtime $_[0]; sprintf('%04d-%02d-%02d %02d:%02d:%02d', $t[5] + 1900, $t[4] + 1, @t[3, 2, 1, 0]) };
+    # Ledger: (count, cost) since/until epoch with extra conditions (DBIx::Class).
+    my $ledger = sub {
+        my ($since, $extra, $until) = @_;
+        my $r = eval {
+            my %x = %{ $extra || {} };
+            $x{'me.created_at'} = { '>=' => $utc->($since), (defined $until ? ('<' => $utc->($until)) : ()) };
+            $self->_base_rs($c, $utc->($since), \%x)->search({}, {
+                select => [ { count => 'me.id' }, { sum => 'me.estimated_cost_usd' } ], as => [qw(n cost)],
+            })->first;
+        };
+        push @{ $out->{errors} }, "ledger: $@" if $@;
+        return $r ? (0 + ($r->get_column('n') // 0), 0 + ($r->get_column('cost') // 0)) : (0, 0);
+    };
+    # Hermes state.db (external SQLite, read-only; same pattern as hermes_summary).
+    my $db = $ENV{HERMES_STATE_DB} || (($ENV{HOME} || '/home/shanta') . '/.hermes/state.db');
+    my $hermes = sub {
+        my ($since, $where, $until) = @_;
+        return (0, 0) unless -r $db;
+        my @r = eval {
+            require DBI;
+            my $dbh = DBI->connect("dbi:SQLite:dbname=$db", '', '', { RaiseError => 1, PrintError => 0, ReadOnly => 1 });
+            my @v = $dbh->selectrow_array(
+                "SELECT COALESCE(SUM(COALESCE(api_call_count,0)),0), COALESCE(SUM(COALESCE(actual_cost_usd, estimated_cost_usd, 0)),0)
+                   FROM sessions WHERE started_at >= ? AND started_at < ? AND ($where)", undef, $since, $until // $now + 1);
+            $dbh->disconnect; @v;
+        };
+        push @{ $out->{errors} }, "hermes: $@" if $@;
+        return @r ? (0 + $r[0], 0 + $r[1]) : (0, 0);
+    };
+    my $W_XAI = q{COALESCE(billing_provider,'') IN ('xai-oauth','supergrok','xai') OR COALESCE(model,'') LIKE '%grok%'};
+    my $W_OR  = q{COALESCE(billing_provider,'') = 'openrouter'};
+    my $W_OL  = q{COALESCE(billing_provider,'') LIKE 'ollama%' OR COALESCE(billing_provider,'') = 'custom'};
+    my $read = sub { my $f = shift; open my $fh, '<', $f or return {}; local $/; my $d = eval { JSON::PP->new->decode(<$fh>) }; ref $d eq 'HASH' ? $d : {} };
+
+    # ---- Grok Bot: Ledger grok_bot ingests (none yet) x default rate.
+    {
+        my $rate = 0.5;
+        my $f = { 'me.request_type' => 'grok_bot' };
+        my $units = sub { ($ledger->($_[0], $f, $_[1]))[0] };
+        my ($n24) = $ledger->($now - 86400, $f);
+        my $e = $E->can('estimate')->(consumer => 'grok_bot', now => $now, readings => $by{grok_bot} || [], rate => $rate,
+            units_since => sub { $units->($_[0]) }, burn_24h => $n24,
+            notes => [ "App-side: Ledger request_type=grok_bot ingests x $rate %/call (default rate; no Grok Bot ingests yet, so the estimate is the latest reading)" ]);
+        push @{ $out->{consumers} }, $e;
+    }
+    # ---- Super Grok: Hermes xai-oauth calls + app supergrok chat x 0.05 %; add-on reading.
+    {
+        my $rate = $Comserv::Util::AI::HealthChecks::PCT_PER_CALL || 0.05;
+        my $sg = $read->("$root/root/static/ai/supergrok_guard.json");
+        my $g  = $read->("$root/root/static/ai/grokcom_usage.json");
+        my $reset = Comserv::Util::AI::HealthChecks::iso_epoch($sg->{reset_at});
+        my @rd = @{ $by{supergrok} || [] };
+        my $gat = Comserv::Util::AI::HealthChecks::iso_epoch($g->{at});
+        if (defined $g->{build} && $gat) {
+            my ($ar) = $E->can('make_reading')->(consumer => 'supergrok', value => $g->{build}, kind => 'used',
+                at => $gat, source => 'addon', note => 'grok.com add-on (Build %)', now => $now);
+            @rd = sort { $a->{at} <=> $b->{at} } (@rd, $ar) if $ar;
+        }
+        my $f = { 'me.provider' => 'supergrok' };
+        my $units = sub { my ($s, $u) = @_; ($hermes->($s, $W_XAI, $u))[0] + ($ledger->($s, $f, $u))[0] };
+        my $rs = $E->can('next_reset')->($reset, $now, 7);
+        my $cs = defined $rs ? $rs - 7 * 86400 : $now - 7 * 86400;
+        my $e = $E->can('estimate')->(consumer => 'supergrok', now => $now, readings => \@rd, rate => $rate, reset_at => $reset,
+            units_since => sub { $units->($_[0]) }, app_cycle => $units->($cs) * $rate,
+            app_at_reading => sub { $_[0] < $cs ? undef : $units->($cs, $_[0]) * $rate },
+            burn_24h => $units->($now - 86400),
+            notes => [ "App-side: Hermes xai-oauth api calls + app supergrok chats x $rate %/call; add-on reading " .
+                       ($gat ? 'last ' . Comserv::Util::AI::HealthChecks::pt($gat) : 'none') ]);
+        push @{ $out->{consumers} }, $e;
+    }
+    # ---- OpenRouter: Ledger openrouter $ + Hermes openrouter $; reading = OpenRouter API week.
+    {
+        my $or = eval { $self->openrouter_live($c) } || {};
+        my @t = gmtime $now; my $dow = ($t[6] + 6) % 7;   # Monday 00:00 UTC week
+        require Time::Local;
+        my $week_start = Time::Local::timegm(0, 0, 0, $t[3], $t[4], $t[5]) - $dow * 86400;
+        my @rd = @{ $by{openrouter} || [] };
+        if ($or->{ok} && defined $or->{week_usd}) {
+            my ($ar) = $E->can('make_reading')->(consumer => 'openrouter', value => sprintf('%.4f', $or->{week_usd}), kind => 'used',
+                at => ($or->{fetched_at} || $now), source => 'api', note => 'OpenRouter /auth/key usage_weekly', now => $now + 300);
+            @rd = sort { $a->{at} <=> $b->{at} } (@rd, $ar) if $ar;
+        }
+        my $f = { 'me.provider' => 'openrouter' };
+        my $cost = sub { my ($s, $u) = @_; ($hermes->($s, $W_OR, $u))[1] + ($ledger->($s, $f, $u))[1] };
+        my (undef, $ed) = $ledger->($week_start, { 'me.provider' => 'openrouter', 'me.request_type' => 'generate' });
+        my (undef, $hm) = $hermes->($week_start, $W_OR);
+        my (undef, $ap) = $ledger->($week_start, $f);
+        my $e = $E->can('estimate')->(consumer => 'openrouter', now => $now, readings => \@rd, rate => 1,
+            reset_at => $week_start + 7 * 86400, cap => 11.50,
+            units_since => sub { $cost->($_[0]) }, app_cycle => $cost->($week_start),
+            app_at_reading => sub { $_[0] < $week_start ? undef : $cost->($week_start, $_[0]) },
+            burn_24h => $cost->($now - 86400),
+            notes => [ sprintf('App-side this week: Hermes $%.2f, app $%.2f (AI editor $%.2f). Caps $1.65/day, $11.50/week, $50/month (Hermes overrun guard).', $hm, $ap, $ed),
+                       ($or->{ok} ? sprintf('OpenRouter API: day $%.2f, week $%.2f, month $%.2f, balance $%.2f', map { $or->{$_} // 0 } qw(day_usd week_usd month_usd balance_usd)) : 'OpenRouter API unavailable') ]);
+        $e->{breakdown} = { hermes => $hm, app => $ap, ai_editor => $ed };
+        # Unlogged-spend reconciliation (billed vs Ledger + Hermes).
+        $e->{reconcile} = eval {
+            require Time::Local;
+            my @g = gmtime $now;
+            my $day_start = Time::Local::timegm(0, 0, 0, @g[3, 4, 5]);
+            my $prices = $self->_openrouter_prices($root);
+            my $hermes_tokens = sub {
+                my ($since) = @_;
+                return {} unless -r $db;
+                require DBI;
+                my $dbh = DBI->connect("dbi:SQLite:dbname=$db", '', '', { RaiseError => 1, PrintError => 0, ReadOnly => 1 });
+                my $rows = $dbh->selectall_arrayref(
+                    "SELECT model, SUM(COALESCE(input_tokens,0)), SUM(COALESCE(output_tokens,0)), SUM(COALESCE(cache_read_tokens,0))
+                       FROM sessions WHERE started_at >= ? AND ($W_OR) GROUP BY model", undef, $since);
+                $dbh->disconnect;
+                return { map { ($_->[0] // '' => { in => $_->[1], out => $_->[2], cache_read => $_->[3] }) } @$rows };
+            };
+            my $part = sub {
+                my ($since) = @_;
+                my (undef, $audit) = $ledger->($since, { 'me.request_type' => 'openrouter_call' });
+                my (undef, $feat)  = $ledger->($since, $f);
+                my (undef, $hc)    = $hermes->($since, $W_OR);
+                my $tok = $hermes_tokens->($since);
+                return { app_audit => $audit, app_feature => $feat, hermes_est => $hc,
+                         (%$prices ? (hermes_full => Comserv::Util::AI::UsageEstimator::price_tokens($tok, $prices, cache_full => 1)) : ()) };
+            };
+            Comserv::Util::AI::UsageEstimator::reconcile(
+                threshold => 0.50,
+                day  => { billed => ($or->{ok} ? $or->{day_usd} : undef), %{ $part->($day_start) } },
+                week => { billed => ($or->{ok} ? $or->{week_usd} : undef), days => (($now - $week_start) / 86400 || 1), %{ $part->($week_start) } },
+            );
+        } || { error => "reconcile: $@" };
+        push @{ $out->{consumers} }, $e;
+    }
+    # ---- Ollama: local calls (no cap, rolling 7 days).
+    {
+        my $f = { 'me.provider' => 'ollama' };
+        my $calls = sub { ($hermes->($_[0], $W_OL))[0] + ($ledger->($_[0], $f))[0] };
+        my $e = $E->can('estimate')->(consumer => 'ollama', now => $now, readings => $by{ollama} || [], rate => 1,
+            app_cycle => $calls->($now - 7 * 86400), burn_24h => $calls->($now - 86400),
+            units_since => ($by{ollama} ? sub { $calls->($_[0]) } : undef),
+            notes => [ 'Local, no cap: calls in the last 7 days (Ledger provider=ollama + Hermes ollama sessions)' ]);
+        push @{ $out->{consumers} }, $e;
+    }
+    return $out;
+}
+
+
+# Public OpenRouter price list (free endpoint), cached 24 h in
+# data/ai_openrouter_prices.json: { model => [prompt, completion, cache_read] } $/token.
+sub _openrouter_prices {
+    my ($self, $root) = @_;
+    my $f = "$root/data/ai_openrouter_prices.json";
+    my $cached = eval { open my $fh, '<', $f or die; local $/; decode_json(<$fh>) };
+    return $cached->{prices} if ref $cached eq 'HASH' && ($cached->{at} // 0) > time - 86400 && ref $cached->{prices} eq 'HASH';
+    my $p = eval {
+        require HTTP::Tiny;
+        my $r = HTTP::Tiny->new(timeout => 10)->get('https://openrouter.ai/api/v1/models');
+        die "HTTP $r->{status}\n" unless $r->{success};
+        my %p;
+        for my $m (@{ decode_json($r->{content})->{data} || [] }) {
+            my $pr = $m->{pricing} || {};
+            $p{ $m->{id} } = [ 0 + ($pr->{prompt} // 0), 0 + ($pr->{completion} // 0),
+                               (defined $pr->{input_cache_read} ? 0 + $pr->{input_cache_read} : undef) ];
+        }
+        \%p;
+    };
+    if ($p && %$p) {
+        if (open my $fh, '>', "$f.tmp") { print $fh encode_json({ at => time, prices => $p }); close $fh; rename "$f.tmp", $f }
+        return $p;
+    }
+    return ref $cached eq 'HASH' && ref $cached->{prices} eq 'HASH' ? $cached->{prices} : {};
 }
 
 1;

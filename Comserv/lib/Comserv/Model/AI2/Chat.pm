@@ -75,6 +75,7 @@ sub build_agent_prompt {
         documentation => "You are the AI Editor documentation agent. Prefer docs/changelog/planning guidance; avoid code file rewrites unless asked.",
         analyze => "You are the AI Editor Analyze worker. Read loaded [FILE:] buffers and named paths only. Return root cause + short plan. Never rewrite files, never emit ## FIX / full-file patches, never ask the user to paste files already provided.",
         nav      => "You are a navigation assistant. Help the user find the right page or feature in Comserv.",
+        investigator => "You are a cost-effective investigator using only cheap or free models. Your job is to search logs, code, git history, usage data, and reports to answer questions about what happened. Be efficient and produce a clear report with findings, relevant paths, commits if possible, and direct quotes. Use [READ_FILE: path] if you need more. For git describe what to look up (recent commits, diffs on current branch, etc.).",
     );
     return $agent{$aid} if exists $agent{$aid};
     return undef;
@@ -213,14 +214,23 @@ sub build_messages {
 }
 
 # Select provider+model via the v2 Router (role/context-aware, local-first).
+# Forward prompt/phase/agent so classify_prompt_for_routing can map the question
+# (using local Ollama eval model if available) to Supergrok/paid/free.
 sub select_provider_and_model {
     my ($self, $c, $requested_model, $can_select, %ctx) = @_;
     my $router = $c->model('AI2::Router');
-    return $router->select_model($c,
+    my ($prov, $model) = $router->select_model($c,
         requested_model => $requested_model,
         can_select      => $can_select,
+        prompt          => $ctx{prompt} || $ctx{user_prompt},
+        phase           => $ctx{phase},
+        agent_id        => $ctx{agent_id},
         %ctx,
     );
+    # Also run classify to surface quota warning for system message
+    my $cl = $router->classify_prompt_for_routing($c, $ctx{prompt} || $ctx{user_prompt},
+        agent_id => $ctx{agent_id}, phase => $ctx{phase}, %ctx);
+    return ($prov, $model, $cl);
 }
 
 # Main entry: run a chat turn. Returns { success, response, model, usage? }.
@@ -492,10 +502,24 @@ sub process {
     }
 
     # Select provider+model (v2 Router)
-    my ($provider_name, $use_model) = $self->select_provider_and_model($c,
+    # Pass prompt + phase + agent so the new classification (question map using
+    # local Ollama eval model when available) can choose Supergrok (allotment OK?),
+    # paid, or free.
+    my ($provider_name, $use_model, $cl) = $self->select_provider_and_model($c,
         $args{model}, $can_select,
         agent_id => $args{agent_id},
+        phase    => $args{phase},
+        prompt   => $prompt,
     );
+    $cl ||= {};
+    my $quota_msg = '';
+    if ($cl->{quota_warning}) {
+        my $next = $cl->{suggested_next_model} || 'a free/cheap model (e.g. openrouter/cohere/north-mini-code:free or local ollama)';
+        $quota_msg = "⚠ SYSTEM WARNING: " . $cl->{quota_warning} . " Switch to $next. Update your Hermes config (default, editor, director, git aliases) to stop using grok-build-0.1 / xai-oauth as default. This applies to both SuperGrok and paid OpenRouter daily quotas.";
+        push @thinking, 'QUOTA: ' . $quota_msg;
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'process',
+            'Daily quota hit in classify: ' . $cl->{quota_warning} . ' suggested=' . $next . ' (or_over=' . ($cl->{openrouter_over_daily}||0) . ', sg_locked=' . ($cl->{supergrok_locked}||0) . ')');
+    }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
         "AI2 chat dispatch: user=$username provider=$provider_name model="
         . ($use_model // '(router-default)') . " can_select=$can_select");
@@ -973,12 +997,15 @@ sub process {
     eval {
         my $usage_info = $resp->{usage} || {};
         my $used = $resp->{model} || $use_model || 'unknown';
+        my $req_agent = $args{agent_id} // '';
+        my $req_phase = $args{phase} // '';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
             "AIMPS model_used provider=$provider_name model=$used "
             . "prompt_tokens=" . ($usage_info->{prompt_tokens} || 0)
             . " completion_tokens=" . ($usage_info->{completion_tokens} || 0)
             . " total_tokens=" . ($usage_info->{total_tokens} || 0)
-            . " user=$username duration_ms=" . (_aimps_elapsed_ms($t0) // '?'));
+            . " user=$username duration_ms=" . (_aimps_elapsed_ms($t0) // '?')
+            . " requested_agent=$req_agent requested_phase=$req_phase");
         $c->model('AI')->log_usage($c,
             provider          => $provider_name,
             model             => $used,
@@ -1036,6 +1063,7 @@ sub process {
         original_model  => $resp->{original_model},
         original_error  => $resp->{original_error},
         all_exhausted   => $resp->{all_exhausted},
+        ($quota_msg ? (system_warning => $quota_msg, quota_switched => 1) : ()),
     };
 }
 

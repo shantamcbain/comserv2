@@ -117,7 +117,7 @@
   [% IF is_admin && eval_summary %][% INCLUDE 'ai/usage_eval_card.tt' %][% END %]
   [%# Model failover (AISYSTEM plan §5e) — admin only; controller only builds it for admins. %]
   [% IF is_admin && fallover %][% INCLUDE 'ai/usage_fallover_card.tt' %][% END %]
-  [% IF is_admin && ai_health %][% INCLUDE 'ai/usage_health_card.tt' %][% INCLUDE 'ai/usage_unified_card.tt' %][% END %]
+  [% IF is_admin && ai_health %][% INCLUDE 'ai/usage_health_card.tt' %][% INCLUDE 'ai/usage_unified_card.tt' %][% INCLUDE 'ai/usage_estimator_card.tt' %][% END %]
 
   <details id="usage-charts">
     <summary style="cursor:pointer;color:var(--link-color);">14-day token and API-call charts</summary>

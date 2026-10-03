@@ -259,6 +259,17 @@ header h1 {
 </div>
 [% END %]
 
+<!-- AI model guard banner: shown to admin/developer on every page when a
+     paid model should be switched away from (SuperGrok cap, OpenRouter spend
+     cap, or credits exhausted).  Checked in Root::auto. -->
+[% IF supergrok_guard_locked && is_admin && supergrok_guard_notice %]
+<div class="ai-guard-banner" role="alert" style="margin:0;padding:10px 16px;border-bottom:2px solid var(--warning-color,#d97706);background:var(--schema-alert-warning-bg,#fff3cd);color:var(--text-color);font-size:14px;text-align:center;">
+  <strong>⚠ [% supergrok_guard_notice | html %]</strong>
+  <span style="margin-left:12px;font-size:12px;opacity:0.8;">Start a new Hermes session or run <code style="font-size:12px;">hermes config set model.default openrouter/cohere/north-mini-code:free</code> to match.</span>
+  <a href="/ai/usage#ai-health" style="margin-left:12px;font-size:12px;">Details</a>
+</div>
+[% END %]
+
 <!-- Include Debug Template - shows session/stash when debug_mode=1 -->
 [% IF c.session.debug_mode == 1 %]
 [% INCLUDE 'debug.tt' %]

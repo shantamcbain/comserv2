@@ -134,6 +134,43 @@ sub extract_path_mentions {
     return \@out;
 }
 
+sub extract_git_requests {
+    my ($self, $text) = @_;
+    return [] unless defined $text && $text =~ /\[GIT:/i;
+    my @out;
+    while ($text =~ /\[GIT:\s*([^\]]+)\]/gi) {
+        push @out, $1;
+        last if @out >= 5;
+    }
+    return \@out;
+}
+
+# Safe limited git queries (no arbitrary commands, branch aware via cwd/git)
+sub safe_git_query {
+    my ($self, $req) = @_;
+    $req = lc($req // '');
+    $req =~ s/[^a-z0-9\s\-~^:\.\/]//g;  # sanitize
+    return '' unless $req;
+
+    my $out = '';
+    eval {
+        if ($req =~ /recent.*commit|log|history/) {
+            $out = `git log --oneline -10 --decorate 2>/dev/null | head -20`;
+        } elsif ($req =~ /diff|change/) {
+            $out = `git diff --name-only HEAD~1 2>/dev/null | head -20`;
+            $out .= "\n" . `git diff --stat HEAD~1 2>/dev/null | tail -5`;
+        } elsif ($req =~ /branch|current/) {
+            $out = `git branch --show-current 2>/dev/null`;
+            $out .= `git log -1 --pretty=%h\ %s 2>/dev/null`;
+        } else {
+            $out = `git log --oneline -5 2>/dev/null`;
+        }
+        chomp $out;
+        $out = substr($out, 0, 2000) if length($out) > 2000;
+    };
+    return $out || '(git query failed or no output)';
+}
+
 sub truncate_text {
     my ($self, $text, $limit) = @_;
     $limit ||= $MAX_CHARS;
@@ -157,6 +194,7 @@ sub editor_contract {
         "To load another file emit exactly: [READ_FILE: lib/Comserv/Controller/AI2.pm]",
         "Optional line slice: [READ_FILE: lib/Comserv/Controller/AI2.pm:100-200]",
         "Only lib/, root/, sql/, script/, t/ — never .env, secrets, or credentials.",
+        "For git (investigator mode): include [GIT: recent commits] or [GIT: diff HEAD~1] in your thinking; server will attach safe output.",
         "After files load, answer from the code. Put suggested edits in one fenced code block so Approve can apply them.",
     );
 }
@@ -302,9 +340,33 @@ sub prepare_turn {
 
     my @reqs = @{ $self->extract_read_requests($prompt) };
     my @mentions = @{ $self->extract_path_mentions($prompt) };
+
+    # Auto-load source for common admin pages when user mentions the URL or "fix the page".
+    # This addresses cases where the AI editor is asked to fix a rendered page (e.g. /ai/usage)
+    # but the user only loaded the post-hoc eval report instead of the actual .tt + controller.
+    if ($prompt =~ m{/ai/usage|usage page|fix.*usage}i) {
+        push @reqs, { path => 'root/ai/usage.tt' };
+        push @reqs, { path => 'root/ai/usage_fallover_card.tt' };
+        push @reqs, { path => 'root/ai/usage_health_card.tt' };
+        push @reqs, { path => 'lib/Comserv/Controller/AI.pm', start => 12844, limit => 100 };  # usage sub
+        push @reqs, { path => 'lib/Comserv/Model/AI2/UsageMonitor.pm', start => 1373, limit => 150 };  # fallover_summary
+    }
+
     my $loaded = $self->load_paths($c, [ @reqs, @mentions ], skip => \%skip);
     push @file_blocks, $loaded->{blocks} if $loaded->{blocks};
     push @files, @{ $loaded->{files_read} || [] };
+
+    # Basic safe git support for investigator/research (branch-aware)
+    my @git_reqs = @{ $self->extract_git_requests($prompt) };
+    if (@git_reqs) {
+        for my $req (@git_reqs) {
+            my $git_out = $self->safe_git_query($req);
+            if ($git_out) {
+                push @file_blocks, "[GIT: $req]\n$git_out\n[/GIT]";
+                push @files, "git:$req";
+            }
+        }
+    }
 
     my $file_blob = join("\n\n", grep { defined && length } @file_blocks);
     return {

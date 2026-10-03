@@ -917,6 +917,17 @@ sub chat :Local :Args(0) {
     my $agent_id= $json_data->{agent_id} // '';
     my $agent_id_requested = $agent_id;
     my $editor_phase = lc($json_data->{phase} // '');
+
+    # For editor agents, treat old cheap free defaults as "auto" so Router
+    # classification + Supergrok (when available per guard) can run instead of
+    # forcing the weak model for initial analyze/evaluation.
+    if ($agent_id =~ /^(programming|coding|code|documentation|analyze)$/i) {
+        if ($model =~ /cohere\/north-mini|gemma-4-31b-it:free|nemotron-3\.5-lightning:free|north-mini-code:free/i || $model eq '') {
+            $model = '';
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ai2_chat',
+                "editor agent=$agent_id phase=$editor_phase: treating cheap/empty model as auto for smart router selection");
+        }
+    }
     unless (Comserv::Util::ModelCatalog->agent_allowed($c, $agent_id)) {
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
             'ai2_chat', "Clamped disallowed agent_id='$agent_id' to general");

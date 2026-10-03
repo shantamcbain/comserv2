@@ -1,6 +1,12 @@
 [%# Admin banners: SuperGrok guard switch + stale AI meters. Data from
   # UsageMonitor->ai_banner (/ai) or ->ai_health (/ai/usage). No JS. %]
 [% bn = ai_health || ai_admin_banner %]
+[% IF bn.overrun_banner %]
+<div class="alert alert-danger ai-overrun-banner" id="hermes-overrun" role="alert" style="margin:8px 0;padding:10px;border:2px solid var(--danger-color,#dc2626);border-radius:6px;">
+  <strong>⛔ [% bn.overrun_banner | html %]</strong>
+  <span class="doc-muted">Last check [% bn.overrun.last_check_pt | html %]. Backup: <code>[% bn.overrun.backup | html %]</code>. Notice: <code>~/.hermes/overrun_notice.txt</code>. <a href="/ai/usage#ai-health">Details</a></span>
+</div>
+[% END %]
 [% IF bn.guard_banner %]
 <div class="alert alert-warning ai-guard-banner" role="status" style="margin:8px 0;padding:10px;border:2px solid var(--warning-color,#d97706);border-radius:6px;">
   <strong>⚠ [% bn.guard_banner | html %]</strong>

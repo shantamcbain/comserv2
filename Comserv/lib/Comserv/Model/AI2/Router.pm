@@ -107,6 +107,11 @@ my %CONTEXT_PREFS = (
     code        => ['qwen3-coder', 'qwen2.5-coder', 'phi4', 'gemma4'],
     developer   => ['qwen3-coder', 'qwen2.5-coder', 'phi4'],
     docker      => ['phi4', 'gemma4'],
+    # Editor agents (from ai2/editor dropdown): analyze = root cause/short plan (can be lighter),
+    # programming = code work (prefer coder models or higher tier), documentation = plans/docs.
+    analyze     => ['gemma4', 'phi4', 'qwen2.5', 'qwen3-coder'],
+    programming => ['qwen3-coder', 'qwen2.5-coder', 'gemma4', 'phi4'],
+    documentation => ['qwen2.5', 'gemma4', 'phi4'],
 );
 
 my %ROLE_TO_CONTEXT = (
@@ -136,14 +141,188 @@ sub _context_for {
     $agent_id //= 'general';
     my $ctx = lc($agent_id);
     $ctx = 'helpdesk' if $ctx =~ /helpdesk/;
-    $ctx = 'code'     if $ctx =~ /code|developer|starcoder/;
+    $ctx = 'code'     if $ctx =~ /code|developer|starcoder|programming/;
     $ctx = 'bmaster'  if $ctx =~ /bmast|beekeep|apiar/;
     $ctx = 'csc'      if $ctx =~ /^csc$/;
     $ctx = 'ency'     if $ctx =~ /^ency$/;
     $ctx = 'docker'   if $ctx =~ /docker/;
     $ctx = 'navigation' if $ctx =~ /nav/;
+    $ctx = 'analyze' if $ctx =~ /analyze/;
+    $ctx = 'documentation' if $ctx =~ /documentation|doc/;
     $ctx = 'general'  unless exists $CONTEXT_PREFS{$ctx};
     return $ctx;
+}
+
+# classify_prompt_for_routing($c, $prompt, %ctx) -> { tier => 'supergrok'|'paid'|'free',
+#   complexity => 'low|med|high', domain => '...', use_supergrok => 0|1, notes => '...' }
+# Uses agent/phase from ctx + prompt keywords (rule based). If a cheap local Ollama
+# "evaluation" model is available (newly installed small/fast one), it will call it
+# with a classification prompt for structured mapping. This lets the router decide
+# initial model instead of client forcing the weakest free for "analyze"/evaluation.
+# Respects agent selection (analyze/programming/documentation from editor dropdown).
+sub classify_prompt_for_routing {
+    my ($self, $c, $prompt, %ctx) = @_;
+    my $p = lc($prompt // '');
+    my $agent = lc($ctx{agent_id} // $ctx{agent} // '');
+    my $phase = lc($ctx{phase} // '');
+    my $notes = '';
+
+    # Rule-based from agent + phase + keywords (fast, no tokens).
+    my $tier = 'free';
+    my $complexity = 'med';
+    my $domain = 'general';
+    my $use_sg = 0;
+
+    if ($agent =~ /analyze/) {
+        $domain = 'analysis';
+        $tier = 'free';  # default cheap for root-cause
+        $notes .= 'analyze agent favors sufficient free; ';
+    } elsif ($agent =~ /programming|code/) {
+        $domain = 'code';
+        $complexity = 'high' if $p =~ /implement|fix|write|complex|bug|refactor/;
+        $tier = 'paid' if $complexity eq 'high';
+        $notes .= 'programming agent; ';
+    } elsif ($agent =~ /documentation|doc/) {
+        $domain = 'docs';
+        $tier = 'free';
+        $notes .= 'documentation agent; ';
+    } elsif ($agent =~ /investigat|research|find.*(log|git|code)|cheap.*(find|search)|investigator/) {
+        $tier = 'free';
+        $notes .= 'investigator mode: forcing cheap/free model for cost-effective search; ';
+        $complexity = 'low';  # keep it cheap
+    }
+
+    if ($phase =~ /implement|plan/) {
+        $complexity = 'high' if $complexity ne 'high';
+        $tier = 'paid' if $tier eq 'free' && $p =~ /\b(code|fix|implement|patch)\b/;
+    }
+    if ($phase =~ /analyze|clarify/) {
+        $tier = 'free' unless $complexity eq 'high';
+    }
+
+    if ($p =~ /\b(root cause|deep analysis|evaluate|review|why|how does|complex)\b/) {
+        $complexity = 'high';
+        $notes .= 'high complexity keywords; ';
+    }
+    if ($p =~ /\b(simple|quick|list|explain briefly)\b/) {
+        $complexity = 'low';
+    }
+
+    # Check SuperGrok guard early for allotment.
+    # For editor agents (programming/analyze/documentation), mark supergrok available
+    # and prefer it when the guard says daily allotment remains and key resolves.
+    my $guard = $self->supergrok_guard($c);
+    my $sg_available = !$guard->{locked} && $self->_external_default_available($c, 'supergrok|grok-4.6');
+    if ($sg_available) {
+        # Point 3: always do a live spend/estimate before allowing SuperGrok (not just failover)
+        my $fresh_spend = eval { $self->openrouter_spend($c) } || {};
+        my $spend_ok = $fresh_spend->{ok} && (($fresh_spend->{day} || 0) < 1.0);  # conservative live check
+        if ($spend_ok && ($complexity eq 'high' || $agent =~ /programming|code/ || $phase =~ /implement/ || $agent =~ /analyze|documentation/)) {
+            $use_sg = 1;
+            $tier = 'supergrok';
+            $notes .= 'supergrok available (guard ok + live spend ok) and suitable; ';
+        } else {
+            $notes .= 'live spend high or guard marginal — skipping supergrok; ';
+        }
+    }
+
+    # Early OpenRouter / daily quota check (symmetric to supergrok guard).
+    # If over soft daily cap (or credits low), force free tier and record warning.
+    # This makes the aisystem switch and can surface a system warning to the user.
+    my $or_spend = eval { $self->openrouter_spend($c) } || {};
+    my $or_over = 0;
+    my $day_cap = 1.65;
+    if ($or_spend->{ok}) {
+        if (($or_spend->{day} || 0) >= $day_cap) {
+            $or_over = 1;
+            $tier = 'free';
+            $use_sg = 0;
+            $notes .= 'openrouter daily cap reached or exceeded — forcing free/cheap only; ';
+        }
+    }
+    if ($guard->{locked}) {
+        $tier = 'free' if $tier ne 'free';
+        $use_sg = 0;
+        $notes .= 'supergrok guard locked — forcing free; ';
+    } else {
+        # Reserve for critical calls: if close to daily cap, force free except high priority
+        my $used = $guard->{used_today} // 0;
+        my $cap  = $guard->{daily_cap} // 100;
+        if ($used >= ($cap - 3)) {  # keep ~3% reserve
+            if ($agent !~ /critical|admin|helpdesk|urgent/) {
+                $tier = 'free';
+                $use_sg = 0;
+                $notes .= 'near daily cap (reserve for critical) — forcing free; ';
+            } else {
+                $notes .= 'near cap but critical agent allowed; ';
+            }
+        }
+    }
+
+    # Optional: use a new local Ollama eval/classifier model if reachable (cheap, no $).
+    # Looks for a small/fast one (e.g. user-installed eval-tuned qwen/phi/gemma variant).
+    # Falls back to rules if not.
+    my $used_llm_classify = 0;
+    eval {
+        my $ollama = $c->model('AI2::Provider::Ollama');
+        my ($host, $port) = $ollama->resolve_host($c) if $ollama && $ollama->can('resolve_host');
+        if ($ollama && $ollama->check_connection($c, $host, $port)) {
+            # Pick a small local model for classification (prefer any :small or known fast).
+            my $models = $ollama->list_models($c, $host, $port) || [];
+            my $clf_model;
+            for my $m (@$models) {
+                my $name = ref($m) ? ($m->{name}||'') : $m;
+                next unless $name && $self->_is_chat_model($name);
+                if ($name =~ /eval|classifier|small|mini|3b|1b|qwen2\.5:3|phi4:mini|gemma.*2b/i) {
+                    $clf_model = $name; last;
+                }
+            }
+            $clf_model ||= 'phi4:mini' if grep { /phi4/i } map { ref($_)?($_->{name}||'') : $_ } @$models;
+            $clf_model ||= ($models->[0] ? (ref($models->[0]) ? $models->[0]->{name} : $models->[0]) : undef);
+
+            if ($clf_model) {
+                my $classify_prompt = "Classify this AI request for routing tier.\n" .
+                    "Agent: $agent Phase: $phase\n" .
+                    "Request: " . substr($prompt||'',0,400) . "\n\n" .
+                    "Return ONLY compact JSON: {\"tier\":\"supergrok|paid|free\",\"complexity\":\"low|med|high\",\"domain\":\"code|analysis|docs|general\",\"use_supergrok\":true|false,\"notes\":\"short reason\"}";
+                my $resp = $ollama->chat($c, messages => [
+                    {role=>'system', content=>'You are a fast request classifier. Output only JSON.'},
+                    {role=>'user', content=>$classify_prompt}
+                ], model => $clf_model, host=>$host, port=>$port);
+                if ($resp && $resp->{success} && $resp->{response}) {
+                    my $json = $resp->{response};
+                    $json =~ s/.*?(\{.*\}).*/$1/s;  # crude extract
+                    my $data = eval { JSON->new->decode($json) } || {};
+                    if ($data->{tier}) {
+                        $tier = $data->{tier} if $data->{tier} =~ /^(supergrok|paid|free)$/;
+                        $complexity = $data->{complexity} if $data->{complexity};
+                        $domain = $data->{domain} if $data->{domain};
+                        $use_sg = $data->{use_supergrok} ? 1 : 0;
+                        $notes .= 'llm-classified(' . ($clf_model||'local') . '); ';
+                        $used_llm_classify = 1;
+                    }
+                }
+            }
+        }
+    };
+    if ($@) {
+        $notes .= 'llm-classify skipped (' . substr($@,0,60) . '); ';
+    }
+
+    return {
+        tier => $tier,
+        complexity => $complexity,
+        domain => $domain,
+        use_supergrok => $use_sg,
+        agent => $agent,
+        phase => $phase,
+        notes => $notes,
+        used_llm => $used_llm_classify,
+        openrouter_over_daily => $or_over,
+        supergrok_locked => $guard->{locked} ? 1 : 0,
+        quota_warning => ($or_over || $guard->{locked}) ? 'Daily quota reached — switched to free/cheap tier' : '',
+        suggested_next_model => ($or_over || $guard->{locked}) ? 'openrouter/cohere/north-mini-code:free' : '',
+    };
 }
 
 # Strip embeddings/rerankers/tts to avoid 400s from non-chat models.
@@ -210,22 +389,49 @@ sub select_model {
     my $requested   = $ctx{requested_model};
     my $installed   = $ctx{installed_models} // [];
     my $default     = $ctx{default_model};
-    my $context_key = $self->_context_for($ctx{agent_id} // $ctx{page_context} // 'general');
+    my $agent_id    = $ctx{agent_id} // $ctx{page_context} // 'general';
+    my $context_key = $self->_context_for($agent_id);
+    my $phase       = $ctx{phase} // '';
+    my $prompt      = $ctx{prompt} // '';  # for classification if passed
+
+    # Run question mapping / classification (agent selection + prompt + phase).
+    # This is the core of the upgrade: map to Supergrok (daily OK?), paid available,
+    # or free if it will do the job without spending.
+    my $cl = $self->classify_prompt_for_routing($c, $prompt, agent_id => $agent_id, phase => $phase, %ctx);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'select_model',
+        sprintf("classify tier=%s use_sg=%s agent=%s phase=%s complexity=%s sg_available=%s or_over=%s sg_locked=%s quota_note=%s notes=%s",
+            $cl->{tier} // '', $cl->{use_supergrok} // 0, $agent_id, $phase, $cl->{complexity} // '', 
+            ($self->_external_default_available($c, 'supergrok|grok-4.6') ? 1 : 0),
+            $cl->{openrouter_over_daily} // 0, $cl->{supergrok_locked} // 0,
+            ($cl->{quota_warning} || ''), substr($cl->{notes} // '', 0, 100)));
 
     # 1) Explicit selection wins if the provider can serve it.
-    #    Grok-named models use SuperGrok (weekly prepaid) when that
-    #    credential exists — never OpenRouter Grok, never xAI pay-per-token first.
-    if ($requested) {
+    #    But for editor agents (analyze/programming/documentation), ignore
+    #    the old cheap free defaults (cohere/north-mini, gemma-4-31b etc.)
+    #    so the smart classification + Supergrok guard can run.
+    #    User explicit strong picks (or header) still honored.
+    my $is_editor_agent = $agent_id =~ /^(programming|coding|code|documentation|analyze)$/i;
+    my $is_cheap_default = $requested =~ /cohere\/north-mini|gemma-4-31b-it:free|nemotron-3\.5-lightning:free|north-mini-code:free/i;
+    if ($requested && $requested !~ /^(auto|router|let.?router|'')$/i && !($is_editor_agent && $is_cheap_default)) {
         my ($prov, $model) = $self->_detect_provider($requested);
         ($prov, $model) = $self->_prefer_supergrok($c, $prov, $model);
         return ($prov, $model);
     }
 
-    # 1.5) SuperGrok weekly credits BEFORE any paid OpenRouter hop.
-    # OpenRouter has no auto-fill — do not default the app onto a paid OR model.
-    if ($self->_external_default_available($c, 'supergrok|grok-4.6')) {
-        return ('supergrok', 'grok-4.6');
+    # 1.5) SuperGrok weekly/daily credits (per guard from 15min eval) BEFORE paid.
+    # Respect classification + agent (programming/analyze) + allotment.
+    my $guard = $self->supergrok_guard($c);
+    my $sg_key_available = $self->_external_default_available($c, 'supergrok|grok-4.6');
+    if (!$guard->{locked} && $sg_key_available) {
+        if ($cl->{use_supergrok} || $is_editor_agent || $cl->{complexity} eq 'high' || $agent_id =~ /programming|code/) {
+            # Prefer grok-build-0.1 for editor/build work when SuperGrok allotment available.
+            my $sg_model = ($cl->{domain} =~ /code|programming/ || $agent_id =~ /programming|code|analyze/) ? 'grok-build-0.1' : 'grok-4.6';
+            return ('supergrok', $sg_model);
+        }
     }
+
+    # If we have a strong classification preferring supergrok but locked, note it.
+    # Continue to paid or free.
 
     # 2) Build a lookup of installed chat models (short name -> full name).
     my %installed;
@@ -237,27 +443,45 @@ sub select_model {
         $installed{$short} = $name;
     }
 
-    # 3) Context preference (first installed match wins).
+    # 3) Context preference (first installed match wins). Now aware of editor agents.
     my $prefs = $CONTEXT_PREFS{$context_key} || $CONTEXT_PREFS{general};
     for my $pref (@$prefs) {
         for my $key (keys %installed) {
             if ($key =~ /\Q$pref\E/i) {
+                # If classification says paid/supergrok needed but we are here (locked),
+                # still return the local pref but caller can escalate.
                 return ('ollama', $installed{$key});
             }
         }
     }
 
-    # 4) Default model if installed + chat-capable.
+    # 4) Use classification to pick a better initial (respect agent dropdown).
+    # For analyze: prefer a sufficient free (or paid if high).
+    # For programming: coder or escalate.
+    if ($cl->{tier} eq 'supergrok' && !$guard->{locked} && !$cl->{openrouter_over_daily} && !$cl->{supergrok_locked}) {
+        return ('supergrok', 'grok-build-0.1');
+    }
+    if ($cl->{quota_warning} || $cl->{openrouter_over_daily} || $cl->{supergrok_locked}) {
+        # Force free path with concrete model so aisystem auto-switches and warning can name it.
+        my $next = $cl->{suggested_next_model} || 'cohere/north-mini-code:free';
+        return ('openrouter', $next);
+    }
+    if ($cl->{tier} eq 'paid') {
+        # Try to find a suitable paid from installed or let fallback handle.
+        # For now fall to prefs; chat_with_fallback will use chains for paid.
+    }
+
+    # 5) Default model if installed + chat-capable.
     if ($default && $self->_is_chat_model($default)) {
         return ('ollama', $default)
             if $installed{$default} || grep { $_ eq $default } values %installed;
     }
 
-    # 5) Any installed chat model.
+    # 6) Any installed chat model (context aware).
     my @chat = grep { $self->_is_chat_model($_) } values %installed;
     return ('ollama', $chat[0]) if @chat;
 
-    # 6) Hardcoded safe fallback (local-first) — must match an installed model.
+    # 7) Hardcoded safe fallback (local-first) — must match an installed model.
     return ('ollama', 'phi4:14b');
 }
 
