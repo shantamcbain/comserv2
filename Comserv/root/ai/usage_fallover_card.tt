@@ -45,7 +45,7 @@
         <div class="doc-muted">OpenRouter (API)</div>
         [% IF orx.ok %]
         <div style="font-size:1.3em;font-weight:600;">balance [% orx.balance_usd.defined ? '$' _ orx.balance_usd : '—' %]</div>
-        <div class="doc-muted">day $[% orx.day_usd.defined ? orx.day_usd | format('%.2f') : '—' %] · week $[% orx.week_usd.defined ? orx.week_usd | format('%.2f') : '—' %] · month $[% orx.month_usd.defined ? orx.month_usd | format('%.2f') : '—' %]
+        <div class="doc-muted">day $[% IF orx.day_usd.defined; orx.day_usd | format('%.2f'); ELSE; '—'; END %] · week $[% IF orx.week_usd.defined; orx.week_usd | format('%.2f'); ELSE; '—'; END %] · month $[% IF orx.month_usd.defined; orx.month_usd | format('%.2f'); ELSE; '—'; END %]
           [% IF orx.exhausted %]<strong>· credits exhausted</strong>[% END %]</div>
         [% ELSE %]<div class="doc-muted">unavailable[% IF orx.error %]: [% orx.error | html %][% END %]</div>[% END %]
       </div>
