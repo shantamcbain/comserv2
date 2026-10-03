@@ -504,9 +504,8 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         # workstation and the prod server, where the hardcoded workstation
         # path does not exist (which is why 'nothing happened' on prod).
         my $repo_path = __FILE__;
+        # .../Comserv/lib/Comserv/Controller/Admin/Docker.pm → .../Comserv
         $repo_path =~ s{/lib/Comserv/Controller/Admin/Docker\.pm$}{};
-        $repo_path =~ s{/lib/Comserv/?$}{};
-        $repo_path =~ s{/Comserv/?$}{};
         if (!-d "$repo_path/script" && -d "/opt/comserv/Comserv/script") {
             $repo_path = "/opt/comserv/Comserv";
         }
@@ -1011,6 +1010,14 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
     my $image_repo    = $c->req->param('image_repo')    || '';
     my $log_file = '/tmp/comserv_deploy.log';
     my $pid_file = '/tmp/comserv_deploy.pid';
+    # Keep prior run for post-mortems (UI + /tmp both vanish otherwise)
+    if (-f $log_file) {
+        my $arch_dir = '/home/shanta/PycharmProjects/comserv2/log/docker_deploy/comserv2-web-prod';
+        mkdir $arch_dir unless -d $arch_dir;
+        my @t = localtime();
+        my $ts = sprintf('%04d%02d%02d_%02d%02d%02d', $t[5]+1900,$t[4]+1,$t[3],$t[2],$t[1],$t[0]);
+        eval { require File::Copy; File::Copy::copy($log_file, "$arch_dir/deploy_$ts.log"); 1 };
+    }
     unlink $log_file;
     unlink $pid_file;
 
@@ -1090,9 +1097,8 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
         # workstation and the prod server, where the hardcoded workstation
         # path does not exist (which is why 'nothing happened' on prod).
         my $repo_path = __FILE__;
+        # .../Comserv/lib/Comserv/Controller/Admin/Docker.pm → .../Comserv
         $repo_path =~ s{/lib/Comserv/Controller/Admin/Docker\.pm$}{};
-        $repo_path =~ s{/lib/Comserv/?$}{};
-        $repo_path =~ s{/Comserv/?$}{};
         if (!-d "$repo_path/script" && -d "/opt/comserv/Comserv/script") {
             $repo_path = "/opt/comserv/Comserv";
         }
@@ -1105,26 +1111,45 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
                  : ($deploy_target eq "production2") ? "192.168.1.127"
                  : $deploy_target;
         my $is_local = ($node eq 'workstation' || $node eq 'local' || $node eq '192.168.1.199');
-        my $flag = ($mode eq 'pull-deploy') ? '--pull-deploy'
-                 : ($mode eq 'build-push')  ? '--build-push'
-                 : $is_local                ? '--local-rebuild'
-                 : '--deploy-to-node';
-        my $node_arg = ($flag eq '--local-rebuild') ? '' : " $node";
+        my $flag;
+        my $node_arg = '';
+        if ($mode eq 'pull-deploy') {
+            $flag = '--pull-deploy';
+            $node_arg = " $node";
+        } elsif ($mode eq 'build-push') {
+            $flag = '--build-push';
+        } elsif ($mode eq 'push-only') {
+            # Tag+push existing local image; do NOT build or recreate containers.
+            $flag = '--push-only';
+        } elsif ($is_local) {
+            $flag = '--local-rebuild';
+        } else {
+            $flag = '--deploy-to-node';
+            $node_arg = " $node";
+        }
         print $log "[".scalar(localtime)."] Running deploy.sh locally $flag$node_arg (mode=$mode). Output streams below.\n";
-        if ($is_local && $mode ne 'build-push' && $mode ne 'pull-deploy') {
+        if ($flag eq '--local-rebuild') {
             print $log "[".scalar(localtime)."] This is a WORKSTATION-only rebuild. Production will NOT be updated.\n";
         }
         $log->flush();
         close($log);
-        my $inner = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='rebuild:$mode' BUILDKIT_PROGRESS=plain script/deploy.sh $flag$node_arg";
-        my $rc = system('script', '-q', '-f', '-a', '-e', '-c', $inner, $log_file);
+        my $repo = (-d "$repo_path/script") ? $repo_path : '/home/shanta/PycharmProjects/comserv2/Comserv';
+        # Prefer bash -lc over `script` so missing `script(1)` cannot silent-fail the job.
+        my $inner = "cd '$repo' && TRIGGER_SOURCE='rebuild:$mode' BUILDKIT_PROGRESS=plain ./script/deploy.sh $flag$node_arg";
+        my $rc = system('/bin/bash', '-lc', "$inner >>'$log_file' 2>&1");
         $rc = $rc >> 8;
         if (open my $lf, '>>', $log_file) {
             print $lf "[" . scalar(localtime) . "] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
+            # Archive this run immediately so the next button press cannot erase evidence
+            my $arch_dir = '/home/shanta/PycharmProjects/comserv2/log/docker_deploy/comserv2-web-prod';
+            mkdir $arch_dir unless -d $arch_dir;
+            my @t = localtime();
+            my $ts = sprintf('%04d%02d%02d_%02d%02d%02d', $t[5]+1900,$t[4]+1,$t[3],$t[2],$t[1],$t[0]);
+            eval { require File::Copy; File::Copy::copy($log_file, "$arch_dir/deploy_$ts.log"); 1 };
             close $lf;
         }
         unlink($pid_file);
-        exit(0);
+        exit($rc ? 1 : 0);
     }
 
     # PARENT

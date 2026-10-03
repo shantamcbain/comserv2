@@ -1,0 +1,64 @@
+[% META
+   title = "Application time (UTC store + user display)"
+   description = "Single Comserv clock: Comserv::Util::AppTime stores UTC, displays in the viewer timezone."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "development,standards"
+   page_version = "0.1"
+   last_updated = "2026-08-30"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/AppTime.tt,v 0.1 2026/08/30 hermes Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    <h1 style="color:var(--text-color);">Application time — one clock</h1>
+    <p class="doc-body" style="color:var(--text-color);">
+        Do <strong>not</strong> invent per-branch time helpers. All controllers use
+        <code>Comserv::Util::AppTime</code>.
+    </p>
+
+    <h2 style="color:var(--text-color);">Rules</h2>
+    <ul style="color:var(--text-color);">
+        <li><strong>Store</strong> — UTC naive DATETIME <code>YYYY-MM-DD HH:MM:SS</code>
+            via <code>AppTime-&gt;now_utc</code> (or <code>-&gt;stamp</code>).</li>
+        <li><strong>Display</strong> — TT filter <code>[% value | user_time %]</code>
+            (or <code>AppTime-&gt;display($c, $value)</code>). Zone label included by default.</li>
+        <li><strong>Never</strong> <code>strftime(..., localtime)</code> for DB columns or user-visible stamps.</li>
+        <li><strong>Calendar “today”</strong> — <code>AppTime-&gt;today_ymd_for($c)</code>, not process local date.</li>
+    </ul>
+
+    <h2 style="color:var(--text-color);">Viewer timezone (resolution order)</h2>
+    <ol style="color:var(--text-color);">
+        <li><code>$c-&gt;session-&gt;{timezone}</code></li>
+        <li>User preference <code>ui.timezone</code> (IANA name)</li>
+        <li><code>user_schedule_settings.timezone</code> for session username</li>
+        <li><code>$ENV{COMSERV_DEFAULT_USER_TZ}</code> or <code>America/Vancouver</code></li>
+        <li><code>UTC</code></li>
+    </ol>
+    <p class="doc-body" style="color:var(--text-color);">
+        Root <code>auto</code> calls <code>AppTime-&gt;inject_request($c)</code> so
+        <code>user_timezone</code> is on the stash for every page.
+    </p>
+
+    <h2 style="color:var(--text-color);">3D queue</h2>
+    <p class="doc-body" style="color:var(--text-color);">
+        Assign / auto-assign sets <code>started_at</code> (UTC). The Active column
+        shows <code>started_at | user_time</code> only — it must <strong>not</strong>
+        fall back to <code>created_at</code> (that caused the multi-day “runtime” bug).
+    </p>
+
+    <h2 style="color:var(--text-color);">Legacy rows</h2>
+    <p class="doc-body" style="color:var(--text-color);">
+        Rows written before this change may be host-local wall clock mixed with true UTC
+        (docker). New writes are UTC. Repair old rows with an explicit conversion when needed;
+        do not add a second clock module.
+    </p>
+
+    <h2 style="color:var(--text-color);">Code</h2>
+    <p class="doc-body" style="color:var(--text-color);">
+        <code>lib/Comserv/Util/AppTime.pm</code> · TT filter in
+        <code>lib/Comserv/View/TT.pm</code> · inject in
+        <code>Controller/Root.pm</code>.
+    </p>
+</div>

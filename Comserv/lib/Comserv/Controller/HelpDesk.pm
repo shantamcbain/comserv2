@@ -2,6 +2,8 @@ package Comserv::Controller::HelpDesk;
 use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use Comserv::Util::Logging;
+use Comserv::Util::AppTime;
+use Comserv::Util::HelpDeskWebhook;
 use POSIX qw(strftime);
 use Try::Tiny;
 use JSON ();
@@ -36,15 +38,20 @@ Common setup for all HelpDesk actions
 
 sub auto :Private {
     my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
         "HelpDesk controller auto method called");
-    
+
+    # Tab icon: green HD badge (legacy public HelpDesk / zenflow :4013).
+    # page_favicon is highest priority in Header.tt.
+    $c->stash->{page_favicon} = '/favicon/helpdesk'
+        unless $c->stash->{page_favicon};
+
     # Initialize debug_msg array if it doesn't exist
     $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-    
+
     # Add the debug message to the array
     push @{$c->stash->{debug_msg}}, "HelpDesk controller loaded successfully";
-    
+
     return 1; # Allow the request to proceed
 }
 
@@ -82,8 +89,11 @@ sub index :Chained('base') :PathPart('') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "Starting HelpDesk index action");
     
-    # Set the template
-    $c->stash(template => 'CSC/HelpDesk.tt');
+    my $is_staff = $self->_is_staff($c);
+    $c->stash(
+        template => 'CSC/HelpDesk.tt',
+        is_staff => $is_staff,
+    );
     
     # Push debug message to stash
     push @{$c->stash->{debug_msg}}, "HelpDesk index action executed";
@@ -122,21 +132,28 @@ Create new ticket page
 
 sub ticket_new :Chained('ticket_base') :PathPart('new') :Args(0) {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_new', 
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_new',
         "Starting ticket_new action");
-    
+
+    my ($num1, $num2) = $self->_issue_math_challenge($c);
+
     $c->stash(
-        template => 'CSC/HelpDesk/new_ticket.tt',
-        title => 'Create New Support Ticket'
+        template        => 'CSC/HelpDesk/new_ticket.tt',
+        title           => 'Create New Support Ticket',
+        math_a          => $num1,
+        math_b          => $num2,
+        num1            => $num1,
+        num2            => $num2,
+        is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
     );
-    
+
     # Push debug message to stash
     push @{$c->stash->{debug_msg}}, "New ticket form loaded";
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_new', 
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_new',
         "Completed ticket_new action");
-    
+
     # Explicitly forward to the TT view
     $c->forward($c->view('TT'));
 }
@@ -234,22 +251,125 @@ Contact Support page
 
 sub contact :Chained('base') :PathPart('contact') :Args(0) {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'contact', 
+
+    # POST lands here (form action /HelpDesk/contact). A separate contact/send
+    # PathPart never reliably beat the HelpDesk default catch-all.
+    if (uc($c->req->method || '') eq 'POST') {
+        return $self->_process_contact_post($c);
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'contact',
         "Starting contact action");
-    
+
+    my ($num1, $num2) = $self->_issue_math_challenge($c);
+
     $c->stash(
-        template => 'CSC/HelpDesk/contact.tt',
-        title => 'Contact Support'
+        template        => 'CSC/HelpDesk/contact.tt',
+        title           => 'Contact Support',
+        math_a => $num1, num1 => $num1,
+        math_b => $num2, num2 => $num2,
+        is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
     );
-    
+
     # Push debug message to stash
     push @{$c->stash->{debug_msg}}, "Contact Support page loaded";
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'contact', 
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'contact',
         "Completed contact action");
-    
+
     # Explicitly forward to the TT view
+    $c->forward($c->view('TT'));
+}
+
+=head2 contact_send
+
+Compatibility alias: /HelpDesk/contact/send → same POST processor.
+
+=cut
+
+sub contact_send :Chained('base') :PathPart('contact') :Args(1) {
+    my ($self, $c, $arg) = @_;
+    if (defined $arg && $arg eq 'send' && uc($c->req->method || '') eq 'POST') {
+        return $self->_process_contact_post($c);
+    }
+    $c->res->redirect($c->uri_for($self->action_for('contact')));
+}
+
+sub _process_contact_post {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'contact_send',
+        "Processing contact form submission");
+
+    my $name    = $c->req->params->{name}    || '';
+    my $email   = $c->req->params->{email}   || '';
+    my $subject = $c->req->params->{subject} || '';
+    my $message = $c->req->params->{message} || '';
+
+    my $spam_err = $self->_spam_guard_fail($c, 'contact_send', $subject, $message);
+    if ($spam_err) {
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
+        $c->stash(
+            template        => 'CSC/HelpDesk/contact.tt',
+            error_msg       => $spam_err,
+            title           => 'Contact Support',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    unless ($name && $email && $subject && $message) {
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
+        $c->stash(
+            template        => 'CSC/HelpDesk/contact.tt',
+            error_msg       => 'All fields are required.',
+            title           => 'Contact Support',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+
+    try {
+        $self->_notify_contact_admins($c,
+            site_name => $site_name,
+            subject   => "[HelpDesk] Contact form: $subject",
+            body      => "A new contact form message has been submitted on $site_name.\n\n"
+                       . "From:     $name <$email>\n"
+                       . "Subject:  $subject\n\n"
+                       . "Message:\n$message\n",
+        );
+        $self->_record_public_submit($c) if $self->_is_public_guest($c);
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
+        $c->stash(
+            template        => 'CSC/HelpDesk/contact.tt',
+            success_msg     => 'Your message has been sent. We will respond within 24 hours.',
+            title           => 'Contact Support',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'contact_send',
+            "Error sending contact form: $_");
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
+        $c->stash(
+            template        => 'CSC/HelpDesk/contact.tt',
+            error_msg       => 'There was an error sending your message. Please try again.',
+            title           => 'Contact Support',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
+        );
+    };
+
     $c->forward($c->view('TT'));
 }
 
@@ -293,6 +413,137 @@ sub admin :Chained('base') :PathPart('admin') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+
+=head2 admin_settings
+
+GET/POST /HelpDesk/admin/settings — admin-configurable Grok webhook URL + auth key.
+
+=cut
+
+sub admin_settings :Chained('base') :PathPart('admin/settings') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_admin($c);
+
+    my $site_id = 1;  # shared HelpDesk defaults live on CSC
+
+    if (uc($c->req->method // '') eq 'POST') {
+        my $url  = $c->req->params->{helpdesk_webhook_url}  // '';
+        my $auth = $c->req->params->{helpdesk_webhook_auth} // '';
+        $url  =~ s/^\s+|\s+$//g;
+        $auth =~ s/^\s+|\s+$//g;
+        eval {
+            Comserv::Util::HelpDeskWebhook->save_config($c,
+                site_id => $site_id,
+                url     => $url,
+                auth    => $auth,
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_settings',
+                "Failed saving webhook config: $@");
+            $c->flash->{error_msg} = 'Failed to save webhook settings: ' . $@;
+        } else {
+            $c->flash->{success_msg} = 'HelpDesk webhook settings saved.'
+                . ($url ? '' : ' (URL empty — webhook disabled)');
+        }
+        $c->res->redirect($c->uri_for('/HelpDesk/admin/settings'));
+        return;
+    }
+
+    my $cfg = Comserv::Util::HelpDeskWebhook->resolve_config($c);
+    # Prefer DB values for the form (env still overrides at send time)
+    my ($db_url, $db_auth) = ('', '');
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('SiteConfig');
+        my $u = $rs->find({ site_id => $site_id, config_key => 'helpdesk_webhook_url' });
+        my $a = $rs->find({ site_id => $site_id, config_key => 'helpdesk_webhook_auth' });
+        $db_url  = $u ? ($u->config_value // '') : '';
+        $db_auth = $a ? ($a->config_value // '') : '';
+    };
+
+    $c->stash(
+        template          => 'CSC/HelpDesk/admin_settings.tt',
+        title             => 'HelpDesk System Settings',
+        webhook_url       => $db_url,
+        webhook_auth      => $db_auth,
+        webhook_url_effective  => $cfg->{url}  || '',
+        webhook_auth_configured => ($cfg->{auth} && $cfg->{auth} =~ /\S/) ? 1 : 0,
+        env_overrides_url => (defined $ENV{HELPDESK_WEBHOOK_URL} && $ENV{HELPDESK_WEBHOOK_URL} =~ /\S/) ? 1 : 0,
+    );
+    $c->forward($c->view('TT'));
+}
+
+=head2 api_mail_ingest_notify
+
+POST /HelpDesk/api/mail_ingest_notify — called by mail→ticket ingest bridges.
+JSON or form: ticket_number (required). Fires ticket.mail_ingested webhook.
+Staff/API local only (same soft-fail semantics).
+
+=cut
+
+sub api_mail_ingest_notify :Chained('base') :PathPart('api/mail_ingest_notify') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Allow staff session OR localhost (mail cron bridges)
+    my $addr = $c->req->address // '';
+    my $is_local = ($addr eq '127.0.0.1' || $addr eq '::1' || $addr =~ /^192\.168\.1\./);
+    unless ($is_local || $self->_is_staff($c)) {
+        $c->res->status(403);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON->new->encode({ success => 0, error => 'forbidden' }));
+        return;
+    }
+
+    my $ticket_number = $c->req->params->{ticket_number} || '';
+    if (!$ticket_number && $c->req->body) {
+        eval {
+            my $body = $c->req->body;
+            my $raw = '';
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                $raw = do { local $/; <$body> };
+            } else {
+                $raw = "$body";
+            }
+            my $data = JSON->new->decode($raw) if $raw;
+            $ticket_number = $data->{ticket_number} || $data->{ticket_id} || '' if $data;
+        };
+    }
+
+    unless ($ticket_number) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON->new->encode({ success => 0, error => 'ticket_number required' }));
+        return;
+    }
+
+    my $ticket;
+    eval {
+        $ticket = $c->model('DBEncy')->schema->resultset('SupportTicket')
+            ->find({ ticket_number => $ticket_number });
+    };
+    unless ($ticket) {
+        $c->res->status(404);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON->new->encode({ success => 0, error => 'ticket not found' }));
+        return;
+    }
+
+    $self->_fire_ticket_webhook($c,
+        event  => 'ticket.mail_ingested',
+        change => 'mail',
+        ticket => $ticket,
+    );
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(JSON->new->encode({
+        success       => 1,
+        ticket_number => $ticket->ticket_number,
+        event         => 'ticket.mail_ingested',
+    }));
+}
+
 sub admin_tickets :Chained('base') :PathPart('admin/tickets') :Args(0) {
     my ($self, $c) = @_;
     $self->_require_admin($c);
@@ -324,7 +575,7 @@ sub _load_admin_tickets {
     my $roles      = $c->session->{roles} || [];
     my @roles_list = ref $roles eq 'ARRAY' ? @$roles : split /,\s*/, $roles;
     my $is_csc     = (lc($site_name) eq 'csc')
-                  || (grep { lc($_) eq 'admin' } @roles_list
+                  || (grep { lc($_) eq 'admin' || lc($_) eq 'helpdesk' } @roles_list
                       && lc($c->session->{SiteName} || '') eq 'csc');
 
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_load_admin_tickets',
@@ -383,15 +634,34 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
 
     my $subject     = $c->req->params->{subject}     || '';
     my $description = $c->req->params->{description} || '';
-    my $category    = $c->req->params->{category}    || 'other';
-    my $priority    = $c->req->params->{priority}    || 'medium';
+    my $category    = $self->_normalize_public_category($c, $c->req->params->{category});
+    my $priority    = $self->_normalize_public_priority($c, $c->req->params->{priority});
     my $email       = $c->req->params->{email}       || $c->session->{email} || '';
 
-    unless ($subject && $description) {
+    my $spam_err = $self->_spam_guard_fail($c, 'submit_ticket', $subject, $description);
+    if ($spam_err) {
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
         $c->stash(
-            template  => 'CSC/HelpDesk/new_ticket.tt',
-            error_msg => 'Subject and description are required.',
-            title     => 'Create New Support Ticket',
+            template      => 'CSC/HelpDesk/new_ticket.tt',
+            error_msg     => $spam_err,
+            title         => 'Create New Support Ticket',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    unless ($subject && $description) {
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
+        $c->stash(
+            template      => 'CSC/HelpDesk/new_ticket.tt',
+            error_msg     => 'Subject and description are required.',
+            title         => 'Create New Support Ticket',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
         );
         $c->forward($c->view('TT'));
         return;
@@ -401,7 +671,7 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
     my $username  = $c->session->{username} || 'guest';
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
 
-    my $ticket_number = uc($site_name) . '-' . strftime('%Y%m%d', localtime) . '-' . sprintf('%04d', int(rand(9999)) + 1);
+    my $ticket_number = uc($site_name) . '-' . Comserv::Util::AppTime->today_utc_ymd_compact . '-' . sprintf('%04d', int(rand(9999)) + 1);
 
     try {
         my $schema = $c->model('DBEncy')->schema;
@@ -416,12 +686,15 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
             category      => $category,
             priority      => $priority,
             status        => 'open',
-            created_at    => strftime('%Y-%m-%d %H:%M:%S', localtime),
+            created_at    => Comserv::Util::AppTime->now_utc,
         });
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'submit_ticket',
             "Ticket created: " . $ticket->ticket_number . " (id=" . $ticket->id . ")");
 
+        $self->_record_public_submit($c) if $self->_is_public_guest($c);
+
+        my $view_url = $c->uri_for('/HelpDesk/ticket/view/' . $ticket->ticket_number);
         $self->_notify_site_admins($c,
             ticket  => $ticket,
             subject => "[HelpDesk] New ticket " . $ticket->ticket_number . ": " . $ticket->subject,
@@ -432,8 +705,15 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
                      . "Priority: " . ($ticket->priority || 'medium') . "\n"
                      . "From:     " . ($ticket->username || $ticket->email || 'Guest') . "\n\n"
                      . "Description:\n" . $ticket->description . "\n\n"
-                     . "View ticket: " . $c->uri_for('/HelpDesk/admin/tickets/open'),
+                     . "View ticket: $view_url\n"
+                     . "Open queue:  " . $c->uri_for('/HelpDesk/admin/tickets/open'),
             event   => 'submit_ticket',
+        );
+
+        $self->_fire_ticket_webhook($c,
+            event  => 'ticket.created',
+            change => 'created',
+            ticket => $ticket,
         );
 
         $c->stash(
@@ -504,14 +784,38 @@ sub view_ticket :Chained('ticket_base') :PathPart('view') :Args(1) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view_ticket',
             "Loaded " . scalar(@messages) . " messages for ticket $ticket_number");
 
+        my $success_msg = $c->flash->{success_msg} || '';
+        my $created_todo_id = $c->flash->{created_todo_id} || '';
+        if ($is_admin && $created_todo_id) {
+            $success_msg = 'Todo #' . $created_todo_id . ' created. ' .
+                '<a href="/todo/details?record_id=' . $created_todo_id . '">View/edit todo</a>';
+        } elsif ($created_todo_id) {
+            $success_msg = 'A todo has been created for this ticket.';
+        }
+
+        # Per-ticket email control for spam / no-notification cases
+        my $emails_disabled = 0;
+        if ($ticket->metadata) {
+            my $meta = eval { JSON->new->decode($ticket->metadata) } || {};
+            $emails_disabled = $meta->{emails_disabled} ? 1 : 0;
+        }
+
+        my $staff_username = $c->session->{username} || '';
+        my $staff_display  = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+        $staff_display     = $staff_username unless $staff_display =~ /\S/;
+
         $c->stash(
-            template     => 'CSC/HelpDesk/ticket_view.tt',
-            ticket       => $ticket,
-            messages     => \@messages,
-            is_staff     => $is_admin,
-            title        => 'Ticket: ' . $ticket_number,
-            success_msg  => $c->flash->{success_msg} || '',
-            error_msg    => $c->flash->{error_msg}   || '',
+            template          => 'CSC/HelpDesk/ticket_view.tt',
+            ticket            => $ticket,
+            messages          => \@messages,
+            is_staff          => $is_admin,
+            title             => 'Ticket: ' . $ticket_number,
+            success_msg       => $success_msg,
+            error_msg         => $c->flash->{error_msg}   || '',
+            emails_disabled   => $emails_disabled,
+            guest_email       => $ticket->email || '',
+            staff_username    => $staff_username,
+            staff_display     => $staff_display,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_ticket',
@@ -574,7 +878,7 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
             return;
         }
 
-        my $reply_now = strftime('%Y-%m-%d %H:%M:%S', localtime);
+        my $reply_now = Comserv::Util::AppTime->now_utc;
 
         if ($sender_type eq 'user' && ($ticket->status eq 'closed' || $ticket->status eq 'resolved')) {
             $ticket->update({ status => 'open', updated_at => $reply_now, closed_at => undef });
@@ -617,7 +921,13 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
 
         if ($sender_type eq 'staff') {
             my $to_email = $ticket->email || '';
-            if ($to_email) {
+            # Respect per-ticket email disable (for spam etc.)
+            my $emails_disabled = 0;
+            if ($ticket->metadata) {
+                my $meta = eval { JSON->new->decode($ticket->metadata) } || {};
+                $emails_disabled = $meta->{emails_disabled} ? 1 : 0;
+            }
+            if ($to_email && !$emails_disabled) {
                 my $subject = "Re: [Ticket " . $ticket->ticket_number . "] " . $ticket->subject;
                 my $body    = "Hello,\n\n"
                     . "A staff member has replied to your support ticket.\n\n"
@@ -667,6 +977,12 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
             event   => 'ticket_reply',
         );
 
+        $self->_fire_ticket_webhook($c,
+            event  => 'ticket.replied',
+            change => 'reply',
+            ticket => $ticket,
+        );
+
         $c->flash->{success_msg} = 'Your reply has been posted.';
 
     } catch {
@@ -712,7 +1028,7 @@ sub ticket_update_status :Chained('ticket_base') :PathPart('update_status') :Arg
 
     my $staff_name  = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
     $staff_name     = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
-    my $now         = strftime('%Y-%m-%d %H:%M:%S', localtime);
+    my $now = Comserv::Util::AppTime->now_utc;
     my $site_name   = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
 
     try {
@@ -747,7 +1063,7 @@ sub ticket_update_status :Chained('ticket_base') :PathPart('update_status') :Arg
 
         $schema->resultset('TicketMessage')->create({
             ticket_id    => $ticket->id,
-            sender_type  => 'staff',
+            sender_type  => "system",  # internal todo note, not a customer reply
             sender_name  => $staff_name,
             sender_email => $c->session->{email} || '',
             body         => $audit_body,
@@ -775,8 +1091,13 @@ sub ticket_update_status :Chained('ticket_base') :PathPart('update_status') :Arg
                 : $c->uri_for('/HelpDesk/ticket/view/' . $ticket_number)->as_string;
         };
 
+        my $emails_disabled = 0;
+        if ($ticket->metadata) {
+            my $meta = eval { JSON->new->decode($ticket->metadata) } || {};
+            $emails_disabled = $meta->{emails_disabled} ? 1 : 0;
+        }
         if (($new_status eq 'closed' || $new_status eq 'resolved' || $new_status eq 'awaiting_response')
-            && $ticket->email) {
+            && $ticket->email && !$emails_disabled) {
             my ($email_subject, $email_body);
             if ($new_status eq 'awaiting_response') {
                 $email_subject = "[Ticket " . $ticket->ticket_number . "] We need your response";
@@ -809,12 +1130,184 @@ sub ticket_update_status :Chained('ticket_base') :PathPart('update_status') :Arg
                 $@ ? "Status-change email failed: $@" : "Status-change email sent to " . $ticket->email);
         }
 
+        $self->_fire_ticket_webhook($c,
+            event  => 'ticket.updated',
+            change => 'status',
+            ticket => $ticket,
+        );
+
         $c->flash->{success_msg} = "Ticket status updated to: $status_label";
 
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ticket_update_status',
             "Error updating status for $ticket_number: $_");
         $c->flash->{error_msg} = 'Error updating ticket status: ' . $_;
+    };
+
+    $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+}
+
+=head2 assign_ticket
+
+Staff-only: assign (or unassign) a ticket to a user/staff member.
+POST /HelpDesk/ticket/assign/<ticket_number>
+  params: assignee (username, name, or empty to unassign)
+
+Also records a system audit message on the ticket.
+
+=cut
+
+sub assign_ticket :Chained('ticket_base') :PathPart('assign') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    unless ($self->_is_staff($c)) {
+        $c->flash->{error_msg} = 'Permission denied.';
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $assignee = $c->req->params->{assignee} || '';
+    $assignee =~ s/^\s+|\s+$//g;  # trim
+
+    my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    $staff_name    = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
+    my $now = Comserv::Util::AppTime->now_utc;
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+
+        unless ($ticket) {
+            $c->flash->{error_msg} = 'Ticket not found.';
+            $c->res->redirect($c->uri_for('/HelpDesk/admin/tickets/open'));
+            return;
+        }
+
+        my $old = $ticket->assigned_to || '';
+        my %update = ( updated_at => $now );
+        if ($assignee) {
+            $update{assigned_to} = $assignee;
+        } else {
+            $update{assigned_to} = undef;
+        }
+
+        $ticket->update(\%update);
+
+        my $audit_body;
+        if ($assignee) {
+            if ($old && $old ne $assignee) {
+                $audit_body = "Reassigned from '$old' to '$assignee' by $staff_name";
+            } else {
+                $audit_body = "Assigned to '$assignee' by $staff_name";
+            }
+        } else {
+            $audit_body = "Unassigned (was '$old') by $staff_name" if $old;
+            $audit_body ||= "Unassigned by $staff_name";
+        }
+
+        $schema->resultset('TicketMessage')->create({
+            ticket_id    => $ticket->id,
+            sender_type  => 'system',
+            sender_name  => $staff_name,
+            sender_email => $c->session->{email} || '',
+            body         => $audit_body,
+            created_at   => $now,
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'assign_ticket',
+            "Ticket $ticket_number assigned_to=" . ($assignee || 'NULL') . " by $staff_name");
+
+        $self->_fire_ticket_webhook($c,
+            event  => 'ticket.updated',
+            change => 'assign',
+            ticket => $ticket,
+        );
+
+        $c->flash->{success_msg} = $assignee
+            ? "Ticket assigned to: $assignee"
+            : "Ticket unassigned";
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'assign_ticket',
+            "Error assigning $ticket_number: $_");
+        $c->flash->{error_msg} = 'Error assigning ticket: ' . $_;
+    };
+
+    $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+}
+
+
+=head2 update_priority
+
+Staff-only: change ticket priority.
+POST /HelpDesk/ticket/update_priority/<ticket_number>
+  params: new_priority (low|medium|high|critical)
+
+=cut
+
+sub update_priority :Chained('ticket_base') :PathPart('update_priority') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
+    return unless $self->_require_admin($c);
+
+    unless (uc($c->req->method // '') eq 'POST') {
+        $c->flash->{error_msg} = 'Invalid request method.';
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $new_priority = lc($c->req->params->{new_priority} || '');
+    $new_priority =~ s/[^a-z]//g;
+    my %ok = map { $_ => 1 } qw(low medium high critical);
+    unless ($ok{$new_priority}) {
+        $c->flash->{error_msg} = "Invalid priority: $new_priority";
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $staff_name = $c->session->{username} || $c->session->{user_name} || 'staff';
+    my $site_name  = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+        unless ($ticket) {
+            $c->flash->{error_msg} = 'Ticket not found.';
+            $c->res->redirect($c->uri_for('/HelpDesk/admin/tickets/open'));
+            return;
+        }
+
+        my $old = $ticket->priority || 'medium';
+        my $now = Comserv::Util::AppTime->now_utc;
+        $ticket->update({ priority => $new_priority, updated_at => $now });
+
+        $schema->resultset('TicketMessage')->create({
+            ticket_id    => $ticket->id,
+            sender_type  => 'system',
+            sender_name  => $staff_name,
+            sender_email => $c->session->{email} || '',
+            body         => "Priority changed from $old to $new_priority by $staff_name",
+            created_at   => $now,
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_priority',
+            "Ticket $ticket_number priority $old -> $new_priority by $staff_name");
+
+        $self->_fire_ticket_webhook($c,
+            event  => 'ticket.updated',
+            change => 'priority',
+            ticket => $ticket,
+        );
+
+        $c->flash->{success_msg} = "Ticket priority updated to: $new_priority";
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_priority',
+            "Error updating priority for $ticket_number: $_");
+        $c->flash->{error_msg} = 'Error updating priority: ' . $_;
     };
 
     $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
@@ -840,7 +1333,7 @@ sub send_reminder :Chained('ticket_base') :PathPart('remind') :Args(1) {
         return;
     }
 
-    my $now       = strftime('%Y-%m-%d %H:%M:%S', localtime);
+    my $now = Comserv::Util::AppTime->now_utc;
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
     my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
     $staff_name    = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
@@ -857,6 +1350,18 @@ sub send_reminder :Chained('ticket_base') :PathPart('remind') :Args(1) {
 
         unless ($ticket->email) {
             $c->flash->{error_msg} = 'No email address on this ticket — cannot send reminder.';
+            $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+            return;
+        }
+
+        # Check if emails are disabled for this ticket
+        my $emails_disabled = 0;
+        if ($ticket->metadata) {
+            my $meta = eval { JSON->new->decode($ticket->metadata) } || {};
+            $emails_disabled = $meta->{emails_disabled} ? 1 : 0;
+        }
+        if ($emails_disabled) {
+            $c->flash->{error_msg} = 'Email notifications are disabled for this ticket.';
             $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
             return;
         }
@@ -897,7 +1402,7 @@ sub send_reminder :Chained('ticket_base') :PathPart('remind') :Args(1) {
         } else {
             $schema->resultset('TicketMessage')->create({
                 ticket_id    => $ticket->id,
-                sender_type  => 'staff',
+                sender_type  => "system",  # internal todo note, not a customer reply
                 sender_name  => $staff_name,
                 sender_email => $c->session->{email} || '',
                 body         => "Reminder email sent to " . $ticket->email,
@@ -917,12 +1422,326 @@ sub send_reminder :Chained('ticket_base') :PathPart('remind') :Args(1) {
 
     $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
 }
+=head2 create_todo
+
+Create a todo to work on the HelpDesk ticket
+POST /HelpDesk/ticket/create_todo/<ticket_number>
+  params: todo_type (work_on | escalate), note (optional)
+
+=cut
+
+sub create_todo :Chained('ticket_base') :PathPart('create_todo') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    unless ($self->_is_staff($c)) {
+        $c->flash->{error_msg} = 'Permission denied.';
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $todo_type = $c->req->params->{todo_type} || 'work_on';
+    my $note      = $c->req->params->{note} || '';
+    my $valid_types = { work_on => 1, escalate => 1 };
+
+    unless ($valid_types->{$todo_type}) {
+        $c->flash->{error_msg} = "Invalid todo type: $todo_type";
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $now = Comserv::Util::AppTime->now_utc;
+    my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    $staff_name  = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+    my $current_date = Comserv::Util::AppTime->today_ymd_for($c);
+    my $username     = $c->session->{username} || 'admin';
+    my $user_id      = $c->session->{user_id} || 1;
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+
+        unless ($ticket) {
+            $c->flash->{error_msg} = 'Ticket not found.';
+            $c->res->redirect($c->uri_for('/HelpDesk/admin/tickets/open'));
+            return;
+        }
+
+        # Resolve project_code / project_id safely. SupportTicket has no project_code column.
+        # Prefer a project matching the ticket's site_name, else fall back to PLANNING.
+        my $project_code = 'PLANNING';
+        my $project_id   = 1;
+        eval {
+            my $site = $ticket->site_name || $site_name || 'default';
+            my $proj = $schema->resultset('Project')->search(
+                { sitename => $site },
+                { rows => 1, order_by => 'id' }
+            )->first;
+            if ($proj) {
+                $project_code = $proj->project_code || 'PLANNING';
+                $project_id   = $proj->id;
+            } else {
+                $proj = $schema->resultset('Project')->search(
+                    { project_code => 'PLANNING' },
+                    { rows => 1 }
+                )->first;
+                if ($proj) {
+                    $project_code = $proj->project_code;
+                    $project_id   = $proj->id;
+                }
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_todo',
+                "Project lookup failed for $ticket_number, using PLANNING: $@");
+        }
+
+        # Auto-assign ticket to current staff when using "Work On" (claim it)
+        if ($todo_type eq 'work_on') {
+            my $current = $ticket->assigned_to || '';
+            if (!$current || $current ne $username) {
+                $ticket->update({ assigned_to => $username, updated_at => $now });
+                $schema->resultset('TicketMessage')->create({
+                    ticket_id    => $ticket->id,
+                    sender_type  => 'system',
+                    sender_name  => $staff_name,
+                    sender_email => $c->session->{email} || '',
+                    body         => "Ticket assigned to $username (Work On)",
+                    created_at   => $now,
+                });
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_todo',
+                    "Auto-assigned ticket $ticket_number to $username via Work On");
+            }
+        }
+
+        my $todo = $schema->resultset('Todo')->create({
+            sitename            => $site_name,
+            start_date          => $current_date,
+            due_date            => $current_date,
+            parent_todo         => '',
+            subject             => "HelpDesk Ticket: " . $ticket->ticket_number,
+            description         => "Working on ticket [" . $ticket->ticket_number . "]:\n" . ($note ? $note : 'No note provided'),
+            estimated_man_hours => 1,
+            status              => 'open',
+            todo_type           => $todo_type,
+            priority            => 3,
+            project_code        => $project_code,
+            project_id          => $project_id,
+            username_of_poster  => $username,
+            last_mod_by         => $username,
+            last_mod_date       => $current_date,
+            date_time_posted    => $current_date . ' 00:00:00',
+            user_id             => $user_id,
+            group_of_poster     => 'admin',
+            share               => 0,
+            developer           => $username,
+            accumulative_time   => '00:00:00',
+            is_blocking         => 0,
+        });
+
+        # Add a ticket message about the todo creation
+        # IMPORTANT: This is internal tracking only. We deliberately do NOT email the guest.
+        # Use explicit reply or status for customer notification. Use Disable emails button for spam.
+        $schema->resultset('TicketMessage')->create({
+            ticket_id    => $ticket->id,
+            sender_type  => "system",  # internal todo note, not a customer reply
+            sender_name  => $staff_name,
+            sender_email => $c->session->{email} || '',
+            body         => "Todo created: $todo_type to work on ticket $ticket_number. Todo ID: " . ($todo->record_id || $todo->id) . ". (internal, no email sent to guest)",
+            created_at   => $now,
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_todo',
+            "Created $todo_type todo for ticket $ticket_number by $staff_name");
+
+        my $todo_id = $todo->record_id || $todo->id;
+        $c->flash->{success_msg} = 'A todo has been created for this ticket.';
+        $c->flash->{created_todo_id} = $todo_id;
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_todo',
+            "Error creating todo for $ticket_number: $_");
+        $c->flash->{error_msg} = 'Error creating todo: ' . $_;
+    };
+
+    $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+}
+
+=head2 escalate_ticket
+
+Escalate a HelpDesk ticket with a follow-up todo
+POST /HelpDesk/ticket/escalate_ticket/<ticket_number>
+  params: note (optional)
+
+=cut
+
+sub escalate_ticket :Chained('ticket_base') :PathPart('escalate_ticket') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    unless ($self->_is_staff($c)) {
+        $c->flash->{error_msg} = 'Permission denied.';
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $note = $c->req->params->{note} || '';
+    my $now = Comserv::Util::AppTime->now_utc;
+    my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    $staff_name  = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+    my $current_date = Comserv::Util::AppTime->today_ymd_for($c);
+    my $username     = $c->session->{username} || 'admin';
+    my $user_id      = $c->session->{user_id} || 1;
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+
+        unless ($ticket) {
+            $c->flash->{error_msg} = 'Ticket not found.';
+            $c->res->redirect($c->uri_for('/HelpDesk/admin/tickets/open'));
+            return;
+        }
+
+        my $todo = $schema->resultset('Todo')->create({
+            sitename            => $site_name,
+            start_date          => $current_date,
+            due_date            => $current_date,
+            parent_todo         => '',
+            subject             => "Escalate HelpDesk Ticket: " . $ticket->ticket_number,
+            description         => "Escalating ticket [" . $ticket->ticket_number . "]:\n" . ($note ? $note : ''),
+            estimated_man_hours => 2,
+            status              => 'open',
+            todo_type           => 'escalate',
+            priority            => 5,  # High priority for escalation
+            project_code        => 'PLANNING',
+            project_id          => 1,
+            username_of_poster  => $username,
+            last_mod_by         => $username,
+            last_mod_date       => $current_date,
+            date_time_posted    => $current_date . ' 00:00:00',
+            user_id             => $user_id,
+            group_of_poster     => 'admin',
+            share               => 0,
+            developer           => $username,
+            accumulative_time   => '00:00:00',
+            is_blocking         => 0,
+        });
+
+        # Add a ticket message about the escalation
+        $schema->resultset('TicketMessage')->create({
+            ticket_id    => $ticket->id,
+            sender_type  => "system",  # internal todo note, not a customer reply
+            sender_name  => $staff_name,
+            sender_email => $c->session->{email} || '',
+            body         => "Ticket escalated. Todo created: escalate (Todo ID: " . ($todo->record_id || $todo->id) . "). Note: $note",
+            created_at   => $now,
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'escalate_ticket',
+            "Escalated ticket $ticket_number with todo by $staff_name");
+
+        my $todo_id = $todo->record_id || $todo->id;
+        $c->flash->{success_msg} = 'A todo has been created for this ticket.';
+        $c->flash->{created_todo_id} = $todo_id;
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'escalate_ticket',
+            "Error escalating ticket $ticket_number: $_");
+        $c->flash->{error_msg} = 'Error escalating ticket: ' . $_;
+    };
+
+    $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+}
+
+=head2 toggle_customer_emails
+
+Staff-only: enable or disable all email notifications to the ticket submitter.
+Useful for spam tickets so no emails are sent at all.
+POST /HelpDesk/ticket/toggle_customer_emails/<ticket_number>
+  params: disable=1 or disable=0
+
+=cut
+
+sub toggle_customer_emails :Chained('ticket_base') :PathPart('toggle_customer_emails') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    unless ($self->_is_staff($c)) {
+        $c->flash->{error_msg} = 'Permission denied.';
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $disable = $c->req->params->{disable} ? 1 : 0;
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+
+        unless ($ticket) {
+            $c->flash->{error_msg} = 'Ticket not found.';
+            $c->res->redirect($c->uri_for('/HelpDesk/admin/tickets/open'));
+            return;
+        }
+
+        my $meta = {};
+        if ($ticket->metadata) {
+            $meta = eval { JSON->new->decode($ticket->metadata) } || {};
+        }
+        $meta->{emails_disabled} = $disable;
+
+        $ticket->update({ metadata => JSON->new->utf8->encode($meta) });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'toggle_customer_emails',
+            ($disable ? 'Disabled' : 'Enabled') . " customer emails for ticket $ticket_number");
+
+        $c->flash->{success_msg} = $disable
+            ? 'Customer email notifications disabled for this ticket (no more emails will be sent).'
+            : 'Customer email notifications enabled for this ticket.';
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'toggle_customer_emails', "Error: $_");
+        $c->flash->{error_msg} = 'Error updating email setting.';
+    };
+
+    $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+}
 
 =head2 ticket_list
 
 Show the authenticated user's tickets (or all tickets for admin)
 
 =cut
+
+sub queue :Chained('base') :PathPart('queue') :Args(0) {
+    my ($self, $c) = @_;
+    unless ($self->_is_staff($c)) {
+        $c->res->redirect($c->uri_for('/HelpDesk'));
+        return;
+    }
+    $self->_load_admin_tickets($c, 'open', 'Open Tickets Queue');
+}
+
+sub staff :Chained('base') :PathPart('staff') :Args(0) {
+    my ($self, $c) = @_;
+    unless ($self->_is_staff($c)) {
+        $c->res->redirect($c->uri_for('/HelpDesk'));
+        return;
+    }
+    $self->_load_admin_tickets($c, undef, 'All Staff Tickets');
+}
 
 sub ticket_list :Chained('ticket_base') :PathPart('list') :Args(0) {
     my ($self, $c) = @_;
@@ -945,10 +1764,13 @@ sub ticket_list :Chained('ticket_base') :PathPart('list') :Args(0) {
             { order_by => { -desc => 'created_at' }, rows => 50 }
         )->all;
 
+        my $title = $is_admin ? 'All Site Tickets (Staff)' : 'My Support Tickets';
         $c->stash(
-            template => 'CSC/HelpDesk/ticket_status.tt',
-            tickets  => \@tickets,
-            title    => 'My Support Tickets',
+            template      => 'CSC/HelpDesk/ticket_status.tt',
+            tickets       => \@tickets,
+            title         => $title,
+            is_staff      => $is_admin,
+            is_admin_view => $is_admin ? 1 : 0,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ticket_list',
@@ -983,7 +1805,7 @@ sub api_search_tickets :Chained('base') :PathPart('api/search_tickets') :Args(0)
     my $is_staff  = $self->_is_staff($c);
 
     unless ($q) {
-        $c->response->body(JSON::encode_json({ error => 'q parameter required', tickets => [] }));
+        $c->response->body(JSON->new->encode({ error => 'q parameter required', tickets => [] }));
         return;
     }
 
@@ -1023,7 +1845,7 @@ sub api_search_tickets :Chained('base') :PathPart('api/search_tickets') :Args(0)
         }
     };
 
-    $c->response->body(JSON::encode_json({
+    $c->response->body(JSON->new->encode({
         query   => $q,
         count   => scalar(@results),
         tickets => \@results,
@@ -1066,9 +1888,9 @@ sub _auto_close_stale_tickets {
     my ($self, $c) = @_;
 
     my $auto_close_days = 14;
-    my $now             = strftime('%Y-%m-%d %H:%M:%S', localtime);
+    my $now = Comserv::Util::AppTime->now_utc;
     my $cutoff_epoch    = time() - ($auto_close_days * 86400);
-    my $cutoff_dt       = strftime('%Y-%m-%d %H:%M:%S', localtime($cutoff_epoch));
+    my $cutoff_dt = Comserv::Util::AppTime->from_epoch_utc($cutoff_epoch);
 
     eval {
         my $schema = $c->model('DBEncy')->schema;
@@ -1090,7 +1912,7 @@ sub _auto_close_stale_tickets {
 
             $schema->resultset('TicketMessage')->create({
                 ticket_id    => $ticket->id,
-                sender_type  => 'staff',
+                sender_type  => "system",  # internal todo note, not a customer reply
                 sender_name  => 'System',
                 sender_email => '',
                 body         => "Ticket automatically closed after $auto_close_days days with no customer response.",
@@ -1124,15 +1946,311 @@ sub _auto_close_stale_tickets {
     }
 }
 
+# --- Public-form anti-spam helpers (ticket submit + contact) ---
+
+# Operands are always 2..9 so sum is always 4..18 (never 0).
+# Store operands in session so a stale/partial render can still show a real question
+# and validation can refuse a form that never issued a challenge.
+sub _issue_math_challenge {
+    my ($self, $c) = @_;
+    my $num1 = int(rand(8)) + 2;
+    my $num2 = int(rand(8)) + 2;
+    my $sum  = $num1 + $num2;
+    $c->session->{math_challenge_a}   = $num1;
+    $c->session->{math_challenge_b}   = $num2;
+    $c->session->{math_challenge_sum} = $sum;
+    $c->session->{math_challenge_issued_at} = time();
+    return ($num1, $num2);
+}
+
+# True when this session has no authenticated user (public form submitters).
+sub _is_public_guest {
+    my ($self, $c) = @_;
+    my $uid = $c->session->{user_id};
+    return 1 unless defined $uid && "$uid" =~ /^\d+$/ && $uid > 0;
+    my $uname = $c->session->{username} // '';
+    return 1 if $uname eq '' || lc($uname) eq 'guest';
+    return 0;
+}
+
+# Guests may not set critical/high — bots always pick Critical. Staff keep full scale.
+sub _normalize_public_priority {
+    my ($self, $c, $priority) = @_;
+    $priority = lc($priority // 'medium');
+    $priority =~ s/[^a-z]//g;
+    my %ok = map { $_ => 1 } qw(low medium high critical);
+    $priority = 'medium' unless $ok{$priority};
+    if ($self->_is_public_guest($c)) {
+        # Cap guests at medium so spam cannot force critical alerts
+        return 'medium' if $priority eq 'high' || $priority eq 'critical';
+    }
+    return $priority;
+}
+
+sub _normalize_public_category {
+    my ($self, $c, $category) = @_;
+    $category = lc($category // 'other');
+    $category =~ s/[^a-z_]//g;
+    my %ok = map { $_ => 1 } qw(technical billing account feature other);
+    return $ok{$category} ? $category : 'other';
+}
+
+sub _record_public_submit {
+    my ($self, $c) = @_;
+    my $now = time();
+    my $key = 'hd_public_submits';
+    my $list = $c->session->{$key} || [];
+    $list = [] unless ref $list eq 'ARRAY';
+    push @$list, $now;
+    # keep last hour only
+    @$list = grep { defined $_ && ($_ > $now - 3600) } @$list;
+    $c->session->{$key} = $list;
+    $self->_record_public_ip_submit($c);
+}
+
+sub _sanitize_public_ip {
+    my ($self, $ip) = @_;
+    $ip = defined $ip ? "$ip" : 'unknown';
+    $ip =~ s/[^0-9a-fA-F.:]/_/g;
+    $ip = 'unknown' if $ip eq '';
+    return $ip;
+}
+
+sub _public_ip_rate_dir {
+    return '/tmp/comserv_hd_public_rate';
+}
+
+sub _public_ip_rate_file {
+    my ($self, $c) = @_;
+    my $dir = $self->_public_ip_rate_dir();
+    unless (-d $dir) {
+        mkdir $dir, 0700 or return;
+    }
+    my $ip = $self->_sanitize_public_ip($c->req->address || 'unknown');
+    return "$dir/$ip";
+}
+
+sub _record_public_ip_submit {
+    my ($self, $c) = @_;
+    my $file = $self->_public_ip_rate_file($c) or return;
+    my $fh;
+    open $fh, '>>', $file or return;
+    print {$fh} time() . "\n";
+    close $fh;
+}
+
+sub _public_ip_rate_exceeded {
+    my ($self, $c) = @_;
+    my $file = $self->_public_ip_rate_file($c) or return 0;
+    return 0 unless -f $file;
+    my $now = time();
+    my $count = 0;
+    my $fh;
+    open $fh, '<', $file or return 0;
+    while (my $line = <$fh>) {
+        $line =~ s/^\s+|\s+$//g;
+        next unless $line =~ /^\d+$/;
+        $count++ if ($line + 0) > ($now - 3600);
+    }
+    close $fh;
+    # guests: max 5 public HelpDesk submits per IP / rolling hour
+    return $count >= 5 ? 1 : 0;
+}
+
+sub _public_submit_rate_exceeded {
+    my ($self, $c) = @_;
+    my $now  = time();
+    my $list = $c->session->{hd_public_submits} || [];
+    if (ref $list eq 'ARRAY') {
+        my @recent = grep { defined $_ && ($_ > $now - 3600) } @$list;
+        # guests: max 3 public HelpDesk submits per session/hour
+        return 1 if scalar(@recent) >= 3;
+    }
+    return $self->_public_ip_rate_exceeded($c) ? 1 : 0;
+}
+
+sub _looks_like_spam_content {
+    my ($self, $subject, $body) = @_;
+    my $text = join(' ', map { defined $_ ? $_ : '' } ($subject, $body));
+    # Normalize lookalikes used by BMASTER-20260901-6247 class spam
+    $text =~ s/\x{2116}/No./g;  # №
+    $text = lc($text);
+    $text =~ s/\s+/ /g;
+
+    # Crypto/phishing patterns (CSC-20260830-2900, BMASTER-20260901-6247, WEAVERBECK-20260902-0936)
+    my @patterns = (
+        qr/graph\.org/i,
+        qr/coinbase/i,
+        qr/\bbitcoin\b/i,
+        qr/bitcoin[\s\-_]?mining/i,
+        qr/cloud.?mining/i,                 # Cloud-Mining-08-27 etc. (WEAVERBECK-20260902-0936)
+        qr/one.?message.?for.?you/i,        # ONE MESSAGE for you (WEAVERBECK spam)
+        qr/open\s*[-=]*>+/i,               # OPEN ->>> graph.org
+        qr/\bbtc\b/i,
+        qr/you.?have.?a.?new.?bitcoin/i,
+        qr/wallet.?transfer/i,
+        qr/claim.?your.?crypto/i,
+        qr/hs=[0-9a-f]{16,}/i,
+        qr/no\.\s*[a-z]?\d{3,}/i,          # Transfer No. V8998 / № V8998
+        qr/transfer\s+(?:no\.?|n[o0]\.?|#)\s*[a-z]?\d+/i,
+        qr/next\s*-*>+/i,                  # NEXT ->> graph.org
+        qr/open\s*[⚡]/i,
+    );
+    for my $re (@patterns) {
+        return 1 if $text =~ $re;
+    }
+    # Extreme link density / short-link spam
+    my $links = () = $text =~ m{https?://}g;
+    return 1 if $links >= 3 && length($text) < 400;
+    # Bare graph.org / shortener without scheme still counts as a link bait
+    my $bare = () = $text =~ m{\b[\w\-]+\.(?:org|com|net|io)/\S+}g;
+    return 1 if $bare >= 1 && $text =~ /(?:coinbase|bitcoin|mining|transfer|wallet|cloud)/i;
+
+    # Link-only / promo profile detection (CSC-20260911-6270)
+    my @urls;
+    while ($text =~ m{(?:https?://|www\.)\S+}g) {
+        push @urls, $&;
+    }
+    if (@urls) {
+        my $stripped = $text;
+        for my $u (@urls) {
+            my $q = quotemeta($u);
+            $stripped =~ s/$q//g;
+        }
+        $stripped =~ s/\s+/ /g;
+        $stripped =~ s/^\s+|\s+$//g;
+        my $remain = length($stripped);
+        return 1 if $remain < 40;
+        if ($remain < 80 && $text =~ /(?:profile|follow me|check out my|visit my|subscribe|followers|promo|discount)/) {
+            return 1;
+        }
+        my $url_len = 0;
+        $url_len += length($_) for @urls;
+        my $tlen = length($text);
+        return 1 if $tlen > 0 && ($url_len / $tlen) >= 0.55;
+    }
+    return 0;
+}
+
+# Returns error message string on failure, empty string if OK.
+# Fail-closed on missing/invalid math session. Math required for public guests.
+# Content filter always runs (even for logged-in users on public forms).
+# Order: honeypot → rate (session+IP) → content → guest math (CSC-20260911-6270)
+sub _spam_guard_fail {
+    my ($self, $c, $event, $subject, $body) = @_;
+    my $ip = $c->req->address || 'unknown';
+    $event ||= 'spam_guard';
+
+    my $honeypot = $c->req->params->{website} // '';
+    if ($honeypot ne '') {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+            "Bot detected (honeypot filled) from ip=$ip");
+        return 'Submission failed. Please try again.';
+    }
+
+    if ($self->_public_submit_rate_exceeded($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+            "Rate limit exceeded for HelpDesk public submit ip=$ip");
+        return 'Too many submissions. Please wait before trying again.';
+    }
+
+    if ($self->_looks_like_spam_content($subject, $body)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+            "Spam content rejected from ip=$ip subject=" . substr($subject // '', 0, 80));
+        return 'Your message was blocked by our spam filter. If this is a real support request, email support or rephrase without promotional links.';
+    }
+
+    my $is_guest = $self->_is_public_guest($c);
+    if ($is_guest) {
+        my $ans = $c->req->params->{math_challenge_ans};
+        $ans = '' unless defined $ans;
+        $ans =~ s/^\s+|\s+$//g;
+        # Strip leading zeros / force pure digits — refuse empty, non-numeric, or "0"
+        # when a real challenge sum is always 4..18.
+        my $expected = $c->session->{math_challenge_sum};
+        my $issued_at = $c->session->{math_challenge_issued_at} // 0;
+        my $a = $c->session->{math_challenge_a};
+        my $b = $c->session->{math_challenge_b};
+
+        my $clear_challenge = sub {
+            delete $c->session->{math_challenge_sum};
+            delete $c->session->{math_challenge_a};
+            delete $c->session->{math_challenge_b};
+            delete $c->session->{math_challenge_issued_at};
+        };
+
+        my $fail = sub {
+            my ($why) = @_;
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+                "Math challenge failed ($why; submitted='$ans', expected='"
+                . (defined $expected ? $expected : '') . "') from ip=$ip");
+            $clear_challenge->();
+            return 'Security check failed. Please reload the form and solve the arithmetic question correctly.';
+        };
+
+        # Fail closed: no challenge issued, expired (>2h), or inconsistent operands
+        return $fail->('missing sum')
+            if !defined $expected || $expected eq '' || $expected !~ /^\d+$/;
+        return $fail->('sum out of range')
+            if $expected < 4 || $expected > 18;
+        return $fail->('missing operands')
+            if !defined $a || !defined $b || $a !~ /^\d+$/ || $b !~ /^\d+$/
+               || ($a + $b) != $expected + 0;
+        return $fail->('challenge expired')
+            if $issued_at && (time() - $issued_at) > 7200;
+        return $fail->('empty answer') if $ans eq '';
+        return $fail->('non-numeric answer') if $ans !~ /^\d+$/;
+        # Explicit: bare 0 is never a valid sum (operands start at 2+2)
+        return $fail->('zero answer') if $ans + 0 == 0;
+        return $fail->('wrong answer') if ($ans + 0) != ($expected + 0);
+
+        $clear_challenge->();
+    }
+
+    return '';
+}
+
+
+=head2 _fire_ticket_webhook
+
+Soft-fail notify to Grok Bot HelpDesk change webhook. Never raises to caller.
+
+=cut
+
+sub _fire_ticket_webhook {
+    my ($self, $c, %args) = @_;
+    eval {
+        Comserv::Util::HelpDeskWebhook->notify_ticket_change($c, %args);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_fire_ticket_webhook',
+            "Webhook notify swallowed: $@");
+    }
+    return 1;
+}
+
+sub _notify_contact_admins {
+    my ($self, $c, %args) = @_;
+    $self->_notify_site_admins($c,
+        site_name => $args{site_name},
+        subject   => $args{subject},
+        body      => $args{body},
+        event     => 'contact_form',
+    );
+}
+
 sub _notify_site_admins {
     my ($self, $c, %args) = @_;
-    my $ticket    = $args{ticket}    or return;
+    my $ticket    = $args{ticket};
     my $subject   = $args{subject}   or return;
     my $body      = $args{body}      or return;
     my $event     = $args{event}     || 'ticket_event';
+    my $site_name = $args{site_name}
+        || (defined $ticket ? (eval { $ticket->site_name } || '') : '')
+        || '';
+    return unless $ticket || $site_name;
 
     my $schema    = $c->model('DBEncy')->schema;
-    my $site_name = $ticket->site_name || '';
 
     my @admin_emails;
     eval {

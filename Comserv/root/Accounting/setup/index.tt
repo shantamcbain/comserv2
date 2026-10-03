@@ -57,8 +57,24 @@
       <p style="margin:0 0 0.4rem;font-size:0.88rem;">
         <code>[% reg.db_name | html %]@[% reg.db_host | html %]:[% reg.db_port %]</code>
         &nbsp;<span style="background:#e0e7ff;color:#3730a3;border-radius:4px;padding:2px 8px;font-size:0.8rem;">[% reg.jurisdiction | html %] / [% reg.currency | html %]</span>
-        [% IF db_ok %]&nbsp;<span style="font-size:0.85rem;color:#6b7280;">[% schema_tables %] tables</span>[% END %]
+        [% IF db_ok %]&nbsp;<span style="font-size:0.85rem;color:var(--text-muted-color,#6b7280);">[% schema_tables %] tables</span>[% END %]
       </p>
+      [% IF db_ok && schema_state %]
+      [% SET sv_bg = schema_state == 'current' ? 'var(--success-bg,#d1fae5)'
+                   : (schema_state == 'unversioned' ? 'var(--warning-bg,#fef9c3)'
+                   : (schema_state == 'unknown'     ? 'var(--muted-bg,#e5e7eb)' : 'var(--danger-bg,#fee2e2)')) %]
+      [% SET sv_fg = schema_state == 'current' ? 'var(--success-text,#065f46)'
+                   : (schema_state == 'unversioned' ? 'var(--warning-text,#92400e)'
+                   : (schema_state == 'unknown'     ? 'var(--text-color,#374151)' : 'var(--danger-text,#991b1b)')) %]
+      [% SET sv_txt = schema_state == 'current'     ? 'schema v' _ schema_version
+                    : (schema_state == 'unversioned' ? 'schema unversioned (pre-marker)'
+                    : (schema_state == 'ahead'       ? 'schema v' _ schema_version _ ' AHEAD of app v' _ schema_expected
+                    : (schema_state == 'unknown'     ? 'schema version unreadable'
+                    : 'schema v' _ schema_version _ ' OUTDATED — app expects v' _ schema_expected))) %]
+      <p style="margin:0.35rem 0 0;">
+        <span style="background:[% sv_bg %];color:[% sv_fg %];border-radius:4px;padding:2px 9px;font-size:0.78rem;font-weight:bold;">[% sv_txt | html %]</span>
+      </p>
+      [% END %]
       [% IF db_error %]
       <p style="margin:0;font-size:0.85rem;color:#991b1b;">Error: [% db_error | html %]</p>
       [% END %]

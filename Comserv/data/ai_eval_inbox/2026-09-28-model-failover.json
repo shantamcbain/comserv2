@@ -1,0 +1,187 @@
+{
+  "report_date": "2026-09-28",
+  "source": "Model failover rollout",
+  "created_by": "AI usage monitor",
+  "summary": "Real model failover is in the aisystem tree (not committed). The Router walks ordered chains from data/ai_model_chains.json, with a per-model circuit breaker, OpenRouter soft-cap guard, and Super Grok lock. Ledger rows carry metadata.fallover. These proposals tune the chains from ledger evidence and fix Hermes' broken coder alias. Nothing is applied until an admin approves and presses Apply.",
+  "markdown": "# Model failover — 2026-09-28\n\n## Ledger evidence (90 days, :4006 usage_live)\n\n| Slug | OK / calls | Note |\n|---|---|---|\n| openrouter\\|nvidia/nemotron-3-nano-30b-a3b:free | 0/4 | 404 \"unavailable for free\"; absent from openrouter.ai/api/v1/models |\n| openrouter\\|nvidia/nemotron-nano-9b-v2:free | – | absent from the live model list |\n| openrouter\\|stealth/ox-alpha | 5/5 historically | absent from the live model list |\n| openrouter\\|google/gemma-3-27b-it:free | 404 | dead |\n| openrouter\\|google/gemma-4-26b-a4b-it:free | 0/7 | all 429 (live error_spike) |\n| openrouter\\|google/gemma-4-31b-it:free | 1/9 | mostly failing |\n| openrouter\\|cohere/north-mini-code:free | 23/23 | reliable, $0 |\n| ollama\\|qwen2.5-coder:14b | 8/8 | 0 tokens always, now logged tokens_unreported |\n\nThe first four are already in `removed` in the seeded file (proposal 1 records that decision so it can be reverted from here).\nProposal 2 reorders chat/docs so the reliable model goes first and the 429-ing gemma goes last.\n\n## Hermes\n\n`code`/`coder` = `openrouter/deepseek/deepseek-v4-pro` as a string alias. Used as a raw model id it went to the default provider (xai-oauth) and returned 404 (session 20260927_184725_af1f9c). Earlier v4-pro calls failed with 402 (credits). `deepseek/deepseek-v4-pro` is live on OpenRouter ($0.783/M in, $1.566/M out).\nProposed file: `~/.hermes/config.yaml.proposed-2026-09-28`; diff: `/tmp/hermes-failover-config.diff`.\n",
+  "metrics": {
+    "failover": {
+      "chains_file": "data/ai_model_chains.json",
+      "health_file": "data/ai_model_health.json",
+      "caps": {
+        "day_usd": 1.65,
+        "week_usd": 11.5,
+        "month_usd": 50
+      },
+      "circuit": {
+        "failure_threshold": 3,
+        "cooldown_minutes": 15,
+        "dead_cooldown_hours": 24
+      }
+    },
+    "ledger_90d": {
+      "nemotron_3_nano_free": {
+        "ok": 0,
+        "calls": 4,
+        "error": "404"
+      },
+      "gemma_4_26b_free": {
+        "ok": 0,
+        "calls": 7,
+        "error": "429"
+      },
+      "gemma_4_31b_free": {
+        "ok": 1,
+        "calls": 9
+      },
+      "north_mini_code_free": {
+        "ok": 23,
+        "calls": 23
+      },
+      "ollama_qwen2_5_coder_14b": {
+        "ok": 8,
+        "calls": 8,
+        "tokens": 0
+      }
+    },
+    "hermes": {
+      "coder_alias": "openrouter/deepseek/deepseek-v4-pro",
+      "coder_alias_status": "404 when routed via xai-oauth; 402 earlier",
+      "fallback_providers_now": [
+        "openrouter/deepseek/deepseek-v4-flash"
+      ]
+    }
+  },
+  "proposals": [
+    {
+      "title": "Keep dead free slugs out of every chain",
+      "change_type": "config",
+      "target": "data/ai_model_chains.json:removed",
+      "rationale": "nemotron-3-nano-30b-a3b:free 0/4 (404 unavailable for free), nemotron-nano-9b-v2:free and stealth/ox-alpha absent from the live OpenRouter model list, gemma-3-27b-it:free 404. Already the seeded value; approving records the decision with a before-value for Revert.",
+      "payload": {
+        "value": [
+          "openrouter|nvidia/nemotron-3-nano-30b-a3b:free",
+          "openrouter|nvidia/nemotron-nano-9b-v2:free",
+          "openrouter|stealth/ox-alpha",
+          "openrouter|google/gemma-3-27b-it:free"
+        ]
+      }
+    },
+    {
+      "title": "Chat chain: reliable model first, 429-ing gemma last",
+      "change_type": "config",
+      "target": "data/ai_model_chains.json:chain_chat",
+      "rationale": "north-mini-code:free 23/23; gemma-4-31b 1/9; gemma-4-26b 0/7 (429 error_spike). nemotron-3.5-lightning:free is live but has no ledger history yet.",
+      "payload": {
+        "value": [
+          "openrouter|cohere/north-mini-code:free",
+          "openrouter|nvidia/nemotron-3.5-lightning:free",
+          "openrouter|google/gemma-4-31b-it:free",
+          "openrouter|google/gemma-4-26b-a4b-it:free",
+          "ollama|auto"
+        ]
+      }
+    },
+    {
+      "title": "Docs chain: same order as chat",
+      "change_type": "config",
+      "target": "data/ai_model_chains.json:chain_docs",
+      "rationale": "Same evidence as the chat chain. Grounded answers that are stripped by the post-check fail over to the next step.",
+      "payload": {
+        "value": [
+          "openrouter|cohere/north-mini-code:free",
+          "openrouter|nvidia/nemotron-3.5-lightning:free",
+          "openrouter|google/gemma-4-31b-it:free",
+          "openrouter|google/gemma-4-26b-a4b-it:free",
+          "ollama|auto"
+        ]
+      }
+    },
+    {
+      "title": "Hermes: fix coder alias and use native fallback_providers",
+      "change_type": "workstation",
+      "target": "workstation:~/.hermes/config.yaml",
+      "rationale": "Sep 27 judge: grok-4.6 keep as coding/eval default, grok-build-0.1 for mechanical edits, nemotron free fabricated files, flash avoid for paid code. The string alias code/coder -> openrouter/deepseek/deepseek-v4-pro returned 404 (routed to xai-oauth) and earlier 402. Hermes natively supports fallback_providers (429/402/404/5xx/empty). Proposed file only; the live config is not changed and Hermes is not restarted.",
+      "payload": {
+        "proposed_file": "~/.hermes/config.yaml.proposed-2026-09-28",
+        "diff": "/tmp/hermes-failover-config.diff",
+        "backup": "~/.hermes/config.yaml.bak-2026-09-28-20260928-093707",
+        "changes": {
+          "model.default": {
+            "from": "grok-4.7",
+            "to": "grok-4.6"
+          },
+          "model.aliases.code": {
+            "from": "openrouter/deepseek/deepseek-v4-pro",
+            "to": {
+              "provider": "xai-oauth",
+              "model": "grok-4.6"
+            }
+          },
+          "model.aliases.coder": {
+            "from": "openrouter/deepseek/deepseek-v4-pro",
+            "to": {
+              "provider": "xai-oauth",
+              "model": "grok-4.6"
+            }
+          },
+          "model.aliases.build": {
+            "from": null,
+            "to": {
+              "provider": "xai-oauth",
+              "model": "grok-build-0.1"
+            }
+          },
+          "model.aliases.code-paid": {
+            "from": null,
+            "to": {
+              "provider": "openrouter",
+              "model": "deepseek/deepseek-v4-pro"
+            }
+          },
+          "model.aliases.*": "all other aliases converted to dict form with explicit provider (same targets)",
+          "fallback_providers": {
+            "from": [
+              {
+                "provider": "openrouter",
+                "model": "deepseek/deepseek-v4-flash"
+              }
+            ],
+            "to": [
+              {
+                "provider": "xai-oauth",
+                "model": "grok-build-0.1"
+              },
+              {
+                "provider": "openrouter",
+                "model": "deepseek/deepseek-v4-pro"
+              }
+            ]
+          },
+          "fallback.min_switch_reset_seconds": {
+            "from": null,
+            "to": 60
+          }
+        },
+        "apply_steps": [
+          "cp ~/.hermes/config.yaml.proposed-2026-09-28 ~/.hermes/config.yaml (after review)",
+          "start a new Hermes session (fallback is read per session)"
+        ]
+      }
+    },
+    {
+      "title": "Hermes: OpenRouter USD soft-cap guard (not native)",
+      "change_type": "workstation",
+      "target": "workstation:~/.hermes/scripts/supergrok_daily_guard.py",
+      "rationale": "Hermes has no USD spend cap. Its native fallback benches a provider on 402 (credits) but will keep spending on deepseek-v4-pro until the key runs out. Extend the existing guard (or add a sibling cron) to read OpenRouter key usage deltas and, past $1.65/day, $11.50/week or $50/month, drop the openrouter entry from fallback_providers and point code-paid at cohere/north-mini-code:free via 'hermes config set'. Write its state next to supergrok_guard.json so usage_live fallover.hermes.guard shows it.",
+      "payload": {
+        "caps": {
+          "day_usd": 1.65,
+          "week_usd": 11.5,
+          "month_usd": 50
+        },
+        "status": "proposal only; no script written"
+      }
+    }
+  ]
+}

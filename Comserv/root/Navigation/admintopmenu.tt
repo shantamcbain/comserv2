@@ -7,7 +7,7 @@
    category = 'developer'
    tags = 'server, development, cpanfile, dependencies, perlbrew'
 %]
-[% PageVersion = 'admintopmenu.tt,v 0.6 2026/04/22 P3.2 theme-audit: no hardcoded colours; all CSS-var compliant' %]
+[% PageVersion = 'admintopmenu.tt,v 0.10 2026/09/25 shanta Exp shanta ' %]
 [% IF debug == 1 %]
     [%# PageVersion %]
     [% #INCLUDE 'debug.tt' %]
@@ -52,6 +52,10 @@
                 <a href="/remotedb"><i class="icon-server"></i>Database Servers</a>
                 <a href="/remotedb"><i class="icon-key"></i>Change DB password</a>
                 <a href='/admin/view_log'><i class="icon-view"></i>View Log</a>
+                [% IF c.session.roles.grep('admin').size %]
+                <a href="[% c.uri_for('/mail/invoice/api') %]"><i class="icon-invoice"></i>Invoice Classification</a>
+                <a href="[% c.uri_for('/mail/invoice/sort') %]"><i class="icon-sort"></i>Sort Invoices by Site</a>
+                [% END %]
                 [% SET admin_sub_db = c.stash.admin_submenu_links || [] %]
                 [% INCLUDE 'Navigation/inc/menu_db_links.tt'
                     db_links = admin_sub_db
@@ -74,7 +78,11 @@
             <div class="submenu">
                 <a href="/ai"><i class="icon-chat"></i>AI Chat Interface</a>
                 <a href="/ai/conversations"><i class="icon-history"></i>Chat History</a>
-                <a href="/ai/usage"><i class="icon-stats"></i>Usage &amp; Billing Monitor</a>
+                <a href="[% c.uri_for('/ai/usage') %]"><i class="icon-stats"></i>Usage &amp; Billing Monitor</a>
+                [% IF c.session.roles.grep('admin').size %]
+                <a href="[% c.uri_for('/ai/eval') %]"><i class="icon-stats"></i>Daily AI Eval Reports</a>
+                <a href="[% c.uri_for('/ai/eval/latest') %]"><i class="icon-stats"></i>Latest AI Eval Report</a>
+                [% END %]
                 <a href="/ai/manage_api_keys"><i class="icon-key"></i>Manage API Keys</a>
                 <a href="/ai/check_status"><i class="icon-status"></i>Check AI Status</a>
                 <a href="/ai/models"><i class="icon-model"></i>Model Management</a>
@@ -87,7 +95,13 @@
                 [% IF c.session.roles.grep('admin').size %]
                     <div class="submenu-section">
                         <span class="submenu-section-title">Admin</span>
-                        <a href="/admin/ai/configure"><i class="icon-config"></i>AI Configuration</a>
+                        <a href="[% c.uri_for('/ai/usage') %]"><i class="icon-stats"></i>Usage &amp; Activity Monitor</a>
+                        <a href="[% c.uri_for('/ai/eval') %]"><i class="icon-stats"></i>Daily AI Eval Reports</a>
+                        <a href="[% c.uri_for('/ai/eval/latest') %]"><i class="icon-stats"></i>Latest AI Eval Report</a>
+                        <a href="[% c.uri_for('/ai/eval') %]#auto-changes"><i class="icon-stats"></i>AI Auto-changes (revert)</a>
+                        <a href="[% c.uri_for('/ai/models') %]"><i class="icon-model"></i>Model Management</a>
+                        <a href="[% c.uri_for('/ai/admin/agents') %]"><i class="icon-ai"></i>Agent Management</a>
+                        <a href="[% c.uri_for('/ai/manage_api_keys') %]"><i class="icon-key"></i>API Keys</a>
                         <a href="/chat/admin" id="nav-support-chat-link"><i class="icon-chat"></i>Support Chat <span id="nav-support-badge" style="display:none;background:#e55;color:#fff;border-radius:10px;padding:1px 7px;font-size:.75em;margin-left:4px;vertical-align:middle;"></span></a>
                     </div>
                 [% END %]

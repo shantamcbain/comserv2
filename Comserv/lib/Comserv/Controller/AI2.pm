@@ -13,6 +13,7 @@ use DateTime;
 use Comserv::Util::Logging;
 use Comserv::Util::ModelCatalog;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::Git;
 
 BEGIN { extends 'Catalyst::Controller' }
 
@@ -86,6 +87,24 @@ sub providers :Local :Args(0) {
     };
     $catalog ||= [];
 
+    # AIMPS W1.1: page-class shortlist via Router (not a per-action array).
+    my $page = $c->req->param('page') || $c->req->param('surface') || '';
+    unless (length $page) {
+        my $ref = $c->req->referer || $c->req->header('Referer') || $c->req->path || '';
+        $page = try {
+            my $r = $c->model('AI2::Router');
+            $r && $r->can('infer_page') ? $r->infer_page($ref) : 'chat';
+        } catch { 'chat' };
+    }
+    $catalog = try {
+        Comserv::Util::ModelCatalog->shortlist($c, page => $page);
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'ai2_providers', "Shortlist failed: $_");
+        $catalog;
+    };
+    $c->stash->{ai_chat_page} = $page;
+
     # Group flattened catalog (each: value, label, provider, local, free, ...)
     # into providers[]. The JS consumes either value (provider|model) or id.
     my %by_service;
@@ -101,8 +120,14 @@ sub providers :Local :Args(0) {
             label           => $m->{label} // $id,
             unreachable     => $m->{unreachable} ? 1 : 0,
             local           => $m->{local}     ? 1 : 0,
-            price_prompt    => $m->{price_prompt}     // 0,
-            price_completion=> $m->{price_completion} // 0,
+            # price_known tells the client whether these numbers are real.
+            # When absent/0 the client must NOT render "$0.00 — free"
+            # (x.AI publishes no pricing; see Grok.pm %XAI_PRICING).
+            price_prompt     => $m->{price_prompt},
+            price_completion => $m->{price_completion},
+            price_known      => ( exists $m->{price_known} && defined $m->{price_known} )
+                                ? ( $m->{price_known} ? 1 : 0 ) : 1,
+            price_tier      => $m->{price_tier},
         };
     }
 
@@ -134,10 +159,18 @@ sub providers :Local :Args(0) {
     # returned by refresh() is the wrong shape for prime(), so skip it here.
     # eval { Comserv::Util::ModelCatalog->prime($c, $catalog); };
 
+    my $model_count = 0;
+    $model_count += @{ $_->{models} || [] } for @providers;
     $c->res->content_type('application/json');
     $c->res->body(encode_json({
         success           => 1,
         providers         => \@providers,
+        page              => $page,
+        page_class        => (eval {
+            my $r = $c->model('AI2::Router');
+            $r && $r->can('page_class_for') ? $r->page_class_for($page) : '';
+        } || ''),
+        model_count       => $model_count,
         is_admin          => $is_admin ? 1 : 0,
         can_select_model  => $is_admin ? 1 : 0,
         can_access_history=> $is_admin ? 1 : 0,
@@ -152,18 +185,51 @@ sub providers :Local :Args(0) {
 sub editing_widget_popup :Local :Args(0) {
     my ($self, $c) = @_;
 
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
         'ai2_editing_widget_popup', "AI2 code editor popup opened");
 
     my $router = eval { $c->model('AI2::Router') } || undef;
 
+    # select_best_model returns [$model,$prov]; coerce to a plain string for TT/JS.
     my $selected_model = $router ? $router->select_best_model($c) : 'grok-beta';
-    my $recommended_models = $router ? $router->get_recommended_models($c) : ['grok-beta','ollama/llama3','ollama/codellama'];
+    if (ref $selected_model eq 'ARRAY') {
+        my ($model, $prov) = @$selected_model;
+        $selected_model = (defined $prov && length $prov && defined $model && length $model)
+            ? "$prov|$model"
+            : (defined $model && length $model ? $model : 'grok-beta');
+    } elsif (ref $selected_model) {
+        $selected_model = 'grok-beta';
+    }
+    $selected_model = 'grok-beta' unless defined $selected_model && !ref($selected_model) && length $selected_model;
+    # Model <select> is filled by ComservChat.modelSelect.init from catalog — do not
+    # stash hashrefs (TT [% m | html %] → HASH(0x…)). Empty list keeps TT safe.
+    my $recommended_models = [];
     my $branches = $router ? $router->get_available_branches($c) : ['main','ai2-refactor','feature/ai2-popup'];
+    $branches = [] unless $branches && ref $branches eq 'ARRAY';
 
-    # Sort branches: current branch first, then alphabetically
-    my $current_branch = 'main';
-    @$branches = sort { $a eq $current_branch ? -1 : $b eq $current_branch ? 1 : $a cmp $b } @$branches;
+    # Live checkout branch for THIS process (e.g. aisystem on :4006) — never hardcode main.
+    my $git = eval { Comserv::Util::Git->new(logging => $self->logging) };
+    my $current_branch = ($git ? eval { $git->get_current_branch($c) } : '') // '';
+    $current_branch = '' unless defined $current_branch;
+    $current_branch = '' if $current_branch eq 'unknown';
+    # Ensure current branch appears in the dropdown even if the branch list omitted it.
+    if (length $current_branch && !grep { $_ eq $current_branch } @$branches) {
+        unshift @$branches, $current_branch;
+    }
+    # Sort: current first, then alphabetically
+    if (length $current_branch) {
+        @$branches = sort {
+            $a eq $current_branch ? -1 : $b eq $current_branch ? 1 : $a cmp $b
+        } @$branches;
+    } else {
+        @$branches = sort { $a cmp $b } @$branches;
+        $current_branch = $branches->[0] // 'main';
+    }
 
     # Accept optional file path to load on open
     my $file_to_load = $c->req->param('file') || '';
@@ -173,6 +239,7 @@ sub editing_widget_popup :Local :Args(0) {
         selected_model      => $selected_model,
         recommended_models  => $recommended_models,
         branches            => $branches,
+        current_branch      => $current_branch,
         no_wrapper          => 1,
         ai_popup_mode       => 1,   # triggers conditional loading of ai2editor/*.js in js_load.tt
         show_ai2_editor     => 1,
@@ -548,12 +615,18 @@ sub _app_log_file {
 
 # GET /ai2/diagnostics — live "what is the system doing" snapshot.
 # Auth: any logged-in user may read their own view; admins see key state.
+# Localhost/LAN bypass (no session) matches Api.pm system_logs/hardware_metrics.
 sub diagnostics :Local :Args(0) {
     my ($self, $c) = @_;
 
     $c->res->content_type('application/json');
 
-    unless ($c->session->{username}) {
+    # Localhost / 192.168.1.0/24 LAN bypass (same trusted-address pattern as
+    # Api.pm system_logs / hardware_metrics). Remote still needs a session.
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+
+    unless ($is_local || $c->session->{username}) {
         $c->res->status(401);
         $c->res->body(encode_json({ success => 0, error => 'Authentication required' }));
         return;
@@ -615,6 +688,8 @@ sub diagnostics :Local :Args(0) {
     # --- v2 catalog the widget would actually show (as this user) ---
     try {
         $diag{catalog} = $c->model('AI2')->get_available_models($c);
+        my $router = $c->model('AI2::Router');
+        $diag{failover} = $router->failover_snapshot($c) if $router && $router->can('failover_snapshot');
     } catch {
         $diag{catalog} = { error => "unavailable: $_" };
     };
@@ -840,6 +915,8 @@ sub chat :Local :Args(0) {
     my $model   = $json_data->{model}  // '';
     my $history = $json_data->{history} // [];
     my $agent_id= $json_data->{agent_id} // '';
+    my $agent_id_requested = $agent_id;
+    my $editor_phase = lc($json_data->{phase} // '');
     unless (Comserv::Util::ModelCatalog->agent_allowed($c, $agent_id)) {
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
             'ai2_chat', "Clamped disallowed agent_id='$agent_id' to general");
@@ -850,6 +927,7 @@ sub chat :Local :Args(0) {
     my $page_path   = $json_data->{page_path} // '';
     my $page_title  = $json_data->{page_title} // '';
     my $page_content= $json_data->{page_content} // '';
+    my $page_links  = $json_data->{page_links} // [];
     my $use_search  = $json_data->{use_search} ? 1 : 0;
     my $conversation_id = $json_data->{conversation_id};
     my $project_id = $json_data->{project_id};
@@ -859,6 +937,7 @@ sub chat :Local :Args(0) {
     # message can be attached to its audio + transcript files.
     my $audio_file_id      = $json_data->{audio_file_id};
     my $transcript_file_id = $json_data->{transcript_file_id};
+    my $skip_role_prompt   = $json_data->{skip_role_prompt} ? 1 : 0;
 
     # The dropdown sends "provider|model" (e.g. openrouter|anthropic/...,
     # grok|grok-4..., ollama|llama3...). Extract the real model name.
@@ -871,41 +950,79 @@ sub chat :Local :Args(0) {
         return;
     }
 
-    # ── Create-todo intent: do this BEFORE the LLM. Free/small models invent
-    # a fake "Add" box instead of emitting [ACTION: create_todo]. One brain:
-    # Model::AI2::TodoCreate (same as /ai2/action and the 📝 button).
-    # Use ->new not $c->model: a newly added Model::* is not in Catalyst's
-    # component registry until the next process start (we must not restart).
-    my $todo_hit = eval {
-        require Comserv::Model::AI2::TodoCreate;
-        my $brain = eval { $c->model('AI2::TodoCreate') };
-        $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
-        $brain->try_chat_create($c,
+    # ── Create-HelpDesk-ticket intent BEFORE todo / LLM.
+    # Ticket prompts that mention "todo" (bug subjects) must not fall into
+    # TodoCreate's project picker (3D-20260907-3180 / 6510). Use ->new: a newly
+    # added Model::* is not in Catalyst's registry until process start.
+    # AI Editor never writes tickets/todos from the loaded buffer (#2423).
+    require Comserv::Model::AI2::ChatIntent;
+    my $editor_skip_writes = Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id)
+        || Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id_requested)
+        || ($editor_phase =~ /^(?:clarify|analyze|plan|verify|implement)$/);
+    my $hd_hit = (!$skip_role_prompt && !$editor_skip_writes) && eval {
+        require Comserv::Model::AI2::HelpDeskTicketCreate;
+        my $hbrain = eval { $c->model('AI2::HelpDeskTicketCreate') };
+        $hbrain = Comserv::Model::AI2::HelpDeskTicketCreate->new if !$hbrain || !ref $hbrain;
+        $hbrain->try_chat_create($c,
             prompt    => $prompt,
             page_path => $page_path,
         );
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            'ai2_chat', "TodoCreate try_chat_create threw: $@");
+            'ai2_chat', "HelpDeskTicketCreate try_chat_create threw: $@");
     }
-    if ($todo_hit && $todo_hit->{handled}) {
+    if ($hd_hit && $hd_hit->{handled}) {
         $c->res->body(encode_json({
-            success         => $todo_hit->{success} ? 1 : 0,
-            response        => $todo_hit->{response} // '',
-            model           => $todo_hit->{model} // '(todo-create)',
-            provider        => $todo_hit->{provider} // 'ai2-todo',
+            success         => $hd_hit->{success} ? 1 : 0,
+            response        => $hd_hit->{response} // '',
+            model           => $hd_hit->{model} // '(helpdesk-ticket-create)',
+            provider        => $hd_hit->{provider} // 'ai2-helpdesk',
             needs_web_search=> 0,
-            error           => $todo_hit->{error},
-            todo_action     => $todo_hit->{todo_action},
+            error           => $hd_hit->{error},
+            ticket_action   => $hd_hit->{ticket_action},
             conversation_id => $conversation_id,
             thinking        => [],
         }));
         return;
     }
 
+    # ── Create-todo intent: AFTER ticket, BEFORE the LLM. Free/small models
+    # invent a fake "Add" box instead of emitting [ACTION: create_todo].
+    # AI Editor: never intercept, even if the buffer says "create a todo" (#2423).
+    my $todo_hit;
+    if (!$skip_role_prompt && !$editor_skip_writes) {
+        $todo_hit = eval {
+            require Comserv::Model::AI2::TodoCreate;
+            my $brain = eval { $c->model('AI2::TodoCreate') };
+            $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
+            $brain->try_chat_create($c,
+                prompt    => $prompt,
+                page_path => $page_path,
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'ai2_chat', "TodoCreate try_chat_create threw: $@");
+        }
+        if ($todo_hit && $todo_hit->{handled}) {
+            $c->res->body(encode_json({
+                success         => $todo_hit->{success} ? 1 : 0,
+                response        => $todo_hit->{response} // '',
+                model           => $todo_hit->{model} // '(todo-create)',
+                provider        => $todo_hit->{provider} // 'ai2-todo',
+                needs_web_search=> 0,
+                error           => $todo_hit->{error},
+                todo_action     => $todo_hit->{todo_action},
+                conversation_id => $conversation_id,
+                thinking        => [],
+            }));
+            return;
+        }
+    }
+
     # Invoice-create intent: BEFORE the LLM. Draft only; never posts GL.
-    my $inv_hit = eval {
+    my $inv_hit = (!$skip_role_prompt && !$editor_skip_writes) && eval {
         require Comserv::Model::AI2::InvoiceCreate;
         my $ibrain = eval { $c->model('AI2::InvoiceCreate') };
         $ibrain = Comserv::Model::AI2::InvoiceCreate->new if !$ibrain || !ref $ibrain;
@@ -930,8 +1047,35 @@ sub chat :Local :Args(0) {
         return;
     }
 
+    # Scheduler: AFTER todo-create, BEFORE the LLM. Preview by default; WRITE
+    # only on apply. Never bulk-reschedules (#2218).
+    my $sched_hit = (!$skip_role_prompt && !$editor_skip_writes) && eval {
+        require Comserv::Model::AI2::Scheduler;
+        my $sbrain = eval { $c->model('AI2::Scheduler') };
+        $sbrain = Comserv::Model::AI2::Scheduler->new if !$sbrain || !ref $sbrain;
+        $sbrain->try_chat_schedule($c, prompt => $prompt);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'ai2_chat', "Scheduler try_chat_schedule threw: $@");
+    }
+    if ($sched_hit && $sched_hit->{handled}) {
+        $c->res->body(encode_json({
+            success          => $sched_hit->{success} ? 1 : 0,
+            response         => $sched_hit->{response} // '',
+            model            => $sched_hit->{model} // '(scheduler)',
+            provider         => $sched_hit->{provider} // 'ai2-scheduler',
+            needs_web_search => 0,
+            error            => $sched_hit->{error},
+            schedule_action  => $sched_hit->{schedule_action},
+            conversation_id  => $conversation_id,
+            thinking         => [],
+        }));
+        return;
+    }
+
     # Code-read: "can you read the files" must not reach Hy3.
-    if (lc($agent_id) eq 'code' || ($prompt =~ /\b(read|files|source|codebase|filesystem)\b/i)) {
+    if (lc($agent_id) =~ /^(?:code|coding|programming)$/ || ($prompt =~ /\b(read|files|source|codebase|filesystem)\b/i)) {
         my $read_hit = eval {
             require Comserv::Model::AI2::CodeRead;
             my $brain = eval { $c->model('AI2::CodeRead') };
@@ -965,9 +1109,11 @@ sub chat :Local :Args(0) {
     # Delegates to Model::AI2::FocusTune (the SAME brain the /api/focus/top5
     # UI button uses) so the question is answerable from Chat-with-AI too.
     # Triggered by the 'focustune' agent_id OR a natural-language intent.
-    my $is_focus = (lc($agent_id) eq 'focustune')
+    # Programming/coding agents in AI Editor must not divert to FocusTune on plan/build words.
+    my $editor_prog = (lc($agent_id // '') =~ /^(?:programming|coding|code|documentation|analyze)$/);
+    my $is_focus = (!$editor_prog) && ((lc($agent_id) eq 'focustune')
         || ($prompt =~ /\b(top\s*5|top five|most important|should i (do|work on|tackle)|what (todo|todos) (should|to) i|priorit)/i
-            && $prompt =~ /\b(todo|todos|task|tasks|plan|next step|next steps|build)\b/i);
+            && $prompt =~ /\b(todo|todos|task|tasks|plan|next step|next steps|build)\b/i));
     if ($is_focus) {
         my $tune = $c->model('AI2::FocusTune');
         my $now_epoch = time();
@@ -1009,12 +1155,19 @@ sub chat :Local :Args(0) {
             page_path       => $page_path,
             page_title      => $page_title,
             page_content    => $page_content,
+            page_links      => $page_links,
             use_search      => $use_search,
             conversation_id => $conversation_id,
             project_id      => $project_id,
             task_id         => $task_id,
             audio_file_id      => $audio_file_id,
             transcript_file_id => $transcript_file_id,
+            skip_role_prompt   => $skip_role_prompt,
+            skip_app_writes    => $editor_skip_writes ? 1 : 0,
+            surface            => $editor_skip_writes ? 'editor' : 'chat',
+            phase              => $editor_phase,
+            grounding          => $json_data->{grounding},   # off|shadow|enforce (Model::AI2::Grounding)
+            creative           => $json_data->{creative} ? 1 : 0,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
@@ -1024,6 +1177,8 @@ sub chat :Local :Args(0) {
 
     $result //= { success => 0, error => 'No response' };
 
+    # Auto web-search / same-origin enrich lives in Model::AI2::Chat::process
+    # (so it runs even when this controller is stale under -r).
     $c->res->body(encode_json({
         success          => $result->{success} ? 1 : 0,
         response         => $result->{response} // '',
@@ -1037,6 +1192,14 @@ sub chat :Local :Args(0) {
         thinking         => $result->{thinking} // [],
         todo_action      => $result->{todo_action},
         files_read       => $result->{files_read} || [],
+        citations        => $result->{citations} || [],
+        grounding        => $result->{grounding},
+        fallover         => $result->{fallover},
+        fallback         => $result->{fallback},
+        fallback_from    => $result->{fallback_from},
+        original_model   => $result->{original_model},
+        original_error   => $result->{original_error},
+        all_exhausted    => $result->{all_exhausted},
     }));
 }
 
@@ -1111,6 +1274,407 @@ sub apiary_voice_save :Local :Args(0) {
 sub action :Local :Args(0) {
     my ($self, $c) = @_;
     $c->model('AI2::Actions')->perform($c);
+}
+
+
+# -------------------------------------------------------------------
+# AI2 editor Review panel — list/create worktrees (developer/editor/admin).
+# Create-only; merge/push remain on /admin/git (admin-gated).
+# Reuses Comserv::Util::Git->create_worktree / list_worktrees (same validation
+# as POST /admin/git/create_worktree).
+# -------------------------------------------------------------------
+
+# GET /ai2/git_worktrees
+# Prefer build_worktree_list (worktrees.json) — same source as the Git dashboard.
+# list_worktrees(porcelain) currently mis-parses "branch refs/heads/..." lines.
+sub git_worktrees :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    return unless $self->_ai2_require_editor_role($c);
+
+    my $git = Comserv::Util::Git->new(logging => $self->logging);
+    my $raw = eval { $git->build_worktree_list() } || [];
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'git_worktrees', "$@");
+        $c->response->body(encode_json({ success => 0, error => 'Failed to list worktrees' }));
+        return;
+    }
+
+    # Shape expected by ai2editor/git-review.js
+    my @wts = map {
+        my $name = $_->{name} // '';
+        {
+            branch  => $name,
+            port    => $_->{port},
+            label   => $_->{label} // $name,
+            path    => $_->{cmd},
+            ahead   => 0,
+            behind  => 0,
+            is_main => ($name eq 'main' || $name eq 'master') ? 1 : 0,
+        }
+    } @$raw;
+
+    $c->response->body(encode_json({ success => 1, worktrees => \@wts }));
+}
+
+# POST /ai2/git_create_worktree  (branch, parent=main, label, url)
+sub git_create_worktree :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    return unless $self->_ai2_require_editor_role($c);
+
+    unless (($c->request->method || '') eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $p      = $c->req->params;
+    my $branch = $p->{branch} // '';
+    my $parent = $p->{parent} // 'main';
+    my $label  = $p->{label}  // $branch;
+    my $url    = $p->{url}    // '/planning/daily';
+    $label = $branch if !defined $label || $label eq '';
+
+    unless ($branch) {
+        $c->response->body(encode_json({ success => 0, error => 'branch is required' }));
+        return;
+    }
+
+    my $git = Comserv::Util::Git->new(logging => $self->logging);
+    my $res = $git->create_worktree($c, $branch,
+        { parent => $parent, label => $label, url => $url });
+
+    $self->logging->log_with_details(
+        $c, $res->{success} ? 'info'
+            : ($res->{error} && $res->{error} =~ /valid branch name/i) ? 'warn'
+            : 'error', __FILE__, __LINE__,
+        'git_create_worktree',
+        "user=" . ($c->session->{username} // '') .
+        " branch='$branch' parent='$parent' port=" . ($res->{port} // '?') .
+        ($res->{error} ? " error=$res->{error}" : '')
+    );
+
+    $c->response->body(encode_json({
+        success => $res->{success} ? 1 : 0,
+        branch  => $branch,
+        port    => $res->{port},
+        path    => $res->{path},
+        cmd     => $res->{cmd},
+        ($res->{error} ? (error => $res->{error}) : ()),
+    }));
+}
+
+# -------------------------------------------------------------------
+# Hermes Run — auto-pick Desktop-vs-CLI and run a prompt.
+#
+# POST /ai2/hermes_run
+# JSON body: { prompt, prefer: "auto"|"desktop"|"cli" }
+# Response:  { success, mode, message, output?, dashboard_url?,
+#              launch_hint?, error? }
+#
+# Auth: editor/admin/developer only (same as the rest of AI2).
+# Timeout: ~180s. Non-fatal errors return JSON, never a 500 HTML page.
+# -------------------------------------------------------------------
+sub hermes_run :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->res->content_type('application/json');
+    return unless $self->_ai2_require_editor_role($c);
+
+    # Parse JSON body (Catalyst often gives a filehandle — slurp like /ai2/chat)
+    my $body = {};
+    try {
+        if ($c->req->can('data') && ref($c->req->data) eq 'HASH' && %{$c->req->data}) {
+            $body = $c->req->data;
+        } else {
+            my $raw = $c->req->can('content') ? $c->req->content : $c->req->body;
+            $raw = do { local $/; <$raw> } if ref($raw);
+            $body = decode_json($raw) if defined $raw && length $raw;
+        }
+    } catch { };
+    $body = {} unless ref($body) eq 'HASH';
+
+    # Also accept form/query fallbacks (same idea as token_login)
+    my $prompt = $body->{prompt}
+              // $c->req->param('prompt')
+              // '';
+    $prompt = '' unless defined $prompt;
+    $prompt =~ s/^\s+|\s+$//g;
+    unless (length $prompt) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'prompt is required' }));
+        return;
+    }
+
+    my $prefer = $body->{prefer} // 'auto';
+    $prefer = 'auto' unless $prefer =~ /^(auto|desktop|cli)$/;
+
+    # --- Resolve the aisystem worktree git root ---
+    # Use worktrees.json base_dir + "aisystem" branch. Fallback to the
+    # known aisystem path. hermes chat must run from the git root so it
+    # reads its own .hermes.md (never -w for Comserv worktrees).
+    my $aisystem_root = '/home/shanta/.comserv/worktrees/aisystem/Comserv';
+    try {
+        my $wt_config = Comserv::Util::Git->build_worktree_list();
+        for my $b (@$wt_config) {
+            if ($b->{name} && lc($b->{name}) eq 'aisystem' && $b->{cmd}) {
+                if ($b->{cmd} =~ m{cd\s+(/\S+?)/Comserv\s*&&}) {
+                    my $d = $1;
+                    $aisystem_root = $d if -d $d;
+                }
+                last;
+            }
+        }
+    } catch { };
+
+    my $mode      = 'cli';
+    my $desktop_url = '';
+    my $launch_hint = '';
+
+    # --- Probe browser dashboard (:9119), NOT Electron Desktop ---
+    # "auto" must not treat a running Hermes Electron app as the dashboard
+    # (that caused AI Editor to chase Desktop login instead of /sessions).
+    if ($prefer eq 'desktop' || $prefer eq 'auto') {
+        # Probe loopback (this host always reaches 127.0.0.1). Return a
+        # browser URL on the same hostname the editor was opened with
+        # (localhost, workstation.local, workstation.zero, ZeroTier IP).
+        my $req_host = eval { $c->req->uri->host } || '127.0.0.1';
+        $req_host =~ s/:\d+$//;
+        $req_host = '127.0.0.1' unless $req_host;
+        $desktop_url = $ENV{HERMES_DASHBOARD_URL}
+                    || ($c->config->{hermes_dashboard_url} // '')
+                    || ("http://${req_host}:9119/chat");
+
+        my $dashboard_reachable = 0;
+        eval {
+            require LWP::UserAgent;
+            my $ua = LWP::UserAgent->new(timeout => 2, max_redirect => 0);
+            my $res = $ua->get('http://127.0.0.1:9119/chat');
+            my $code = $res ? $res->code : 0;
+            $dashboard_reachable = 1 if $code && $code >= 200 && $code < 500;
+        };
+
+        if ($dashboard_reachable) {
+            $mode = 'desktop';  # kept for API compat; means browser dashboard
+            $launch_hint = "Open dashboard: $desktop_url (not hermes desktop Electron)";
+        } elsif ($prefer eq 'desktop') {
+            $mode = 'cli';
+            $launch_hint = "Dashboard not reachable at $desktop_url — fell back to CLI";
+        }
+    }
+
+    # --- CLI fallback ---
+    my $output    = '';
+    my $cli_error = '';
+
+    if ($mode eq 'cli') {
+        require IPC::Run3;
+        my $out = '';
+        my $err = '';
+        my @cmd = ('/home/shanta/.local/bin/hermes', 'chat', '-q', $prompt, '--oneshot');
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'hermes_run', "CLI mode: running hermes chat in $aisystem_root");
+
+        eval {
+            chdir $aisystem_root;
+            local $SIG{ALRM} = sub { die "TIMEOUT\n" };
+            alarm 180;
+            IPC::Run3::run3(\@cmd, \undef, \$out, \$err);
+            alarm 0;
+        };
+        my $eval_err = $@;
+
+        if ($eval_err && $eval_err eq "TIMEOUT\n") {
+            $cli_error = 'Command timed out after 180s';
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'hermes_run', "CLI timeout");
+        } elsif ($eval_err) {
+            $cli_error = "Execution error: $eval_err";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'hermes_run', "CLI failed: $eval_err");
+        }
+
+        $output = $out // '';
+        if (length($output) > 8000) {
+            $output = substr($output, 0, 8000) . "\n\n[... truncated at 8000 chars ...]";
+        }
+        if (length($err // '')) {
+            $cli_error //= '';
+            $cli_error .= "stderr: " . substr($err, 0, 2000) if length $cli_error < 2000;
+        }
+    }
+
+    my $message = $mode eq 'desktop'
+        ? "Dashboard mode — browser UI reachable at  $desktop_url"
+        : (length $output)
+            ? "CLI mode — hermes chat ran successfully"
+            : "CLI mode — hermes chat completed (no output)";
+
+    $c->res->body(encode_json({
+        success        => ($mode eq 'cli' && $cli_error && !length $output) ? 0 : 1,
+        mode           => $mode,
+        message        => $message,
+        output         => (length $output)  ? $output : undef,
+        dashboard_url  => ($mode eq 'desktop') ? $desktop_url : undef,
+        launch_hint    => ($mode eq 'desktop') ? $launch_hint : undef,
+        error          => (length $cli_error) ? $cli_error : undef,
+    }));
+}
+
+# -------------------------------------------------------------------
+# POST /ai2/hermes_start_desktop
+# Actually launch Hermes Desktop Electron with aisystem --cwd.
+# Opens on the workstation display (DISPLAY), not in the browser.
+# Auth: editor/admin/developer. Non-blocking spawn.
+# -------------------------------------------------------------------
+sub hermes_start_desktop :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->res->content_type('application/json');
+    return unless $self->_ai2_require_editor_role($c);
+
+    my $aisystem_root = '/home/shanta/.comserv/worktrees/aisystem/Comserv';
+    try {
+        my $wt_config = Comserv::Util::Git->build_worktree_list();
+        for my $b (@$wt_config) {
+            if ($b->{name} && lc($b->{name}) eq 'aisystem' && $b->{cmd}) {
+                if ($b->{cmd} =~ m{cd\s+(/\S+?)/Comserv\s*&&}) {
+                    my $d = $1;
+                    $aisystem_root = $d if -d $d;
+                }
+                last;
+            }
+        }
+    } catch { };
+
+    unless (-d $aisystem_root) {
+        $c->res->status(500);
+        $c->res->body(encode_json({
+            success => 0,
+            error   => "aisystem worktree not found: $aisystem_root",
+        }));
+        return;
+    }
+
+    my $hermes_bin = '/home/shanta/.local/bin/hermes';
+    $hermes_bin = 'hermes' unless -x $hermes_bin;
+
+    # Already running?
+    my $already = 0;
+    my $pids = '';
+    if (open my $ph, '-|', 'pgrep', '-af', 'hermes.*desktop|Hermes.*Desktop|apps/desktop') {
+        local $/;
+        $pids = <$ph> // '';
+        close $ph;
+        $already = 1 if $pids =~ /\d+/ && $pids !~ /pgrep/;
+    }
+
+    my $cmd = "$hermes_bin desktop --skip-build --cwd "
+            . quotemeta($aisystem_root);
+    my $launch_hint = "hermes desktop --skip-build --cwd $aisystem_root";
+
+    if ($already) {
+        $c->res->body(encode_json({
+            success     => 1,
+            started     => 0,
+            already     => 1,
+            cwd         => $aisystem_root,
+            launch_hint => $launch_hint,
+            message     => 'Hermes Desktop already appears to be running on the workstation. '
+                         . 'Use that window (aisystem cwd if started with --cwd). '
+                         . 'This is not a browser page.',
+            note        => 'Desktop opens on the workstation screen, not in your remote browser.',
+        }));
+        return;
+    }
+
+    my $log = '/tmp/hermes-desktop-aisystem.log';
+    my $display = $ENV{DISPLAY} || ':0';
+    my $spawn_err = '';
+    eval {
+        # Detach so Starman is not blocked; inherit user session display when possible.
+        my $full = "DISPLAY=$display "
+                 . "HERMES_DESKTOP_CWD=" . quotemeta($aisystem_root) . " "
+                 . "nohup $cmd >> " . quotemeta($log) . " 2>&1 &";
+        my $rc = system('/bin/bash', '-lc', $full);
+        if ($rc != 0) {
+            $spawn_err = "spawn exit status $rc";
+        }
+    };
+    if ($@ || $spawn_err) {
+        $c->res->status(500);
+        $c->res->body(encode_json({
+            success => 0,
+            error   => $spawn_err || "$@",
+            cwd     => $aisystem_root,
+            launch_hint => $launch_hint,
+            log     => $log,
+        }));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'hermes_start_desktop', "Spawned Desktop cwd=$aisystem_root DISPLAY=$display");
+
+    $c->res->body(encode_json({
+        success     => 1,
+        started     => 1,
+        already     => 0,
+        cwd         => $aisystem_root,
+        display     => $display,
+        launch_hint => $launch_hint,
+        log         => $log,
+        message     => 'Started Hermes Desktop with aisystem worktree. '
+                     . 'Look for the Electron window on the workstation (DISPLAY). '
+                     . 'Remote browsers will not show Desktop — use the workstation screen or Hermes CLI in a terminal.',
+        note        => 'Desktop ≠ browser dashboard. For browser UI use hermes dashboard separately.',
+    }));
+}
+
+# -------------------------------------------------------------------------
+# Org usage JSON — lives here so Starman -r can reload it. Controller::AI.pm
+# is too large to reload; Controller::AI::Usage is a new file the current
+# :4006 process never loaded. Canonical home remains AI::Usage; this Local
+# action is the live bridge. Do not add more usage HTML to this file.
+#   GET /ai2/usage_live
+# -------------------------------------------------------------------------
+sub usage_live :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+    unless ($is_local || $c->session->{user_id}) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'login required' }));
+        return;
+    }
+    my $org = eval {
+        require Comserv::Model::AI2::UsageMonitor;
+        my $days    = $c->req->param('days') || 14;
+        my $prov_f  = $c->req->param('provider') || '';
+        my $site_f  = $c->req->param('site_id')  || '';
+        my $model_f = $c->req->param('model') || '';
+        Comserv::Model::AI2::UsageMonitor->new->org_summary($c,
+            days => $days, provider => $prov_f, site_id => $site_f, model => $model_f);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'usage_live', "$@");
+        $c->response->body(encode_json({ success => JSON::false, error => 'summary failed' }));
+        return;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'usage_live',
+        'org_calls=' . (($org->{org_totals} || {})->{calls} // 0)
+        . ' hermes_tokens=' . ((($org->{hermes} || {})->{totals} || {})->{tokens} // 0));
+    # Same org.fallover key and access rule as /ai/usage_live (AISYSTEM plan §5e).
+    my $uc = eval { $c->controller('AI::Usage') };
+    if ($uc && $uc->can('_can_see_fallover') && $uc->_can_see_fallover($c)) {
+        $org->{fallover} = eval {
+            Comserv::Model::AI2::UsageMonitor->new->fallover_summary($c, days => ($c->req->param('days') || 14));
+        } || { errors => [ 'fallover summary failed: ' . ($@ || 'unknown') ] };
+    }
+    $c->response->body(encode_json({ success => JSON::true, org => $org }));
 }
 
 __PACKAGE__->meta->make_immutable;

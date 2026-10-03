@@ -2,6 +2,11 @@
 # Stage 1: Build environment with all dependencies
 ARG PERL_VERSION=5.40.0
 ARG BASE_IMAGE=perl:5.40.0
+# Build metadata (injected at build time via --build-arg)
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ARG BUILD_DATE=unknown
+ARG BUILD_HOST=unknown
 
 FROM ${BASE_IMAGE} AS builder
 
@@ -37,18 +42,42 @@ RUN mkdir -p /opt/comserv/local/lib/perl5
 # Application uses YAML::Tiny for all YAML operations
 # Use multiple mirrors for better dependency resolution
 # Template::Toolkit version is pinned in cpanfile (single source of truth)
-# Pre-install modules that cpanm --installdeps sometimes fails to resolve 
-# in its dependency walk (Crypt::CBC, Session::Store::Cookie)
-# vvv PRE-INSTALL FORK RESILIENCE vvv
+# CPAN install strategy (keep Catalyst OUT of the pre-install step):
+# 1) Crypt::CBC alone — fork-resilience, no Catalyst tree
+# 2) JSON backend with retries — metacpan/cpan sometimes serve truncated tarballs
+#    (Cpanel-JSON-XS "gzip: unexpected end of file"), which cascades into Plack/Catalyst failures
+# 3) --installdeps from cpanfile
+# 4) Session::Store::Cookie AFTER Catalyst exists (cpanfile already requires it; this is a safety net)
+# vvv CPAN INSTALL vvv
 RUN cpanm --local-lib=/opt/comserv/local --notest \
     --mirror https://cpan.metacpan.org \
     --mirror https://www.cpan.org \
-    Crypt::CBC Catalyst::Plugin::Session::Store::Cookie
-# ^^^ PRE-INSTALL FORK RESILIENCE ^^^
-RUN cpanm --local-lib=/opt/comserv/local --notest \
+    Crypt::CBC
+RUN set -eux; \
+    for i in 1 2 3 4 5; do \
+      rm -rf /root/.cpanm && \
+      cpanm --local-lib=/opt/comserv/local --notest --mirror https://cpan.metacpan.org --mirror https://www.cpan.org \
+        Cpanel::JSON::XS JSON::MaybeXS && break; \
+      echo "JSON backend install attempt $i failed — retrying"; \
+      sleep $((i * 5)); \
+    done; \
+    perl -MCpanel::JSON::XS -MJSON::MaybeXS -e1
+RUN set -eux; \
+    for i in 1 2 3; do \
+      rm -rf /root/.cpanm && \
+      cpanm --local-lib=/opt/comserv/local --notest \
+        --mirror https://cpan.metacpan.org \
+        --mirror https://www.cpan.org \
+        --installdeps . && break; \
+      echo "installdeps attempt $i failed — retrying"; \
+      sleep $((i * 10)); \
+    done
+RUN rm -rf /root/.cpanm && \
+    cpanm --local-lib=/opt/comserv/local --notest \
     --mirror https://cpan.metacpan.org \
     --mirror https://www.cpan.org \
-    --installdeps .
+    Catalyst::Plugin::Session::Store::Cookie
+# ^^^ CPAN INSTALL ^^^
 
 # Verify critical modules
 RUN perl -e 'use Catalyst; use DBIx::Class; use Template; use Starman; print "Core modules loaded\n"'
@@ -147,6 +176,18 @@ CMD []
 LABEL maintainer="Comserv Development Team"
 LABEL description="Comserv Catalyst Web Application - Production Container"
 LABEL version="1.0"
+# OCI standard labels (immutable image metadata, queryable via docker inspect)
+LABEL org.opencontainers.image.title="Comserv Web Application"
+LABEL org.opencontainers.image.description="Comserv Catalyst Web Application - Production Container"
+LABEL org.opencontainers.image.version="1.0"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
+LABEL org.opencontainers.image.source="https://github.com/shantamcbain/comserv2"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.authors="Comserv Development Team"
+LABEL org.opencontainers.image.licenses="Proprietary"
+LABEL org.opencontainers.image.ref.name="shantamcsbain/comserv-web-prod"
+LABEL org.opencontainers.image.branch="${GIT_BRANCH}"
+LABEL org.opencontainers.image.build.host="${BUILD_HOST}"
 
 # ===================================================================
 # Stage 3: Development image (IMGDEP Ph.0)

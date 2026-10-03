@@ -1,0 +1,43 @@
+[%# Auto-changes (admin) — included from ai/eval/list.tt.
+  # Data: Model::AI2::EvalReports->auto_changes (proposals approved by an
+  # "auto..." actor). Same Revert form as the report detail page. No JS. %]
+[% ac = auto_changes %]
+<div id="auto-changes" class="card" style="margin:16px 0;">
+  <div class="card-header">Auto-changes (safe, allow-listed, one-click revert)</div>
+  <div class="card-body">
+    <p class="doc-body">The auto-improver applies only <strong>chain re-orderings</strong> (e.g. demote a model whose circuit is open
+      or that keeps returning 429 to the end of its chain) and <strong>cap decreases</strong>. Caps can never be raised and no model is added.
+      Every change is recorded here and in <code>data/ai_auto_changes.jsonl</code>. A change you revert is not re-applied the same day.</p>
+    <form method="post" action="/ai/eval/auto_improve" style="margin:0 0 10px;">
+      <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+      <button type="submit" class="btn btn-secondary">Run auto-improve now</button>
+      <span class="doc-muted">(the same as <code>script/ai_eval_auto_improve.pl</code>, which can also run from cron)</span>
+    </form>
+    [% IF ac.table_missing %]<p class="doc-muted">Proposal table not created yet — run schema compare.</p>
+    [% ELSIF ac.error %]<p class="doc-muted">Could not read auto-changes: [% ac.error | html %]</p>
+    [% ELSIF ! ac.rows.size %]<p class="doc-muted">No auto-changes yet.</p>
+    [% ELSE %]
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Who / when (UTC)</th><th>What</th><th>Why</th><th>Before</th><th>After</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      [% FOREACH p IN ac.rows %]
+        <tr>
+          <td><a href="/ai/eval/report/[% p.report_id | uri %]#proposal-[% p.id | uri %]">[% p.id | html %]</a></td>
+          <td>[% p.applied_by || p.approved_by | html %]<br><span class="doc-muted">[% p.applied_at || p.approved_at | html %]</span></td>
+          <td><code>[% p.target | html %]</code></td>
+          <td>[% p.title | html %][% IF p.rationale %]<br><span class="doc-muted">[% p.rationale | truncate(200) | html %]</span>[% END %]</td>
+          <td><code style="font-size:0.8em;">[% p.before_text | html %]</code></td>
+          <td><code style="font-size:0.8em;">[% p.after_text | html %]</code></td>
+          <td>[% p.status | html %]</td>
+          <td>[% IF p.can_revert %]
+            <form method="post" action="/ai/eval/proposal/[% p.id | uri %]/revert">
+              <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+              <button type="submit" class="btn btn-secondary">Revert</button>
+            </form>[% END %]</td>
+        </tr>
+      [% END %]
+      </tbody>
+    </table>
+    [% END %]
+  </div>
+</div>

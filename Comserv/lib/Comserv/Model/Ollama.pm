@@ -14,6 +14,7 @@ has 'model' => (
 with 'Comserv::Model::Ollama::Connection';
 with 'Comserv::Model::Ollama::Chat';
 with 'Comserv::Model::Ollama::Models';
+with 'Comserv::Model::Ollama::Decision';
 
 # All other methods (shell fallbacks, etc.) remain here for now
 # They will be moved into additional role modules in subsequent steps.

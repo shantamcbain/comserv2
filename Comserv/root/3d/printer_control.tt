@@ -1,0 +1,225 @@
+[% PageVersion = '3d/printer_control.tt,v 0.02 2026/09/24 shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Printer control</h1>
+    <p class="page-subtitle">[% printer.name | html %] — [% lan_host | html %]</p>
+  </div>
+
+  [% IF c.flash.error_msg %]
+  <p class="app-flash-error">[% c.flash.error_msg | html %]</p>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <p class="app-flash-success">[% c.flash.success_msg | html %]</p>
+  [% END %]
+
+  <p>
+    <a href="/3d/printers">Printer farm</a>
+    |
+    <a href="/3d/printer_lan/control?printer_id=[% printer.id %]">Refresh now</a>
+    (manual — auto-reload was looping a browser Allow/OK dialog)
+  </p>
+
+  <div class="content-container">
+    <div class="app-section">
+      <h2>Identity (HTTP /info)</h2>
+      <table class="data-table">
+        <tr><th>Model</th><td>[% state.model_name | html %] ([% state.model_id | html %])</td></tr>
+        <tr><th>Serial</th><td>[% state.serial | html %]</td></tr>
+        <tr><th>LAN mode</th><td>[% state.ctrl_type | html %]</td></tr>
+        <tr><th>Host</th><td>[% state.host | html %]:18910</td></tr>
+      </table>
+    </div>
+
+    <div class="app-section">
+      <h2>Live state (LAN MQTT)</h2>
+      [% IF state.error %]
+      <p>[% state.error | html %]</p>
+      [% END %]
+      [% IF state.mqtt_ok %]
+      <table class="data-table">
+        <tr><th>Printer state</th><td>[% state.print_state || '—' | html %]</td></tr>
+        <tr><th>File</th><td>[% state.filename || '—' | html %]</td></tr>
+        <tr><th>Progress</th>
+          <td>[% IF state.progress != '' %][% state.progress | html %] %[% ELSE %]—[% END %]</td>
+        </tr>
+        <tr><th>Layer</th>
+          <td>
+            [% IF state.curr_layer.defined %][% state.curr_layer | html %][% ELSE %]—[% END %]
+            /
+            [% IF state.total_layers.defined %][% state.total_layers | html %][% ELSE %]—[% END %]
+          </td>
+        </tr>
+        <tr><th>Time (min)</th>
+          <td>
+            printed [% IF state.print_time_min.defined %][% state.print_time_min | html %][% ELSE %]—[% END %]
+            · remaining [% IF state.remain_time_min.defined %][% state.remain_time_min | html %][% ELSE %]—[% END %]
+          </td>
+        </tr>
+        <tr><th>Nozzle</th>
+          <td>
+            [% IF state.nozzle_temp.defined %][% state.nozzle_temp | html %] °C[% ELSE %]—[% END %]
+            / target [% IF state.target_nozzle.defined %][% state.target_nozzle | html %][% ELSE %]—[% END %]
+          </td>
+        </tr>
+        <tr><th>Bed</th>
+          <td>
+            [% IF state.bed_temp.defined %][% state.bed_temp | html %] °C[% ELSE %]—[% END %]
+            / target [% IF state.target_bed.defined %][% state.target_bed | html %][% ELSE %]—[% END %]
+          </td>
+        </tr>
+        [% IF state.firmware %]
+        <tr><th>Firmware</th><td>[% state.firmware | html %]</td></tr>
+        [% END %]
+      </table>
+      [% ELSE %]
+      <p>MQTT did not return a report. Identity above still came from HTTP /info. Controls need the local MQTT broker.</p>
+      [% END %]
+    </div>
+
+    <div class="app-section">
+      <h2>ACE dryer</h2>
+      <p>Filament dryer on the ACE attached to this printer. Not a separate farm machine.</p>
+      [% IF state.ace_ok %]
+      <table class="data-table">
+        <tr><th>Box temp</th><td>[% IF state.ace_temp.defined %][% state.ace_temp | html %] °C[% ELSE %]—[% END %]</td></tr>
+        <tr><th>Humidity</th><td>[% IF state.ace_humidity.defined %][% state.ace_humidity | html %] %[% ELSE %]—[% END %]</td></tr>
+        <tr><th>Drying</th>
+          <td>
+            [% IF state.drying_active %]on[% ELSE %]off[% END %]
+            [% IF state.drying_target.defined %] · target [% state.drying_target | html %] °C[% END %]
+            [% IF state.drying_remain.defined %] · remain [% state.drying_remain | html %] min[% END %]
+          </td>
+        </tr>
+        <tr><th>Loaded slot</th><td>[% IF state.ace_loaded_slot.defined %][% state.ace_loaded_slot | html %][% ELSE %]—[% END %]</td></tr>
+      </table>
+      [% IF state.ace_slots.size %]
+      <table class="data-table">
+        <tr><th>Slot</th><th>Material</th><th>%</th></tr>
+        [% FOREACH s IN state.ace_slots %]
+        <tr>
+          <td>[% s.index | html %]</td>
+          <td>[% s.type || '—' | html %]</td>
+          <td>[% IF s.pct.defined %][% s.pct | html %][% ELSE %]—[% END %]</td>
+        </tr>
+        [% END %]
+      </table>
+      [% END %]
+      [% ELSE %]
+      <p>ACE did not answer getInfo (idle boxes often stay quiet until drying or a feed). Start dryer still sends setDry.</p>
+      [% END %]
+      <form method="post" action="/3d/printer_lan/command" class="app-form">
+        <input type="hidden" name="printer_id" value="[% printer.id %]">
+        <input type="hidden" name="cmd" value="drying_start">
+        <label>Temp °C <input type="number" name="target_temp" value="45" min="35" max="85"></label>
+        <label>Minutes <input type="number" name="duration" value="240" min="10" max="1440"></label>
+        <button type="submit" class="btn">Start dryer</button>
+      </form>
+      <form method="post" action="/3d/printer_lan/command" class="app-form">
+        <input type="hidden" name="printer_id" value="[% printer.id %]">
+        <input type="hidden" name="cmd" value="drying_stop">
+        <button type="submit" class="btn">Stop dryer</button>
+      </form>
+    </div>
+
+    <div class="app-section">
+      <h2>Files on the printer</h2>
+      <p>Local storage and USB as the machine lists them. Delete frees space. Start print only from local files. No upload from Comserv yet — send from Anycubic Slicer Next or USB.</p>
+      <p>
+        <a href="/3d/printer_lan/control?printer_id=[% printer.id %]&amp;storage=local">Local</a>
+        |
+        <a href="/3d/printer_lan/control?printer_id=[% printer.id %]&amp;storage=udisk">USB</a>
+        · path <code>[% state.file_path || '/' | html %]</code>
+        [% IF state.file_path && state.file_path != '/' %]
+        · <a href="/3d/printer_lan/control?printer_id=[% printer.id %]&amp;storage=[% state.file_storage | html %]&amp;path=[% state.file_parent | uri %]">Up</a>
+        [% END %]
+      </p>
+      [% IF state.file_error %]
+      <p>[% state.file_error | html %]</p>
+      [% END %]
+      [% IF state.file_rows.size %]
+      <table class="data-table">
+        <tr><th>Name</th><th>Size</th><th>Actions</th></tr>
+        [% FOREACH f IN state.file_rows %]
+        <tr>
+          <td>
+            [% IF f.is_dir %]
+            <a href="/3d/printer_lan/control?printer_id=[% printer.id %]&amp;storage=[% state.file_storage | html %]&amp;path=[% f.open_path | uri %]">[% f.name | html %]/</a>
+            [% ELSE %]
+            [% f.name | html %]
+            [% END %]
+          </td>
+          <td>[% IF f.size.defined %][% f.size | html %][% ELSE %]—[% END %]</td>
+          <td>
+            [% IF !f.is_dir && state.file_storage == 'local' %]
+            <form method="post" action="/3d/printer_lan/command" class="app-form">
+              <input type="hidden" name="printer_id" value="[% printer.id %]">
+              <input type="hidden" name="cmd" value="start_print">
+              <input type="hidden" name="filename" value="[% f.name | html %]">
+              <input type="hidden" name="path" value="[% state.file_path | html %]">
+              <input type="hidden" name="storage" value="local">
+              <label><input type="checkbox" name="confirm_start" value="1"> start</label>
+              <button type="submit" class="btn">Print</button>
+            </form>
+            [% END %]
+            [% IF !f.is_dir %]
+            <form method="post" action="/3d/printer_lan/command" class="app-form">
+              <input type="hidden" name="printer_id" value="[% printer.id %]">
+              <input type="hidden" name="cmd" value="[% IF state.file_storage == 'udisk' %]delete_udisk[% ELSE %]delete_local[% END %]">
+              <input type="hidden" name="filename" value="[% f.name | html %]">
+              <input type="hidden" name="path" value="[% state.file_path | html %]">
+              <input type="hidden" name="storage" value="[% state.file_storage | html %]">
+              <label><input type="checkbox" name="confirm_delete" value="1"> delete</label>
+              <button type="submit" class="btn">Delete</button>
+            </form>
+            [% END %]
+          </td>
+        </tr>
+        [% END %]
+      </table>
+      [% ELSE %]
+      <p>No files in this folder (or the printer did not answer listLocal/listUdisk). Refresh after a slicer send.</p>
+      [% END %]
+    </div>
+
+    <div class="app-section">
+      <h2>Camera</h2>
+      <p>Stock stream is HTTP-FLV at port 18088. Chrome/Firefox cannot play it in this tab (that was the Allow/OK loop). Start capture, then open the URL in VLC or mpv.</p>
+      <form method="post" action="/3d/printer_lan/command" class="app-form" style="display:inline;">
+        <input type="hidden" name="printer_id" value="[% printer.id %]">
+        <input type="hidden" name="cmd" value="camera_start">
+        <button type="submit" class="btn">Start camera</button>
+      </form>
+      <form method="post" action="/3d/printer_lan/command" class="app-form" style="display:inline;">
+        <input type="hidden" name="printer_id" value="[% printer.id %]">
+        <input type="hidden" name="cmd" value="camera_stop">
+        <button type="submit" class="btn">Stop camera</button>
+      </form>
+      [% IF state.camera_url %]
+      <p>After Start camera: <code>[% state.camera_url | html %]</code></p>
+      [% END %]
+    </div>
+
+    <div class="app-section">
+      <h2>Job control</h2>
+      <p>Stop cancels the current job on the machine.</p>
+      <form method="post" action="/3d/printer_lan/command" class="app-form" style="display:inline;">
+        <input type="hidden" name="printer_id" value="[% printer.id %]">
+        <input type="hidden" name="cmd" value="pause">
+        <button type="submit" class="btn">Pause</button>
+      </form>
+      <form method="post" action="/3d/printer_lan/command" class="app-form" style="display:inline;">
+        <input type="hidden" name="printer_id" value="[% printer.id %]">
+        <input type="hidden" name="cmd" value="resume">
+        <button type="submit" class="btn">Resume</button>
+      </form>
+      <form method="post" action="/3d/printer_lan/command" class="app-form" style="margin-top:0.8em;">
+        <input type="hidden" name="printer_id" value="[% printer.id %]">
+        <input type="hidden" name="cmd" value="stop">
+        <label><input type="checkbox" name="confirm_stop" value="1"> Cancel the print</label>
+        <button type="submit" class="btn">Stop</button>
+      </form>
+    </div>
+  </div>
+</div>

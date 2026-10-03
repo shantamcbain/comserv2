@@ -111,8 +111,13 @@ sub parse_stl {
         for my $i (1 .. $triangle_count) {
             my $tri;
             read($fh, $tri, 50) or last;
-            my (undef, $x1,$y1,$z1, $x2,$y2,$z2, $x3,$y3,$z3) =
-                unpack('f<3 f<3 f<3 f<3', $tri);
+            # unpack('f<3 f<3 f<3 f<3') is WRONG: Perl does not group "f<3" as
+            # three little-endian floats, so every vertex was garbage. Measured
+            # 446.73 cm3 on a part whose true volume is 137.20 cm3 (3.3x high) —
+            # which inflated every filament estimate derived from it.
+            # Read 12 flat floats: normal(3) + v1(3) + v2(3) + v3(3).
+            my @v = unpack('f<12', substr($tri, 0, 48));
+            my ($x1,$y1,$z1, $x2,$y2,$z2, $x3,$y3,$z3) = @v[3..11];
             $volume_cm3 += ($x1*($y2*$z3 - $y3*$z2)
                           - $y1*($x2*$z3 - $x3*$z2)
                           + $z1*($x2*$y3 - $x3*$y2)) / 6.0;
@@ -385,6 +390,144 @@ sub change_filament {
         grams   => $grams,
         reserved => $grams ? 1 : 0,
     };
+}
+
+# Re-open a job that was marked complete (or cancelled) by mistake.
+# Resets status -> queued and unwinds the inventory side effects that the
+# complete/cancel handlers applied:
+#   * filament 'issue'  -> 'return'   (stock back on hand)
+#   * finished goods 'receive' -> 'issue' (part taken back out of stock)
+#   * printer 'depreciation' isNOT reversed (already consumed; accounting artefact)
+# $ctl is Controller::3d (for _inventory_transaction).
+# Returns { ok => 1, job_id => $id, reversed => \@notes } or { ok => 0, error => $msg }.
+sub reopen_job {
+    my ($self, $c, $job, $ctl) = @_;
+    return { ok => 0, error => 'Job not found.' } unless $job;
+
+    my $st = $job->status || '';
+    return { ok => 0, error => 'Only completed or cancelled jobs can be reopened.' }
+        unless $st =~ /^(completed|cancelled)$/;
+
+    my $schema   = $c->model('DBEncy');
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    my $who      = $c->session->{username} || 'system';
+    my @reversed;
+
+    my $err;
+    try {
+        $schema->txn_do(sub {
+            # ---- 1. Reverse the filament issue (grams consumed at completion) ----
+            if ($job->filament_item_id && $job->filament_quantity) {
+                my $fil = eval { $schema->resultset('Accounting::InventoryItem')
+                                    ->find($job->filament_item_id) };
+                my $sl  = $fil ? eval { ($fil->stock_levels->all)[0] } : undef;
+                my $qty = $self->stock_qty_from_grams($fil, $job->filament_quantity);
+                $ctl->_inventory_transaction($c,
+                    schema           => $schema,
+                    sitename         => $sitename,
+                    item_id          => $job->filament_item_id,
+                    location_id      => $sl ? $sl->location_id : undef,
+                    transaction_type => 'return',
+                    quantity         => $qty,
+                    unit_cost        => ($job->filament_cost && $qty)
+                                        ? ($job->filament_cost / $qty) : undef,
+                    reference_number => '3D-JOB-' . $job->id,
+                    notes            => sprintf('Filament returned: %sg — job #%d reopened',
+                                            $job->filament_quantity, $job->id),
+                    performed_by     => $who,
+                );
+                push @reversed, sprintf('returned %sg of filament', $job->filament_quantity);
+            }
+
+            # ---- 2. Reverse the finished-goods receipt (part back out of stock) ----
+            # Mirror completion: prefer model.item_id (printed component), then source/consignment.
+            my $printed_item_id;
+            if ($job->model_id) {
+                my $model = eval { $job->model };
+                $printed_item_id = $model->item_id
+                    if $model && eval { $model->item_id };
+            }
+            if (!$printed_item_id && $job->source_item_id) {
+                $printed_item_id = $job->source_item_id;
+            }
+            if (!$printed_item_id && $job->consignment_line_id) {
+                $printed_item_id = eval {
+                    $schema->storage->dbh->selectrow_array(
+                        'SELECT item_id FROM inventory_consignment_lines WHERE id = ?',
+                        undef, $job->consignment_line_id)
+                };
+            }
+            if ($printed_item_id) {
+                # Mirror the completion handler: it received into the FIRST location
+                # for this site. Reverse against the same location.
+                my $default_loc = eval {
+                    $schema->storage->dbh->selectrow_array(
+                        'SELECT id FROM inventory_locations WHERE sitename = ? ORDER BY id LIMIT 1',
+                        undef, $sitename)
+                };
+                if ($default_loc) {
+                    $ctl->_inventory_transaction($c,
+                        schema           => $schema,
+                        sitename         => $sitename,
+                        item_id          => $printed_item_id,
+                        location_id      => $default_loc,
+                        transaction_type => 'issue',
+                        quantity         => $job->quantity || 1,
+                        unit_cost        => $job->total_cost || undef,
+                        reference_number => '3D-JOB-' . $job->id,
+                        notes            => sprintf('Printed unit removed from stock — job #%d reopened',
+                                                $job->id),
+                        performed_by     => $who,
+                    );
+                    push @reversed, sprintf('removed %d printed unit(s) from stock',
+                                        $job->quantity || 1);
+                }
+            }
+
+            # ---- 3. Reset the job to queued and clear completion bookkeeping ----
+            $job->update({
+                status            => 'queued',
+                completed_at      => undef,
+                print_hours       => undef,
+                filament_quantity => undef,
+                filament_cost     => undef,
+                printer_cost      => undef,
+                electricity_cost  => undef,
+                total_cost        => undef,
+                inventory_reserved => 0,
+                admin_notes       => (($job->admin_notes || '') =~ s/\s*$//r)
+                                     . ($job->admin_notes ? "\n" : '')
+                                     . sprintf('[%s] Reopened by %s (was %s)',
+                                           Comserv::Util::AppTime->now_utc, $who, $st),
+            });
+
+            # ---- 4. Free the printer if it is still holding this job ----
+            if ($job->printer_id) {
+                my $printer = eval { $schema->resultset('Printing3dPrinter')
+                                        ->find($job->printer_id) };
+                if ($printer && ($printer->current_job_id // 0) == $job->id) {
+                    $printer->update({
+                        status         => 'idle',
+                        current_job_id => undef,
+                        updated_at     => Comserv::Util::AppTime->now_utc,
+                    });
+                    push @reversed, 'printer set back to idle';
+                }
+            }
+        });
+    }
+    catch {
+        $err = "$_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'reopen_job', "job ".$job->id." failed: $err");
+    };
+    return { ok => 0, error => $err } if $err;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reopen_job',
+        sprintf('Job #%d reopened by %s (was %s). Reversed: %s',
+            $job->id, $who, $st, (@reversed ? join('; ', @reversed) : 'nothing')));
+
+    return { ok => 1, job_id => $job->id, reversed => \@reversed };
 }
 
 __PACKAGE__->meta->make_immutable;

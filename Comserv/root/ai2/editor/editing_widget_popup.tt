@@ -32,6 +32,110 @@
         .commit-panel button#cancel-commit-btn { background:#555; }
         .terminal { background:#1e1f22; font-family:monospace; font-size:11px; padding:6px 12px; margin:0 12px; border:1px solid #444; border-radius:3px; }
         .status-bar { background:#007acc; color:white; font-size:11px; padding:2px 8px; display:flex; justify-content:space-between; }
+        .sidebar-right { border-right:none; border-left:1px solid #555; }
+        .sidebar-right .sidebar-icon.active { background:#0e639c; color:white; }
+        #editor-right-rail { position:relative; }
+        #editor-right-rail .rail-resize-handle { position:absolute; left:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:20; background:transparent; }
+    
+        /* AI Editor docked chat — high contrast + layout (beat ai-chat.css .chat-input) */
+        #ai-chat-sidebar {
+            background: #1e1f22 !important;
+            color: #f2f2f2 !important;
+            font-size: 13px;
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: 0 !important;
+        }
+        #ai-chat-sidebar .chat-header { flex: 0 0 auto !important; }
+        #ai-chat-sidebar .chat-agent-phase {
+            flex: 0 0 auto !important;
+            background: #252830 !important;
+            color: #ddd !important;
+        }
+        #ai-chat-sidebar .chat-messages,
+        #ai-chat-sidebar #chat-messages {
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+            background: #1a1b1e !important;
+            background-color: #1a1b1e !important;
+            color: #f2f2f2 !important;
+            font-size: 13px !important;
+            line-height: 1.45 !important;
+            gap: 8px;
+        }
+        #ai-chat-sidebar .chat-msg {
+            margin-bottom: 10px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px solid #3a3f4a;
+            color: #f2f2f2 !important;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            max-width: 100%;
+        }
+        #ai-chat-sidebar .chat-msg-you {
+            background: #243044 !important;
+            border-color: #3d5a80;
+        }
+        #ai-chat-sidebar .chat-msg-ai {
+            background: #252830 !important;
+            border-color: #4a5568;
+        }
+        #ai-chat-sidebar .chat-msg strong { color: #9ecbff !important; }
+        #ai-chat-sidebar .chat-msg-you strong { color: #ffd27a !important; }
+        #ai-chat-sidebar .chat-msg pre,
+        #ai-chat-sidebar .chat-msg code {
+            background: #0f1115 !important;
+            color: #e6edf3 !important;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 6px 8px;
+            display: block;
+            white-space: pre-wrap;
+            font-size: 12px !important;
+            max-height: 280px;
+            overflow: auto;
+        }
+        /* IMPORTANT: do not use class name chat-input — ai-chat.css forces column + light bg */
+        #ai-chat-sidebar .ai2-chat-input-row {
+            flex: 0 0 auto !important;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: flex-end !important;
+            gap: 6px !important;
+            padding: 8px !important;
+            border-top: 1px solid #555 !important;
+            background: #1e1f22 !important;
+            background-color: #1e1f22 !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        #ai-chat-sidebar #ai-chat-input {
+            flex: 1 1 auto !important;
+            width: auto !important;
+            min-width: 0 !important;
+            min-height: 36px !important;
+            max-height: 120px !important;
+            resize: none !important;
+            background: #0f1115 !important;
+            background-color: #0f1115 !important;
+            color: #f2f2f2 !important;
+            border: 1px solid #555 !important;
+            border-radius: 3px !important;
+            padding: 8px !important;
+            font-size: 13px !important;
+            line-height: 1.35 !important;
+            box-sizing: border-box !important;
+        }
+        #ai-chat-sidebar #ai-chat-input::placeholder {
+            color: #9aa3b2 !important;
+            opacity: 1 !important;
+        }
+        #ai-chat-sidebar #ai-chat-send {
+            flex: 0 0 auto !important;
+            align-self: flex-end !important;
+        }
+        #ai-chat-sidebar a { color: #7ec8ff !important; }
     </style>
 </head>
 <body>
@@ -40,7 +144,7 @@
         <label>Branch:
             <select id="branch-select">
                 [% FOREACH b IN branches %]
-                    <option [% IF b == 'main' %]selected[% END %]>[% b | html %]</option>
+                    <option value="[% b | html %]" [% IF b == current_branch %]selected[% END %]>[% b | html %]</option>
                 [% END %]
             </select>
         </label>
@@ -48,9 +152,7 @@
 
         <label style="margin-left:auto">Model:
             <select id="model-select">
-                [% FOREACH m IN recommended_models %]
-                    <option [% IF m == selected_model %]selected[% END %]>[% m | html %]</option>
-                [% END %]
+                <option value="" disabled selected>Loading models…</option>
             </select>
         </label>
 
@@ -106,10 +208,14 @@
                 <div id="ai2-changed-files" style="margin-top:4px;"></div>
             </div>
 
-            <div id="panel-git" class="sidebar-panel" style="display:none; padding:0; width:100%; background:#2b2b2b; font-size:13px;">
+            <div id="panel-git" class="sidebar-panel" style="display:none; padding:0; width:100%; height:100%; background:#2b2b2b; font-size:13px; flex-direction:column; overflow:hidden;">
                 <!-- The editor and Git desktop intentionally share one implementation. -->
-                <iframe src="/admin/git" title="Git Dashboard"
-                        style="width:100%;height:calc(100vh - 42px);min-height:620px;border:0;background:#1e1f22;"></iframe>
+                <div class="git-panel-header" style="padding:6px 10px; background:#2b2b2b; font-weight:bold; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #555; flex:0 0 auto;">
+                    <span>Git</span>
+                    <button id="ai-git-detach" type="button" title="Open Git dashboard in its own window" style="background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;">⤢ Detach</button>
+                </div>
+                <iframe src="/admin/git?embed=1" title="Git Dashboard"
+                        style="width:100%;flex:1 1 auto;height:100%;min-height:0;border:0;background:#1e1f22;"></iframe>
             </div>
 
             <div id="panel-terminal" class="sidebar-panel" style="display:none; padding:12px;">
@@ -124,7 +230,27 @@
             <div id="panel-review" class="sidebar-panel" style="display:none; padding:0; width:340px; background:#2b2b2b; font-size:13px; overflow:auto;">
                 <div style="padding:12px;">
                     <h4 style="margin:0 0 8px 0; font-size:12px; color:#aaa;">REVIEW &amp; MERGE WORKTREE</h4>
-                    <p style="font-size:11px;color:#888;margin:0 0 8px;">AI commits in the worktree; you merge to main here.</p>
+                    <p style="font-size:11px;color:#888;margin:0 0 8px;">Create an isolated branch/worktree here; AI commits on it. Merge to main stays admin-gated.</p>
+                    <form id="review-create-worktree-form" data-create-worktree-form="1" style="margin:0 0 12px;padding:8px;border:1px solid #444;border-radius:4px;background:#1e1f22;">
+                        <div style="font-size:11px;color:#aaa;margin-bottom:6px;">Create Branch + Worktree</div>
+                        <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;">Branch
+                            <input type="text" name="branch" required pattern="[A-Za-z0-9._/-]+"
+                                   placeholder="feature/my-change"
+                                   style="width:100%;box-sizing:border-box;background:#313335;color:#ddd;border:1px solid #555;padding:4px;border-radius:3px;margin-top:2px;">
+                        </label>
+                        <label style="display:block;font-size:11px;color:#888;margin:6px 0 4px;">Parent
+                            <input type="text" name="parent" value="main"
+                                   style="width:100%;box-sizing:border-box;background:#313335;color:#ddd;border:1px solid #555;padding:4px;border-radius:3px;margin-top:2px;">
+                        </label>
+                        <input type="hidden" name="label" value="">
+                        <input type="hidden" name="url" value="/planning/daily">
+                        <button type="submit" id="review-create-worktree-btn"
+                                style="width:100%;margin-top:8px;background:#6a1b9a;color:#fff;border:none;padding:6px;border-radius:4px;cursor:pointer;">
+                            Create Branch + Worktree
+                        </button>
+                        <pre id="review-create-worktree-status" data-create-worktree-status="1"
+                             style="font-size:11px;color:#9f9;white-space:pre-wrap;margin:6px 0 0;"></pre>
+                    </form>
                     <select id="review-branch" style="width:100%;background:#313335;color:#ddd;border:1px solid #555;padding:4px;border-radius:3px;margin-bottom:8px;">
                         <option value="">— select worktree branch —</option>
                     </select>
@@ -142,16 +268,45 @@
                 </div>
             </div>
 
-            <div id="panel-hermes" class="sidebar-panel" style="display:none; padding:0; width:420px; background:#2b2b2b; overflow:auto;">
-                <div style="padding:8px;">
-                    <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa;">HERMES DASHBOARD</h4>
-                    <p style="font-size:11px;color:#888;margin:0 0 6px;">Embedded Hermes web view (set HERMES_DASHBOARD_URL to enable).</p>
+            <div id="panel-hermes" class="sidebar-panel" style="display:none; padding:0; width:720px; background:#2b2b2b; overflow:hidden;">
+                <div style="padding:8px; display:flex; flex-direction:column; height:100%; min-height:0; box-sizing:border-box;">
+                    <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa; flex:0 0 auto;">HERMES</h4>
+                    <p style="font-size:11px;color:#888;margin:0 0 6px;flex:0 0 auto;">Hermes dashboard opens on this page&apos;s hostname at port 9119 (<code>/chat</code>) — localhost, <code>*.local</code>, <code>*.zero</code>, or the ZeroTier IP, matching how you opened the editor. Drag the panel edge to widen, drag the bar under the frame to change height, or Detach for a full window.</p>
+                    <p style="font-size:11px;color:#9ecbff;margin:0 0 6px;flex:0 0 auto;">Login: username <code>shanta</code> (dashboard password is the one you set locally).</p>
+                    <div style="font-size:11px;color:#c8d0dc;background:#0f1115;border:1px solid #444;border-radius:4px;padding:8px;margin-bottom:8px;flex:0 0 auto;">
+                      <div style="color:#888;margin-bottom:4px;">Terminal (normal Hermes):</div>
+                      <code id="hermes-terminal-cmd" style="word-break:break-all;">cd /home/shanta/.comserv/worktrees/aisystem/Comserv &amp;&amp; hermes chat</code>
+                      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+                        <button type="button" id="hermes-copy-cmd" style="background:#37474f;color:#fff;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Copy terminal command</button>
+                        <button type="button" id="hermes-start-desktop" style="background:#6a1b9a;color:#fff;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Optional: Electron Desktop (not dashboard)</button>
+                      </div>
+                      <div id="hermes-desktop-status" style="font-size:11px;color:#9ecbff;margin-top:6px;display:none;"></div>
+                    </div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;flex:0 0 auto;">
+                      <button type="button" id="hermes-detach" style="background:#1565c0;color:#fff;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px;" title="Open Hermes dashboard in its own window">⤢ Detach</button>
+                      <button type="button" id="hermes-reload-dashboard" style="background:#37474f;color:#fff;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px;">Load dashboard</button>
+                      <button type="button" id="hermes-taller" style="background:#455a64;color:#fff;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px;">Taller</button>
+                      <button type="button" id="hermes-shorter" style="background:#455a64;color:#fff;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px;">Shorter</button>
+                      <a id="hermes-open-tab" href="#" target="_blank" rel="noopener" style="color:#7ec8ff;font-size:11px;">Open /sessions in a new tab</a>
+                    </div>
                     [% IF c.config.hermes_dashboard_url %]
-                        <iframe src="[% c.config.hermes_dashboard_url | html %]" style="width:100%;height:420px;border:1px solid #555;border-radius:4px;"></iframe>
+                        <div id="hermes-frame-wrap" style="position:relative;width:100%;min-height:420px;height:min(70vh,720px);border:1px solid #555;border-radius:4px;background:#111;overflow:hidden;flex:1 1 auto;">
+                          <iframe id="hermes-iframe" src="[% c.config.hermes_dashboard_url | html %]" title="Hermes dashboard" style="width:100%;height:100%;border:0;display:block;background:#111;"></iframe>
+                          <div id="hermes-iframe-resize" title="Drag to resize height" style="position:absolute;left:0;right:0;bottom:0;height:8px;cursor:ns-resize;background:linear-gradient(transparent,#555);"></div>
+                        </div>
                     [% ELSE %]
-                        <iframe id="hermes-iframe" src="" style="width:100%;height:420px;border:1px solid #555;border-radius:4px;display:none;"></iframe>
-                        <div id="hermes-placeholder" style="color:#888;font-size:12px;padding:12px;">No Hermes dashboard URL configured. Set <code>HERMES_DASHBOARD_URL</code> in the app config or pass <code>?hermes=URL</code> to this page.</div>
+                        <div id="hermes-placeholder" style="color:#888;font-size:12px;padding:12px;border:1px dashed #555;border-radius:4px;margin-bottom:8px;flex:0 0 auto;">
+                            No dashboard URL yet. Starting from this page host on port <code>9119</code>, or set <code>HERMES_DASHBOARD_URL</code> / <code>?hermes=URL</code>.
+                        </div>
+                        <div id="hermes-frame-wrap" style="position:relative;width:100%;min-height:420px;height:min(70vh,720px);border:1px solid #555;border-radius:4px;background:#111;overflow:hidden;flex:1 1 auto;display:none;">
+                          <iframe id="hermes-iframe" src="" title="Hermes dashboard" style="width:100%;height:100%;border:0;display:block;background:#111;"></iframe>
+                          <div id="hermes-iframe-resize" title="Drag to resize height" style="position:absolute;left:0;right:0;bottom:0;height:8px;cursor:ns-resize;background:linear-gradient(transparent,#555);"></div>
+                        </div>
                     [% END %]
+                    <div id="hermes-run-section" style="margin-top:10px;border-top:1px solid #444;padding-top:8px;flex:0 0 auto;">
+                      <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa;">HERMES CLI ONESHOT</h4>
+                      <p style="font-size:11px;color:#888;margin:0 0 6px;">CLI oneshot when Desktop is down — does not replace the dashboard above.</p>
+                    </div>
                 </div>
             </div>
 
@@ -166,15 +321,14 @@
             </div>
         </div>
 
-        <!-- Main Editor Area (row: code on left, diff rail on right) -->
-        <div class="editor-area" style="flex:1; display:flex; flex-direction:row; min-width:0;">
-            <!-- Left: editor (tabs + Ace) -->
+        <!-- Main Editor Area (Ace only; Diff is a right tool window, not an editor split) -->
+        <div class="editor-area" style="flex:1; display:flex; flex-direction:column; min-width:0;">
             <div class="editor-main" style="flex:1; display:flex; flex-direction:column; min-width:0;">
                 <div class="editor-tabs" style="background:#2b2b2b; padding:4px 8px; color:#aaa; display:flex; align-items:center; justify-content:space-between;">
                     <span id="file-tab-label" style="font-size:12px;">[% IF file_to_load %][% file_to_load | html %][% ELSE %]No file loaded[% END %]</span>
                     <span style="display:flex;align-items:center;gap:8px;">
                         <span id="file-status" style="font-size:11px;color:#888;"></span>
-                        <button id="editor-diff-btn" type="button" title="Show this file's git diff (right panel)" style="background:#3c3f41;color:#ddd;border:1px solid #555;border-radius:3px;cursor:pointer;font-size:11px;padding:2px 8px;">Diff</button>
+                        <button id="editor-diff-btn" type="button" title="Open Diff tool tab for this file's git diff" style="background:#3c3f41;color:#ddd;border:1px solid #555;border-radius:3px;cursor:pointer;font-size:11px;padding:2px 8px;">Diff</button>
                         <button id="save-btn" style="background:#0e639c;color:white;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;font-size:12px;display:none;">Save</button>
                     </span>
                 </div>
@@ -182,28 +336,29 @@
                     <div id="ace-editor" style="width:100%;height:100%;"></div>
                 </div>
             </div>
-            <!-- Right rail: diff panes (AI suggestion + git diff) sit BESIDE the editor -->
-            <div id="editor-right-rail" style="flex:0 0 42%; min-width:260px; max-width:70vw; display:flex; flex-direction:column; border-left:1px solid #555; overflow:auto;">
-                <!-- AI Diff Pane -->
-                <div id="ai-diff-pane" class="diff-pane" style="flex:0 0 auto; max-height:38vh; background:#2b2b2b; color:#0f0; padding:8px; border-bottom:1px solid #555; font-size:0.85em; overflow:auto; display:none;">
-                    <strong style="color:#9cdcfe;">AI Suggestion</strong>
-                    <span id="ai-diff-status" style="color:#888; font-size:0.9em;"></span>
-                    <pre id="ai-diff-content" style="white-space:pre-wrap; margin:6px 0; color:#0f0;"></pre>
-                    <div style="margin-top:8px">
-                        <button id="ai-approve-btn" type="button" style="background:#2e7d32;color:white;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;">Approve</button>
-                        <button id="ai-reject-btn" type="button" style="background:#555;color:white;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;">Reject</button>
-                    </div>
+        </div>
+
+        <!-- Right Diff tool window (sibling of editor-area / chat; toggled by Diff strip) -->
+        <div id="editor-right-rail" data-right-closed="1" style="position:relative; flex:0 0 var(--ai-diff-w,360px); width:var(--ai-diff-w,360px); min-width:220px; max-width:70vw; display:none; flex-direction:column; border-left:1px solid #555; overflow:auto; background:#2b2b2b;">
+            <!-- AI Diff Pane -->
+            <div id="ai-diff-pane" class="diff-pane" style="flex:0 0 auto; max-height:38vh; background:#2b2b2b; color:#0f0; padding:8px; border-bottom:1px solid #555; font-size:0.85em; overflow:auto; display:none;">
+                <strong style="color:#9cdcfe;">AI Suggestion</strong>
+                <span id="ai-diff-status" style="color:#888; font-size:0.9em;"></span>
+                <pre id="ai-diff-content" style="white-space:pre-wrap; margin:6px 0; color:#0f0;"></pre>
+                <div style="margin-top:8px">
+                    <button id="ai-approve-btn" type="button" style="background:#2e7d32;color:white;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;">Approve</button>
+                    <button id="ai-reject-btn" type="button" style="background:#555;color:white;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;">Reject</button>
                 </div>
-                <!-- git diff pane (injected by ai2editor/file-diff.js into this rail) -->
             </div>
+            <!-- git diff pane (injected by ai2editor/file-diff.js into this rail) -->
         </div>
 
         <!-- Right Chat Sidebar (resizable + detachable) -->
-        <div id="ai-chat-sidebar" class="chat-sidebar" style="width:var(--ai-chat-w,320px); min-width:220px; max-width:70vw; background:#313335; color:#ddd; display:flex; flex-direction:column; border-left:1px solid #555; position:relative;">
+        <div id="ai-chat-sidebar" class="chat-sidebar right-tool-window" data-right-panel-host="chat" style="width:var(--ai-chat-w,320px); min-width:220px; max-width:70vw; background:#313335; color:#ddd; display:flex; flex-direction:column; border-left:1px solid #555; position:relative;">
             <!-- Resize handle (drag left edge to resize) -->
             <div id="ai-chat-resize" title="Drag to resize" style="position:absolute; left:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:5;"></div>
             <div class="chat-header" style="padding:6px 10px; background:#2b2b2b; font-weight:bold; display:flex; align-items:center; justify-content:space-between;">
-                <span>AI Chat (Hy3)</span>
+                <span id="ai-chat-title">AI Chat</span>
                 <span style="display:flex; gap:4px;">
                     <button id="ai-chat-todo" type="button" title="Add a todo for this page’s project" style="background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;">📝 Todo</button>
                     <button id="ai-chat-detach" type="button" title="Open chat in its own window" style="background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;">⤢ Detach</button>
@@ -211,18 +366,47 @@
                     <button id="ai-chat-close" type="button" title="Hide chat (reopen from the 💬 button)" style="background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;">✕</button>
                 </span>
             </div>
-            <div id="chat-messages" class="chat-messages" style="flex:1; padding:8px; overflow:auto; font-size:0.9em;">
+            <div id="chat-messages" class="chat-messages" style="flex:1; padding:8px; overflow:auto; font-size:13px; background:#1a1b1e; color:#f2f2f2;">
                 <div><strong>AI:</strong> How can I help with this file?</div>
             </div>
-            <div class="chat-input" style="padding:6px; border-top:1px solid #555; display:flex; gap:6px;">
-                <input id="ai-chat-input" type="text" style="flex:1" placeholder="Ask about this file, or name another lib/… path to read">
-                <button id="ai-chat-send" type="button" style="background:#0e639c;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">Send</button>
+            <div class="chat-agent-phase" style="padding:4px 6px; border-top:1px solid #555; display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:11px; color:#bbb;">
+                <label for="ai-editor-agent" style="margin:0;">Agent</label>
+                <select id="ai-editor-agent" title="Analyze = cheap root-cause worker; Programming edits code; Documentation focuses on docs/plans" style="background:#222;color:#ddd;border:1px solid #555;border-radius:3px;padding:1px 4px;max-width:140px;">
+                    <option value="analyze">🔍 Analyze</option>
+                    <option value="programming" selected>💻 Programming</option>
+                    <option value="documentation">📚 Documentation</option>
+                </select>
+                <label for="ai-editor-phase" style="margin:0;">Phase</label>
+                <select id="ai-editor-phase" title="clarify → analyze → plan → Verify → implement" style="background:#222;color:#ddd;border:1px solid #555;border-radius:3px;padding:1px 4px;max-width:120px;">
+                    <option value="clarify">0 Clarify</option>
+                    <option value="analyze" selected>A Analyze</option>
+                    <option value="plan">B Plan</option>
+                    <option value="implement">C Implement</option>
+                </select>
+                <button id="ai-editor-verify" type="button" title="Approve plan and move to implement" style="background:#2e7d32;color:white;border:none;border-radius:3px;cursor:pointer;font-size:11px;padding:2px 8px;">Verify</button>
+                <span id="ai-editor-phase-badge" style="opacity:0.85;">Phase: analyze</span>
+            </div>
+            <div class="ai2-chat-input-row">
+                <textarea id="ai-chat-input" rows="2" placeholder="Describe the bug (vague asks get Clarify first) — Enter send, Shift+Enter newline"></textarea>
+                <button id="ai-chat-send" type="button" style="background:#0e639c;color:white;border:none;padding:6px 12px;border-radius:3px;cursor:pointer;">Send</button>
+            </div>
+        </div>
+
+        <!-- Right vertical tool strip (PyCharm-like) -->
+        <div class="sidebar sidebar-right" id="right-sidebar-icons">
+            <div class="sidebar-icon active" data-right-panel="chat" title="AI Chat">
+                <div class="icon">💬</div>
+                <div class="label">Chat</div>
+            </div>
+            <div class="sidebar-icon" data-right-panel="diff" title="Diff tool tab">
+                <div class="icon">🧾</div>
+                <div class="label">Diff</div>
             </div>
         </div>
 
         <!-- Floating reopen button: shown only when the chat sidebar is closed -->
         <button id="ai-chat-reopen" type="button" title="Show AI chat"
-                style="display:none; position:absolute; right:8px; top:50%; transform:translateY(-50%); z-index:30;
+                style="display:none; position:absolute; right:72px; top:50%; transform:translateY(-50%); z-index:30;
                        background:#0e639c; color:#fff; border:none; border-radius:50%; width:38px; height:38px;
                        cursor:pointer; font-size:18px; box-shadow:0 0 6px rgba(0,0,0,0.5);">💬</button>
     </div>

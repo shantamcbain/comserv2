@@ -18,6 +18,10 @@
 (function () {
     'use strict';
 
+    // Mark this page as AI Editor so Chat-with-AI Apply Fix / coding paths stay off elsewhere.
+    try { window.AI2_EDITOR = true; } catch (e) { /* ignore */ }
+
+
     const NS = 'AI2EditorChat';
     let _activeFile = '';
 
@@ -120,19 +124,124 @@
     //     panel is attached to the editor or detached into its own window.
     //     We keep the messages in memory and re-render whichever view is active,
     //     so detaching/reattaching never loses context. ---
-    let chatLog = [];   // [{who:'You'|'AI', html:'...'}]
+    let chatLog = [];   // [{who:'You'|'AI'|'Think', html?, summary?, steps?, open?, done?}]
+
+        function ensureEditorChatContrast(doc) {
+        doc = doc || document;
+        if (!doc || !doc.head) return;
+        if (doc.getElementById('ai2-editor-chat-contrast-css')) {
+            // Allow upgrades after deploy: replace contents
+            var existing = doc.getElementById('ai2-editor-chat-contrast-css');
+            if (existing && existing.getAttribute('data-v') === '2') return;
+            if (existing) existing.remove();
+        }
+        const style = doc.createElement('style');
+        style.id = 'ai2-editor-chat-contrast-css';
+        style.setAttribute('data-v', '2');
+        style.textContent = [
+            '#ai-chat-sidebar{background:#1e1f22!important;color:#f2f2f2!important;display:flex!important;flex-direction:column!important;min-height:0!important;}',
+            '#ai-chat-sidebar .chat-messages,#ai-chat-sidebar #chat-messages{flex:1 1 auto!important;min-height:0!important;background:#1a1b1e!important;color:#f2f2f2!important;font-size:13px!important;line-height:1.45!important;}',
+            '#ai-chat-sidebar .chat-msg{margin-bottom:10px;padding:8px 10px;border-radius:6px;border:1px solid #3a3f4a;color:#f2f2f2!important;word-break:break-word;overflow-wrap:anywhere;}',
+            '#ai-chat-sidebar .chat-msg-you{background:#243044!important;border-color:#3d5a80;}',
+            '#ai-chat-sidebar .chat-msg-ai{background:#252830!important;border-color:#4a5568;}',
+            '#ai-chat-sidebar .chat-msg strong{color:#9ecbff!important;}',
+            '#ai-chat-sidebar .chat-msg-you strong{color:#ffd27a!important;}',
+            '#ai-chat-sidebar .chat-msg pre,#ai-chat-sidebar .chat-msg code{background:#0f1115!important;color:#e6edf3!important;border:1px solid #333;border-radius:4px;padding:6px 8px;display:block;white-space:pre-wrap;font-size:12px!important;max-height:280px;overflow:auto;}',
+            '#ai-chat-sidebar .ai2-chat-input-row{flex:0 0 auto!important;display:flex!important;flex-direction:row!important;align-items:flex-end!important;gap:6px!important;padding:8px!important;border-top:1px solid #555!important;background:#1e1f22!important;width:100%!important;box-sizing:border-box!important;}',
+            '#ai-chat-sidebar #ai-chat-input{flex:1 1 auto!important;min-width:0!important;min-height:36px!important;max-height:120px!important;background:#0f1115!important;color:#f2f2f2!important;border:1px solid #555!important;border-radius:3px!important;padding:8px!important;font-size:13px!important;box-sizing:border-box!important;}',
+            '#ai-chat-sidebar #ai-chat-input::placeholder{color:#9aa3b2!important;opacity:1!important;}',
+            /* neutralize leaked widget class if still present */
+            '#ai-chat-sidebar .chat-input{flex:0 0 auto!important;display:flex!important;flex-direction:row!important;align-items:flex-end!important;background:#1e1f22!important;}'
+        ].join('');
+        doc.head.appendChild(style);
+    }
+
+function ensureThinkingStyles(doc) {
+        doc = doc || document;
+        if (!doc || !doc.head) return;
+        if (doc.getElementById('ai2-editor-thinking-css')) return;
+        const style = doc.createElement('style');
+        style.id = 'ai2-editor-thinking-css';
+        style.textContent = [
+            '.ai-thinking{margin:8px 0;border:1px solid #4a5568;border-radius:6px;background:#252830;color:#c8d0dc;font-size:12px;}',
+            '.ai-thinking summary{cursor:pointer;padding:6px 10px;list-style:none;font-weight:600;color:#9ecbff;}',
+            '.ai-thinking summary::-webkit-details-marker{display:none;}',
+            '.ai-thinking summary::before{content:"▸ ";display:inline-block;transition:transform .1s;}',
+            '.ai-thinking[open] summary::before{transform:rotate(90deg);}',
+            '.ai-thinking-body{padding:4px 10px 8px;border-top:1px solid #3a4150;}',
+            '.ai-thinking-step{padding:4px 0;border-bottom:1px solid #333842;white-space:pre-wrap;line-height:1.35;}',
+            '.ai-thinking-step:last-child{border-bottom:none;}',
+            '.ai-thinking-live{border-color:#0e639c;box-shadow:0 0 0 1px rgba(14,99,156,.35);}',
+            '.ai-thinking-live summary{color:#7ec8ff;}'
+        ].join('');
+        doc.head.appendChild(style);
+    }
+
+    function autosizePrompt(el) {
+        if (!el || !el.style) return;
+        el.style.height = 'auto';
+        const max = 200;
+        const next = Math.min(Math.max(el.scrollHeight, 32), max);
+        el.style.height = next + 'px';
+        el.style.overflowY = (el.scrollHeight > max) ? 'auto' : 'hidden';
+    }
+
+    function wirePromptBox(el, onSend) {
+        if (!el || el._ai2PromptWired) return;
+        el._ai2PromptWired = true;
+        autosizePrompt(el);
+        el.addEventListener('input', function () { autosizePrompt(el); });
+        el.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (typeof onSend === 'function') onSend();
+            }
+        });
+    }
+
+    function refreshChatViews() {
+        const attachedBox = document.getElementById('chat-messages');
+        if (attachedBox && sidebarAttached()) renderChatLog(attachedBox);
+        const w = window._aiChatWin;
+        if (w && !w.closed) {
+            const dBox = w.document.getElementById('chat-messages');
+            if (dBox) renderChatLog(dBox);
+        }
+    }
 
     function renderChatLog(box) {
         if (!box) return;
+        ensureThinkingStyles(box.ownerDocument || document);
+        ensureEditorChatContrast(box.ownerDocument || document);
         box.innerHTML = '';
         if (!chatLog.length) {
-            box.innerHTML = '<div><strong>AI:</strong> How can I help with this file?</div>';
+            box.innerHTML = '<div class="chat-msg chat-msg-ai"><strong>AI:</strong> How can I help with this file?</div>';
             return;
         }
         for (let i = 0; i < chatLog.length; i++) {
             const e = chatLog[i];
+            if (e.who === 'Think') {
+                const details = document.createElement('details');
+                details.className = 'ai-thinking' + (e.done ? '' : ' ai-thinking-live');
+                details.open = e.open !== false;
+                if (e.id) details.dataset.thinkId = e.id;
+                const summary = document.createElement('summary');
+                summary.textContent = e.summary || 'AI thinking…';
+                const body = document.createElement('div');
+                body.className = 'ai-thinking-body';
+                (e.steps || []).forEach(function (step) {
+                    const stepEl = document.createElement('div');
+                    stepEl.className = 'ai-thinking-step';
+                    stepEl.textContent = step;
+                    body.appendChild(stepEl);
+                });
+                details.appendChild(summary);
+                details.appendChild(body);
+                box.appendChild(details);
+                continue;
+            }
             const div = document.createElement('div');
-            div.style.marginBottom = '8px';
+            div.className = 'chat-msg ' + (e.who === 'AI' ? 'chat-msg-ai' : 'chat-msg-you');
             div.innerHTML = '<strong>' + (e.who === 'AI' ? 'AI:' : 'You:') + '</strong> ' + e.html;
             box.appendChild(div);
         }
@@ -142,13 +251,86 @@
     // The single place a message is recorded + shown in whichever view is live.
     function recordMessage(who, html) {
         chatLog.push({ who: who, html: html });
-        const attachedBox = document.getElementById('chat-messages');
-        if (attachedBox && sidebarAttached()) renderChatLog(attachedBox);
-        const w = window._aiChatWin;
-        if (w && !w.closed) {
-            const dBox = w.document.getElementById('chat-messages');
-            if (dBox) renderChatLog(dBox);
+        refreshChatViews();
+    }
+
+    // Live thinking trail in chat (visible + kept for daily agent analysis).
+    function startLiveThinking(meta) {
+        ensureThinkingStyles(document);
+        try {
+            const w = window._aiChatWin;
+            if (w && !w.closed) ensureThinkingStyles(w.document);
+        } catch (e0) { /* ignore */ }
+        const id = 'think-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+        const startedAt = Date.now();
+        const entry = {
+            who: 'Think',
+            id: id,
+            open: true,
+            done: false,
+            summary: '⏳ AI thinking…',
+            steps: []
+        };
+        chatLog.push(entry);
+
+        function find() {
+            for (let i = chatLog.length - 1; i >= 0; i--) {
+                if (chatLog[i].id === id) return chatLog[i];
+            }
+            return entry;
         }
+        function addStep(text) {
+            const e = find();
+            e.steps.push(String(text));
+            refreshChatViews();
+        }
+        function setSummary(text) {
+            const e = find();
+            e.summary = String(text);
+            refreshChatViews();
+        }
+        if (meta && meta.agent) addStep('Agent: ' + meta.agent);
+        if (meta && meta.phase) addStep('Phase: ' + meta.phase);
+        if (meta && meta.model) addStep('Model: ' + meta.model);
+        if (meta && meta.file) addStep('Open file: ' + meta.file);
+        addStep('Preparing request…');
+        setSummary('⏳ Thinking — ' + (meta && meta.phase ? meta.phase + ' / ' : '') + (meta && meta.model ? meta.model : 'model') + ' (0s)');
+
+        const heartbeat = setInterval(function () {
+            const secs = Math.round((Date.now() - startedAt) / 1000);
+            const e = find();
+            if (e.done) return;
+            e.summary = '⏳ Still thinking — ' + (meta && meta.phase ? meta.phase + ' / ' : '')
+                + (meta && meta.model ? meta.model : 'model') + ' (' + secs + 's)';
+            // Refresh last wait step or append tick every 5s for the record
+            if (secs > 0 && secs % 5 === 0) {
+                const waitLabel = 'Waiting on model… ' + secs + 's elapsed';
+                if (!e.steps.length || e.steps[e.steps.length - 1].indexOf('Waiting on model') !== 0) {
+                    e.steps.push(waitLabel);
+                } else {
+                    e.steps[e.steps.length - 1] = waitLabel;
+                }
+            }
+            refreshChatViews();
+            if (typeof setStatus === 'function') {
+                setStatus('AI thinking… ' + secs + 's (' + ((meta && meta.model) || '') + ')');
+            }
+        }, 1000);
+
+        function finalize(ok, extraSteps) {
+            clearInterval(heartbeat);
+            const e = find();
+            e.done = true;
+            const secs = Math.round((Date.now() - startedAt) / 1000);
+            (extraSteps || []).forEach(function (s) { e.steps.push(String(s)); });
+            e.steps.push(ok ? ('Done in ' + secs + 's') : ('Failed after ' + secs + 's'));
+            e.summary = (ok ? '🔍 AI thinking' : '⚠️ AI thinking (failed)')
+                + ' (' + e.steps.length + ' steps, ' + secs + 's)';
+            refreshChatViews();
+            return e.steps.slice();
+        }
+
+        return { id: id, addStep: addStep, setSummary: setSummary, finalize: finalize, startedAt: startedAt };
     }
 
     // --- Attach/Detach is a VIEW TOGGLE of one chat, not two chats. ---
@@ -175,6 +357,11 @@
             if (sidebar) sidebar.style.display = (_closed || _detached) ? 'none' : 'flex';
             if (reopen) reopen.style.display = _closed ? 'block' : 'none';
             if (btn) btn.textContent = _detached ? '⊞ Attach' : '⤢ Detach';
+            try {
+                document.dispatchEvent(new CustomEvent('ai2:chat-view', {
+                    detail: { closed: _closed, detached: _detached }
+                }));
+            } catch (evErr) { /* ignore */ }
             if (window.AI2EditorCore && typeof window.AI2EditorCore.resizeEditor === 'function') {
                 window.AI2EditorCore.resizeEditor();
             }
@@ -256,37 +443,54 @@
                 '<title>AI Chat — editor</title>' +
                 '<style>body{margin:0;font-family:system-ui,sans-serif;background:#1e1f22;color:#ddd;height:100vh;display:flex;flex-direction:column;}' +
                 '#chat-messages{flex:1;overflow:auto;padding:8px;font-size:0.9em;}' +
-                '#chat-input{flex:1;padding:6px;border:1px solid #555;border-radius:3px;background:#1e1f22;color:#ddd;}' +
-                '#send{background:#0e639c;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;}' +
-                '.bar{display:flex;gap:6px;padding:6px;border-top:1px solid #555;}' +
+                '#chat-input{flex:1;min-height:32px;max-height:200px;resize:none;overflow-y:hidden;padding:6px;border:1px solid #555;border-radius:3px;background:#1e1f22;color:#ddd;font:inherit;line-height:1.35;}' +
+                '#send{background:#0e639c;color:#fff;border:none;padding:6px 12px;border-radius:3px;cursor:pointer;align-self:flex-end;}' +
+                '.bar{display:flex;gap:6px;padding:6px;border-top:1px solid #555;align-items:flex-end;}' +
+                '#chat-status{padding:4px 8px;font-size:11px;color:#9ecbff;border-top:1px solid #333;min-height:16px;}' +
+                '#chat-status.err{color:#f88;}' +
                 'h3{margin:0;padding:8px;background:#2b2b2b;font-size:13px;display:flex;justify-content:space-between;align-items:center;}' +
                 '#attach{background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;}</style>' +
                 '</head><body>' +
-                '<h3>AI Chat (Hy3) — detached <button id="attach">⊞ Attach</button></h3>' +
+                '<h3>AI Chat — detached <button id="attach">⊞ Attach</button></h3>' +
                 '<div id="chat-messages"></div>' +
-                '<div class="bar"><input id="chat-input" placeholder="Ask AI about the open file...">' +
+                '<div id="chat-status">Ready</div>' +
+                '<div class="bar"><textarea id="chat-input" rows="1" placeholder="Describe the bug… vague asks get Clarify first. Enter send, Shift+Enter newline"></textarea>' +
                 '<button id="send">Send</button></div>' +
                 '</body></html>'
             );
             w.document.close();
+            ensureThinkingStyles(w.document);
             renderChatLog(w.document.getElementById('chat-messages'));
 
             const dInput = w.document.getElementById('chat-input');
             const dSend = w.document.getElementById('send');
             const dMsgs = w.document.getElementById('chat-messages');
+            const dStatus = w.document.getElementById('chat-status');
             const target = {
                 messages: dMsgs,
                 input: dInput,
                 sendBtn: dSend,
-                status: function () { /* detached window has no status bar */ }
+                status: function (msg, isError) {
+                    if (!dStatus) return;
+                    dStatus.textContent = msg || '';
+                    dStatus.className = isError ? 'err' : '';
+                }
             };
             function fire() {
-                const v = dInput.value;
+                const v = (dInput.value || '').trim();
+                if (!v) return;
                 dInput.value = '';
-                sendPrompt(v, target);
+                autosizePrompt(dInput);
+                try {
+                    sendPrompt(v, target);
+                } catch (err) {
+                    console.error('[AI2EditorChat] send failed', err);
+                    target.status('Send failed: ' + (err && err.message ? err.message : err), true);
+                    recordMessage('AI', '<span style="color:#f66">Send failed: ' + escapeHtml(String(err && err.message ? err.message : err)) + '</span>');
+                }
             }
             dSend.addEventListener('click', fire);
-            dInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') fire(); });
+            wirePromptBox(dInput, fire);
 
             // "Attach" inside the detached window re-attaches into the editor.
             const attachBtn = w.document.getElementById('attach');
@@ -468,6 +672,266 @@
             });
     }
 
+
+    // --- Agent + phase (clarify → analyze → plan → verify → implement) ---
+    // Budget: clarify + most analyze/plan stay on free models; implement uses a free
+    // code model by default. Header model select still overrides when set.
+    const CLARIFY_MODEL = 'openrouter|google/gemma-4-31b-it:free';
+    const ANALYZE_MODEL = 'openrouter|google/gemma-4-31b-it:free';
+    const IMPLEMENT_MODEL = 'openrouter|cohere/north-mini-code:free';
+    let _editorPhase = 'analyze'; // clarify | analyze | plan | implement
+    let _planApproved = false;
+    // Pending clarify session: original vague ask + gap questions awaiting answers.
+    let _clarifySession = null; // { original, gaps, askedAt }
+
+    function currentEditorAgentId() {
+        const sel = document.getElementById('ai-editor-agent');
+        const v = sel && sel.value ? sel.value : 'programming';
+        return v || 'programming';
+    }
+
+    function currentEditorPhase() {
+        const sel = document.getElementById('ai-editor-phase');
+        if (sel && sel.value) _editorPhase = sel.value;
+        return _editorPhase || 'analyze';
+    }
+
+    function setEditorPhase(phase) {
+        _editorPhase = phase || 'analyze';
+        const sel = document.getElementById('ai-editor-phase');
+        if (sel) sel.value = _editorPhase;
+        const badge = document.getElementById('ai-editor-phase-badge');
+        if (badge) {
+            badge.textContent = 'Phase: ' + _editorPhase + (_planApproved ? ' (plan approved)' : '');
+        }
+    }
+
+    function resolveEditorModel(phase) {
+        // Header model select always wins when user picks something other than empty.
+        const picked = (window.ComservChat && ComservChat.modelSelect)
+            ? ComservChat.modelSelect.getSelectedValue()
+            : '';
+        if (phase === 'clarify') {
+            return picked || CLARIFY_MODEL;
+        }
+        // Analyze worker stays on the cheap analyze model unless user overrides.
+        if (currentEditorAgentId() === 'analyze') {
+            return picked || ANALYZE_MODEL;
+        }
+        if (phase === 'implement') {
+            return picked || IMPLEMENT_MODEL;
+        }
+        // analyze / plan: prefer cheap free model; keep user pick if set
+        return picked || ANALYZE_MODEL;
+    }
+
+    // Local gap detection — no tokens. Used before any clarify/analyze model call.
+    function promptGaps(prompt, filePath) {
+        const p = String(prompt || '').trim();
+        const lower = p.toLowerCase();
+        const gaps = [];
+        if (p.length < 40) {
+            gaps.push('What exactly is broken or missing? (one sentence symptom)');
+        }
+        const hasSite = /\b(sitename|site\s*name|3d|bmaster|csc|forager|brew)\b/i.test(p);
+        if (!hasSite && /\b(site|nav|menu|feature|addon|module)\b/i.test(lower)) {
+            gaps.push('Which sitename / host is this on? (e.g. 3d, CSC, BMaster)');
+        }
+        const hasPath = /(?:^|\s)(?:lib\/|root\/|Comserv\/|[\w.-]+\.(?:pm|tt|js|sql))\b/.test(p)
+            || (filePath && filePath.length > 0);
+        if (!hasPath && /\b(bug|broken|fix|error|fail|not work|missing|gate|nav)\b/i.test(lower)) {
+            gaps.push('Any file/module path you already suspect, or should we search from Root/nav?');
+        }
+        if (/\b(not work|broken|fail|wrong|missing|no .+ feature)\b/i.test(lower)
+            && !/\b(expected|should|want|instead)\b/i.test(lower)) {
+            gaps.push('What should happen instead? (expected behavior)');
+        }
+        if (!/\b(repro|steps|when i|after i|click|login|guest)\b/i.test(lower) && p.length < 200) {
+            gaps.push('How do you reproduce it? (short steps)');
+        }
+        if (/\b(addon|feature)\b/i.test(lower) && !/\b(site_modules|enabled_modules|hosting|nav)\b/i.test(lower)) {
+            gaps.push('Is this a site *feature* (nav/module enablement) or something else?');
+        }
+                if (/SQL_[A-Z_]+\s*=>/.test(p) || /Address already in use/i.test(p) || /failed to listen to port/i.test(p)) {
+            gaps.push('That looks like a server log paste. What do you want fixed — the bug behind it, or help reading the log?');
+        }
+        // Dedup, max 4
+        const out = [];
+        gaps.forEach(function (g) { if (out.indexOf(g) === -1) out.push(g); });
+        return out.slice(0, 4);
+    }
+
+    function looksLikeLogNoise(prompt) {
+        const p = String(prompt || '');
+        let hits = 0;
+        if (/SQL_[A-Z_]+\s*=>/.test(p)) hits++;
+        if (/Address already in use/i.test(p)) hits++;
+        if (/Exiting eval via next/i.test(p)) hits++;
+        if (/failed to listen to port/i.test(p)) hits++;
+        if (/_initialize_ai_chat_schema/i.test(p)) hits++;
+        if (/HTTP\/Server\/PSGI/i.test(p)) hits++;
+        if (/\[workstation \(Standalone\):\d+\]/.test(p)) hits++;
+        if (/SQL_QUOTED_IDENTIFIER_CASE/i.test(p)) hits++;
+        if (/shanta@workstation:/i.test(p)) hits++;
+        return hits >= 2;
+    }
+
+    // Free code models often invent tool calls or echo shell noise instead of analyzing.
+    function looksLikeJunkAnalyzeReply(text, phase) {
+        const t = String(text || '').trim();
+        if (!t) return true;
+        if (looksLikeLogNoise(t)) return true;
+        if (/\[ACTION:\s*\{/i.test(t) && t.length < 800) return true;
+        if (/^\s*\[ACTION:/i.test(t)) return true;
+        if ((phase === 'analyze' || phase === 'plan' || phase === 'clarify')
+            && /list_files|read_file|run_terminal/i.test(t)
+            && !/root cause|enabled_modules|SiteModule|can_beekeep/i.test(t)) {
+            return true;
+        }
+        return false;
+    }
+
+    function looksVague(prompt, filePath) {
+        const p = String(prompt || '').trim();
+        if (/^(skip\s+clarify|analyze\s+now|looks\s+good)\b/i.test(p)) return false;
+        if (/^## Refined engineering task/.test(p)) return false; // already fabricated
+        if (looksLikeLogNoise(p)) return true;
+        const gaps = promptGaps(p, filePath);
+        // One missing fact is enough — do not burn an analyze turn on a thin ask.
+        if (gaps.length >= 1) return true;
+        if (p.length < 100) return true;
+        if (/\b(fix|help|broken|not working|whats wrong|what'?s wrong|happening)\b/i.test(p)) {
+            return true;
+        }
+        return false;
+    }
+
+    function isSkipClarify(prompt) {
+        return /^\s*(skip\s+clarify|analyze\s+now|looks\s+good|just\s+analyze)\b/i.test(String(prompt || ''));
+    }
+
+    function synthesizePrompt(original, answers, filePath) {
+        const lines = [
+            '## Refined engineering task (fabricated from clarify)',
+            '',
+            '### Original ask',
+            String(original || '').trim(),
+            '',
+            '### Clarifications from user',
+            String(answers || '').trim() || '(none — user skipped; infer carefully from code)',
+            '',
+            '### Editor context',
+            'Open file: ' + (filePath || '(none)'),
+            '',
+            '### Required output',
+            '1. Reproduce / locate the real gate in Comserv code (not guesswork about DNS/addons unless evidence).',
+            '2. Name root cause with file/symbol references.',
+            '3. Propose the smallest safe fix.',
+            '4. How to verify on aisystem :4006 (no prod deploy).',
+            'Do not invent infrastructure. Prefer site *features* / enabled_modules / nav gating over "paid addon" language unless the code literally says addon.'
+        ];
+        return lines.join('\n');
+    }
+
+    function beginClarifySession(original, gaps, target, sendBtn) {
+        _clarifySession = {
+            original: original,
+            gaps: gaps.slice(),
+            askedAt: Date.now()
+        };
+        setEditorPhase('clarify');
+        const qHtml = gaps.map(function (g, i) {
+            return (i + 1) + '. ' + escapeHtml(g);
+        }).join('<br>');
+        recordMessage('AI',
+            '<span style="color:#ffd27a;font-size:0.9em;">[clarify · free]</span> '
+            + 'Your ask is a bit thin for a good analysis. Please answer:<br><br>'
+            + qHtml
+            + '<br><br><span style="opacity:0.85;">Reply with answers in one message, or say '
+            + '<code>skip clarify</code> / <code>analyze now</code> to proceed anyway.</span>');
+        if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+        if (target && target.status) target.status('Clarify — waiting for your answers');
+    }
+
+    function phaseContract(phase, agentId) {
+        const lines = [
+            '[AI Editor agent=' + agentId + ' phase=' + phase + ']',
+            'Contract:',
+            '0) clarify — ask only for missing facts; do not analyze code deeply yet.',
+            'A) analyze — cost-effective analysis; no ## FIX / large rewrites.',
+            'B) plan — short plan for user verify; docs/changelog notes only as text; do not create todos; end by asking for "approve plan".',
+            'C) implement — code suggestion only after plan approval (or explicit implement request).'
+        ];
+        if (agentId === 'analyze') {
+            lines.push('You are the Analyze worker: read open buffers and named paths; explain root cause and a short plan only. Never emit ## FIX, never rewrite files, never ask the user to paste files already loaded via /ai2/load_file.');
+        } else if (agentId === 'documentation') {
+            lines.push('You are in documentation mode: prefer docs/changelog/planning guidance; do not emit code file rewrites unless asked.');
+        } else {
+            lines.push('You are in programming mode: do NOT divert to FocusTune; never create todos or emit [ACTION: create_todo]; stay on code/docs/plan for this file.');
+        }
+        if (phase === 'clarify') {
+            lines.push('Current phase CLARIFY: ask 2–4 short questions about missing context only. No root-cause essay.');
+        } else if (phase === 'analyze') {
+            lines.push('Current phase ANALYZE: respond with analysis only. Prefer evidence from loaded files and Comserv patterns (features/modules/nav).');
+        } else if (phase === 'plan') {
+            lines.push('Current phase PLAN: propose the plan; wait for user "approve plan" / Verify before code.');
+        } else {
+            lines.push('Current phase IMPLEMENT: provide concrete code suggestion for Approve/Reject.');
+        }
+        return lines.join('\n');
+    }
+
+    function todoStartReminder() {
+        let todoId = '';
+        try {
+            const q = new URLSearchParams(window.location.search);
+            todoId = q.get('todo_id') || q.get('record_id') || '';
+        } catch (e) { /* ignore */ }
+        if (!todoId && window.AI2_TODO_ID) todoId = String(window.AI2_TODO_ID);
+        if (!todoId) {
+            // Look for todo #NNNN in recent chat
+            try {
+                const blob = chatLog.map(function (e) { return e.html || ''; }).join(' ');
+                const m = blob.match(/todo\s*#?\s*(\d{3,})/i) || blob.match(/record_id[=: ]+(\d{3,})/i);
+                if (m) todoId = m[1];
+            } catch (e2) { /* ignore */ }
+        }
+        if (!todoId) return '';
+        return '\n[TODO CONTEXT] Existing todo #' + todoId
+            + ' — remind user to Start it first (POST /todo/open_log) before coding if not already started. '
+            + 'Link: /todo/details?record_id=' + todoId + '\n';
+    }
+
+    function maybeAdvancePhaseFromUser(prompt) {
+        const p = String(prompt || '').toLowerCase();
+        // Analyze worker never auto-advances to implement from chat text.
+        if (currentEditorAgentId() === 'analyze') {
+            if (/\b(make\s+a\s+)?plan\b|\bpropose\b/.test(p) && currentEditorPhase() === 'analyze') {
+                setEditorPhase('plan');
+            }
+            return;
+        }
+        // Waiting/negative wording must not advance (e.g. "wait for Verify before implementing").
+        const waitingOrNegative = /\b(wait\s+for|do\s+not|don't|dont|never|before)\b/.test(p)
+            && /\b(verify|implement)/.test(p);
+        if (!waitingOrNegative && (
+            /\bapprove\s+plan\b/.test(p)
+            || /\bplan\s+approved\b/.test(p)
+            || /\bverified\b/.test(p)
+            || /\bgo\s+ahead\b/.test(p)
+            || /\bwrite\s+the\s+code\b/.test(p)
+            || /\bplease\s+implement\b/.test(p)
+            || /\bimplement\s+now\b/.test(p)
+        )) {
+            _planApproved = true;
+            setEditorPhase('implement');
+            return;
+        }
+        if (/\b(make\s+a\s+)?plan\b|\bpropose\b/.test(p) && currentEditorPhase() === 'analyze') {
+            setEditorPhase('plan');
+        }
+    }
+
     function sendPrompt(prompt, target) {
         target = target || {
             messages: document.getElementById('chat-messages'),
@@ -479,6 +943,7 @@
         const sendBtn = target.sendBtn;
         if (!prompt || !prompt.trim()) return;
 
+        if (target.status) target.status('Starting…');
         // Record to the shared chat log (survives attach/detach).
         recordMessage('You', escapeHtml(prompt));
 
@@ -491,18 +956,56 @@
             return;
         }
 
-        if (target.status) target.status('Asking AI...');
+        const filePathEarly = currentFilePath();
 
-        // The editor is a coding context. The model is chosen from the shared
-        // #model-select (populated by ai-chat/model-select.js), defaulting to
-        // hy3 — the same code path the general "Chat with AI" widget uses, so
-        // the two chat UIs can never diverge on model selection again.
-        const model = (window.ComservChat && ComservChat.modelSelect)
-            ? ComservChat.modelSelect.getSelectedValue()
-            : 'tencent/hy3';
-        const filePath = currentFilePath();
+        // Answer an open clarify session → fabricate analyze prompt (no extra clarify model $).
+        if (_clarifySession) {
+            const original = _clarifySession.original;
+            const answers = isSkipClarify(prompt) ? '' : prompt;
+            _clarifySession = null;
+            const fabricated = synthesizePrompt(original, answers, filePathEarly);
+            recordMessage('AI',
+                '<span style="color:#7fb7ff;font-size:0.9em;">[fabricated prompt → analyze · free]</span><br>'
+                + '<pre style="white-space:pre-wrap;margin:6px 0;font-size:0.85em;opacity:0.95;">'
+                + escapeHtml(fabricated) + '</pre>');
+            setEditorPhase('analyze');
+            prompt = fabricated;
+            if (target.status) target.status('Fabricated prompt — starting analyze…');
+        } else {
+            // Auto-clarify when ask is thin (or phase is Clarify).
+            maybeAdvancePhaseFromUser(prompt);
+            let phasePeek = currentEditorPhase();
+            const wantClarify = (phasePeek === 'clarify')
+                || ((phasePeek === 'analyze' || phasePeek === 'plan') && looksVague(prompt, filePathEarly));
+            if (wantClarify && !isSkipClarify(prompt)) {
+                const gaps = promptGaps(prompt, filePathEarly);
+                if (gaps.length) {
+                    beginClarifySession(prompt, gaps, target, sendBtn);
+                    return;
+                }
+                if (phasePeek === 'clarify') setEditorPhase('analyze');
+            }
+        }
+
+        // Agent + phase first so thinking UI can name model/phase immediately.
+        maybeAdvancePhaseFromUser(prompt);
+        const agentId = currentEditorAgentId();
+        const phase = currentEditorPhase() === 'clarify' ? 'analyze' : currentEditorPhase();
+        if (currentEditorPhase() === 'clarify') setEditorPhase('analyze');
+        const model = resolveEditorModel(phase);
+        const filePath = filePathEarly;
+
+        if (target.status) target.status('AI thinking…');
+        const liveThink = startLiveThinking({
+            agent: agentId,
+            phase: phase,
+            model: model,
+            file: filePath || '(none)'
+        });
 
         loadCurrentFileContent().then(function (fileContent) {
+            liveThink.addStep('Loaded editor buffer' + (fileContent && fileContent.length
+                ? ' (' + fileContent.length + ' chars)' : ' (empty)'));
             const wantEval = isEvaluatePrompt(prompt);
             const filesP = wantEval
                 ? loadFilesForEval(filePath, fileContent)
@@ -510,19 +1013,24 @@
                     ? [{ path: filePath, content: fileContent }] : []);
             return filesP.then(function (files) {
                 const blob = filesToPromptBlob(files);
+                const contract = phaseContract(phase, agentId) + todoStartReminder();
                 const fullPrompt = blob
-                    ? (prompt + '\n\n---\nThese files were loaded live from this app via GET /ai2/load_file. They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n' + blob)
-                    : prompt;
-                if (target.status && files.length) {
-                    target.status('Loaded ' + files.map(function (f) { return f.path; }).join(', '));
+                    ? (contract + '\n\n' + prompt + '\n\n---\nThese files were loaded live from this app via GET /ai2/load_file. They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n' + blob)
+                    : (contract + '\n\n' + prompt);
+                if (files.length) {
+                    liveThink.addStep('Attached files: ' + files.map(function (f) { return f.path; }).join(', '));
+                    if (target.status) target.status('Loaded ' + files.map(function (f) { return f.path; }).join(', '));
                 }
+                liveThink.addStep('Calling /ai2/chat (waiting on provider)…');
+                if (target.status) target.status('Asking AI…');
                 return fetch('/ai2/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         prompt: fullPrompt,
                         model: model,
-                        agent_id: 'code',
+                        agent_id: agentId,
+                        phase: phase,
                         page_path: filePath || (files[0] && files[0].path) || '',
                         page_title: filePath ? filePath.split('/').pop() : '',
                         page_content: (files[0] && files[0].content) || fileContent || ''
@@ -534,12 +1042,20 @@
               if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
               if (!data || data.success === 0 || data.error) {
                   const err = (data && data.error) ? data.error : 'No response';
+                  const serverSteps = (data && data.thinking && data.thinking.length) ? data.thinking : [];
+                  liveThink.finalize(false, serverSteps.concat(['Error: ' + err]));
                   recordMessage('AI', '<span style="color:#f66">' + escapeHtml(err) + '</span>');
                   if (target.status) target.status('AI error: ' + err, true);
                   return;
               }
               const usedModel = (data.model ? data.model + (data.provider ? ' (' + data.provider + ')' : '') : EDITOR_MODEL);
               const resp = data.response || '';
+              const serverSteps = (data.thinking && data.thinking.length) ? data.thinking : [];
+              const extra = serverSteps.slice();
+              if (data.provider) extra.push('Provider: ' + data.provider);
+              if (data.model) extra.push('Model used: ' + data.model);
+              if (data.fallback) extra.push('Fallback used' + (data.fallback_from ? ' from ' + data.fallback_from : ''));
+              liveThink.finalize(true, extra);
               if (data.files_read && data.files_read.length) {
                   recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[read ' + escapeHtml(data.files_read.join(', ')) + ']</span>');
                   if (target.status) target.status('Read ' + data.files_read.join(', '));
@@ -549,9 +1065,39 @@
                   : { cleanText: resp, actions: [] };
               const display = extracted.cleanText || resp;
               // Prefix the reply with the model actually used, for transparency.
-              recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + escapeHtml(display).replace(/\n/g, '<br>'));
+              if (looksLikeJunkAnalyzeReply(display, phase)) {
+                  liveThink.finalize(false, ['Rejected junk/log-like model reply']);
+                  recordMessage('AI',
+                      '<span style="color:#f88;">[rejected reply]</span> '
+                      + 'That model response was shell/SQL log noise or a fake <code>[ACTION:…]</code> — '
+                      + '<strong>not</strong> an analysis of your bug.<br><br>'
+                      + 'Try again with Agent <strong>Analyze</strong>, Phase <strong>A Analyze</strong>, '
+                      + 'and clear the header model (or pick a free analyze model). '
+                      + 'Say <code>clarify</code> if you want gap questions first.<br>'
+                      + '<details style="margin-top:6px;opacity:0.75;"><summary>Show rejected snippet</summary>'
+                      + '<pre style="max-height:120px;overflow:auto;">'
+                      + escapeHtml(display).slice(0, 600) + '</pre></details>');
+                  if (target.status) target.status('Rejected junk model reply', true);
+                  // Re-open clarify on the last real user ask (not fabricated blob) when possible.
+                  if (!_clarifySession) {
+                      var gaps = [
+                          'Confirm the bug in one sentence (e.g. brew+beekeeping nav show on sitename 3d but should not).',
+                          'Where do you see it — top nav, Features menu, or /brew page?',
+                          'Expected: those features hidden/disabled for 3d — correct?'
+                      ];
+                      beginClarifySession(
+                          'Brew and beekeeping features appear for sitename 3d but should not (not subscribed / not enabled).',
+                          gaps, target, sendBtn
+                      );
+                  }
+                  return;
+              }
+              var bodyHtml = escapeHtml(display).replace(/\n/g, '<br>');
+              recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + bodyHtml);
 
-              if (data.todo_action && window.ComservChat && ComservChat.featureTodo
+              // Belt-and-suspenders: programming/docs agents must not create todos from chat.
+              const skipTodoCreate = /^(programming|coding|code|documentation|analyze)$/i.test(agentId);
+              if (!skipTodoCreate && data.todo_action && window.ComservChat && ComservChat.featureTodo
                   && typeof ComservChat.featureTodo.handleServerResult === 'function') {
                   ComservChat.featureTodo.handleServerResult(data.todo_action, {
                       host: document.getElementById('chat-messages'),
@@ -559,8 +1105,7 @@
                       pagePath: currentFilePath() || window.location.pathname
                   });
               }
-
-              if (extracted.actions && extracted.actions.length && window.ComservChat.featureTodo.handleAction) {
+              if (!skipTodoCreate && extracted.actions && extracted.actions.length && window.ComservChat.featureTodo.handleAction) {
                   extracted.actions.forEach(function (a) {
                       if (a.action === 'create_todo' || a.action === 'create_project') {
                           ComservChat.featureTodo.handleAction(a, {
@@ -573,17 +1118,27 @@
               }
 
               const block = (data.provider === 'ai2-coderead') ? null : extractCodeBlock(display);
-              if (block) {
+              const allowSuggest = (currentEditorAgentId() !== 'documentation')
+                  && (currentEditorAgentId() !== 'analyze')
+                  && (currentEditorPhase() === 'implement' || _planApproved
+                      || /\b(implement|apply|write code|fix now)\b/i.test(prompt));
+              if (block && allowSuggest) {
                   // A suggestion is always applied to the MAIN editor window,
                   // even when chat is detached into its own window.
                   showSuggestion(block.code);
                   if (target.status) target.status('Suggestion ready (' + usedModel + ')');
               } else {
-                  if (target.status) target.status('Replied (no code suggestion)');
+                  if (target.status) {
+                      target.status(block && !allowSuggest
+                          ? 'Plan/analyze reply (code suggestion held until implement/Verify)'
+                          : 'Replied (no code suggestion)');
+                  }
               }
           })
+          
           .catch(function (err) {
               if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+              try { liveThink.finalize(false, ['Request failed: ' + (err && err.message ? err.message : err)]); } catch (e2) { /* ignore */ }
               recordMessage('AI', '<span style="color:#f66">Request failed: ' + escapeHtml(err.message) + '</span>');
               if (target.status) target.status('Request failed: ' + err.message, true);
           });
@@ -643,6 +1198,8 @@
     //     the admin's in-progress edits. Updates the status-bar timestamp. ---
     let _dirty = false;
     let _autoTimer = null;
+    let _checksumInFlight = false;
+    let _changeWired = false;
 
     function markDirty() { _dirty = true; }
     function markClean() { _dirty = false; }
@@ -651,6 +1208,10 @@
         const filePath = currentFilePath();
         const lastModEl = document.getElementById('last-modified');
         const statusEl = document.getElementById('auto-refresh-status');
+        if (_autoTimer) {
+            clearInterval(_autoTimer);
+            _autoTimer = null;
+        }
         if (statusEl) statusEl.textContent = 'Auto-refresh: ON (4s)';
         if (!filePath) {
             if (statusEl) statusEl.textContent = 'Auto-refresh: off (no file)';
@@ -658,35 +1219,82 @@
         }
 
         const editor = getEditor();
-        if (editor) {
+        if (editor && !_changeWired) {
+            _changeWired = true;
             editor.session.on('change', function () { _dirty = true; });
         }
 
         _autoTimer = setInterval(function () {
-            if (_dirty) return;   // don't overwrite unsaved work
+            if (_dirty) return;
+            if (_checksumInFlight) return;
+            if (typeof document.hidden === 'boolean' && document.hidden) return;
+            if (!window.AI2EditorCore || typeof window.AI2EditorCore.getFileMtime !== 'function') return;
+            _checksumInFlight = true;
             window.AI2EditorCore.getFileMtime(filePath).then(function (mtime) {
                 if (!mtime) return;
                 const last = initAutoRefresh._lastMtime || 0;
                 initAutoRefresh._lastMtime = mtime;
                 if (last && mtime !== last) {
-                    // File changed on disk — reload it
-                    window.AI2EditorCore.loadFileContent(filePath).then(function (data) {
+                    return window.AI2EditorCore.loadFileContent(filePath).then(function (data) {
                         if (data && data.content !== undefined) {
                             const ed = getEditor();
                             if (ed) { ed.setValue(data.content, -1); ed.clearSelection(); }
                             if (lastModEl) lastModEl.textContent = 'updated ' + new Date().toLocaleTimeString();
                             setStatus('Reloaded (external change)');
                         }
-                    }).catch(function () {});
-                } else if (!last) {
+                    });
+                }
+                if (!last) {
                     initAutoRefresh._lastMtime = mtime;
                     if (lastModEl) lastModEl.textContent = 'loaded ' + new Date().toLocaleTimeString();
                 }
-            }).catch(function () {});
+            }).catch(function () {
+            }).then(function () {
+                _checksumInFlight = false;
+            });
         }, 4000);
     }
 
+
+    function initModelSelect() {
+        const modelSel = document.getElementById('model-select');
+        if (!modelSel) return;
+        function go() {
+            if (!(window.ComservChat && ComservChat.modelSelect)) return false;
+            ComservChat.modelSelect.init({
+                selectEl: modelSel,
+                context: 'code',
+                pinModel: 'cohere/north-mini-code:free',
+                onReady: function () {
+                    console.log('[AI2EditorChat] model-select populated by shared module');
+                },
+                onError: function (e) {
+                    console.error('[AI2EditorChat] model-select failed', e);
+                    try {
+                        modelSel.innerHTML = '';
+                        const opt = document.createElement('option');
+                        opt.disabled = true;
+                        opt.selected = true;
+                        opt.textContent = 'Model list unavailable';
+                        modelSel.appendChild(opt);
+                    } catch (err) { /* ignore */ }
+                }
+            });
+            return true;
+        }
+        if (go()) return;
+        // Defer script order race: retry briefly
+        let n = 0;
+        const t = setInterval(function () {
+            n++;
+            if (go() || n >= 40) clearInterval(t);
+        }, 100);
+    }
+
     function wire() {
+        // Models first so a later throw cannot leave "Loading models…" forever.
+        initModelSelect();
+
         const sendBtn = document.getElementById('ai-chat-send');
         const input = document.getElementById('ai-chat-input');
         const approve = document.getElementById('ai-approve-btn');
@@ -694,22 +1302,26 @@
         const clear = document.getElementById('ai-chat-clear');
 
         if (sendBtn && input) {
-            sendBtn.addEventListener('click', function () {
-                const v = input.value;
+            function fireAttached() {
+                const v = (input.value || '').trim();
+                if (!v) return;
                 input.value = '';
-                sendPrompt(v);
-            });
-            input.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter') {
-                    const v = input.value;
-                    input.value = '';
+                autosizePrompt(input);
+                try {
                     sendPrompt(v);
+                } catch (err) {
+                    console.error('[AI2EditorChat] send failed', err);
+                    setStatus('Send failed: ' + (err && err.message ? err.message : err), true);
+                    recordMessage('AI', '<span style="color:#f66">Send failed: ' + escapeHtml(String(err && err.message ? err.message : err)) + '</span>');
                 }
-            });
+            }
+            sendBtn.addEventListener('click', fireAttached);
+            wirePromptBox(input, fireAttached);
         }
         if (approve) approve.addEventListener('click', approveSuggestion);
         if (reject) reject.addEventListener('click', rejectSuggestion);
         if (clear && input) clear.addEventListener('click', function () {
+            _clarifySession = null;
             chatLog = [];   // reset the shared log (both views re-render empty)
             renderChatLog(document.getElementById('chat-messages'));
             const w = window._aiChatWin;
@@ -721,22 +1333,8 @@
         initDetach();
         initClose();
         applyViewState();   // ensure correct initial view (attached by default)
-        applyClosedState();
 
-        // Populate the editor's #model-select from the SHARED model-selection
-        // module (same catalog + hy3 default the general widget uses).
-        const modelSel = document.getElementById('model-select');
-        if (modelSel && window.ComservChat && ComservChat.modelSelect) {
-            ComservChat.modelSelect.init({
-                selectEl: modelSel,
-                context: 'code',
-                pinModel: 'tencent/hy3',
-                onReady: function () {
-                    console.log('[AI2EditorChat] model-select populated by shared module');
-                },
-                onError: function (e) { console.error('[AI2EditorChat] model-select failed', e); }
-            });
-        }
+        // model-select: see initModelSelect() at top of wire()
 
         // "Add Todo" chat feature (shared module) — attaches to the current page's project.
         const todoBtn = document.getElementById('ai-chat-todo');
@@ -759,6 +1357,37 @@
         // Apply shared tooltip map to this widget's buttons.
         if (window.ComservChat && ComservChat.tooltips) ComservChat.tooltips.apply(document);
 
+
+        // Agent + phase controls (minimal analyze → plan → verify → implement UI)
+        const agentSel = document.getElementById('ai-editor-agent');
+        const phaseSel = document.getElementById('ai-editor-phase');
+        const verifyBtn = document.getElementById('ai-editor-verify');
+        if (agentSel && !agentSel._wired) {
+            agentSel._wired = true;
+            agentSel.addEventListener('change', function () {
+                _planApproved = false;
+                setEditorPhase((agentSel.value === 'documentation' || agentSel.value === 'analyze') ? 'analyze' : currentEditorPhase());
+                recordMessage('AI', '<em>Switched agent to ' + escapeHtml(agentSel.value) + '. Flow: analyze → plan → Verify → implement.</em>');
+            });
+        }
+        if (phaseSel && !phaseSel._wired) {
+            phaseSel._wired = true;
+            phaseSel.addEventListener('change', function () {
+                setEditorPhase(phaseSel.value);
+            });
+            setEditorPhase(phaseSel.value || 'analyze');
+        }
+        if (verifyBtn && !verifyBtn._wired) {
+            verifyBtn._wired = true;
+            verifyBtn.addEventListener('click', function () {
+                _planApproved = true;
+                setEditorPhase('implement');
+                recordMessage('You', escapeHtml('approve plan'));
+                recordMessage('AI', '<em>Plan verified. Phase → implement. Ask for the code change (or Send again).</em>');
+                if (typeof setStatus === 'function') setStatus('Plan approved — implement phase');
+            });
+        }
+
         console.log('[AI2EditorChat] chat + suggestion wiring ready');
     }
 
@@ -770,6 +1399,19 @@
     }
 
     console.log('%c[AI2] chat module ready', 'color:#0a0');
-    window.AI2Chat = { setActiveFile: setActiveFile };
+    window.AI2Chat = {
+        setActiveFile: setActiveFile,
+        setClosed: function (v) { _closed = !!v; applyViewState(); },
+        isClosed: function () { return !!_closed; },
+        isDetached: function () { return !!_detached; },
+        reattach: function () {
+            _detached = false;
+            if (window._aiChatWin && !window._aiChatWin.closed) {
+                try { window._aiChatWin.close(); } catch (e) {}
+                window._aiChatWin = null;
+            }
+            applyViewState();
+        }
+    };
     window[NS] = window.AI2Chat;
 })();

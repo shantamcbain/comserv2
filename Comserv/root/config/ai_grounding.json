@@ -1,0 +1,8 @@
+{
+  "_doc": "Golden Data / Anti-Hallucination (Comserv::Model::AI2::Grounding). mode: off | shadow | enforce. shadow = live chat unchanged, Ledger records grounded=0 + factual_intent. enforce = factual /ai2/chat turns answer only from labelled Grounding Context, else the fixed fallback. Callers may send {\"grounding\":\"enforce\"|\"off\"} or {\"creative\":1} per request.",
+  "mode": "shadow",
+  "max_snippets": 6,
+  "max_total_chars": 6000,
+  "postcheck_action": "strip",
+  "web_search": 1
+}

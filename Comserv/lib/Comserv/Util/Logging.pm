@@ -298,9 +298,15 @@ sub get_system_identifier {
 
     my $identifier = '';
 
-    # 1. Explicit override via environment variable (set in Docker compose / systemd unit)
+    # 1. Explicit override via environment variable (set in Docker compose / systemd unit).
+    # Normalize known FQDN / .local forms to the short host so Docker
+    # (SYSTEM_IDENTIFIER=workstation.computersystemconsulting.ca) and Standalone
+    # (resolved short "workstation") share one base identity before runtime tags.
     if ($ENV{SYSTEM_IDENTIFIER} && $ENV{SYSTEM_IDENTIFIER} ne '') {
         $identifier = $ENV{SYSTEM_IDENTIFIER};
+        if ($identifier =~ /^([A-Za-z0-9_-]+)\.(?:local|computersystemconsulting\.ca)$/i) {
+            $identifier = $1;
+        }
     } else {
         # Check if we are inside a Docker container
         my $is_docker = -f '/.dockerenv' || -f '/run/.containerenv' || ($ENV{container} && $ENV{container} eq 'docker');
@@ -688,11 +694,36 @@ sub log_with_details {
             )->first;
 
             my $audit_header = "Automatic error todo from system log (level: $top_level).\n"
-                . "Area: $meta->{controller_action}\n"
-                . ($meta->{path} ? "Path: $meta->{path}\n" : '')
-                . ($meta->{source_file} ? "Source: $meta->{source_file}:$meta->{source_line}\n" : '')
-                . ($meta->{error_summary} ? "Summary: $meta->{error_summary}\n" : '')
-                . "\n";
+            . "Area: $meta->{controller_action}\n"
+            . ($meta->{path} ? "Path: $meta->{path}\n" : '')
+            . ($meta->{source_file} ? "Source: $meta->{source_file}:$meta->{source_line}\n" : '')
+            . ($meta->{error_summary} ? "Summary: $meta->{error_summary}\n" : '')
+            . "\n";
+
+            # Seed a Director+Coder work-order stub so description is never only a raw
+            # log dump. Hermes/Director fills DO/ACCEPT after diagnose; Coder waits for
+            # CODER_READY. (Comserv todo #2350)
+            my $work_order_stub = "plan_rev: auto-error-audit\n"
+            . "ROOT CAUSE / CONTEXT:\n"
+            . "(unknown — Director diagnoses using Area/Path/Source/Summary and the log body below)\n"
+            . "Area: " . ($meta->{controller_action} // '') . "\n"
+            . ($meta->{error_summary} ? ("Summary: $meta->{error_summary}\n") : '')
+            . "\n"
+            . "DO:\n"
+            . "1. Diagnose root cause from the log body and source location.\n"
+            . "2. Replace this stub with a full work order (ROOT/DO/DO NOT/ACCEPT).\n"
+            . "3. Append comments CODER_READY when a free/cheap Coder may execute without re-planning.\n"
+            . "\n"
+            . "DO NOT:\n"
+            . "- Hand-edit MariaDB; use app API / normal code paths only.\n"
+            . "- Close as fixed without ACCEPT evidence or a cannot-reproduce note.\n"
+            . "- Put secrets in description/comments.\n"
+            . "\n"
+            . "ACCEPT:\n"
+            . "- Root cause stated.\n"
+            . "- Fix verified (compile/HTTP/log) or documented non-repro.\n"
+            . "\n"
+            . "--- raw audit / log ---\n";
 
             if ($existing) {
                 # Same open error already tracked. INCREMENT the occurrence counter
@@ -790,7 +821,7 @@ sub log_with_details {
 
                 my %create_args = (
                     subject             => $todo_subject,
-                    description         => $audit_header . $log_message,
+                    description         => $work_order_stub . $audit_header . $log_message,
                     status              => 1,
                     priority            => $todo_priority,
                     is_blocking         => 0,

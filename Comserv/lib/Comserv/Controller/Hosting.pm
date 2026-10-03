@@ -92,6 +92,14 @@ sub redirect_apply         :Path('/apply')    :Args(0) { $_[1]->response->redire
 sub hosted_dashboard :Path('/hosted') :Args(0) {
     my ($self, $c) = @_;
 
+    # CSC-20260831-1151: tenant inventory must not be visible to anonymous guests
+    my $root = $c->controller('Root');
+    unless ($root && $root->user_exists($c)) {
+        $c->flash->{error_msg} = 'Please log in to view hosted services.';
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        $c->detach;
+    }
+
     my $schema   = $c->model('DBEncy');
     my $sitename = $c->session->{SiteName} || 'CSC';
     my $is_admin = $c->stash->{is_admin} || $c->session->{is_admin} || 0;

@@ -8,17 +8,17 @@ use FindBin '$Bin';
 use Comserv::Util::Logging;
 use Comserv::Util::ConfigDatabaseInit;
 
-# ── Timezone fix (2026-08-14) ─────────────────────────────────────────────
-# The web container runs with TZ=UTC (see docker-compose.yml), but the owner
-# operates in America/Los_Angeles (PDT). DateTime->now therefore returned the
-# server's UTC "today" (one day ahead in the evening), which made calendar
-# "today" highlighting land on the wrong day. Pin the process timezone to the
-# owner's local zone so all "today" computations match the user's wall clock.
-# Overridable via $ENV{TZ} (already-respected by DateTime) so containers can
-# still set their own. POSIX::tzset makes the change live for the process.
+# ── Process TZ (legacy bare localtime / DateTime->now) ────────────────────
+# Canonical app clock is Comserv::Util::AppTime:
+#   STORE  = UTC DATETIME strings (now_utc / stamp)
+#   DISPLAY = user TZ via timezone_for + TT filter | user_time
+# This BEGIN only stabilizes unreformed localtime call sites when the host
+# did not set TZ (docker often has TZ=UTC already). Do NOT add new
+# strftime(localtime) writers — use AppTime->now_utc instead.
+# "Today" for calendars must use AppTime->today_ymd_for($c), not process local.
 BEGIN {
     unless ($ENV{TZ}) {
-        $ENV{TZ} = 'America/Los_Angeles';
+        $ENV{TZ} = $ENV{COMSERV_PROCESS_TZ} || 'UTC';
         eval { require POSIX; POSIX::tzset(); };
     }
 }
@@ -61,8 +61,14 @@ __PACKAGE__->config(
     # Relative paths resolve against the application home directory (FindBin/..)
     # Works on host (/home/.../Comserv/root) and in Docker (/opt/comserv/root)
     'Plugin::Static::Simple' => {
+        # Request path is appended to include_path. Pages use /static/css and
+        # /static/js, so include_path must be 'root' (file = root/static/...).
+        # include_path => ['root/static'] looked for root/static/static/js and
+        # 404'd every asset. Restrict with dirs, not a nested include_path.
         include_path => [ 'root' ],
-        dirs         => [ 'static', 'LegacyStaticPages' ],
+        dirs => [ 'static', 'LegacyStaticPages' ],
+        ignore_dirs => [ 'config' ],
+        ignore => [ qr{^config/} ],
     },
     # Force-disable stack traces in production even if CATALYST_DEBUG is accidentally set
     'Plugin::StackTrace' => { enable => $ENV{CATALYST_DEBUG} // 0 ? 1 : 0 },

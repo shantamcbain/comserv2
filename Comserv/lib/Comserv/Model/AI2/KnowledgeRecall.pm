@@ -22,6 +22,7 @@ use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use Try::Tiny;
 use JSON;
+use File::Spec;
 
 use Comserv::Util::Logging;
 
@@ -97,6 +98,95 @@ sub _doc_rows {
     return \@rows;
 }
 
+# File-based docs (the real store). DB `documentation` is empty in prod (#2299).
+# Uses the same catalog the Documentation controller serves.
+sub _file_doc_rows {
+    my ($self, $c, $sitename, $query, $priv) = @_;
+    my $root = eval { $c->path_to('root', 'Documentation') };
+    $root = "$root" if $root;
+    unless ($root && -d $root) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'knowledge_recall', 'Documentation file root missing; skip file recall');
+        return [];
+    }
+    my $pages = [];
+    eval {
+        require Comserv::Util::DocumentationConfig;
+        my $cfg = Comserv::Util::DocumentationConfig->instance;
+        $pages = $cfg->get_pages || [];
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'knowledge_recall', "DocumentationConfig load failed: $@");
+        $pages = [];
+    }
+    return $self->file_docs_from_catalog($root, $pages, $query, $priv, $sitename);
+}
+
+# Testable: catalog array + docs root → scored snippet records (no $c).
+sub file_docs_from_catalog {
+    my ($self, $root, $pages, $query, $priv, $sitename) = @_;
+    $pages ||= [];
+    $query //= '';
+    my @out;
+    my $n = 0;
+    for my $p (@$pages) {
+        last if $n >= 80;
+        next unless $p && ref($p) eq 'HASH';
+        my $roles = $p->{roles} // $p->{role} // '';
+        $roles = join(',', @$roles) if ref $roles eq 'ARRAY';
+        my $public = (!$roles || $roles =~ /\b(all|guest|public|member)\b/i) ? 1 : 0;
+        next if !$priv && !$public && $roles =~ /admin|developer|devops/i;
+
+        my $site = $p->{site} // $p->{site_specific} // 'all';
+        if ($sitename && $site && $site ne 'all' && $site ne 'false'
+            && lc($site) ne lc($sitename)) {
+            next unless $priv;
+        }
+
+        my $title = $p->{title} // $p->{id} // $p->{name} // '';
+        my $path  = $p->{path}  // $p->{file} // '';
+        my $desc  = $p->{description} // '';
+        my $hay   = lc("$title $path $desc");
+        if ($query) {
+            my $hit = 0;
+            for my $tok (grep { length > 2 } split /\s+/, lc($query)) {
+                if (index($hay, $tok) >= 0) { $hit = 1; last }
+            }
+            next unless $hit;
+        }
+
+        my $body = $desc;
+        if ($path) {
+            my $abs = $path;
+            $abs = File::Spec->catfile($root, $path) unless $path =~ m{^/};
+            $abs =~ s/\.md$/.tt/ unless -f $abs;
+            if (-f $abs && -s $abs < 400_000) {
+                if (open my $fh, '<', $abs) {
+                    local $/;
+                    my $raw = <$fh> // '';
+                    close $fh;
+                    $raw =~ s/\[\%.*?\%\]//sg;
+                    $raw =~ s/<[^>]+>/ /g;
+                    $raw =~ s/\s+/ /g;
+                    $body = substr($raw, 0, 900);
+                }
+            }
+        }
+        next unless length($title) || length($body);
+        my $verified = ($body =~ /\bVERIFIED:/i || ($p->{status} // '') =~ /verified/i) ? 1 : 0;
+        push @out, {
+            title    => $title || ($path || 'untitled'),
+            content  => $body,
+            section  => $p->{category} // 'docs',
+            verified => $verified,
+            source   => 'documentation-files',
+        };
+        $n++;
+    }
+    return \@out;
+}
+
 # Planning/todo context for this SiteName — what is actively being worked on.
 # These are unverified in-progress items, so they are INTERNAL tier only.
 sub _plan_rows {
@@ -165,7 +255,8 @@ sub recall_block {
 
     my @all;
     push @all, @{ $self->_doc_rows($c, $sitename, $query, $priv) };
-    push @all, @{ $self->_plan_rows($c, $sitename, $query) };
+    push @all, @{ $self->_file_doc_rows($c, $sitename, $query, $priv) };
+    push @all, @{ $self->_plan_rows($c, $sitename, $query) } if $priv;
 
     # Score + filter
     my @scored;

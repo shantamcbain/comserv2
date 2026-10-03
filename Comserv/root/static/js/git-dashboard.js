@@ -150,7 +150,7 @@
             if (devPollTimer) { clearInterval(devPollTimer); devPollTimer = null; }
         }
 
-        function showDevConsole(branch, port, url, cmd) {
+        function showDevConsole(branch, port, url, cmd, kind) {
             if (!devConsole) { return; }
             devTitle.textContent = 'Starting ' + branch + ' on port ' + port + '…';
             devCmd.textContent = cmd || '';
@@ -161,8 +161,10 @@
             devConsole.style.display = 'flex';
 
             if (devPollTimer) { clearInterval(devPollTimer); }
+            var logQs = 'branch=' + encodeURIComponent(branch);
+            if (kind) { logQs += '&kind=' + encodeURIComponent(kind); }
             devPollTimer = setInterval(function () {
-                fetch('/admin/branch_server_log?branch=' + encodeURIComponent(branch), {
+                fetch('/admin/branch_server_log?' + logQs, {
                     credentials: 'same-origin'
                 }).then(function (r) { return r.text(); })
                   .then(function (text) {
@@ -182,25 +184,34 @@
         }
 
         function branchServerAction(action, branch, port, btn) {
-            if (!branch || !port) return;
+            if (!branch || !port) {
+                return Promise.reject(new Error('missing branch or port'));
+            }
             if (btn) { btn.disabled = true; var prev = btn.textContent; }
             var body = new URLSearchParams();
             body.set('action', action);
             body.set('branch', branch);
             body.set('port', port);
-            fetch('/admin/branch_server_action', {
+            return fetch('/admin/branch_server_action', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: body.toString(),
                 credentials: 'same-origin'
-            }).then(function (r) { return r.json(); })
-              .then(function (res) {
-                  if (!res || res.ok == 0) {
-                      throw new Error((res && res.error) || (action + ' failed'));
-                  }
-              })
-              .catch(function (err) { window.alert(action + ' ' + branch + ': ' + err.message); })
-              .finally(function () { if (btn) { btn.disabled = false; btn.textContent = prev; } });
+            }).then(function (r) {
+                var ct = r.headers.get('content-type') || '';
+                if (r.status === 302 || r.redirected || ct.indexOf('json') === -1) {
+                    throw new Error('not logged in (HTTP ' + r.status + ')');
+                }
+                return r.json();
+            }).then(function (res) {
+                if (!res || res.ok == 0) {
+                    throw new Error((res && res.error) || (action + ' failed'));
+                }
+                return res;
+            }).catch(function (err) {
+                window.alert(action + ' ' + branch + ': ' + err.message);
+                throw err;
+            }).finally(function () { if (btn) { btn.disabled = false; btn.textContent = prev; } });
         }
 
         var devServerButtons = document.querySelectorAll('.git-dev-actions button');
@@ -226,19 +237,72 @@
                 // command for manual copy.
                 var hermesBranch = el.getAttribute('data-hermes-branch');
                 if (hermesBranch) {
-                    var hcmd = el.getAttribute('data-hermes-cmd') || '';
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(hcmd).then(function () {
-                            if (typeof window.HermesNotify === 'function') {
-                                window.HermesNotify('Copied Hermes command for ' + hermesBranch);
-                            } else {
-                                window.alert('Copied to clipboard:\n' + hcmd);
-                            }
-                        }).catch(function () { window.alert(hcmd); });
+                    var appPort = el.getAttribute('data-port') || '';
+                    var appPortN = parseInt(appPort, 10) || 0;
+                    var hport;
+                    if (appPortN === 3001 || hermesBranch === 'main') {
+                        hport = '9119';
+                    } else if (appPortN >= 4000) {
+                        hport = String(9100 + (appPortN % 100));
                     } else {
-                        window.alert(hcmd);
+                        window.alert('Hermes for ' + hermesBranch + ': button has no app port.');
+                        return;
                     }
-                    showDevConsole(hermesBranch, el.getAttribute('data-port') || '', '', hcmd);
+                    var hcwd = el.getAttribute('data-hermes-cwd') || '';
+                    if (!hcwd) {
+                        hcwd = hermesBranch === 'main'
+                            ? '/home/shanta/PycharmProjects/comserv2'
+                            : '/home/shanta/.comserv/worktrees/' + hermesBranch + '/Comserv';
+                    }
+                    var hcmd = el.getAttribute('data-hermes-cmd') || (
+                        'cd ' + hcwd
+                        + ' && hermes dashboard --isolated --host 0.0.0.0 --port '
+                        + hport + ' --no-open --skip-build'
+                    );
+                    var tab = window.open('about:blank', 'hermes-' + hermesBranch);
+                    if (tab && !tab.closed) {
+                        try { tab.document.write('<p>Starting Hermes on :' + hport + '…</p>'); } catch (e1) {}
+                    }
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(hcmd);
+                    }
+                    showDevConsole(hermesBranch, hport, '', hcmd, 'hermes');
+                    function goHermes(port) {
+                        var url = window.location.protocol + '//' + window.location.hostname
+                            + ':' + port + '/chat';
+                        if (devOpenLink) { devOpenLink.href = url; devOpenLink.style.display = ''; }
+                        if (tab && !tab.closed) { tab.location = url; }
+                        else { window.open(url, 'hermes-' + hermesBranch); }
+                    }
+                    function waitReady(port) {
+                        var n = 0;
+                        var timer = setInterval(function () {
+                            n += 1;
+                            fetch('/admin/branch_server_log?kind=hermes&branch='
+                                    + encodeURIComponent(hermesBranch),
+                                { credentials: 'same-origin' })
+                                .then(function (r) { return r.text(); })
+                                .then(function (txt) {
+                                    if ((txt && txt.indexOf('HERMES_DASHBOARD_READY') !== -1) || n >= 25) {
+                                        clearInterval(timer);
+                                        goHermes(port);
+                                    }
+                                })
+                                .catch(function () {
+                                    if (n >= 25) { clearInterval(timer); goHermes(port); }
+                                });
+                        }, 400);
+                    }
+                    branchServerAction('hermes', hermesBranch, String(appPortN), el)
+                        .then(function (res) {
+                            var port = String((res && res.hermes_port) || hport);
+                            if (hermesBranch !== 'main' && port === '9119') { port = hport; }
+                            if (res && res.running) { goHermes(port); }
+                            else { waitReady(port); }
+                        })
+                        .catch(function () {
+                            if (tab && !tab.closed) { tab.close(); }
+                        });
                     return;
                 }
                 var action = el.getAttribute('data-branch-action');
@@ -369,19 +433,63 @@
             })
               .then(function (res) {
                   console.log('[git-dashboard] merge response:', res);
-                  if (res.conflict) {
-                      // Lead with WHY: the server now names the conflicting
-                      // files (or the uncommitted-changes blocker) in res.error;
-                      // raw git output stays in the <pre> as detail.
-                      var why = res.error || 'Merge conflict';
-                      showMergeResult(false, true, 'conflict', why + '\n\n' + (res.output || ''));
-                      return;
-                  }
                   var stashNote = '';
                   if (res.autostash_conflict) {
                       stashNote = 'WIP not cleanly reapplied \u2014 safe in stash@{0} (use Stash Pop)';
                   } else if (res.autostash) {
                       stashNote = 'uncommitted changes preserved & reapplied';
+                  }
+
+                  function buildFailBody(r) {
+                      var parts = [];
+                      if (r.error) { parts.push(String(r.error)); }
+                      if (r.fix_hint && (!r.error || String(r.error).indexOf(r.fix_hint) < 0)) {
+                          parts.push('What to do: ' + r.fix_hint);
+                      }
+                      if (r.uncommitted_files && r.uncommitted_files.length) {
+                          parts.push('Uncommitted files:\n  - ' + r.uncommitted_files.slice(0, 20).join('\n  - '));
+                      }
+                      if (r.conflict_files && r.conflict_files.length) {
+                          parts.push('Conflict files:\n  - ' + r.conflict_files.join('\n  - '));
+                      }
+                      if (r.checkout_path) {
+                          parts.push('Checkout: ' + r.checkout_path
+                              + (r.target_branch ? ' (branch ' + r.target_branch + ')' : ''));
+                      }
+                      if (r.output && String(r.output).replace(/\s/g, '').length) {
+                          parts.push('--- git detail ---\n' + r.output);
+                      }
+                      if (r.detail && String(r.detail).replace(/\s/g, '').length) {
+                          parts.push(String(r.detail));
+                      }
+                      return parts.join('\n\n') || 'merge failed';
+                  }
+
+                  function failTitle(r) {
+                      if (r.reason === 'uncommitted_on_main') {
+                          return 'blocked \u2014 main has uncommitted changes';
+                      }
+                      if (r.reason === 'uncommitted' || r.uncommitted) {
+                          return 'blocked \u2014 uncommitted changes';
+                      }
+                      if (r.reason === 'worktree_collision') {
+                          return 'blocked \u2014 worktree checkout collision';
+                      }
+                      if (r.conflict || r.reason === 'conflict') {
+                          return 'conflict';
+                      }
+                      if (r.reason === 'merge_in_progress') {
+                          return 'blocked \u2014 merge already in progress';
+                      }
+                      if (r.reason === 'missing_ref') {
+                          return 'failed \u2014 branch/ref not found';
+                      }
+                      return 'failed';
+                  }
+
+                  if (res.conflict) {
+                      showMergeResult(false, true, failTitle(res), buildFailBody(res), stashNote);
+                      return;
                   }
                   if (res.success) {
                       showMergeResult(true, false, 'merged \u2014 reloading\u2026', res.output || '', stashNote);
@@ -393,8 +501,7 @@
                       });
                       reloadGitDashboardSoon();
                   } else {
-                      var failText = (res.error || '') + (res.output && res.output.replace(/\s/g,'') ? ('\n' + res.output) : '') + (res.detail ? ('\n' + res.detail) : '');
-                      showMergeResult(false, false, 'failed', failText || 'merge failed', stashNote);
+                      showMergeResult(false, false, failTitle(res), buildFailBody(res), stashNote);
                   }
               })
               .catch(function (err) {
@@ -473,7 +580,9 @@
                     automatic.value = '';
                     automatic.textContent = 'Use automatic model selection';
                     aiModelSelect.insertBefore(automatic, aiModelSelect.firstChild);
-                    aiModelSelect.value = '';
+                    // Default to north-mini-code (cheap/free coding model) for commit message drafting
+                    // instead of letting automatic selection potentially pick Grok/SuperGrok.
+                    aiModelSelect.value = 'openrouter|cohere/north-mini-code:free';
                 },
                 onError: function () {
                     aiModelSelect.innerHTML = '<option value="">Automatic model selection</option>';

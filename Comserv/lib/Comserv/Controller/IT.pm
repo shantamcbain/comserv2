@@ -10,6 +10,18 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+# CSC-20260831-2970: IT pages are staff/internal — require login (Root LAYER 0b also gates).
+sub auto :Private {
+    my ($self, $c) = @_;
+    my $root = $c->controller('Root');
+    unless ($root && $root->user_exists($c)) {
+        $c->flash->{error_msg} = 'Please log in to access IT resources.';
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        $c->detach;
+    }
+    return 1;
+}
+
 =head1 NAME
 
 Comserv::Controller::IT - IT Controller for Comserv

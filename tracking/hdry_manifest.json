@@ -1,0 +1,31 @@
+{
+  "project": "HDRY System V3 (3D-printed dryer)",
+  "density_g_per_cm3": 1.24,
+  "dirs": [
+    "/home/shanta/Downloads/hdry",
+    "/home/shanta/Downloads/hdry/Mod1",
+    "/home/shanta/Downloads/hdry/model2",
+    "/home/shanta/Downloads/hdry/doors",
+    "/home/shanta/Downloads/hdry/extras"
+  ],
+  "part_map": {
+    "BR03.stl": {"code": "BR01", "name": "Back Right corner L1", "category": "corner_post", "level": "L1", "expected_dim_mm": 150, "bom": "51/52/53", "link_status": "SHOULD LINK (was wrongly BR02)", "verified": "Y", "action_needed": "relink model 26 to BR03.stl (150mm)"},
+    "BR02.stl": {"code": "BR02", "name": "Back Right corner L2", "category": "corner_post", "level": "L2", "expected_dim_mm": 215, "bom": "51/52/53", "link_status": "correct", "verified": "Y", "action_needed": "none"},
+    "BL03.stl": {"code": "BL01", "name": "Back Left corner L1", "category": "corner_post", "level": "L1", "expected_dim_mm": 150, "bom": "51/52/53", "link_status": "SHOULD LINK (was wrongly BL02)", "verified": "Y", "action_needed": "relink model 22 to BL03.stl"},
+    "BL02.stl": {"code": "BL02", "name": "Back Left corner L2", "category": "corner_post", "level": "L2", "expected_dim_mm": 215, "bom": "51/52/53", "link_status": "correct", "verified": "Y", "action_needed": "none"},
+    "FL03.stl": {"code": "FL01", "name": "Front Left corner L1", "category": "corner_post", "level": "L1", "expected_dim_mm": 150, "bom": "51/52/53", "link_status": "SHOULD LINK (was wrongly FL02)", "verified": "Y", "action_needed": "relink model 32 to FL03.stl"},
+    "FL02.stl": {"code": "FL02", "name": "Front Left corner L2", "category": "corner_post", "level": "L2", "expected_dim_mm": 215, "bom": "51/52/53", "link_status": "correct", "verified": "Y", "action_needed": "none"},
+    "FR01.stl": {"code": "FR01", "name": "Front Right corner L1", "category": "corner_post", "level": "L1", "expected_dim_mm": 150, "bom": "51/52/53", "link_status": "correct", "verified": "Y", "action_needed": "none"},
+    "FR02.stl": {"code": "FR02", "name": "Front Right corner L2", "category": "corner_post", "level": "L2", "expected_dim_mm": 215, "bom": "51/52/53", "link_status": "correct", "verified": "Y", "action_needed": "none"},
+    "BBR03.stl": {"code": "BBR01", "name": "Bottom Back Right L1", "category": "corner_post", "level": "L1", "expected_dim_mm": 150, "bom": "51/52/53", "link_status": "SHOULD LINK (was wrongly BBR02)", "verified": "Y", "action_needed": "relink model 20 to BBR03.stl"},
+    "BBR02.stl": {"code": "BBR02", "name": "Bottom Back Right L2", "category": "corner_post", "level": "L2", "expected_dim_mm": 215, "bom": "51/52/53", "link_status": "correct", "verified": "Y", "action_needed": "none"},
+    "BLS01.stl": {"code": "BLS01", "name": "Back Left Side panel L1", "category": "side_panel", "level": "L1", "expected_dim_mm": 150, "bom": "51/52/53", "link_status": "correct", "verified": "Y", "action_needed": "none"},
+    "BLS02.stl": {"code": "BLS02", "name": "Back Left Side panel L2", "category": "side_panel", "level": "L2", "expected_dim_mm": 215, "bom": "51/52/53", "link_status": "correct", "verified": "Y", "action_needed": "none"},
+    "BRS01.stl": {"code": "BRS01", "name": "Back Right Side panel L1", "category": "side_panel", "level": "L1", "expected_dim_mm": 150, "bom": "51/52/53", "link_status": "correct", "verified": "Y", "action_needed": "none"},
+    "BRS02.stl": {"code": "BRS02", "name": "Back Right Side panel L2", "category": "side_panel", "level": "L2", "expected_dim_mm": 215, "bom": "51/52/53", "link_status": "correct", "verified": "Y", "action_needed": "none"},
+    "FLS01.stl": {"code": "FLS01", "name": "Front Left Side panel L1", "category": "side_panel", "level": "L1", "expected_dim_mm": 150, "bom": "51/52/53", "link_status": "correct", "verified": "Y", "action_needed": "none"},
+    "FLS02 .stl": {"code": "FLS02", "name": "Front Left Side panel L2", "category": "side_panel", "level": "L2", "expected_dim_mm": 215, "bom": "51/52/53", "link_status": "correct", "verified": "Y", "action_needed": "none"},
+    "FRS01.stl": {"code": "FRS01", "name": "Front Right Side panel L1", "category": "side_panel", "level": "L1", "expected_dim_mm": 150, "bom": "51/52/53", "link_status": "correct", "verified": "Y", "action_needed": "none"},
+    "FRS02.stl": {"code": "FRS02", "name": "Front Right Side panel L2", "category": "side_panel", "level": "L2", "expected_dim_mm": 215, "bom": "51/52/53", "link_status": "correct", "verified": "Y", "action_needed": "none"}
+  }
+}

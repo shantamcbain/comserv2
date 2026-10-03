@@ -191,7 +191,10 @@ tr.opn-plan-fixed { background: var(--bg-secondary, #fafafa); }
                     <em>never</em> production (<code>192.168.1.126</code>).
                     Starman default: <code>:[% gateway_plan.targets.dev_port | html %]</code>
                     (<code>dev.csc</code> is portless via gateway <code>:80</code> → HAProxy → <code>:[% gateway_plan.targets.dev_port | html %]</code>).
-                    Works via Unbound, Cloudflare, or <code>/etc/hosts</code>.
+                    <strong>Do not WAN-forward :3001.</strong>
+                    Devices with no hosts file use Unbound (DHCP DNS) or <code>workstation.local</code> on the LAN;
+                    remote without ZeroTier needs a named HTTPS front door (see
+                    <a href="[% c.uri_for('/Documentation/GatewayPlan') %]">Gateway Plan</a>), not a public ZeroTier A record.
                 </p>
                 <form method="POST" action="[% c.uri_for('/admin/infrastructure/opnsense/action') %]" style="margin:10px 0 0;">
                     <input type="hidden" name="action" value="fix_all_dev_to_workstation">
@@ -199,7 +202,7 @@ tr.opn-plan-fixed { background: var(--bg-secondary, #fafafa); }
                         <i class="fas fa-wrench"></i> Fix all dev.* → workstation
                     </button>
                     <span style="font-size:0.88em;color:#555;margin-left:8px;">
-                        Unbound + HAProxy (dev.csc) + Cloudflare dev A records + hosts snippet below
+                        Unbound + LAN HAProxy (dev.csc). Does not open WAN :3001. Hosts snippet is optional.
                     </span>
                 </form>
             </div>

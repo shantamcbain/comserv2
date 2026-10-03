@@ -21,6 +21,7 @@ use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use Try::Tiny;
 use JSON;
+use Comserv::Model::AI::ConversationScope qw(is_guest_session ensure_guest_session_id guest_meta_ok conversation_owned_by_session);
 use Template;
 use DateTime;
 use LWP::UserAgent;
@@ -304,6 +305,15 @@ sub index :Path :Args(0) {
         task_todo => $task_todo,
         ai_quota_warning => $c->stash->{ai_quota_warning},
     );
+    # Admin banner on /ai: SuperGrok guard switch + stale AI meters (no network).
+    {
+        my $r = $c->session->{roles} || [];
+        $r = [ split /,/, $r ] unless ref $r eq 'ARRAY';
+        if (grep { /^admin$/i } @$r) {
+            my $b = eval { require Comserv::Model::AI2::UsageMonitor; Comserv::Model::AI2::UsageMonitor->new->ai_banner($c) };
+            $c->stash(ai_admin_banner => $b) if $b;
+        }
+    }
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
         'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
@@ -604,6 +614,34 @@ sub grok_cli :Local :Args(0) {
     if (length($prompt) > 200_000) {
         $c->response->status(400);
         $c->response->body(encode_json({ success => JSON::false, error => 'prompt too large (max 200k)' }));
+        return;
+    }
+
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::classify($prompt);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'grok_cli',
+            "HarmRefusal failed closed: $@");
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            refused => JSON::true,
+            error   => 'Chat safety check failed. The question was not sent.',
+        }));
+        return;
+    }
+    if ($harm) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'grok_cli',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, $c->session->{user_id}));
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            refused  => JSON::true,
+            response => Comserv::Util::AI::HarmRefusal::refusal_text($harm),
+            provider => 'local-refusal',
+            model    => 'harm-refusal',
+        }));
         return;
     }
 
@@ -1150,7 +1188,20 @@ sub generate :Local :Args(0) {
         $agent_name = $c->request->params->{agent_name} || 'AI Assistant';
         $conversation_id = $c->request->params->{conversation_id};  # May be undef if new conversation
     }
-    
+
+    # Normalize pipe-delimited model value (v2 format "provider|model_name")
+    # This lets the v1 generate endpoint accept model dropdown values like
+    # "openrouter|google/gemma-4-31b-it:free" or "ollama|phi4:14b"
+    if ($model && $model =~ /^([^|]+)\|(.+)$/) {
+        my $pipe_provider = lc($1);
+        my $pipe_model    = $2;
+        # Only override provider if it's still the default 'ollama'
+        $provider = $pipe_provider if lc($provider) eq 'ollama';
+        $model    = $pipe_model;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+            'generate', "Pipe-delimited model detected: provider=$pipe_provider, model=$pipe_model");
+    }
+
     # Fall back to session-stored conversation_id if not provided in request
     unless ($conversation_id) {
         $conversation_id = $c->session->{current_conversation_id};
@@ -1190,6 +1241,35 @@ sub generate :Local :Args(0) {
     if (!$is_guest && $prompt =~ /^\s*(good\s+night|end\s+day|finish\s+day|end\s+of\s+day)\s*[!.]?\s*$/i) {
         my $kw_resp = $c->controller("Planning")->_daily_log_action($c, 'end', $username, $user_id);
         $c->response->body(encode_json($kw_resp));
+        return;
+    }
+
+    # Refuse before the prompt preview is logged and before any provider call.
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::classify_turn($prompt, $history_items);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'generate',
+            "HarmRefusal failed closed: $@");
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            refused => JSON::true,
+            error   => 'Chat safety check failed. The question was not sent.',
+        }));
+        return;
+    }
+    if ($harm) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'generate',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, $user_id));
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            refused  => JSON::true,
+            response => Comserv::Util::AI::HarmRefusal::refusal_text($harm),
+            provider => 'local-refusal',
+            model    => 'harm-refusal',
+        }));
         return;
     }
 
@@ -1603,6 +1683,54 @@ sub generate :Local :Args(0) {
             }
             
             $model_used = $response->{model} || $grok->model;
+        } elsif (lc($provider) eq 'openrouter') {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'generate', "Using OpenRouter provider for query, user_id: $user_id");
+
+            # Require login for external AI models
+            if ($is_guest) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'generate', "Guest user attempted to use OpenRouter — login required");
+                die "Please log in to use external AI models (OpenRouter).";
+            }
+
+            # Only admins/editors may select external models
+            unless ($can_select_model_gen) {
+                die "Only administrators and editors may use external AI models.";
+            }
+
+            my $or = $c->model('AI2::Provider::OpenRouter');
+            unless ($or && $or->can('chat') && $or->can('_resolve_api_key')) {
+                die "OpenRouter provider is not configured";
+            }
+
+            my $or_api_key = $or->_resolve_api_key($c);
+            unless ($or_api_key) {
+                die "No OpenRouter API key found. Please add your API key at /ai/manage_api_keys";
+            }
+
+            my $or_response = $or->chat($c,
+                model    => $model,
+                messages => [
+                    ($system ? { role => 'system', content => $system } : ()),
+                    { role => 'user', content => $prompt },
+                ],
+                api_key  => $or_api_key,
+            );
+
+            unless ($or_response && $or_response->{success}) {
+                my $or_error = $or_response->{error} || $or->last_error || 'Unknown error';
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'generate', "OpenRouter query failed: $or_error");
+                die "OpenRouter query failed: $or_error";
+            }
+
+            $response  = {
+                response => $or_response->{response},
+                model    => $or_response->{model} || $model,
+                usage    => $or_response->{usage} || {},
+            };
+            $model_used = $response->{model};
         } else {
             # Default to Ollama
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
@@ -2676,7 +2804,7 @@ sub chat :Local :Args(0) {
     my $is_guest = 0;
     
     # If not logged in, create guest session
-    if (!$username) {
+    if (!$username || lc($username) eq 'guest' || $username =~ /^Guest-/i) {
         $is_guest = 1;
         
         # Create a unique guest session ID if not already present
@@ -2757,6 +2885,11 @@ sub chat :Local :Args(0) {
     # Get parameters from JSON or fallback to form params
     my $prompt = $json_data->{prompt} || $c->request->params->{prompt} || '';
     my $model = $json_data->{model} || $c->request->params->{model} || '';
+    # CSC-20260914-0477: AI Editor / model picker often send the wire value in
+    # `provider` ("openrouter|org/model") and omit `model`. Old chat() ignored
+    # provider and treated every non-grok* request as Ollama — so the literal
+    # provider name "openrouter" was used as an Ollama model id (hard UI errors).
+    my $provider = $json_data->{provider} || $c->request->params->{provider} || '';
     my $history = $json_data->{history} || [];
     my $conversation_id = $json_data->{conversation_id} || $c->request->params->{conversation_id};
     my $use_search_chat = $json_data->{use_search} ? 1 : 0;
@@ -2767,6 +2900,33 @@ sub chat :Local :Args(0) {
     my $chat_page_content = $json_data->{page_content}  || $c->request->params->{page_content}  || '';
     my $project_id        = $json_data->{project_id}    || $c->request->params->{project_id}    || undef;
     my $task_id           = $json_data->{task_id}       || $c->request->params->{task_id}       || undef;
+
+    # Normalize "provider|model" from either field (same contract as generate()/ai2).
+    if (!$model && $provider && $provider =~ /^\s*([^|]+)\|(.+?)\s*$/) {
+        $provider = lc($1);
+        $model    = $2;
+    }
+    elsif ($model && $model =~ /^\s*([^|]+)\|(.+?)\s*$/) {
+        my $pipe_provider = lc($1);
+        my $pipe_model    = $2;
+        $provider = $pipe_provider if !$provider || lc($provider) eq 'ollama';
+        $model    = $pipe_model;
+    }
+    # CSC-20260914-4380: also accept accidental "provider/model" for first-party
+    # providers (OpenRouter-style slash). Do NOT treat org/model (anthropic/...)
+    # as a provider prefix — only known service names.
+    elsif ($model && $model =~ /^\s*(supergrok|grok-oauth|grok|ollama|openrouter|external)\/(.+?)\s*$/i) {
+        my $slash_provider = lc($1);
+        my $slash_model    = $2;
+        $provider = $slash_provider if !$provider || lc($provider) eq 'ollama';
+        $model    = $slash_model;
+    }
+    $provider = lc($provider // '');
+    # Bare provider token without a model must never become an Ollama model id.
+    if ($model && $model =~ /^(openrouter|external|supergrok|grok|openai|ollama)$/i) {
+        $provider = lc($model) if !$provider || $provider eq 'ollama';
+        $model = '';
+    }
 
     # Record structured page_links if the client sent them (from extractPageLinks JS helper).
     # Complements the content-based extraction. (safe)
@@ -2795,6 +2955,34 @@ sub chat :Local :Args(0) {
         });
         $c->response->body($error_response);
         $c->response->status(400);
+        return;
+    }
+
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::classify_turn($prompt, $history);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'chat',
+            "HarmRefusal failed closed: $@");
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            refused => JSON::true,
+            error   => 'Chat safety check failed. The question was not sent.',
+        }));
+        return;
+    }
+    if ($harm) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, $user_id));
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            refused  => JSON::true,
+            response => Comserv::Util::AI::HarmRefusal::refusal_text($harm),
+            provider => 'local-refusal',
+            model    => 'harm-refusal',
+        }));
         return;
     }
 
@@ -2866,11 +3054,22 @@ sub chat :Local :Args(0) {
         $can_select_model_perm = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_chat;
     }
 
-    # Detect if selected model is a Grok (xAI) model
-    my $is_grok_model = ($model && $model =~ /^grok/i) ? 1 : 0;
+    # Detect provider: grok / openrouter(external) / ollama.
+    # Prefer explicit provider; fall back to model-name heuristics (legacy clients).
+    my $is_openrouter = ($provider =~ /^(openrouter|external)$/) ? 1 : 0;
+    my $is_grok_model = (
+        $provider =~ /^(grok|supergrok|xai)$/
+        || (!$is_openrouter && $model && $model =~ /^(?:x-ai\/)?grok/i)
+    ) ? 1 : 0;
+    # OpenRouter model ids are org/model (or :free). Do not let them fall into Ollama.
+    if (!$is_openrouter && !$is_grok_model && $model && $model =~ m{/}) {
+        $is_openrouter = 1;
+        $provider = 'openrouter';
+    }
+    my $chat_provider_label = $is_openrouter ? 'openrouter' : ($is_grok_model ? 'grok' : 'ollama');
 
     # Role-based capability injection into messages (insert as system message)
-    my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $is_grok_model ? 'grok' : 'ollama', $chat_page_path, $chat_page_title);
+    my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $chat_provider_label, $chat_page_path, $chat_page_title);
 
     # Inject agent-specific system prompts
     if (lc($chat_agent_id) eq 'helpdesk' && !$chat_agent_system) {
@@ -2982,8 +3181,8 @@ sub chat :Local :Args(0) {
         $username, $is_guest ? 'guest' : 'authenticated',
         $c->stash->{SiteName} || $c->session->{SiteName} || 'unknown',
         $chat_page_path || '(unknown)');
-    push @chat_trace, sprintf("🤖 Agent: %s | Provider: %s",
-        $chat_agent_id || 'general', $is_grok_model ? 'grok' : 'ollama');
+    push @chat_trace, sprintf("🤖 Agent: %s | Provider: %s | Model: %s",
+        $chat_agent_id || 'general', $chat_provider_label, $model || '(default)');
     push @chat_trace, sprintf("💬 Prompt (%d chars) | History: %d prior messages",
         length($prompt), scalar(@$history));
     push @chat_trace, $module_data   ? "🗂️ DB data injected" : "🗂️ No DB data injected (prompt didn't match todo/project/ENCY keywords)";
@@ -2996,13 +3195,13 @@ sub chat :Local :Args(0) {
     $use_search_chat = 0 unless $can_select_model_perm;
 
     # Require login for external AI models - check before entering try block
-    if ($is_grok_model && $is_guest) {
+    if (($is_grok_model || $is_openrouter) && $is_guest) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-            'chat', "Guest user attempted to use Grok model - login required");
+            'chat', "Guest user attempted to use external model ($chat_provider_label) - login required");
         $c->response->status(401);
         $c->response->body(encode_json({
             success => JSON::false,
-            error => 'Please log in to use external AI models (Grok/xAI). Click the login link above.'
+            error => 'Please log in to use external AI models (Grok/OpenRouter). Click the login link above.'
         }));
         return;
     }
@@ -3163,10 +3362,64 @@ sub chat :Local :Args(0) {
             push @chat_trace, sprintf("✅ Grok responded — model=%s %d chars%s", $model_used, length($ai_response),
                 $response_eval_count ? " ($response_eval_count tokens)" : '');
 
+        } elsif ($is_openrouter) {
+            # CSC-20260914-0477: route OpenRouter explicitly (do not fall into Ollama).
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'chat', "Routing to OpenRouter for model: " . ($model || '(required)') . ", user_id: $user_id");
+            push @chat_trace, sprintf("📡 Calling OpenRouter — model=%s", $model || '(none)');
+
+            unless ($can_select_model_perm) {
+                die "Only administrators and editors may use external AI models (OpenRouter).";
+            }
+            unless ($model && length $model) {
+                die "OpenRouter requires an explicit model id (got provider name only). Pick a real model such as cohere/north-mini-code:free.";
+            }
+            if ($model =~ /^(openrouter|external)$/i) {
+                die "Invalid OpenRouter model id '$model' — that is a provider name, not a model. Pick org/model from the dropdown.";
+            }
+
+            my $or = $c->model('AI2::Provider::OpenRouter');
+            unless ($or && $or->can('chat') && $or->can('_resolve_api_key')) {
+                die "OpenRouter provider is not configured";
+            }
+            my $or_api_key = $or->_resolve_api_key($c);
+            unless ($or_api_key) {
+                die "No OpenRouter API key found. Please add your API key at /ai/manage_api_keys";
+            }
+
+            my @or_messages = @messages;
+            if ($combined_system_prompt) {
+                unshift @or_messages, { role => 'system', content => $combined_system_prompt };
+            }
+
+            my $or_response = $or->chat($c,
+                model    => $model,
+                messages => \@or_messages,
+                api_key  => $or_api_key,
+            );
+            unless ($or_response && $or_response->{success}) {
+                my $or_error = $or_response->{error} || $or->last_error || 'Unknown error';
+                die "OpenRouter query failed: $or_error";
+            }
+
+            $ai_response = $or_response->{response} // '';
+            $model_used  = $or_response->{model} || $model;
+            $response = { response => $ai_response, model => $model_used, usage => $or_response->{usage} };
+            $response_eval_count = ($or_response->{usage} && $or_response->{usage}{total_tokens})
+                ? $or_response->{usage}{total_tokens} : 0;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'chat', "OpenRouter chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response));
+            push @chat_trace, sprintf("✅ OpenRouter responded — model=%s %d chars", $model_used, length($ai_response));
+
         } else {
             # ── Ollama 3-Tier Escalation ──────────────────────────────────────
             # Tier 1: small/fast model → if quality poor, Tier 2: large model
             # → if still poor AND user has Grok, return web-search consent flag.
+
+            # Final guard: never pass a provider token to Ollama as a model name.
+            if ($model && $model =~ /^(openrouter|external|supergrok|grok|openai)$/i) {
+                die "Refusing to call Ollama with provider name '$model' as the model id (CSC-20260914-0477). Select a real local or OpenRouter model.";
+            }
 
             my $ollama = $c->model('Ollama');
             unless ($ollama) {
@@ -3569,7 +3822,7 @@ sub chat :Local :Args(0) {
         my $chat_pt = $response->{prompt_eval_count} // 0;
         my $chat_ct = $response_eval_count // $response->{eval_count} // 0;
         my $chat_tt = $response->{usage} && $response->{usage}{total_tokens} ? $response->{usage}{total_tokens} : ($chat_pt + $chat_ct);
-        my $chat_provider = $is_grok_model ? 'grok' : 'ollama';
+        my $chat_provider = $chat_provider_label;
         $self->_log_ai_usage($c,
             user_id           => $user_id,
             site_id           => $c->session->{SiteID},
@@ -3689,7 +3942,7 @@ sub chat :Local :Args(0) {
 
         # === AI USAGE LOG (chat error path) ===
         my $chat_err_ms = int( (time() - $chat_trace_start) * 1000 );
-        my $chat_err_provider = $is_grok_model ? 'grok' : 'ollama';
+        my $chat_err_provider = $chat_provider_label;
         $self->_log_ai_usage($c,
             user_id           => $user_id,
             site_id           => $c->session->{SiteID},
@@ -5298,10 +5551,26 @@ sub _assess_response_quality {
         "don't have access", "do not have access",
         "unable to answer", "cannot answer", "no relevant",
         "i don't have that", "not in my knowledge",
+        # CSC auto-websearch: refusals that only cite missing page context
+        "no mention", "not documented", "cannot confirm",
+        "based solely on the provided", "based only on the page content",
+        "not in the current page context", "not present in the given context",
+        "i don't have any information about", "no dedicated documentation",
+        "would need to consult", "not included in this excerpt",
+        # Page-context refusals (substring match; develclub-style "does not contain any information")
+        "does not contain", "doesn't contain", "do not contain",
+        "current page does not", "page does not contain",
+        "not on this page", "not on the current page",
+        "does not contain any", "contain any information about",
+        "not contain any information",
+        "i'm sorry, but", "i am sorry, but",
+        "please let me know if you have a specific",
+        "cannot find", "could not find", "couldn't find",
+        "outside the scope of this page", "outside the scope of the provided",
     );
     my $lc_resp = lc($response);
     for my $phrase (@uncertain_phrases) {
-        return 'poor' if index($lc_resp, $phrase) >= 0;
+        return 'poor' if CORE::index($lc_resp, $phrase) >= 0;
     }
 
     return 'good';
@@ -5319,8 +5588,8 @@ Small = tinyllama or smallest by name; Large = llama3.1 or largest by name.
 # a formatted context string ready to inject into the model prompt.
 #
 # Provider priority (per agent):
-#   ency / bmaster  →  brave (if key) → searxng (if configured) → ddg
-#   all others      →  ollama-cloud (if key) → ddg → brave → searxng
+#   all agents      →  searxng (AI2::Search) → brave → ddg → ollama-cloud
+#   (ollama cloud often 401; DDG Instant Answer often empty; SearXNG local is reliable)
 #
 # Returns: (context_string, provider_used) or ('', '') on failure.
 # ──────────────────────────────────────────────────────────────────────────────
@@ -5360,15 +5629,14 @@ sub _do_web_search {
     };
 
     # ── determine provider order ──
-    my $is_precise_agent = ($agent_id && $agent_id =~ /^(ency|bmaster|bmast|usbm|accounting)$/i) ? 1 : 0;
-    my @order = $is_precise_agent
-        ? ('brave', 'searxng', 'ollama_cloud', 'ddg')
-        : ('ollama_cloud', 'ddg', 'brave', 'searxng');
+    # Agent-specific order removed: SearXNG-first for all (incl. ency/bmaster).
+    my @order = ('searxng', 'brave', 'ddg', 'ollama_cloud');
 
     for my $provider (@order) {
 
         # ── Brave Search ───────────────────────────────────────────────────
         if ($provider eq 'brave' && $keys{brave}) {
+            my ($br_ctx, $br_prov);
             eval {
                 my $url  = 'https://api.search.brave.com/res/v1/web/search?q='
                          . URI::Escape::uri_escape($query) . '&count=5';
@@ -5386,45 +5654,91 @@ sub _do_web_search {
                     } } @{ $data->{web}{results} || [] };
                     if (@results) {
                         push @$trace_ref, sprintf("🌐 Brave search: %d results", scalar @results);
-                        my ($ctx, $p) = $format_results->(\@results, 'Brave');
-                        return ($ctx, $p);
+                        ($br_ctx, $br_prov) = $format_results->(\@results, 'Brave');
                     }
                 } else {
                     push @$trace_ref, "⚠️ Brave search HTTP " . $resp->code;
                 }
             };
             push @$trace_ref, "⚠️ Brave search error: $@" if $@;
+            return ($br_ctx, $br_prov) if defined $br_ctx && length $br_ctx;
             next;
         }
 
         # ── SearXNG ────────────────────────────────────────────────────────
+        # Canonical path: Model::AI2::Search (services.json POST JSON).
+        # Legacy comserv.conf GET is fallback only; skip HTML responses.
         if ($provider eq 'searxng') {
-            my $cfg      = $c->config->{SearXNG} || {};
-            my $host     = $cfg->{host} || '';
-            next unless $host;
+            my $used_ai2 = 0;
+            my ($sx_ctx, $sx_prov);
             eval {
-                require URI::Escape;
-                my $url  = "$host/search?q=" . URI::Escape::uri_escape($query)
-                         . '&format=json&categories=general&language=en';
-                my $req  = HTTP::Request->new(GET => $url);
-                my $resp = $ua->request($req);
-                if ($resp->is_success) {
-                    my $data    = JSON::decode_json($resp->decoded_content);
-                    my @results = map { {
-                        title   => $_->{title}   || '',
-                        url     => $_->{url}     || '',
-                        snippet => $_->{content} || '',
-                    } } @{ $data->{results} || [] }[0..4];
-                    if (@results) {
-                        push @$trace_ref, sprintf("🌐 SearXNG: %d results", scalar @results);
-                        my ($ctx, $p) = $format_results->(\@results, 'SearXNG');
-                        return ($ctx, $p);
-                    }
-                } else {
-                    push @$trace_ref, "⚠️ SearXNG HTTP " . $resp->code;
+                require Comserv::Model::AI2::Search;
+                my $svc = eval { $c->model('AI2::Search') } || Comserv::Model::AI2::Search->new;
+                my $r = $svc->query($c, query => $query);
+                $used_ai2 = 1;
+                if ($r && $r->{success} && @{$r->{results}||[]}) {
+                    my @results = map {
+                        { title => $_->{title}, url => $_->{url}, snippet => $_->{content} }
+                    } @{$r->{results}}[0..4];
+                    # Drop undef holes if results < 5
+                    @results = grep { $_ && $_->{url} } @results;
+                    push @$trace_ref, sprintf('🌐 SearXNG(AI2::Search): %d results', scalar @results);
+                    ($sx_ctx,$sx_prov) = $format_results->(\@results, 'SearXNG');
                 }
+                push @$trace_ref, '⚠️ SearXNG: '.($r->{error}||'no results') if $r && !($sx_ctx && length $sx_ctx);
             };
             push @$trace_ref, "⚠️ SearXNG error: $@" if $@;
+            # return outside eval — return inside eval BLOCK only exits the eval (Perl)
+            return ($sx_ctx, $sx_prov) if defined $sx_ctx && length $sx_ctx;
+            # Legacy GET fallback only if AI2::Search path did not run / was disabled
+            if (!$used_ai2) {
+                my $host = '';
+                eval {
+                    require Comserv::Model::AI2::Search;
+                    my $svc = Comserv::Model::AI2::Search->_cfg($c) || {};
+                    if ($svc->{enabled} && $svc->{url}) {
+                        $host = $svc->{url};
+                    }
+                };
+                if (!$host) {
+                    my $cfg = $c->config->{SearXNG} || {};
+                    $host = $cfg->{host} || '';
+                }
+                $host =~ s{/+$}{} if $host;
+                if ($host) {
+                    eval {
+                        require URI::Escape;
+                        my $url  = "$host/search?q=" . URI::Escape::uri_escape($query)
+                                 . '&format=json&categories=general&language=en';
+                        my $req  = HTTP::Request->new(GET => $url);
+                        $req->header('Accept' => 'application/json');
+                        my $resp = $ua->request($req);
+                        if ($resp->is_success) {
+                            my $ctype = $resp->header('Content-Type') // '';
+                            my $body = $resp->decoded_content // '';
+                            if ($ctype =~ /html/i || $body =~ /^\s*</) {
+                                push @$trace_ref, "⚠️ SearXNG returned HTML (skip JSON decode) at $host";
+                            } else {
+                                my $data    = JSON::decode_json($body);
+                                my @results = map { {
+                                    title   => $_->{title}   || '',
+                                    url     => $_->{url}     || '',
+                                    snippet => $_->{content} || '',
+                                } } @{ $data->{results} || [] }[0..4];
+                                if (@results) {
+                                    push @$trace_ref, sprintf("🌐 SearXNG: %d results", scalar @results);
+                                    my ($ctx, $p) = $format_results->(\@results, 'SearXNG');
+                                    return ($ctx, $p);
+                                }
+                                push @$trace_ref, "⚠️ SearXNG: 0 results";
+                            }
+                        } else {
+                            push @$trace_ref, "⚠️ SearXNG HTTP " . $resp->code;
+                        }
+                    };
+                    push @$trace_ref, "⚠️ SearXNG legacy error: $@" if $@;
+                }
+            }
             next;
         }
 
@@ -5536,25 +5850,25 @@ sub _pick_ollama_tier {
         'deepseek'   => 7, 'command'  => 7,
         'kimi-k2'    => 232, 'kimi'   => 72,
     );
-    for my $n (@names) {
-        my $score;
-        # 1. Explicit Nb in name (deepseek-r1:7b, llama2:13b, etc.)
-        if ($n =~ /[:\-](\d+)b/i) { $score = $1; }
-        # 2. Known family prefix
-        unless ($score) {
-            for my $family (sort { length($b) <=> length($a) } keys %known_family) {
-                if (index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
+        for my $n (@names) {
+            my $score;
+            # 1. Explicit Nb in name (deepseek-r1:7b, llama2:13b, etc.)
+            if ($n =~ /[:\\-](\d+)b/i) { $score = $1; }
+            # 2. Known family prefix
+            unless ($score) {
+                for my $family (sort { length($b) <=> length($a) } keys %known_family) {
+                    if (CORE::index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
+                }
             }
+            # 3. Generic hints
+            $score //= $n =~ /tiny/i   ? 1
+                     : $n =~ /small/i  ? 3
+                     : $n =~ /mini/i   ? 3
+                     : $n =~ /medium/i ? 7
+                     : $n =~ /large/i  ? 13
+                     :                   7;
+            $size_score{$n} = $score;
         }
-        # 3. Generic hints
-        $score //= $n =~ /tiny/i   ? 1
-                 : $n =~ /small/i  ? 3
-                 : $n =~ /mini/i   ? 3
-                 : $n =~ /medium/i ? 7
-                 : $n =~ /large/i  ? 13
-                 :                   7;
-        $size_score{$n} = $score;
-    }
 
     my @sorted = sort { ($size_score{$a} || 7) <=> ($size_score{$b} || 7) } @names;
 
@@ -5892,6 +6206,7 @@ sub _build_navigation_command_guide {
             [ 'Manage AI models',           '/ai/models'                ],
             [ 'AI server status',           '/ai/check_status'          ],
             [ 'AI Usage & Billing Monitor', '/ai/usage'                 ],
+            [ 'Daily AI Eval Reports',      '/ai/eval'                  ],
             [ 'Support chat admin',         '/chat/admin'               ],
         ]],
         # ── Common sections ───────────────────────────────────────────────────
@@ -5932,6 +6247,7 @@ sub _build_navigation_command_guide {
         ]],
         [ 'AI Assistant (logged in)', 'user', [
             [ 'AI conversations / chat history', '/ai/conversations'    ],
+            [ 'AI search/audit index',      '/ai/search_index'          ],
             [ 'AI Usage & Billing Monitor', '/ai/usage'                 ],
             [ 'Manage API keys',            '/ai/manage_api_keys'       ],
             [ 'AI in-app action endpoint',  '/ai/action'                ],
@@ -6546,7 +6862,7 @@ sub conversations :Local :Args(0) {
     my $is_guest = 0;
     
     # If not logged in, create guest session
-    if (!$username) {
+    if (!$username || lc($username) eq 'guest' || $username =~ /^Guest-/i) {
         $is_guest = 1;
         
         # Create a unique guest session ID if not already present
@@ -6617,19 +6933,7 @@ sub conversations :Local :Args(0) {
                 
                 # For guests, only show conversations that belong to this guest session
                 if ($is_guest) {
-                    my $conv_metadata = {};
-                    if ($conv->metadata) {
-                        try {
-                            $conv_metadata = decode_json($conv->metadata);
-                        } catch {
-                            # Metadata parsing failed, skip this conversation
-                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                                'conversations', "Failed to parse conversation metadata for ID=" . $conv->id);
-                        };
-                    }
-                    
-                    # Check if this conversation belongs to this guest session
-                    unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
+                    unless (guest_meta_ok($conv->metadata, $guest_session_id)) {
                         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                             'conversations', "Skipping conversation ID=" . $conv->id . " - not owned by this guest session");
                         next;
@@ -6950,20 +7254,15 @@ sub get_conversation_list :Local :Args(0) {
     
     $c->response->content_type('application/json');
     
-    my $username = $c->session->{username};
+    my $is_guest = is_guest_session($c);
     my $user_id = $c->session->{user_id};
-    my $guest_session_id = $c->session->{guest_session_id};
-    my $is_guest = 0;
-    
-    if (!$username) {
-        $is_guest = 1;
-        $user_id = 199;
-        unless ($guest_session_id) {
-            use Data::UUID;
-            my $ug = Data::UUID->new;
-            $guest_session_id = $ug->create_str();
-            $c->session->{guest_session_id} = $guest_session_id;
-        }
+    my $guest_session_id = ensure_guest_session_id($c);
+    if ($is_guest) {
+        $user_id = 199 unless defined $user_id;
+    }
+    unless (defined $user_id) {
+        $c->response->body(encode_json({ success => JSON::true, conversations => [] }));
+        return;
     }
     
     try {
@@ -6979,13 +7278,7 @@ sub get_conversation_list :Local :Args(0) {
         my @conv_list;
         foreach my $conv ($conv_rs->all) {
             if ($is_guest) {
-                my $conv_metadata = {};
-                if ($conv->metadata) {
-                    try {
-                        $conv_metadata = decode_json($conv->metadata);
-                    } catch {};
-                }
-                next unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id);
+                next unless guest_meta_ok($conv->metadata, $guest_session_id);
             }
             
             my $message_count = $conv->ai_messages->count;
@@ -7029,16 +7322,6 @@ sub get_conversation_messages :Local :Args(1) {
         return;
     }
     
-    my $username = $c->session->{username};
-    my $user_id = $c->session->{user_id};
-    my $guest_session_id = $c->session->{guest_session_id};
-    my $is_guest = 0;
-    
-    if (!$username) {
-        $is_guest = 1;
-        $user_id = 199;
-    }
-    
     try {
         my $schema = $c->model('DBEncy')->schema;
         my $conv = $schema->resultset('AiConversation')->find($conversation_id);
@@ -7051,28 +7334,12 @@ sub get_conversation_messages :Local :Args(1) {
             return;
         }
         
-        if ($conv->user_id != $user_id) {
+        unless (conversation_owned_by_session($c, $conv)) {
             $c->response->body(encode_json({
                 success => JSON::false,
                 error => 'Access denied'
             }));
             return;
-        }
-        
-        if ($is_guest) {
-            my $conv_metadata = {};
-            if ($conv->metadata) {
-                try {
-                    $conv_metadata = decode_json($conv->metadata);
-                } catch {};
-            }
-            unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
-                $c->response->body(encode_json({
-                    success => JSON::false,
-                    error => 'Access denied'
-                }));
-                return;
-            }
         }
         
         my @messages;
@@ -8799,6 +9066,14 @@ sub action :Local :Args(0) {
         my $user_id     = $c->session->{user_id} || undef;
         my $username    = $current_user;
 
+        if (Comserv::Controller::HelpDesk->_looks_like_spam_content($subject, $description)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'action',
+                "AI create_helpdesk_ticket blocked as spam: subject=" . substr($subject // '', 0, 80));
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Your request was blocked by our spam filter.' }));
+            return;
+        }
+
         my $ticket_number = uc($site_name) . '-' . DateTime->now->strftime('%Y%m%d') . '-' . sprintf('%04d', int(rand(9999)) + 1);
         my $now_str = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
 
@@ -8829,6 +9104,14 @@ sub action :Local :Args(0) {
         my $ticket_num = $new_ticket->ticket_number // $ticket_number;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
             "AI action create_helpdesk_ticket: id=$ticket_id num=$ticket_num sitename=$site_name by=$username subject='$subject'");
+        eval {
+            require Comserv::Util::HelpDeskWebhook;
+            Comserv::Util::HelpDeskWebhook->notify_ticket_change($c,
+                event  => 'ticket.created',
+                change => 'created',
+                ticket => $new_ticket,
+            );
+        };
         $c->response->body(encode_json({
             success       => JSON::true,
             message       => "Support ticket $ticket_num created: \"$subject\". An admin will be notified.",
@@ -12440,6 +12723,95 @@ sub transcribe_status :Local :Args(0) {
     }
 }
 
+
+=head2 search_index
+
+Developer/admin browse of persisted WebSearchResult rows (auto-enrich
+web-search + site-audit hits). GET /ai/search_index?q=optional
+
+=cut
+
+sub search_index :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}
+            && lc($c->session->{username}) ne 'guest'
+            && $c->session->{username} !~ /^Guest-/i) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'search_index', 'Unauthorized — login required');
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
+    my $allowed = grep { /^(admin|developer|editor)$/i } @$roles;
+    unless ($allowed) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'search_index', 'Forbidden — admin/developer/editor required');
+        $c->flash->{error_msg} = 'Admin, developer, or editor role required to view the search index.';
+        $c->response->redirect($c->uri_for('/ai'));
+        return;
+    }
+
+    my $q = $c->req->param('q') || '';
+    $q =~ s/^\s+|\s+$//g;
+
+    my @hits;
+    my $error;
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $cond = {};
+        if (length $q) {
+            my $like = '%' . $q . '%';
+            $cond = {
+                -or => [
+                    { query => { -like => $like } },
+                    { result_title => { -like => $like } },
+                    { result_url => { -like => $like } },
+                    { result_snippet => { -like => $like } },
+                ]
+            };
+        }
+        my $rs = $schema->resultset('WebSearchResult')->search(
+            $cond,
+            { order_by => { -desc => 'created_at' }, rows => 100 }
+        );
+        for my $r ($rs->all) {
+            my $snip = $r->result_snippet // '';
+            $snip = substr($snip, 0, 200);
+            my $created = $r->created_at;
+            if (ref $created && $created->can('strftime')) {
+                $created = $created->strftime('%Y-%m-%d %H:%M:%S');
+            }
+            push @hits, {
+                id          => $r->id,
+                created_at  => $created,
+                query       => $r->query,
+                title       => $r->result_title,
+                url         => $r->result_url,
+                snippet     => $snip,
+                source_type => $r->source_type,
+                is_verified => $r->is_verified ? 1 : 0,
+            };
+        }
+    } catch {
+        $error = "$_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'search_index', "Failed to load WebSearchResult: $_");
+    };
+
+    $c->stash(
+        template   => 'ai/search_index.tt',
+        page_title => 'AI Search Index',
+        hits       => \@hits,
+        q          => $q,
+        error      => $error,
+        total      => scalar(@hits),
+        username   => $c->session->{username},
+    );
+}
+
 =head2 usage
 
 Admin / operator usage monitor for AI chat.
@@ -12447,6 +12819,27 @@ Shows calls by provider, model, customer (site), tokens, estimated costs.
 Supports basic filtering for billing reports and capacity planning (anticipate ollama load vs paid spend).
 Access: any authenticated user sees their site's usage; admins see more.
 =cut
+
+sub _usage_is_operator {
+    my ($self, $c) = @_;
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+    my $roles    = $c->session->{roles} || [];
+    $roles = [ split /,/, $roles ] unless ref $roles eq 'ARRAY';
+    my $is_admin = grep { /^(admin|developer)$/i } @$roles;
+    return ($is_local || $is_admin) ? 1 : 0;
+}
+
+sub _usage_org {
+    my ($self, $c) = @_;
+    require Comserv::Model::AI2::UsageMonitor;
+    my $days   = $c->req->param('days') || 14;
+    my $prov_f = $c->req->param('provider') || '';
+    my $site_f = $c->req->param('site_id')  || '';
+    my $model_f= $c->req->param('model') || '';
+    return Comserv::Model::AI2::UsageMonitor->new->org_summary($c,
+        days => $days, provider => $prov_f, site_id => $site_f, model => $model_f);
+}
 
 sub usage :Local :Args(0) {
     my ($self, $c) = @_;
@@ -12456,90 +12849,91 @@ sub usage :Local :Args(0) {
     my $site_id  = $c->session->{SiteID};
     my $roles    = $c->session->{roles} || [];
     $roles = [split /,/, $roles] unless ref $roles eq 'ARRAY';
-
     my $is_admin = grep { /^admin$/i } @$roles;
 
-    # Filters from query
-    my $days       = $c->req->param('days') || 30;
-    my $prov_f     = $c->req->param('provider') || '';
-    my $site_f     = $c->req->param('site_id')  || ($is_admin ? '' : $site_id);
-    my $model_f    = $c->req->param('model') || '';
+    my $days   = $c->req->param('days') || 14;
+    my $prov_f = $c->req->param('provider') || '';
+    my $site_f = $c->req->param('site_id')  || ($is_admin ? '' : $site_id);
+    my $model_f= $c->req->param('model') || '';
 
-    my $schema = eval { $c->model('DBEncy')->schema };
-    my @logs;
-    my %summary = ( total_calls => 0, total_tokens => 0, total_cost => 0, by_provider => {}, by_site => {} );
+    my $org = $self->_usage_org($c);
+    my $usage_m = eval { $c->model('AI')->usage };
+    my $provider_status = $usage_m ? ($usage_m->snapshot_provider_status($c) || {}) : {};
 
-    if ($schema) {
-        my $rs = $schema->resultset('AiUsageLog');
-        my $since = DateTime->now->subtract(days => $days)->ymd . ' 00:00:00';
-
-        my $cond = { created_at => { '>=' => $since } };
-        $cond->{provider} = $prov_f if $prov_f;
-        $cond->{site_id}  = $site_f if $site_f;
-        $cond->{model}    = { 'like' => "%$model_f%" } if $model_f;
-
-        # Limit rows for UI
-        @logs = $rs->search($cond, { order_by => { -desc => 'created_at' }, rows => 200 })->all;
-
-        # Compute aggregates (simple, in-mem for now; for high volume add SQL GROUP BY)
-        foreach my $log (@logs) {
-            $summary{total_calls}++;
-            $summary{total_tokens} += $log->total_tokens || 0;
-            $summary{total_cost}   += $log->estimated_cost_usd || 0;
-
-            my $p = $log->provider || 'unknown';
-            $summary{by_provider}{$p}{calls}  += 1;
-            $summary{by_provider}{$p}{tokens} += $log->total_tokens || 0;
-            $summary{by_provider}{$p}{cost}   += $log->estimated_cost_usd || 0;
-
-            my $s = $log->site_id || 0;
-            $summary{by_site}{$s}{calls}  += 1;
-            $summary{by_site}{$s}{tokens} += $log->total_tokens || 0;
-            $summary{by_site}{$s}{cost}   += $log->estimated_cost_usd || 0;
-
-            # Track quota info for display
-            if ($log->plan_ai_requests_per_day) {
-                $summary{by_site}{$s}{plan_quota} = $log->plan_ai_requests_per_day;
-            }
-            if (defined $log->within_free_quota) {
-                $summary{by_site}{$s}{free_calls} += ($log->within_free_quota ? 1 : 0);
-                $summary{by_site}{$s}{overage_calls} += ($log->within_free_quota ? 0 : 1);
-            }
-        }
-        $summary{total_cost} = sprintf('%.4f', $summary{total_cost});
+    # Ledger / Golden Data monitor (admin only) — Model::AI2::UsageMonitor.
+    my $ledger_monitor;
+    if ($is_admin) {
+        $ledger_monitor = eval {
+            require Comserv::Model::AI2::UsageMonitor;
+            # Honor the requested window ($days read above); this was pinned to
+            # 14 days, which is why no view could show less than two weeks.
+            Comserv::Model::AI2::UsageMonitor->new->ledger_summary($c, days => $days);
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
+            "Ledger monitor failed: $@") if $@;
     }
 
-    my $usage_m = eval { $c->model('AI')->usage };
-    my $daily_models = [];
-    my $provider_status = {};
-    if ($usage_m) {
-        $daily_models = $usage_m->daily_model_summary($c, $days) || [];
-        $provider_status = $usage_m->snapshot_provider_status($c) || {};
+    # Daily AI Eval Reports summary card (admin only) — full pages on /ai/eval
+    # (Controller::AI::Eval, Model::AI2::EvalReports).
+    my $eval_summary;
+    if ($is_admin) {
+        $eval_summary = eval {
+            require Comserv::Model::AI2::EvalReports;
+            Comserv::Model::AI2::EvalReports->new->latest_summary($c);
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
+            "Eval summary failed: $@") if $@;
+    }
+
+    # Model failover section #fallover (admin only) — AISYSTEM plan §5e.
+    my $fallover;
+    if ($is_admin) {
+        $fallover = eval {
+            require Comserv::Model::AI2::UsageMonitor;
+            Comserv::Model::AI2::UsageMonitor->new->fallover_summary($c, days => $days);
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
+            "Fallover summary failed: $@") if $@;
+    }
+
+    # Health & preflight card #ai-health + admin banners (guard switch,
+    # stale meters) - Model::AI2::UsageMonitor::ai_health.
+    my $ai_health;
+    if ($is_admin) {
+        $ai_health = eval {
+            require Comserv::Model::AI2::UsageMonitor;
+            Comserv::Model::AI2::UsageMonitor->new->ai_health($c, days => $days);
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
+            "ai_health failed: $@") if $@;
     }
 
     # For filter dropdowns: recent distinct providers/sites (lightweight)
-    my @providers = qw(ollama grok supergrok openrouter openai);
+    my @providers = qw(ollama grok supergrok openrouter openai hermes xai-oauth opencode-free);
     my @sites;
+    my $schema = eval { $c->model('DBEncy')->schema };
     if ($is_admin && $schema) {
         eval {
-            @sites = map { { id => $_->id, name => $_->name || $_->site_display_name || 'Site '.$_->id } }
+            @sites = map { { id => $_->id, name => $_->name || 'Site '.$_->id } }
                      $schema->resultset('Site')->search({}, { rows => 50, order_by => 'name' })->all;
         };
     }
 
     $c->stash(
-        template    => 'ai/usage.tt',
-        page_title  => 'AI Usage & Billing Monitor',
-        logs        => \@logs,
-        summary     => \%summary,
-        daily_models=> $daily_models,
-        provider_status => $provider_status,
-        filters     => { days => $days, provider => $prov_f, site_id => $site_f, model => $model_f },
-        providers   => \@providers,
-        sites       => \@sites,
-        is_admin    => $is_admin ? 1 : 0,
-        current_site=> $site_id,
-        username    => $username,
+        template         => 'ai/usage.tt',
+        page_title       => 'AI Usage & Activity Monitor',
+        org              => $org,
+        provider_status  => $provider_status,
+        filters          => { days => $days, provider => $prov_f, site_id => $site_f, model => $model_f },
+        providers        => \@providers,
+        sites            => \@sites,
+        is_admin         => $is_admin ? 1 : 0,
+        current_site     => $site_id,
+        username         => $username,
+        ledger_monitor   => $ledger_monitor,
+        eval_summary     => $eval_summary,
+        fallover         => $fallover,
+        ai_health        => $ai_health,
     );
 }
 
@@ -12564,9 +12958,14 @@ sub grok_balance :Local :Args(0) {
     
     my $user_id = $c->session->{user_id};
     my $site_id = $c->session->{SiteID};
+
+    # Localhost / 192.168.1.0/24 LAN bypass (same trusted-address pattern as
+    # Api.pm system_logs / hardware_metrics). Remote still needs a session.
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
     
     # Early auth check - return clean JSON instead of letting Catalyst redirect or crash
-    unless ($user_id) {
+    unless ($is_local || $user_id) {
         $c->response->body(encode_json({
             success => JSON::false,
             error   => 'You must be logged in to check Grok/xAI balance and usage.',

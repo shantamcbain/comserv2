@@ -13,6 +13,7 @@ use Try::Tiny;
 use JSON;
 use DateTime;
 use Comserv::Util::Logging;
+use Comserv::Util::AppTime;
 
 extends 'Catalyst::Model';
 
@@ -270,13 +271,24 @@ sub detect_create_intent {
 
     return if $p =~ /^(how\s+(do\s+i|to)|what\s+is|explain|where\s+(is|do))\b/i;
     return if $p =~ /\b(top\s*5|list (my |the )?(todos|tasks)|which todo|show (me )?(my )?todos)\b/i;
-    return unless $p =~ /\b(add|create|make|file|track)\b/i
-               && $p =~ /\b(todos?|tasks?|to-dos?|to dos?)\b/i;
+
+    # Negations: "does not create todos", "don't create", "without creating", etc.
+    return if $p =~ /\b(?:does\s+not|doesn'?t|do\s+not|don'?t|never|not|without)\s+(?:creating|create|adding|add|making|make|tracking|track)\b/i;
+
+    # Clear create-todo intent (shared with ChatIntent so widget + editor agree).
+    require Comserv::Model::AI2::ChatIntent;
+    if (Comserv::Model::AI2::ChatIntent::looks_like_helpdesk_ticket_create($p)
+        && !Comserv::Model::AI2::ChatIntent::looks_like_todo_create($p)) {
+        return;
+    }
+    return unless Comserv::Model::AI2::ChatIntent::looks_like_todo_create($p);
 
     my $rest = $p;
     $rest =~ s/^(please\s+)//i;
     $rest =~ s/^(can you|could you|would you|will you)\s+(please\s+)?//i;
-    $rest =~ s/^(add|create|make|file|track)\s+(me\s+)?(a\s+|an\s+|new\s+)*((todo|task|to-do|to do)s?)(\s+item)?\s*//i;
+    $rest =~ s/^(add|create|make|track|log)\s+(me\s+)?(a\s+|an\s+|new\s+)*((todo|task|to-do|to do)s?)(\s+item)?\s*//i;
+    $rest =~ s/^(need|want)\s+(a\s+|an\s+|new\s+)*((todo|task|to-do|to do)s?)\s*(for|to|about)?\s*//i;
+    $rest =~ s/^put\s+(this|it|that)\s+on\s+(the\s+)?(todo|task)\s+list\s*(:\s*|-+\s*)?//i;
     $rest =~ s/^(to\s+the\s+|to\s+|for\s+the\s+|for\s+|:\s*|-\s*)//i;
     $rest =~ s/\s+/ /g;
     $rest =~ s/^\s+|\s+$//g;
@@ -333,13 +345,13 @@ sub enrich_parse {
             $due = $today; push @inferred, "due_date=$due from 'today'";
         }
         elsif ($raw =~ /\btomorrow\b/i) {
-            $due = DateTime->now->add(days => 1)->ymd; push @inferred, "due_date=$due from 'tomorrow'";
+            $due = Comserv::Util::AppTime->now_dt->add(days => 1)->ymd; push @inferred, "due_date=$due from 'tomorrow'";
         }
         elsif ($raw =~ /\bthis week\b/i) {
-            $due = DateTime->now->add(days => 7)->ymd; push @inferred, "due_date=$due from 'this week'";
+            $due = Comserv::Util::AppTime->now_dt->add(days => 7)->ymd; push @inferred, "due_date=$due from 'this week'";
         }
         else {
-            $due = DateTime->now->add(days => 7)->ymd;
+            $due = Comserv::Util::AppTime->now_dt->add(days => 7)->ymd;
             push @inferred, "due_date=$due default (+7 days; not specified)";
         }
         $intent->{due_date} = $due;
@@ -371,6 +383,41 @@ sub subject_needs_clarify {
     return 1 unless defined $subject && length $subject >= 3;
     return 1 if $subject =~ /^(this|that|it|something|stuff|one|a thing)\b/i;
     return 0;
+}
+
+# todo.subject is varchar(255). Chat often dumps the whole request into subject,
+# which raised Application Error Audit #2344 (Data too long for column 'subject').
+# Keep a short title on subject; move overflow into description (text).
+use constant SUBJECT_MAX => 255;
+
+sub normalize_subject_description {
+    my ($self, $subject, $description) = @_;
+    $subject = defined $subject ? $subject : '';
+    $description = defined $description ? $description : '';
+    $subject =~ s/^\s+|\s+$//g;
+    $description =~ s/^\s+|\s+$//g;
+    return ($subject, $description) unless length $subject > SUBJECT_MAX;
+
+    my $max = SUBJECT_MAX;
+    my $head = substr($subject, 0, $max);
+    # Prefer a clean break on whitespace/punctuation near the end of the head.
+    if ($head =~ /^(.*[\s,;:\-\.])\S*$/s && length($1) >= int($max * 0.55)) {
+        $head = $1;
+        $head =~ s/\s+$//;
+    }
+    my $overflow = substr($subject, length($head));
+    $overflow =~ s/^\s+//;
+    $subject = $head;
+    if (length $overflow) {
+        if (length $description) {
+            $description = $overflow . "\n\n" . $description
+                unless index($description, $overflow) == 0;
+        }
+        else {
+            $description = $overflow;
+        }
+    }
+    return ($subject, $description);
 }
 
 # Short-circuit /ai2/chat when the user asked to create a todo.
@@ -458,12 +505,12 @@ sub chat_contract {
     return <<"END";
 TODO CREATION + TIME TRACKING (SiteName=$sitename):
 When the user asks to add, create, or track a todo/task:
-1. Extract subject (required), optional description, due_date (YYYY-MM-DD), priority (1=highest … 5=lowest, default 3).
+1. Extract a SHORT subject (required, max 255 chars — a title, not the whole message), optional description (put long detail here), due_date (YYYY-MM-DD), priority (1=highest … 5=lowest, default 3).
 2. If they named a project, put it in params.project_name or project_code or project_id. Prefer a sub-project when both a parent and a child match.
 3. Emit exactly one ACTION on its own line (do not invent a project_id if you are unsure):
 [ACTION: {"action":"create_todo","params":{"subject":"...","description":"...","project_name":"...","due_date":"YYYY-MM-DD","priority":3}}]
 4. The server matches against $sitename projects. If none match it will ASK the user whether to create a new project — do not create a project yourself unless they already said yes.
-5. Do not emit create_todo unless the user asked to track/add/create a todo.
+5. Do not emit create_todo unless the user asked to track/add/create a todo THIS message. Mentions of todos in analysis/plan text are not a create request.
 
 TIME TRACKING (start/stop work on an EXISTING todo):
 - "Start/track/work on todo #N" → [ACTION: {"action":"start_todo","params":{"todo_id":N}}]
@@ -475,7 +522,7 @@ $list
 END
 }
 
-sub _today { DateTime->now->ymd }
+sub _today { Comserv::Util::AppTime->today_utc_ymd }
 
 sub _status_text {
     my ($raw) = @_;
@@ -493,8 +540,8 @@ sub _insert_project {
     my $name     = $args{name} or return (undef, 'name required');
     my $user     = $args{user} || $c->session->{username} || 'ai';
     my $today    = $self->_today;
-    my $due      = $args{due_date} || DateTime->now->add(months => 1)->ymd;
-    $due = DateTime->now->add(months => 1)->ymd unless $due =~ /^\d{4}-\d{2}-\d{2}$/;
+    my $due      = $args{due_date} || Comserv::Util::AppTime->now_dt->add(months => 1)->ymd;
+    $due = Comserv::Util::AppTime->now_dt->add(months => 1)->ymd unless $due =~ /^\d{4}-\d{2}-\d{2}$/;
     my $roles    = $c->session->{roles} || [];
     my $group    = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : 'user';
     my $code     = $args{project_code} || lc($name);
@@ -542,11 +589,15 @@ sub _insert_todo {
     my $user     = $args{user} || $c->session->{username} || 'ai';
     my $user_id  = $c->session->{user_id} || 1;
     my $today    = $self->_today;
-    my $due      = $args{due_date} || DateTime->now->add(days => 7)->ymd;
-    $due = DateTime->now->add(days => 7)->ymd unless $due =~ /^\d{4}-\d{2}-\d{2}$/;
+    my $due      = $args{due_date} || Comserv::Util::AppTime->now_dt->add(days => 7)->ymd;
+    $due = Comserv::Util::AppTime->now_dt->add(days => 7)->ymd unless $due =~ /^\d{4}-\d{2}-\d{2}$/;
     my $roles    = $c->session->{roles} || [];
     my $group    = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : 'user';
     my $code     = $project->{project_code} || '';
+    # Defense in depth: never INSERT a subject longer than the column
+    # (Application Error Audit #2344 — Data too long for column 'subject').
+    my $description = $args{description} // '';
+    ($subject, $description) = $self->normalize_subject_description($subject, $description);
     my $row;
     eval {
         $row = $schema->resultset('Todo')->create({
@@ -555,7 +606,7 @@ sub _insert_todo {
             parent_todo         => '',
             due_date            => $due,
             subject             => $subject,
-            description         => $args{description} // '',
+            description         => $description,
             estimated_man_hours => 0,
             comments            => $args{comments} // '',
             reporter            => $user,
@@ -587,7 +638,7 @@ sub _insert_todo {
                 parent_todo         => '',
                 due_date            => $due,
                 subject             => $subject,
-                description         => $args{description} // '',
+                description         => $description,
                 estimated_man_hours => 0,
                 comments            => $args{comments} // '',
                 reporter            => $user,
@@ -619,9 +670,13 @@ sub _insert_todo {
 sub _draft_from_params {
     my ($self, $params) = @_;
     $params ||= {};
+    my ($subject, $description) = $self->normalize_subject_description(
+        $params->{subject} || '',
+        $params->{description} || '',
+    );
     return {
-        subject        => $params->{subject} || '',
-        description    => $params->{description} || '',
+        subject        => $subject,
+        description    => $description,
         due_date       => $params->{due_date} || '',
         priority       => $params->{priority} // 3,
         status         => $params->{status} // 1,
@@ -733,13 +788,20 @@ sub create_from_params {
         model       => $params->{rank_model},
     );
 
+    # #2218: after WRITE, Scheduler proposes queue-aware start. Advisory only —
+    # never bulk-reschedule; scheduled_date (Focus Queue) stays today.
+    my $sched_note = $self->schedule_handoff($c, todo_id => $new_id);
+
     my $message = "Todo #$new_id created on $sitename / $project->{name}";
     if ($rank_note && $rank_note->{suggestion}) {
         $message .= "\nTodoRank agent reviewed it (dry-run): " . $rank_note->{suggestion}
-                 .  " — say \"apply rank suggestions\" to write them.";
+                 .  " - say \"apply rank suggestions\" to write them.";
     }
     elsif ($rank_note && $rank_note->{error}) {
         $message .= "\n(TodoRank review unavailable: $rank_note->{error})";
+    }
+    if ($sched_note && $sched_note->{suggestion}) {
+        $message .= "\n" . $sched_note->{suggestion};
     }
 
     return {
@@ -756,6 +818,7 @@ sub create_from_params {
         similar      => $similar,
         sitename_mismatch => $match->{sitename_mismatch} ? JSON::true : JSON::false,
         rank_review  => $rank_note,
+        schedule_review => $sched_note,
     };
 }
 
@@ -805,6 +868,43 @@ sub rank_handoff {
     my $sugg = @parts ? ucfirst(join(', ', @parts)) : '';
     $sugg .= " — $prop->{reason}" if $prop->{reason};
     return { suggestion => $sugg, proposals => $prop };
+}
+
+# #2218: queue-aware start preview after create. Does not write start_date or
+# scheduled_date. Failure is NON-FATAL (caller logs via message omit).
+sub schedule_handoff {
+    my ($self, $c, %args) = @_;
+    my $todo_id = $args{todo_id} or return { skipped => 'no todo_id' };
+    my $sched = eval {
+        require Comserv::Model::AI2::Scheduler;
+        my $m = eval { $c->model('AI2::Scheduler') };
+        $m = Comserv::Model::AI2::Scheduler->new if !$m || !ref $m;
+        $m;
+    };
+    unless ($sched) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+            'schedule_handoff', "Scheduler unavailable: $@");
+        return { error => 'Scheduler unavailable' };
+    }
+    my $open = eval { $sched->_open_queue($c) } || [];
+    if ($@) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+            'schedule_handoff', "open queue failed: $@");
+        return { error => 'could not read open queue' };
+    }
+    my $proposed = eval { $sched->queue_tail_date($open) };
+    if ($@ || !$proposed) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+            'schedule_handoff', "queue_tail_date failed: $@");
+        return { error => 'could not propose start' };
+    }
+    return {
+        suggestion =>
+            "Queue-aware start would be $proposed (day after latest open date). "
+          . "scheduled_date stays today for Focus Queue. "
+          . "Say \"apply schedule for todo #$todo_id\" to write that one row - never bulk.",
+        proposed_start => $proposed,
+    };
 }
 
 sub resolve_from_params {

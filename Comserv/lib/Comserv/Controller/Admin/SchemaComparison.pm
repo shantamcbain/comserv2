@@ -17,6 +17,7 @@ use File::Path qw(make_path);
 use File::Spec;
 use File::Find;
 use Comserv::Util::Schema::ResultParser;
+use DBI;
 
 sub begin :Private {
     my ($self, $c) = @_;
@@ -73,8 +74,234 @@ sub _schema_to_model_name {
     return $schema_name eq 'forager' ? 'DBForager' : 'DBEncy';
 }
 
-# Get a fresh DB connection via RemoteDB — avoids stale cached model handles
+# True when config (or bare type string) is PostgreSQL.
+# Schema-compare must not run MySQL-only SQL (SELECT DATABASE(), SHOW TABLES, …)
+# on a Pg handle — that is error-audit #2322 (function database() does not exist).
+sub _is_postgresql {
+    my ($self, $cfg_or_type) = @_;
+    my $t = ref($cfg_or_type) eq 'HASH'
+        ? ($cfg_or_type->{db_type} // $cfg_or_type->{type} // '')
+        : ($cfg_or_type // '');
+    return 1 if lc($t) =~ /^(postgresql|postgres|pg)$/;
+    return 0;
+}
+
+# current catalog name — DATABASE() is MySQL-only; PG uses current_database().
+sub _dbh_current_database {
+    my ($self, $dbh, $is_pg) = @_;
+    return undef unless $dbh;
+    my $sql = $is_pg ? 'SELECT current_database()' : 'SELECT DATABASE()';
+    my ($name) = eval { $dbh->selectrow_array($sql) };
+    return $name;
+}
+
+# List base tables. MySQL: SHOW TABLES. PG: pg_tables (exclude system schemas).
+sub _dbh_list_tables {
+    my ($self, $dbh, $is_pg) = @_;
+    return () unless $dbh;
+    my @tables;
+    if ($is_pg) {
+        my $sth = $dbh->prepare(q{
+            SELECT tablename
+              FROM pg_catalog.pg_tables
+             WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+             ORDER BY 1
+        });
+        $sth->execute();
+        while (my ($n) = $sth->fetchrow_array) {
+            push @tables, $n;
+        }
+        $sth->finish;
+    }
+    else {
+        my $sth = $dbh->prepare('SHOW TABLES');
+        $sth->execute();
+        while (my ($n) = $sth->fetchrow_array) {
+            push @tables, $n;
+        }
+        $sth->finish;
+    }
+    return @tables;
+}
+
+# Approximate row_count + size_kb for one table.
+# MySQL: information_schema.tables (table_schema = catalog).
+# PG: pg_class.reltuples + pg_total_relation_size (schemaname public preferred).
+sub _dbh_table_stats {
+    my ($self, $dbh, $db_name, $tname, $is_pg) = @_;
+    my ($row_count, $size_kb) = (0, 0);
+    return ($row_count, $size_kb) unless $dbh && defined $tname && length $tname;
+    if ($is_pg) {
+        eval {
+            my $sth = $dbh->prepare(q{
+                SELECT COALESCE(c.reltuples, 0)::bigint AS row_est,
+                       ROUND(pg_total_relation_size(
+                           quote_ident(n.nspname) || '.' || quote_ident(c.relname)
+                       ) / 1024.0, 1) AS size_kb
+                  FROM pg_catalog.pg_class c
+                  JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                 WHERE c.relkind = 'r'
+                   AND c.relname = ?
+                   AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+                 ORDER BY CASE WHEN n.nspname = 'public' THEN 0 ELSE 1 END
+                 LIMIT 1
+            });
+            $sth->execute($tname);
+            ($row_count, $size_kb) = $sth->fetchrow_array;
+            $sth->finish;
+        };
+    }
+    else {
+        eval {
+            my $sth = $dbh->prepare(q{
+                SELECT table_rows,
+                       ROUND((data_length + index_length) / 1024, 1) AS size_kb
+                  FROM information_schema.tables
+                 WHERE table_schema = ? AND table_name = ?
+            });
+            $sth->execute($db_name, $tname);
+            ($row_count, $size_kb) = $sth->fetchrow_array;
+            $sth->finish;
+        };
+    }
+    return ($row_count || 0, $size_kb || 0);
+}
+
+# Catalog-wide table count + rough size (server card / db list).
+sub _dbh_catalog_stats {
+    my ($self, $dbh, $db_name, $is_pg) = @_;
+    my ($table_count, $size_kb) = (0, 0);
+    return ($table_count, $size_kb) unless $dbh;
+    if ($is_pg) {
+        eval {
+            my $sth = $dbh->prepare(q{
+                SELECT COUNT(*)
+                  FROM pg_catalog.pg_tables
+                 WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+            });
+            $sth->execute();
+            ($table_count) = $sth->fetchrow_array;
+            $sth->finish;
+
+            $sth = $dbh->prepare(q{
+                SELECT ROUND(COALESCE(SUM(pg_total_relation_size(
+                           quote_ident(n.nspname) || '.' || quote_ident(c.relname)
+                       )), 0) / 1024.0, 1)
+                  FROM pg_catalog.pg_class c
+                  JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                 WHERE c.relkind = 'r'
+                   AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+            });
+            $sth->execute();
+            ($size_kb) = $sth->fetchrow_array;
+            $sth->finish;
+        };
+    }
+    else {
+        eval {
+            my $sth = $dbh->prepare(
+                'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ?'
+            );
+            $sth->execute($db_name);
+            ($table_count) = $sth->fetchrow_array;
+            $sth->finish;
+
+            $sth = $dbh->prepare(q{
+                SELECT ROUND(SUM(data_length + index_length) / 1024, 1)
+                  FROM information_schema.tables
+                 WHERE table_schema = ?
+            });
+            $sth->execute($db_name);
+            ($size_kb) = $sth->fetchrow_array;
+            $sth->finish;
+        };
+    }
+    return ($table_count || 0, $size_kb || 0);
+}
+
+# Column definitions for field compare. MySQL SHOW FULL COLUMNS;
+# PG information_schema.columns (+ udt_name).
+sub _dbh_list_columns {
+    my ($self, $dbh, $table_name, $is_pg) = @_;
+    my %db_columns;
+    return %db_columns unless $dbh && defined $table_name && length $table_name;
+    if ($is_pg) {
+        eval {
+            my $sth = $dbh->prepare(q{
+                SELECT column_name,
+                       udt_name,
+                       character_maximum_length,
+                       numeric_precision,
+                       numeric_scale,
+                       is_nullable,
+                       column_default
+                  FROM information_schema.columns
+                 WHERE table_schema = 'public'
+                   AND table_name = ?
+                 ORDER BY ordinal_position
+            });
+            $sth->execute($table_name);
+            while (my $row = $sth->fetchrow_hashref) {
+                my $dt = $row->{udt_name} // '';
+                my $size = '';
+                if (defined $row->{character_maximum_length}) {
+                    $size = '(' . $row->{character_maximum_length} . ')';
+                }
+                elsif (defined $row->{numeric_precision}) {
+                    $size = defined $row->{numeric_scale}
+                        ? '(' . $row->{numeric_precision} . ',' . $row->{numeric_scale} . ')'
+                        : '(' . $row->{numeric_precision} . ')';
+                }
+                my $def = $row->{column_default};
+                # strip PG cast suffix like 'foo'::character varying
+                $def =~ s/::[\w\s]+$// if defined $def;
+                $db_columns{ lc($row->{column_name}) } = {
+                    name          => $row->{column_name},
+                    data_type     => $dt,
+                    size          => $size,
+                    is_nullable   => ($row->{is_nullable} // 'YES') eq 'NO' ? 'NO' : 'YES',
+                    default_value => $def,
+                    extra         => '',
+                    comment       => '',
+                };
+            }
+            $sth->finish;
+        };
+    }
+    else {
+        eval {
+            my $qt = $dbh->quote_identifier($table_name);
+            my $sth = $dbh->prepare("SHOW FULL COLUMNS FROM $qt");
+            $sth->execute();
+            while (my $row = $sth->fetchrow_hashref) {
+                my $type_raw = $row->{Type} // '';
+                my ($data_type, $size) = $type_raw =~ /^(\w+)(\([^)]+\))?/;
+                $size //= '';
+                if ($data_type && $data_type =~ /^(enum|set)$/i) {
+                    $data_type = $type_raw;
+                    $size      = '';
+                }
+                $db_columns{ lc($row->{Field}) } = {
+                    name          => $row->{Field},
+                    data_type     => $data_type // $type_raw,
+                    size          => $size,
+                    is_nullable   => ($row->{Null} // 'YES') eq 'NO' ? 'NO' : 'YES',
+                    default_value => $row->{Default},
+                    extra         => $row->{Extra} // '',
+                    comment       => $row->{Comment} // '',
+                };
+            }
+            $sth->finish;
+        };
+    }
+    return %db_columns;
+}
+
 # Get a fresh DB connection via RemoteDB — uses highest-priority connection for the selected database
+# Audit #2378: never DBI-connect as username '' (DatabaseCredentials is often
+# missing; the old die interpolated "admin user ''"). Prefer a named *_admin
+# JSON slot / env admin user via a direct DBI connect so RemoteDB::_load_config
+# cannot discard an in-memory username override.
 sub _get_fresh_dbh {
     my ($self, $c, $database) = @_;
     require Comserv::Model::RemoteDB;
@@ -82,13 +309,11 @@ sub _get_fresh_dbh {
     $remote_db->config({});
     my $all_conns = $remote_db->get_all_connections();
 
-    # Filter to only connections matching this database name exactly
     my @group_conns = grep {
         my $cfg = $all_conns->{$_}{config};
         (lc($cfg->{database} // '') eq lc($database))
     } keys %$all_conns;
 
-    # Sort by priority (lower = higher priority)
     @group_conns = sort {
         ($all_conns->{$a}{priority} // 999) <=> ($all_conns->{$b}{priority} // 999)
         || $a cmp $b
@@ -98,45 +323,125 @@ sub _get_fresh_dbh {
         die "No connection found for database '$database'";
     }
 
-    # DDL (CREATE/DROP/ALTER) must run as the admin DB user (comserv_admin), so it
-    # can CREATE/DROP tables. Prefer the env-provided admin credentials; fall back
-    # to the highest-priority connection's own credentials if admin is not set.
-    my $admin_user = eval { Comserv::Util::DatabaseCredentials->admin_user };
-    my $admin_pass = eval { Comserv::Util::DatabaseCredentials->admin_password };
-    my $want_admin = ($admin_user && $admin_pass);
+    my ($admin_user, $admin_pass, $admin_src) =
+        $self->_resolve_admin_creds($all_conns, $database);
 
-    my $dbh;
-    for my $conn_name (@group_conns) {
-        my $user = $want_admin ? $admin_user : $all_conns->{$conn_name}{config}{username};
-        my $pass = $want_admin ? $admin_pass : $all_conns->{$conn_name}{config}{password};
-
-        # Temporarily override the connection's credentials so get_connection uses
-        # the admin user, then restore (get_connection reads from $self->config).
-        my $saved_cfg = $all_conns->{$conn_name}{config};
-        my $orig_user = $saved_cfg->{username};
-        my $orig_pass = $saved_cfg->{password};
-        $saved_cfg->{username} = $user;
-        $saved_cfg->{password} = $pass;
-        $remote_db->config($all_conns);
-
-        $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
-
-        # Restore original credentials immediately.
-        $saved_cfg->{username} = $orig_user;
-        $saved_cfg->{password} = $orig_pass;
-        $remote_db->config($all_conns);
-
-        if ($dbh) {
-            $c->stash->{schema_compare_ddl_user} = $user;
-            last;
+    if ($admin_user && $admin_pass) {
+        for my $conn_name (@group_conns) {
+            my $cfg = $all_conns->{$conn_name}{config} || {};
+            my $dbh = $self->_dbi_connect_as($cfg, $admin_user, $admin_pass);
+            if ($dbh) {
+                $c->stash->{schema_compare_ddl_user}   = $admin_user;
+                $c->stash->{schema_compare_ddl_source} = $admin_src;
+                $self->logging->log_with_details(
+                    $c, 'info', __FILE__, __LINE__, '_get_fresh_dbh',
+                    "DDL connect to '$database' as '$admin_user' via $admin_src ($conn_name)"
+                );
+                return $dbh;
+            }
         }
+        $self->logging->log_with_details(
+            $c, 'warn', __FILE__, __LINE__, '_get_fresh_dbh',
+            "Admin login '$admin_user' ($admin_src) failed for '$database'; falling back to ordinary connections"
+        );
     }
+    else {
+        $self->logging->log_with_details(
+            $c, 'warn', __FILE__, __LINE__, '_get_fresh_dbh',
+            "No admin DB user configured for '$database' (DatabaseCredentials/env/JSON *_admin empty); using ordinary connection"
+        );
+    }
+
+    # Read paths (DESCRIBE / information_schema) and last-resort DDL: any live slot.
+    my ($dbh, $used_conn) = $self->_pick_live_connection(
+        $remote_db, $all_conns, \@group_conns, $database
+    );
 
     unless ($dbh) {
-        die "Failed to connect to database '$database' for DDL via admin user '$admin_user': $@";
+        my $tried = join(', ', map {
+            sprintf('%s(%s)', $_, ($all_conns->{$_}{config}{username} // '?'))
+        } @group_conns);
+        my $admin_note = ($admin_user && $admin_pass)
+            ? "admin '$admin_user' via $admin_src also failed"
+            : 'no non-empty admin user (do not connect as \'\')';
+        die "Failed to connect to database '$database' for schema-compare. "
+          . "$admin_note. Tried connections (priority order): $tried. "
+          . "Last DBI error: " . ($remote_db->last_connection_error // 'none recorded');
     }
 
+    $c->stash->{schema_compare_ddl_user} =
+        $all_conns->{$used_conn}{config}{username} // '';
+    $c->stash->{schema_compare_ddl_source} = "remotedb:$used_conn";
+
     return $dbh;
+}
+
+# Returns ($user, $pass, $source). Never returns a defined user with empty name.
+sub _resolve_admin_creds {
+    my ($self, $all_conns, $database) = @_;
+
+    my $u = eval { Comserv::Util::DatabaseCredentials->admin_user };
+    my $p = eval { Comserv::Util::DatabaseCredentials->admin_password };
+    $u = defined $u ? $u : '';
+    $p = defined $p ? $p : '';
+    $u =~ s/^\s+|\s+$//g;
+    if ($u ne '' && $p ne '') {
+        return ($u, $p, 'DatabaseCredentials');
+    }
+
+    $u = $ENV{COMSERV_DB_ADMIN_USER} // '';
+    $p = $ENV{COMSERV_DB_ADMIN_PASS} // $ENV{COMSERV_DB_ADMIN_PASSWORD} // '';
+    $u =~ s/^\s+|\s+$//g;
+    if ($u ne '' && $p ne '') {
+        return ($u, $p, 'env');
+    }
+
+    my @admin_slots = grep {
+        my $cfg = $all_conns->{$_}{config} || {};
+        (lc($cfg->{database} // '') eq lc($database // ''))
+        && (
+            ($_ =~ /_admin$/i)
+            || lc($cfg->{username} // '') eq 'comserv_admin'
+        )
+        && length($cfg->{username} // '')
+        && length($cfg->{password} // '')
+    } keys %$all_conns;
+
+    @admin_slots = sort {
+        ($all_conns->{$a}{priority} // 999) <=> ($all_conns->{$b}{priority} // 999)
+        || $a cmp $b
+    } @admin_slots;
+
+    if (@admin_slots) {
+        my $cfg = $all_conns->{ $admin_slots[0] }{config};
+        return ($cfg->{username}, $cfg->{password}, "json:$admin_slots[0]");
+    }
+
+    return ('', '', 'none');
+}
+
+sub _dbi_connect_as {
+    my ($self, $cfg, $user, $pass) = @_;
+    return unless $cfg && $user && length $user;
+    $pass = '' unless defined $pass;
+
+    my $host = $cfg->{host} || '127.0.0.1';
+    my $port = $cfg->{port} || ($self->_is_postgresql($cfg) ? 5432 : 3306);
+    my $db   = $cfg->{database} || '';
+    return unless $db;
+
+    my $dsn;
+    my %attr = (RaiseError => 0, PrintError => 0, AutoCommit => 1);
+    if ($self->_is_postgresql($cfg)) {
+        $dsn = "dbi:Pg:dbname=$db;host=$host;port=$port";
+        $attr{pg_connect_timeout} = 5;
+    }
+    else {
+        $dsn = "dbi:mysql:database=$db;host=$host;port=$port";
+        $attr{mysql_connect_timeout} = 5;
+    }
+
+    return DBI->connect($dsn, $user, $pass, \%attr);
 }
 
 sub _write_result_file_safe {
@@ -801,6 +1106,136 @@ sub create_result_from_table :Path('/schema-comparison/create_result_from_table'
     $c->forward('View::JSON');
 }
 
+# Live schema objects freeze at process start. Nested Result classes
+# (HealthKitchen::*, Accounting::*) can be require'd but still missing from
+# $schema->source() until restart. Attach them on this instance so Create
+# Table works without bouncing :4006.
+sub _ensure_result_source {
+    my ($self, $c, $schema, $result_path, $class_name) = @_;
+    my @try = ($result_path);
+    (my $short = $result_path) =~ s/.*:://;
+    push @try, $short if length $short && $short ne $result_path;
+
+    for my $name (@try) {
+        my $src = eval { $schema->source($name) };
+        return $src if $src;
+    }
+
+    die "$class_name has no result_source_instance"
+        unless $class_name->can('result_source_instance');
+    my $rsi = $class_name->result_source_instance;
+    $schema->register_source($result_path, $rsi);
+    if (length $short && $short ne $result_path) {
+        eval { $schema->register_source($short, $rsi) };
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_ensure_result_source',
+        "Registered missing source '$result_path' from $class_name on live schema");
+    return eval { $schema->source($result_path) };
+}
+
+# A live schema freezes at process start. Create Table used to call
+# $schema->deployment_statements, which walks every source, then fell through
+# to $schema->deploy(), which deploys the whole schema. One unregistered
+# relationship (Can't find source for AiModelPolicyHistory) aborted the
+# request. Generate SQL for this source only. If source() names a missing
+# class, register it on this instance and retry. Never deploy the schema.
+sub _create_sql_for_source {
+    my ($self, $c, $schema, $namespace, $result_path, $class_name, $table_name) = @_;
+
+    my $source = $self->_ensure_result_source($c, $schema, $result_path, $class_name);
+    die "Could not register source '$result_path' from $class_name" unless $source;
+    $self->_ensure_related_sources($c, $schema, $namespace, $source);
+
+    require SQL::Translator;
+    my %tried;
+    my $last_err = '';
+    for my $attempt (1 .. 8) {
+        my $moniker = eval { $source->source_name } || $result_path;
+        my $tr = SQL::Translator->new(
+            parser => 'SQL::Translator::Parser::DBIx::Class',
+            parser_args => {
+                dbic_schema => $schema,
+                sources     => [$moniker],
+            },
+            producer => 'MySQL',
+            producer_args => { no_comments => 1 },
+        );
+        my $sql = eval { $tr->translate };
+        my $err = $@ || '';
+        $err ||= $tr->error if !$sql;
+        if ($sql && $sql =~ /CREATE TABLE\s+`?\Q$table_name\E`?/i) {
+            return $sql;
+        }
+        $last_err = $err || "SQL::Translator produced no CREATE TABLE for '$table_name'";
+        my ($missing) = $last_err =~ /Can't find source for (\S+)/;
+        last unless $missing;
+        $missing =~ s/['"]//g;
+        $missing =~ s/\s+at\b.*//s;
+        die "Could not register missing source '$missing': $last_err" if $tried{$missing}++;
+        my $ok = $self->_register_result_class($c, $schema, $namespace, $missing);
+        die "Could not register missing source '$missing': $last_err" unless $ok;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_sql_for_source',
+            "Registered missing source '$missing' and retrying CREATE for '$table_name'");
+        $source = eval { $schema->source($moniker) } || $source;
+    }
+    die $last_err;
+}
+
+# Load and attach a Result class the live schema does not know yet.
+# $source_name may be a moniker (AiModelPolicy) or a full class name.
+# Returns 1 on success. Does not die — the caller decides.
+sub _register_result_class {
+    my ($self, $c, $schema, $namespace, $source_name) = @_;
+    return 1 if eval { $schema->source($source_name) };
+    return 0 unless defined $source_name && $source_name =~ /\A[A-Za-z0-9:]+\z/;
+
+    my $class = $source_name;
+    unless ($class =~ /^Comserv::/) {
+        $class = "Comserv::Model::Schema::${namespace}::Result::${class}";
+    }
+    my $load_err = do { local $@; eval "require $class"; $@ };
+    if ($load_err) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_register_result_class',
+            "Could not load Result class for source '$source_name': $load_err");
+        return 0;
+    }
+    (my $path = $class) =~ s/^Comserv::Model::Schema::\Q$namespace\E::Result:://;
+    my $src = eval { $self->_ensure_result_source($c, $schema, $path, $class) };
+    if ($@ || !$src) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_register_result_class',
+            "Could not register source '$source_name': " . ($@ || 'no source'));
+        return 0;
+    }
+    # _ensure_result_source already attaches the moniker. DBIC also indexes the
+    # class name. A second register_source replaces that and warns.
+    return 1 if eval { $schema->source($source_name) };
+    eval { $schema->register_source($source_name, $src) };
+    return eval { $schema->source($source_name) } ? 1 : 0;
+}
+
+# Register belongs_to / has_many targets so a frozen schema can resolve them.
+# A missing cousin class is a warning, not a failed CREATE — FKs are stripped.
+sub _ensure_related_sources {
+    my ($self, $c, $schema, $namespace, $source, $seen) = @_;
+    $seen ||= {};
+    return unless $source;
+    my $name = eval { $source->source_name } || return;
+    return if $seen->{$name}++;
+    for my $rel (eval { $source->relationships }) {
+        my $info = eval { $source->relationship_info($rel) } || next;
+        my $rel_class = $info->{class} || next;
+        next if $seen->{$rel_class};
+        my $rel_src = eval { $source->related_source($rel) };
+        if (!$rel_src) {
+            $self->_register_result_class($c, $schema, $namespace, $rel_class);
+            $rel_src = eval { $schema->source($rel_class) };
+            (my $short = $rel_class) =~ s/.*:://;
+            $rel_src ||= eval { $schema->source($short) };
+        }
+        $self->_ensure_related_sources($c, $schema, $namespace, $rel_src, $seen) if $rel_src;
+    }
+}
+
 sub create_table_from_result :Path('/schema-comparison/create_table_from_result') :Args(0) {
     my ($self, $c) = @_;
     
@@ -924,34 +1359,18 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         }
 
         if (!$table_exists) {
-            # Create the table using deployment_statements
+            # SQL for this table only. Do not call deployment_statements or deploy.
             try {
-                my $source = $schema->source($result_path);
-                unless ($source) {
-                    die "Could not find source '$result_path' in schema";
-                }
-
-                my @statements = $schema->deployment_statements('MySQL');
-                my @table_statements = grep { /CREATE TABLE\s+`?\Q$table_name\E`?/i } @statements;
-
-                if (@table_statements) {
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=0');
-                    foreach my $statement (@table_statements) {
-                        ($statement) = ($statement =~ /(CREATE\s+TABLE\b.*)/si);
-                        next unless $statement;
-                        my $safe_statement = _strip_fk_constraints($statement);
-                        $dbh->do($safe_statement);
-                    }
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=1');
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                        "Successfully created table '$table_name' from Result class '$class_name'");
-                } else {
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=0');
-                    $schema->deploy();
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=1');
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                        "Deployed table '$table_name' via schema->deploy()");
-                }
+                my $sql = $self->_create_sql_for_source(
+                    $c, $schema, $namespace, $result_path, $class_name, $table_name);
+                my ($statement) = ($sql =~ /(CREATE\s+TABLE\s+`?\Q$table_name\E`?\b.*)/si);
+                die "Could not isolate CREATE TABLE for '$table_name'" unless $statement;
+                $dbh->do('SET FOREIGN_KEY_CHECKS=0');
+                my $safe_statement = _strip_fk_constraints($statement);
+                $dbh->do($safe_statement);
+                $dbh->do('SET FOREIGN_KEY_CHECKS=1');
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
+                    "Successfully created table '$table_name' from Result class '$class_name'");
             } catch {
                 my $deploy_error = $_;
                 eval { $dbh->do('SET FOREIGN_KEY_CHECKS=1') };
@@ -1240,12 +1659,27 @@ sub update_result_field_from_table {
         my $list_str = join("', '", @{$table_field_info->{enum_list}});
         $new_field_def .= "\n        extra => { list => ['$list_str'] },";
     }
-    # Size may be a scalar (e.g. 255) or an array ref (e.g. [10, 0]) from the parser.
+    # Size may be a scalar (e.g. 255), an array ref (e.g. [10, 0]), or — for
+    # DECIMAL/NUMERIC columns — the string "10,2" as returned by the DB parser
+    # from a "decimal(10,2)" Type. The string form used to fall through to the
+    # plain-scalar branch and emit "size => 10,2", which is a bare list: it
+    # parses (so perl -c passes) but silently sets size to 10 with a stray 2,
+    # losing the scale. Normalize the "p,q" form into an array ref.
     if (my $sz = $table_field_info->{size}) {
         if (ref($sz) eq 'ARRAY') {
             $new_field_def .= "\n        size => [" . join(', ', @$sz) . "],";
-        } else {
+        }
+        elsif (!ref($sz) && $sz =~ /^\s*(\d+)\s*,\s*(\d+)\s*$/) {
+            $new_field_def .= "\n        size => [$1, $2],";
+        }
+        elsif (!ref($sz) && $sz =~ /^\s*\d+\s*$/) {
             $new_field_def .= "\n        size => $sz,";
+        }
+        else {
+            # Unrecognized shape — quote it so it can never emit bare-list syntax.
+            my $safe = $sz;
+            $safe =~ s/'/\\'/g;
+            $new_field_def .= "\n        size => '$safe',";
         }
     }
     $new_field_def .= "\n        is_nullable => " . ($table_field_info->{is_nullable} ? 1 : 0) . ",";
@@ -1257,16 +1691,22 @@ sub update_result_field_from_table {
     }
     $new_field_def .= "\n    }";
 
-    # --- Safe, bracket-aware field replacement ---------------------------------
-    # The old approach used a non-greedy /ms regex across the entire add_columns
-    # block; on large multi-field tables it could match the wrong field or
-    # backtrack badly and corrupt the file (which then wedged the worker and
-    # surfaced to the user as a bare "NetworkError"). We now locate the exact
-    # "$field_name => { ... }" block by counting braces, rebuild ONLY that block,
-    # and leave every other field untouched.
+    # --- Safe, bracket-aware field replacement / insertion ---------------------
+    # Two cases:
+    #   * field already present  -> rebuild ONLY that block (see below).
+    #   * field NOT present      -> INSERT it into the add_columns block.
+    # The second case is the "Add to Result" flow; previously it fell through to
+    # the replace-only path, which returned undef for a missing field and died
+    # with "Could not locate field ... in result file" — nonsense for an ADD.
     my $new_content = $self->_replace_result_field_block($content, $field_name, $new_field_def);
+
     unless (defined $new_content) {
-        die "Could not locate field '$field_name' in result file '$result_file_path'";
+        $new_content = $self->_insert_result_field_block($content, $field_name, $new_field_def);
+    }
+
+    unless (defined $new_content) {
+        die "Could not update field '$field_name' in result file '$result_file_path': "
+          . "the add_columns(...) block could not be located";
     }
 
     $self->_write_result_file_safe($result_file_path, $new_content);
@@ -1319,6 +1759,57 @@ sub _replace_result_field_block {
     my $prefix  = substr($content, 0, $brace_pos);
     my $suffix  = substr($content, $block_end + 1);
     return $prefix . $new_field_def . $suffix;
+}
+
+# Insert a NEW field definition into the add_columns( ... ) block.
+# Used by the "Add to Result" flow when the field does not yet exist in the
+# Result file. Finds the add_columns block by brace/paren counting and appends
+# the new "field_name => { ... }," entry just before its closing paren,
+# preserving each existing field untouched.
+# Returns the new full file content, or undef if the block cannot be located.
+sub _insert_result_field_block {
+    my ($self, $content, $field_name, $new_field_def) = @_;
+
+    return undef unless $content =~ /__PACKAGE__->add_columns\s*\(/;
+
+    # Locate the opening paren of add_columns( ... )
+    my $open_pos;
+    if ($content =~ /__PACKAGE__->add_columns\s*\(/g) {
+        $open_pos = pos($content) - 1;   # position of '('
+    }
+    return undef unless defined $open_pos;
+
+    # Walk forward counting parens/braces to find the matching close paren.
+    my $depth  = 0;
+    my $i      = $open_pos;
+    my $len    = length($content);
+    my $close_pos;
+    while ($i < $len) {
+        my $ch = substr($content, $i, 1);
+        if    ($ch eq '(') { $depth++; }
+        elsif ($ch eq ')') {
+            $depth--;
+            if ($depth == 0) { $close_pos = $i; last; }
+        }
+        $i++;
+    }
+    return undef unless defined $close_pos;
+
+    my $block = substr($content, $open_pos + 1, $close_pos - $open_pos - 1);
+
+    # Ensure the previous entry ends with a comma so we don't glue entries together.
+    my $trimmed = $block;
+    $trimmed =~ s/\s+$//;
+    my $needs_comma = ($trimmed ne '' && $trimmed !~ /,\s*$/) ? 1 : 0;
+
+    my $insertion = ($needs_comma ? ",\n" : "\n")
+                  . "    $field_name => " . $new_field_def;
+
+    my $new_block = $block . $insertion;
+
+    return substr($content, 0, $open_pos + 1)
+         . $new_block
+         . substr($content, $close_pos);
 }
 
 sub update_table_field_from_result {
@@ -2421,13 +2912,26 @@ sub _check_server_live {
     my $last_error    = '';
     my @routes;
 
+    # Collapse credential slots that share host:port. db-server-1:3307 has
+    # app/admin/fallback/production_server — four logins, ONE Maria listener.
+    # Listing each slot as a Host line made it look like four databases.
+    my %by_endpoint;
     for my $conn_name (@$conns_for_group) {
         my $cfg = $all->{$conn_name}{config}
             or next;
-        my $host = $cfg->{host}  || 'localhost';
-        my $port = $cfg->{port}  || 3306;
+        my $host = $cfg->{host} || 'localhost';
+        my $port = $cfg->{port} || 3306;
+        my $key  = lc("$host:$port");
+        $by_endpoint{$key} ||= { host => $host, port => $port, conns => [] };
+        push @{ $by_endpoint{$key}{conns} }, $conn_name;
+    }
 
-        # Tier 1: is this route's server process listening?
+    for my $key ( sort keys %by_endpoint ) {
+        my $ep   = $by_endpoint{$key};
+        my $host = $ep->{host};
+        my $port = $ep->{port};
+
+        # Tier 1: one TCP probe per unique host:port.
         my $sock = IO::Socket::INET->new(
             PeerHost => $host,
             PeerPort => $port,
@@ -2438,36 +2942,41 @@ sub _check_server_live {
         close($sock) if $sock;
         $any_reachable ||= $reachable;
 
-        # Tier 2: only attempt a login if the route is reachable.
-        my ($db_ok, $err) = (0, '');
+        my ( $db_ok, $err ) = ( 0, '' );
         if ($reachable) {
-            my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
-            if ($dbh) {
-                $db_ok = eval {
-                    my $sth = $dbh->prepare('SELECT 1');
-                    $sth->execute();
-                    $sth->finish;
-                    1;
-                } ? 1 : 0;
-                $dbh->disconnect;
-            } else {
-                $err = $remote_db->last_connection_error || 'login failed';
-                $err =~ s/\s+/ /g;
-                $err = substr($err, 0, 160);
+            for my $conn_name ( @{ $ep->{conns} } ) {
+                my $dbh = eval { $remote_db->get_connection( undef, $conn_name ) };
+                if ($dbh) {
+                    $db_ok = eval {
+                        my $sth = $dbh->prepare('SELECT 1');
+                        $sth->execute();
+                        $sth->finish;
+                        1;
+                    } ? 1 : 0;
+                    $dbh->disconnect;
+                    last if $db_ok;
+                }
+                else {
+                    $err = $remote_db->last_connection_error || 'login failed';
+                    $err =~ s/\s+/ /g;
+                    $err = substr( $err, 0, 160 );
+                }
             }
             $any_db_ok ||= $db_ok;
-            $last_error = $err if $err;
-        } else {
-            $err = "no service on $host:$port (TCP)";
+            $last_error = $err if $err && !$db_ok;
+        }
+        else {
+            $err        = "no service on $host:$port (TCP)";
             $last_error ||= $err;
         }
 
         push @routes, {
-            host      => $host,
-            port      => $port,
-            reachable => $reachable,
-            db_ok     => $db_ok,
-            error     => $err,
+            host       => $host,
+            port       => $port,
+            reachable  => $reachable,
+            db_ok      => $db_ok,
+            error      => $err,
+            slot_count => scalar @{ $ep->{conns} },
         };
     }
 
@@ -2513,6 +3022,42 @@ sub _match_group_connections {
     return @matches;
 }
 
+# Pick a live connection for a database within a group.
+#
+# The group's connections are NOT all reachable: a group can contain dead rows
+# (placeholder credentials, offline hosts, wrong-port fallbacks). Previously a
+# caller did a single `grep` and used whichever connection happened to be first
+# in hash order, so the schema-compare display nondeterministically bound itself
+# to a dead connection: get_connection() returned undef, the DB column list came
+# back empty, and the page silently rendered with the table side missing (only
+# Result rows shown). That made the page appear to "break" on reload even though
+# nothing had changed.
+#
+# Fix: walk the matching connections in priority order and return a handle from
+# the first one that actually connects, together with its name.
+# Returns ($dbh, $conn_name); both undef if nothing connects.
+sub _pick_live_connection {
+    my ($self, $remote_db, $all_conns, $conn_names, $db_name) = @_;
+
+    my @candidates = grep {
+        my $cfg = $all_conns->{$_}{config};
+        (lc($cfg->{database} // $_) eq lc($db_name))
+    } @$conn_names;
+
+    # Deterministic order: lowest priority number first, then name.
+    @candidates = sort {
+        ($all_conns->{$a}{priority} // 999) <=> ($all_conns->{$b}{priority} // 999)
+        || $a cmp $b
+    } @candidates;
+
+    for my $conn_name (@candidates) {
+        my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
+        next unless $dbh;
+        return ($dbh, $conn_name);
+    }
+    return (undef, undef);
+}
+
 sub schema_compare_server :Path('/admin/schema_compare/server') :Args(1) {
     my ($self, $c, $group_key) = @_;
 
@@ -2541,22 +3086,8 @@ sub schema_compare_server :Path('/admin/schema_compare/server') :Args(1) {
         my $status      = 'unreachable';
         if ($dbh) {
             $status = 'active';
-            eval {
-                my $sth = $dbh->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ?");
-                $sth->execute($db_name);
-                ($table_count) = $sth->fetchrow_array;
-                $sth->finish;
-
-                # Rough size in KB (data_length + index_length)
-                $sth = $dbh->prepare("
-                    SELECT ROUND(SUM(data_length + index_length) / 1024, 1) 
-                    FROM information_schema.tables 
-                    WHERE table_schema = ?
-                ");
-                $sth->execute($db_name);
-                ($size_kb) = $sth->fetchrow_array;
-                $sth->finish;
-            };
+            my $is_pg = $self->_is_postgresql($cfg);
+            ($table_count, $size_kb) = $self->_dbh_catalog_stats($dbh, $db_name, $is_pg);
             $dbh->disconnect;
         }
 
@@ -2589,46 +3120,35 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
 
     # Find a connection that matches this group key + database
     my @group_conns = $self->_match_group_connections($all_conns, $group_key);
-    my ($conn_name) = grep {
-        my $cfg = $all_conns->{$_}{config};
-        (($cfg->{database} // $_) eq $db_name)
-    } @group_conns;
 
-    # Get live tables from the database
+    # Get live tables from the database.
+    # Use a LIVE connection (priority order + fallback) — a single first-match
+    # grep can bind to a dead connection in the group and silently report the
+    # database as empty.
     my %db_tables;  # name => { row_count, size_kb, size }
-    if ($conn_name) {
-        my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
+    my $is_pg = 0;
+    my ($dbh, $conn_name) = $self->_pick_live_connection(
+        $remote_db, $all_conns, \@group_conns, $db_name
+    );
+    if ($dbh) {
+        my $cfg = $all_conns->{$conn_name}{config} // {};
+        $is_pg = $self->_is_postgresql($cfg);
         if ($dbh) {
-            # Verify which database we are actually connected to
-            my ($actual_db) = $dbh->selectrow_array("SELECT DATABASE()");
+            # Verify which database we are actually connected to.
+            # MySQL: DATABASE(); PostgreSQL: current_database() — never SELECT DATABASE() on Pg (#2322).
+            my $actual_db = $self->_dbh_current_database($dbh, $is_pg);
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare_database',
-                "Connected via $conn_name to database: $actual_db (requested: $db_name)");
+                "Connected via $conn_name to database: "
+                . ($actual_db // '(unknown)')
+                . " (requested: $db_name, engine="
+                . ($is_pg ? 'postgresql' : 'mysql')
+                . ")");
 
             eval {
-                # Use SHOW TABLES for authoritative count (matches MariaDB client exactly)
-                my $sth = $dbh->prepare("SHOW TABLES");
-                $sth->execute();
-                my @all_tables;
-                while (my $row = $sth->fetchrow_array) {
-                    push @all_tables, $row;
-                }
-                $sth->finish;
+                my @all_tables = $self->_dbh_list_tables($dbh, $is_pg);
 
-                # Now get detailed stats for each table
                 foreach my $tname (@all_tables) {
-                    my ($row_count, $size_kb) = (0, 0);
-                    eval {
-                        my $info_sth = $dbh->prepare("
-                            SELECT 
-                                table_rows,
-                                ROUND((data_length + index_length) / 1024, 1) AS size_kb
-                            FROM information_schema.tables 
-                            WHERE table_schema = ? AND table_name = ?
-                        ");
-                        $info_sth->execute($db_name, $tname);
-                        ($row_count, $size_kb) = $info_sth->fetchrow_array;
-                        $info_sth->finish;
-                    };
+                    my ($row_count, $size_kb) = $self->_dbh_table_stats($dbh, $db_name, $tname, $is_pg);
 
                     $db_tables{ lc($tname) } = {
                         name        => $tname,
@@ -2639,14 +3159,20 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
                         in_table    => 1,
                     };
                 }
-                # Old query removed - using SHOW TABLES above for authoritative count
             };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'schema_compare_database',
+                    "Table list failed for $db_name via $conn_name: $@");
+            }
             $dbh->disconnect;
         }
     }
 
-    # === Determine which Result schema to use based on database name ===
-    my $result_schema = lc($db_name) =~ /forager/ ? 'forager' : 'ency';
+    # === Determine which Result schema to use based on database name / engine ===
+    # PG catalog (csc / accounting) maps to Schema::Accounting::Result, not Ency.
+    my $result_schema = $is_pg
+        ? 'accounting'
+        : (lc($db_name) =~ /forager/ ? 'forager' : 'ency');
 
     # Determine project root for relative path calculation
     my $app_root = $c->path_to('.')->stringify;
@@ -2721,15 +3247,51 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
         }
     }
 
-    # Explicitly find result files whose table name is NOT in the live DB
+    # Explicitly find result files whose table name is NOT in the live DB.
+    # Attach parsed columns so tables.tt can preview fields before Create Table.
     my @orphaned_result_files = ();
+    my $orphan_parser = Comserv::Util::Schema::ResultParser->new();
     foreach my $tname (sort keys %$result_mapping) {
         if (!exists $db_tables{lc($tname)}) {
+            my $rpath = $result_mapping->{$tname}{result_path};
+            my $rname = $result_mapping->{$tname}{result_name};
+            my $rel   = $rpath =~ s{^\Q$app_root\E/?}{}r;
+
+            my $columns = {};
+            my @fields  = ();
+            my @pks     = ();
+            my $schema  = eval { $orphan_parser->get_result_file_schema($rpath) };
+            if ($schema && ref($schema->{columns}) eq 'HASH') {
+                $columns = $schema->{columns};
+                @pks = @{ $schema->{primary_keys} || [] };
+                my %pk_lookup = map { $_ => 1 } @pks;
+                foreach my $cname (sort keys %$columns) {
+                    my $cinfo = $columns->{$cname} || {};
+                    $cinfo->{is_primary_key} = 1 if $pk_lookup{$cname};
+                    # Flatten for Template Toolkit: ordered list with name + attrs
+                    push @fields, {
+                        name            => $cname,
+                        data_type       => $cinfo->{data_type} // '',
+                        size            => $cinfo->{size},
+                        is_nullable     => defined $cinfo->{is_nullable} ? $cinfo->{is_nullable} : 1,
+                        is_auto_increment => $cinfo->{is_auto_increment} ? 1 : 0,
+                        is_primary_key  => $cinfo->{is_primary_key} ? 1 : 0,
+                        default_value   => defined $cinfo->{default_value} ? $cinfo->{default_value} : undef,
+                        docs            => $cinfo->{docs} // $cinfo->{documentation} // $cinfo->{comment} // '',
+                    };
+                    $columns->{$cname} = $cinfo;
+                }
+            }
+
             push @orphaned_result_files, {
-                result_name => $result_mapping->{$tname}{result_name},
-                result_path => $result_mapping->{$tname}{result_path},
-                result_rel_path => $result_mapping->{$tname}{result_path} =~ s{^\Q$app_root\E/?}{}r,
+                result_name => $rname,
+                result_path => $rpath,
+                result_rel_path => $rel,
                 extracted_table_name => $tname,
+                columns     => $columns,
+                fields      => [ @fields ],
+                primary_keys => [ @pks ],
+                field_count => scalar(@fields),
             };
             push @result_only, {
                 name        => $tname,
@@ -2739,9 +3301,13 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
                 status      => 'result-only',
                 in_table    => 0,
                 has_result  => 1,
-                result_name => $result_mapping->{$tname}{result_name},
-                result_path => $result_mapping->{$tname}{result_path},
-                result_rel_path => $result_mapping->{$tname}{result_path} =~ s{^\Q$app_root\E/?}{}r,
+                result_name => $rname,
+                result_path => $rpath,
+                result_rel_path => $rel,
+                columns     => $columns,
+                fields      => [ @fields ],
+                primary_keys => [ @pks ],
+                field_count => scalar(@fields),
             };
         }
     }
@@ -2779,44 +3345,21 @@ sub schema_compare_table :Path('/admin/schema_compare/server') :Args(5) {
     my $all_conns = $remote_db->get_all_connections();
 
     my @group_conns = $self->_match_group_connections($all_conns, $group_key);
-    my ($conn_name) = grep {
-        my $cfg = $all_conns->{$_}{config};
-        ($cfg->{database} // $_) eq $db_name
-    } @group_conns;
 
     # --- Get DB column definitions ---
+    # Pick a LIVE connection (priority order + fallback). A single first-match
+    # grep used to bind to a dead connection in the group, leaving %db_columns
+    # empty so the page rendered with the table side missing.
     my %db_columns;  # lc(name) => { name, data_type, size, is_nullable, default_value, extra, comment }
-    if ($conn_name) {
-        my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
+    my $is_pg = 0;
+    {
+        my ($dbh, $live_conn) = $self->_pick_live_connection(
+            $remote_db, $all_conns, \@group_conns, $db_name
+        );
         if ($dbh) {
-            eval {
-                my $qt = $dbh->quote_identifier($table_name);
-                my $sth = $dbh->prepare("SHOW FULL COLUMNS FROM $qt");
-                $sth->execute();
-                while (my $row = $sth->fetchrow_hashref) {
-                    # Parse data_type and size from e.g. "varchar(255)" or "int(11)".
-                    # For enum/set the parenthetical holds the ALLOWED VALUES, not a
-                    # length — keep it attached to data_type so it doesn't spill into
-                    # the "size" column (which is meant for numeric lengths like (11)).
-                    my $type_raw = $row->{Type} // '';
-                    my ($data_type, $size) = $type_raw =~ /^(\w+)(\([^)]+\))?/;
-                    $size //= '';
-                    if ($data_type && $data_type =~ /^(enum|set)$/i) {
-                        $data_type = $type_raw;   # keep full "enum('a','b')" together
-                        $size      = '';
-                    }
-                    $db_columns{ lc($row->{Field}) } = {
-                        name          => $row->{Field},
-                        data_type     => $data_type // $type_raw,
-                        size          => $size,
-                        is_nullable   => ($row->{Null} // 'YES') eq 'NO' ? 'NO' : 'YES',
-                        default_value => $row->{Default},
-                        extra         => $row->{Extra} // '',
-                        comment       => $row->{Comment} // '',
-                    };
-                }
-                $sth->finish;
-            };
+            my $cfg = $all_conns->{$live_conn}{config} // {};
+            $is_pg = $self->_is_postgresql($cfg);
+            %db_columns = $self->_dbh_list_columns($dbh, $table_name, $is_pg);
             $dbh->disconnect;
         }
     }
@@ -2824,7 +3367,9 @@ sub schema_compare_table :Path('/admin/schema_compare/server') :Args(5) {
     # --- Get Result file column definitions ---
     my %result_columns;  # lc(name) => { name, data_type, size, is_nullable, default_value }
     {
-        my $result_schema = lc($db_name) eq 'shanta_forager' ? 'forager' : 'ency';
+        my $result_schema = $is_pg
+            ? 'accounting'
+            : (lc($db_name) =~ /forager/ ? 'forager' : 'ency');
         my $parser = Comserv::Util::Schema::ResultParser->new();
         my @result_files = $parser->get_all_result_files($result_schema, $c);
 

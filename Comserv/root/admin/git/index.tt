@@ -19,11 +19,13 @@
     [% PageVersion %]
 [% END %]
 
+[% UNLESS git_embed %]
 <div class="quick-nav">
     <a href="[% c.uri_for('/admin') %]" class="admin-btn admin-btn-secondary admin-btn-sm">
         <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
     </a>
 </div>
+[% END %]
 
 <div class="app-container">
     <div class="content-container">
@@ -302,6 +304,8 @@
             </div>
 
             [%# ==================== Develop Servers (zenflow worktree registry) ==================== %]
+            [%# Highlight uses current_worktree (from app_workflow = worktree dir key) to mark the active server row.
+               This matches b.name even when live git branch (current_branch) differs (e.g. feature branch in a named worktree slot). #]
             [%# Single source of truth = stash.worktree_list (Comserv::Util::Git->build_worktree_list,\n               which reads root/config/worktrees.json). Mirrors the planning tab's "Branch Servers"\n               panel. Open/Stop/Restart buttons POST to /admin/branch_server_action (handled in\n               git-dashboard.js). No inline <script>. #]
             [% IF worktree_list && worktree_list.size %]
             <details class="git-collapse git-dev-servers">
@@ -318,10 +322,10 @@
                         </thead>
                         <tbody>
                             [% FOREACH b IN worktree_list %]
-                            <tr[% IF b.name == current_branch %] class="git-dev-current"[% END %]>
+                            <tr[% IF b.name == current_worktree %] class="git-dev-current"[% END %]>
                                 <td>
                                     <code>[% b.label | html %]</code>
-                                    [% IF b.name == current_branch %]<span class="status-badge">current</span>[% END %]
+                                    [% IF b.name == current_worktree %]<span class="status-badge">current</span>[% END %]
                                 </td>
                                 <td><code>:[% b.port %]</code></td>
                                 <td>
@@ -336,12 +340,29 @@
                                        hybrid link. Branches carry their own host in
                                        worktrees.json; default scheme is http (LAN). %]
                                     [% SET bh = b.host || host %]
+                                    [%# Always derive Hermes port from this row's app port (do not
+                                       reuse hp from the previous FOREACH row). main/:3001 = 9119. %]
+                                    [% hp = 0 %]
+                                    [% IF b.name == 'main' || b.port == 3001 %]
+                                        [% hp = 9119 %]
+                                    [% ELSIF b.port %]
+                                        [% hp = 9100 + (b.port mod 100) %]
+                                    [% END %]
+                                    [% hcwd = b.hermes_cwd %]
+                                    [% IF !hcwd && b.name == 'main' %]
+                                        [% hcwd = '/home/shanta/PycharmProjects/comserv2' %]
+                                    [% ELSIF !hcwd %]
+                                        [% hcwd = '/home/shanta/.comserv/worktrees/' _ b.name _ '/Comserv' %]
+                                    [% END %]
                                     <button type="button" class="admin-btn admin-btn-sm admin-btn-primary"
                                             data-open-branch="[% b.name | html %]" data-port="[% b.port %]"
                                             data-url="http://[% bh | html %]:[% b.port %][% b.url | html %]"
                                             data-cmd="[% b.cmd | html %]">Open</button>
                                     <button type="button" class="admin-btn admin-btn-sm"
                                             data-hermes-branch="[% b.name | html %]"
+                                            data-port="[% b.port %]"
+                                            data-hermes-port="[% hp %]"
+                                            data-hermes-cwd="[% hcwd | html %]"
                                             data-hermes-cmd="[% b.hermes_cmd | html %]">Hermes</button>
                                     <button type="button" class="admin-btn admin-btn-sm admin-btn-danger"
                                             data-branch-action="stop" data-branch="[% b.name | html %]" data-port="[% b.port %]">Stop</button>

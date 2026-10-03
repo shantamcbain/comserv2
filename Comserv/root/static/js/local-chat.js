@@ -245,8 +245,21 @@
         if (typeof state.roleRank === 'number') return state.roleRank;
         return state.canSelectModel || state.isAdmin ? 2 : (state.isGuest ? 0 : 1);
     }
+    // Site Chat-with-AI must never act as a code editor. AI Editor popup sets AI2_EDITOR.
+    function isAi2EditorContext() {
+        try {
+            if (window.AI2_EDITOR || window.AI2EditorCore || window.AI2EditorChat) return true;
+            var p = (window.location && window.location.pathname) || '';
+            if (/editing_widget_popup|\/ai2\/editor|ai2editor/i.test(p)) return true;
+            if (document.getElementById('ace-editor')) return true;
+        } catch (e) { /* ignore */ }
+        return false;
+    }
+
     function _agentAllowed(agent) {
         if (!agent) return false;
+        // Coding/programming agents are AI Editor only — never offer on /ai Chat-with-AI
+        if (agent.editor_only && !isAi2EditorContext()) return false;
         if (agent.local_only && !state.isDevMode) return false;
         if (agent.admin_only && _userRoleRank() < 2) return false;
         var min = agent.min_role;
@@ -313,6 +326,7 @@
         // Keep the Auto option, then add one per eligible agent
         sel.innerHTML = '<option value="auto">⚡ Auto</option>';
         Object.entries(agents).forEach(function([key, agent]) {
+            if (agent && (agent.hidden || agent.alias_of)) return;
             if (!_agentAllowed(agent)) return;
             var opt = document.createElement('option');
             opt.value = key;
@@ -331,6 +345,7 @@
         // URL-based match always wins over saved preference (so navigating to /ENCY
         // always gets the ency agent even if the user last selected "coding").
         var saved = localStorage.getItem('ai_widget_agent');
+        if (saved === 'todo' || saved === 'projects' || saved === 'project') saved = 'planning';
         var urlAgent = selectAgentForPage();
         if (urlAgent && urlAgent.id && sel.querySelector('option[value="' + urlAgent.id + '"]')) {
             sel.value = urlAgent.id;
@@ -466,6 +481,15 @@
     // Called when the AI response contains [READ_FILE: path] tokens.
     // Fetches the file content and sends it back as a follow-up context message.
     function _handleReadFileRequest(path) {
+        // Hard disable code-read mutation path from site Chat-with-AI widget
+        if (!isAi2EditorContext()) {
+            console.warn('[Chat-with-AI] READ_FILE ignored outside AI Editor');
+            var msgInput0 = document.getElementById('message-input');
+            if (msgInput0) {
+                msgInput0.value = '[Chat-with-AI cannot load/edit code files. Open AI Editor for code work.]';
+            }
+            return;
+        }
         var url = '/ai/read_file?path=' + encodeURIComponent(path) + '&limit=300';
         fetch(url, { credentials: 'include' })
             .then(function(r) { return r.json(); })
@@ -549,6 +573,8 @@
         // an admin-only / non-public agent (that lands on Access denied).
         for (const [agentKey, agent] of Object.entries(agents)) {
             if (!agent.url_patterns) continue;
+            if (agent.hidden || agent.alias_of) continue;
+            if (agent.editor_only && !isAi2EditorContext()) continue;
             if (agent.local_only && !state.isDevMode) continue;
             if (!_agentAllowed(agent)) continue;
 
@@ -600,11 +626,20 @@
     }
 
     // Extract visible text content from the current page for context
+    function _pageDocument() {
+        try {
+            if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed && window.opener.document) {
+                return window.opener.document;
+            }
+        } catch (e) {}
+        return document;
+    }
     function extractPageContent() {
+        const rootDoc = _pageDocument();
         const skipSelectors = '#local-chat-widget, #chat-panel, script, style, nav, footer, .navbar, header';
         const contentSelectors = ['main', '.main-content', '#content', '.content-area', '.page-content', 'article', '.container'];
         for (const sel of contentSelectors) {
-            const el = document.querySelector(sel);
+            const el = rootDoc.querySelector(sel);
             if (!el) continue;
             const clone = el.cloneNode(true);
             clone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
@@ -614,7 +649,8 @@
             }
         }
         // Fallback: body text
-        const bodyClone = document.body.cloneNode(true);
+        if (!rootDoc.body) return '';
+        const bodyClone = rootDoc.body.cloneNode(true);
         bodyClone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
         const bodyText = bodyClone.textContent.replace(/\s+/g, ' ').trim();
         return bodyText.substring(0, 4000);
@@ -622,6 +658,7 @@
 
     // Extract all meaningful links from the current page (nav menu + quick links + content links)
     function extractPageLinks() {
+        const rootDoc = _pageDocument();
         const seen = new Set();
         const navLinks = [];
         const contentLinks = [];
@@ -639,7 +676,7 @@
         // 1. Navigation menu and header links (always include these for link auditing)
         const navSelectors = ['nav', 'header nav', '.navbar', '#main-menu', '#nav', '.nav-menu', '.site-nav', '.menu', 'header'];
         navSelectors.forEach(function(sel) {
-            const el = document.querySelector(sel);
+            const el = rootDoc.querySelector(sel);
             if (!el) return;
             // Exclude the chat widget itself
             if (el.closest('#local-chat-widget, #chat-panel')) return;
@@ -653,13 +690,13 @@
             '.tabs a', '.tab-links a', '[data-tab] a'
         ];
         prioritySelectors.forEach(function(sel) {
-            document.querySelectorAll(sel).forEach(function(a) { collectLink(a, contentLinks); });
+            rootDoc.querySelectorAll(sel).forEach(function(a) { collectLink(a, contentLinks); });
         });
 
         // 3. General content-area links
         const contentSelectors = ['main', '.main-content', '#content', '.content-area', '.page-content', 'article'];
         contentSelectors.forEach(function(sel) {
-            const el = document.querySelector(sel);
+            const el = rootDoc.querySelector(sel);
             if (!el) return;
             el.querySelectorAll('a[href]').forEach(function(a) { collectLink(a, contentLinks); });
         });
@@ -672,22 +709,64 @@
     }
 
     // Detect page context (documentation, helpdesk, project, etc.)
-    function detectPageContext() {
-        // In PAGE_MODE (detached popup), honour the originating page URL so the
-        // same agent and context are used as on the page the widget was on.
-        let pathname = window.HELPDESK_PRESCREEN_PAGE_PATH || window.location.pathname;
-        let pageTitle = window.HELPDESK_PRESCREEN_PAGE_TITLE || document.title || 'Unknown Page';
-        if ((PAGE_MODE || window.AI_WIDGET_POPUP) && (state.detachedFromPath || window.AI_DETACHED_FROM_PATH)) {
-            pathname  = state.detachedFromPath  || window.AI_DETACHED_FROM_PATH  || pathname;
-            pageTitle = state.detachedFromTitle || window.AI_DETACHED_FROM_TITLE || pageTitle;
+
+    // Originating page for detached /ai/widget popup (CSC-20260914-8057).
+    // Never report the widget URL itself as page_path, and never append the
+    // widget's ?from_path= query onto the origin path.
+    function _isWidgetPath(path) {
+        path = (path || '').split('?')[0];
+        return path === '/ai/widget' || path.indexOf('/ai/widget/') === 0
+            || path === '/ai' || path === '/ai/';
+    }
+    function _openerPathname() {
+        try {
+            if (window.opener && !window.opener.closed && window.opener.location) {
+                var op = window.opener.location.pathname || '';
+                if (op && !_isWidgetPath(op)) return op;
+            }
+        } catch (e) {}
+        return '';
+    }
+    function _originatingPathname() {
+        var det = (state && state.detachedFromPath) || window.AI_DETACHED_FROM_PATH || '';
+        var here = window.location.pathname || '';
+        var onWidget = !!(window.AI_WIDGET_POPUP || PAGE_MODE || _isWidgetPath(here));
+        if (onWidget) {
+            if (det && !_isWidgetPath(det)) return det;
+            var fromOpener = _openerPathname();
+            if (fromOpener) return fromOpener;
+            // Last resort: never report the widget URL as the user's page.
+            if (_isWidgetPath(here)) return (det && det !== here) ? det : '/';
         }
+        return window.HELPDESK_PRESCREEN_PAGE_PATH || here;
+    }
+    function _originatingTitle(fallback) {
+        var det = (state && state.detachedFromTitle) || window.AI_DETACHED_FROM_TITLE || '';
+        var here = window.location.pathname || '';
+        if ((window.AI_WIDGET_POPUP || PAGE_MODE || here === '/ai/widget') && det) {
+            return det;
+        }
+        return window.HELPDESK_PRESCREEN_PAGE_TITLE || fallback || document.title || 'Unknown Page';
+    }
+    function _originatingSearch() {
+        var here = window.location.pathname || '';
+        if (window.AI_WIDGET_POPUP || PAGE_MODE || here === '/ai/widget' || here.indexOf('/ai/widget') === 0) {
+            return '';
+        }
+        return window.location.search || '';
+    }
+
+    function detectPageContext() {
+        // Detached /ai/widget: honour originating page (CSC-20260914-8057).
+        let pathname = _originatingPathname();
+        let pageTitle = _originatingTitle();
         
         // Try to load and select agent from config
         const selectedAgent = selectAgentForPage();
         state.currentAgent = selectedAgent;
         
         let context = {
-            page_path: pathname + (window.location.search || ''),
+            page_path: pathname + _originatingSearch(),
             page_title: pageTitle,
             page_url: window.AI_WIDGET_POPUP
                 ? (window.location.origin + pathname)
@@ -707,8 +786,12 @@
             context.agent_id = selectedAgent.id;
             context.agent_name = selectedAgent.display_name;
             context.system_prompt = selectedAgent.system_prompt
-                + '\nDo NOT invent file paths, documentation URLs, or system details not explicitly provided.'
+                + '\nDo NOT invent file paths, documentation URLs, or system details. Use only page content/docs and any Web search section included in this prompt.'
                 + '\nCurrent page: "' + pageTitle + '" at URL: ' + pathname
+                + ((window.AI_WIDGET_POPUP || PAGE_MODE)
+                    ? ('\nIMPORTANT: The chat UI may load from /ai/widget, but the user\'s page is '
+                       + pathname + '. Never say the current page is /ai/widget.')
+                    : '')
                 + (pageContent ? '\n\nPage content:\n' + pageContent : '')
                 + linksSection;
             context.capabilities = selectedAgent.capabilities;
@@ -718,9 +801,13 @@
             context.page_type = 'general';
             context.agent_id = 'general';
             context.system_prompt = 'You are a helpful AI assistant for the Comserv web application. '
-                + 'You can only answer based on information explicitly provided to you here. '
+                + 'Prefer answers from the application page content and docs provided here. If the answer is not in that material, say clearly that it is not in the application context (so a follow-up web search can run). '
                 + 'Do NOT invent file paths, documentation URLs, or system details not shown below.\n\n'
                 + 'Current page: "' + pageTitle + '" at URL: ' + pathname
+                + ((window.AI_WIDGET_POPUP || PAGE_MODE)
+                    ? ('\nIMPORTANT: The chat UI may load from /ai/widget, but the user\'s page is '
+                       + pathname + '. Never say the current page is /ai/widget.')
+                    : '')
                 + (pageContent ? '\n\nPage content:\n' + pageContent : '')
                 + linksSection;
         }
@@ -1603,7 +1690,7 @@
             // Label from the SHARED helper: it derives the provider from the
             // "provider|model" value itself. The old code assumed anything that
             // was not Grok must be Ollama, so picking an OpenRouter model (e.g.
-            // openrouter|tencent/hy3) was mislabelled "Ollama (Local)".
+            // openrouter|…) was mislabelled "Ollama (Local)".
             let modelDisplay = describeModel(selectedVal, { host: state.ollamaHost });
             state.activeModel = modelDisplay;
             const statusEl = document.getElementById('chat-status');
@@ -1824,11 +1911,11 @@
             // Delegate catalog fetch + dropdown rendering to the SHARED module
             // (ai-chat/model-select.js). Both the general widget and the editor
             // chat use the same code path now, so model selection can't diverge.
-            // Pin hy3 to the top + default for this chat context.
+            // Pin coding default (north-mini-code:free) to the top for this chat context.
             ComservChat.modelSelect.init({
                 selectEl: providerSelect,
                 context: 'chat',
-                pinModel: 'tencent/hy3',
+                pinModel: 'cohere/north-mini-code:free',
                 onReady: function (catalog) {
                     // Re-derive model tiers (used by auto-tier query routing).
                     (catalog || []).forEach(function (p) {
@@ -2057,10 +2144,10 @@
             const selProvider = document.getElementById('ai-provider');
             const provider = (selProvider && selProvider.value) || 'ollama';
 
-            fetch('/ai/generate', {
+            fetch('/ai2/chat', {
                 method: 'POST', credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider, skip_role_prompt: true, use_search: useSearch })
+                body: JSON.stringify({ prompt: desc, system: SYSTEM, model: provider, agent_id: 'general', skip_role_prompt: true, use_search: useSearch })
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -2231,23 +2318,36 @@
             : loadAgentsConfig();
         
         ensureAgentsLoaded.then(function() {
-            // Initialize page context if not already done (after agents loaded)
-            if (!state.pageContext) {
-                state.pageContext = detectPageContext();
+            // Always re-detect so detached from_path / opener stay current (CSC-20260914-8057).
+            state.pageContext = detectPageContext();
+            if (state.taskPagePath) {
+                state.pageContext.page_path = state.taskPagePath;
             }
 
-            // Fetch documentation for the current page (cached after first load)
-            const docPromise = state.pageDocFetched
-                ? Promise.resolve('')
-                : fetchPageDoc(window.location.pathname).then(function(docText) {
+            // Fetch documentation for the ORIGINATING page — never /ai/widget.
+            // Cache the doc body so re-detect on later messages can re-attach it.
+            var originPath = _originatingPathname();
+            function _attachPageDoc(docText) {
+                if (docText && state.pageContext) {
+                    state.pageDocText = docText;
+                    state.pageContext.system_prompt =
+                        (state.pageContext.system_prompt || '') +
+                        '\n\n--- Page Documentation ---\n' + docText;
+                }
+            }
+            var docPromise;
+            if (state.pageDocText) {
+                _attachPageDoc(state.pageDocText);
+                docPromise = Promise.resolve(state.pageDocText);
+            } else if (state.pageDocFetched) {
+                docPromise = Promise.resolve('');
+            } else {
+                docPromise = fetchPageDoc(originPath).then(function(docText) {
                     state.pageDocFetched = true;
-                    if (docText && state.pageContext) {
-                        state.pageContext.system_prompt =
-                            (state.pageContext.system_prompt || '') +
-                            '\n\n--- Page Documentation ---\n' + docText;
-                    }
+                    _attachPageDoc(docText);
                     return docText;
                 });
+            }
 
             docPromise.then(function() {
                 var effectivePrompt = prompt;
@@ -2261,7 +2361,7 @@
 
                 if (state.pageContext && state.pageContext.agent_id === 'template_editor'
                         && !prompt.includes('[FILE:')) {
-                    var tplPath = _getTemplatePathForPage(window.location.pathname);
+                    var tplPath = _getTemplatePathForPage(_originatingPathname());
                     if (tplPath) {
                         fetch('/ai/read_file?path=' + encodeURIComponent(tplPath) + '&limit=500',
                               { credentials: 'include' })
@@ -2446,8 +2546,15 @@
                     _nfFields.auto_pay = '1';
                     _nfFields.auto_pay_method = (_methodM ? _methodM[1] : 'Visa') + ' Auto Pay';
                 }
-                const _supplierM = _billText.match(/HostGator|PayPal|Freedom Mobile|Rogers|Bell|Telus|Shaw|Koodo|Fido|Videotron|SaskTel|MTS|Eastlink|OpenAI|Anthropic|Google|Microsoft|AWS|Azure|Cloudflare|GitHub|Stripe|Mailgun|Twilio|eNom|GoDaddy|Namecheap|Hover|Tucows|WHC|Domain\.com/i);
-                const _supplierName = _supplierM ? _supplierM[0] : 'Supplier';
+                // Derive the vendor name WITHOUT a hardcoded list. The old
+                // regex (HostGator|PayPal|OpenAI|...) could not match new
+                // vendors, so "OpenRouter" fell back to the literal 'Supplier'
+                // and the dropdown stayed empty. Prefer an explicit
+                // "Receipt from X" / "Invoice from X"; else first line.
+                const _fromM = _billText.match(/(?:Receipt|Invoice)\s+from\s+([A-Za-z0-9][A-Za-z0-9 .,&'\-]{1,58}?)\s*(?=\$|\d|USD|CAD|Receipt|Invoice|Qty|Total|\.|$)/i);
+                const _supplierName = (_fromM && _fromM[1].trim())
+                    ? _fromM[1].trim()
+                    : (_billText.split(/[\n\r]/)[0] || 'Supplier').slice(0, 60);
                 const _billedToM = _billText.match(/Billed\s+To[:\s]+([^\n\r]+)/i);
                 const _billedTo = _billedToM ? ' (' + _billedToM[1].trim() + ')' : '';
                 if (!_nfFields.notes) {
@@ -2471,7 +2578,31 @@
                         const _qs = Object.keys(_tf).filter(k => _tf[k]).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(_tf[k])).join('&');
                         executeAIAction({ action: 'navigate_and_fill', url: '/Accounting/transfer/new?' + _qs, fields: _tf });
                     } else {
-                        executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: _nfFields });
+                        // Resolve the supplier NAME to its numeric id on the
+                        // server before navigating: the <select> is keyed by
+                        // id, and only the server reliably knows it.
+                        (function(fields, sName){
+                            if (!sName || sName === 'Supplier') {
+                                executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: fields });
+                                return;
+                            }
+                            fetch('/ai2/action', {
+                                method: 'POST',
+                                credentials: 'include',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'resolve_supplier', params: { name: sName } })
+                            })
+                            .then(function(r){ return r.json(); })
+                            .then(function(d){
+                                if (d && d.success && d.supplier_id) {
+                                    fields.supplier_id = String(d.supplier_id);
+                                }
+                            })
+                            .catch(function(e){ console.warn('resolve_supplier failed', e); })
+                            .then(function(){
+                                executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: fields });
+                            });
+                        })(_nfFields, _supplierName);
                     }
                     const _wAcc = document.createElement('div');
                     _wAcc.className = 'msg-wrapper msg-wrapper-ai';
@@ -2907,6 +3038,16 @@
                 throw new Error('AI server returned an empty response. Please try again.');
             }
 
+            if (data.success && !(data.response || '').trim() && !data.needs_web_search) {
+                // CSC-20260914-5166: server sometimes marks empty provider text as success.
+                console.error('AI returned empty success response', data);
+                statusIndicator.textContent = 'AI Error';
+                statusIndicator.className = 'chat-status error';
+                addMessage('The model returned an empty reply. Try again or pick another model.', 'ai-message');
+                persistMessages();
+                return;
+            }
+
             if (data.success) {
                 // Reset retry counter on success
                 state.retryCount = 0;
@@ -2990,7 +3131,7 @@
                 // Use the SHARED describeModel() helper so the label always matches
                 // the provider that actually served the request. The previous code
                 // treated every non-Grok response as Ollama, which is why an
-                // OpenRouter answer displayed as "Ollama (Local): tencent/hy3".
+                // OpenRouter answer displayed as "Ollama (Local): <model>".
                 const providerParts2 = (state.selectedProvider || '').split('|');
                 // Prefer the user's selected prefix when the backend collapses
                 // SuperGrok onto the Grok client (same API, different billing).
@@ -3056,8 +3197,10 @@
                     });
                 }
 
-                // Coding agent: intercept [READ_FILE: path] requests automatically
-                if (state.pageContext && state.pageContext.agent_id === 'coding') {
+                // Coding READ_FILE auto-fetch is AI Editor only — hard-disable on site Chat-with-AI
+                if (isAi2EditorContext()
+                    && state.pageContext
+                    && (state.pageContext.agent_id === 'coding' || state.pageContext.agent_id === 'programming')) {
                     var rfMatch = cleanText.match(/\[READ_FILE:\s*([^\]]+)\]/i);
                     if (rfMatch) {
                         _handleReadFileRequest(rfMatch[1].trim());
@@ -5162,7 +5305,7 @@
             ComservChat.modelSelect.init({
                 selectEl: modelSelectEl,
                 context: 'chat',
-                pinModel: 'tencent/hy3',
+                pinModel: 'cohere/north-mini-code:free',
                 onReady: function () {
                     modelSelectEl.addEventListener('change', _applyPageModelSelection);
                     _applyPageModelSelection();
@@ -5840,6 +5983,11 @@
         // override the chat panel to fill 100% of the window.
         if (window.AI_WIDGET_POPUP) {
             document.body.classList.add('ai-widget-popup');
+            // Seed detached origin before any detectPageContext() call
+            if (window.AI_DETACHED_FROM_PATH) {
+                state.detachedFromPath  = window.AI_DETACHED_FROM_PATH;
+                state.detachedFromTitle = window.AI_DETACHED_FROM_TITLE || '';
+            }
         }
 
         if (PAGE_MODE) {

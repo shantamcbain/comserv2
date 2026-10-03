@@ -13,6 +13,7 @@ use Comserv::Model::Ollama;
 use JSON qw(encode_json);
 use Time::Piece;
 use DateTime;
+use Comserv::Util::AppTime;
 use DateTime::Format::ISO8601;
 use POSIX ();
 
@@ -65,8 +66,8 @@ sub daily :Path('/planning/daily') :Args {
     }
 
     # Current date
-    my $now              = Time::Piece->new();
-    my $current_date_str = $now->strftime('%Y-%m-%d');
+    my $current_date_str = Comserv::Util::AppTime->today_ymd_for($c);
+    my $now = eval { Time::Piece->strptime($current_date_str, '%Y-%m-%d') } || Time::Piece->new();
     my $current_display  = $now->strftime('%A, %B %d, %Y');
 
     # Selected date (from URL or today)
@@ -526,6 +527,17 @@ sub daily :Path('/planning/daily') :Args {
     my @active_priorities;
     eval {
         my $roles    = $c->stash->{user_roles} || [];
+        # Determine ai_role_tier for client-side JavaScript consistency
+        my $is_admin = $c->stash->{is_admin} || 0;
+        my $is_staff = 0;
+        if ($c->session->{user_id}) {
+            my $user_roles = $c->stash->{user_roles} || [];
+            $is_staff = grep { $_ eq 'helpdesksupport' || $_ eq 'staff' } @$user_roles;
+        }
+        my $ai_role_tier = $is_admin ? 'priv' : 
+                           $is_staff ? 'staff' : 
+                           $c->session->{user_id} ? 'member' : 'guest';
+        $c->stash->{ai_role_tier} = $ai_role_tier;
 
         my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
         my %ap_cond = (status => { -not_in => \@done_statuses });
@@ -707,6 +719,67 @@ sub daily :Path('/planning/daily') :Args {
                     branch_project_ids => \%branch_scope,
                 })
             } @all_sorted;
+
+            # ── Decision-model ordering (AISYSTEMPlan 5f) ─────────────────────
+            # ON LOAD we only READ the cached order. The local decision model is
+            # never called during a render (nimble cold is ~133s; the Focus Queue
+            # must not block on it). The cache is written by
+            # script/compute_decision_rank.pl. Rows whose confidence clears the
+            # gate are ordered by model score; everything else keeps the
+            # hardcoded ap_score order, and reordering happens only inside a row's
+            # own Active/branch group so cmp_branch_focus semantics survive.
+            my $dec_cache = eval {
+                require Comserv::Util::AI::DecisionRank;
+                Comserv::Util::AI::DecisionRank->read_cache($cur_branch);
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'daily', "DecisionRank cache read failed: $@");
+            }
+            elsif (!$dec_cache) {
+                # Silent-failure guard: without this line a missing/expired cache
+                # and a hook that never ran look identical in the log.
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                    'daily', "DecisionRank: no usable cache for '$cur_branch' "
+                    . "(file=" . Comserv::Util::AI::DecisionRank->cache_file
+                    . " exists=" . (-s Comserv::Util::AI::DecisionRank->cache_file ? 1 : 0)
+                    . ") - hardcoded score order in force");
+            }
+            else {
+                my $reordered = eval {
+                    Comserv::Util::AI::DecisionRank->apply_order(
+                        \@all_sorted, $dec_cache,
+                        { branch => $cur_branch, branch_project_ids => \%branch_scope },
+                    );
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'daily', "DecisionRank apply_order failed: $@");
+                }
+                elsif ($reordered) {
+                    @all_sorted = @$reordered;
+                    my $used  = grep { $_->{decision_used} } @all_sorted;
+                    my $scored = scalar(keys %{ $dec_cache->{rows} || {} });
+                    $c->stash->{decision_order} = {
+                        active      => 1,
+                        model       => $dec_cache->{model},
+                        computed_at => $dec_cache->{computed_at},
+                        gate        => $dec_cache->{gate},
+                        used        => $used,
+                        scored      => $scored,
+                    };
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'daily', "Decision ordering applied for '$cur_branch': "
+                        . "model=" . ($dec_cache->{model} // '?')
+                        . " gate=" . ($dec_cache->{gate} // '?')
+                        . " applied_rows=$used scored=$scored");
+                }
+                else {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'daily', "DecisionRank: cache found for '$cur_branch' but "
+                        . "apply_order returned nothing (rows=" . scalar(@all_sorted) . ")");
+                }
+            }
         }
         elsif ($filter_project && !$show_all_projects) {
             @all_sorted = grep {
@@ -1183,8 +1256,8 @@ sub daily_impl :Private {
     }
 
     # Current date
-    my $now              = Time::Piece->new();
-    my $current_date_str = $now->strftime('%Y-%m-%d');
+    my $current_date_str = Comserv::Util::AppTime->today_ymd_for($c);
+    my $now = eval { Time::Piece->strptime($current_date_str, '%Y-%m-%d') } || Time::Piece->new();
     my $current_display  = $now->strftime('%A, %B %d, %Y');
 
     # Selected date (from URL or today)
@@ -1630,7 +1703,7 @@ sub refresh_audit :Path('/planning/refresh_audit') :Args(0) {
     my $username = $c->session->{username} || 'user';
     my $user_id  = $c->session->{user_id}  || 0;
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
 
     my $schema;
     eval { $schema = $c->model('DBEncy')->schema };
@@ -1740,8 +1813,8 @@ sub _daily_log_action {
     $user_id  //= $c->session->{user_id}  || 0;
 
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
-    my $now_time = do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
+    my $now_time = Comserv::Util::AppTime->now_hms_utc;
 
     my $schema;
     eval { $schema = $c->model('DBEncy')->schema };
@@ -1796,11 +1869,17 @@ sub _daily_log_action {
         my @audit_todo_subjects  = @{ $audit->{subjects} };
 
         # ── Check for open HelpDesk support tickets ──
+        # Link each ticket to /HelpDesk/ticket/view/<number> (not /HelpDesk public index).
         my $helpdesk_count = 0;
+        my @open_helpdesk_tickets;
         eval {
-            $helpdesk_count = $schema->resultset('SupportTicket')->count(
-                { status => 'open' }
-            ) || 0;
+            my %hd_search = ( status => 'open' );
+            $hd_search{site_name} = $sitename unless lc($sitename || '') eq 'csc';
+            @open_helpdesk_tickets = $schema->resultset('SupportTicket')->search(
+                \%hd_search,
+                { order_by => [{ -asc => 'priority' }, { -desc => 'created_at' }], rows => 20 }
+            )->all;
+            $helpdesk_count = scalar @open_helpdesk_tickets;
         };
 
         # ── Build daily log details ──
@@ -1813,7 +1892,14 @@ sub _daily_log_action {
             $details .= "\n";
         }
         if ($helpdesk_count) {
-            $details .= "\x{1F3AB} OPEN HELPDESK TICKETS: $helpdesk_count ticket(s) awaiting response — see <a href='/HelpDesk'>/HelpDesk</a>\n\n";
+            $details .= "\x{1F3AB} OPEN HELPDESK TICKETS: $helpdesk_count ticket(s) awaiting response:\n";
+            for my $ht (@open_helpdesk_tickets) {
+                my $num = eval { $ht->ticket_number } || '';
+                next unless $num;
+                my $subj = substr(eval { $ht->subject } || '', 0, 80);
+                $details .= "  \x{2022} <a href='/HelpDesk/ticket/view/$num'>$num</a> — $subj\n";
+            }
+            $details .= "  All open: <a href='/HelpDesk/admin/tickets/open'>/HelpDesk/admin/tickets/open</a>\n\n";
         }
         if (@top_todos) {
             $details .= "\x{1F4CB} TOP PRIORITIES FOR TODAY:\n";
@@ -1872,7 +1958,23 @@ sub _daily_log_action {
         $self->_schedule_day($c, $schema, $sitename, $today);
 
         my $stale_msg    = @stale_logs      ? " \x{26A0}\x{FE0F} <a href='/log?status=open' style='color:inherit;'>" . scalar(@stale_logs) . " unclosed log(s) from previous days</a>." : '';
-        my $helpdesk_msg = $helpdesk_count  ? " \x{1F3AB} $helpdesk_count open HelpDesk ticket(s) — <a href='/HelpDesk'>view tickets</a>." : '';
+        my $helpdesk_msg = '';
+        if ($helpdesk_count) {
+            if ($helpdesk_count == 1) {
+                my $num = eval { $open_helpdesk_tickets[0]->ticket_number } || '';
+                $helpdesk_msg = $num
+                    ? " \x{1F3AB} 1 open HelpDesk ticket — <a href='/HelpDesk/ticket/view/$num'>view $num</a>."
+                    : " \x{1F3AB} 1 open HelpDesk ticket — <a href='/HelpDesk/admin/tickets/open'>view ticket</a>.";
+            }
+            else {
+                # Toast stays short: first ticket deep-link + admin open list for the rest
+                my $first = eval { $open_helpdesk_tickets[0]->ticket_number } || '';
+                my $first_link = $first
+                    ? "<a href='/HelpDesk/ticket/view/$first'>$first</a>"
+                    : 'tickets';
+                $helpdesk_msg = " \x{1F3AB} $helpdesk_count open HelpDesk tickets — $first_link + <a href='/HelpDesk/admin/tickets/open'>all open</a>.";
+            }
+        }
         my $deploy_since = $audit->{last_deploy_dt} ? " since last deploy ($audit->{last_deploy_dt})" : " in last 24h";
         my $error_msg    = $error_count     ? " \x{1F6A8} $error_count error area(s) found$deploy_since — " . scalar(@audit_todo_subjects) . " AI-assisted todo(s) created — <a href='/todo'>view todos</a>." : '';
         my $priority_msg = @top_todos       ? " Top priority: " . substr($top_todos[0]->subject || '', 0, 60) . "." : '';
@@ -1903,7 +2005,7 @@ sub _daily_log_action {
                 error    => 'No open log entry for today',
             };
         }
-        my $now_end = do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
+        my $now_end = Comserv::Util::AppTime->now_hms_utc;
         eval { $open_entry->update({ status => 3, end_time => $now_end }) };
         return { success => JSON::false, error => "Could not close log entry: $@" } if $@;
 
@@ -2082,7 +2184,7 @@ sub schedule_day :Path('/planning/schedule_day') :Args(0) {
     }
     my $sitename = $c->session->{SiteName} || $c->stash->{SiteName} || 'CSC';
     my $username = $c->session->{username} || '';
-    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
     my $schema;
     eval { $schema = $c->model('DBEncy')->schema };
     if ($@ || !$schema) {
@@ -2358,7 +2460,7 @@ sub deploy :Path('deploy') :Args(0) {
                            no_cache => $c->req->body_params->{no_cache} // 0,
                        );
             my $ok = $deploy->deploy_to_target_safe();
-            print $log "[${\scalar localtime}] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
+            print $log "[${\Comserv::Util::AppTime->now_utc}] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
             close($log);
             exit($ok ? 0 : 1);
         } else {

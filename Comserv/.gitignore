@@ -53,3 +53,19 @@ config/dev_tls/
 /root/session/documentation_config/scan_state.json
 /root/session/documentation_config/*.bak
 /root/session/documentation_config/*.tmp
+Comserv/root/data/
+
+# Per-call / runtime AI state (AISYSTEM plan; untracked 2026-10-01). Written by
+# the running app, the Super Grok guard, the Firefox meter add-on and the
+# decision-rank cron. Never commit these.
+/data/ai_model_health.json
+/data/ai_model_health.json.lock
+/data/ai_model_health.json.tmp*
+/data/ai_decision_calls.jsonl
+/data/ai_rank_order.json
+/data/ai_eval_outbox/openrouter-live.json
+/data/ai_auto_changes.jsonl
+/data/ai_guard_events.json
+/root/static/ai/grokcom_usage.json
+/root/static/ai/grokcom_usage_history.jsonl
+/root/static/ai/supergrok_guard.json
