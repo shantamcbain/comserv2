@@ -132,12 +132,8 @@ sub open_or_start_hermes {
     # Pin TERMINAL_CWD to this worktree. Unset session/update leftovers so a
     # spawn from 9119 cannot leak InventoryAccounting (or any other) cwd into
     # the new isolated dashboard. bash -c not -l: login profiles often cd away.
-    my $cmd = 'cd ' . quotemeta($cwd)
-            . ' && env -u HERMES_SESSION_ID -u HERMES_UPDATE_POST_SWAP -u HERMES_UPDATE_REEXEC'
-            . ' TERMINAL_CWD=' . quotemeta($cwd)
-            . ' nohup ' . quotemeta($bin)
-            . " dashboard --isolated --host 0.0.0.0 --port $hport --no-open --skip-build"
-            . ' >> ' . quotemeta($log) . ' 2>&1 &';
+    # Use single quotes for reliable shell quoting of paths (avoids quotemeta regex escapes).
+    my $cmd = "cd '$cwd' && env -u HERMES_SESSION_ID -u HERMES_UPDATE_POST_SWAP -u HERMES_UPDATE_REEXEC TERMINAL_CWD='$cwd' nohup '$bin' dashboard --isolated --host 0.0.0.0 --port $hport --no-open --skip-build >> '$log' 2>&1 &";
     my $rc = system('/bin/bash', '-c', $cmd);
     if ($rc != 0) {
         return {

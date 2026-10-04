@@ -268,8 +268,10 @@
                     }
                     showDevConsole(hermesBranch, hport, '', hcmd, 'hermes');
                     function goHermes(port) {
+                        // Open the Hermes dashboard root (not /chat). The dashboard serves the full web UI
+                        // at / after any login redirect. /chat was a leftover from chat-focused launches.
                         var url = window.location.protocol + '//' + window.location.hostname
-                            + ':' + port + '/chat';
+                            + ':' + port + '/';
                         if (devOpenLink) { devOpenLink.href = url; devOpenLink.style.display = ''; }
                         if (tab && !tab.closed) { tab.location = url; }
                         else { window.open(url, 'hermes-' + hermesBranch); }
