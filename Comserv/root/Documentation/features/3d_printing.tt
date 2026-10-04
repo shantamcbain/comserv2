@@ -1,8 +1,8 @@
-[% PageVersion = 'Documentation/features/3d_printing.tt,v 1.01 2026/09/24 hermes-agent Exp' %]
+[% PageVersion = 'Documentation/features/3d_printing.tt,v 1.02 2026/10/03 hermes-agent Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 [% META title = '3D Printing System' %]
-[% META description = 'How to use the 3D printing system: model library, printer farm, print queue, store, orders' %]
+[% META description = 'How to use the 3D printing system: model library, web search + external site cards, printer farm, print queue, store, orders' %]
 [% META roles = 'admin developer editor' %]
 
 <h1>3D Printing System</h1>
@@ -16,7 +16,7 @@
     ·
     <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">MASTER_PLAN</a>
 </p>
-<p><em>Last updated: September 24, 2026</em></p>
+<p><em>Last updated: October 3, 2026</em></p>
 
 <h2>Overview</h2>
 <p>
@@ -55,6 +55,18 @@ Each model record stores:
     <li><strong>show_in_shop</strong> — whether this model appears in the public store</li>
 </ul>
 <p>Browse the public model gallery at <a href="/3d/browse">/3d/browse</a>. Click a model for its detail page.</p>
+<p><strong>Web search + External Sites cards.</strong> The browse page can also search external model
+repositories. Tick <strong>Deep web search</strong> with a query to run the AI-augmented web search
+(self-hosted SearXNG, scoped with <code>site:</code> filters) — hits render as site-branded web result
+cards with a <em>Save</em> button (admin) that copies the model into the catalog metadata-only.
+At the bottom of the browse page an <strong>External Sites</strong> card grid always shows the real,
+logo-branded cards for the 11 supported repositories (Printables, MakerWorld, Thangs, Cults3D,
+Thingiverse, MyMiniFactory, CGTrader, Gambody, Pinshape, YouMagine, Anycubic). Each card is one
+link: with a search query typed it opens <strong>that site's own search</strong> carrying the
+AI-augmented term in a new tab (e.g. <code>thingiverse.com/search?q=…</code>, Pinshape
+<code>/items?search=…</code>, Printables <code>/search/all-models?q=…</code>); with no query it opens
+the site's homepage. Logos live in <code>root/static/images/3d/sites/&lt;code&gt;.png</code>; the site
+list is a single source of truth in <code>Comserv::Controller::3d::_external_sites</code>.</p>
 
 <hr>
 
@@ -204,7 +216,7 @@ Finished 3D prints can be consigned to other sites (e.g. a co-op shop or arts ma
     <thead><tr><th>URL</th><th>Description</th><th>Access</th></tr></thead>
     <tbody>
         <tr><td><code>/3d</code></td><td>3D printing home</td><td>All</td></tr>
-        <tr><td><code>/3d/browse</code></td><td>Public model browser</td><td>All</td></tr>
+        <tr><td><code>/3d/browse</code></td><td>Public model browser — local catalog, deep web search (<code>?deep=1</code>), External Sites card grid; <code>?site=&lt;code&gt;</code> scopes web search to one repository</td><td>All</td></tr>
         <tr><td><code>/3d/model/&lt;id&gt;</code></td><td>Model detail page</td><td>All</td></tr>
         <tr><td><code>/3d/model_download/&lt;id&gt;</code></td><td>Download model file</td><td>All (if enabled)</td></tr>
         <tr><td><code>/3d/store</code></td><td>Redirects to /shop</td><td>All</td></tr>
@@ -218,7 +230,7 @@ Finished 3D prints can be consigned to other sites (e.g. a co-op shop or arts ma
         <tr><td><code>/3d/models</code></td><td>Model library management</td><td>Admin</td></tr>
         <tr><td><code>/3d/model_stl_info/&lt;id&gt;</code></td><td>STL geometry stats</td><td>Admin</td></tr>
         <tr><td><code>/3d/admin</code></td><td>Admin dashboard</td><td>Admin</td></tr>
-        <tr><td><code>/3d/search_deeper</code></td><td>Deep inventory search</td><td>Admin</td></tr>
+        <tr><td><code>/3d/search_deeper</code></td><td>Redirects to /3d/browse?deep=1 (AI-augmented web search)</td><td>Admin</td></tr>
     </tbody>
 </table>
 
