@@ -1,0 +1,132 @@
+[% PageVersion = 'Inventory/categories.tt,v 1.00 2026/10/01 Shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.cat-admin { max-width:900px; margin:0 auto; }
+.cat-admin h2 { margin-bottom:0.5em; color:var(--heading-color, var(--text-color)); }
+.cat-tree { margin:1em 0; }
+.cat-tree ul { list-style:none; padding-left:1.5em; margin:0; }
+.cat-tree li { padding:0.25em 0; display:flex; align-items:center; gap:0.5em; }
+.cat-tree .cat-name { flex:1; color:var(--text-color); }
+.cat-tree .cat-actions form { display:inline; }
+.cat-form { display:flex; gap:0.5em; align-items:center; margin:1em 0; flex-wrap:wrap; }
+.cat-form input, .cat-form select {
+    padding:0.4em 0.6em; border:1px solid var(--border-color); border-radius:4px;
+    background:var(--input-bg, var(--secondary-color)); color:var(--text-color);
+}
+.cat-form button, .btn { padding:0.4em 1em; border:none; border-radius:4px;
+    background:var(--button-bg, var(--accent-color)); color:var(--button-text, white); cursor:pointer; }
+.msg { padding:0.6em 1em; border-radius:4px; margin:0.5em 0; }
+.msg.success { background:var(--schema-alert-warning-bg, #d4edda); color:var(--text-color); }
+.msg.error { background:var(--warning-color, #f8d7da); color:var(--text-color); }
+.item-list { margin-top:2em; }
+.item-list table { width:100%; border-collapse:collapse; }
+.item-list th, .item-list td { padding:0.4em 0.8em; text-align:left; border-bottom:1px solid var(--border-color); }
+.item-list th { font-size:0.85em; color:var(--muted-color, #888); }
+.item-list td { color:var(--text-color); }
+.cat-tag { display:inline-block; background:var(--accent-color); color:var(--button-text, white);
+    padding:0.15em 0.5em; border-radius:3px; font-size:0.8em; margin:0.1em; }
+.item-list select[multiple] { min-height:60px; min-width:150px; }
+</style>
+
+<div class="cat-admin">
+<h2>Inventory Category Management</h2>
+
+[% IF msg %]<div class="msg success">[% msg | html %]</div>[% END %]
+[% IF error %]<div class="msg error">[% error | html %]</div>[% END %]
+
+<!-- Add category -->
+<form method="post" action="/inventory/categories/manage" class="cat-form">
+    <input type="hidden" name="action" value="add">
+    <input type="text" name="name" placeholder="New category name" required>
+    <select name="parent_id">
+        <option value="">Top level</option>
+        [% MACRO cat_opts(tree, depth) BLOCK %]
+            [% FOREACH node IN tree %]
+                <option value="[% node.id %]">[% "&nbsp;" | repeat(depth * 2) %][% node.name | html %]</option>
+                [% IF node.children && node.children.size %]
+                    [% cat_opts(node.children, depth + 1) %]
+                [% END %]
+            [% END %]
+        [% END %]
+        [% cat_opts(cat_tree, 0) %]
+    </select>
+    <button type="submit">Add Category</button>
+</form>
+
+<!-- Category tree -->
+[% IF cat_tree && cat_tree.size %]
+<div class="cat-tree">
+    [% MACRO render_tree(tree, depth) BLOCK %]
+        <ul>
+            [% FOREACH node IN tree %]
+                <li>
+                    <span class="cat-name"><strong>[% node.name | html %]</strong>
+                        <small style="color:var(--muted-color,#888)">([% node.item_count %] items)</small></span>
+                    <span class="cat-actions">
+                        <form method="post" action="/inventory/categories/manage" style="display:inline">
+                            <input type="hidden" name="action" value="rename">
+                            <input type="hidden" name="id" value="[% node.id %]">
+                            <input type="text" name="name" value="[% node.name | html %]" size="12"
+                                   style="padding:0.2em 0.4em;border:1px solid var(--border-color);border-radius:3px;">
+                            <button type="submit" style="padding:0.2em 0.5em;font-size:0.8em;">Rename</button>
+                        </form>
+                        <form method="post" action="/inventory/categories/manage" style="display:inline"
+                              onsubmit="return confirm('Deactivate [% node.name | html %]?')">
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="id" value="[% node.id %]">
+                            <button type="submit" style="padding:0.2em 0.5em;font-size:0.8em;background:#dc3545;">X</button>
+                        </form>
+                    </span>
+                </li>
+                [% IF node.children && node.children.size %]
+                    [% render_tree(node.children, depth + 1) %]
+                [% END %]
+            [% END %]
+        </ul>
+    [% END %]
+    [% render_tree(cat_tree, 0) %]
+</div>
+[% ELSE %]
+<p style="color:var(--muted-color,#888);">No categories yet. Add one above.</p>
+[% END %]
+
+<!-- Assign inventory items to categories -->
+<h2 style="margin-top:2em;">Assign Items to Categories</h2>
+<p style="color:var(--muted-color,#888);font-size:0.9em;">
+    Select categories for each item (Ctrl+Click for multiple), then click <strong>Set</strong>.
+</p>
+[% IF recent_items && recent_items.size %]
+<div class="item-list">
+<table>
+    <tr><th>Item</th><th>Current Categories</th><th>Assign</th></tr>
+    [% FOREACH item IN recent_items %]
+    [%   SET cur_ids = item_cats.item(item.id) || [] %]
+    <tr>
+        <td><strong>[% item.name | html %]</strong>
+            <br><small style="color:var(--muted-color)">SKU: [% item.sku | html %]</small></td>
+        <td>
+            [% FOREACH cid IN cur_ids %]
+                <span class="cat-tag">[% cat_name.item(cid) || cid | html %]</span>
+            [% END %]
+            [% UNLESS cur_ids.size %]<span style="color:var(--muted-color)">none</span>[% END %]
+        </td>
+        <td>
+            <form method="post" action="/inventory/categories/manage" style="display:flex;gap:0.3em;align-items:center;">
+                <input type="hidden" name="action" value="assign">
+                <input type="hidden" name="item_id" value="[% item.id %]">
+                <select name="category_ids" multiple size="2" style="min-width:120px;">
+                    [% cat_opts(cat_tree, 0) %]
+                </select>
+                <button type="submit" style="padding:0.2em 0.5em;font-size:0.8em;">Set</button>
+            </form>
+        </td>
+    </tr>
+    [% END %]
+</table>
+</div>
+[% ELSE %]
+<p style="color:var(--muted-color,#888);">No active inventory items found.</p>
+[% END %]
+
+</div>

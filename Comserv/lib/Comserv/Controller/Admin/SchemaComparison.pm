@@ -1363,7 +1363,7 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
             try {
                 my $sql = $self->_create_sql_for_source(
                     $c, $schema, $namespace, $result_path, $class_name, $table_name);
-                my ($statement) = ($sql =~ /(CREATE\s+TABLE\s+`?\Q$table_name\E`?\b.*)/si);
+                my ($statement) = ($sql =~ /(CREATE\s+TABLE\s+`?\Q$table_name\E`?\b.*?);/si);
                 die "Could not isolate CREATE TABLE for '$table_name'" unless $statement;
                 $dbh->do('SET FOREIGN_KEY_CHECKS=0');
                 my $safe_statement = _strip_fk_constraints($statement);

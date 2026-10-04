@@ -120,92 +120,101 @@
     </form>
 </div>
 
-[% IF models && models.size %]
-<div class="card">
-    <h2>📋 Registered Models ([% models.size %])</h2>
-    <table class="models-table">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Linked Item</th>
-                <th>STL Info</th>
-                <th>Slicer Time</th>
-                <th>File</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-        [% FOREACH m IN models %]
-        <tr[% IF !m.is_active %] style="opacity:0.5"[% END %]>
-            <td>
-                <strong>[% m.name | html %]</strong>
-                [% IF m.description %]<br><small style="color:var(--text-muted-color)">[% m.description | html %]</small>[% END %]
-            </td>
-            <td>
-                [% IF m.item_id %]
-                <span class="badge-linked">✓ Linked</span>
-                <br><small>[% m.item_name | html %]</small>
-                <br><small style="color:var(--text-muted-color)">[% m.item_sku | html %]</small>
-                [% ELSE %]
-                <span class="badge-unlinked">⚠ Unlinked</span>
-                [% END %]
-            </td>
-            <td class="stl-info">
-                [% IF m.stl_volume_cm3 %]
-                Vol: [% m.stl_volume_cm3 | format('%.2f') %] cm³<br>
-                ~[% m.stl_weight_g | format('%.1f') %] g (PLA)
-                <button type="button" class="btn-sm btn-warning" style="margin-top:0.2em;"
-                        onclick="recalcSTL([% m.id %], this)">↺ Recalc</button>
-                [% ELSE %]
-                <em style="color:var(--text-muted-color)">not parsed</em>
-                [% IF m.nfs_path %]
-                <button type="button" class="btn-sm btn-warning" style="margin-top:0.2em;"
-                        onclick="recalcSTL([% m.id %], this)">▶ Parse STL</button>
-                [% END %]
-                [% END %]
-            </td>
-            <td>[% m.print_time_hours ? m.print_time_hours _ ' h' : '—' %]</td>
-            <td class="stl-info">
-                [% IF m.nfs_path %]
-                <code style="font-size:0.75em;word-break:break-all;">[% m.nfs_path | html %]</code><br>
-                <a href="/3d/model_download/[% m.id %]" class="btn-sm btn-primary" style="margin-top:0.3em;display:inline-block;">⬇ Download</a>
-                [% ELSE %]<em>—</em>[% END %]
-            </td>
-            <td>
-                <form method="post" action="/3d/models" style="display:inline;">
-                    <input type="hidden" name="action" value="link">
-                    <input type="hidden" name="model_id" value="[% m.id %]">
-                    <select name="item_id" style="font-size:0.8em;padding:0.2em;">
-                        <option value="">— unlink —</option>
-                        [% FOREACH it IN all_items %]
-                        <option value="[% it.id %]"
-                            [% IF m.item_id == it.id %]selected[% END %]>
-                            [% it.name | html %]
-                        </option>
-                        [% END %]
-                    </select>
-                    <input type="text" name="print_hours"
-                           value="[% m.print_time_hours | html %]"
-                           placeholder="h" style="width:55px;font-size:0.8em;padding:0.2em;">
-                    <button type="submit" class="btn-sm btn-primary">Save</button>
-                </form>
-                [% IF m.is_active %]
-                <form method="post" action="/3d/models" style="display:inline;margin-left:0.3em;">
-                    <input type="hidden" name="action" value="deactivate">
-                    <input type="hidden" name="model_id" value="[% m.id %]">
-                    <button type="submit" class="btn-sm btn-danger"
-                            onclick="return confirm('Hide this model?')">✕</button>
-                </form>
-                [% END %]
-            </td>
-        </tr>
+[% IF cat_tree && cat_tree.size %]
+<form method="get" action="/3d/models" style="display:flex;gap:0.5em;align-items:center;margin-bottom:0.8em;flex-wrap:wrap;">
+    <span style="font-size:0.85em;color:var(--muted-color);">Category:</span>
+    <select name="cat" onchange="this.form.submit()" style="padding:0.35em 0.6em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,var(--secondary-color));color:var(--text-color);max-width:260px;">
+        <option value="">All categories</option>
+        <option value="0"[% IF cat AND cat == '0' %] selected[% END %]>⚠ Uncategorized</option>
+        [% MACRO cf(tree,depth) BLOCK %]
+        [% FOREACH node IN tree %]
+        <option value="[% node.id %]"[% IF cat == node.id %] selected[% END %]>[% "&nbsp;&nbsp;" | repeat(depth) %][% node.name | html %] ([% node.item_count %])</option>
+        [% IF node.children && node.children.size; cf(node.children, depth+1); END %]
         [% END %]
-        </tbody>
-    </table>
+        [% END %]
+        [% cf(cat_tree, 0) %]
+    </select>
+    [% IF cat %]<a href="/3d/models" class="btn-sm" style="background:#6c757d;">✕ Clear</a>[% END %]
+</form>
+[% END %]
+
+<div class="cat-quick">
+    <strong>Quick add:</strong>
+    <form method="post" action="/inventory/categories/manage" style="display:flex;gap:0.3em;">
+        <input type="hidden" name="action" value="add"><input type="hidden" name="redirect" value="/3d/models">
+        <input type="text" name="name" placeholder="New category" size="14" style="padding:0.3em;border:1px solid var(--border-color);border-radius:3px;background:var(--input-bg,var(--secondary-color));color:var(--text-color);">
+        <select name="parent_id" style="padding:0.3em;border:1px solid var(--border-color);border-radius:3px;background:var(--input-bg,var(--secondary-color));color:var(--text-color);">
+            <option value="">Top level</option>
+            [% FOREACH node IN cat_tree %]<option value="[% node.id %]">[% node.name | html %]</option>
+            [% IF node.children && node.children.size; FOREACH sub IN node.children %]<option value="[% sub.id %]">&nbsp;&nbsp;[% sub.name | html %]</option>[% END; END %]
+            [% END %]
+        </select>
+        <button type="submit" style="padding:0.25em 0.8em;font-size:0.85em;background:var(--accent-color);color:#fff;border:none;border-radius:3px;cursor:pointer;">Add</button>
+    </form>
+    <span style="font-size:0.8em;color:var(--muted-color);">|</span>
+    <a href="/inventory/categories/manage" style="font-size:0.8em;">Full category editor</a>
+    <span style="font-size:0.8em;color:var(--muted-color);">|</span>
+    <form method="post" action="/3d/models" style="display:inline;">
+        <input type="hidden" name="action" value="auto_categorize">
+        <button type="submit" class="btn-sm btn-primary" style="font-size:0.75em;"
+                onclick="return confirm('Auto-categorize all models from their directory paths? This may create inventory items.')">🤖 Auto-categorize from paths</button>
+    </form>
+</div>
+
+[% IF category_groups && category_groups.size %]
+<div class="card" style="margin-bottom:0.4em;padding:0.6em 1em;">
+    <strong>📋 [% total_models %] Models</strong>
+</div>
+[% MACRO rg(group,depth) BLOCK %]
+[% IF group.model_count > 0 %]
+<div style="margin-left:[% depth*14 %]px; margin-bottom:0.2em;">
+  <div onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none';this.querySelector('.toggle').textContent=this.querySelector('.toggle').textContent==='▶'?'▼':'▶';"
+       style="background:var(--secondary-color);border:1px solid var(--border-color);border-radius:6px;padding:0.35em 0.6em;cursor:pointer;display:flex;align-items:center;gap:0.5em;">
+    <span class="toggle" style="font-size:0.65em;">▼</span>
+    <strong style="color:var(--heading-color,var(--text-color));font-size:0.85em;">[% group.name | html %]</strong>
+    <span style="background:var(--accent-color);color:var(--button-text,white);border-radius:10px;padding:0.1em 0.5em;font-size:0.65em;font-weight:bold;">[% group.model_count %]</span>
+  </div>
+  <div style="display:block;padding-top:0.1em;">
+    [% IF group.children && group.children.size; FOREACH child IN group.children; rg(child, depth+1); END; END %]
+    [% IF group.models && group.models.size; FOREACH m IN group.models; SET cur_ids = item_cats.item(m.item_id) || [] %]
+    <div style="display:flex;align-items:center;gap:0.3em;padding:0.2em 0.4em;margin-left:[% (depth+1)*14 %]px;border-bottom:1px solid var(--border-color);font-size:0.76em;">
+      [% IF m.thumbnail_url; SET thumb = m.thumbnail_url.replace('\.svg$','.png') %]<img src="[% thumb | html %]" style="width:34px;height:34px;object-fit:cover;border-radius:3px;flex-shrink:0;" loading="lazy" onerror="this.style.display='none'">
+      [% ELSE %]<div style="width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--muted-color);background:var(--bg-color);border-radius:3px;">◻</div>[% END %]
+      <div style="flex:2;min-width:80px;"><strong>[% m.name | html %]</strong></div>
+      <div style="flex:0.5;min-width:30px;">[% IF m.item_id %]<span class="badge-linked">✓</span>[% ELSE %]<span class="badge-unlinked">⚠</span>[% END %]</div>
+      <div style="flex:2;min-width:130px;">
+        [% FOREACH cid IN cur_ids %]<span class="cat-tag">[% cat_name.item(cid)||cid|html %]</span>[% END %]
+        [% UNLESS cur_ids.size %]<span style="color:var(--muted-color);font-size:0.7em;">none</span>[% END %]
+        <form method="post" action="/3d/models" style="display:flex;gap:0.1em;align-items:center;margin-top:0.08em;">
+          [% IF m.item_id %]<input type="hidden" name="action" value="assign_cat"><input type="hidden" name="item_id" value="[% m.item_id %]">
+          [% ELSE %]<input type="hidden" name="action" value="assign_cat"><input type="hidden" name="model_id" value="[% m.id %]">[% END %]
+          
+          <select name="category_ids" multiple size="1" style="font-size:0.6em;width:80px;">
+            [% FOREACH node IN cat_tree %]<option value="[% node.id %]"[% IF cur_ids.grep(node.id).size %] selected[% END %]>[% node.name|html %]</option>
+            [% IF node.children && node.children.size; FOREACH sub IN node.children %]<option value="[% sub.id %]"[% IF cur_ids.grep(sub.id).size %] selected[% END %]>&nbsp;&nbsp;[% sub.name|html %]</option>[% END; END %]
+            [% END %]
+          </select>
+          <button type="submit" class="btn-sm btn-primary" style="font-size:0.55em;">Set</button>
+        </form>
+      </div>
+      <div style="flex:0.6;min-width:45px;font-size:0.72em;color:var(--muted-color);">[% IF m.stl_volume_cm3 %]~[% m.stl_weight_g|format('%.0f') %]g[% END %] [% IF m.print_time_hours %][% m.print_time_hours %]h[% END %]</div>
+      <div>[% IF m.nfs_path %]<a href="/3d/model_download/[% m.id %]" class="btn-sm btn-primary" style="font-size:0.55em;">⬇</a>[% END %]</div>
+    </div>
+    [% END; END %]
+  </div>
+</div>
+[% END %]
+[% END %]
+[% FOREACH group IN category_groups %][% rg(group,0) %][% END %]
+[% ELSIF total_models == 0 %]
+<div style="text-align:center;padding:2em;background:var(--secondary-color);border:1px dashed var(--border-color);border-radius:6px;color:var(--text-muted-color);">
+    No models registered yet. Upload your first STL above.
 </div>
 [% ELSE %]
 <div style="text-align:center;padding:2em;background:var(--secondary-color);border:1px dashed var(--border-color);border-radius:6px;color:var(--text-muted-color);">
-    No models registered yet. Upload your first STL above.
+    [% total_models %] models — none categorized yet.
+    <br>Use the <strong>Set</strong> button on any model row to pick categories.
+    <br><a href="/inventory/categories/manage">Manage categories &amp; bulk assign</a>
 </div>
 [% END %]
 
