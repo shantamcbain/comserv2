@@ -200,3 +200,5 @@ Comserv/root/session/**
 # Hermes agent scratch plans (local working notes, not project source)
 .hermes/plans/
 .hermes/plans/**
+# 3d library user-uploaded images (giant SVG re-uploads would exceed GitHub limits; keep out of git)
+Comserv/root/static/images/3d/library/**
