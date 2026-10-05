@@ -56,6 +56,9 @@ sub _base_rs {
     my $cond = {
         'me.created_at'   => { '>=' => $since },
         'me.request_type' => [ -or => { -not_in => [ EXCLUDED_REQUEST_TYPES ] }, undef ],
+        # Overrun-guard trip/restore rows are ops events, not AI call outcomes
+        # (they were dragging ok_rate down as "errors" with 0 tokens).
+        'me.status'       => { -not_in => [qw(trip restore)] },
     };
     if ($extra && ref $extra eq 'HASH') {
         $cond->{$_} = $extra->{$_} for keys %$extra;
@@ -164,6 +167,8 @@ sub org_summary {
     $out->{agents} = $self->agents_active($c, $out->{hermes});
     $out->{openrouter} = $self->openrouter_live($c);
     $out->{supergrok_week} = $self->supergrok_week_from_hermes($c);
+    $out->{failure_buckets} = eval { $self->failure_buckets($c, days => $days) } || { buckets => [], errors => ["$@"] };
+
 
     for my $r (@{ $out->{by_day} }, @{ $out->{by_model} }, @{ $out->{by_user} },
                @{ $out->{by_site} }, @{ $out->{by_source} }, @{ $out->{combinations} }) {
@@ -884,6 +889,71 @@ sub hermes_summary {
     };
     return $out;
 }
+
+# Map a Ledger status + error_message to a stable reason bucket for the usage page.
+sub classify_failure_reason {
+    my ($self, $status, $err) = @_;
+    $status = $status // '';
+    $err    = $err // '';
+    return 'success' if $status eq 'success';
+    return 'all_exhausted' if $status eq 'all_exhausted' || $err =~ /all_exhausted|No AI model is available/i;
+    return 'circuit_open'  if $err =~ /circuit_open|circuit open/i;
+    return 'budget_cap'    if $err =~ /budget_cap|credits_exhausted|soft.?cap/i;
+    return 'supergrok_locked' if $err =~ /supergrok_locked/i;
+    return 'http_429' if $err =~ /\b429\b|rate.?limit/i;
+    return 'http_402' if $err =~ /\b402\b|Payment Required|Insufficient credits/i;
+    return 'http_404' if $err =~ /\b404\b|not a valid model|No endpoints/i;
+    return 'http_401' if $err =~ /\b401\b|Unauthorized|invalid.?api.?key/i;
+    return 'http_5xx' if $err =~ /\b50[0-9]\b/;
+    return 'timeout'  if $err =~ /timeout|timed out|DeadlineExceeded/i;
+    return 'empty'    if $err =~ /empty_output|empty content|zero_tokens_empty|postcheck_empty/i;
+    return 'provider_error' if $err =~ /provider error|provider_error/i;
+    return 'refused'  if $err =~ /refus|harm|safety/i;
+    return 'timeout' if $status eq 'timeout';
+    return 'other';
+}
+
+=head2 failure_buckets($c, days => 14)
+
+Counts non-success Ledger rows (excluding guard trip/restore via _base_rs)
+into reason buckets for /ai/usage and usage_live.
+
+=cut
+
+sub failure_buckets {
+    my ($self, $c, %a) = @_;
+    my ($days, $since) = $self->_since($a{days});
+    my $out = { days => $days, since => $since, buckets => [], total_failures => 0, errors => [] };
+    try {
+        my $rs = $self->_base_rs($c, $since)->search({ 'me.status' => { '!=' => 'success' } }, {
+            columns => [qw(id status error_message provider model request_type)],
+            order_by => { -desc => 'me.id' }, rows => METADATA_SCAN_ROWS * 2,
+        });
+        my %b;
+        while (my $r = $rs->next) {
+            my $bucket = $self->classify_failure_reason($r->get_column('status'), $r->get_column('error_message'));
+            my $row = $b{$bucket} ||= { reason => $bucket, count => 0, providers => {}, models => {} };
+            $row->{count}++;
+            $out->{total_failures}++;
+            my $pv = $r->get_column('provider') // '-';
+            my $md = $r->get_column('model') // '-';
+            $row->{providers}{$pv}++;
+            $row->{models}{$md}++;
+        }
+        $out->{buckets} = [
+            map {
+                my $x = $b{$_};
+                +{ reason => $x->{reason}, count => $x->{count},
+                   providers => [ sort { $x->{providers}{$b} <=> $x->{providers}{$a} } keys %{ $x->{providers} } ],
+                   top_model => (sort { $x->{models}{$b} <=> $x->{models}{$a} } keys %{ $x->{models} })[0] }
+            } sort { $b{$b}{count} <=> $b{$a}{count} || $a cmp $b } keys %b
+        ];
+    } catch {
+        push @{ $out->{errors} }, "failure_buckets: $_";
+    };
+    return $out;
+}
+
 
 sub _merge_org_totals {
     my ($self, $out) = @_;
@@ -1733,6 +1803,7 @@ sub ai_health {
         require Comserv::Util::AI::HermesOverrunGuard;
         $out->{overrun} = Comserv::Util::AI::HermesOverrunGuard->status;
         $out->{overrun_banner} = Comserv::Util::AI::HermesOverrunGuard::banner($out->{overrun});
+        $out->{handoff_banner} = $out->{overrun}{handoff_banner} if $out->{overrun}{handoff_banner};
     };
     $out->{ollama} = Comserv::Util::AI::HealthChecks::ollama_health(journal => 1);
     $out->{preflight} = eval { Comserv::Util::AI::StalePreflight::check_all() } || [];
@@ -1778,6 +1849,7 @@ sub ai_banner {
         require Comserv::Util::AI::HermesOverrunGuard;
         $out->{overrun} = Comserv::Util::AI::HermesOverrunGuard->status;
         $out->{overrun_banner} = Comserv::Util::AI::HermesOverrunGuard::banner($out->{overrun});
+        $out->{handoff_banner} = $out->{overrun}{handoff_banner} if $out->{overrun}{handoff_banner};
     };
     return $out;
 }

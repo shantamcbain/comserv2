@@ -139,7 +139,7 @@ sub chat {
             Comserv::Util::AI::HarmRefusal::log_line($harm, eval { $c->session->{user_id} }));
         return Comserv::Util::AI::HarmRefusal::reply_hash($harm);
     }
-    my $model    = $args{model}    || 'phi4:14b';
+    my $model    = $args{model}    || 'gemma4-64k:latest';
     my ($rhost, $rport, $reachable) = $self->resolve_host($c);
     my $host     = $args{host}     || $rhost;
     my $port     = $args{port}     || $rport;

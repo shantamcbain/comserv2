@@ -18,7 +18,7 @@ our $ALERT_AFTER_S  = 6 * 3600;
 our $PCT_PER_CALL   = 0.05;     # same rough calibration as supergrok_daily_guard.py
 our $OLLAMA_URL     = $ENV{OLLAMA_URL} || 'http://127.0.0.1:11434';
 our $LLAMA_SERVER   = $ENV{OLLAMA_LLAMA_SERVER} || '/usr/local/lib/ollama/llama-server';
-our @FOCUS_MODELS   = qw(tev1:0.8b nimble:latest clef-flash:latest);   # Today's Focus decision models (DecisionRank / Ollama::Decision)
+our @FOCUS_MODELS   = qw(tev1:0.8b tev1:latest nimble:latest clef-flash:latest);   # Today's Focus decision models (DecisionRank / Ollama::Decision)
 our %LAST_ALERT;                                    # throttle: one log line per meter per hour
 
 sub _home { $ENV{HOME} && $ENV{HOME} ne '/' ? $ENV{HOME} : '/home/shanta' }

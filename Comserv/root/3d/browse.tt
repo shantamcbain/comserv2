@@ -1,4 +1,4 @@
-[% PageVersion = '3d/browse.tt,v 1.00 2026/04/10 Shanta Exp shanta' %]
+[% PageVersion = '3d/browse.tt,v 1.01 2026/10/03 Shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <style>
@@ -84,6 +84,87 @@
     color: var(--link-color);
     border: 1px solid var(--border-color);
 }
+.btn-sm.save-model {
+    background: #28a745;
+    font-size: 0.75em;
+    padding: 0.3em 0.6em;
+}
+.btn-sm.save-model.saved {
+    background: #6c757d;
+    pointer-events: none;
+}
+
+/* ── Site-branded web result cards ── */
+.web-result-card {
+    border-top: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    border-radius: 6px;
+    overflow: hidden;
+    padding: 0;
+}
+.web-result-card .site-bar {
+    padding: 0.3em 0.7em;
+    font-size: 0.72em;
+    font-weight: bold;
+    letter-spacing: 0.03em;
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    color: #fff;
+}
+.web-result-card .site-bar .site-icon {
+    font-size: 1.1em;
+}
+.web-result-card .card-body {
+    padding: 0.7em;
+    display: flex;
+    flex-direction: column;
+}
+.web-result-card .card-body h3 {
+    font-size: 0.9em;
+    margin: 0 0 0.3em 0;
+    color: var(--heading-color, var(--text-color));
+}
+.web-result-card .card-body .model-type {
+    font-size: 0.75em;
+    margin-bottom: 0.4em;
+    color: var(--muted-color, var(--text-color));
+}
+.web-result-card .card-body p {
+    font-size: 0.8em;
+    flex: 1;
+    margin: 0 0 0.6em 0;
+    color: var(--text-color);
+}
+
+/* Per-site colors */
+.site-prtbl .site-bar { background: #FA6831; }  /* Printables orange */
+.site-mkwld .site-bar { background: #00B894; }  /* MakerWorld (Bambu) teal */
+.site-thngs .site-bar { background: #1A1A2E; }  /* Thangs dark */
+.site-cult3 .site-bar { background: #8E44AD; }  /* Cults3D purple */
+.site-thing .site-bar { background: #248BFB; }  /* Thingiverse blue */
+.site-mymin .site-bar { background: #FF6B35; }  /* MyMiniFactory orange-red */
+.site-cgtrd .site-bar { background: #2252A3; }  /* CGTrader dark blue */
+.site-gambd .site-bar { background: #D81B60; }  /* Gambody pink */
+.site-pnshp .site-bar { background: #27AE60; }  /* Pinshape green */
+.site-ymagn .site-bar { background: #2980B9; }  /* YouMagine blue */
+.site-anycu .site-bar { background: #00A8E8; }  /* Anycubic/MakerOnline cyan */
+
+/* Thin accent border on web result cards matching site color */
+.site-prtbl { border: 1px solid #FA6831; }
+.site-mkwld { border: 1px solid #00B894; }
+.site-thngs { border: 1px solid #1A1A2E; }
+.site-cult3 { border: 1px solid #8E44AD; }
+.site-thing { border: 1px solid #248BFB; }
+.site-mymin { border: 1px solid #FF6B35; }
+.site-cgtrd { border: 1px solid #2252A3; }
+.site-gambd { border: 1px solid #D81B60; }
+.site-pnshp { border: 1px solid #27AE60; }
+.site-ymagn { border: 1px solid #2980B9; }
+.site-anycu { border: 1px solid #00A8E8; }
+
 .empty-notice {
     text-align: center;
     padding: 3em 1em;
@@ -135,6 +216,129 @@
 .sign-preview {
     margin-top: 0.6em;
 }
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5em;
+    margin-top: 1.5em;
+    flex-wrap: wrap;
+}
+.pagination a, .pagination span {
+    padding: 0.4em 0.8em;
+    border-radius: 4px;
+    font-size: 0.9em;
+    text-decoration: none;
+}
+.pagination a {
+    background: var(--button-bg, var(--accent-color));
+    color: var(--button-text, white);
+}
+.pagination a.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+.pagination .page-info {
+    color: var(--muted-color, var(--text-color));
+    font-size: 0.85em;
+}
+.pagination .page-current {
+    padding: 0.4em 0.8em;
+    border-radius: 4px;
+    font-size: 0.9em;
+    background: var(--accent-color);
+    color: var(--button-text, white);
+    font-weight: bold;
+}
+
+/* ── External Sites branded card grid (bottom of page) ── */
+/*
+ * Cards represent external model repositories. Each card uses the site's
+ * REAL logo (static/images/3d/sites/<code>.png) and a brand color sampled
+ * from that logo's dominant pixel — no hardcoded approximations. The whole
+ * card is one link that opens the external site in a new tab.
+ */
+.ext-sites-section {
+    margin-top: 2em;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1em 1.2em;
+    background: var(--secondary-color);
+}
+.ext-sites-section h3 {
+    margin: 0 0 0.3em 0;
+    color: var(--heading-color, var(--text-color));
+}
+.ext-sites-section .ext-sites-note {
+    font-size: 0.85em;
+    color: var(--muted-color, var(--text-color));
+    margin: 0 0 1em 0;
+}
+.ext-sites-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1em;
+}
+.ext-site-card {
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    text-decoration: none;
+    background: var(--secondary-color);
+    transition: box-shadow 0.15s ease;
+}
+.ext-site-card:hover, .ext-site-card:focus-visible {
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    outline: 2px solid var(--accent-color, #007bff);
+    outline-offset: 1px;
+}
+/* Brand header: site's own logo on its own brand color */
+.ext-site-card .ext-site-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.9em 0;
+    background: var(--ext-site-accent, var(--secondary-color));
+}
+.ext-site-card .ext-site-brand img {
+    height: 44px;
+    max-width: 150px;
+    object-fit: contain;
+}
+.ext-site-card .ext-site-name {
+    padding: 0.55em 0.8em;
+    font-size: 0.85em;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--heading-color, var(--text-color));
+    border-top: 1px solid var(--border-color);
+}
+.ext-site-card .ext-site-go {
+    font-size: 0.72em;
+    color: var(--link-color, var(--accent-color));
+    font-weight: 600;
+    padding: 0.15em 0.8em 0.4em;
+}
+.ext-site-card .ext-site-go:hover,
+.ext-site-card .ext-site-go:focus-visible {
+    text-decoration: underline;
+}
+/* Per-site accent color sampled from each real logo (see JS-free static
+   images under static/images/3d/sites/). Card background uses the logo's
+   dominant hue; white text stays readable because logos are dark. */
+.ext-site-card.site-prtbl { --ext-site-accent: #F06020; }
+.ext-site-card.site-mkwld { --ext-site-accent: #00B894; }
+.ext-site-card.site-thngs { --ext-site-accent: #1A1A2E; }
+.ext-site-card.site-cult3 { --ext-site-accent: #8020F0; }
+.ext-site-card.site-thing { --ext-site-accent: #2050F0; }
+.ext-site-card.site-mymin { --ext-site-accent: #FF6B35; }
+.ext-site-card.site-cgtrd { --ext-site-accent: #60B8C0; }
+.ext-site-card.site-gambd { --ext-site-accent: #D03030; }
+.ext-site-card.site-pnshp { --ext-site-accent: #40A0D0; }
+.ext-site-card.site-ymagn { --ext-site-accent: #204090; }
+.ext-site-card.site-anycu { --ext-site-accent: #00A8E8; }
 </style>
 
 [% IF feature_pending %]
@@ -150,6 +354,11 @@
             <input type="hidden" name="kind" value="[% kind | html %]">
             <input type="text" name="q" value="[% q | html %]" placeholder="Search models…">
             <button type="submit"><i class="icon-search"></i> Search</button>
+            <label style="font-size:0.85em;color:var(--muted-color,var(--text-color));cursor:pointer;display:inline-flex;align-items:center;gap:0.25em;margin-left:0.3em;">
+                <input type="checkbox" name="deep" value="1" onchange="this.form.submit()"
+                       [% IF deep %]checked[% END %]>
+                Deep web search
+            </label>
         </form>
     </div>
 </div>
@@ -160,14 +369,30 @@
                      { id => 'sign',    label => 'Signs' },
                      { id => 'all',     label => 'All' } ] %]
     [% FOREACH k IN kinds %]
-    <a href="/3d/browse?kind=[% k.id %][% IF q %]&amp;q=[% q | uri %][% END %]"
+    <a href="/3d/browse?kind=[% k.id %][% IF q %]&amp;q=[% q | uri %][% END %][% IF deep %]&amp;deep=1[% END %]"
        class="btn-sm[% UNLESS kind == k.id %] secondary[% END %]">[% k.label %]</a>
     [% END %]
 </p>
 
-[% IF c.session.username %]
-<p style="margin-bottom:1em;">
-    <a href="/3d/search_deeper?q=[% q | uri %]" class="btn-sm secondary"><i class="icon-ai"></i> Deeper AI/Web Search</a>
+[% IF cat_tree && cat_tree.size %]
+<p class="browse-3d-filters">
+    <span style="color:var(--muted-color,#888);font-size:0.85em;margin-right:0.3em;">Category:</span>
+    [% MACRO cat_options(tree, depth) BLOCK %]
+        [% FOREACH node IN tree %]
+            <option value="[% node.id %]"[% IF cat == node.id %] selected[% END %]>
+                [% "&nbsp;&nbsp;" | repeat(depth) %][% node.name | html %] ([% node.item_count %])</option>
+            [% IF node.children && node.children.size %]
+                [% cat_options(node.children, depth + 1) %]
+            [% END %]
+        [% END %]
+    [% END %]
+    <select name="cat" onchange="var v=this.value;var u=window.location.href.split('?')[0]+'?kind=[% kind | uri %]&q=[% q | uri %]';if(v)u+='&cat='+v;window.location=u;" style="padding:0.4em 0.8em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg, var(--secondary-color));color:var(--text-color);max-width:280px;">
+        <option value="">All categories</option>
+        [% cat_options(cat_tree, 0) %]
+    </select>
+    [% IF cat %]
+    <a href="/3d/browse?kind=[% kind | uri %][% IF q %]&amp;q=[% q | uri %][% END %][% IF deep %]&amp;deep=1[% END %]" class="btn-sm secondary">Clear</a>
+    [% END %]
 </p>
 [% END %]
 
@@ -175,10 +400,18 @@
 <div class="model-grid">
     [% FOREACH model IN models %]
     <div class="model-card">
+        <div class="model-thumb" style="width:100%;height:140px;border-radius:4px;margin-bottom:0.6em;
+             background:var(--secondary-color);display:flex;align-items:center;justify-content:center;
+             color:var(--muted-color,#888);font-size:2.5em;overflow:hidden;">
         [% IF model.thumbnail_url %]
-        <img src="[% model.thumbnail_url | html %]" alt="[% model.name | html %]"
-             style="width:100%;height:140px;object-fit:cover;border-radius:4px;margin-bottom:0.6em;">
+        [% SET thumb_src = model.thumbnail_url.replace('\.svg$', '.png') %]
+        <img src="[% thumb_src | html %]" alt="[% model.name | html %]" loading="lazy"
+             style="width:100%;height:100%;object-fit:cover;border-radius:4px;"
+             onerror="this.style.display='none';this.parentElement.innerHTML='&#9673;';">
+        [% ELSE %]
+        &#9673;
         [% END %]
+        </div>
         <h3>[% model.name | html %]</h3>
         <div class="model-type">[% model.file_type | upper %]
             [% IF model.tags %] &bull; [% model.tags | html %][% END %]
@@ -227,17 +460,193 @@
     </div>
     [% END %]
 </div>
-[% ELSE %]
+[% IF total_pages > 1 %]
+[%   SET win_size = 5;
+    SET win_start = page - 2;
+    SET win_start = 1 IF win_start < 1;
+    SET win_end   = win_start + win_size - 1;
+    IF win_end > total_pages;
+        win_end = total_pages;
+        win_start = win_end - win_size + 1;
+        win_start = 1 IF win_start < 1;
+    END;
+    SET pq = "kind=$kind&amp;q=$q";
+    SET pq = pq _ "&amp;deep=1" IF deep;
+    SET pq = pq _ "&amp;cat=$cat" IF cat %]
+<div class="pagination">
+    [% IF page > 1 %]
+    <a href="/3d/browse?[% pq %]&amp;page=1" title="First">&laquo;</a>
+    <a href="/3d/browse?[% pq %]&amp;page=[% page - 1 %]">&lsaquo; Prev</a>
+    [% ELSE %]
+    <a class="disabled">&laquo;</a>
+    <a class="disabled">&lsaquo; Prev</a>
+    [% END %]
+    [% IF win_start > 1 %]<span class="page-info">&hellip;</span>[% END %]
+    [% FOREACH p IN [ win_start .. win_end ] %]
+    [%   IF p == page %]
+    <span class="page-current">[% p %]</span>
+    [%   ELSE %]
+    <a href="/3d/browse?[% pq %]&amp;page=[% p %]">[% p %]</a>
+    [%   END %]
+    [% END %]
+    [% IF win_end < total_pages %]<span class="page-info">&hellip;</span>[% END %]
+    [% IF page < total_pages %]
+    <a href="/3d/browse?[% pq %]&amp;page=[% page + 1 %]">Next &rsaquo;</a>
+    <a href="/3d/browse?[% pq %]&amp;page=[% total_pages %]" title="Last">&raquo;</a>
+    [% ELSE %]
+    <a class="disabled">Next &rsaquo;</a>
+    <a class="disabled">&raquo;</a>
+    [% END %]
+    <span class="page-info">[% total_models %] models</span>
+</div>
+[% END %]
+[% END %]
+
+[% MACRO site_icon(code) BLOCK %]
+[%   SWITCH code %]
+[%     CASE 'prtbl' %]🟠[% CASE 'mkwld' %]🟢[% CASE 'thngs' %]⬛[% CASE 'cult3' %]🟣[% CASE 'thing' %]🔵[% CASE 'mymin' %]🟠
+[%     CASE 'cgtrd' %]🔷[% CASE 'gambd' %]💗[% CASE 'pnshp' %]🟢[% CASE 'ymagn' %]🔹[% CASE 'anycu' %]🩵
+[%     CASE %]🌐
+[%   END %]
+[% END %]
+
+[% IF web_results && web_results.size %]
+<div style="margin-top:1.5em;">
+    <h3 style="margin-bottom:0.6em;color:var(--heading-color,var(--text-color));">
+        🌐 Web Search Results
+        [% IF search_provider %]<span style="font-weight:normal;font-size:0.85em;color:var(--muted-color);">via [% search_provider | html %]</span>[% END %]
+        [% IF augmented_q %]<span style="font-weight:normal;font-size:0.8em;color:var(--muted-color);display:block;">query: [% augmented_q | html %]</span>[% END %]
+    </h3>
+    <div class="model-grid">
+        [% FOREACH r IN web_results %]
+        [%   SET sc = r.site_code || '' %]
+        <div class="model-card web-result-card site-[% sc || 'unknown' %]">
+            <!-- Site-branded top bar -->
+            <div class="site-bar">
+                <span class="site-icon">[% site_icon(sc) %]</span>
+                <span>[% r.site || 'Web' | html %]</span>
+            </div>
+            <div class="card-body">
+                [% IF r.thumbnail %]
+                <div style="width:100%;height:110px;border-radius:4px;margin-bottom:0.5em;overflow:hidden;background:var(--bg-color);">
+                    <img src="[% r.thumbnail | html %]" alt="" loading="lazy"
+                         style="width:100%;height:100%;object-fit:cover;"
+                         onerror="this.style.display='none';this.parentElement.innerHTML='&#127760;';">
+                </div>
+                [% ELSE %]
+                <div style="font-size:2em;text-align:center;color:var(--muted-color);margin-bottom:0.3em;">&#127760;</div>
+                [% END %]
+                <h3>[% r.title | html %]</h3>
+                <div class="model-type">
+                    [% IF r.file_type %][% r.file_type | html %][% ELSE %]STL[% END %]
+                    [% IF r.cost %]&bull; <span style="color:var(--accent-color);">[% r.cost | html %]</span>[% END %]
+                </div>
+                <p>[% r.snippet | html %]</p>
+                <div class="model-card-actions" style="flex-wrap:wrap;">
+                    <a href="[% r.url | html %]" target="_blank" rel="noopener" class="btn-sm" style="font-size:0.8em;">View on [% r.site | html %] &rarr;</a>
+                    <a href="/3d/browse?q=[% r.title | uri %]&amp;deep=1" class="btn-sm secondary" style="font-size:0.75em;" title="Find more like this">&#128269;</a>
+                    [% IF c.session.roles.grep('admin').size %]
+                    <button class="btn-sm save-model"
+                        type="button"
+                        data-title="[% r.title | html %]"
+                        data-url="[% r.url | html %]"
+                        data-thumb="[% r.thumbnail | html %]"
+                        data-site="[% r.site | html %]"
+                        data-snippet="[% r.snippet | html %]"
+                        data-type="[% r.file_type | html %]"
+                        onclick="saveWebModel(this)"
+                        title="Save to model catalog (no file — metadata only)">💾 Save</button>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+        [% END %]
+    </div>
+</div>
+
+<script>
+window.saveWebModel = function(btn) {
+    if (btn.classList.contains('saved')) return;
+    var orig = btn.textContent;
+    btn.textContent = '…';
+    btn.disabled = true;
+
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/3d/copy';
+    form.style.display = 'none';
+
+    var fields = {title:1, url:1, thumbnail:1, site:1, description:1, file_type:1};
+    for (var k in fields) {
+        var v = btn.getAttribute('data-' + k.replace(/_/g, '-')) || '';
+        if (k === 'description') v = btn.getAttribute('data-snippet') || '';
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = k;
+        input.value = v;
+        form.appendChild(input);
+    }
+
+    document.body.appendChild(form);
+    form.submit();
+};
+</script>
+[% END %]
+
+[% UNLESS (models && models.size) || (web_results && web_results.size) %]
 <div class="empty-notice">
     [% IF q %]
-    No models found matching &ldquo;<strong>[% q | html %]</strong>&rdquo;.
+    No results found matching &ldquo;<strong>[% q | html %]</strong>&rdquo;.
+    [% UNLESS deep %]
     <br><a href="/3d/browse">Clear search</a> or
-    <a href="/3d/search_deeper?q=[% q | uri %]">try a deeper AI/web search</a>.
+    <a href="/3d/browse?q=[% q | uri %]&amp;deep=1">try a deep web search</a>.
+    [% ELSE %]
+    <br><a href="/3d/browse">Clear search</a>.
+    [% END %]
     [% ELSE %]
     No 3D models in the catalog yet.
     [% IF c.session.roles.grep('admin').size %]
     <br><a href="/3d/admin">Add models via the Admin panel.</a>
     [% END %]
     [% END %]
+</div>
+[% END %]
+
+[%# ── External Sites: branded entry cards (always visible) ─────────────── %]
+[%# One link per card, no second action to confuse the click target:       %]
+[%#   • query present → card IS the AI-modified deep search for that site   %]
+[%#     (/3d/browse?q=…&deep=1&site=code)                                  %]
+[%#   • no query      → card opens the site's homepage in a new tab         %]
+[%# Branding = the site's real logo + logo-sampled accent color.            %]
+[% IF external_sites && external_sites.size %]
+<div class="ext-sites-section">
+    <h3>&#127760; External Sites</h3>
+    <p class="ext-sites-note">
+        [% IF q %]Click a site to search it for &ldquo;<strong>[% q | html %]</strong>&rdquo;[% ELSE %]Click a site to open it in a new tab[% END %] &mdash; each card uses that site's own logo and colors.
+    </p>
+    <div class="ext-sites-grid">
+    [% FOREACH s IN external_sites %]
+        [% IF q && s.search_href %]
+        <a class="ext-site-card site-[% s.code %]"
+           href="[% s.search_href | html %]"
+           target="_blank" rel="noopener"
+           title="Search [% s.label | html %] for &ldquo;[% q | html %]&rdquo;">
+        [% ELSE %]
+        <a class="ext-site-card site-[% s.code %]"
+           href="[% s.url | html %]"
+           target="_blank" rel="noopener"
+           title="Open [% s.label | html %] in a new tab">
+        [% END %]
+            <div class="ext-site-brand">
+                <img src="/static/images/3d/sites/[% s.code %].png"
+                     alt="[% s.label | html %] logo"
+                     loading="lazy"
+                     onerror="this.style.display='none'">
+            </div>
+            <div class="ext-site-name">[% s.label | html %]</div>
+            <div class="ext-site-go">[% q ? 'Search this site &rarr;' : 'Open site &rarr;' %]</div>
+        </a>
+    [% END %]
+    </div>
 </div>
 [% END %]

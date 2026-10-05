@@ -113,6 +113,7 @@
       Buried in a collapsed details they were never seen this session. %]
   [% IF is_admin && ledger_monitor %]
   [% INCLUDE 'ai/usage_effectiveness_card.tt' %]
+  [% INCLUDE 'ai/usage_failure_buckets_card.tt' %]
   [% END %]
   [% IF is_admin && eval_summary %][% INCLUDE 'ai/usage_eval_card.tt' %][% END %]
   [%# Model failover (AISYSTEM plan §5e) — admin only; controller only builds it for admins. %]

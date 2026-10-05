@@ -42,7 +42,7 @@
       [% IF e.error %]<span class="doc-muted">([% e.error | html %])</span>[% END %]
       Grok Bot / browser use of SuperGrok is not visible here, so this is a floor, not a ceiling.</p>
     [% o = h.openrouter %]
-    <p class="doc-body">OpenRouter: [% IF o.ok %]balance <strong>[% o.balance_usd.defined ? '$' _ o.balance_usd : '—' %]</strong> · day $[% o.day_usd.defined ? (o.day_usd | format('%.2f')) : '—' %] · week $[% o.week_usd.defined ? (o.week_usd | format('%.2f')) : '—' %] · month $[% o.month_usd.defined ? (o.month_usd | format('%.2f')) : '—' %][% IF o.exhausted %] · <strong>credits exhausted</strong>[% END %][% ELSE %]unavailable [% o.error | html %][% END %]
+    <p class="doc-body">OpenRouter: [% IF o.ok %]balance <strong>[% o.balance_usd.defined ? '$' _ o.balance_usd : '—' %]</strong> · day $[% IF o.day_usd.defined; o.day_usd | format('%.2f'); ELSE; '—'; END %] · week $[% IF o.week_usd.defined; o.week_usd | format('%.2f'); ELSE; '—'; END %] · month $[% IF o.month_usd.defined; o.month_usd | format('%.2f'); ELSE; '—'; END %][% IF o.exhausted %] · <strong>credits exhausted</strong>[% END %][% ELSE %]unavailable [% o.error | html %][% END %]
       <span class="doc-muted">(also org.openrouter / org.health in <code>/ai/usage_live</code>)</span></p>
 
     <h3 style="font-size:1em;margin-top:14px;">SuperGrok guard</h3>

@@ -23,7 +23,7 @@ my ($old) = $mk->(consumer => 'grok_bot', value => 43, at => '2026-10-01 09:23',
 
 # conflicts: 43 % Oct 1 then 1 % Oct 3, reset ~Oct 5 -> flagged, not adjusted
 my $cf = $E->can('conflicts')->([ $old, $r ], reset_at => $r->{reset_at});
-is scalar @$cf, 1, 'Grok Bot conflict flagged'; like $cf->[0], qr/43\.0% used .*1\.0% used.*not adjusted/, 'conflict text';
+is scalar @$cf, 0, 'Grok Bot 43->1 with reset_at on newer is a new cycle, not a conflict';
 my $cf2 = $E->can('conflicts')->([ $old, $r ], reset_at => $E->can('parse_time')->('2026-10-02 12:00') + 7 * 86400);
 is scalar @$cf2, 0, 'no conflict when a reset falls between';
 my ($sg) = $mk->(consumer => 'supergrok', value => 22, kind => 'unconfirmed', at => '2026-10-03 08:07', source => 'spoken', now => $now);
@@ -38,7 +38,7 @@ is $e->{estimate}, 3, 'estimate = reading 1 + 4 calls x 0.5';
 is $e->{latest_used}, 1, 'latest stored as spoken (no refund logic)';
 is $e->{burn_per_hour}, 0.5, 'burn/h';
 ok abs($e->{projection} - (3 + 0.5 * ($r->{reset_at} - $now) / 3600)) < 1e-6, 'projection to reset';
-is scalar @{ $e->{conflicts} }, 1, 'estimate carries conflict';
+is scalar @{ $e->{conflicts} }, 0, 'estimate no conflict across cycle';
 is $e->{reset_pt}, 'Mon Oct 05 08:07 PT', 'reset ~2 days';
 
 # drift + pre-cycle reading
@@ -56,4 +56,29 @@ my $root = tempdir(CLEANUP => 1); mkdir "$root/data";
 ok !$E->can('append_reading')->($root, $_), 'append' for $old, $r, $sg;
 my $all = $E->can('read_readings')->($root);
 is scalar @$all, 3, 'read back 3'; is $all->[0]{value}, 43, 'sorted by time';
+
+# Oct 5: new Bot cycle — 43% Oct 1 then 1% Oct 3 with reset ~Oct 5 is NOT a conflict
+{
+    my ($old) = $mk->(consumer => 'grok_bot', value => 43, at => '2026-10-01 09:23', source => 'spoken', now => $now);
+    my ($neu) = $mk->(consumer => 'grok_bot', value => 1, at => '2026-10-03 08:07', reset_in_hours => 48, source => 'spoken', now => $now);
+    my $cf = $E->can('conflicts')->([ $old, $neu ]);
+    is scalar @$cf, 0, 'cycle boundary clears 43->1 conflict';
+    my ($r18) = $mk->(consumer => 'grok_bot', value => 18, at => '2026-10-04 06:48', reset_in_hours => 48, source => 'spoken', now => $E->can('parse_time')->('2026-10-05 07:24'));
+    my ($r21) = $mk->(consumer => 'grok_bot', value => 21, at => '2026-10-05 07:24', reset_in_hours => 24, source => 'spoken', now => $E->can('parse_time')->('2026-10-05 07:24')+60);
+    my $n = $E->can('parse_time')->('2026-10-05 07:24') + 60;
+    my $e = $E->can('estimate')->(consumer => 'grok_bot', now => $n, readings => [ $old, $neu, $r18, $r21 ], rate => 0,
+        units_since => sub { 0 }, burn_24h => undef);
+    # burn from newest reading: without burn_24h, projection uses undef burn — set burn from readings delta
+    # Base burn: (21-18)% over ~24.6h ≈ 0.122%/h; projection to reset (+24h) ≈ 21+3 ≈ 24
+    my $hours = ($r21->{reset_at} - $r18->{at}) / 3600;
+    my $burn_h = (21 - 18) / $hours;
+    $e = $E->can('estimate')->(consumer => 'grok_bot', now => $n, readings => [ $neu, $r18, $r21 ], rate => 0,
+        units_since => sub { 0 }, burn_per_hour => $burn_h);
+    is $e->{latest_used}, 21, 'latest 21%';
+    ok abs($e->{burn_per_hour} - $burn_h) < 1e-9, 'burn from newest window';
+    ok $e->{reset_pt} =~ /Oct 06/, 'reset from newest reading (~Tue Oct 6)';
+    is scalar @{$e->{conflicts}}, 0, 'no conflict across new cycle';
+}
+
+
 done_testing;

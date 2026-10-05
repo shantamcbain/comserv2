@@ -45,6 +45,7 @@ sub new {
         config       => "$hh/config.yaml",
         state_file   => "$hh/overrun_guard_state.json",
         notice_file  => "$hh/overrun_notice.txt",
+        session_notice => "$hh/overrun_session_notice.json",
         events_file  => "$hh/overrun_guard_events.jsonl",
         log_file     => "$hh/logs/overrun_guard.log",
         lock_file    => "$hh/overrun_guard.lock",
@@ -108,6 +109,46 @@ sub pick_target {
         return { %$c };
     }
     return undef;
+}
+
+
+# Aliases that must not point at paid coding models while tripped.
+our @DANGEROUS_ALIASES = qw(code coder code-paid flash delegate glm hy3);
+# Already-safe aliases we never rewrite.
+our @SAFE_ALIAS_KEEP = qw(cheap director local xai git reasoner editor deepseek);
+
+# pure: which aliases to rewrite to $safe (full openrouter/...:free or ollama slug).
+# Returns { set => {alias=>new}, saved => {alias=>old_value} }.
+sub alias_rewrite_plan {
+    my (%in) = @_;
+    my $cur  = $in{aliases} || {};
+    my $safe = $in{safe} || 'openrouter/cohere/north-mini-code:free';
+    my (%set, %saved);
+    for my $a (@{ $in{dangerous} || \@DANGEROUS_ALIASES }) {
+        my $v = $cur->{$a};
+        next unless defined $v && length $v;
+        next if $v eq $safe;
+        next if $v =~ /:free\z/ || $v =~ /^ollama/;
+        $set{$a} = $safe;
+        $saved{$a} = $v;
+    }
+    return { set => \%set, saved => \%saved };
+}
+
+# pure: should restore put back saved_model.default?
+# If the user changed model.default during the trip (current != what we set as target),
+# leave it alone. Only restore the default when it still matches the guard target.
+sub restore_model_decision {
+    my (%in) = @_;
+    my $cur    = $in{current_default};
+    my $target = $in{target};
+    my $saved  = $in{saved_model} || {};
+    my $saved_d = $saved->{default};
+    return { restore_default => 0, reason => 'no_saved' } unless defined $saved_d && length $saved_d;
+    if (defined $cur && defined $target && length $cur && length $target && $cur ne $target) {
+        return { restore_default => 0, reason => 'manual_default_preserved', current => $cur, target => $target, saved => $saved_d };
+    }
+    return { restore_default => 1, reason => 'restore_saved', saved => $saved_d };
 }
 
 # ---- inputs ----------------------------------------------------------------
@@ -188,6 +229,58 @@ sub backup_config {
     return $dst;
 }
 
+
+sub read_aliases {
+    my ($self) = @_;
+    open my $fh, '<', $self->{config} or return {};
+    my (%a, $in_model, $in_al);
+    while (my $l = <$fh>) {
+        if ($l =~ /^model:\s*$/) { $in_model = 1; $in_al = 0; next }
+        if ($in_model) {
+            last if $l =~ /^\S/;
+            if ($l =~ /^  aliases:\s*$/) { $in_al = 1; next }
+            if ($in_al) {
+                if ($l =~ /^  \S/) { $in_al = 0; next }
+                $a{$1} = $2 if $l =~ /^    ([A-Za-z0-9_-]+):\s*['"]?(.*?)['"]?\s*$/;
+            }
+        }
+    }
+    return \%a;
+}
+
+sub set_aliases {
+    my ($s, $map) = @_;
+    return [] unless ref $map eq 'HASH' && %$map;
+    my @done;
+    for my $a (sort keys %$map) {
+        my $v = $map->{$a};
+        if ($s->{set_cb}) { $s->{set_cb}->("model.aliases.$a", $v) }
+        else {
+            system($s->{hermes_bin}, 'config', 'set', "model.aliases.$a", $v) == 0
+                or die "hermes config set model.aliases.$a failed\n";
+        }
+        push @done, "$a=$v";
+    }
+    return \@done;
+}
+
+sub write_session_notice {
+    my ($s, $hash) = @_;
+    my $tmp = "$s->{session_notice}.tmp";
+    open my $fh, '>', $tmp or return;
+    print $fh $J->encode($hash); close $fh;
+    rename $tmp, $s->{session_notice};
+}
+
+sub desktop_notify {
+    my ($s, $title, $body) = @_;
+    return if $s->{dry_run} || $s->{no_notify};
+    eval {
+        system('notify-send', $title, $body, '--app-name', 'Hermes Overrun Guard',
+               '--urgency', 'critical');
+    };
+}
+
 sub set_model {
     my ($s, $m) = @_;
     my $cur = $s->current_model;
@@ -247,42 +340,92 @@ sub run {
     if ($d->{action} eq 'trip') {
         my $target = pick_target(health => $s->model_health, ollama_models => $s->ollama_models);
         my $cur    = $s->current_model;
+        my $aliases = $s->read_aliases;
         my $bak    = $s->backup_config;
         my $paused = $target ? 0 : 1;
-        $target ||= { %{ $CANDIDATES[0] }, placeholder => 1 };   # free model: zero spend even if failing
+        $target ||= { %{ $CANDIDATES[0] }, placeholder => 1 };
+        my $safe = $target->{name};
+        my $aplan = alias_rewrite_plan(aliases => $aliases, safe => $safe);
         my $done = eval { $s->set_model($target) } || [];
         my $err  = $@;
+        my $adone = eval { $s->set_aliases($aplan->{set}) } || [];
+        $err ||= $@;
         %$st = (%$st, tripped => 1, paused => $paused, since => $t, since_pt => pt($t),
-                reasons => $d->{reasons}, saved_model => $cur, target => $target->{name},
-                backup => $bak, set => $done, ($err ? (set_error => "$err") : ()));
-        my $msg = sprintf("Hermes overrun guard TRIPPED %s: %s. %s Backup: %s",
+                reasons => $d->{reasons}, saved_model => $cur, saved_aliases => $aplan->{saved},
+                target => $target->{name}, backup => $bak, set => $done, aliases_set => $adone,
+                ($err ? (set_error => "$err") : ()));
+        my $msg = sprintf("Hermes overrun guard TRIPPED %s: %s. %s Backup: %s. Aliases blocked: %s. End open Hermes sessions (or /model cheap) - live sessions keep their model until restarted.",
             pt($t), join('; ', @{ $d->{reasons} }),
             $paused ? "No working cheap model - Hermes PAUSED (free placeholder $target->{name})."
-                    : "Hermes switched to $target->{name}.", $bak // 'FAILED');
+                    : "Hermes default switched to $target->{name}.", $bak // 'FAILED',
+            (@$adone ? join(', ', @$adone) : 'none'));
         _write_notice($s, $msg . "\nAuto-restores when thrash < $THRASH_N/15 min and OpenRouter day/week/month are under \$$CAPS{day}/\$$CAPS{week}/\$$CAPS{month}.");
+        $s->write_session_notice({ at => $t, at_pt => pt($t), action => 'trip', reasons => $d->{reasons},
+            target => $target->{name}, text => $msg });
+        $s->desktop_notify('Hermes overrun guard TRIPPED',
+            ($paused ? 'Hermes PAUSED. ' : "Switched to $target->{name}. ")
+            . 'End/restart open sessions. Details: ~/.hermes/overrun_notice.txt');
         $s->log_line($msg . ($err ? " set_error=$err" : ''));
         my $ev = { at => $t, at_pt => pt($t), action => 'trip', reasons => $d->{reasons},
-                   from => $cur->{default}, to => $target->{name}, paused => $paused, backup => $bak };
+                   from => $cur->{default}, to => $target->{name}, paused => $paused, backup => $bak,
+                   aliases_blocked => [ sort keys %{ $aplan->{set} } ] };
         _append($s->{events_file}, $J->encode($ev));
         $ev->{ledger} = $s->ledger($ev);
         $d->{target} = $target->{name}; $d->{paused} = $paused; $d->{backup} = $bak;
+        $d->{aliases_blocked} = [ sort keys %{ $aplan->{set} } ];
     }
     elsif ($d->{action} eq 'restore') {
         my $want = $st->{saved_model} || {};
+        my $cur  = $s->current_model;
+        my $dec  = restore_model_decision(current_default => $cur->{default}, target => $st->{target},
+                                          saved_model => $want);
         my $bak  = $s->backup_config;
-        my $done = eval { $s->set_model($want) } || [];
-        my $err  = $@;
-        my $msg  = sprintf('Hermes overrun guard RESTORED %s: windows clear; model back to %s (tripped since %s). Backup: %s',
-            pt($t), $want->{default} // '?', $st->{since_pt} // '?', $bak // 'FAILED');
+        my ($done, $err) = ([], undef);
+        if ($dec->{restore_default}) {
+            $done = eval { $s->set_model($want) } || [];
+            $err  = $@;
+        }
+        my $aliases_restored = eval { $s->set_aliases($st->{saved_aliases} || {}) } || [];
+        $err ||= $@;
+        # If Super Grok guard wants grok and we left a free placeholder in place, prefer grok.
+        my $sg = eval {
+            open my $fh, '<', "$s->{hermes_home}/supergrok_guard_state.json" or return undef;
+            local $/; $J->decode(<$fh>);
+        } || {};
+        if (!$dec->{restore_default} && ($sg->{mode} // '') eq 'grok' && !($sg->{locked} || $sg->{off_today})) {
+            # leave manual default; do not force grok over a hand-set model
+        } elsif ($dec->{restore_default} && ($sg->{mode} // '') eq 'grok' && !($sg->{locked} || $sg->{off_today})
+                 && ($want->{default} // '') =~ /:free\z|north-mini/) {
+            # saved was free (pre-trip idle); Super Grok has allotment - hand off via notice only
+            # (supergrok_daily_guard cron will switch within 5 min). Mark for the cron.
+            $st->{hand_off_supergrok} = 1;
+            # Coding aliases must not snap back to v4-pro on restore — Super Grok
+            # guard will apply default; leave code/coder aimed at grok-build.
+            $st->{saved_aliases} ||= {};
+            $st->{saved_aliases}{$_} = 'xai-oauth/grok-build-0.1' for qw(code coder);
+        }
+        my $msg  = sprintf('Hermes overrun guard RESTORED %s: windows clear; %s (tripped since %s). Backup: %s. Aliases restored: %s',
+            pt($t),
+            ($dec->{restore_default}
+                ? "model back to " . ($want->{default} // '?')
+                : "kept hand-set default " . ($cur->{default} // '?') . " (guard had set " . ($st->{target} // '?') . ")"),
+            $st->{since_pt} // '?', $bak // 'FAILED',
+            (@$aliases_restored ? join(', ', @$aliases_restored) : 'none'));
         $s->log_line($msg . ($err ? " set_error=$err" : ''));
         _write_notice($s, $msg);
-        my $ev = { at => $t, at_pt => pt($t), action => 'restore', to => $want->{default}, backup => $bak,
-                   tripped_since => $st->{since} };
+        $s->write_session_notice({ at => $t, at_pt => pt($t), action => 'clear', text => $msg });
+        $s->desktop_notify('Hermes overrun guard cleared', $msg);
+        my $ev = { at => $t, at_pt => pt($t), action => 'restore',
+                   to => ($dec->{restore_default} ? $want->{default} : $cur->{default}),
+                   preserved_manual => $dec->{restore_default} ? 0 : 1,
+                   backup => $bak, tripped_since => $st->{since} };
         _append($s->{events_file}, $J->encode($ev));
         $ev->{ledger} = $s->ledger($ev);
-        %$st = (%$st, tripped => 0, paused => 0, restored_at => $t, restored_pt => pt($t), restore_backup => $bak);
-        delete @$st{qw(reasons target set set_error)};
-        $d->{restored_to} = $want->{default};
+        %$st = (%$st, tripped => 0, paused => 0, restored_at => $t, restored_pt => pt($t),
+                restore_backup => $bak, restore_decision => $dec->{reason});
+        delete @$st{qw(reasons target set set_error aliases_set)};
+        $d->{restored_to} = $ev->{to};
+        $d->{preserved_manual} = $ev->{preserved_manual};
     }
     elsif ($d->{action} eq 'hold') {
         $st->{reasons} = $d->{reasons} if @{ $d->{reasons} };
@@ -295,12 +438,33 @@ sub run {
 sub _write_notice { my ($s, $m) = @_; open my $fh, '>', $s->{notice_file} or return; print $fh "$m\n"; close $fh }
 
 # For banner: read-only status.
+
+sub read_session_notice {
+    my ($s) = @_;
+    require JSON::PP;
+    $s = $s->new unless ref $s;
+    my $path = $s->{session_notice};
+    return {} unless $path && -f $path;
+    open my $fh, '<', $path or return {};
+    local $/; my $raw = <$fh>; close $fh;
+    my $j = eval { JSON::PP->new->utf8->decode($raw) };
+    return ref $j eq 'HASH' ? $j : {};
+}
+
 sub status {
     my ($class_or_self, %a) = @_;
     my $s = ref $class_or_self ? $class_or_self : $class_or_self->new(%a);
     my $st = $s->read_state;
     return { tripped => 0, checked => 0 } unless %$st;
     my $stale = $st->{last_check} ? ($s->_now - $st->{last_check} > 1200 ? 1 : 0) : 1;
+    my $sn = $s->read_session_notice;
+    my $handoff_banner = '';
+    if ($sn && ($sn->{action} || '') eq 'supergrok_handoff' && $sn->{at}
+        && ($s->_now - $sn->{at}) < 6 * 3600) {
+        $handoff_banner = $sn->{text} || sprintf(
+            'Super Grok handoff (%s) — Hermes → %s. Open TUI may need /model or a new session.',
+            $sn->{reason} // 'handoff', $sn->{to} // 'grok-build-0.1');
+    }
     return {
         tripped => $st->{tripped} ? 1 : 0, paused => $st->{paused} ? 1 : 0,
         since_pt => $st->{since_pt}, reasons => $st->{reasons} || [], target => $st->{target},
@@ -308,13 +472,16 @@ sub status {
         last_reasons => $st->{last_reasons} || [], last_thrash => $st->{last_thrash},
         openrouter => $st->{last_openrouter}, caps => $st->{caps}, restored_pt => $st->{restored_pt},
         checked => 1,
+        session_notice => $sn,
+        handoff_banner => $handoff_banner,
+        hand_off_supergrok => $st->{hand_off_supergrok} ? 1 : 0,
     };
 }
 
 sub banner {
     my ($st) = @_;
     return '' unless $st && $st->{tripped};
-    return sprintf('Hermes overrun guard %s since %s: %s -> %s. Auto-restores when clear.',
+    return sprintf('Hermes overrun guard %s since %s: %s -> %s. Live Hermes sessions keep their model - end them or /model cheap, then start a new session. Auto-restores when clear.',
         $st->{paused} ? 'PAUSED Hermes' : 'tripped', $st->{since_pt} // '?',
         join('; ', @{ $st->{reasons} || [] }), $st->{target} // '?');
 }

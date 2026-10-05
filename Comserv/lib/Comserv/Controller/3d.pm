@@ -3,11 +3,13 @@ use Moose;
 use namespace::autoclean;
 use POSIX qw(strftime);
 use JSON qw(encode_json);
+use URI::Escape qw(uri_escape);
 use Try::Tiny;
 use Comserv::Util::Logging;
 use Comserv::Util::SignGenerator;
 use Comserv::Util::Printing3d;
 use Comserv::Util::NfsPath;
+use Comserv::Util::CategoryManager;
 use Comserv::Util::AppTime;
 
 has 'logging' => (
@@ -664,35 +666,101 @@ sub browse :Path('/3d/browse') :Args(0) {
 
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
-    my $q    = $c->req->params->{q}    || '';
+    my $q   = $c->req->params->{q}   || '';
     my $kind = $c->req->params->{kind} || '';
+    my $cat  = $c->req->params->{cat}  || '';
+    my $page = $c->req->params->{page} || 1;
+    $page    = 1 unless $page =~ /^\d+$/ && $page >= 1;
+    my $per_page = 24;
     $kind = 'product' if $kind eq '' && $sitename eq '3d';
     $kind = 'all' unless $kind =~ /^(all|product|part|sign)$/;
 
-    my @models;
+    # Build category tree for filter dropdown (whether or not cat is selected)
+    my $cat_tree = [];
+    my %item_category_ids;  # item_id => [category_ids]
+    eval {
+        $cat_tree = Comserv::Util::CategoryManager->new->tree($schema, $sitename);
+        # Preload all item→category mappings for fast filtering
+        if ($cat_tree && @$cat_tree) {
+            my @links = $schema->resultset('Accounting::InventoryItemCategory')->search(
+                {},
+                { columns => [qw(item_id category_id)] }
+            )->all;
+            for my $l (@links) {
+                push @{ $item_category_ids{ $l->item_id } }, $l->category_id;
+            }
+        }
+    };
+
+    my @all_models;
     eval {
         my %search = (sitename => $sitename, is_active => 1);
         if ($q) {
-            $search{-or} = [
+            # Keyword extraction for broad matching (especially with deep=1)
+            my @terms;
+            my %stop = map { $_ => 1 } qw(
+                need want find show me get for the model models
+                that this with from have what when where which about
+                please can you do does did are is am be been was were
+                it its they them their our my your his her a an
+            );
+            for my $w (split(/\W+/, lc($q))) {
+                next if length($w) < 3;
+                next if $stop{$w};
+                push @terms, $w;
+            }
+            # Full raw query as broadest match
+            my @or = (
                 { name        => { -like => "%$q%" } },
                 { description => { -like => "%$q%" } },
                 { tags        => { -like => "%$q%" } },
-            ];
+            );
+            # Per-keyword matches (hits partial names like "stackable" in "Stackable Box")
+            for my $t (@terms) {
+                push @or,
+                    { name        => { -like => "%$t%" } },
+                    { description => { -like => "%$t%" } },
+                    { tags        => { -like => "%$t%" } };
+            }
+            $search{-or} = \@or;
         }
-        @models = $schema->resultset('Printing3dModel')->search(
+        @all_models = $schema->resultset('Printing3dModel')->search(
             \%search, { order_by => { -asc => 'name' } }
         )->all;
         # Browse is the printable-part catalog. Assemblies (Has BOM) and
         # pack 3MF plates belong on the item/BOM page, not here.
-        @models = grep { $self->_browse_is_printable($schema, $_) } @models;
+        @all_models = grep { $self->_browse_is_printable($schema, $_) } @all_models;
         if ($kind ne 'all') {
-            @models = grep { $self->_browse_kind($schema, $_) eq $kind } @models;
+            @all_models = grep { $self->_browse_kind($schema, $_) eq $kind } @all_models;
+        }
+        # Category filter: model must have item_id and item must be in the selected category or its descendants
+        if ($cat && %item_category_ids) {
+            my @desc_ids = ($cat);
+            if ($cat && $cat ne '0') {
+                @desc_ids = Comserv::Util::CategoryManager->new->descendant_ids($schema, $cat);
+            }
+            my %desc_set = map { $_ => 1 } @desc_ids;
+            @all_models = grep {
+                my $iid = $_->item_id;
+                $iid && $item_category_ids{$iid} && grep { $desc_set{$_} } @{ $item_category_ids{$iid} };
+            } @all_models;
         }
     };
     push @{$c->stash->{debug_errors}}, "Error loading models: $@" if $@;
 
+    my $total_models = scalar @all_models;
+    my $total_pages  = $total_models > 0
+        ? int(($total_models + $per_page - 1) / $per_page)
+        : 1;
+    $page = $total_pages if $page > $total_pages;
+
+    my $offset = ($page - 1) * $per_page;
+    my @models = @all_models[$offset .. ($offset + $per_page - 1 < $#all_models ? $offset + $per_page - 1 : $#all_models)];
+    @models = () if $offset > $#all_models;
+
     # For herb signs, attach the stored sign layout (sidecar JSON) so the
     # browse cards can show the PDF and identify each build by size/colour.
+    # Only load sign_meta for models on the current page.
     my $signutil = Comserv::Util::SignGenerator->new;
     my %sign_meta;
     for my $m (@models) {
@@ -701,14 +769,211 @@ sub browse :Path('/3d/browse') :Args(0) {
         $sign_meta{ $m->id } = $meta if %$meta;
     }
 
+    # ── AI Web Search (if query present) ──────────────────────────────────
+    my $deep           = $c->req->params->{deep} || 0;
+    my $model_id_param = $c->req->params->{model_id} || 0;
+    my $site_param     = $c->req->params->{site} || '';
+    my $web_results    = [];
+    my $search_provider = '';
+    my $augmented_q    = '';
+    if (length $q && $deep) {
+        ($web_results, $search_provider, $augmented_q) =
+            $self->_run_web_search_for_browse($c, $q, $model_id_param, $site_param);
+    }
+
+    # Always-visible branded entry cards for external model repositories.
+    # When a query exists, prebuild each site's REAL search URL (site's own
+    # endpoint + escaped term, augmented by the AI when a deep search ran).
+    # Built in Perl — TT2's | uri filter does not escape reliably here.
+    my $external_sites = $self->_external_sites;
+    if (length $q) {
+        my $term = ($deep && $augmented_q) ? $augmented_q : $q;
+        my $esc  = URI::Escape::uri_escape($term // $q);
+        for my $s (@$external_sites) {
+            $s->{search_href} = $s->{search} . $esc;
+        }
+    }
+
     $c->stash(
-        sitename  => $sitename,
-        models    => \@models,
-        sign_meta => \%sign_meta,
-        q         => $q,
-        kind      => $kind,
-        template  => '3d/browse.tt',
+        sitename        => $sitename,
+        models          => \@models,
+        sign_meta       => \%sign_meta,
+        q               => $q,
+        kind            => $kind,
+        cat             => $cat,
+        cat_tree        => $cat_tree,
+        page            => $page,
+        total_pages     => $total_pages,
+        total_models    => $total_models,
+        per_page        => $per_page,
+        deep            => $deep,
+        site            => $site_param,
+        external_sites  => $external_sites,
+        web_results     => $web_results,
+        search_provider => $search_provider,
+        augmented_q     => $augmented_q,
+        template        => '3d/browse.tt',
     );
+}
+
+# ── _external_sites ────────────────────────────────────────────────────
+# Single source of truth for the external model repositories the deep web
+# search targets. Shared by _run_web_search_for_browse (site: filters) and
+# browse.tt (the branded "External Sites" card grid at the bottom of the
+# page). code maps to the site-* CSS classes + site icons in browse.tt.
+sub _external_sites {
+    my ($self) = @_;
+    return [
+        # search = the site's OWN search page base; param = its query-string
+        # field. Cards link seeds + escaped term, so a click searches the
+        # external site itself — never the app's local/SearXNG page.
+        { domain => 'printables.com/model',         label => 'Printables',   code => 'prtbl', url => 'https://www.printables.com', search => 'https://www.printables.com/search/all-models?q=', param => 'q' },
+        { domain => 'makerworld.com/en/models',     label => 'MakerWorld',   code => 'mkwld', url => 'https://makerworld.com', search => 'https://makerworld.com/en/search?q=', param => 'q' },
+        { domain => 'thangs.com/designer',          label => 'Thangs',       code => 'thngs', url => 'https://www.thangs.com', search => 'https://www.thangs.com/search?q=', param => 'q' },
+        { domain => 'cults3d.com/en/3d-model',      label => 'Cults3D',      code => 'cult3', url => 'https://cults3d.com', search => 'https://cults3d.com/en/search?q=', param => 'q' },
+        { domain => 'thingiverse.com/thing',        label => 'Thingiverse',  code => 'thing', url => 'https://www.thingiverse.com', search => 'https://www.thingiverse.com/search?q=', param => 'q' },
+        { domain => 'myminifactory.com/object',     label => 'MyMiniFactory', code => 'mymin', url => 'https://www.myminifactory.com', search => 'https://www.myminifactory.com/search?q=', param => 'q' },
+        { domain => 'cgtrader.com/3d-print-models', label => 'CGTrader',     code => 'cgtrd', url => 'https://www.cgtrader.com', search => 'https://www.cgtrader.com/search?q=', param => 'q' },
+        { domain => 'gambody.com/3d-models',        label => 'Gambody',      code => 'gambd', url => 'https://www.gambody.com', search => 'https://www.gambody.com/search?q=', param => 'q' },
+        { domain => 'pinshape.com/items',           label => 'Pinshape',     code => 'pnshp', url => 'https://pinshape.com', search => 'https://pinshape.com/items?search=', param => 'search' },
+        { domain => 'youmagine.com/designs',        label => 'YouMagine',    code => 'ymagn', url => 'https://www.youmagine.com', search => 'https://www.youmagine.com/search?q=', param => 'q' },
+        { domain => 'makeronline.com/model',        label => 'Anycubic',     code => 'anycu', url => 'https://www.makeronline.com', search => 'https://makeronline.com/search?q=', param => 'q' },
+    ];
+}
+
+# ── _run_web_search_for_browse ──────────────────────────────────────────
+# Asks aisystem (SearchString + Controller::AI::_do_web_search) to augment
+# the query and run a web search.  Returns ([web_result_cards], provider, augmented_q).
+# Persists hits to WebSearchResult (non-fatal).
+sub _run_web_search_for_browse {
+    my ($self, $c, $raw_query, $model_id, $site_code) = @_;
+    my @results;
+
+    # 1. Load model context for query augmentation
+    my ($model_name, $model_tags);
+    if ($model_id) {
+        eval {
+            my $schema = $self->_schema($c);
+            my $model = $schema->resultset('Printing3dModel')->find({
+                id => $model_id,
+                sitename => $self->_sitename($c),
+            });
+            if ($model) {
+                $model_name = $model->name // '';
+                $model_tags = $model->tags // '';
+            }
+        };
+    }
+
+    # 2. Ask aisystem to create the augmented search string
+    my $augmented;
+    eval {
+        require Comserv::Model::AI2::SearchString;
+        $augmented = Comserv::Model::AI2::SearchString->augment(
+            raw_query => $raw_query,
+            context   => '3d_model',
+            tags      => $model_tags // '',
+            name      => $model_name  // '',
+        );
+    };
+    $augmented = $raw_query unless length($augmented // '');
+
+    # 3. Search model sites for individual STL listings via SearXNG.
+    #    site: filters target model detail pages (/model/, /models/, /thing/)
+    #    instead of tag/collection pages. Each query finds individual files
+    #    with thumbnails from a specific model repository.
+    my $provider = 'Web';
+    eval {
+        require Comserv::Model::AI2::Search;
+        my $svc = Comserv::Model::AI2::Search->new;
+        if ($svc->enabled($c)) {
+            # Each site query finds individual model pages, not tag pages.
+            # Site-branded cards: label is the CSS key; domain is the site: filter.
+            # Short codes (4-6 chars) map to CSS classes in browse.tt.
+            # The list is the same one browse.tt renders as the bottom
+            # "External Sites" card grid; single source of truth.
+            my $sites = $self->_external_sites;
+            my %seen;
+
+            for my $site (@$sites) {
+                next if $site_code && $site->{code} ne $site_code;
+                my $site_q = "site:$site->{domain} $augmented";
+                my $r = $svc->query($c, query => $site_q);
+                next unless $r && $r->{success} && $r->{results};
+                for my $hit (@{ $r->{results} }) {
+                    last if @results >= 24;
+                    next unless $hit->{url};
+                    next if $seen{$hit->{url}}++;
+                    push @results, {
+                        title     => $hit->{title}    // '',
+                        url       => $hit->{url}      // '',
+                        snippet   => substr($hit->{content} // '', 0, 200),
+                        thumbnail => $hit->{thumbnail} // '',
+                        site      => $site->{label},
+                        site_code => $site->{code},
+                        site_url  => $hit->{url},
+                        cost      => '',
+                        file_type => 'STL',
+                    };
+                }
+            }
+        }
+    };
+
+    # Fallback: generic SearXNG search if site-specific queries returned nothing
+    if (!@results) {
+        $provider = 'Web (broad)';
+        eval {
+            require Comserv::Model::AI2::Search;
+            my $svc = Comserv::Model::AI2::Search->new;
+            if ($svc->enabled($c)) {
+                my $r = $svc->query($c, query => $augmented);
+                if ($r && $r->{success} && $r->{results}) {
+                    for my $hit (@{ $r->{results} }) {
+                        last if @results >= 24;
+                        next unless $hit->{url};
+                        push @results, {
+                            title     => $hit->{title}     // '',
+                            url       => $hit->{url}       // '',
+                            snippet   => substr($hit->{content} // '', 0, 250),
+                            thumbnail => $hit->{thumbnail}  // '',
+                            site      => '',
+                        };
+                    }
+                }
+            }
+        };
+    }
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+        'web_search', "Web search error: $@") if $@;
+
+    # 5. Persist to WebSearchResult (search index) — non-fatal
+    if (@results) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            my $uid    = $c->session->{user_id} || 0;
+            for my $r (@results) {
+                my $exists = $schema->resultset('WebSearchResult')->search(
+                    { result_url => $r->{url}, query => $augmented },
+                    { rows => 1 }
+                )->single;
+                next if $exists;
+                $schema->resultset('WebSearchResult')->create({
+                    query            => substr($augmented, 0, 500),
+                    result_title     => substr($r->{title}, 0, 512),
+                    result_url       => substr($r->{url}, 0, 1000),
+                    result_snippet   => substr($r->{snippet}, 0, 65000),
+                    source_type      => 'web',
+                    found_by_user_id => $uid,
+                    is_verified      => 0,
+                });
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'web_search', "WebSearchResult persist: $@") if $@;
+    }
+
+    return (\@results, $provider || '', $augmented);
 }
 
 # ============================================================
@@ -842,16 +1107,57 @@ sub model_detail :Path('/3d/model') :Args(1) {
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'model_detail',
         "attachable jobs load failed: $@") if $@;
 
+    # ── \"More like this\" — similar models via AI search ──────────────
+    my $similar_param = $c->req->params->{similar} || 0;
+    my $similar_models = [];
+    my $similar_web    = [];
+    my $similar_provider = '';
+    if ($similar_param) {
+        # Build query from model name + tags
+        my $sim_q = join(' ', grep { length } ($model->name // '', $model->tags // ''));
+        if (length $sim_q) {
+            ($similar_web, $similar_provider, my $dummy) =
+                $self->_run_web_search_for_browse($c, $sim_q, $model->id);
+            # Also search local models with similar name/tags
+            eval {
+                my @like;
+                for my $term (split(/\s+/, $sim_q)) {
+                    next if length($term) < 3;
+                    push @like,
+                        { name => { -like => "%$term%" } },
+                        { tags => { -like => "%$term%" } };
+                }
+                if (@like) {
+                    $similar_models = [
+                        $schema->resultset('Printing3dModel')->search(
+                            {
+                                sitename => $sitename,
+                                is_active => 1,
+                                id => { '!=' => $model->id },
+                                -or => \@like,
+                            },
+                            { order_by => { -asc => 'name' }, rows => 12 }
+                        )->all
+                    ];
+                }
+            };
+        }
+    }
+
     $c->stash(
-        sitename      => $sitename,
-        model         => $model,
-        inv_item      => $inv_item,
-        bom_admin     => \@bom_admin,
-        filaments       => \@filaments,
-        filament_spools => \@filament_spools,
-        printer_count   => $printer_count,
-        attachable_jobs => \@attachable_jobs,
-        template        => '3d/model_detail.tt',
+        sitename          => $sitename,
+        model             => $model,
+        inv_item          => $inv_item,
+        bom_admin         => \@bom_admin,
+        filaments         => \@filaments,
+        filament_spools   => \@filament_spools,
+        printer_count     => $printer_count,
+        attachable_jobs   => \@attachable_jobs,
+        similar           => $similar_param,
+        similar_models    => $similar_models,
+        similar_web       => $similar_web,
+        similar_provider  => $similar_provider,
+        template          => '3d/model_detail.tt',
     );
 }
 
@@ -1979,19 +2285,19 @@ sub search_deeper :Path('/3d/search_deeper') :Args(0) {
     my ($self, $c) = @_;
     $self->_require_module($c);
 
-    my $sitename = $self->_sitename($c);
     my $q        = $c->req->params->{q} || '';
+    my $model_id = $c->req->params->{model_id} || '';
+    my $kind     = $c->req->params->{kind} || 'all';
 
-    # BLOCKED: AIChatSystem /ai/search_3d_models not yet implemented.
-    $c->stash(
-        sitename        => $sitename,
-        q               => $q,
-        models          => [],
-        feature_pending => 1,
-        pending_message => 'AI-powered web search for 3D models is coming soon. '
-            . 'This feature is pending the AIChatSystem web-search extension.',
-        template => '3d/browse.tt',
-    );
+    # Redirect to browse with deep=1 — browse() now runs both local + web search
+    my $uri = $c->uri_for('/3d/browse', {
+        q        => $q,
+        deep     => 1,
+        kind     => $kind,
+        ($model_id ? (model_id => $model_id) : ()),
+    });
+    $c->res->redirect($uri);
+    $c->detach;
 }
 
 # Change filament / grams on an open job. Logic in Util::Printing3d.
@@ -2119,6 +2425,8 @@ sub models :Path('/3d/models') :Args(0) {
     my $schema   = $self->_schema($c);
     my $dbh      = $schema->storage->dbh;
 
+    my $cat      = $c->req->params->{cat}  || '';
+
     my @all_items = eval {
         $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active',
@@ -2132,19 +2440,43 @@ sub models :Path('/3d/models') :Args(0) {
         )->all;
     };
 
-    my @models = eval {
+    my $total_models = 0;
+    my @models;
+    eval {
+        my $cat_join  = '';
+        my $cat_where = '';
+        my @bind;
+        if ($cat && $cat ne '0') {
+            my @all_ids = Comserv::Util::CategoryManager->new->descendant_ids($schema, $cat);
+            my $placeholders = join(',', ('?') x @all_ids);
+            $cat_join  = ' JOIN inventory_item_categories ic ON ic.item_id = m.item_id';
+            $cat_where = " AND ic.category_id IN ($placeholders)";
+            @bind      = ($sitename, @all_ids);
+        } elsif ($cat && $cat eq '0') {
+            # Uncategorized: models with no item OR item has no categories
+            $cat_where = q{ AND (m.item_id IS NULL OR m.item_id NOT IN (
+                SELECT DISTINCT item_id FROM inventory_item_categories))};
+            @bind      = ($sitename);
+        } else {
+            @bind      = ($sitename);
+        }
+        ($total_models) = $dbh->selectrow_array(
+            "SELECT COUNT(*) FROM printing_3d_models m$cat_join WHERE m.sitename = ?$cat_where",
+            undef, @bind);
         my $rows = $dbh->selectall_arrayref(
-            q{SELECT m.id, m.name, m.description, m.nfs_path, m.file_type,
+            "SELECT m.id, m.name, m.description, m.nfs_path, m.file_type,
                      m.stl_volume_cm3, m.stl_weight_g, m.print_time_hours,
                      m.item_id, m.created_at, m.is_active,
+                     m.thumbnail_url,
                      i.name AS item_name, i.sku AS item_sku
               FROM printing_3d_models m
               LEFT JOIN inventory_items i ON i.id = m.item_id
-              WHERE m.sitename = ?
-              ORDER BY m.name},
-            { Slice => {} }, $sitename
+              $cat_join
+              WHERE m.sitename = ?$cat_where
+              ORDER BY m.name",
+            { Slice => {} }, @bind
         );
-        @{ $rows // [] }
+        @models = @{ $rows // [] };
     };
 
     if ($c->req->method eq 'POST') {
@@ -2227,7 +2559,7 @@ sub models :Path('/3d/models') :Args(0) {
         } elsif ($action eq 'link') {
             my $model_id = $c->req->params->{model_id} or do {
                 $c->flash->{error_msg} = 'No model specified.';
-                $c->res->redirect($c->uri_for('/3d/models'));
+                $c->res->redirect($c->uri_for('/3d/models', {$cat ? (cat => $cat) : ()}));
                 $c->detach;
             };
             my $item_id      = $c->req->params->{item_id}      || undef;
@@ -2242,7 +2574,7 @@ sub models :Path('/3d/models') :Args(0) {
             };
             $c->flash->{$@ ? 'error_msg' : 'success_msg'} =
                 $@ ? "Update failed: $@" : 'Model updated.';
-            $c->res->redirect($c->uri_for('/3d/models'));
+            $c->res->redirect($c->uri_for('/3d/models', {$cat ? (cat => $cat) : ()}));
             $c->detach;
 
         } elsif ($action eq 'deactivate') {
@@ -2251,15 +2583,203 @@ sub models :Path('/3d/models') :Args(0) {
             $c->flash->{success_msg} = 'Model deactivated.';
             $c->res->redirect($c->uri_for('/3d/models'));
             $c->detach;
+
+        } elsif ($action eq 'assign_cat') {
+            my $item_id  = $c->req->params->{item_id};
+            my $model_id = $c->req->params->{model_id};
+            my @cat_ids  = $c->req->param('category_ids');
+
+            # Auto-create inventory item for unlinked models
+            if (!$item_id && $model_id && @cat_ids) {
+                my $model = $schema->resultset('Printing3dModel')->find($model_id);
+                if ($model) {
+                    my $sku = '3D-' . $model->id;
+                    my $new_item = $schema->resultset('Accounting::InventoryItem')->create({
+                        sitename      => $sitename,
+                        sku           => $sku,
+                        name          => $model->name || '3D Model ' . $model->id,
+                        item_origin   => '3d_printed',
+                        unit_of_measure => 'ea',
+                        status        => 'active',
+                        show_in_shop        => 0,
+                        hide_stock_count    => 0,
+                        list_in_marketplace => 0,
+                    });
+                    $model->update({ item_id => $new_item->id });
+                    $item_id = $new_item->id;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'assign_cat', "Auto-created item $item_id for model $model_id");
+                }
+            }
+
+            if ($item_id) {
+                eval { Comserv::Util::CategoryManager->new->set_item_categories($schema, $item_id, \@cat_ids); };
+                $c->flash->{success_msg} = $@ ? "Category update failed: $@" : 'Categories updated.';
+            }
+            $c->res->redirect($c->uri_for('/3d/models', {$cat ? (cat => $cat) : ()}));
+            $c->detach;
+        }
+
+        elsif ($action eq 'auto_categorize') {
+            my ($assigned, $items_created, $total) = (0, 0, 0);
+            my $mgr = Comserv::Util::CategoryManager->new;
+            my $cat_tree = $mgr->tree($schema, $sitename);
+            my %cat_lookup = _build_path_category_map($cat_tree);
+
+            my $models_rs = $schema->resultset('Printing3dModel')->search(
+                { sitename => $sitename, nfs_path => { '!=' => undef } }
+            );
+            while (my $m = $models_rs->next) {
+                $total++;
+                my $path = $m->nfs_path || '';
+                my @dirs = grep { $_ && $_ !~ /\.(stl|3mf|obj|step|gcode|STL)$/i }
+                           split('/', $path);
+                my @cat_ids;
+                for my $d (@dirs) {
+                    my $lc = lc($d);
+                    $lc =~ s/[-_]+/ /g;
+                    $lc =~ s/s$//;  # singularize
+                    if (my $cid = $cat_lookup{$lc}) {
+                        push @cat_ids, $cid;
+                    }
+                }
+                next unless @cat_ids;
+
+                my $item_id = $m->item_id;
+                if (!$item_id) {
+                    my $sku = '3D-' . $m->id;
+                    eval {
+                        my $item = $schema->resultset('Accounting::InventoryItem')->create({
+                            sitename => $sitename, sku => $sku,
+                            name => $m->name || '3D Model ' . $m->id,
+                            item_origin => '3d_printed', unit_of_measure => 'ea',
+                            status => 'active', show_in_shop => 0,
+                            hide_stock_count => 0, list_in_marketplace => 0,
+                        });
+                        $m->update({ item_id => $item->id });
+                        $item_id = $item->id;
+                        $items_created++;
+                    };
+                }
+                if ($item_id) {
+                    eval { $mgr->set_item_categories($schema, $item_id, \@cat_ids); };
+                    $assigned++ unless $@;
+                }
+            }
+            $c->flash->{success_msg} = "Auto-categorized $assigned of $total models ($items_created items created). Refresh to see results.";
+            $c->res->redirect($c->uri_for('/3d/models'));
+            $c->detach;
         }
     }
 
+    # Load category tree and item-category mappings for displayed models
+    my $cat_tree = eval { Comserv::Util::CategoryManager->new->tree($schema, $sitename) } || [];
+    my %item_cats;
+    my %cat_name;
+    for my $m (@models) {
+        next unless $m->{item_id};
+        my $ids = eval { Comserv::Util::CategoryManager->new->item_category_ids($schema, $m->{item_id}) } || [];
+        $item_cats{ $m->{item_id} } = $ids if @$ids;
+    }
+    _flatten_cat_names($cat_tree, \%cat_name);
+
+    # Build category-grouped model containers
+    my $category_groups = _build_category_groups($cat_tree, \@models, \%item_cats, \%cat_name);
+
     $c->stash(
-        sitename   => $sitename,
-        models     => \@models,
-        all_items  => \@all_items,
-        template   => '3d/models.tt',
+        sitename        => $sitename,
+        models          => \@models,
+        all_items       => \@all_items,
+        cat_tree        => $cat_tree,
+        cat_name        => \%cat_name,
+        item_cats       => \%item_cats,
+        category_groups => $category_groups,
+        cat             => $cat,
+        total_models    => $total_models,
+        template        => '3d/models.tt',
     );
+}  # end of models
+
+sub _flatten_cat_names {
+    my ($tree, $map) = @_;
+    for my $n (@$tree) {
+        $map->{ $n->{id} } = $n->{name};
+        _flatten_cat_names($n->{children}, $map) if $n->{children};
+    }
+}
+
+# Build nested category → model groups for container view.
+# Returns arrayref of { id, name, model_count, models, children }
+sub _build_category_groups {
+    my ($tree, $models, $item_cats, $cat_name) = @_;
+
+    # Group models by category ID, track which models are categorized
+    my %cat_models;
+    my %seen_model;  # model_id => 1 if categorized
+    for my $m (@$models) {
+        next unless $m->{item_id};
+        my $cat_ids = $item_cats->{ $m->{item_id} } || [];
+        if (@$cat_ids) {
+            $seen_model{ $m->{id} } = 1;
+            for my $cid (@$cat_ids) {
+                push @{ $cat_models{$cid} }, $m;
+            }
+        }
+    }
+
+    my @groups = @{ _build_group_tree($tree, \%cat_models) };
+
+    # Add uncategorized models as a group at the top
+    my @uncategorized = grep { !$seen_model{ $_->{id} } } @$models;
+    if (@uncategorized) {
+        unshift @groups, {
+            id          => 0,
+            name        => 'Uncategorized',
+            model_count => scalar(@uncategorized),
+            models      => \@uncategorized,
+            children    => [],
+        };
+    }
+
+    return \@groups;
+}
+
+sub _build_group_tree {
+    my ($nodes, $cat_models) = @_;
+    my @out;
+    for my $n (@$nodes) {
+        my $models = $cat_models->{ $n->{id} } || [];
+        my $children = _build_group_tree($n->{children} || [], $cat_models);
+        my $child_count = 0;
+        for my $c (@$children) { $child_count += $c->{model_count} }
+        push @out, {
+            id          => $n->{id},
+            name        => $n->{name},
+            model_count => scalar(@$models) + $child_count,
+            models      => $models,
+            children    => $children,
+        };
+    }
+    return \@out;
+}
+
+# Build a lowercase-name → category_id map for path matching
+sub _build_path_category_map {
+    my ($tree) = @_;
+    my %map;
+    _add_cat_map($tree, \%map);
+    return %map;
+}
+
+sub _add_cat_map {
+    my ($nodes, $map) = @_;
+    for my $n (@$nodes) {
+        my $lc = lc($n->{name});
+        $lc =~ s/s$//;
+        $map->{$lc} = $n->{id};
+        $map->{lc($n->{name})} = $n->{id};
+        _add_cat_map($n->{children} || [], $map) if $n->{children};
+    }
 }
 
 sub model_stl_info :Path('/3d/model_stl_info') :Args(1) {
@@ -2945,6 +3465,97 @@ it under the same terms as Perl itself.
 
 =cut
 
+
+# ============================================================
+# /3d/copy — Save a web search result as a local model card.
+# No file download — just metadata + link back to the source.
+# The user downloads/pays on the external site, then uploads the
+# STL here for printing. Copyright: the external site's license
+# governs whether the model can be kept for reprint or added to
+# printing stock.
+# ============================================================
+
+sub copy :Path('/3d/copy') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    unless ($c->req->method eq 'POST') {
+        $c->flash->{error_msg} = 'POST required.';
+        $c->res->redirect($c->uri_for('/3d/browse'));
+        $c->detach;
+    }
+
+    my $title       = $c->req->params->{title}       || '';
+    my $url         = $c->req->params->{url}         || '';
+    my $thumbnail   = $c->req->params->{thumbnail}   || '';
+    my $site        = $c->req->params->{site}        || '';
+    my $description = $c->req->params->{description} || '';
+    my $tags        = $c->req->params->{tags}        || '';
+    my $file_type   = $c->req->params->{file_type}   || 'STL';
+
+    unless (length $title && length $url) {
+        $c->flash->{error_msg} = 'Title and URL are required.';
+        $c->res->redirect($c->uri_for('/3d/browse'));
+        $c->detach;
+    }
+
+    # Truncate long fields to DB column sizes
+    $title       = substr($title, 0, 255);
+    $url         = substr($url,   0, 1000);
+    $thumbnail   = substr($thumbnail, 0, 1000);
+    $description = substr($description, 0, 500);
+    $tags        = substr($tags, 0, 500);
+
+    # Build tags from site + user-supplied
+    my $tag_str = join(', ', grep { length } ($site, $tags));
+
+    my $model_id;
+    eval {
+        my $model = $schema->resultset('Printing3dModel')->create({
+            sitename      => $sitename,
+            name          => $title,
+            description   => $description || undef,
+            file_type     => lc($file_type) || 'stl',
+            tags          => $tag_str || undef,
+            thumbnail_url => $thumbnail || undef,
+            source        => 'web_import',
+            source_url    => $url,
+            added_by      => $c->session->{username} || 'web_import',
+            is_active     => 1,
+            nfs_path      => undef,        # no file — link-only card
+            file_id       => undef,
+            item_id       => undef,        # no inventory item yet
+            created_at    => _now(),
+        });
+        $model_id = $model->id;
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'copy',
+            "web_import save failed: $@");
+        $c->flash->{error_msg} = "Could not save model card: $@";
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'copy',
+            "web_import model_id=$model_id title=$title site=$site");
+        $c->flash->{success_msg} =
+            "Saved \"$title\" to catalog (model #$model_id). "
+          . "Download the STL from $site, then upload it on the Model Manager page.";
+    }
+
+    # Redirect back to browse preserving the search
+    my $q = $c->req->params->{q} || '';
+    $c->res->redirect($c->uri_for('/3d/browse', {
+        ($q ? (q => $q) : ()),
+        deep => 1,
+    }));
+    $c->detach;
+}
+
+# ============================================================
 
 sub sign_delete :Path('/3d/sign/delete') :Args(1) {
     my ($self, $c, $model_id) = @_;

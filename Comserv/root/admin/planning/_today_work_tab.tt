@@ -272,6 +272,15 @@
                         class="SortBtn">Project</button>
                     <button data-action="sort-due" id="sort-due"
                         class="SortBtn">Due</button>
+                    [%# Decision-model resort (local Ollama systemone via DecisionRank,
+                        never a chat model). decision-resort.js auto-runs it once on
+                        load (data-autorank) and on click; status shows in the span. %]
+                    [% IF branch_focus_filter %]
+                    <button data-action="decision-resort" id="decision-resort-btn"
+                        class="SortBtn" data-autorank="1" data-model="nimble:latest"
+                        title="Re-sort the Focus Queue with the local decision model (nimble). Runs in the background; the page stays usable.">🤖 Resort</button>
+                    <span id="decision-rank-status" class="AITuneStatus" role="status" aria-live="polite"></span>
+                    [% END %]
                     <a href="/planning/daily" data-action="clear-filters"
                         class="ClearFiltersLink">✕ Clear</a>
                 </div>

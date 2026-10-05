@@ -122,14 +122,20 @@ sub conflicts {
         my ($pu, $qu) = (used_of($p, $o{cap}), used_of($q, $o{cap}));
         next unless defined $pu && defined $qu && $qu < $pu;
         my $reset_between = 0;
+        # Cycle boundary: a drop in used% where the newer reading carries its
+        # own reset_at means a new Bot cycle began at/before that reading
+        # (meters reset; the date can move). Not a conflict.
+        if (defined $q->{reset_at} && $qu < $pu && $p->{at} < $q->{at}) {
+            $reset_between = 1;
+        }
         for my $rs (grep { defined } $p->{reset_at}, $o{reset_at}) {
             my $x = $rs; my $cd = ($o{cycle_days} || 7) * 86400;
             $x -= $cd while $x > $q->{at};
             $reset_between = 1 if $x > $p->{at} && $x <= $q->{at};
         }
         next if $reset_between;
-        push @out, sprintf('%s%s used at %s, then %s%s used at %s with no reset in between - conflict flagged, not adjusted',
-            _fmt($pu, $p->{unit}), '', $p->{at_pt}, _fmt($qu, $q->{unit}), '', $q->{at_pt});
+        push @out, sprintf('%s used at %s, then %s used at %s with no reset in between - conflict flagged, not adjusted',
+            _fmt($pu, $p->{unit}), $p->{at_pt}, _fmt($qu, $q->{unit}), $q->{at_pt});
     }
     for my $q (grep { $_->{kind} eq 'unconfirmed' } @$readings) {
         push @out, sprintf('%s at %s: used/left unconfirmed (as used: %s used; as left: %s used)',
@@ -186,7 +192,8 @@ sub estimate {
         my $a = $in{app_at_reading}->($latest->{at});
         $drift = $a - $lu if defined $a;
     }
-    my $burn_h = defined $in{burn_24h} ? $in{burn_24h} * $rate / 24 : undef;
+    my $burn_h = defined $in{burn_per_hour} ? $in{burn_per_hour}
+               : defined $in{burn_24h} ? $in{burn_24h} * $rate / 24 : undef;
     my $hours_left = defined $reset ? ($reset - $now) / 3600 : undef;
     my $proj = (defined $norm && defined $burn_h && defined $hours_left) ? $norm + $burn_h * $hours_left : undef;
     my $limit = $c->{unit} eq '%' ? 100 : $in{cap};

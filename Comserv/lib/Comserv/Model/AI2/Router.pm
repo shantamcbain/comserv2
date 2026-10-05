@@ -96,22 +96,25 @@ sub _detect_provider {
 # Ported from Controller::AI::_select_model_for_context.
 # -------------------------------------------------------------------
 my %CONTEXT_PREFS = (
-    chat        => ['phi4', 'gemma4', 'qwen2.5', 'qwen3-coder'],
-    helpdesk    => ['phi4', 'gemma4', 'qwen2.5'],
-    ency        => ['qwen2.5', 'gemma4', 'phi4'],
-    bmaster     => ['qwen2.5', 'gemma4', 'phi4'],
-    csc         => ['phi4', 'gemma4', 'qwen2.5'],
-    general     => ['phi4', 'gemma4', 'qwen2.5-coder', 'qwen3-coder'],
-    navigation  => ['phi4', 'gemma4'],
-    simple      => ['phi4', 'gemma4'],
-    code        => ['qwen3-coder', 'qwen2.5-coder', 'phi4', 'gemma4'],
-    developer   => ['qwen3-coder', 'qwen2.5-coder', 'phi4'],
-    docker      => ['phi4', 'gemma4'],
+    # Chat-capable installs only (gemma4-64k, qwen2.5-coder). Decision-only
+    # tags (tev1/nimble/clef-flash) go through DecisionRank / Provider::decide,
+    # never chat prefs — they reject /api/chat.
+    chat        => ['gemma4-64k', 'gemma4', 'qwen2.5-coder', 'qwen2.5'],
+    helpdesk    => ['gemma4-64k', 'gemma4', 'qwen2.5-coder', 'qwen2.5'],
+    ency        => ['gemma4-64k', 'qwen2.5-coder', 'gemma4', 'qwen2.5'],
+    bmaster     => ['gemma4-64k', 'qwen2.5-coder', 'gemma4', 'qwen2.5'],
+    csc         => ['gemma4-64k', 'gemma4', 'qwen2.5-coder', 'qwen2.5'],
+    general     => ['gemma4-64k', 'gemma4', 'qwen2.5-coder', 'qwen3-coder'],
+    navigation  => ['gemma4-64k', 'gemma4', 'qwen2.5-coder'],
+    simple      => ['gemma4-64k', 'gemma4', 'qwen2.5-coder'],
+    code        => ['qwen2.5-coder', 'qwen3-coder', 'gemma4-64k', 'gemma4'],
+    developer   => ['qwen2.5-coder', 'qwen3-coder', 'gemma4-64k'],
+    docker      => ['gemma4-64k', 'qwen2.5-coder', 'gemma4'],
     # Editor agents (from ai2/editor dropdown): analyze = root cause/short plan (can be lighter),
     # programming = code work (prefer coder models or higher tier), documentation = plans/docs.
-    analyze     => ['gemma4', 'phi4', 'qwen2.5', 'qwen3-coder'],
-    programming => ['qwen3-coder', 'qwen2.5-coder', 'gemma4', 'phi4'],
-    documentation => ['qwen2.5', 'gemma4', 'phi4'],
+    analyze     => ['gemma4-64k', 'gemma4', 'qwen2.5-coder', 'qwen3-coder'],
+    programming => ['qwen2.5-coder', 'qwen3-coder', 'gemma4-64k', 'gemma4'],
+    documentation => ['gemma4-64k', 'qwen2.5-coder', 'gemma4', 'qwen2.5'],
 );
 
 my %ROLE_TO_CONTEXT = (
@@ -325,10 +328,15 @@ sub classify_prompt_for_routing {
     };
 }
 
-# Strip embeddings/rerankers/tts to avoid 400s from non-chat models.
+# Strip embeddings/rerankers/tts/decision-only tags to avoid 400s from
+# non-chat models. tev1/nimble/clef-flash are Ollama 0.35+ systemone
+# decision models (Today's Focus / ticket sort) — they reject /api/chat.
 sub _is_chat_model {
     my ($self, $name) = @_;
-    return $name !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
+    return 0 unless defined $name && length $name;
+    return 0 if $name =~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
+    return 0 if $name =~ /^(?:tev1|nimble|clef-flash)(?::|$)/i;
+    return 1;
 }
 
 # The Router identifies external models as "provider|slug" (e.g.
@@ -481,8 +489,14 @@ sub select_model {
     my @chat = grep { $self->_is_chat_model($_) } values %installed;
     return ('ollama', $chat[0]) if @chat;
 
-    # 7) Hardcoded safe fallback (local-first) — must match an installed model.
-    return ('ollama', 'phi4:14b');
+    # 7) Hardcoded safe fallback — only return a model that is actually
+    # installed. phi4:14b used to be hardcoded here after it was uninstalled,
+    # which made every Chat turn burn a failed Ollama hop before OpenRouter.
+    for my $cand (qw(gemma4-64k:latest qwen2.5-coder:14b gemma4-64k qwen2.5-coder)) {
+        return ('ollama', $installed{$cand}) if $installed{$cand};
+        return ('ollama', $cand) if grep { $_ eq $cand } values %installed;
+    }
+    return ('openrouter', 'cohere/north-mini-code:free');
 }
 
 # If SuperGrok OAuth is present, every grok-* hop uses it (weekly credits)

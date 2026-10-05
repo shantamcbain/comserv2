@@ -93,4 +93,74 @@ my $h3 = home();
 $r = $g->run(thrash => 50, openrouter => $ok);
 ok $r->{dry_run} && $r->{action} eq 'trip', 'dry run decides trip'; ok !-e "$h3/.hermes/overrun_guard_state.json", 'dry run no state';
 
+
+# Oct 5: alias rewrite + restore preserves hand-set default
+{
+    my $plan = $G->can('alias_rewrite_plan')->(aliases => {
+        code => 'openrouter/deepseek/deepseek-v4-pro',
+        coder => 'openrouter/deepseek/deepseek-v4-pro',
+        cheap => 'openrouter/cohere/north-mini-code:free',
+        deepseek => 'openrouter/deepseek/deepseek-v4-flash:free',
+        delegate => 'openrouter/deepseek/deepseek-v4-flash',
+    }, safe => 'openrouter/cohere/north-mini-code:free');
+    ok $plan->{set}{code}, 'rewrites code';
+    ok $plan->{set}{coder}, 'rewrites coder';
+    ok $plan->{set}{delegate}, 'rewrites paid delegate';
+    ok !$plan->{set}{cheap}, 'keeps cheap';
+    ok !$plan->{set}{deepseek}, 'keeps :free deepseek';
+    is $plan->{saved}{code}, 'openrouter/deepseek/deepseek-v4-pro', 'saves old code';
+}
+is $G->can('restore_model_decision')->(current_default => 'openrouter/deepseek/deepseek-v4-flash-0731',
+    target => 'openrouter/cohere/north-mini-code:free',
+    saved_model => { default => 'openrouter/cohere/north-mini-code:free' })->{restore_default}, 0, 'preserve hand-set';
+is $G->can('restore_model_decision')->(current_default => 'openrouter/cohere/north-mini-code:free',
+    target => 'openrouter/cohere/north-mini-code:free',
+    saved_model => { default => 'openrouter/deepseek/deepseek-v4-pro' })->{restore_default}, 1, 'restore when still target';
+
+# run() trip rewrites aliases; restore keeps hand-set
+{
+    my $h = home();
+    open my $fh, '>>', "$h/.hermes/config.yaml"; print $fh "  aliases:\n    code: openrouter/deepseek/deepseek-v4-pro\n    cheap: openrouter/cohere/north-mini-code:free\n"; close $fh;
+    # Fix yaml - rewrite whole config with aliases under model
+    open $fh, '>', "$h/.hermes/config.yaml"; print $fh "model:\n  default: openrouter/deepseek/deepseek-v4-pro\n  provider: openrouter\n  base_url: https://openrouter.ai/api/v1\n  api_mode: chat_completions\n  aliases:\n    code: openrouter/deepseek/deepseek-v4-pro\n    cheap: openrouter/cohere/north-mini-code:free\n"; close $fh;
+    my @set;
+    my $g = $G->new(home => $h, app_root => $h, no_ledger => 1, no_notify => 1, base_urls => [], ollama_url => 'http://127.0.0.1:9', now => 5000000,
+        set_cb => sub { my ($k,$v)=@_; push @set, [$k,$v];
+            if ($k =~ /^model\.aliases\.(.+)$/) {
+                my $a=$1; open my $in,'<',"$h/.hermes/config.yaml"; my @l=<$in>; close $in;
+                my $found=0; for (@l) { if (/^    \Q$a\E:/) { $_="    $a: $v\n"; $found=1 } }
+                push @l, "    $a: $v\n" unless $found;
+                open my $o,'>',"$h/.hermes/config.yaml"; print $o @l; close $o;
+            } else {
+                (my $kk=$k)=~s/^model\.//; open my $in,'<',"$h/.hermes/config.yaml"; my @l=<$in>; close $in;
+                s/^  \Q$kk\E: .*/  $kk: $v/ for @l; open my $o,'>',"$h/.hermes/config.yaml"; print $o @l; close $o;
+            }
+        });
+    my $r = $g->run(thrash => 25, openrouter => { ok => 1, day_usd => 0.1, week_usd => 1, month_usd => 2 });
+    is $r->{action}, 'trip', 'alias trip';
+    ok grep({ $_->[0] eq 'model.aliases.code' } @set), 'code alias set on trip';
+    is $g->read_aliases->{code}, 'openrouter/cohere/north-mini-code:free', 'code now free';
+    # hand-set default during trip
+    { open my $in,'<',"$h/.hermes/config.yaml"; my @l=<$in>; close $in; s/^  default: .*/  default: openrouter\/deepseek\/deepseek-v4-flash-0731/ for @l; open my $o,'>',"$h/.hermes/config.yaml"; print $o @l; close $o; }
+    ($g) = do {
+        my @set2; my $g2 = $G->new(home => $h, app_root => $h, no_ledger => 1, no_notify => 1, base_urls => [], ollama_url => 'http://127.0.0.1:9', now => 5000600,
+            set_cb => sub { my ($k,$v)=@_; push @set2, [$k,$v];
+                if ($k =~ /^model\.aliases\.(.+)$/) {
+                    my $a=$1; open my $in,'<',"$h/.hermes/config.yaml"; my @l=<$in>; close $in;
+                    for (@l) { if (/^    \Q$a\E:/) { $_="    $a: $v\n" } }
+                    open my $o,'>',"$h/.hermes/config.yaml"; print $o @l; close $o;
+                } else {
+                    (my $kk=$k)=~s/^model\.//; open my $in,'<',"$h/.hermes/config.yaml"; my @l=<$in>; close $in;
+                    s/^  \Q$kk\E: .*/  $kk: $v/ for @l; open my $o,'>',"$h/.hermes/config.yaml"; print $o @l; close $o;
+                }
+            });
+        ($g2, \@set2);
+    };
+    $r = $g->run(thrash => 1, openrouter => { ok => 1, day_usd => 0.1, week_usd => 1, month_usd => 2 });
+    is $r->{action}, 'restore', 'alias restore';
+    ok $r->{preserved_manual}, 'preserved manual flag';
+    is $g->current_model->{default}, 'openrouter/deepseek/deepseek-v4-flash-0731', 'hand-set default kept';
+    is $g->read_aliases->{code}, 'openrouter/deepseek/deepseek-v4-pro', 'code alias restored';
+}
+
 done_testing;
