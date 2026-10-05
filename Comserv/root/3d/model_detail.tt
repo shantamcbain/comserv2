@@ -131,7 +131,11 @@
 .filament-pick p { margin: 0 0 0.8em 0; color: #222; }
 </style>
 
-<p><a href="/3d/browse">&larr; Back to Browse</a></p>
+<nav aria-label="Breadcrumb" style="font-size:0.85em;margin-bottom:0.8em;">
+    <a href="/3d">3D Printing</a> &rsaquo;
+    <a href="/3d/browse">Browse Models</a> &rsaquo;
+    <span>[% model.name | html %]</span>
+</nav>
 
 <div class="model-detail-header">
     <div class="model-detail-thumb">
@@ -156,13 +160,19 @@
         [% IF model.source_url %]
         <p><a href="[% model.source_url | html %]" target="_blank" rel="noopener">Original source &rarr;</a></p>
         [% END %]
-        [% IF c.session.user_id && model.nfs_path %]
+        [% IF c.session.user_id %]
         <p style="margin-top:0.8em;">
+            [% IF model.nfs_path %]
             <a href="/3d/model_download/[% model.id %]"
                style="display:inline-block;padding:0.45em 1.1em;background:var(--button-bg,var(--accent-color,#007bff));color:var(--button-text,white);border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;"
                title="Download [% model.file_type | upper | html %] file to open in your slicer">
                 ⬇ Download [% model.file_type | upper | html %] File
             </a>
+            [% ELSE %]
+            <span style="display:inline-block;padding:0.45em 1.1em;background:var(--secondary-color,#eee);color:var(--muted-color,var(--text-color));border:1px dashed var(--border-color);border-radius:4px;font-size:0.9em;font-weight:bold;">
+                ⚠ No STL linked — file missing or not yet uploaded
+            </span>
+            [% END %]
             <form method="post" action="/3d/model_upload/[% model.id %]" enctype="multipart/form-data" style="display:inline;margin-left:0.4em;">
                 <label for="mdl_up_[% model.id %]"
                    style="display:inline-block;padding:0.45em 1.1em;background:var(--secondary-color, #eee);color:var(--link-color,#007bff);border:1px solid var(--border-color);border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;cursor:pointer;"
@@ -177,6 +187,13 @@
             </a>
             [% END %]
             <small style="color:var(--muted-color,var(--text-color));margin-left:0.6em;">Open in Bambu Studio, PrusaSlicer, Cura, etc.</small>
+            [% IF inv_item %]
+            <a href="/Inventory/item/view/[% inv_item.id %]"
+               style="display:inline-block;padding:0.45em 1.1em;background:var(--secondary-color,#eee);color:var(--link-color,#007bff);border:1px solid var(--border-color);border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;margin-left:0.4em;"
+               title="Open the inventory item and its bill of materials for this part">
+                📦 View in Inventory / BOM
+            </a>
+            [% END %]
         </p>
         [% END %]
         [% IF model.source == 'sign_generator' %]
@@ -194,6 +211,64 @@
         [% END %]
     </div>
 </div>
+
+[% IF c.session.user_id %]
+<form method="get" action="/3d/model/[% model.id %]" style="margin-bottom:1em;display:flex;align-items:center;gap:0.5em;">
+    <label style="cursor:pointer;font-size:0.9em;color:var(--text-color);display:flex;align-items:center;gap:0.4em;">
+        <input type="checkbox" name="similar" value="1"
+               onchange="this.form.submit()"
+               [% IF similar %]checked[% END %]>
+        Show similar models (web search)
+    </label>
+</form>
+[% END %]
+
+[% IF similar %]
+<div style="margin-bottom:1.5em;padding:1em;background:var(--secondary-color);border:1px solid var(--border-color);border-radius:6px;">
+    <h3 style="margin:0 0 0.6em 0;color:var(--heading-color,var(--text-color));">Similar Models</h3>
+
+    [% IF similar_models && similar_models.size %]
+    <div class="model-grid" style="margin-bottom:1em;">
+        [% FOREACH m IN similar_models %]
+        <div class="model-card">
+            <div class="model-thumb" style="width:100%;height:100px;border-radius:4px;margin-bottom:0.5em;
+                 background:var(--secondary-color);display:flex;align-items:center;justify-content:center;
+                 color:var(--muted-color,#888);font-size:2em;overflow:hidden;">
+            [% IF m.thumbnail_url %]
+            [% SET ts = m.thumbnail_url.replace('\\.svg$', '.png') %]
+            <img src="[% ts | html %]" alt="[% m.name | html %]" loading="lazy"
+                 style="width:100%;height:100%;object-fit:cover;border-radius:4px;"
+                 onerror="this.style.display='none';this.parentElement.innerHTML='&#9673;';">
+            [% ELSE %]
+            &#9673;
+            [% END %]
+            </div>
+            <h3 style="font-size:0.9em;">[% m.name | html %]</h3>
+            <p style="font-size:0.8em;">[% m.description | truncate(80) | html %]</p>
+            <a href="/3d/model/[% m.id %]" class="btn-sm" style="font-size:0.8em;">View</a>
+        </div>
+        [% END %]
+    </div>
+    [% ELSE %]
+    <p style="color:var(--muted-color);">No similar local models found.</p>
+    [% END %]
+
+    [% IF similar_web && similar_web.size %]
+    <h4 style="margin:0.8em 0 0.4em 0;color:var(--heading-color,var(--text-color));font-size:0.95em;">
+        Web results[% IF similar_provider %] via [% similar_provider | html %][% END %]
+    </h4>
+    <div class="model-grid">
+        [% FOREACH r IN similar_web %]
+        <div class="model-card">
+            <h3 style="font-size:0.9em;">[% r.title | html %]</h3>
+            <p style="font-size:0.8em;">[% r.snippet | html %]</p>
+            <a href="[% r.url | html %]" target="_blank" rel="noopener" class="btn-sm secondary" style="font-size:0.8em;">Open &rarr;</a>
+        </div>
+        [% END %]
+    </div>
+    [% END %]
+</div>
+[% END %]
 
 [% SET two_colour = (inv_item && inv_item.is_assemblable) || (model.source == 'sign_generator') %]
 

@@ -1,0 +1,650 @@
+{
+  "report_date": "2026-10-01",
+  "source": "AI usage monitor",
+  "created_by": "AI usage monitor",
+  "summary": "NO, not improving: days=1 Chat ok_rate fell 100%\u219226.3% (5/19); gemma-4-31b-it:free 6/6 429 at head of chat/docs chain (circuit open), 6 all_exhausted from Focus-Tune (failover=0), ollama tev1 2/2 llama-server missing. No AI code regressions (c15b1b68c no effect; f73d37ff7 too little data). Spend low: OR key +$1.03 since Sep 30 report; Super Grok 11% left, meter stale 24h, reset ~10:31 AM PT today.",
+  "markdown": "# Daily AI Eval \u2014 2026-10-01 (America/Vancouver)\n\nRun: Thu 2026-10-01 ~8:14\u20138:35 AM PT (re-run; the 6:33 AM run failed because the workstation was disconnected). Workstation reachable.\nWindows: usage_live days=1 covers **Sep 30 00:00 \u2192 now PT** (no Oct 1 app calls yet). days=7 covers Sep 24 00:00 \u2192 now. Hermes 24h = Sep 30 08:15 \u2192 Oct 1 08:15 PT.\n\n**Core question: is the code making our AI usage better or worse?**\n**Answer: NO, not improving today. Chat reliability slipped (raw ok rate 100% \u2192 26.3%, n=19). The cause is the routing data and the runtime, not new code:** `google/gemma-4-31b-it:free` sits first in the chat and docs chains and returned 429 on 6 of 6 calls (circuit open, 0 successes ever). Focus-Tune scoring runs (failover=0) added 6 all_exhausted rows and are counted as Chat. Ollama `tev1:0.8b` failed 2/2 (llama-server binary not found). Failover did work when it ran: gemma \u2192 nemotron at 2:33 PM PT. Spend is well under every cap.\n\n## Budget\n- **Grok Bot (user-supplied):** 27% used at Thu Oct 1 8:14 AM PT, after the Mon Sep 28 8 AM PT reset. That is 3.01 days elapsed, about 9.0%/day, projecting about 63% at the Mon Oct 5 ~8 AM PT reset. Soft max for the remaining 73% over 4.0 days is about 18%/day. On track.\n- **OpenRouter:** the live balance and day/week/month are **unavailable**. usage_live exposes only the lifetime auth-key usage, and the app's OpenRouter key isn't readable without scraping a credential, which I didn't do. Derived numbers: auth-key usage is **$241.3757** now vs $240.3465 at the Sep 30 6:44 AM PT report, so **about $1.03 over the ~25.5 h** in between (under the $1.65/day pace). September close is about $42.89 (Sep 30 snapshot $41.87 + $1.03, assuming it was all billed before the UTC month rollover) of the $50 cap. Week is about $2.17 of $11.50 (derived). Balance estimate: \u2264 ~$17.03 (credits 260 \u2212 usage, derived, not live). App fallover ledger: day $0 / week $1.1462 / month $0 (new month).\n- **Super Grok:** guard remaining **11%** (meter build 89% used at Sep 30 8:07 AM PT), used_today 2 / daily_cap 5, **unlocked**, mode grok. The guard day is still 2026-09-30 because the grokcom usage meter has been **stale ~24 h**: the guard log repeats \"usage file stale (86840s) \u2014 no switch\". Reset due today ~10:31 AM PT, not yet reached at run time. Hermes xai-oauth calls in the last 24h: grok-4.7 55, grok-build-0.1 47. The usage_live supergrok_week card still says 205 API / 33.75M tokens / 2 sessions, which doesn't match those calls.\n\n## Code and config changes since the Sep 30 report (last known 898ce8ca5)\naisystem `fix-ai-generate-pipe-model` HEAD 0113a4532; main HEAD 42900c4b0 has the same commits merged at Oct 1 8:11 AM PT. Times below are PT.\n- **c15b1b68c** (Sep 30 9:19 AM): feat(ai) Ollama System One decision-model plan, plus health/guard data and inbox/outbox files. Docs and data only. \u2192 **no effect**. It does commit `ai_model_health.json` churn again.\n- **f73d37ff7** (Oct 1 8:08 AM): feat(ollama) decision-model ordering for the planning daily view (Provider/Ollama.pm +101, Util/AI/DecisionRank.pm, Model/Ollama/Decision.pm, tests). Landed minutes before this run; ai_decision_calls.jsonl has 2 lines; no ledger rows yet. \u2192 **too little data**.\n- **627bcc7b7** (admin schema compare) and **1e54faa7c** (3D printing): not AI \u2192 no effect on AI. Merges 4203851b6, 8198d981b, e16cb7a1e, a67908368, 0113a4532 \u2192 no effect.\n- **898ce8ca5** (carry-over): gemma-26b has had no calls since. That improvement holds.\n- **Config, not code:** the Hermes `config.yaml` default changed to `openrouter/deepseek/deepseek-v4.1-flash` (mtime Sep 30 11:30 AM). That matches yesterday's proposal 2 in intent, but the first session afterwards was coding work on flash (\"Continue Ollama model selection feature\": 153 calls, est $0.167). \u2192 **too little data / watch** (it conflicts with the flash-for-idle/title-only policy).\n- **Chains file:** unchanged since 898ce8ca5. gemma-31b is still first in chat/docs and second in coding. In effect \u2192 **regressed** (6/6 429 today).\n\n## Scorecard\n- **App ledger days=1:** 19 calls, 5 ok, **ok_rate 26.3%**, cost $0.0465, 14 errors. By model: all_exhausted 6/6 err; gemma-4-31b-it:free 6/6 err (429); ollama tev1:0.8b 2/2 err (llama-server missing); ling-3.0-flash-sante:free 2/2 ok ($0.0194); north-mini-code:free 2/2 ok ($0.0160); nemotron-3.5-lightning:free 1/1 ok ($0.0111).\n  - Derived breakdown: 8 of the 19 rows are Focus-Tune scoring (6 all_exhausted + 2 gemma 429 at 7:29 and 7:48 PM PT, purpose=title, failover=0). Without them the rate is 5/11 = 45%. One gemma 429 at 3:39 PM PT has no follow-up success row.\n- **vs yesterday's report (days=1):** 100% (2/2) \u2192 26.3% (5/19).\n- **days=7:** 43 calls, 16 ok (**37.2%**), cost $0.1063 (Sep 30 report: 55.3% on 38). Org 7d: 2951 calls (2908 Hermes), $1.7944.\n- **Hermes state.db (read-only):**\n  - Last 24h: 6 sessions, 528 API calls, est $0.757 (actual_cost not reconciled; usage_live calendar-day Sep 30 shows $0.4423).\n  - Calls by model: deepseek-v4.1-flash 153 ($0.167), nemotron-3.5-lightning:free 107 ($0), grok-4.7 55, grok-build-0.1 47, tencent/hy3 35 ($0.0885), qwen3.8-flash 27 ($0.1867), deepseek-v4-flash title_generation 5.\n  - Last 7d: 42 sessions, 2857 calls, est $1.688. grok-4.6 1482, deepseek-v4-flash 283 ($0.957), grok-4.7 260, grok-build-0.1 159, v4.1-flash 153, north-mini 140, ~flash-latest 134, nemotron 123, flash-0731 60, title_generation 35.\n  - Iteration-cap hits: 24h **0**; 7d 6 sessions reported hitting the limit (Sep 24, 25, 26\u00d72, 28, 29). Config: agent.max_turns=20, delegation.max_iterations=250.\n  - Stale open sessions: **41** with ended_at NULL, unarchived, all idle >6h (usage_live shows 20 open, 0 live).\n- **Hermes config now:**\n  - default `deepseek/deepseek-v4.1-flash` @openrouter; fallback `openrouter/deepseek/deepseek-v4-flash`; delegation `deepseek-v4-flash` (max_iterations 250); title_generation deepseek-v4-flash.\n  - Aliases: cheap north-mini-code:free; code/coder deepseek-v4-pro; deepseek v4-flash:free; delegate v4-flash; director/git/reasoner/editor grok-4.6; xai grok-build-0.1; glm z-ai/glm-5.3-flash; hy3 tencent/hy3; local ollama gemma4-64k.\n  - tool_loop_guardrails: hard_stop **disabled**.\n\n### Anomalies\n- **error_spike:** openrouter google/gemma-4-31b-it:free 100% (6/6), in both 1d and 7d. Historical 7d: gemma-4-26b 7/7 and nemotron-3-nano 5/5, both already in `removed`.\n- **dead_model (candidates, under 10 calls):** gemma-4-31b-it:free has an open circuit with 5 failures and 0 successes ever; ollama tev1:0.8b failed 2/2 with \"llama-server binary not found\". Ollama 0.35.0 now lists 8 models and /usr/local/lib/ollama/llama-server exists; live inference was not tested (read-only).\n- **cost_spike:** none. App $0.0465/day; Hermes 24h est $0.757 vs Sep 29 day $0.911. Note that the ledger books non-zero cost on `:free` slugs ($0.0465 total).\n\n### Thrash (20+ calls in 15 min, same user/provider/model)\n- **App ledger:** none (Shanta's busiest day had 19 calls across models).\n- **Hermes, last 24h** (assistant turns per 15 min, all Shanta, agent tool loops):\n  - grok-4.7: 45 (session 0c2bbe \"App not accepting calls on branch\", 3d, 10:00 AM)\n  - deepseek-v4.1-flash: 45 (fd6efe \"Continue Ollama model selection feature\", 12:45 PM)\n  - tencent/hy3: 37 (0c2bbe, 9:44 AM)\n  - nemotron-3.5-lightning:free: 27 (cd42a9 \"Upgrade Ollama\", 10:56 AM)\n  - nemotron-3.5-lightning:free: 20 (0c2bbe, 9:34 AM)\n- 7d: 35 windows, mostly grok-4.6 on Sep 24\u201325.\n- Session 0c2bbe (3d stale-server symptom) went through 4 models in 2 h (nemotron \u2192 hy3 \u2192 grok-4.7 \u2192 qwen3.8-flash, 137 calls, est $0.275). :4003 restarted at 10:33 AM PT, during or just after the grok-4.7 stretch.\n\n### Effectiveness (needs 10+ calls)\n- **App:** no model reached 10 calls in 1d or 7d, so too little data for a formal replace/watch. Policy note: gemma-31b is 0/6 and has an open circuit, so watch it and move it out of the chain head (proposal 1).\n- **Hermes:** per-call ok/flagged isn't recorded in state.db, so ok_rate and flagged per call are **unavailable**.\n\n### Failover health\n- days=1: turns 1, answered_after_failover **1**, answered_first 0, fallover_rate 100%, failed_attempts 4 (all http_429), all_exhausted **6** (all Focus-Tune purpose=title on gemma-31b; circuit_open skips).\n- days=7: turns 4, after_failover 2, first 2 (50%); failed_by_reason http_429 4, http_404 1.\n- **Circuits:** open = [openrouter|google/gemma-4-31b-it:free] (probe_failed:http_429, 5 failures); half_open []; closed_tracked 3.\n- Spend guard: soft caps wired at $1.65/$11.50/$50; fallover spend day $0 / week $1.1462.\n- supergrok_guard: locked 0 (checked Sep 30 10:00 AM PT, stale).\n- Hermes hops: usage_live reports 6 sessions_with_hops (1d) and 36 (7d). Excluding title_generation and compression, there are **2 real hop sessions in 24h** and **9 in 7d**.\n- Kill switch: none killed.\n- Grounding: still shadow (no grounding block in usage_live).\n\n### Pending proposals\n- Report 10 (no-flash rule for runtime debugging) and report 9's 3 proposals are **not queryable without logging in** (/ai/eval and /ai/eval/report/{9,10} return 302 to /user/login).\n\n### Ops notes\n- :4006 (pid 158909, `-r`) has been up since Sep 30 3:56 PM PT. :4003 (`-r`) since Sep 30 10:33 AM. :3001 since Oct 1 8:11 AM (not touched by this run).\n- Hermes dashboards on :9101/:9103/:9106/:9119 were **not listening** at check time (~8:25 AM PT).\n- `data/ai_model_health.json` is still not gitignored.\n- Not changed by this run: no code edits, restarts, commits, or Hermes config changes.\n\n## Ideas (review-first proposals, prioritized)\n1. **Config:** move gemma-4-31b-it:free out of the chat/docs chain head (lead with north-mini-code:free 5/5 7d and nemotron-3.5-lightning:free; keep gemma last or remove). It went 0/6 today with a circuit that has never succeeded.\n2. **Code (extend AI.pm / Usage.pm, DBIx::Class):** log Focus-Tune scoring as its own request_type and keep it out of Chat ok_rate. Skip models with open circuits in Focus-Tune. Count Hermes hops without title_generation/compression (6 reported vs 2 real).\n3. **Workstation (Hermes):** route by task. Flash only for idle and titles; runtime debugging and coding go to director grok-4.6 while Super Grok is unlocked, else deepseek-v4-pro. Escalate after about 20 calls without progress. Evidence: Sep 29 flash $0.54 / 122 calls, the Sep 30 4-model 137-call session, and 153 coding calls on v4.1-flash.\n4. **Code:** stale-server preflight on the AI usage page and in a Hermes skill. Compare the dev-server pid start time with the newest lib/ or root/ mtime and HEAD time, and warn before any AI debugging. This targets the :4003 restart-on-change bug.\n5. **Code + workstation:** make usage_live return OpenRouter usage_daily/weekly/monthly and the credits balance from fetch_openrouter_status, so the eval needs no key. Then write the supergrok_daily_guard.py OpenRouter dollar-cap extension so Hermes drops to `:free` when the day is over $1.65.\n6. **Workstation:** add a stale-meter alert for the Super Grok guard (meter 24 h stale; guard stuck on Sep 30). Fall back to Hermes state.db xai-oauth calls to estimate usage.\n7. **Code:** fix cost attribution for `:free` slugs ($0.0465 booked on ling/north-mini/nemotron :free). Use OpenRouter's generation cost or zero.\n8. **Hygiene:** gitignore the runtime JSONs (ai_model_health, grokcom_usage, supergrok_guard). Archive the 41 stale Hermes sessions. Drop gemma-26b from @FREE_PREFERENCE and Router.pm:1257. Add an Ollama health probe (tev1 llama-server error) because `ollama|auto` is the last hop of every chain.\n\n_Ingest note: proposal 1 as first submitted used a non-allow-listed target; allow-listed `chain_chat` and `chain_docs` versions were added (targets `data/ai_model_chains.json:chain_chat|chain_docs`)._\n",
+  "metrics": {
+    "run": {
+      "started_pt": "2026-10-01T08:14:00-07:00",
+      "note": "re-run; 06:33 AM run failed (workstation disconnected)",
+      "usage_live_days1_since": "2026-09-30 00:00:00",
+      "usage_live_days7_since": "2026-09-24 00:00:00",
+      "hermes_24h_since": "2026-09-30T08:15:38-07:00"
+    },
+    "bot": {
+      "spoken_used_pct": 27,
+      "spoken_percent_left": 73,
+      "observed_at": "2026-10-01T08:14:00-07:00",
+      "last_reset": "2026-09-28T08:00:00-07:00",
+      "next_reset": "2026-10-05T08:00:00-07:00",
+      "days_elapsed": 3.01,
+      "days_left": 4.0,
+      "burn_pct_per_day": 9.0,
+      "projected_used_at_reset_pct": 63,
+      "soft_daily_max_pct": 18.25,
+      "source": "user-supplied"
+    },
+    "openrouter": {
+      "balance_usd": null,
+      "day_usd": null,
+      "week_usd": null,
+      "month_usd": null,
+      "live_status": "unavailable (usage_live exposes lifetime auth-key usage only; key not read)",
+      "auth_key_usage_total_usd": 241.375746097,
+      "prev_report_auth_key_usage_usd": 240.346525213,
+      "derived_spend_since_prev_report_usd": 1.0292,
+      "derived_window_hours": 25.5,
+      "derived_sep_month_close_usd_est": 42.89,
+      "derived_week_usd_est": 2.17,
+      "derived_balance_usd_upper_est": 17.03,
+      "caps": {
+        "day_usd": 1.65,
+        "week_usd": 11.5,
+        "month_usd": 50
+      },
+      "vs_caps": {
+        "day": "under (derived)",
+        "week": "under (derived)",
+        "month": "under (derived, Sep)"
+      },
+      "fallover_spend": {
+        "day": 0,
+        "week": 1.1462,
+        "month": 0
+      }
+    },
+    "supergrok": {
+      "remaining_pct": 11,
+      "build_used_pct": 89,
+      "used_today": 2,
+      "used_yesterday": 1,
+      "daily_cap_pct": 5,
+      "locked_today": false,
+      "mode": "grok",
+      "guard_day": "2026-09-30",
+      "guard_checked": "2026-09-30T10:00:01-07:00",
+      "meter_at": "2026-09-30T08:07:40-07:00",
+      "meter_stale_hours": 24,
+      "reset_at": "2026-10-01T10:31:00-07:00",
+      "reset_reached_at_run": false,
+      "hermes_xai_24h_calls": {
+        "grok-4.7": 55,
+        "grok-build-0.1": 47
+      },
+      "usage_live_week_card": {
+        "week_start": "2026-09-28",
+        "api_calls": 205,
+        "tokens": 33753933,
+        "sessions": 2
+      },
+      "note": "guard log: usage file stale (86840s) \u2014 no switch"
+    },
+    "hermes": {
+      "window_24h": {
+        "sessions": 6,
+        "api_calls": 528,
+        "cost_usd_est": 0.757,
+        "actual_cost_usd": 0.0,
+        "tokens": 78227153,
+        "by_model": [
+          {
+            "model": "deepseek/deepseek-v4.1-flash",
+            "provider": "openrouter",
+            "calls": 153,
+            "sessions": 1,
+            "cost_usd_est": 0.167
+          },
+          {
+            "model": "nvidia/nemotron-3.5-lightning:free",
+            "provider": "openrouter",
+            "calls": 107,
+            "sessions": 5,
+            "cost_usd_est": 0.0
+          },
+          {
+            "model": "grok-4.7",
+            "provider": "xai-oauth",
+            "calls": 55,
+            "sessions": 1,
+            "cost_usd_est": 0.0
+          },
+          {
+            "model": "grok-build-0.1",
+            "provider": "xai-oauth",
+            "calls": 47,
+            "sessions": 1,
+            "cost_usd_est": 0.0
+          },
+          {
+            "model": "tencent/hy3",
+            "provider": "openrouter",
+            "calls": 35,
+            "sessions": 1,
+            "cost_usd_est": 0.0885
+          },
+          {
+            "model": "qwen/qwen3.8-flash",
+            "provider": "openrouter",
+            "calls": 27,
+            "sessions": 1,
+            "cost_usd_est": 0.1867
+          },
+          {
+            "model": "deepseek/deepseek-v4-flash",
+            "provider": "openrouter",
+            "task": "title_generation",
+            "calls": 5,
+            "sessions": 5,
+            "cost_usd_est": 0.0001
+          }
+        ],
+        "iteration_cap_hits": 0,
+        "real_hop_sessions": 2,
+        "usage_live_sessions_with_hops": 6
+      },
+      "window_7d": {
+        "sessions": 42,
+        "api_calls": 2857,
+        "cost_usd_est": 1.6881,
+        "top_models": {
+          "grok-4.6": 1482,
+          "deepseek/deepseek-v4-flash": 283,
+          "grok-4.7": 260,
+          "grok-build-0.1": 159,
+          "deepseek/deepseek-v4.1-flash": 153,
+          "cohere/north-mini-code:free": 140,
+          "~deepseek/deepseek-flash-latest": 134,
+          "nvidia/nemotron-3.5-lightning:free": 123,
+          "deepseek/deepseek-v4-flash-0731": 60,
+          "title_generation(v4-flash)": 35
+        },
+        "deepseek_v4_flash_cost_usd_est": 0.9567,
+        "iteration_cap_hit_sessions": 6,
+        "real_hop_sessions": 9,
+        "usage_live_sessions_with_hops": 36
+      },
+      "usage_live_calendar_day_2026_09_30": {
+        "api_calls": 429,
+        "cost_usd": 0.4423,
+        "sessions": 5
+      },
+      "stale_open_sessions": 41,
+      "usage_live_open": 20,
+      "live": 0,
+      "config": {
+        "default": "deepseek/deepseek-v4.1-flash",
+        "provider": "openrouter",
+        "fallback": "openrouter/deepseek/deepseek-v4-flash",
+        "delegation_model": "deepseek/deepseek-v4-flash",
+        "delegation_max_iterations": 250,
+        "agent_max_turns": 20,
+        "title_generation": "openrouter/deepseek/deepseek-v4-flash",
+        "tool_loop_hard_stop": false,
+        "aliases": {
+          "cheap": "openrouter/cohere/north-mini-code:free",
+          "code": "openrouter/deepseek/deepseek-v4-pro",
+          "coder": "openrouter/deepseek/deepseek-v4-pro",
+          "deepseek": "openrouter/deepseek/deepseek-v4-flash:free",
+          "delegate": "openrouter/deepseek/deepseek-v4-flash",
+          "director": "xai-oauth/grok-4.6",
+          "git": "xai-oauth/grok-4.6",
+          "reasoner": "xai-oauth/grok-4.6",
+          "editor": "xai-oauth/grok-4.6",
+          "xai": "xai-oauth/grok-build-0.1",
+          "glm": "openrouter/z-ai/glm-5.3-flash",
+          "hy3": "openrouter/tencent/hy3",
+          "local": "ollama-launch/gemma4-64k:latest"
+        },
+        "config_mtime": "2026-09-30T11:30:00-07:00"
+      }
+    },
+    "chat": {
+      "window_1d": {
+        "calls": 19,
+        "ok": 5,
+        "ok_rate": 26.3,
+        "cost_usd": 0.0465,
+        "errors": 14,
+        "derived_excl_focustune": {
+          "calls": 11,
+          "ok": 5,
+          "ok_rate": 45.5
+        }
+      },
+      "window_7d": {
+        "calls": 43,
+        "ok": 16,
+        "ok_rate": 37.2,
+        "cost_usd": 0.1063,
+        "errors": 27
+      },
+      "errors_by_model_1d": [
+        {
+          "provider": "router",
+          "model": "all_exhausted",
+          "calls": 6,
+          "errors": 6
+        },
+        {
+          "provider": "openrouter",
+          "model": "google/gemma-4-31b-it:free",
+          "calls": 6,
+          "errors": 6,
+          "reason": "http_429"
+        },
+        {
+          "provider": "ollama",
+          "model": "tev1:0.8b",
+          "calls": 2,
+          "errors": 2,
+          "reason": "llama-server binary not found"
+        },
+        {
+          "provider": "openrouter",
+          "model": "inclusionai/ling-3.0-flash-sante:free",
+          "calls": 2,
+          "errors": 0,
+          "cost": 0.0194
+        },
+        {
+          "provider": "openrouter",
+          "model": "cohere/north-mini-code:free",
+          "calls": 2,
+          "errors": 0,
+          "cost": 0.016
+        },
+        {
+          "provider": "openrouter",
+          "model": "nvidia/nemotron-3.5-lightning:free",
+          "calls": 1,
+          "errors": 0,
+          "cost": 0.0111
+        }
+      ],
+      "agents_status": "quiet",
+      "last_activity": "2026-09-30T19:48:15",
+      "grounding_mode": "shadow",
+      "org_7d": {
+        "calls": 2951,
+        "hermes_calls": 2908,
+        "cost_usd": 1.7944
+      }
+    },
+    "anomalies": [
+      {
+        "severity": "high",
+        "kind": "error_spike",
+        "provider": "openrouter",
+        "model": "google/gemma-4-31b-it:free",
+        "text": "100% (6/6) 429 in 1d and 7d; head of chat/docs chain; circuit open"
+      },
+      {
+        "severity": "medium",
+        "kind": "dead_model",
+        "provider": "openrouter",
+        "model": "google/gemma-4-31b-it:free",
+        "text": "candidate: 5 failures, 0 successes ever (circuit health); <10 calls"
+      },
+      {
+        "severity": "medium",
+        "kind": "dead_model",
+        "provider": "ollama",
+        "model": "tev1:0.8b",
+        "text": "candidate: 2/2 'llama-server binary not found' Sep 30 18:20 PT; live inference not tested"
+      },
+      {
+        "severity": "info",
+        "kind": "error_spike",
+        "provider": "openrouter",
+        "model": "google/gemma-4-26b-a4b-it:free",
+        "text": "historical 7/7 (7d); already removed"
+      },
+      {
+        "severity": "info",
+        "kind": "error_spike",
+        "provider": "openrouter",
+        "model": "nvidia/nemotron-3-nano-30b-a3b:free",
+        "text": "historical 5/5 (7d); already removed"
+      },
+      {
+        "severity": "none",
+        "kind": "cost_spike",
+        "text": "none; app $0.0465/day, Hermes 24h est $0.757"
+      }
+    ],
+    "thrash": {
+      "app_ledger": [],
+      "hermes_24h": [
+        {
+          "session": "20260930_093326_0c2bbe",
+          "provider": "xai-oauth",
+          "model": "grok-4.7",
+          "max_15min": 45,
+          "at": "2026-09-30T10:00:00-07:00"
+        },
+        {
+          "session": "20260930_113013_fd6efe",
+          "provider": "openrouter",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "max_15min": 45,
+          "at": "2026-09-30T12:45:00-07:00"
+        },
+        {
+          "session": "20260930_093326_0c2bbe",
+          "provider": "openrouter",
+          "model": "tencent/hy3",
+          "max_15min": 37,
+          "at": "2026-09-30T09:44:00-07:00"
+        },
+        {
+          "session": "20260930_103010_cd42a9",
+          "provider": "openrouter",
+          "model": "nvidia/nemotron-3.5-lightning:free",
+          "max_15min": 27,
+          "at": "2026-09-30T10:56:00-07:00"
+        },
+        {
+          "session": "20260930_093326_0c2bbe",
+          "provider": "openrouter",
+          "model": "nvidia/nemotron-3.5-lightning:free",
+          "max_15min": 20,
+          "at": "2026-09-30T09:34:00-07:00"
+        }
+      ],
+      "hermes_7d_windows": 35,
+      "method": "assistant turns per 15-min sliding window, model attributed via session_model_usage first/last_seen; all user Shanta"
+    },
+    "effectiveness": [
+      {
+        "provider": "openrouter",
+        "model": "google/gemma-4-31b-it:free",
+        "calls": 6,
+        "ok_rate": 0.0,
+        "verdict": "too little data",
+        "note": "watch; move off chain head"
+      },
+      {
+        "provider": "openrouter",
+        "model": "cohere/north-mini-code:free",
+        "calls": 5,
+        "ok_rate": 100.0,
+        "verdict": "too little data",
+        "note": "7d"
+      },
+      {
+        "provider": "ollama",
+        "model": "tev1:0.8b",
+        "calls": 2,
+        "ok_rate": 0.0,
+        "verdict": "too little data"
+      },
+      {
+        "provider": "hermes",
+        "model": "*",
+        "verdict": "unavailable",
+        "note": "state.db has no per-call ok/flagged"
+      }
+    ],
+    "failover": {
+      "answered_after_failover": 1,
+      "answered_first": 0,
+      "turns": 1,
+      "fallover_rate_pct": 100.0,
+      "failed_by_reason": {
+        "http_429": 4
+      },
+      "all_exhausted": 6,
+      "all_exhausted_purpose": "title (Focus-Tune, failover=0)",
+      "open_circuits": [
+        "openrouter|google/gemma-4-31b-it:free"
+      ],
+      "half_open": [],
+      "closed_tracked": 3,
+      "supergrok_guard_locked": false,
+      "spend_guard": {
+        "day": 0,
+        "week": 1.1462,
+        "month": 0
+      },
+      "window_7d": {
+        "turns": 4,
+        "answered_after_failover": 2,
+        "answered_first": 2,
+        "fallover_rate_pct": 50.0,
+        "failed_by_reason": {
+          "http_404": 1,
+          "http_429": 4
+        }
+      },
+      "chains_unchanged_since": "898ce8ca5",
+      "chains": {
+        "chat": [
+          "gemma-4-31b-it:free",
+          "nemotron-3.5-lightning:free",
+          "north-mini-code:free",
+          "ollama|auto"
+        ],
+        "coding": [
+          "north-mini-code:free",
+          "gemma-4-31b-it:free",
+          "nemotron-3.5-lightning:free",
+          "ollama|qwen2.5-coder:14b"
+        ]
+      },
+      "hermes_hops": {
+        "usage_live_1d": 6,
+        "real_1d": 2,
+        "usage_live_7d": 36,
+        "real_7d": 9
+      }
+    },
+    "changes": [
+      {
+        "commit": "c15b1b68c",
+        "when_pt": "2026-09-30T09:19:41-07:00",
+        "verdict": "no effect",
+        "evidence": "Docs/plan + health/guard data + inbox/outbox files only"
+      },
+      {
+        "commit": "f73d37ff7",
+        "when_pt": "2026-10-01T08:08:58-07:00",
+        "verdict": "too little data",
+        "evidence": "Ollama decision ranking for planning view; landed minutes before run; 2 decision calls, no ledger rows"
+      },
+      {
+        "commit": "627bcc7b7",
+        "verdict": "no effect",
+        "evidence": "admin schema compare; not AI"
+      },
+      {
+        "commit": "1e54faa7c",
+        "verdict": "no effect",
+        "evidence": "3D printing; not AI"
+      },
+      {
+        "commit": "merges 4203851b6 8198d981b e16cb7a1e a67908368 0113a4532 / main 42900c4b0",
+        "verdict": "no effect"
+      },
+      {
+        "commit": "config:hermes-default",
+        "verdict": "too little data",
+        "evidence": "default -> deepseek-v4.1-flash (Sep 30 11:30); first session coding on flash 153 calls est $0.167 \u2014 conflicts with flash idle/title policy"
+      },
+      {
+        "commit": "chains (unchanged)",
+        "verdict": "regressed",
+        "evidence": "gemma-4-31b-it:free at chat head 6/6 429"
+      }
+    ],
+    "pending_proposals": {
+      "report_10": "not queryable without login",
+      "report_9": "not queryable without login",
+      "detail": "/ai/eval and /ai/eval/report/{9,10} -> 302 /user/login"
+    },
+    "ops": {
+      "port_4006_started": "2026-09-30T15:56:38-07:00",
+      "port_4003_started": "2026-09-30T10:33:08-07:00",
+      "port_3001_started": "2026-10-01T08:11:25-07:00",
+      "hermes_dashboards_listening": [],
+      "ai_model_health_gitignored": false
+    },
+    "trend": {
+      "app_ok_rate_1d": 26.3,
+      "app_ok_rate_1d_yesterday": 100.0,
+      "app_ok_rate_7d": 37.2,
+      "app_ok_rate_7d_yesterday": 55.3,
+      "app_calls_1d": 19,
+      "improving": false
+    }
+  },
+  "proposals": [
+    {
+      "title": "Demote gemma-4-31b-it:free from chat/docs chain head",
+      "change_type": "config",
+      "target": "data/ai_model_chains.json chains.chat / chains.docs / chains.coding",
+      "rationale": "6/6 http_429 on Sep 30, circuit open with 0 successes ever; every chat turn pays a failed first hop. north-mini-code:free 5/5 ok (7d), nemotron-3.5-lightning:free answered the failover. Review-first via /ai/eval.",
+      "payload": {
+        "chat": [
+          "openrouter|cohere/north-mini-code:free",
+          "openrouter|nvidia/nemotron-3.5-lightning:free",
+          "openrouter|google/gemma-4-31b-it:free",
+          "ollama|auto"
+        ],
+        "docs": [
+          "openrouter|nvidia/nemotron-3.5-lightning:free",
+          "openrouter|cohere/north-mini-code:free",
+          "openrouter|google/gemma-4-31b-it:free",
+          "ollama|auto"
+        ],
+        "evidence": {
+          "gemma31b_calls": 6,
+          "gemma31b_errors": 6,
+          "reason": "http_429"
+        }
+      }
+    },
+    {
+      "title": "Apply: chain_chat lead with north-mini-code:free, gemma-31b last",
+      "change_type": "config",
+      "target": "data/ai_model_chains.json:chain_chat",
+      "rationale": "Allow-listed form of proposal 1. gemma-4-31b-it:free 6/6 http_429 Sep 30, circuit open, 0 successes ever; north-mini-code:free 5/5 ok 7d. Review-first; Apply records before-value for Revert.",
+      "payload": {
+        "value": [
+          "openrouter|cohere/north-mini-code:free",
+          "openrouter|nvidia/nemotron-3.5-lightning:free",
+          "openrouter|google/gemma-4-31b-it:free",
+          "ollama|auto"
+        ]
+      }
+    },
+    {
+      "title": "Apply: chain_docs lead with nemotron-3.5-lightning:free, gemma-31b last",
+      "change_type": "config",
+      "target": "data/ai_model_chains.json:chain_docs",
+      "rationale": "Allow-listed form of proposal 1 for docs purpose; same gemma-31b 429 evidence.",
+      "payload": {
+        "value": [
+          "openrouter|nvidia/nemotron-3.5-lightning:free",
+          "openrouter|cohere/north-mini-code:free",
+          "openrouter|google/gemma-4-31b-it:free",
+          "ollama|auto"
+        ]
+      }
+    },
+    {
+      "title": "Separate Focus-Tune ledger rows from Chat ok_rate; skip open-circuit models",
+      "change_type": "code",
+      "target": "lib/Comserv/Model/AI2/FocusTune.pm, Model/AI/Usage.pm (DBIx::Class), extend AI.pm",
+      "rationale": "8 of 19 Sep 30 ledger rows (6 all_exhausted + 2 gemma 429) were Focus-Tune scoring (purpose=title, failover=0) but logged as request_type chat, dragging Chat ok_rate 45%->26%. Also count Hermes hops excluding title_generation/compression (6 reported vs 2 real in 24h; 36 vs 9 in 7d). Perl/DBIx::Class only; no inline JS.",
+      "payload": {
+        "request_type": "focustune",
+        "skip_when_circuit_open": true,
+        "hop_count_exclude_tasks": [
+          "title_generation",
+          "compression"
+        ]
+      }
+    },
+    {
+      "title": "Hermes task routing: flash only for idle/title; escalate runtime debugging",
+      "change_type": "workstation",
+      "target": "~/.hermes/config.yaml model.default / aliases / delegation (Shanta applies)",
+      "rationale": "Default now deepseek-v4.1-flash; first session after was coding (153 calls, est $0.167). Sep 29 flash wasted $0.54/122 calls on the :4003 stale-server bug grok-4.6 had solved; Sep 30 3d session hopped 4 models over 137 calls. Ties to report 10 no-flash rule. Use director grok-4.6 while Super Grok unlocked, else deepseek-v4-pro; escalate after ~20 calls without progress.",
+      "payload": {
+        "idle_title": "openrouter/deepseek/deepseek-v4-flash",
+        "coding_runtime_debug": "xai-oauth/grok-4.6 (fallback openrouter/deepseek/deepseek-v4-pro)",
+        "escalate_after_calls": 20
+      }
+    },
+    {
+      "title": "Stale dev-server preflight before AI debugging",
+      "change_type": "code",
+      "target": "extend Controller/AI.pm agents card + Hermes skill",
+      "rationale": "Restart-on-change (-r) on :4003 did not reload (running since Sep 24 until Sep 30 10:33 PT restart), causing flash thrash. Compare server pid start time vs newest lib/root mtime and git HEAD time; warn on /ai/usage and in Hermes before debugging. Server-side Perl, no new inline JS.",
+      "payload": {
+        "ports": [
+          4003,
+          4006
+        ],
+        "check": "pid lstart < max(mtime lib/, root/, HEAD commit time)"
+      }
+    },
+    {
+      "title": "Expose OpenRouter day/week/month + credits in usage_live; Hermes dollar cap",
+      "change_type": "code",
+      "target": "lib/Comserv/Model/AI/Usage.pm fetch_openrouter_status (+ /api/v1/credits); ~/.hermes/scripts/supergrok_daily_guard.py",
+      "rationale": "Today's eval could not report OR balance/day/week/month without reading a key; auth/key already returns usage_daily/weekly/monthly. Then let the guard switch Hermes to :free when day > $1.65 / week > $11.50 (Hermes can't enforce caps today).",
+      "payload": {
+        "fields": [
+          "usage_daily",
+          "usage_weekly",
+          "usage_monthly",
+          "credits_balance"
+        ],
+        "caps": {
+          "day": 1.65,
+          "week": 11.5,
+          "month": 50
+        }
+      }
+    },
+    {
+      "title": "Super Grok guard stale-meter alert + state.db fallback",
+      "change_type": "workstation",
+      "target": "~/.hermes/scripts/supergrok_daily_guard.py, usage_live supergrok_guard",
+      "rationale": "grokcom meter last updated Sep 30 08:07 PT; guard logged 'usage file stale \u2014 no switch' 89 times; guard day still 2026-09-30 while 102 xai-oauth calls ran in 24h. Alert when meter >6h stale and estimate from Hermes xai-oauth calls.",
+      "payload": {
+        "stale_threshold_hours": 6,
+        "meter_stale_hours": 24
+      }
+    },
+    {
+      "title": "Fix cost attribution on :free slugs",
+      "change_type": "code",
+      "target": "Router/_log_ai_usage cost calc (DBIx::Class)",
+      "rationale": "Ledger booked $0.0465 on Sep 30 for :free models (ling-3.0-flash-sante:free $0.0194, north-mini-code:free $0.016, nemotron :free $0.0111). Use OpenRouter generation cost or zero so cost_spike/effectiveness are trustworthy.",
+      "payload": {
+        "models": [
+          "inclusionai/ling-3.0-flash-sante:free",
+          "cohere/north-mini-code:free",
+          "nvidia/nemotron-3.5-lightning:free"
+        ]
+      }
+    },
+    {
+      "title": "Hygiene: gitignore runtime JSON, archive stale Hermes sessions, drop gemma-26b leftovers, Ollama probe",
+      "change_type": "other",
+      "target": ".gitignore; ~/.hermes/state.db; ModelCatalog @FREE_PREFERENCE; Router.pm:1257; agents card",
+      "rationale": "ai_model_health.json/grokcom_usage.json/supergrok_guard.json committed again in c15b1b68c and f73d37ff7; 41 stale open Hermes sessions; gemma-4-26b still in @FREE_PREFERENCE and Router last-resort list; ollama tev1 failed 'llama-server binary not found' and ollama|auto is the last hop of every chain.",
+      "payload": {
+        "gitignore": [
+          "Comserv/data/ai_model_health.json",
+          "Comserv/root/static/ai/grokcom_usage.json",
+          "Comserv/root/static/ai/supergrok_guard.json"
+        ],
+        "stale_sessions": 41
+      }
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+<div id="2026-10-01-browse-pagination" class="cl-entry">
+<h3>2026-10-01 — 3D browse pagination + SVG→PNG thumbnail conversion</h3>
+<p class="doc-body"><strong>What.</strong> The 3D browse page (kind=all) crashed browsers because it rendered all 1,707 printable models on a single page with 565 inline 5.9MB SVG thumbnails (~3.3GB of image data). Added 24-card pagination with page-number buttons (5-number sliding window + first/last links), batch-converted STL-triangle SVGs to ~42KB 220×140 PNGs via rsvg-convert, and added loading="lazy" with onerror fallback for missing thumbnails.</p>
+<p class="doc-body"><strong>Why.</strong> Each SVG stored the full STL triangle mesh as polygon elements — useful for the source file but disastrous as a thumbnail. A page of 24 PNGs is ~1MB vs ~141MB for 24 SVGs.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/lib/Comserv/Controller/3d.pm</code> — browse() pagination (page/per_page/offset params, total_pages/model_count stash). <code>Comserv/root/3d/browse.tt</code> — lazy loading, .svg→.png extension swap, pagination controls. Batch conversion: <code>root/static/images/3d/library/*.svg</code> → <code>*.png</code> (background, ~10 min for 1,382 files). Installed <code>librsvg2-bin</code> for rsvg-convert.</p>
+</div>

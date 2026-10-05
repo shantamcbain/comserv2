@@ -719,6 +719,67 @@ sub daily :Path('/planning/daily') :Args {
                     branch_project_ids => \%branch_scope,
                 })
             } @all_sorted;
+
+            # ── Decision-model ordering (AISYSTEMPlan 5f) ─────────────────────
+            # ON LOAD we only READ the cached order. The local decision model is
+            # never called during a render (nimble cold is ~133s; the Focus Queue
+            # must not block on it). The cache is written by
+            # script/compute_decision_rank.pl. Rows whose confidence clears the
+            # gate are ordered by model score; everything else keeps the
+            # hardcoded ap_score order, and reordering happens only inside a row's
+            # own Active/branch group so cmp_branch_focus semantics survive.
+            my $dec_cache = eval {
+                require Comserv::Util::AI::DecisionRank;
+                Comserv::Util::AI::DecisionRank->read_cache($cur_branch);
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'daily', "DecisionRank cache read failed: $@");
+            }
+            elsif (!$dec_cache) {
+                # Silent-failure guard: without this line a missing/expired cache
+                # and a hook that never ran look identical in the log.
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                    'daily', "DecisionRank: no usable cache for '$cur_branch' "
+                    . "(file=" . Comserv::Util::AI::DecisionRank->cache_file
+                    . " exists=" . (-s Comserv::Util::AI::DecisionRank->cache_file ? 1 : 0)
+                    . ") - hardcoded score order in force");
+            }
+            else {
+                my $reordered = eval {
+                    Comserv::Util::AI::DecisionRank->apply_order(
+                        \@all_sorted, $dec_cache,
+                        { branch => $cur_branch, branch_project_ids => \%branch_scope },
+                    );
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'daily', "DecisionRank apply_order failed: $@");
+                }
+                elsif ($reordered) {
+                    @all_sorted = @$reordered;
+                    my $used  = grep { $_->{decision_used} } @all_sorted;
+                    my $scored = scalar(keys %{ $dec_cache->{rows} || {} });
+                    $c->stash->{decision_order} = {
+                        active      => 1,
+                        model       => $dec_cache->{model},
+                        computed_at => $dec_cache->{computed_at},
+                        gate        => $dec_cache->{gate},
+                        used        => $used,
+                        scored      => $scored,
+                    };
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'daily', "Decision ordering applied for '$cur_branch': "
+                        . "model=" . ($dec_cache->{model} // '?')
+                        . " gate=" . ($dec_cache->{gate} // '?')
+                        . " applied_rows=$used scored=$scored");
+                }
+                else {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'daily', "DecisionRank: cache found for '$cur_branch' but "
+                        . "apply_order returned nothing (rows=" . scalar(@all_sorted) . ")");
+                }
+            }
         }
         elsif ($filter_project && !$show_all_projects) {
             @all_sorted = grep {

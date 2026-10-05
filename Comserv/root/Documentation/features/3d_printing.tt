@@ -1,4 +1,4 @@
-[% PageVersion = 'Documentation/features/3d_printing.tt,v 1.00 2026/04/28 shanta Exp' %]
+[% PageVersion = 'Documentation/features/3d_printing.tt,v 1.01 2026/09/24 hermes-agent Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 [% META title = '3D Printing System' %]
@@ -16,7 +16,7 @@
     ·
     <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">MASTER_PLAN</a>
 </p>
-<p><em>Last updated: April 28, 2026</em></p>
+<p><em>Last updated: September 24, 2026</em></p>
 
 <h2>Overview</h2>
 <p>
@@ -141,6 +141,8 @@ fire automatically.
 
 <p class="doc-body">
 Until an in-app maintenance tracker exists, the worker is responsible for doing the pre-print checks below by hand. Track hours/cycles on the printer's inventory-item notes so the interval is not missed.
+The 500-hour ritual for the LAN Kobra 3 is
+<a href="[% c.uri_for('/Documentation/Printer500HourMaintenance') %]">Printer500HourMaintenance</a>.
 </p>
 
 <p class="doc-body"><strong>Universal pre-next-print checklist (all types):</strong></p>
@@ -230,19 +232,29 @@ worked example). Full tracking:
 (project <a href="/project/details?project_id=272">#272 DRYER-INT</a>).
 </p>
 <ol>
-    <li><strong>Catalog</strong> the download. Deduplicate copies. Keep license + provider invoice.</li>
+    <li><strong>Downloads</strong> — catalog the pack. Deduplicate copies. Keep license + provider invoice.
+        HDRY files live under <code>/data/nfs/hdry_parts/&lt;project-dir&gt;/</code> (directories of <code>.stl</code>, not
+        <code>/data/nfs/3d/projects/…</code>).</li>
+    <li><strong>3MF extract</strong> — a <code>.3mf</code> is a plate, not one part. Split to per-part
+        <code>.stl</code> before import. Do not store a project directory as <code>printing_3d_models.nfs_path</code>
+        (download will fail with empty resolve).</li>
     <li><strong>File Manager</strong> — <a href="/file/admin_browser">/file/admin_browser</a>.
         Upload into an NFS project folder via <a href="/file/upload_file">/file/upload_file</a>,
         then import each file into the <code>files</code> table (do not point the 3D importer at <code>~/Downloads</code>).</li>
     <li><strong>Parent assembly</strong> — <a href="/Inventory/item/add">/Inventory/item/add</a>,
         hidden from shop (<code>show_in_shop=0</code>, <code>list_in_marketplace=0</code>), <code>is_assemblable=1</code>.</li>
-    <li><strong>Parts</strong> — each printable file becomes a <code>printing_3d_models</code> row
+    <li><strong>Models / BOM</strong> — each printable file becomes a <code>printing_3d_models</code> row
         (see <a href="/3d/models">/3d/models</a>) + child inventory item + BOM line
-        (<a href="/Inventory/bom/add">/Inventory/bom/add</a>). Review the mesh before queueing.</li>
-    <li><strong>Pay the provider</strong> — supplier at
+        (<a href="/Inventory/bom/add">/Inventory/bom/add</a>). Filament BOM unit must be <code>g</code> and
+        <code>print_time_hours</code> set, or the queue reports “Not configured”.</li>
+    <li><strong>AP invoice / membership</strong> — supplier at
         <a href="/Inventory/suppliers">/Inventory/suppliers</a>; files invoice at
         <a href="/Inventory/invoice/new">/Inventory/invoice/new</a>. Monthly support is not a first-class
-        recurring AP yet (todo #2190 on #207).</li>
-    <li><strong>Print</strong> — <a href="/3d/queue">/3d/queue</a>, complete with
-        <a href="/3d/queue_print">/3d/queue_print</a>. Filament reservations use <code>3D-JOB-{id}</code>.</li>
+        recurring AP yet (todo #2190 on #207). Do not treat unrelated hosting invoices as the files purchase.</li>
+    <li><strong>Staff prep, then queue</strong> — review orient/scale/supports before creating
+        <code>printing_3d_jobs</code>. Queue at <a href="/3d/queue">/3d/queue</a>
+        (<code>source_type=project</code>, <code>source_item_id</code> = parent assembly, qty from BOM).</li>
+    <li><strong>First print / stock-in</strong> — complete via
+        <a href="/3d/queue_print">/3d/queue_print</a>. Filament reservations use <code>3D-JOB-{id}</code>.
+        Confirm the child part on-hand increases.</li>
 </ol>

@@ -1,0 +1,15 @@
+[%# Admin banners: SuperGrok guard switch + stale AI meters. Data from
+  # UsageMonitor->ai_banner (/ai) or ->ai_health (/ai/usage). No JS. %]
+[% bn = ai_health || ai_admin_banner %]
+[% IF bn.guard_banner %]
+<div class="alert alert-warning ai-guard-banner" role="status" style="margin:8px 0;padding:10px;border:2px solid var(--warning-color,#d97706);border-radius:6px;">
+  <strong>⚠ [% bn.guard_banner | html %]</strong>
+  <span class="doc-muted">Flash stays for idle / title work only. <a href="/ai/usage#ai-health">Details</a></span>
+</div>
+[% END %]
+[% stale_list = bn.stale_meters || bn.meters.stale %]
+[% IF stale_list.size %]
+<div class="alert alert-info ai-meter-banner" role="status" style="margin:8px 0;padding:8px;border:1px solid var(--border-color,#ccc);border-radius:6px;">
+  AI meter reading older than 6 h: [% stale_list.join(', ') | html %]. Our own estimate is used instead — <a href="/ai/usage#ai-health">see Health &amp; preflight</a>.
+</div>
+[% END %]

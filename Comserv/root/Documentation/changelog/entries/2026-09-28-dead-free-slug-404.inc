@@ -1,0 +1,6 @@
+<div id="2026-09-28-dead-free-slug-404" class="cl-entry">
+<h3>2026-09-28 — Drop dead free-model slug from fallback defaults (OpenRouter 404)</h3>
+<p class="doc-body"><strong>What.</strong> The <code>nvidia/nemotron-3-nano-30b-a3b:free</code> fallback target stopped existing on OpenRouter's free tier (404 "This model is unavailable for free. The paid version is available now"). Two hardcoded last-resort fallback lists still offered it: <code>Util/ModelCatalog.pm @FREE_PREFERENCE</code> and <code>Model/AI2/Router.pm _default_free_catalog</code> (the <code>unless @slugs</code> trio). Audit todos 2496 (openrouter_chat) and 2497 (process) both traced to this slug.</p>
+<p class="doc-body"><strong>Why.</strong> The chains-driven failover (data/ai_model_chains.json) already listed the slug in <code>removed</code>, so the primary path was safe — only the two "no chains" code fallbacks leaked a dead model, and OpenRouter answers any free-tier lookup on it with a 404 the Router must walk past.</p>
+<p class="doc-body"><strong>Files.</strong> <code>lib/Comserv/Util/ModelCatalog.pm</code>, <code>lib/Comserv/Model/AI2/Router.pm</code></p>
+</div>

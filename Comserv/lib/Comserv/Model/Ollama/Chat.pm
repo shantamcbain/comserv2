@@ -10,6 +10,17 @@ requires qw(endpoint ua last_error timeout);
 sub query {
     my ($self, %args) = @_;
     my $prompt = $args{prompt} // '';
+    my $blocked = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::classify($prompt);
+    };
+    if ($@) {
+        $self->last_error('Chat safety check failed. The question was not sent.');
+        return undef;
+    }
+    if ($blocked) {
+        return Comserv::Util::AI::HarmRefusal::refusal_text($blocked);
+    }
     my $model  = $args{model} // $self->model;
     my $format = $args{format} // 'text';
     my $url = $self->endpoint . '/api/generate';
@@ -35,6 +46,23 @@ sub query {
 sub chat {
     my ($self, %args) = @_;
     my $messages = $args{messages} // [];
+    my $blocked = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::scan_messages($messages);
+    };
+    if ($@) {
+        $self->last_error('Chat safety check failed. The question was not sent.');
+        return undef;
+    }
+    if ($blocked) {
+        my $text = Comserv::Util::AI::HarmRefusal::refusal_text($blocked);
+        return {
+            response => $text,
+            message  => { content => $text },
+            refused  => 1,
+            model    => 'harm-refusal',
+        };
+    }
     my $model    = $args{model}    // $self->model;
     my $url = $self->endpoint . '/api/chat';
     my $payload = {

@@ -1,0 +1,77 @@
+[%# Ledger / Golden Data monitor (admin only) — included from ai/usage.tt.
+  # Data: Comserv::Model::AI2::UsageMonitor->ledger_summary (DBIx::Class group_by, no raw SQL).
+  # Terms: see lib/Comserv/Util/AI/Glossary.pm. No JS, no CDNs. %]
+[% lm = ledger_monitor %]
+<div id="ledger-grounding" class="card" style="margin:16px 0;">
+  <div class="card-header">Ledger &amp; Golden Data monitor (admin) — last [% lm.days %] days</div>
+  <div class="card-body">
+    [% FOREACH e IN lm.errors %]<div class="doc-warning" role="alert">[% e | html %]</div>[% END %]
+
+    <h4>Golden Data store (ai_golden_data)</h4>
+    <p class="doc-body">Status today: <strong>[% lm.golden_store.status_today | html %]</strong>.
+      A record is golden only once a human agrees/verifies it (status=golden). Nothing is promoted automatically.</p>
+    [% IF lm.golden_store.table_missing %]
+      <p class="doc-muted">Table not created yet — create it via <a href="/admin/schema_compare">/admin/schema_compare</a> → “Result files without tables” → <code>AiGoldenData</code> → Create Table.</p>
+    [% ELSE %]
+      <table class="data-table">
+        <thead><tr><th>candidate</th><th>in_review</th><th>golden</th><th>rejected</th><th>stale</th><th>total</th></tr></thead>
+        <tbody><tr>
+          <td>[% lm.golden_store.counts.candidate || 0 %]</td>
+          <td>[% lm.golden_store.counts.in_review || 0 %]</td>
+          <td>[% lm.golden_store.counts.golden || 0 %]</td>
+          <td>[% lm.golden_store.counts.rejected || 0 %]</td>
+          <td>[% lm.golden_store.counts.stale || 0 %]</td>
+          <td>[% lm.golden_store.total || 0 %]</td>
+        </tr></tbody>
+      </table>
+    [% END %]
+
+    <h4>Grounded vs Ungrounded Generation</h4>
+    [% g = lm.grounding %]
+    [% IF g.source == 'none' %]
+      <p class="doc-muted">Not yet recorded. Grounding fields are written for /ai2/chat turns from 2026-09-24 on
+        [% IF ! g.columns_present %](Ledger columns not in the DB yet — sync them on ai_usage_logs via schema-compare; until then values live in metadata.grounding)[% END %].</p>
+    [% ELSE %]
+      <table class="data-table">
+        <thead><tr><th>Recorded turns</th><th>Grounded</th><th>Ungrounded</th><th>Golden hits</th><th>Candidate hits</th><th>Uncited flagged</th><th>No-golden fallbacks</th><th>Source</th></tr></thead>
+        <tbody><tr>
+          <td>[% g.recorded %]</td><td>[% g.grounded %]</td><td>[% g.ungrounded %]</td>
+          <td>[% g.golden_hits %]</td><td>[% g.candidate_hits %]</td><td>[% g.flagged %]</td><td>[% g.fallbacks %]</td>
+          <td>[% IF g.source == 'columns' %]Ledger columns[% ELSE %]metadata.grounding (columns not synced yet)[% END %]</td>
+        </tr></tbody>
+      </table>
+    [% END %]
+    [% IF g.error %]<p class="doc-muted">Grounding summary error: [% g.error | html %]</p>[% END %]
+
+    <h4>Calls by day</h4>
+    <table class="data-table">
+      <thead><tr><th>Day</th><th>Calls</th><th>OK</th><th>Errors</th><th>0-token “OK”</th><th>404s</th><th>Tokens</th><th>Logged cost USD</th></tr></thead>
+      <tbody>
+      [% FOREACH r IN lm.by_day %]
+        <tr><td>[% r.day %]</td><td>[% r.calls %]</td><td>[% r.ok %]</td><td>[% r.errors %]</td>
+            <td>[% r.zero_token_ok %]</td><td>[% r.http_404 %]</td><td>[% r.tokens || 0 %]</td><td>$[% r.cost %]</td></tr>
+      [% END %]
+      [% IF ! lm.by_day.size %]<tr><td colspan="8" class="doc-muted">No Ledger rows in this period.</td></tr>[% END %]
+      <tr><th>Total</th><th>[% lm.totals.calls %]</th><th>[% lm.totals.ok %]</th><th>[% lm.totals.errors %]</th>
+          <th>[% lm.totals.zero_token_ok %]</th><th>[% lm.totals.http_404 %]</th><th>[% lm.totals.tokens %]</th><th>$[% lm.totals.cost %]</th></tr>
+      </tbody>
+    </table>
+
+    <h4>Provider / model</h4>
+    <table class="data-table">
+      <thead><tr><th>Provider</th><th>Model</th><th>Calls</th><th>OK</th><th>Errors</th><th>0-token “OK”</th><th>404s</th><th>Tokens</th><th>Logged cost USD</th></tr></thead>
+      <tbody>
+      [% FOREACH r IN lm.by_model %]
+        <tr><td>[% r.provider | html %]</td><td>[% r.model | html %]</td><td>[% r.calls %]</td><td>[% r.ok %]</td><td>[% r.errors %]</td>
+            <td>[% r.zero_token_ok %]</td><td>[% r.http_404 %]</td><td>[% r.tokens || 0 %]</td><td>$[% r.cost %]</td></tr>
+      [% END %]
+      [% IF ! lm.by_model.size %]<tr><td colspan="9" class="doc-muted">No Ledger rows in this period.</td></tr>[% END %]
+      </tbody>
+    </table>
+
+    <p class="doc-muted">Heuristics: error = status ≠ success; 404 = error row whose error_message contains “404”;
+      0-token “OK” = status success with total_tokens 0/empty (excludes the deliberate <code>ai2-grounding</code> no-golden fallback);
+      diagnostic rows (grok_balance_check, provider_snapshot) excluded. Effectiveness = jobs completed correctly per dollar, not tokens.
+      Web/SearXNG hits are Candidate Data, never Golden Data.</p>
+  </div>
+</div>

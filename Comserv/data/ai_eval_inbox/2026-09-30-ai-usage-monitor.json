@@ -1,0 +1,303 @@
+{
+  "report_date": "2026-09-30",
+  "source": "AI usage monitor",
+  "created_by": "AI usage monitor",
+  "summary": "YES \u2014 improving: 898ce8ca5 removed gemma-26b + fixed dead nano last-resort; days=1 Chat 2/2 ok (100%) with answered_after_failover=0 and open circuits=[]; OpenRouter month ~$41.87/$50 (day $0.015); Super Grok unlocked at 13% remaining (daily_cap 6%).",
+  "markdown": "# Daily AI Eval \u2014 2026-09-30 (America/Vancouver)\n\n**Core question: Is the code making our AI usage better or worse?**\n**Answer: YES \u2014 improving. Dead free-slug cleanup landed; last-24h Chat 100% ok with no failover needed; circuits clean.**\n\n## Budget\n\n- **Grok Bot:** last spoken 0% used (Mon 2026-09-28 ~9:17 AM PT, post-reset) \u2192 interpret ~100% left. Next reset Mon 2026-10-05 ~8:00 AM PT (~5.05 days left). Soft daily max \u2248 19.8%/day. Used-to-date from that spoken: ~0%. No newer spoken % found (not invented).\n- **OpenRouter:** balance \u2248 $18.05 (credits 260 \u2212 usage 241.95). Auth key: day $0.0151 / week $1.1427 / month $41.8655 vs soft caps $1.65 / $11.50 / $50. Fallover ledger spend day $0 / week $0.2815 / month $41.0054. Under all soft caps. Free-model daily requests 21/1000 used. Sep 29 context was \u2248$19.06 balance / \u2248$40.86 month \u2014 now \u2248$18.05 / $41.87.\n- **Super Grok:** guard remaining **13%**, used_today 0, used_yesterday 0, daily_cap **6%**, **unlocked** today (mode=grok, off_today=false). Reset \u2248 2026-10-01 10:31 AM PT (~2 days left). Hermes xai-oauth week card still 205 API / 33.8M tokens (2 sessions, week_start 2026-09-28). No new spoken Super Grok %. Risk: Hermes `config.yaml` default is now `xai-oauth/grok-build-0.1` while remaining is only 13%.\n\n## Code changes since last report (~2026-09-29 06:50 AM PT)\n\naisystem branch `fix-ai-generate-pipe-model` (main: no AI commits; HelpDesk TT still UU):\n\n- **898ce8ca5 \u2014 drop gemma-4-26b-a4b-it:free from chains + dead nano catalog fix** \u2192 verdict: **improved**. Evidence: live `ai_model_chains.json` removed list includes gemma-26b; chat/docs/title no longer hop it; ModelCatalog/Router last-resort nano:free \u2192 omni successor; days=1 Chat answered_first=2, answered_after_failover=0, open circuits=[].\n- **Uncommitted runtime only:** `ai_model_health.json`, `grokcom_usage.json`, `supergrok_guard.json` \u2192 verdict: **no effect** on quality (telemetry/guard meter).\n\n## Scorecard trend\n\n- **App ledger days=1 (since 2026-09-29 00:00):** 2 calls, ok_rate **100%**, cost $0.0037, 0 errors (north-mini-code:free + tencent/hy3). No calendar-day 2026-09-30 app Chat yet this morning. Hermes org window: 280 API / $0.9111 / 4 sessions / 46.1M tokens (mostly Sep 29 flash).\n- **vs yesterday (2026-09-29 report days=1):** ok_rate 50% \u2192 **100%**; failover recovery turn aged out; no new 404 hops.\n- **vs 7-day app baseline:** 38 calls, ok 21 (55.3%), errors 17, cost $0.1418. Org: 2724 calls (2686 Hermes), $1.3876.\n- **vs 14-day app:** 40 calls, ok 23 (57.5%), cost $0.1418. Org cost $1.7071.\n- **Day-over-day:** YES improving on resilience + short-window Chat quality; 7d ok_rate still mid-50s from older dead-slug spikes (gemma-26b 7/7, nano 5/5) now in `removed`.\n\n### Thrash / effectiveness\n\n- **Thrash:** none in 1d or 7d anomalies (no \u226520 calls / 15 min same user+provider+model).\n- **Effectiveness (\u226510 calls rule):** no model reached \u226510 app calls in the last-24h window for a formal replace/watch/keep.\n  - Historical 7d anomaly still lists `google/gemma-4-26b-a4b-it:free` 7/7 and `nvidia/nemotron-3-nano-30b-a3b:free` 5/5 \u2014 both now in chains `removed` (898ce8ca5 applied yesterday's proposal).\n  - `cohere/north-mini-code:free`: 3/3 ok over 7d \u2014 keep, too little data; circuit closed (6 successes).\n  - `tencent/hy3`: 1/1 ok \u2014 too little data; circuit closed.\n  - Ollama `qwen2.5-coder:14b`: 8/8 ok, 0 tokens reported \u2014 too little data / unreported provider.\n  - Policy note (Sep 27 judge): free nemotron = replace; flash for cheap idle. `nemotron-3.5-lightning:free` remains in live chains and was Hermes's overnight model ($0, 16 API) \u2014 watch, not formal \u226510-call replace.\n\n### Failover health\n\n- Chains source=file; **open circuits=[]**; half_open=[]; closed_tracked=2 (north-mini, hy3).\n- Soft caps wired; fallover spend day $0 / week $0.28 / month $41.01.\n- SuperGrok guard respected (`supergrok_respect_guard=1`); unlocked today with 13% remaining / daily_cap 6%.\n- days=1: fallover_rate **0%**, answered_first=2, answered_after_failover=0, failed_attempts=0.\n- days=7: fallover_rate 33.3% on n=3 turns (1 historical http_404 recovered on Sep 28); answered_after_failover=1 lifetime in window.\n- Hermes model hops since report: 4 sessions (flash-heavy Sep 29; overnight flash\u2192nemotron-3.5-lightning:free). Stale open sessions: usage_live 20 (0 live); state.db ~41 ended_at NULL unarchived \u2014 cleanup still recommended.\n\n### Chat UX sample\n\n- Last Chat turns (2026-09-29 ~15:59\u201316:13 PT): both success \u2014 `cohere/north-mini-code:free` (~11.2s, $0.0026) then `tencent/hy3` (~15.1s, $0.0011). No dead-slug first hop. Agents card: Chat quiet this morning; last activity those turns. Grounding mode=shadow.\n\n### HelpDesk\n\n- No HelpDesk AI calls in usage_live windows. Main worktree still has unresolved merge conflicts on HelpDesk TT templates \u2014 not aisystem; do not touch :3001.\n\n## Proposals\n\n1. Workstation: archive/close stale Hermes open sessions (20\u201341 idle) \u2014 still inflating agent card.\n2. Workstation: set Hermes default back to `openrouter/deepseek/deepseek-v4-flash` (or `:free`) for cheap idle; keep Super Grok aliases for coding/director only while remaining 13% until Oct 1 reset.\n3. Code: remove `google/gemma-4-26b-a4b-it:free` from ModelCatalog `@FREE_PREFERENCE` (still present even though chains `removed` + last-resort Router slug fixed for nano).\n4. No new EvalAllowList config change required \u2014 yesterday's gemma `removed` proposal already applied via 898ce8ca5.\n",
+  "metrics": {
+    "bot": {
+      "spoken_percent_left": null,
+      "spoken_interpretation": "0% used / fresh week after Mon Sep 28 8AM PT reset (spoken Mon 2026-09-28 ~9:17 AM PT)",
+      "implied_percent_left": 100,
+      "used_to_date_pct": 0,
+      "observed_at": "2026-09-28T09:17:00-07:00",
+      "next_reset": "2026-10-05T08:00:00-07:00",
+      "days_left": 5.05,
+      "soft_daily_max_pct": 19.8,
+      "note": "Last spoken 0% at Mon 2026-09-28 ~9:17 AM PT; interpreted as 100% left. No new spoken % on 2026-09-30.",
+      "rise_policy": "spoken rises are observations not refunds; prefer burn-from-drops"
+    },
+    "openrouter": {
+      "balance_usd": 18.0547,
+      "day_usd": 0.015064353,
+      "week_usd": 1.142744097,
+      "month_usd": 41.865510737,
+      "usage_total_usd": 240.346525213,
+      "credits_total_usage": 241.945345233,
+      "free_model_daily_remaining": 979,
+      "free_model_daily_used": 21,
+      "caps": {
+        "day_usd": 1.65,
+        "week_usd": 11.5,
+        "month_usd": 50
+      },
+      "vs_caps": {
+        "day": "under",
+        "week": "under",
+        "month": "under"
+      },
+      "fallover_spend": {
+        "day": 0,
+        "week": 0.2815,
+        "month": 41.0054
+      }
+    },
+    "supergrok": {
+      "remaining_pct": 13,
+      "used_today": 0,
+      "used_yesterday": 0,
+      "daily_cap_pct": 6,
+      "locked_today": false,
+      "lock_reason": "",
+      "reset_at": "2026-10-01T10:31:00-07:00",
+      "mode": "grok",
+      "days_left": 2,
+      "hermes_week": {
+        "week_start": "2026-09-28",
+        "api_calls": 205,
+        "tokens": 33753933,
+        "sessions": 2,
+        "source": "hermes_state.db"
+      },
+      "spoken_pct": null,
+      "note": "Unlocked today (used_yesterday 0); remaining 13% from guard history+meter; no new spoken %"
+    },
+    "hermes": {
+      "since_last_report": {
+        "sessions": 4,
+        "api_calls": 280,
+        "tokens_incl_cache_read": 45969107,
+        "cost_usd_est": 0.9111,
+        "cost_per_session_usd": 0.2278,
+        "model_hops_sessions": 4
+      },
+      "window_1d_org": {
+        "api_calls": 280,
+        "cost_usd": 0.9111,
+        "sessions": 4,
+        "tokens": 46100772,
+        "open_sessions": 20,
+        "live": 0
+      },
+      "config": {
+        "default": "grok-build-0.1",
+        "provider": "xai-oauth",
+        "fallback": "openrouter/deepseek/deepseek-v4-flash",
+        "aliases_code": "openrouter/deepseek/deepseek-v4-pro",
+        "aliases_director": "xai-oauth/grok-4.6",
+        "aliases_cheap": "openrouter/cohere/north-mini-code:free"
+      },
+      "stalled_open_gt_6h": 41,
+      "today_pt": {
+        "session": "20260930_000751_21ff69",
+        "model": "nvidia/nemotron-3.5-lightning:free",
+        "api_calls": 16,
+        "cost_usd": 0.0
+      }
+    },
+    "chat": {
+      "window_1d": {
+        "calls": 2,
+        "ok": 2,
+        "ok_rate": 100.0,
+        "cost_usd": 0.0037,
+        "errors": 0
+      },
+      "window_7d": {
+        "calls": 38,
+        "ok": 21,
+        "ok_rate": 55.3,
+        "cost_usd": 0.1418,
+        "errors": 17
+      },
+      "window_14d": {
+        "calls": 40,
+        "ok": 23,
+        "ok_rate": 57.5,
+        "cost_usd": 0.1418,
+        "errors": 17
+      },
+      "last_turns": [
+        {
+          "at": "2026-09-29T15:59:27",
+          "model": "cohere/north-mini-code:free",
+          "status": "success",
+          "duration_ms": 11200,
+          "cost": 0.0026
+        },
+        {
+          "at": "2026-09-29T16:13:38",
+          "model": "tencent/hy3",
+          "status": "success",
+          "duration_ms": 15068,
+          "cost": 0.0011
+        }
+      ],
+      "agents_status": "quiet",
+      "grounding_mode": "shadow"
+    },
+    "helpdesk": {
+      "ai_calls_in_window": 0,
+      "note": "main has UU conflicts on HelpDesk TT; aisystem untouched; :3001 not restarted"
+    },
+    "anomalies": [
+      {
+        "severity": "high",
+        "kind": "error_spike",
+        "provider": "openrouter",
+        "model": "google/gemma-4-26b-a4b-it:free",
+        "text": "error rate 100% (7/7) over 7d \u2014 historical; now in chains removed via 898ce8ca5"
+      },
+      {
+        "severity": "high",
+        "kind": "error_spike",
+        "provider": "openrouter",
+        "model": "nvidia/nemotron-3-nano-30b-a3b:free",
+        "text": "error rate 100% (5/5) over 7d \u2014 historical; in chains removed; catalog last-resort swapped to omni"
+      }
+    ],
+    "effectiveness": [
+      {
+        "provider": "openrouter",
+        "model": "google/gemma-4-26b-a4b-it:free",
+        "calls": 7,
+        "ok_rate": 0.0,
+        "verdict": "too little data",
+        "note": "100% errors but <10; removed from chains 898ce8ca5; still in @FREE_PREFERENCE"
+      },
+      {
+        "provider": "openrouter",
+        "model": "nvidia/nemotron-3-nano-30b-a3b:free",
+        "calls": 5,
+        "ok_rate": 0.0,
+        "verdict": "too little data",
+        "note": "Already removed; omni successor in last-resort defaults"
+      },
+      {
+        "provider": "openrouter",
+        "model": "cohere/north-mini-code:free",
+        "calls": 3,
+        "ok_rate": 100.0,
+        "verdict": "too little data",
+        "note": "Circuit closed; 6 total_successes in health"
+      },
+      {
+        "provider": "openrouter",
+        "model": "tencent/hy3",
+        "calls": 1,
+        "ok_rate": 100.0,
+        "verdict": "too little data",
+        "note": "Sep 29 chat success"
+      },
+      {
+        "provider": "ollama",
+        "model": "qwen2.5-coder:14b",
+        "calls": 8,
+        "ok_rate": 100.0,
+        "verdict": "too little data",
+        "note": "Zero tokens reported (ollama unreported)"
+      }
+    ],
+    "failover": {
+      "answered_after_failover": 0,
+      "answered_first": 2,
+      "turns": 2,
+      "fallover_rate_pct": 0.0,
+      "failed_by_reason": {},
+      "open_circuits": [],
+      "half_open": [],
+      "closed_tracked": 2,
+      "all_exhausted": 0,
+      "supergrok_guard_locked": false,
+      "chains_removed_includes_gemma26b": true,
+      "chains_removed_includes_nano": true,
+      "window_7d": {
+        "fallover_rate_pct": 33.3,
+        "answered_after_failover": 1,
+        "answered_first": 2,
+        "turns": 3,
+        "failed_by_reason": {
+          "http_404": 1
+        }
+      },
+      "health": "healthy \u2014 no hops needed in last-24h Chat; dead free slugs removed from live chains"
+    },
+    "changes": [
+      {
+        "commit": "898ce8ca5",
+        "branch": "fix-ai-generate-pipe-model",
+        "files": [
+          "data/ai_model_chains.json",
+          "lib/Comserv/Model/AI2/Router.pm",
+          "lib/Comserv/Util/ModelCatalog.pm",
+          "root/Documentation/changelog/entries/2026-09-28-dead-free-slug-404.inc"
+        ],
+        "verdict": "improved",
+        "evidence": "Applied 2026-09-29 proposal: gemma-26b out of chains+into removed; nano:free\u2192omni in last-resort; days=1 Chat 100% ok, 0 failovers, open circuits=[]"
+      },
+      {
+        "commit": "uncommitted-runtime",
+        "branch": "fix-ai-generate-pipe-model",
+        "files": [
+          "data/ai_model_health.json",
+          "root/static/ai/grokcom_usage.json",
+          "root/static/ai/supergrok_guard.json"
+        ],
+        "verdict": "no effect",
+        "evidence": "Live meter/health updates only; not quality-path code"
+      }
+    ],
+    "trend": {
+      "app_ok_rate_1d": 100.0,
+      "app_ok_rate_7d": 55.3,
+      "app_ok_rate_14d": 57.5,
+      "app_calls_1d": 2,
+      "app_calls_7d": 38,
+      "app_ok_rate_1d_yesterday": 50.0,
+      "or_month_usd": 41.865510737,
+      "or_week_usd": 1.142744097,
+      "or_day_usd": 0.015064353,
+      "vs_yesterday_inbox": "2026-09-29 AI-usage-monitor present; ok_rate 50%\u2192100% in days=1; gemma-remove proposal applied",
+      "improving": true
+    }
+  },
+  "proposals": [
+    {
+      "title": "Archive stale Hermes open sessions",
+      "change_type": "workstation",
+      "target": "~/.hermes/state.db sessions ended_at IS NULL",
+      "rationale": "usage_live lists 20 open / 0 live; state.db ~41 unarchived with ended_at NULL and idle >6h. Inflates Hermes agent card; not EvalAllowList.",
+      "payload": {
+        "open_sessions_usage_live": 20,
+        "open_unarchived_db": 41,
+        "stalled_gt_6h": 41
+      }
+    },
+    {
+      "title": "Hermes default back to deepseek flash for cheap idle",
+      "change_type": "workstation",
+      "target": "~/.hermes/config.yaml model.default / model.provider",
+      "rationale": "config.yaml default is xai-oauth/grok-build-0.1 while Super Grok remaining is 13% with ~2 days to reset. Flash/fallback already configured; keep grok aliases for coding/director only. Not EvalAllowList.",
+      "payload": {
+        "current_default": "grok-build-0.1",
+        "current_provider": "xai-oauth",
+        "suggested_default": "deepseek/deepseek-v4-flash",
+        "suggested_provider": "openrouter",
+        "supergrok_remaining_pct": 13
+      }
+    },
+    {
+      "title": "Drop gemma-4-26b from ModelCatalog @FREE_PREFERENCE",
+      "change_type": "code",
+      "target": "aisystem: lib/Comserv/Util/ModelCatalog.pm @FREE_PREFERENCE",
+      "rationale": "Chains removed gemma-26b (898ce8ca5) but @FREE_PREFERENCE still lists openrouter|google/gemma-4-26b-a4b-it:free. Last-resort path when chains file missing could reintroduce 100%-error slug. Not EvalAllowList \u2014 code.",
+      "payload": {
+        "files": [
+          "lib/Comserv/Util/ModelCatalog.pm"
+        ],
+        "remove": "openrouter|google/gemma-4-26b-a4b-it:free",
+        "note": "Shanta commits/merges on aisystem; bots do not commit"
+      }
+    }
+  ]
+}

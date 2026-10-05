@@ -154,6 +154,7 @@ AI_CONTROLLER_IMPLEMENTATION_SUMMARY.md
 /current_session.md
 /Comserv/data/ency_offline.db
 /Comserv/data/forager_offline.db
+/Comserv/data/ai_model_health.json
 /config/dbi_config.json
 deploy-logs/
 .aider*
@@ -199,3 +200,5 @@ Comserv/root/session/**
 # Hermes agent scratch plans (local working notes, not project source)
 .hermes/plans/
 .hermes/plans/**
+# 3d library user-uploaded images (giant SVG re-uploads would exceed GitHub limits; keep out of git)
+Comserv/root/static/images/3d/library/**

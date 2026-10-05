@@ -330,4 +330,14 @@ __PACKAGE__->has_many(
     { cascade_delete => 0 }
 );
 
+__PACKAGE__->has_many(
+    'category_links' => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItemCategory',
+    { 'foreign.item_id' => 'self.id' },
+    { cascade_delete => 1 }
+);
+
+__PACKAGE__->many_to_many(
+    'categories' => 'category_links', 'category'
+);
+
 1;

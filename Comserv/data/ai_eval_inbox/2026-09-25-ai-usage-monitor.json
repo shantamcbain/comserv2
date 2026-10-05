@@ -1,0 +1,99 @@
+{
+  "report_date": "2026-09-25",
+  "source": "AI usage monitor",
+  "created_by": "AI usage monitor",
+  "summary": "Bot 90% left (up from 78%, observation not refund); burn ~5.6%/day vs ~29%/day soft allowance to Mon Sep 28 8 AM PT. OpenRouter $19.49 balance, month $40.43 of $50 soft cap. Chat on :3001: 7 calls, 1 usable, 3 zero-token Ollama 'successes', 2 nemotron free 404s. Hermes: 18 Super Grok sessions landed code, still on grok-4.6; :9119 down.",
+  "markdown": "# Daily AI Eval Report — 2026-09-25 (AI usage monitor)\n\n## Bot allowance\n- **90% left**, spoken by Shanta at 6:58 AM PT on Sep 25.\n- Rose from **78%**. Logged as an **observation, not a refund**.\n- Soft allowance: about **29%/day** until **Mon Sep 28, 8:00 AM PT**.\n- Burn estimate from the observed drops: about **5.6%/day**. Well under the soft allowance.\n\n## OpenRouter\n- Balance: **~$19.49**\n- Day: ~$0.0001 (soft cap $1.65)\n- Week: ~$0.0006 (soft cap $11.50)\n- Month: **$40.43** (soft cap $50.00)\n\nMonth spend is at about 81% of the $50 soft cap.\n\n## Super Grok\n- No spoken figure since the **Sep 24, 10:31 AM PT** reset.\n- Prior cycle: about **93% used**.\n\n## Hermes\n- **18** Super Grok sessions landed real code.\n- Still defaults to **grok-4.6** (`~/.hermes/config.yaml` `model.default`).\n- Dashboard **:9119 is down**.\n\n## Chat (:3001, last 1 day)\n- 7 calls. **1 usable** (cohere).\n- **3** Ollama calls logged as success with **zero tokens**.\n- **2** 404s from the free nemotron slug on OpenRouter.\n\n## HelpDesk\n- No figures reported today.\n\n## Proposals\n1. Switch the Hermes idle model to flash (workstation → todo).\n2. Drop or replace the free nemotron slug in Chat routing (code → todo; routing is Perl code, not config).\n3. Stop counting zero-token Ollama calls as success (code → todo).\n",
+  "metrics": {
+    "bot": {
+      "percent_left": 90,
+      "previous_percent_left": 78,
+      "observed_at": "2026-09-25T06:58:00-07:00",
+      "observed_by": "Shanta (spoken)",
+      "rise_note": "Observation only, not a refund",
+      "soft_allowance_pct_per_day": 29,
+      "window_ends": "2026-09-28T08:00:00-07:00",
+      "burn_estimate_pct_per_day": 5.6
+    },
+    "openrouter": {
+      "balance_usd": 19.49,
+      "day_usd": 0.0001,
+      "week_usd": 0.0006,
+      "month_usd": 40.43,
+      "caps": {
+        "day_usd": 1.65,
+        "week_usd": 11.5,
+        "month_usd": 50
+      }
+    },
+    "supergrok": {
+      "spoken_pct": null,
+      "last_reset": "2026-09-24T10:31:00-07:00",
+      "prior_cycle_used_pct": 93,
+      "note": "No spoken figure since the Sep 24 reset"
+    },
+    "hermes": {
+      "sessions_with_code": 18,
+      "sessions": 18,
+      "default_model": "grok-4.6",
+      "dashboard_9119": "down"
+    },
+    "chat": {
+      "host": ":3001",
+      "window_days": 1,
+      "calls": 7,
+      "usable": 1,
+      "usable_providers": [
+        "cohere"
+      ],
+      "zero_token_ok": 3,
+      "zero_token_provider": "ollama",
+      "http_404": 2,
+      "http_404_model": "nemotron (OpenRouter :free)"
+    },
+    "helpdesk": {
+      "note": "No figures reported"
+    }
+  },
+  "proposals": [
+    {
+      "title": "Switch Hermes idle model to flash",
+      "change_type": "workstation",
+      "target": "workstation:~/.hermes/config.yaml:model.default",
+      "rationale": "Hermes still defaults to grok-4.6 for idle and light turns. Super Grok allowance is better spent on the 18-session code work. Change the idle/default model to flash on the workstation. This is workstation config, so it becomes a todo and is not applied from /ai/eval.",
+      "payload": {
+        "from": "grok-4.6",
+        "to": "flash",
+        "scope": "idle/default model only"
+      }
+    },
+    {
+      "title": "Drop or replace the free nemotron slug in Chat routing",
+      "change_type": "code",
+      "target": "lib/Comserv/Util/ModelCatalog.pm:@FREE_PREFERENCE; lib/Comserv/Model/AI2/Router.pm:_default_free_catalog",
+      "rationale": "2 of 7 Chat calls on :3001 were 404s from the free nemotron slug on OpenRouter. Routing preferences are Perl code (FREE_PREFERENCE list and the startup default catalog), not an allow-listed config, so this becomes a todo. Remove the slug(s) that 404, or replace with a live :free model, after checking the live OpenRouter model list.",
+      "payload": {
+        "action": "remove_from_fallback",
+        "remove": [
+          "openrouter|nvidia/nemotron-3-nano-30b-a3b:free"
+        ],
+        "verify_also": [
+          "openrouter|nvidia/nemotron-nano-9b-v2:free",
+          "openrouter|nvidia/nemotron-3.5-lightning:free"
+        ],
+        "replacement": "first live OpenRouter :free instruction model (verify on /api/v1/models)"
+      }
+    },
+    {
+      "title": "Stop counting zero-token Ollama calls as success",
+      "change_type": "code",
+      "target": "lib/Comserv/Model/AI2/Provider/Ollama.pm; lib/Comserv/Model/AI/Usage.pm (Ledger status)",
+      "rationale": "3 Ollama calls on :3001 were logged status=success with 0 tokens and no usable reply. They inflate the success rate. A call with 0 completion tokens and empty content should be logged as an error/empty result and should trigger the normal fallback.",
+      "payload": {
+        "rule": "success requires completion_tokens > 0 or non-empty content",
+        "else_status": "empty_response",
+        "fallback": "treat like a provider failure"
+      }
+    }
+  ]
+}

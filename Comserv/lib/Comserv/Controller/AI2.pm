@@ -1166,6 +1166,8 @@ sub chat :Local :Args(0) {
             skip_app_writes    => $editor_skip_writes ? 1 : 0,
             surface            => $editor_skip_writes ? 'editor' : 'chat',
             phase              => $editor_phase,
+            grounding          => $json_data->{grounding},   # off|shadow|enforce (Model::AI2::Grounding)
+            creative           => $json_data->{creative} ? 1 : 0,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
@@ -1191,6 +1193,13 @@ sub chat :Local :Args(0) {
         todo_action      => $result->{todo_action},
         files_read       => $result->{files_read} || [],
         citations        => $result->{citations} || [],
+        grounding        => $result->{grounding},
+        fallover         => $result->{fallover},
+        fallback         => $result->{fallback},
+        fallback_from    => $result->{fallback_from},
+        original_model   => $result->{original_model},
+        original_error   => $result->{original_error},
+        all_exhausted    => $result->{all_exhausted},
     }));
 }
 
@@ -1623,6 +1632,49 @@ sub hermes_start_desktop :Local :Args(0) {
                      . 'Remote browsers will not show Desktop — use the workstation screen or Hermes CLI in a terminal.',
         note        => 'Desktop ≠ browser dashboard. For browser UI use hermes dashboard separately.',
     }));
+}
+
+# -------------------------------------------------------------------------
+# Org usage JSON — lives here so Starman -r can reload it. Controller::AI.pm
+# is too large to reload; Controller::AI::Usage is a new file the current
+# :4006 process never loaded. Canonical home remains AI::Usage; this Local
+# action is the live bridge. Do not add more usage HTML to this file.
+#   GET /ai2/usage_live
+# -------------------------------------------------------------------------
+sub usage_live :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+    unless ($is_local || $c->session->{user_id}) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'login required' }));
+        return;
+    }
+    my $org = eval {
+        require Comserv::Model::AI2::UsageMonitor;
+        my $days    = $c->req->param('days') || 14;
+        my $prov_f  = $c->req->param('provider') || '';
+        my $site_f  = $c->req->param('site_id')  || '';
+        my $model_f = $c->req->param('model') || '';
+        Comserv::Model::AI2::UsageMonitor->new->org_summary($c,
+            days => $days, provider => $prov_f, site_id => $site_f, model => $model_f);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'usage_live', "$@");
+        $c->response->body(encode_json({ success => JSON::false, error => 'summary failed' }));
+        return;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'usage_live',
+        'org_calls=' . (($org->{org_totals} || {})->{calls} // 0)
+        . ' hermes_tokens=' . ((($org->{hermes} || {})->{totals} || {})->{tokens} // 0));
+    # Same org.fallover key and access rule as /ai/usage_live (AISYSTEM plan §5e).
+    my $uc = eval { $c->controller('AI::Usage') };
+    if ($uc && $uc->can('_can_see_fallover') && $uc->_can_see_fallover($c)) {
+        $org->{fallover} = eval {
+            Comserv::Model::AI2::UsageMonitor->new->fallover_summary($c, days => ($c->req->param('days') || 14));
+        } || { errors => [ 'fallover summary failed: ' . ($@ || 'unknown') ] };
+    }
+    $c->response->body(encode_json({ success => JSON::true, org => $org }));
 }
 
 __PACKAGE__->meta->make_immutable;
