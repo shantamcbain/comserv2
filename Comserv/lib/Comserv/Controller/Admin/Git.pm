@@ -274,7 +274,7 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         $validated = $self->_validate_paths($c, \@paths);
         if (@{ $validated->{invalid} }) {
             $c->flash->{error_msg} =
-                "Rejected unsafe or unknown path(s): " . join(', ', @{ $validated->{invalid} });
+                "Rejected unsafe or unknown path(s): " . join(', ', @{ $validated->{invalid} }) . " (must exactly match git status --porcelain on the bound target. Refresh view or select only current dirty paths for this target. Runtime data should be gitignored.)";
             $c->response->redirect($c->uri_for('/admin/git'));
             return;
         }
