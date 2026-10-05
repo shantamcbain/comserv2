@@ -345,7 +345,99 @@ sub _provider_needs_credit_fallback {
     return ($provider_name // '') =~ /^(supergrok|openrouter|external)$/ ? 1 : 0;
 }
 
+# Vendor prefix of an OpenRouter slug (google/gemma-… → google). Used to
+# avoid spending the first fallback hop on a sibling in the same upstream
+# rate-limit pool (both Gemma :free models 429 together).
+sub _vendor_family {
+    my ($self, $name) = @_;
+    return '' unless defined $name && $name =~ m{^([^/]+)/};
+    return lc $1;
+}
+
+# Different-family free models first, same-family free models next, Ollama
+# last. Cap free hops so a shared-pool 429 cannot walk the whole catalog.
+sub _order_fallback_hops {
+    my ($self, $failed_model, $hops) = @_;
+    my $fam = $self->_vendor_family($failed_model);
+    my (@diff, @same, @local, %seen);
+    for my $h (@{ $hops || [] }) {
+        next unless $h && ref $h eq 'HASH' && ($h->{model} // '') ne '';
+        my $key = ($h->{provider} // '') . '|' . $h->{model};
+        next if $seen{$key}++;
+        if (($h->{provider} // '') eq 'ollama') {
+            push @local, $h;
+            next;
+        }
+        my $hf = $self->_vendor_family($h->{model});
+        if ($fam ne '' && $hf eq $fam) {
+            push @same, $h;
+        }
+        else {
+            push @diff, $h;
+        }
+    }
+    my @free = (@diff, @same);
+    splice(@free, 4) if @free > 4;
+    return (@free, @local);
+}
+
+# Live catalog for a failed turn. include_ollama is required: the cheap
+# catalog used by page render (and by pick_free_fallback) omits Ollama, so
+# a 429 used to die after one other :free sibling and never reach a local
+# model. Caller logs; this returns () on failure.
+sub _catalog_fallback_hops {
+    my ($self, $c, $skip_provider, $skip_model) = @_;
+    return () unless $c;
+    my $catalog = try {
+        $self->get_available_models($c, include_ollama => 1);
+    } catch {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+            'fallback_hops', "Catalog for fallback hops failed: $_");
+        [];
+    };
+    $catalog = [] unless $catalog && ref($catalog) eq 'ARRAY';
+    my (@hops, $local);
+    for my $m (@$catalog) {
+        next unless ref $m eq 'HASH';
+        next if $m->{disabled} || $m->{needs_key} || $m->{unreachable};
+        my $name = $m->{name} // '';
+        my $svc  = $m->{provider} || '';
+        next unless length $name;
+        next if $name =~ /^(?:ollama_unreachable|ollama_empty)$/;
+        next if $name =~ /grok/i || $name =~ /^x-ai\//i;
+        next if $svc eq ($skip_provider // '') && $name eq ($skip_model // '');
+        next if $self->_model_is_killed($c, $svc, $name);
+        my $is_free  = $m->{free} || ($name =~ /:free$/);
+        my $is_local = $m->{local} || ($svc eq 'ollama');
+        if ($is_free && $svc =~ /^(openrouter|external)$/) {
+            push @hops, { provider => 'openrouter', model => $name };
+        }
+        if (!$local && $is_local && $svc eq 'ollama' && $self->_is_chat_model($name)
+            && ($skip_provider // '') ne 'ollama') {
+            $local = { provider => 'ollama', model => $name };
+        }
+    }
+    push @hops, $local if $local;
+    return @hops;
+}
+
+# Ordered hops for chat_with_fallback. With a request context, walk the
+# live catalog (other free families, then same-family, then Ollama).
+# Without one (unit tests), honor pick_free_fallback including stubs.
+sub fallback_hops {
+    my ($self, $c, $skip_provider, $skip_model) = @_;
+    if ($c) {
+        my @from_cat = $self->_catalog_fallback_hops($c, $skip_provider, $skip_model);
+        return $self->_order_fallback_hops($skip_model, \@from_cat) if @from_cat;
+    }
+    my ($free, $local) = $self->pick_free_fallback($c, $skip_provider, $skip_model);
+    $local = undef if ($skip_provider // '') eq 'ollama';
+    return $self->_order_fallback_hops($skip_model, [ grep { $_ } ($free, $local) ]);
+}
+
 # First live OpenRouter :free model, then first chat-capable Ollama tag.
+# Snapshot/diagnostics only — chat failover uses fallback_hops, which also
+# tries later free models and requests include_ollama.
 # No hardcoded model slugs — catalog is the source of truth.
 sub pick_free_fallback {
     my ($self, $c, $skip_provider, $skip_model) = @_;
@@ -526,11 +618,12 @@ sub chat_with_fallback {
         return $resp;
     }
 
-    my ($free, $local) = $self->pick_free_fallback($c, $provider_name, $use_model);
-    # When Ollama itself is the failing hop, do not retry another Ollama tag.
-    $local = undef if ($provider_name // '') eq 'ollama';
-    for my $hop ($free, $local) {
-        next unless $hop;
+    # Other free families first (not the sibling in the same 429 pool), then
+    # same-family :free, then one Ollama tag. A single hop 429 is a warning;
+    # error only if every hop fails (that is what files an audit todo).
+    my @hops = $self->fallback_hops($c, $provider_name, $use_model);
+    my @hop_notes;
+    for my $hop (@hops) {
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
             "$provider_name failed ($err); falling back to $hop->{provider} $hop->{model}");
         my $retry = $self->_chat_one_with_retry($c, $hop->{provider}, $hop->{model}, $messages, %opts);
@@ -543,8 +636,14 @@ sub chat_with_fallback {
             return $retry;
         }
         my $hop_err = ($retry && $retry->{error}) || 'fallback hop failed';
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'chat_with_fallback',
+        push @hop_notes, "$hop->{provider}/$hop->{model}: $hop_err";
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
             "Fallback hop $hop->{provider}/$hop->{model} failed: $hop_err");
+    }
+    if (@hop_notes) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'chat_with_fallback',
+            "All fallback hops failed after $provider_name/" . ($use_model // '?')
+            . " ($err): " . join('; ', @hop_notes));
     }
 
     $resp ||= { success => 0, error => $err, provider => $provider_name };
