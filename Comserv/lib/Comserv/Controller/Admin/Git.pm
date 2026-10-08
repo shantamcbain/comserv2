@@ -356,12 +356,17 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     elsif ($op eq 'push') {
         my $branch = $self->get_current_branch($c);
         my $tracking = $self->get_tracking_info($c);
-        if (!$tracking->{upstream} && !$c->req->param('set_upstream')) {
+        # main/master on the primary checkout (:3001) always publishes to origin.
+        # Worktree branches still require an explicit set-upstream checkbox.
+        my $publish = ($branch eq 'main' || $branch eq 'master');
+        if (!$tracking->{upstream} && !$publish && !$c->req->param('set_upstream')) {
             $msg = "Branch '$branch' has no upstream. Re-submit with 'set upstream' checked to push.";
         }
         else {
             my @cmd = ('push');
-            push @cmd, '--set-upstream' if !$tracking->{upstream};
+            # Restore branch.<name>.merge when it is missing so the next load
+            # uses @{u} instead of the origin/<branch> inference.
+            push @cmd, '--set-upstream' if !$tracking->{upstream_configured};
             push @cmd, 'origin', $branch;
             my ($out, $code) = $self->_git_list($c, @cmd);
             $ok = ($code == 0);
