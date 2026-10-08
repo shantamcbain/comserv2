@@ -6066,9 +6066,9 @@ New pages like the AI usage monitor will appear automatically without editing th
 =cut
 
 {
-    my $cached_tt_links;
-    my $cache_time = 0;
-    my $CACHE_TTL = 300;  # 5 minutes
+    our $cached_tt_links;
+    our $cache_time = 0;
+    our $CACHE_TTL = 300;  # 5 minutes
 
     sub _get_auto_discovered_tt_pages {
         my ($self, $base_url) = @_;
