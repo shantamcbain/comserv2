@@ -2,6 +2,7 @@ package Comserv::Controller::Api;
 use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use File::Spec;
+use File::Path qw(mkpath);
 use JSON::MaybeXS;
 use DateTime;
 use Comserv::Util::AppTime;

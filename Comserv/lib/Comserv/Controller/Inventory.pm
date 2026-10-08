@@ -399,6 +399,15 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
         if ($@) {
             $c->stash->{error_msg} = "Failed to create item: $@";
         } else {
+            # If we got an existing item back because of barcode (or sku) duplicate,
+            # switch to edit instead of treating as new create.
+            if ($params->{barcode} && $new_item && $new_item->barcode
+                && $new_item->barcode eq $params->{barcode}) {
+                $c->flash->{success_msg} = 'Item with this barcode already exists. Switched to edit mode.';
+                $c->res->redirect($c->uri_for('/Inventory/item/edit', [$new_item->id]));
+                return;
+            }
+
             $c->flash->{success_msg} = $params->{is_assemblable}
                 ? 'Item created. Now add BOM components below.'
                 : 'Item created successfully';
@@ -448,6 +457,18 @@ sub _create_item {
         }
     }
 
+    # Also guard / allow switch on barcode (for camera/scan flow)
+    if ($p->{barcode}) {
+        my $existing = $schema->resultset('Accounting::InventoryItem')->find(
+            { sitename => $sitename, barcode => $p->{barcode} }
+        );
+        if ($existing) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_item',
+                "Barcode already exists (id=" . $existing->id . ") — returning existing for edit/receive/adjust");
+            return $existing;
+        }
+    }
+
     return $schema->resultset('Accounting::InventoryItem')->create({
         sitename            => $sitename,
         sku                 => $p->{sku},
@@ -461,6 +482,8 @@ sub _create_item {
         unit_cost           => $p->{unit_cost}  || undef,
         unit_price          => $p->{unit_price} || undef,
         barcode             => $p->{barcode}    || undef,
+        barcode_type        => $p->{barcode_type} || undef,
+        image_path          => $p->{image_path}   || undef,
         reorder_point       => $p->{reorder_point} || 0,
         reorder_quantity    => $p->{reorder_quantity} || 0,
         status              => $p->{status} || 'active',
@@ -642,6 +665,8 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
                 unit_cost          => $params->{unit_cost}  || undef,
                 unit_price         => $params->{unit_price} || undef,
                 barcode            => $params->{barcode}    || undef,
+                barcode_type       => $params->{barcode_type} || undef,
+                image_path         => $params->{image_path}   || undef,
                 reorder_point      => $params->{reorder_point} || 0,
                 reorder_quantity   => $params->{reorder_quantity} || 0,
                 status             => $params->{status} || 'active',
@@ -2140,6 +2165,8 @@ sub inventory_count :Path('/Inventory/count') :Args(0) {
                 item_id      => $item->id,
                 sku          => $item->sku,
                 name         => $item->name,
+                barcode      => $item->barcode,
+                barcode_type => $item->barcode_type,
                 category     => $item->category,
                 unit_of_measure => $item->unit_of_measure,
                 location_id  => $loc,

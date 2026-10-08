@@ -1,0 +1,581 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:2:1-28:12
+INJECTED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:2:1-28:12
+INJECTED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:2:1-28:12
+INJECTED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:2:1-28:12
+MERGED from [com.google.accompanist:accompanist-permissions:0.36.0] /home/shanta/.gradle/caches/8.9/transforms/494cad5cd70dd5a62e825fa200842101/transformed/accompanist-permissions-0.36.0/AndroidManifest.xml:17:1-23:12
+MERGED from [androidx.camera:camera-video:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/869d87703fae734883fa513520d47d54/transformed/camera-video-1.4.1/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.camera:camera-view:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/ad2fc8dd04a01c36800ccd0acc9855f1/transformed/camera-view-1.4.1/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.camera:camera-lifecycle:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/95502bf7933bff41707323e6f45e4a26/transformed/camera-lifecycle-1.4.1/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:17:1-36:12
+MERGED from [androidx.camera:camera-core:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/6c95889e9990c11195cf4321706161d5/transformed/camera-core-1.4.1/AndroidManifest.xml:17:1-36:12
+MERGED from [com.google.mlkit:barcode-scanning:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d6686192fd23f2dd0558acdb30c79773/transformed/barcode-scanning-17.3.0/AndroidManifest.xml:2:1-7:12
+MERGED from [com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:2:1-18:12
+MERGED from [com.google.mlkit:barcode-scanning-common:17.0.0] /home/shanta/.gradle/caches/8.9/transforms/ad18b7a366bfaba129c41e48802af090/transformed/barcode-scanning-common-17.0.0/AndroidManifest.xml:2:1-7:12
+MERGED from [com.google.mlkit:vision-common:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d4166ae9397ef4f929de6306fec04644/transformed/vision-common-17.3.0/AndroidManifest.xml:2:1-18:12
+MERGED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:2:1-26:12
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/shanta/.gradle/caches/8.9/transforms/bb1cda158478c703e01ce3b861206dba/transformed/appcompat-resources-1.6.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.appcompat:appcompat:1.6.1] /home/shanta/.gradle/caches/8.9/transforms/6264f758fdf1e384c9664edb222bc47d/transformed/appcompat-1.6.1/AndroidManifest.xml:17:1-22:12
+MERGED from [com.google.android.gms:play-services-base:18.5.0] /home/shanta/.gradle/caches/8.9/transforms/e03afd7d927490ba9afb446ca59d7940/transformed/play-services-base-18.5.0/AndroidManifest.xml:2:1-7:12
+MERGED from [com.google.mlkit:vision-interfaces:16.3.0] /home/shanta/.gradle/caches/8.9/transforms/79f3454618debbf653e36e1b93f4cd66/transformed/vision-interfaces-16.3.0/AndroidManifest.xml:2:1-7:12
+MERGED from [com.google.android.gms:play-services-tasks:18.2.0] /home/shanta/.gradle/caches/8.9/transforms/de4625d3b65cec64a6ac88e9ce2d3f4e/transformed/play-services-tasks-18.2.0/AndroidManifest.xml:2:1-5:12
+MERGED from [com.google.android.gms:play-services-basement:18.4.0] /home/shanta/.gradle/caches/8.9/transforms/b0bbf89d7f26daf9097c42618b522f47/transformed/play-services-basement-18.4.0/AndroidManifest.xml:2:1-9:12
+MERGED from [androidx.fragment:fragment:1.3.6] /home/shanta/.gradle/caches/8.9/transforms/21276c3b8884338cade0141f45f840a3/transformed/fragment-1.3.6/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.activity:activity:1.9.3] /home/shanta/.gradle/caches/8.9/transforms/3f3c9e5d5c931178a244dcdae4cfcf34/transformed/activity-1.9.3/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.compose.material3:material3-android:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/7e4ab284cbb16d5fa92a377b892666a2/transformed/material3-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.compose.material:material-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/8cd6782b8efe418a32fdcc7fda94d477/transformed/material-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.animation:animation-core-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/4c6d4d558db38353db4947e19faf310f/transformed/animation-core-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.material:material-ripple-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/792061eb961fd872b9c7f41144f079f9/transformed/material-ripple-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.animation:animation-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/21c3ff75b3ebb41870758e1c9b593ae8/transformed/animation-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/c5582b91f0038c893fa3959642f3f95f/transformed/foundation-layout-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.foundation:foundation-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/a9c6014f023edcaf3afc59c77f45f12a/transformed/foundation-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-tooling-data-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/568e2b55be1148148aef78b11c8452df/transformed/ui-tooling-data-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-unit-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/eebf42a4d4d67154c69f14538a43d86f/transformed/ui-unit-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-graphics-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/c2c641d6cfe884fd12a3daca26b49b1d/transformed/ui-graphics-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-geometry-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/7a5524acaf1ae0d7208e516232f12285/transformed/ui-geometry-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-util-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/da9190744fd205161545b3298ecd0fdd/transformed/ui-util-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-text-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/1f290cbcc63ed6c4756ffeae4ab3122c/transformed/ui-text-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/f6303c379ece991ea908e57261715ff8/transformed/ui-tooling-preview-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.compose.ui:ui-tooling-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/40b085cd86d5e92c66250c8dab606ecb/transformed/ui-tooling-release/AndroidManifest.xml:17:1-28:12
+MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /home/shanta/.gradle/caches/8.9/transforms/c26ee7d7b98694eadfccce703f9212a3/transformed/savedstate-ktx-1.2.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.savedstate:savedstate:1.2.1] /home/shanta/.gradle/caches/8.9/transforms/1b075359befbac60000d5ca6e7267ed5/transformed/savedstate-1.2.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.autofill:autofill:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/4fbe853bdd0b25a9e562374e224f1e0e/transformed/autofill-1.0.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/ed7d8956f6cd94af3e34daef1dcff5da/transformed/drawerlayout-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.emoji2:emoji2-views-helper:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/2d53e1b5cc1cf0fd31ee1412c1bdb4ac/transformed/emoji2-views-helper-1.3.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:17:1-35:12
+MERGED from [androidx.viewpager:viewpager:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/ae450d52996ada403b4d1b0ffc042704/transformed/viewpager-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.loader:loader:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/caa3aeebbc62c27f2592e06fb146144c/transformed/loader-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /home/shanta/.gradle/caches/8.9/transforms/ab88136130c1a6569c36f1b3354c2b2d/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /home/shanta/.gradle/caches/8.9/transforms/bad5377a62800b3ae1c4851b2826dc62/transformed/vectordrawable-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.customview:customview:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/049c5c7fb16289400a86076bd8402230/transformed/customview-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/d712cc770aaddac8e875269d8040ab29/transformed/customview-poolingcontainer-1.0.0/AndroidManifest.xml:17:1-23:12
+MERGED from [androidx.core:core-ktx:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/79cfde83ebf8145117dda90ecced9ccd/transformed/core-ktx-1.13.1/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.graphics:graphics-path:1.0.1] /home/shanta/.gradle/caches/8.9/transforms/3f2defb7008540bfff938534f26d78f2/transformed/graphics-path-1.0.1/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:17:1-30:12
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/462a3837a69f7e2c8c3b6f39b710cac6/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:17:1-35:12
+MERGED from [androidx.lifecycle:lifecycle-runtime-compose-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/8d01df5b373d101c4d03bc1fba1237ee/transformed/lifecycle-runtime-compose-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.lifecycle:lifecycle-runtime-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/5961b1e0896d39f23b76359bf7a32a5b/transformed/lifecycle-runtime-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-runtime-ktx-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/364b0e7b66497ef73e535427e1a67956/transformed/lifecycle-runtime-ktx-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/c4b01e710cf82cbdd71b3f837af09198/transformed/lifecycle-viewmodel-2.8.7/AndroidManifest.xml:2:1-5:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/93f025abc9536b43eb607b54709af5c2/transformed/lifecycle-viewmodel-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-livedata-core-ktx:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/6014bcd9d98780a08271b3102904b12f/transformed/lifecycle-livedata-core-ktx-2.8.7/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/3e8a1c67360d925ae240534b4cd505a9/transformed/lifecycle-livedata-core-2.8.7/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/5000e13b27688c945d7a4a8447893c2e/transformed/lifecycle-viewmodel-savedstate-2.8.7/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/fa9a7fa03897e7e69ad841e31179a5f0/transformed/lifecycle-viewmodel-ktx-2.8.7/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/5c990f96be5fa64a5542e89f418e56dc/transformed/lifecycle-livedata-2.8.7/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-compose-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/8b1921dd80ba66c1fd8a6c98008f4330/transformed/lifecycle-viewmodel-compose-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.material:material-icons-core-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/bc2ef6c1b9e72f661196c0bd56e6f540/transformed/material-icons-core-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/3095ca8a1e3dbf8b931fbeab83ffb1de/transformed/ui-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.activity:activity-ktx:1.9.3] /home/shanta/.gradle/caches/8.9/transforms/26fdb8dca8c3c5bad69a9e1345ca97e4/transformed/activity-ktx-1.9.3/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.activity:activity-compose:1.9.3] /home/shanta/.gradle/caches/8.9/transforms/aebd5084869911b602d6a45428324e2d/transformed/activity-compose-1.9.3/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.datastore:datastore-core-android:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/069ba8d9bc9b5a1f6e3672f2f64a0158/transformed/datastore-core-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.datastore:datastore-android:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/a9e4304db656d84b70c81ad764e250b5/transformed/datastore-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.datastore:datastore-preferences-android:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/f2f23a2b17b8fd5fd496440b82db0ff5/transformed/datastore-preferences-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/d999aef1af8dd693bf1e6dd0e9445078/transformed/runtime-saveable-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.runtime:runtime-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/2d5b3a742dcc9931d2389f1659eb0b51/transformed/runtime-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.annotation:annotation-experimental:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/d476e5af897154189b66ef975246647f/transformed/annotation-experimental-1.4.1/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:17:1-55:12
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/33fc610a34f72d3d644af1e5a854635a/transformed/startup-runtime-1.1.1/AndroidManifest.xml:17:1-33:12
+MERGED from [androidx.tracing:tracing:1.2.0] /home/shanta/.gradle/caches/8.9/transforms/76ed3e2f8a222e1336bfba2f15c59822/transformed/tracing-1.2.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.tracing:tracing-ktx:1.2.0] /home/shanta/.gradle/caches/8.9/transforms/81273519905da991805905219a35be5c/transformed/tracing-ktx-1.2.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/8dc357b1aba95770b603a8c93c9237b7/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:17:1-27:12
+MERGED from [androidx.exifinterface:exifinterface:1.3.2] /home/shanta/.gradle/caches/8.9/transforms/e4346e34c82b56d6fe53482556cf120e/transformed/exifinterface-1.3.2/AndroidManifest.xml:17:1-24:12
+MERGED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:15:1-38:12
+MERGED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:15:1-41:12
+MERGED from [com.google.android.datatransport:transport-api:2.2.1] /home/shanta/.gradle/caches/8.9/transforms/2af8ee89bcd36f8755946c171c6fea9c/transformed/transport-api-2.2.1/AndroidManifest.xml:15:1-22:12
+MERGED from [com.google.firebase:firebase-components:16.1.0] /home/shanta/.gradle/caches/8.9/transforms/511e9feef55e90441e8866d7b8bc3fd6/transformed/firebase-components-16.1.0/AndroidManifest.xml:15:1-23:12
+MERGED from [com.google.firebase:firebase-encoders-json:17.1.0] /home/shanta/.gradle/caches/8.9/transforms/8c3112ac26f47ac91634dc91b032ddd2/transformed/firebase-encoders-json-17.1.0/AndroidManifest.xml:15:1-23:12
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /home/shanta/.gradle/caches/8.9/transforms/64a8bceec654be2737e9ce33de0f9e50/transformed/core-runtime-2.2.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/f85b40c94941bbe055e7242dc7f4b4cd/transformed/cursoradapter-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.interpolator:interpolator:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/04e782f021bd4efd4df56a1a011e1e5f/transformed/interpolator-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [com.google.android.odml:image:1.0.0-beta1] /home/shanta/.gradle/caches/8.9/transforms/5c9afcf14619751a2c5987c4986bb688/transformed/image-1.0.0-beta1/AndroidManifest.xml:2:1-9:12
+	package
+		INJECTED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml
+	android:versionName
+		INJECTED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml
+	android:versionCode
+		INJECTED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:2:11-69
+uses-permission#android.permission.CAMERA
+ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:4:5-65
+	android:name
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:4:22-62
+uses-permission#android.permission.INTERNET
+ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:5:5-67
+MERGED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:26:5-67
+MERGED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:26:5-67
+	android:name
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:5:22-64
+uses-permission#android.permission.ACCESS_NETWORK_STATE
+ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:6:5-79
+MERGED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:25:5-79
+MERGED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:25:5-79
+MERGED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:22:5-79
+MERGED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:22:5-79
+	android:name
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:6:22-76
+uses-feature#android.hardware.camera
+ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:8:5-85
+	android:required
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:8:58-82
+	android:name
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:8:19-57
+uses-feature#android.hardware.camera.autofocus
+ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:9:5-95
+	android:required
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:9:68-92
+	android:name
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:9:19-67
+application
+ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:11:5-27:19
+INJECTED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:11:5-27:19
+MERGED from [androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:23:5-34:19
+MERGED from [androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:23:5-34:19
+MERGED from [androidx.camera:camera-core:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/6c95889e9990c11195cf4321706161d5/transformed/camera-core-1.4.1/AndroidManifest.xml:23:5-34:19
+MERGED from [androidx.camera:camera-core:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/6c95889e9990c11195cf4321706161d5/transformed/camera-core-1.4.1/AndroidManifest.xml:23:5-34:19
+MERGED from [com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:8:5-16:19
+MERGED from [com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:8:5-16:19
+MERGED from [com.google.mlkit:vision-common:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d4166ae9397ef4f929de6306fec04644/transformed/vision-common-17.3.0/AndroidManifest.xml:8:5-16:19
+MERGED from [com.google.mlkit:vision-common:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d4166ae9397ef4f929de6306fec04644/transformed/vision-common-17.3.0/AndroidManifest.xml:8:5-16:19
+MERGED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:8:5-24:19
+MERGED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:8:5-24:19
+MERGED from [com.google.android.gms:play-services-base:18.5.0] /home/shanta/.gradle/caches/8.9/transforms/e03afd7d927490ba9afb446ca59d7940/transformed/play-services-base-18.5.0/AndroidManifest.xml:4:5-6:19
+MERGED from [com.google.android.gms:play-services-base:18.5.0] /home/shanta/.gradle/caches/8.9/transforms/e03afd7d927490ba9afb446ca59d7940/transformed/play-services-base-18.5.0/AndroidManifest.xml:4:5-6:19
+MERGED from [com.google.android.gms:play-services-tasks:18.2.0] /home/shanta/.gradle/caches/8.9/transforms/de4625d3b65cec64a6ac88e9ce2d3f4e/transformed/play-services-tasks-18.2.0/AndroidManifest.xml:4:5-20
+MERGED from [com.google.android.gms:play-services-tasks:18.2.0] /home/shanta/.gradle/caches/8.9/transforms/de4625d3b65cec64a6ac88e9ce2d3f4e/transformed/play-services-tasks-18.2.0/AndroidManifest.xml:4:5-20
+MERGED from [com.google.android.gms:play-services-basement:18.4.0] /home/shanta/.gradle/caches/8.9/transforms/b0bbf89d7f26daf9097c42618b522f47/transformed/play-services-basement-18.4.0/AndroidManifest.xml:5:5-7:19
+MERGED from [com.google.android.gms:play-services-basement:18.4.0] /home/shanta/.gradle/caches/8.9/transforms/b0bbf89d7f26daf9097c42618b522f47/transformed/play-services-basement-18.4.0/AndroidManifest.xml:5:5-7:19
+MERGED from [androidx.compose.ui:ui-tooling-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/40b085cd86d5e92c66250c8dab606ecb/transformed/ui-tooling-release/AndroidManifest.xml:22:5-26:19
+MERGED from [androidx.compose.ui:ui-tooling-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/40b085cd86d5e92c66250c8dab606ecb/transformed/ui-tooling-release/AndroidManifest.xml:22:5-26:19
+MERGED from [androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:28:5-89
+MERGED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:28:5-89
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/462a3837a69f7e2c8c3b6f39b710cac6/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/462a3837a69f7e2c8c3b6f39b710cac6/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:23:5-53:19
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:23:5-53:19
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/33fc610a34f72d3d644af1e5a854635a/transformed/startup-runtime-1.1.1/AndroidManifest.xml:25:5-31:19
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/33fc610a34f72d3d644af1e5a854635a/transformed/startup-runtime-1.1.1/AndroidManifest.xml:25:5-31:19
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/8dc357b1aba95770b603a8c93c9237b7/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/8dc357b1aba95770b603a8c93c9237b7/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
+MERGED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:28:5-36:19
+MERGED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:28:5-36:19
+MERGED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:25:5-39:19
+MERGED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:25:5-39:19
+MERGED from [com.google.android.odml:image:1.0.0-beta1] /home/shanta/.gradle/caches/8.9/transforms/5c9afcf14619751a2c5987c4986bb688/transformed/image-1.0.0-beta1/AndroidManifest.xml:7:5-20
+MERGED from [com.google.android.odml:image:1.0.0-beta1] /home/shanta/.gradle/caches/8.9/transforms/5c9afcf14619751a2c5987c4986bb688/transformed/image-1.0.0-beta1/AndroidManifest.xml:7:5-20
+	android:extractNativeLibs
+		INJECTED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml
+	android:appComponentFactory
+		ADDED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:28:18-86
+	android:supportsRtl
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:14:9-35
+	android:label
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:13:9-42
+	android:allowBackup
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:12:9-35
+	android:theme
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:15:9-54
+	android:usesCleartextTraffic
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:16:9-44
+activity#com.comserv.inventory.MainActivity
+ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:18:9-26:20
+	android:exported
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:20:13-36
+	android:configChanges
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:21:13-87
+	android:name
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:19:13-41
+intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
+ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:22:13-25:29
+action#android.intent.action.MAIN
+ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:23:17-69
+	android:name
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:23:25-66
+category#android.intent.category.LAUNCHER
+ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:24:17-77
+	android:name
+		ADDED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:24:27-74
+uses-sdk
+INJECTED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml
+INJECTED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml
+MERGED from [com.google.accompanist:accompanist-permissions:0.36.0] /home/shanta/.gradle/caches/8.9/transforms/494cad5cd70dd5a62e825fa200842101/transformed/accompanist-permissions-0.36.0/AndroidManifest.xml:21:5-44
+MERGED from [com.google.accompanist:accompanist-permissions:0.36.0] /home/shanta/.gradle/caches/8.9/transforms/494cad5cd70dd5a62e825fa200842101/transformed/accompanist-permissions-0.36.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.camera:camera-video:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/869d87703fae734883fa513520d47d54/transformed/camera-video-1.4.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.camera:camera-video:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/869d87703fae734883fa513520d47d54/transformed/camera-video-1.4.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.camera:camera-view:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/ad2fc8dd04a01c36800ccd0acc9855f1/transformed/camera-view-1.4.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.camera:camera-view:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/ad2fc8dd04a01c36800ccd0acc9855f1/transformed/camera-view-1.4.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.camera:camera-lifecycle:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/95502bf7933bff41707323e6f45e4a26/transformed/camera-lifecycle-1.4.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.camera:camera-lifecycle:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/95502bf7933bff41707323e6f45e4a26/transformed/camera-lifecycle-1.4.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:21:5-44
+MERGED from [androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:21:5-44
+MERGED from [androidx.camera:camera-core:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/6c95889e9990c11195cf4321706161d5/transformed/camera-core-1.4.1/AndroidManifest.xml:21:5-44
+MERGED from [androidx.camera:camera-core:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/6c95889e9990c11195cf4321706161d5/transformed/camera-core-1.4.1/AndroidManifest.xml:21:5-44
+MERGED from [com.google.mlkit:barcode-scanning:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d6686192fd23f2dd0558acdb30c79773/transformed/barcode-scanning-17.3.0/AndroidManifest.xml:5:5-44
+MERGED from [com.google.mlkit:barcode-scanning:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d6686192fd23f2dd0558acdb30c79773/transformed/barcode-scanning-17.3.0/AndroidManifest.xml:5:5-44
+MERGED from [com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:6:5-44
+MERGED from [com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:6:5-44
+MERGED from [com.google.mlkit:barcode-scanning-common:17.0.0] /home/shanta/.gradle/caches/8.9/transforms/ad18b7a366bfaba129c41e48802af090/transformed/barcode-scanning-common-17.0.0/AndroidManifest.xml:5:5-44
+MERGED from [com.google.mlkit:barcode-scanning-common:17.0.0] /home/shanta/.gradle/caches/8.9/transforms/ad18b7a366bfaba129c41e48802af090/transformed/barcode-scanning-common-17.0.0/AndroidManifest.xml:5:5-44
+MERGED from [com.google.mlkit:vision-common:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d4166ae9397ef4f929de6306fec04644/transformed/vision-common-17.3.0/AndroidManifest.xml:6:5-44
+MERGED from [com.google.mlkit:vision-common:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d4166ae9397ef4f929de6306fec04644/transformed/vision-common-17.3.0/AndroidManifest.xml:6:5-44
+MERGED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:6:5-44
+MERGED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:6:5-44
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/shanta/.gradle/caches/8.9/transforms/bb1cda158478c703e01ce3b861206dba/transformed/appcompat-resources-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/shanta/.gradle/caches/8.9/transforms/bb1cda158478c703e01ce3b861206dba/transformed/appcompat-resources-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat:1.6.1] /home/shanta/.gradle/caches/8.9/transforms/6264f758fdf1e384c9664edb222bc47d/transformed/appcompat-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat:1.6.1] /home/shanta/.gradle/caches/8.9/transforms/6264f758fdf1e384c9664edb222bc47d/transformed/appcompat-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [com.google.android.gms:play-services-base:18.5.0] /home/shanta/.gradle/caches/8.9/transforms/e03afd7d927490ba9afb446ca59d7940/transformed/play-services-base-18.5.0/AndroidManifest.xml:3:5-44
+MERGED from [com.google.android.gms:play-services-base:18.5.0] /home/shanta/.gradle/caches/8.9/transforms/e03afd7d927490ba9afb446ca59d7940/transformed/play-services-base-18.5.0/AndroidManifest.xml:3:5-44
+MERGED from [com.google.mlkit:vision-interfaces:16.3.0] /home/shanta/.gradle/caches/8.9/transforms/79f3454618debbf653e36e1b93f4cd66/transformed/vision-interfaces-16.3.0/AndroidManifest.xml:5:5-44
+MERGED from [com.google.mlkit:vision-interfaces:16.3.0] /home/shanta/.gradle/caches/8.9/transforms/79f3454618debbf653e36e1b93f4cd66/transformed/vision-interfaces-16.3.0/AndroidManifest.xml:5:5-44
+MERGED from [com.google.android.gms:play-services-tasks:18.2.0] /home/shanta/.gradle/caches/8.9/transforms/de4625d3b65cec64a6ac88e9ce2d3f4e/transformed/play-services-tasks-18.2.0/AndroidManifest.xml:3:5-44
+MERGED from [com.google.android.gms:play-services-tasks:18.2.0] /home/shanta/.gradle/caches/8.9/transforms/de4625d3b65cec64a6ac88e9ce2d3f4e/transformed/play-services-tasks-18.2.0/AndroidManifest.xml:3:5-44
+MERGED from [com.google.android.gms:play-services-basement:18.4.0] /home/shanta/.gradle/caches/8.9/transforms/b0bbf89d7f26daf9097c42618b522f47/transformed/play-services-basement-18.4.0/AndroidManifest.xml:3:5-44
+MERGED from [com.google.android.gms:play-services-basement:18.4.0] /home/shanta/.gradle/caches/8.9/transforms/b0bbf89d7f26daf9097c42618b522f47/transformed/play-services-basement-18.4.0/AndroidManifest.xml:3:5-44
+MERGED from [androidx.fragment:fragment:1.3.6] /home/shanta/.gradle/caches/8.9/transforms/21276c3b8884338cade0141f45f840a3/transformed/fragment-1.3.6/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.fragment:fragment:1.3.6] /home/shanta/.gradle/caches/8.9/transforms/21276c3b8884338cade0141f45f840a3/transformed/fragment-1.3.6/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.activity:activity:1.9.3] /home/shanta/.gradle/caches/8.9/transforms/3f3c9e5d5c931178a244dcdae4cfcf34/transformed/activity-1.9.3/AndroidManifest.xml:20:5-44
+MERGED from [androidx.activity:activity:1.9.3] /home/shanta/.gradle/caches/8.9/transforms/3f3c9e5d5c931178a244dcdae4cfcf34/transformed/activity-1.9.3/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.material3:material3-android:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/7e4ab284cbb16d5fa92a377b892666a2/transformed/material3-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.material3:material3-android:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/7e4ab284cbb16d5fa92a377b892666a2/transformed/material3-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.material:material-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/8cd6782b8efe418a32fdcc7fda94d477/transformed/material-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/8cd6782b8efe418a32fdcc7fda94d477/transformed/material-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-core-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/4c6d4d558db38353db4947e19faf310f/transformed/animation-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-core-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/4c6d4d558db38353db4947e19faf310f/transformed/animation-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-ripple-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/792061eb961fd872b9c7f41144f079f9/transformed/material-ripple-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-ripple-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/792061eb961fd872b9c7f41144f079f9/transformed/material-ripple-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/21c3ff75b3ebb41870758e1c9b593ae8/transformed/animation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/21c3ff75b3ebb41870758e1c9b593ae8/transformed/animation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/c5582b91f0038c893fa3959642f3f95f/transformed/foundation-layout-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/c5582b91f0038c893fa3959642f3f95f/transformed/foundation-layout-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/a9c6014f023edcaf3afc59c77f45f12a/transformed/foundation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/a9c6014f023edcaf3afc59c77f45f12a/transformed/foundation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-tooling-data-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/568e2b55be1148148aef78b11c8452df/transformed/ui-tooling-data-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-tooling-data-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/568e2b55be1148148aef78b11c8452df/transformed/ui-tooling-data-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-unit-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/eebf42a4d4d67154c69f14538a43d86f/transformed/ui-unit-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-unit-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/eebf42a4d4d67154c69f14538a43d86f/transformed/ui-unit-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-graphics-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/c2c641d6cfe884fd12a3daca26b49b1d/transformed/ui-graphics-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-graphics-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/c2c641d6cfe884fd12a3daca26b49b1d/transformed/ui-graphics-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-geometry-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/7a5524acaf1ae0d7208e516232f12285/transformed/ui-geometry-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-geometry-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/7a5524acaf1ae0d7208e516232f12285/transformed/ui-geometry-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-util-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/da9190744fd205161545b3298ecd0fdd/transformed/ui-util-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-util-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/da9190744fd205161545b3298ecd0fdd/transformed/ui-util-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-text-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/1f290cbcc63ed6c4756ffeae4ab3122c/transformed/ui-text-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-text-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/1f290cbcc63ed6c4756ffeae4ab3122c/transformed/ui-text-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/f6303c379ece991ea908e57261715ff8/transformed/ui-tooling-preview-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/f6303c379ece991ea908e57261715ff8/transformed/ui-tooling-preview-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.ui:ui-tooling-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/40b085cd86d5e92c66250c8dab606ecb/transformed/ui-tooling-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.ui:ui-tooling-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/40b085cd86d5e92c66250c8dab606ecb/transformed/ui-tooling-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /home/shanta/.gradle/caches/8.9/transforms/c26ee7d7b98694eadfccce703f9212a3/transformed/savedstate-ktx-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /home/shanta/.gradle/caches/8.9/transforms/c26ee7d7b98694eadfccce703f9212a3/transformed/savedstate-ktx-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate:1.2.1] /home/shanta/.gradle/caches/8.9/transforms/1b075359befbac60000d5ca6e7267ed5/transformed/savedstate-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate:1.2.1] /home/shanta/.gradle/caches/8.9/transforms/1b075359befbac60000d5ca6e7267ed5/transformed/savedstate-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.autofill:autofill:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/4fbe853bdd0b25a9e562374e224f1e0e/transformed/autofill-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.autofill:autofill:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/4fbe853bdd0b25a9e562374e224f1e0e/transformed/autofill-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/ed7d8956f6cd94af3e34daef1dcff5da/transformed/drawerlayout-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/ed7d8956f6cd94af3e34daef1dcff5da/transformed/drawerlayout-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.emoji2:emoji2-views-helper:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/2d53e1b5cc1cf0fd31ee1412c1bdb4ac/transformed/emoji2-views-helper-1.3.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.emoji2:emoji2-views-helper:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/2d53e1b5cc1cf0fd31ee1412c1bdb4ac/transformed/emoji2-views-helper-1.3.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.viewpager:viewpager:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/ae450d52996ada403b4d1b0ffc042704/transformed/viewpager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.viewpager:viewpager:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/ae450d52996ada403b4d1b0ffc042704/transformed/viewpager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.loader:loader:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/caa3aeebbc62c27f2592e06fb146144c/transformed/loader-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.loader:loader:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/caa3aeebbc62c27f2592e06fb146144c/transformed/loader-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /home/shanta/.gradle/caches/8.9/transforms/ab88136130c1a6569c36f1b3354c2b2d/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /home/shanta/.gradle/caches/8.9/transforms/ab88136130c1a6569c36f1b3354c2b2d/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /home/shanta/.gradle/caches/8.9/transforms/bad5377a62800b3ae1c4851b2826dc62/transformed/vectordrawable-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /home/shanta/.gradle/caches/8.9/transforms/bad5377a62800b3ae1c4851b2826dc62/transformed/vectordrawable-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.customview:customview:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/049c5c7fb16289400a86076bd8402230/transformed/customview-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/049c5c7fb16289400a86076bd8402230/transformed/customview-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/d712cc770aaddac8e875269d8040ab29/transformed/customview-poolingcontainer-1.0.0/AndroidManifest.xml:20:5-21:38
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/d712cc770aaddac8e875269d8040ab29/transformed/customview-poolingcontainer-1.0.0/AndroidManifest.xml:20:5-21:38
+MERGED from [androidx.core:core-ktx:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/79cfde83ebf8145117dda90ecced9ccd/transformed/core-ktx-1.13.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.core:core-ktx:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/79cfde83ebf8145117dda90ecced9ccd/transformed/core-ktx-1.13.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.graphics:graphics-path:1.0.1] /home/shanta/.gradle/caches/8.9/transforms/3f2defb7008540bfff938534f26d78f2/transformed/graphics-path-1.0.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.graphics:graphics-path:1.0.1] /home/shanta/.gradle/caches/8.9/transforms/3f2defb7008540bfff938534f26d78f2/transformed/graphics-path-1.0.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/462a3837a69f7e2c8c3b6f39b710cac6/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:21:5-44
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/462a3837a69f7e2c8c3b6f39b710cac6/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:21:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-compose-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/8d01df5b373d101c4d03bc1fba1237ee/transformed/lifecycle-runtime-compose-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-compose-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/8d01df5b373d101c4d03bc1fba1237ee/transformed/lifecycle-runtime-compose-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/5961b1e0896d39f23b76359bf7a32a5b/transformed/lifecycle-runtime-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/5961b1e0896d39f23b76359bf7a32a5b/transformed/lifecycle-runtime-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-ktx-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/364b0e7b66497ef73e535427e1a67956/transformed/lifecycle-runtime-ktx-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-ktx-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/364b0e7b66497ef73e535427e1a67956/transformed/lifecycle-runtime-ktx-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/c4b01e710cf82cbdd71b3f837af09198/transformed/lifecycle-viewmodel-2.8.7/AndroidManifest.xml:4:5-43
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/c4b01e710cf82cbdd71b3f837af09198/transformed/lifecycle-viewmodel-2.8.7/AndroidManifest.xml:4:5-43
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/93f025abc9536b43eb607b54709af5c2/transformed/lifecycle-viewmodel-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/93f025abc9536b43eb607b54709af5c2/transformed/lifecycle-viewmodel-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core-ktx:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/6014bcd9d98780a08271b3102904b12f/transformed/lifecycle-livedata-core-ktx-2.8.7/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core-ktx:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/6014bcd9d98780a08271b3102904b12f/transformed/lifecycle-livedata-core-ktx-2.8.7/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/3e8a1c67360d925ae240534b4cd505a9/transformed/lifecycle-livedata-core-2.8.7/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/3e8a1c67360d925ae240534b4cd505a9/transformed/lifecycle-livedata-core-2.8.7/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/5000e13b27688c945d7a4a8447893c2e/transformed/lifecycle-viewmodel-savedstate-2.8.7/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/5000e13b27688c945d7a4a8447893c2e/transformed/lifecycle-viewmodel-savedstate-2.8.7/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/fa9a7fa03897e7e69ad841e31179a5f0/transformed/lifecycle-viewmodel-ktx-2.8.7/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/fa9a7fa03897e7e69ad841e31179a5f0/transformed/lifecycle-viewmodel-ktx-2.8.7/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/5c990f96be5fa64a5542e89f418e56dc/transformed/lifecycle-livedata-2.8.7/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/5c990f96be5fa64a5542e89f418e56dc/transformed/lifecycle-livedata-2.8.7/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-compose-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/8b1921dd80ba66c1fd8a6c98008f4330/transformed/lifecycle-viewmodel-compose-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-compose-android:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/8b1921dd80ba66c1fd8a6c98008f4330/transformed/lifecycle-viewmodel-compose-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-icons-core-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/bc2ef6c1b9e72f661196c0bd56e6f540/transformed/material-icons-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-icons-core-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/bc2ef6c1b9e72f661196c0bd56e6f540/transformed/material-icons-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/3095ca8a1e3dbf8b931fbeab83ffb1de/transformed/ui-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/3095ca8a1e3dbf8b931fbeab83ffb1de/transformed/ui-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-ktx:1.9.3] /home/shanta/.gradle/caches/8.9/transforms/26fdb8dca8c3c5bad69a9e1345ca97e4/transformed/activity-ktx-1.9.3/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-ktx:1.9.3] /home/shanta/.gradle/caches/8.9/transforms/26fdb8dca8c3c5bad69a9e1345ca97e4/transformed/activity-ktx-1.9.3/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-compose:1.9.3] /home/shanta/.gradle/caches/8.9/transforms/aebd5084869911b602d6a45428324e2d/transformed/activity-compose-1.9.3/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-compose:1.9.3] /home/shanta/.gradle/caches/8.9/transforms/aebd5084869911b602d6a45428324e2d/transformed/activity-compose-1.9.3/AndroidManifest.xml:5:5-44
+MERGED from [androidx.datastore:datastore-core-android:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/069ba8d9bc9b5a1f6e3672f2f64a0158/transformed/datastore-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.datastore:datastore-core-android:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/069ba8d9bc9b5a1f6e3672f2f64a0158/transformed/datastore-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.datastore:datastore-android:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/a9e4304db656d84b70c81ad764e250b5/transformed/datastore-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.datastore:datastore-android:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/a9e4304db656d84b70c81ad764e250b5/transformed/datastore-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.datastore:datastore-preferences-android:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/f2f23a2b17b8fd5fd496440b82db0ff5/transformed/datastore-preferences-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.datastore:datastore-preferences-android:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/f2f23a2b17b8fd5fd496440b82db0ff5/transformed/datastore-preferences-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/d999aef1af8dd693bf1e6dd0e9445078/transformed/runtime-saveable-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/d999aef1af8dd693bf1e6dd0e9445078/transformed/runtime-saveable-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/2d5b3a742dcc9931d2389f1659eb0b51/transformed/runtime-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/2d5b3a742dcc9931d2389f1659eb0b51/transformed/runtime-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/d476e5af897154189b66ef975246647f/transformed/annotation-experimental-1.4.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/d476e5af897154189b66ef975246647f/transformed/annotation-experimental-1.4.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:21:5-44
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:21:5-44
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/33fc610a34f72d3d644af1e5a854635a/transformed/startup-runtime-1.1.1/AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/33fc610a34f72d3d644af1e5a854635a/transformed/startup-runtime-1.1.1/AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.tracing:tracing:1.2.0] /home/shanta/.gradle/caches/8.9/transforms/76ed3e2f8a222e1336bfba2f15c59822/transformed/tracing-1.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.tracing:tracing:1.2.0] /home/shanta/.gradle/caches/8.9/transforms/76ed3e2f8a222e1336bfba2f15c59822/transformed/tracing-1.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.tracing:tracing-ktx:1.2.0] /home/shanta/.gradle/caches/8.9/transforms/81273519905da991805905219a35be5c/transformed/tracing-ktx-1.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.tracing:tracing-ktx:1.2.0] /home/shanta/.gradle/caches/8.9/transforms/81273519905da991805905219a35be5c/transformed/tracing-ktx-1.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/8dc357b1aba95770b603a8c93c9237b7/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/8dc357b1aba95770b603a8c93c9237b7/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.exifinterface:exifinterface:1.3.2] /home/shanta/.gradle/caches/8.9/transforms/e4346e34c82b56d6fe53482556cf120e/transformed/exifinterface-1.3.2/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.exifinterface:exifinterface:1.3.2] /home/shanta/.gradle/caches/8.9/transforms/e4346e34c82b56d6fe53482556cf120e/transformed/exifinterface-1.3.2/AndroidManifest.xml:20:5-22:41
+MERGED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:19:5-21:41
+MERGED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:19:5-21:41
+MERGED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:18:5-20:41
+MERGED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:18:5-20:41
+MERGED from [com.google.android.datatransport:transport-api:2.2.1] /home/shanta/.gradle/caches/8.9/transforms/2af8ee89bcd36f8755946c171c6fea9c/transformed/transport-api-2.2.1/AndroidManifest.xml:18:5-20:41
+MERGED from [com.google.android.datatransport:transport-api:2.2.1] /home/shanta/.gradle/caches/8.9/transforms/2af8ee89bcd36f8755946c171c6fea9c/transformed/transport-api-2.2.1/AndroidManifest.xml:18:5-20:41
+MERGED from [com.google.firebase:firebase-components:16.1.0] /home/shanta/.gradle/caches/8.9/transforms/511e9feef55e90441e8866d7b8bc3fd6/transformed/firebase-components-16.1.0/AndroidManifest.xml:19:5-21:41
+MERGED from [com.google.firebase:firebase-components:16.1.0] /home/shanta/.gradle/caches/8.9/transforms/511e9feef55e90441e8866d7b8bc3fd6/transformed/firebase-components-16.1.0/AndroidManifest.xml:19:5-21:41
+MERGED from [com.google.firebase:firebase-encoders-json:17.1.0] /home/shanta/.gradle/caches/8.9/transforms/8c3112ac26f47ac91634dc91b032ddd2/transformed/firebase-encoders-json-17.1.0/AndroidManifest.xml:19:5-21:41
+MERGED from [com.google.firebase:firebase-encoders-json:17.1.0] /home/shanta/.gradle/caches/8.9/transforms/8c3112ac26f47ac91634dc91b032ddd2/transformed/firebase-encoders-json-17.1.0/AndroidManifest.xml:19:5-21:41
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /home/shanta/.gradle/caches/8.9/transforms/64a8bceec654be2737e9ce33de0f9e50/transformed/core-runtime-2.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /home/shanta/.gradle/caches/8.9/transforms/64a8bceec654be2737e9ce33de0f9e50/transformed/core-runtime-2.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/f85b40c94941bbe055e7242dc7f4b4cd/transformed/cursoradapter-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/f85b40c94941bbe055e7242dc7f4b4cd/transformed/cursoradapter-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.interpolator:interpolator:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/04e782f021bd4efd4df56a1a011e1e5f/transformed/interpolator-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.interpolator:interpolator:1.0.0] /home/shanta/.gradle/caches/8.9/transforms/04e782f021bd4efd4df56a1a011e1e5f/transformed/interpolator-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [com.google.android.odml:image:1.0.0-beta1] /home/shanta/.gradle/caches/8.9/transforms/5c9afcf14619751a2c5987c4986bb688/transformed/image-1.0.0-beta1/AndroidManifest.xml:5:5-44
+MERGED from [com.google.android.odml:image:1.0.0-beta1] /home/shanta/.gradle/caches/8.9/transforms/5c9afcf14619751a2c5987c4986bb688/transformed/image-1.0.0-beta1/AndroidManifest.xml:5:5-44
+	android:targetSdkVersion
+		INJECTED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml
+service#androidx.camera.core.impl.MetadataHolderService
+ADDED from [androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:24:9-33:19
+MERGED from [androidx.camera:camera-core:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/6c95889e9990c11195cf4321706161d5/transformed/camera-core-1.4.1/AndroidManifest.xml:29:9-33:78
+MERGED from [androidx.camera:camera-core:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/6c95889e9990c11195cf4321706161d5/transformed/camera-core-1.4.1/AndroidManifest.xml:29:9-33:78
+	tools:node
+		ADDED from [androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:29:13-31
+	android:enabled
+		ADDED from [androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:26:13-36
+	android:exported
+		ADDED from [androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:27:13-37
+	tools:ignore
+		ADDED from [androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:28:13-75
+	android:name
+		ADDED from [androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:25:13-75
+meta-data#androidx.camera.core.impl.MetadataHolderService.DEFAULT_CONFIG_PROVIDER
+ADDED from [androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:30:13-32:89
+	android:value
+		ADDED from [androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:32:17-86
+	android:name
+		ADDED from [androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:31:17-103
+service#com.google.mlkit.common.internal.MlKitComponentDiscoveryService
+ADDED from [com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:9:9-15:19
+MERGED from [com.google.mlkit:vision-common:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d4166ae9397ef4f929de6306fec04644/transformed/vision-common-17.3.0/AndroidManifest.xml:9:9-15:19
+MERGED from [com.google.mlkit:vision-common:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d4166ae9397ef4f929de6306fec04644/transformed/vision-common-17.3.0/AndroidManifest.xml:9:9-15:19
+MERGED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:15:9-23:19
+MERGED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:15:9-23:19
+	android:exported
+		ADDED from [com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:11:13-37
+	tools:targetApi
+		ADDED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:19:13-32
+	android:directBootAware
+		ADDED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:17:13-43
+	android:name
+		ADDED from [com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:10:13-91
+meta-data#com.google.firebase.components:com.google.mlkit.vision.barcode.internal.BarcodeRegistrar
+ADDED from [com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:12:13-14:85
+	android:value
+		ADDED from [com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:14:17-82
+	android:name
+		ADDED from [com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:13:17-120
+meta-data#com.google.firebase.components:com.google.mlkit.vision.common.internal.VisionCommonRegistrar
+ADDED from [com.google.mlkit:vision-common:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d4166ae9397ef4f929de6306fec04644/transformed/vision-common-17.3.0/AndroidManifest.xml:12:13-14:85
+	android:value
+		ADDED from [com.google.mlkit:vision-common:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d4166ae9397ef4f929de6306fec04644/transformed/vision-common-17.3.0/AndroidManifest.xml:14:17-82
+	android:name
+		ADDED from [com.google.mlkit:vision-common:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d4166ae9397ef4f929de6306fec04644/transformed/vision-common-17.3.0/AndroidManifest.xml:13:17-124
+provider#com.google.mlkit.common.internal.MlKitInitProvider
+ADDED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:9:9-13:38
+	android:authorities
+		ADDED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:11:13-69
+	android:exported
+		ADDED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:12:13-37
+	android:initOrder
+		ADDED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:13:13-35
+	android:name
+		ADDED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:10:13-78
+meta-data#com.google.firebase.components:com.google.mlkit.common.internal.CommonComponentRegistrar
+ADDED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:20:13-22:85
+	android:value
+		ADDED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:22:17-82
+	android:name
+		ADDED from [com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:21:17-120
+activity#com.google.android.gms.common.api.GoogleApiActivity
+ADDED from [com.google.android.gms:play-services-base:18.5.0] /home/shanta/.gradle/caches/8.9/transforms/e03afd7d927490ba9afb446ca59d7940/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:9-173
+	android:exported
+		ADDED from [com.google.android.gms:play-services-base:18.5.0] /home/shanta/.gradle/caches/8.9/transforms/e03afd7d927490ba9afb446ca59d7940/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:146-170
+	android:theme
+		ADDED from [com.google.android.gms:play-services-base:18.5.0] /home/shanta/.gradle/caches/8.9/transforms/e03afd7d927490ba9afb446ca59d7940/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:86-145
+	android:name
+		ADDED from [com.google.android.gms:play-services-base:18.5.0] /home/shanta/.gradle/caches/8.9/transforms/e03afd7d927490ba9afb446ca59d7940/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:19-85
+meta-data#com.google.android.gms.version
+ADDED from [com.google.android.gms:play-services-basement:18.4.0] /home/shanta/.gradle/caches/8.9/transforms/b0bbf89d7f26daf9097c42618b522f47/transformed/play-services-basement-18.4.0/AndroidManifest.xml:6:9-122
+	android:value
+		ADDED from [com.google.android.gms:play-services-basement:18.4.0] /home/shanta/.gradle/caches/8.9/transforms/b0bbf89d7f26daf9097c42618b522f47/transformed/play-services-basement-18.4.0/AndroidManifest.xml:6:66-119
+	android:name
+		ADDED from [com.google.android.gms:play-services-basement:18.4.0] /home/shanta/.gradle/caches/8.9/transforms/b0bbf89d7f26daf9097c42618b522f47/transformed/play-services-basement-18.4.0/AndroidManifest.xml:6:20-65
+activity#androidx.compose.ui.tooling.PreviewActivity
+ADDED from [androidx.compose.ui:ui-tooling-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/40b085cd86d5e92c66250c8dab606ecb/transformed/ui-tooling-release/AndroidManifest.xml:23:9-25:39
+	android:exported
+		ADDED from [androidx.compose.ui:ui-tooling-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/40b085cd86d5e92c66250c8dab606ecb/transformed/ui-tooling-release/AndroidManifest.xml:25:13-36
+	android:name
+		ADDED from [androidx.compose.ui:ui-tooling-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/40b085cd86d5e92c66250c8dab606ecb/transformed/ui-tooling-release/AndroidManifest.xml:24:13-71
+provider#androidx.startup.InitializationProvider
+ADDED from [androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/462a3837a69f7e2c8c3b6f39b710cac6/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/462a3837a69f7e2c8c3b6f39b710cac6/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/33fc610a34f72d3d644af1e5a854635a/transformed/startup-runtime-1.1.1/AndroidManifest.xml:26:9-30:34
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/shanta/.gradle/caches/8.9/transforms/33fc610a34f72d3d644af1e5a854635a/transformed/startup-runtime-1.1.1/AndroidManifest.xml:26:9-30:34
+	tools:node
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:28:13-31
+	android:authorities
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:26:13-68
+	android:exported
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:27:13-37
+	android:name
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:25:13-67
+meta-data#androidx.emoji2.text.EmojiCompatInitializer
+ADDED from [androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:30:17-75
+permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:22:5-24:47
+	android:protectionLevel
+		ADDED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:24:9-44
+	android:name
+		ADDED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:23:9-81
+permission#com.comserv.inventory.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:22:5-24:47
+	android:protectionLevel
+		ADDED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:24:9-44
+	android:name
+		ADDED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:23:9-81
+uses-permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:26:5-97
+	android:name
+		ADDED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:26:22-94
+uses-permission#com.comserv.inventory.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:26:5-97
+	android:name
+		ADDED from [androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:26:22-94
+meta-data#androidx.lifecycle.ProcessLifecycleInitializer
+ADDED from [androidx.lifecycle:lifecycle-process:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/462a3837a69f7e2c8c3b6f39b710cac6/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.lifecycle:lifecycle-process:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/462a3837a69f7e2c8c3b6f39b710cac6/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.lifecycle:lifecycle-process:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/462a3837a69f7e2c8c3b6f39b710cac6/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:30:17-78
+meta-data#androidx.profileinstaller.ProfileInstallerInitializer
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:30:17-85
+receiver#androidx.profileinstaller.ProfileInstallReceiver
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:34:9-52:20
+	android:enabled
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:37:13-35
+	android:exported
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:38:13-36
+	android:permission
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:39:13-57
+	android:directBootAware
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:36:13-44
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:35:13-76
+intent-filter#action:name:androidx.profileinstaller.action.INSTALL_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:40:13-42:29
+action#androidx.profileinstaller.action.INSTALL_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:41:17-91
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:41:25-88
+intent-filter#action:name:androidx.profileinstaller.action.SKIP_FILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:43:13-45:29
+action#androidx.profileinstaller.action.SKIP_FILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:44:17-85
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:44:25-82
+intent-filter#action:name:androidx.profileinstaller.action.SAVE_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:46:13-48:29
+action#androidx.profileinstaller.action.SAVE_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:47:17-88
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:47:25-85
+intent-filter#action:name:androidx.profileinstaller.action.BENCHMARK_OPERATION
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:49:13-51:29
+action#androidx.profileinstaller.action.BENCHMARK_OPERATION
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:17-95
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:25-92
+service#com.google.android.datatransport.runtime.backends.TransportBackendDiscovery
+ADDED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:29:9-35:19
+MERGED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:36:9-38:40
+MERGED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:36:9-38:40
+	android:exported
+		ADDED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:31:13-37
+	android:name
+		ADDED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:30:13-103
+meta-data#backend:com.google.android.datatransport.cct.CctBackendFactory
+ADDED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:32:13-34:39
+	android:value
+		ADDED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:34:17-36
+	android:name
+		ADDED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:33:17-94
+service#com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService
+ADDED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:26:9-30:19
+	android:exported
+		ADDED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:28:13-37
+	android:permission
+		ADDED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:29:13-69
+	android:name
+		ADDED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:27:13-117
+receiver#com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver
+ADDED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:32:9-34:40
+	android:exported
+		ADDED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:34:13-37
+	android:name
+		ADDED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:33:13-132

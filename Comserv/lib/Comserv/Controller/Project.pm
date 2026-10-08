@@ -889,13 +889,13 @@ sub _project_search_score {
         if ($id ne '' && lc($id) eq $qw) {
             $best = 4;
         }
-        elsif ($id ne '' && CORE::index(lc($id), $qw) == 0) {
+        elsif ($id ne '' && index(lc($id), $qw) == 0) {
             $best = 3;
         }
         else {
             foreach my $t (@tokens) {
                 if ($t eq $qw) { $best = 3; last; }
-                if (CORE::index($t, $qw) == 0 && $best < 2) { $best = 2; }
+                if (index($t, $qw) == 0 && $best < 2) { $best = 2; }
             }
         }
         return 0 unless $best;

@@ -1,0 +1,255 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.comserv.inventory"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="26"
+9        android:targetSdkVersion="35" />
+10
+11    <uses-permission android:name="android.permission.CAMERA" />
+11-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:4:5-65
+11-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:4:22-62
+12    <uses-permission android:name="android.permission.INTERNET" />
+12-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:5:5-67
+12-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:5:22-64
+13    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+13-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:6:5-79
+13-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:6:22-76
+14
+15    <uses-feature
+15-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:8:5-85
+16        android:name="android.hardware.camera"
+16-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:8:19-57
+17        android:required="false" />
+17-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:8:58-82
+18    <uses-feature
+18-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:9:5-95
+19        android:name="android.hardware.camera.autofocus"
+19-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:9:19-67
+20        android:required="false" />
+20-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:9:68-92
+21
+22    <permission
+22-->[androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:22:5-24:47
+23        android:name="com.comserv.inventory.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+23-->[androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:23:9-81
+24        android:protectionLevel="signature" />
+24-->[androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:24:9-44
+25
+26    <uses-permission android:name="com.comserv.inventory.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+26-->[androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:26:5-97
+26-->[androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:26:22-94
+27
+28    <application
+28-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:11:5-27:19
+29        android:allowBackup="true"
+29-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:12:9-35
+30        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+30-->[androidx.core:core:1.13.1] /home/shanta/.gradle/caches/8.9/transforms/70d7064ec1d05a9623213a4e6a9f7e43/transformed/core-1.13.1/AndroidManifest.xml:28:18-86
+31        android:debuggable="true"
+32        android:extractNativeLibs="false"
+33        android:label="Comserv Inventory"
+33-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:13:9-42
+34        android:supportsRtl="true"
+34-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:14:9-35
+35        android:theme="@style/Theme.ComservInventory"
+35-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:15:9-54
+36        android:usesCleartextTraffic="true" >
+36-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:16:9-44
+37        <activity
+37-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:18:9-26:20
+38            android:name="com.comserv.inventory.MainActivity"
+38-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:19:13-41
+39            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+39-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:21:13-87
+40            android:exported="true" >
+40-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:20:13-36
+41            <intent-filter>
+41-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:22:13-25:29
+42                <action android:name="android.intent.action.MAIN" />
+42-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:23:17-69
+42-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:23:25-66
+43
+44                <category android:name="android.intent.category.LAUNCHER" />
+44-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:24:17-77
+44-->/home/shanta/.comserv/worktrees/InventoryAccounting/Comserv/android/app/src/main/AndroidManifest.xml:24:27-74
+45            </intent-filter>
+46        </activity>
+47
+48        <service
+48-->[androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:24:9-33:19
+49            android:name="androidx.camera.core.impl.MetadataHolderService"
+49-->[androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:25:13-75
+50            android:enabled="false"
+50-->[androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:26:13-36
+51            android:exported="false" >
+51-->[androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:27:13-37
+52            <meta-data
+52-->[androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:30:13-32:89
+53                android:name="androidx.camera.core.impl.MetadataHolderService.DEFAULT_CONFIG_PROVIDER"
+53-->[androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:31:17-103
+54                android:value="androidx.camera.camera2.Camera2Config$DefaultProvider" />
+54-->[androidx.camera:camera-camera2:1.4.1] /home/shanta/.gradle/caches/8.9/transforms/72f60af6c96aa27c136e4581ef117560/transformed/camera-camera2-1.4.1/AndroidManifest.xml:32:17-86
+55        </service>
+56        <service
+56-->[com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:9:9-15:19
+57            android:name="com.google.mlkit.common.internal.MlKitComponentDiscoveryService"
+57-->[com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:10:13-91
+58            android:directBootAware="true"
+58-->[com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:17:13-43
+59            android:exported="false" >
+59-->[com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:11:13-37
+60            <meta-data
+60-->[com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:12:13-14:85
+61                android:name="com.google.firebase.components:com.google.mlkit.vision.barcode.internal.BarcodeRegistrar"
+61-->[com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:13:17-120
+62                android:value="com.google.firebase.components.ComponentRegistrar" />
+62-->[com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1] /home/shanta/.gradle/caches/8.9/transforms/0210fd05ef6a4f9bef012b9712c87a5f/transformed/play-services-mlkit-barcode-scanning-18.3.1/AndroidManifest.xml:14:17-82
+63            <meta-data
+63-->[com.google.mlkit:vision-common:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d4166ae9397ef4f929de6306fec04644/transformed/vision-common-17.3.0/AndroidManifest.xml:12:13-14:85
+64                android:name="com.google.firebase.components:com.google.mlkit.vision.common.internal.VisionCommonRegistrar"
+64-->[com.google.mlkit:vision-common:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d4166ae9397ef4f929de6306fec04644/transformed/vision-common-17.3.0/AndroidManifest.xml:13:17-124
+65                android:value="com.google.firebase.components.ComponentRegistrar" />
+65-->[com.google.mlkit:vision-common:17.3.0] /home/shanta/.gradle/caches/8.9/transforms/d4166ae9397ef4f929de6306fec04644/transformed/vision-common-17.3.0/AndroidManifest.xml:14:17-82
+66            <meta-data
+66-->[com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:20:13-22:85
+67                android:name="com.google.firebase.components:com.google.mlkit.common.internal.CommonComponentRegistrar"
+67-->[com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:21:17-120
+68                android:value="com.google.firebase.components.ComponentRegistrar" />
+68-->[com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:22:17-82
+69        </service>
+70
+71        <provider
+71-->[com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:9:9-13:38
+72            android:name="com.google.mlkit.common.internal.MlKitInitProvider"
+72-->[com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:10:13-78
+73            android:authorities="com.comserv.inventory.mlkitinitprovider"
+73-->[com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:11:13-69
+74            android:exported="false"
+74-->[com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:12:13-37
+75            android:initOrder="99" />
+75-->[com.google.mlkit:common:18.11.0] /home/shanta/.gradle/caches/8.9/transforms/1ca539669e9257d45d3fbc61666c1c32/transformed/common-18.11.0/AndroidManifest.xml:13:13-35
+76
+77        <activity
+77-->[com.google.android.gms:play-services-base:18.5.0] /home/shanta/.gradle/caches/8.9/transforms/e03afd7d927490ba9afb446ca59d7940/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:9-173
+78            android:name="com.google.android.gms.common.api.GoogleApiActivity"
+78-->[com.google.android.gms:play-services-base:18.5.0] /home/shanta/.gradle/caches/8.9/transforms/e03afd7d927490ba9afb446ca59d7940/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:19-85
+79            android:exported="false"
+79-->[com.google.android.gms:play-services-base:18.5.0] /home/shanta/.gradle/caches/8.9/transforms/e03afd7d927490ba9afb446ca59d7940/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:146-170
+80            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+80-->[com.google.android.gms:play-services-base:18.5.0] /home/shanta/.gradle/caches/8.9/transforms/e03afd7d927490ba9afb446ca59d7940/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:86-145
+81
+82        <meta-data
+82-->[com.google.android.gms:play-services-basement:18.4.0] /home/shanta/.gradle/caches/8.9/transforms/b0bbf89d7f26daf9097c42618b522f47/transformed/play-services-basement-18.4.0/AndroidManifest.xml:6:9-122
+83            android:name="com.google.android.gms.version"
+83-->[com.google.android.gms:play-services-basement:18.4.0] /home/shanta/.gradle/caches/8.9/transforms/b0bbf89d7f26daf9097c42618b522f47/transformed/play-services-basement-18.4.0/AndroidManifest.xml:6:20-65
+84            android:value="@integer/google_play_services_version" />
+84-->[com.google.android.gms:play-services-basement:18.4.0] /home/shanta/.gradle/caches/8.9/transforms/b0bbf89d7f26daf9097c42618b522f47/transformed/play-services-basement-18.4.0/AndroidManifest.xml:6:66-119
+85
+86        <activity
+86-->[androidx.compose.ui:ui-tooling-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/40b085cd86d5e92c66250c8dab606ecb/transformed/ui-tooling-release/AndroidManifest.xml:23:9-25:39
+87            android:name="androidx.compose.ui.tooling.PreviewActivity"
+87-->[androidx.compose.ui:ui-tooling-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/40b085cd86d5e92c66250c8dab606ecb/transformed/ui-tooling-release/AndroidManifest.xml:24:13-71
+88            android:exported="true" />
+88-->[androidx.compose.ui:ui-tooling-android:1.7.6] /home/shanta/.gradle/caches/8.9/transforms/40b085cd86d5e92c66250c8dab606ecb/transformed/ui-tooling-release/AndroidManifest.xml:25:13-36
+89
+90        <provider
+90-->[androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:24:9-32:20
+91            android:name="androidx.startup.InitializationProvider"
+91-->[androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:25:13-67
+92            android:authorities="com.comserv.inventory.androidx-startup"
+92-->[androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:26:13-68
+93            android:exported="false" >
+93-->[androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:27:13-37
+94            <meta-data
+94-->[androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:29:13-31:52
+95                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+95-->[androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:30:17-75
+96                android:value="androidx.startup" />
+96-->[androidx.emoji2:emoji2:1.3.0] /home/shanta/.gradle/caches/8.9/transforms/d313e0ff3eba5e236857a2c3375c8383/transformed/emoji2-1.3.0/AndroidManifest.xml:31:17-49
+97            <meta-data
+97-->[androidx.lifecycle:lifecycle-process:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/462a3837a69f7e2c8c3b6f39b710cac6/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:29:13-31:52
+98                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+98-->[androidx.lifecycle:lifecycle-process:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/462a3837a69f7e2c8c3b6f39b710cac6/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:30:17-78
+99                android:value="androidx.startup" />
+99-->[androidx.lifecycle:lifecycle-process:2.8.7] /home/shanta/.gradle/caches/8.9/transforms/462a3837a69f7e2c8c3b6f39b710cac6/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:31:17-49
+100            <meta-data
+100-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:29:13-31:52
+101                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+101-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:30:17-85
+102                android:value="androidx.startup" />
+102-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:31:17-49
+103        </provider>
+104
+105        <receiver
+105-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:34:9-52:20
+106            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+106-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:35:13-76
+107            android:directBootAware="false"
+107-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:36:13-44
+108            android:enabled="true"
+108-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:37:13-35
+109            android:exported="true"
+109-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:38:13-36
+110            android:permission="android.permission.DUMP" >
+110-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:39:13-57
+111            <intent-filter>
+111-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:40:13-42:29
+112                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+112-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:41:17-91
+112-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:41:25-88
+113            </intent-filter>
+114            <intent-filter>
+114-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:43:13-45:29
+115                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+115-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:44:17-85
+115-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:44:25-82
+116            </intent-filter>
+117            <intent-filter>
+117-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:46:13-48:29
+118                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+118-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:47:17-88
+118-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:47:25-85
+119            </intent-filter>
+120            <intent-filter>
+120-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:49:13-51:29
+121                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+121-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:17-95
+121-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/shanta/.gradle/caches/8.9/transforms/89afe378ad4071d00dc7f24238e5d9bd/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:25-92
+122            </intent-filter>
+123        </receiver>
+124
+125        <service
+125-->[com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:29:9-35:19
+126            android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
+126-->[com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:30:13-103
+127            android:exported="false" >
+127-->[com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:31:13-37
+128            <meta-data
+128-->[com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:32:13-34:39
+129                android:name="backend:com.google.android.datatransport.cct.CctBackendFactory"
+129-->[com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:33:17-94
+130                android:value="cct" />
+130-->[com.google.android.datatransport:transport-backend-cct:2.3.3] /home/shanta/.gradle/caches/8.9/transforms/c570d61db1fea8179e6b3b55e2f5f6fc/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:34:17-36
+131        </service>
+132        <service
+132-->[com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:26:9-30:19
+133            android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService"
+133-->[com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:27:13-117
+134            android:exported="false"
+134-->[com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:28:13-37
+135            android:permission="android.permission.BIND_JOB_SERVICE" >
+135-->[com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:29:13-69
+136        </service>
+137
+138        <receiver
+138-->[com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:32:9-34:40
+139            android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver"
+139-->[com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:33:13-132
+140            android:exported="false" />
+140-->[com.google.android.datatransport:transport-runtime:2.2.6] /home/shanta/.gradle/caches/8.9/transforms/2bc5d8af52dd99b8ddeaa871aa75684b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:34:13-37
+141    </application>
+142
+143</manifest>

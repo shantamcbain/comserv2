@@ -84,16 +84,22 @@ __PACKAGE__->add_columns(
         size        => 100,
         is_nullable => 1,
     },
+    barcode_type => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 1,
+        comment     => 'upc, ean, qr, internal, other',
+    },
     image_path => {
         data_type   => 'varchar',
         size        => 500,
         is_nullable => 1,
     },
     discount_percent => {
-        data_type     => 'decimal',
-        size          => [5, 2],
-        is_nullable   => 1,
-        default_value => 0,
+        data_type => 'decimal',
+        size => [10, 0],
+        is_nullable => 1,
+        default_value => '0',
     },
     shop_options => {
         data_type   => 'text',
