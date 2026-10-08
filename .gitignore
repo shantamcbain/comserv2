@@ -202,3 +202,17 @@ Comserv/root/session/**
 .hermes/plans/**
 # 3d library user-uploaded images (giant SVG re-uploads would exceed GitHub limits; keep out of git)
 Comserv/root/static/images/3d/library/**
+
+# Runtime AI state (usage, model chains, prices, eval inbox, hermes guards, etc.)
+# These are generated at runtime by AI2 components and must never be committed.
+# They cause "Rejected unsafe or unknown path(s)" on commit attempts when
+# the UI collects them but the target's git status does not list them (or they
+# are not dirty in the bound checkout).
+Comserv/data/ai_model_chains.json
+Comserv/data/ai_openrouter_prices.json
+Comserv/data/ai_usage_readings.jsonl
+Comserv/data/ai_eval_inbox/
+Comserv/data/ai_eval_inbox/**
+Comserv/data/ai_hermes_overrun*.json
+Comserv/root/static/ai/*usage*.json*
+Comserv/root/static/ai/*monitor*.json*
