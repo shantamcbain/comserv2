@@ -3022,4 +3022,38 @@ sub _sitename_for_write {
     return 'CSC';
 }
 
+=head2 api_app_version
+
+GET /api/app/version - Public version metadata for the Android app updater.
+
+Returns: { success, versionCode, versionName, apkUrl, releaseNotes }
+
+No auth required (clients hit this before login to decide whether to update).
+=cut
+
+sub api_app_version :Path('app/version') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $path = $c->path_to('root/static/app/version.json')->stringify;
+    my $json;
+    if (-r $path) {
+        local $/;
+        open my $fh, '<', $path or do {
+            $c->res->status(500);
+            $c->res->content_type('application/json');
+            $c->res->body(encode_json({ success => 0, error => 'version file unreadable' }));
+            $c->detach();
+        };
+        $json = <$fh>;
+        close $fh;
+    } else {
+        $json = q{{"versionCode":1,"versionName":"1.0","apkUrl":"","releaseNotes":""}};
+    }
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body($json);
+    $c->detach();
+}
+
 1;

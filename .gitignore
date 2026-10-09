@@ -216,3 +216,7 @@ Comserv/data/ai_eval_inbox/**
 Comserv/data/ai_hermes_overrun*.json
 Comserv/root/static/ai/*usage*.json*
 Comserv/root/static/ai/*monitor*.json*
+
+# Android inventory app APK binaries are huge (35MB+) and rebuilt constantly —
+# serve them from /data/nfs/inventory-apks via symlink, keep out of git
+Comserv/root/static/app/*.apk
