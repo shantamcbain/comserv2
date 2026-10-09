@@ -38,7 +38,7 @@
     <thead style="background:#f0f0f0;">
       <tr>
         <th>SKU</th>
-        <th>Item</th>
+        <th>Item (Barcode)</th>
         <th>Location</th>
         <th>System Qty (g)</th>
         <th>Found Qty</th>
@@ -57,7 +57,7 @@
       [% SET diff = found_g != '' ? (found_g - row.sys_g) : '' %]
       <tr>
         <td>[% row.sku %]</td>
-        <td>[% row.name %]</td>
+        <td>[% row.name %] <br><small>[% row.barcode || '—' %] ([% row.barcode_type || '—' %])</small></td>
         <td>[% row.location_id || '—' %]</td>
         <td style="text-align:right;">[% row.sys_g %]</td>
         <td><input type="text" name="found_[% row.item_id %]_[% row.location_id %]" value="[% fq %]" size="8"
@@ -78,7 +78,26 @@
   </table>
   <p><em>[% rows.size %] row(s). Submit sets system stock to your entered values (grams); a physical_count transaction records the delta.</em></p>
 </form>
-[% END %]
+
+<!-- Quick scan helper for count -->
+<div style="margin: 0.5rem 0;">
+  <label>Quick Scan / Lookup Barcode: 
+    <input type="text" id="count-barcode-scan" placeholder="Scan or type barcode" style="width:200px;">
+  </label>
+  <button type="button" onclick="scanCountBarcode()">Find &amp; Focus</button>
+  <small> (Enter barcode to highlight matching row. On phone: use a barcode scanner app then paste.)</small>
+</div>
+
+<!-- Camera section for count (reuse pattern) -->
+<div style="margin:0.5rem 0; padding:0.5rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.9em;">
+  <strong>Camera (optional visual for count evidence)</strong><br>
+  <small><strong>ZeroTier note:</strong> In-browser camera blocked on phones/tablets (no HTTPS). Use manual entry + File Manager for photos. The buttons will show a clear message.</small>
+  <button type="button" id="count-start-cam">📷 Cam (desktop/HTTPS only)</button>
+  <button type="button" id="count-capture">Capture</button>
+  <video id="count-video" style="display:none;max-width:200px;"></video>
+  <canvas id="count-canvas" style="display:none;"></canvas>
+  <img id="count-preview" style="display:none;max-width:100px;">
+</div>
 
 <script>
 function recalc(el, sys_g, key) {
@@ -93,4 +112,52 @@ function recalc(el, sys_g, key) {
   d.textContent = df;
   d.style.color = df < 0 ? '#c00' : (df > 0 ? '#080' : '');
 }
+
+function scanCountBarcode() {
+  var val = document.getElementById('count-barcode-scan').value.trim().toLowerCase();
+  if (!val) return;
+  var rows = document.querySelectorAll('#count-form tbody tr');
+  rows.forEach(function(r) {
+    r.style.background = '';
+    var text = r.textContent.toLowerCase();
+    if (text.indexOf(val) !== -1) {
+      r.style.background = '#fff3cd';
+      r.scrollIntoView({block: 'center'});
+      var input = r.querySelector('input[name^="found_"]');
+      if (input) input.focus();
+    }
+  });
+}
+
+// Basic camera for count (evidence photo)
+// Note: getUserMedia requires HTTPS on most mobile devices (Android etc.). Will gracefully degrade.
+(function() {
+  var v = document.getElementById('count-video');
+  var c = document.getElementById('count-canvas');
+  var p = document.getElementById('count-preview');
+  if (!v) return;
+
+  function cameraSupported() {
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  }
+
+  document.getElementById('count-start-cam').onclick = async function() {
+    if (!cameraSupported()) {
+      alert('Camera blocked on ZeroTier (no HTTPS). Use phone camera app + File Manager for photos on mobile.');
+      return;
+    }
+    try {
+      var s = await navigator.mediaDevices.getUserMedia({video:true});
+      v.srcObject = s; v.style.display='block';
+    } catch(e){ alert('Camera error: '+e.message || e); }
+  };
+  document.getElementById('count-capture').onclick = function() {
+    if (!v.srcObject) return;
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    c.getContext('2d').drawImage(v,0,0);
+    p.src = c.toDataURL('image/jpeg');
+    p.style.display = 'inline';
+    alert('Photo captured for evidence. Save via File Manager to NFS and note in the item or count note.');
+  };
+})();
 </script>

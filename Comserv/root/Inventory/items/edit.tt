@@ -86,6 +86,24 @@
           <small>UPC / EAN / QR / Code128</small></td>
     </tr>
     <tr>
+      <th><label for="barcode_type">Barcode Type</label></th>
+      <td>
+        <select id="barcode_type" name="barcode_type">
+          <option value="">— unknown —</option>
+          <option value="upc" [% IF item.barcode_type == 'upc' %]selected[% END %]>UPC</option>
+          <option value="ean" [% IF item.barcode_type == 'ean' %]selected[% END %]>EAN</option>
+          <option value="qr" [% IF item.barcode_type == 'qr' %]selected[% END %]>QR</option>
+          <option value="internal" [% IF item.barcode_type == 'internal' %]selected[% END %]>Internal / custom</option>
+          <option value="other" [% IF item.barcode_type == 'other' %]selected[% END %]>Other</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="image_path">Image / Photo Path</label></th>
+      <td><input type="text" id="image_path" name="image_path" maxlength="500" value="[% item.image_path | html %]">
+          <small>Optional visual. NFS path or external URL.</small></td>
+    </tr>
+    <tr>
       <th><label for="reorder_point">Reorder Point</label></th>
       <td><input type="number" id="reorder_point" name="reorder_point" min="0" value="[% item.reorder_point %]"></td>
     </tr>

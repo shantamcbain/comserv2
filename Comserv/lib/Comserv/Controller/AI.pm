@@ -315,13 +315,155 @@ sub index :Path :Args(0) {
         }
     }
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-        'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
+    # Vision analysis endpoints
+    sub vision :Path('/ai/vision') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'vision', "AI vision query endpoint accessed");
+    
+    # Check if request is from .zero address (allow access without authentication)
+    my $client_address = $c->req->address // '';
+    my $is_zero_address = ($client_address eq '127.0.0.1' || $client_address eq '::1' 
+                         || $client_address =~ /^192\.168\.1\./ || $client_address =~ /127\.0\.0\./
+                         || $client_address =~ /^localhost$/i);
+    
+    if (!$is_zero_address) {
+        # Standard authentication for non-.zero addresses
+        my $username = $c->session->{username};
+        my $guest_session_id = $c->session->{guest_session_id};
+        
+        unless ($username) {
+            unless ($guest_session_id) {
+                use Data::UUID;
+                my $ug = Data::UUID->new;
+                $guest_session_id = $ug->create_str();
+                $c->session->{guest_session_id} = $guest_session_id;
+            }
+            $username = "Guest-" . substr($guest_session_id, 0, 8);
+        }
+    } else {
+        # .zero address access: use system identifier
+        $c->stash->{username} = 'system-zero';
+        $c->stash->{guest_session_id} = 'zero-system';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'vision', "AI vision accessed from .zero address: $client_address");
+    }
+    
+    # Get vision query parameters
+    my $prompt = $c->request->param('prompt');
+    my $image_data = $c->request->param('image_data');
+    
+    # Validate parameters
+    unless ($prompt && $image_data) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'vision', "Missing required parameters: prompt or image_data");
+        $c->response->status(400);
+        $c->response->header('Content-Type' => 'application/json');
+        $c->response->body(JSON::encode_json({
+            success => 0,
+            error   => 'Both prompt and image_data parameters are required',
+        }));
+        return;
+    }
+    
+    # Process vision query
+    my $args = {
+        prompt       => $prompt,
+        image_data   => $image_data,
+        vision_model => $c->request->param('vision_model') || 'llava',
+        temperature  => $c->request->param('temperature') || 0.7,
+        max_tokens   => $c->request->param('max_tokens') || 512,
+    };
+    
+    my $result = $self->_vision_query($c, $args);
+    
+    if ($result->{success}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'vision', "Vision analysis completed successfully for location_id=" . ($result->{location_id} // 'unknown'));
+        
+        $c->response->status(200);
+        $c->response->header('Content-Type' => 'application/json');
+        $c->response->body(JSON::encode_json($result));
+    } else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'vision', "Vision analysis failed: " . ($result->{error} // 'Unknown error'));
+        
+        $c->response->status(500);
+        $c->response->header('Content-Type' => 'application/json');
+        $c->response->body(JSON::encode_json($result));
+    }
 }
 
-=head2 template_editor
+# Legacy vision endpoint for backward compatibility
+sub legacy_vision :Path('/ai/analyze-image') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'legacy_vision', "Legacy vision analysis endpoint accessed");
+    
+    # Same implementation as vision but with different path
+    my $client_address = $c->req->address // '';
+    my $is_zero_address = ($client_address eq '127.0.0.1' || $client_address eq '::1' 
+                         || $client_address =~ /^192\.168\.1\./ || $client_address =~ /127\.0\.0\./
+                         || $client_address =~ /^localhost$/i);
+    
+    if (!$is_zero_address) {
+        # Standard authentication for non-.zero addresses
+        my $username = $c->session->{username};
+        my $guest_session_id = $c->session->{guest_session_id};
+        
+        unless ($username) {
+            unless ($guest_session_id) {
+                use Data::UUID;
+                my $ug = Data::UUID->new;
+                $guest_session_id = $ug->create_str();
+                $c->session->{guest_session_id} = $guest_session_id;
+            }
+            $username = "Guest-" . substr($guest_session_id, 0, 8);
+        }
+    } else {
+        # .zero address access: use system identifier
+        $c->stash->{username} = 'system-zero';
+        $c->stash->{guest_session_id} = 'zero-system';
+    }
+    
+    # Same implementation as vision for backward compatibility
+    my $prompt = $c->request->param('prompt');
+    my $image_data = $c->request->param('image_data');
+    
+    unless ($prompt && $image_data) {
+        $c->response->status(400);
+        $c->response->header('Content-Type' => 'application/json');
+        $c->response->body(JSON::encode_json({
+            success => 0,
+            error   => 'Both prompt and image_data parameters are required',
+        }));
+        return;
+    }
+    
+    my $args = {
+        prompt       => $prompt,
+        image_data   => $image_data,
+        vision_model => $c->request->param('vision_model') || 'llava',
+        temperature  => $c->request->param('temperature') || 0.7,
+        max_tokens   => $c->request->param('max_tokens') || 512,
+    };
+    
+    my $result = $self->_vision_query($c, $args);
+    
+    if ($result->{success}) {
+        $c->response->status(200);
+        $c->response->header('Content-Type' => 'application/json');
+        $c->response->body(JSON::encode_json($result));
+    } else {
+        $c->response->status(500);
+        $c->response->header('Content-Type' => 'application/json');
+        $c->response->body(JSON::encode_json($result));
+    }
+}
 
-Admin-only page for reviewing and applying AI-proposed TT2 template edits.
+# Admin-only page for reviewing and applying AI-proposed TT2 template edits.
 
 =cut
 
@@ -2021,7 +2163,7 @@ sub generate :Local :Args(0) {
                     # Pass 3: hard-cap system prompt to SYS_MAX_CHARS (snap to newline to avoid mid-URL cuts)
                     if (length($sys) > $SYS_MAX_CHARS) {
                         my $cut = substr($sys, 0, $SYS_MAX_CHARS);
-                        my $nl  = rindex($cut, "\n");
+                        my $nl  = index($cut, "\n");
                         $cut    = substr($cut, 0, $nl > 0 ? $nl : $SYS_MAX_CHARS);
                         $ollama_msgs[0]{content} = $cut . "\n[system prompt truncated to fit context budget]";
                         push @trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS);
@@ -3549,7 +3691,7 @@ sub chat :Local :Args(0) {
                     # Pass 3: hard-cap system prompt
                     if (length($sys) > $SYS_MAX_CHARS_CHAT) {
                         my $cut = substr($sys, 0, $SYS_MAX_CHARS_CHAT);
-                        my $nl  = rindex($cut, "\n");
+                        my $nl  = index($cut, "\n");
                         $cut    = substr($cut, 0, $nl > 0 ? $nl : $SYS_MAX_CHARS_CHAT);
                         $ollama_messages[0]{content} = $cut . "\n[system prompt truncated to fit context budget]";
                         push @chat_trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS_CHAT);
@@ -5570,7 +5712,7 @@ sub _assess_response_quality {
     );
     my $lc_resp = lc($response);
     for my $phrase (@uncertain_phrases) {
-        return 'poor' if CORE::index($lc_resp, $phrase) >= 0;
+        return 'poor' if index($lc_resp, $phrase) >= 0;
     }
 
     return 'good';
@@ -5857,7 +5999,7 @@ sub _pick_ollama_tier {
             # 2. Known family prefix
             unless ($score) {
                 for my $family (sort { length($b) <=> length($a) } keys %known_family) {
-                    if (CORE::index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
+                    if (index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
                 }
             }
             # 3. Generic hints
@@ -11026,7 +11168,7 @@ sub _project_root_path {
         || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
 }
 
-my @_EDITOR_ROOTS = qw(lib root sql script t);
+our @_EDITOR_ROOTS = qw(lib root sql script t);
 
 sub _list_dir_param {
     my ($self, $c) = @_;
@@ -11710,9 +11852,9 @@ sub search_files :Local :Args(0) {
             my $low = lc($path);
             if ($low eq $query) {
                 push @exact, $path;
-            } elsif (CORE::index($low, $query) == 0) {
+            } elsif (index($low, $query) == 0) {
                 push @prefix, $path;
-            } elsif (CORE::index($low, $query) != -1) {
+            } elsif (index($low, $query) != -1) {
                 push @substring, $path;
             }
         }
@@ -11723,9 +11865,9 @@ sub search_files :Local :Args(0) {
             my $name = (split m{/}, $low)[-1];
             if ($name eq $query || $low eq $query) {
                 push @exact, $path;
-            } elsif (CORE::index($name, $query) == 0 || CORE::index($low, $query) == 0) {
+            } elsif (index($name, $query) == 0 || index($low, $query) == 0) {
                 push @prefix, $path;
-            } elsif (CORE::index($name, $query) != -1 || CORE::index($low, $query) != -1) {
+            } elsif (index($name, $query) != -1 || index($low, $query) != -1) {
                 push @substring, $path;
             }
         }
@@ -11896,7 +12038,7 @@ sub resolve_route :Local :Args(0) {
         my @guesses;
         my $lc_route = lc($route);
         for my $known (keys %$map) {
-            if (CORE::index($known, $lc_route) != -1 || CORE::index($lc_route, $known) != -1) {
+            if (index($known, $lc_route) != -1 || index($lc_route, $known) != -1) {
                 push @guesses, $map->{$known}{template};
             }
         }
@@ -13333,5 +13475,6 @@ sub _log_ai_usage {
 }
 
 __PACKAGE__->meta->make_immutable;
+}
 
-1;
+__PACKAGE__->meta->make_immutable;

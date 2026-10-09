@@ -1753,7 +1753,7 @@ sub _resolve_storage_path {
         for my $prefix (@host_prefixes) {
             my $p = $prefix;
             $p =~ s{/*$}{};
-            next unless $path eq $p || CORE::index($path, "$p/") == 0;
+            next unless $path eq $p || index($path, "$p/") == 0;
             my $suffix = substr($path, length($p));
             $suffix =~ s{^/}{};
             for my $root (@roots) {
