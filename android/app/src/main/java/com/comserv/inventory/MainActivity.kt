@@ -57,16 +57,34 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun ComservInventoryApp() {
-    var currentScreen by remember { mutableStateOf("main") }
+    var currentScreen by remember { mutableStateOf("login") }
+    var loggedIn by remember { mutableStateOf(false) }
     var scannedBarcode by remember { mutableStateOf("") }
     var scannedBarcodeType by remember { mutableStateOf("") }
     var capturedPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    var countPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    val context = LocalContext.current
+    val prefs = remember { PreferencesManager(context) }
+
+    LaunchedEffect(Unit) {
+        prefs.sessionCookie.collect { cookie ->
+            loggedIn = cookie.isNotEmpty()
+            if (cookie.isNotEmpty() && currentScreen == "login") currentScreen = "main"
+            if (cookie.isEmpty() && currentScreen != "login") currentScreen = "login"
+        }
+    }
+
+    if (!loggedIn) {
+        LoginScreen(onLoggedIn = { currentScreen = "main" })
+        return
+    }
 
     when (currentScreen) {
         "main" -> MainScreen(
             onAddItem = { currentScreen = "add" },
             onSettings = { currentScreen = "settings" },
-            onScanBarcode = { currentScreen = "scan" }
+            onScanBarcode = { currentScreen = "scan" },
+            onCountStock = { currentScreen = "count" }
         )
         "add" -> AddItemScreen(
             initialBarcode = scannedBarcode,
@@ -103,7 +121,25 @@ fun ComservInventoryApp() {
             onBack = { currentScreen = "main" }
         )
         "settings" -> SettingsScreen(
+            onBack = { currentScreen = "main" },
+            onLoggedOut = { currentScreen = "login" }
+        )
+        "count" -> CountStockScreen(
+            photoUri = countPhotoUri,
+            scannedBarcode = scannedBarcode,
+            onTakePhoto = { currentScreen = "countcam" },
             onBack = { currentScreen = "main" }
+        )
+        "countcam" -> CameraCaptureScreen(
+            onPhotoCaptured = { uri ->
+                countPhotoUri = uri
+                currentScreen = "count"
+            },
+            onBarcodeScanned = { barcode, _ ->
+                scannedBarcode = barcode
+                currentScreen = "count"
+            },
+            onBack = { currentScreen = "count" }
         )
     }
 }
@@ -114,28 +150,27 @@ fun ComservInventoryApp() {
 fun MainScreen(
     onAddItem: () -> Unit,
     onSettings: () -> Unit,
-    onScanBarcode: () -> Unit
+    onScanBarcode: () -> Unit,
+    onCountStock: () -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text("Comserv Inventory", style = MaterialTheme.typography.headlineLarge)
-        Spacer(Modifier.height(8.dp))
-        Text("Inventory Accounting via API", style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.height(32.dp))
-
-        Button(onClick = onScanBarcode, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-            Text("📷 Scan Barcode & Add Item")
+        Text("Comserv Inventory", style = MaterialTheme.typography.titleLarge)
+        Text("Inventory", style = MaterialTheme.typography.bodyMedium)
+        Button(onClick = onCountStock, modifier = Modifier.fillMaxWidth()) {
+            Text("Count stock from photo")
         }
-        Spacer(Modifier.height(12.dp))
-        Button(onClick = onAddItem, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-            Text("➕ Add Item Manually")
+        Button(onClick = onScanBarcode, modifier = Modifier.fillMaxWidth()) {
+            Text("Scan barcode")
         }
-        Spacer(Modifier.height(12.dp))
+        Button(onClick = onAddItem, modifier = Modifier.fillMaxWidth()) {
+            Text("Add item")
+        }
         OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) {
-            Text("⚙️ Settings")
+            Text("Settings")
         }
     }
 }
@@ -167,15 +202,15 @@ fun AddItemScreen(
     var isSubmitting by remember { mutableStateOf(false) }
     var resultMsg by remember { mutableStateOf("") }
     val prefs = remember { PreferencesManager(context) }
-    var serverUrl by remember { mutableStateOf("http://workstation.local:4001") }
-    var apiToken by remember { mutableStateOf("") }
+    var mode by remember { mutableStateOf(PreferencesManager.MODE_LAN) }
+    var site by remember { mutableStateOf(PreferencesManager.DEFAULT_SITENAME) }
+    var port by remember { mutableStateOf(PreferencesManager.DEFAULT_PORT) }
+    var sessionCookie by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) {
-        prefs.serverUrl.collect { serverUrl = it }
-    }
-    LaunchedEffect(Unit) {
-        prefs.apiToken.collect { apiToken = it }
-    }
+    LaunchedEffect(Unit) { prefs.networkMode.collect { mode = it } }
+    LaunchedEffect(Unit) { prefs.sitename.collect { site = it } }
+    LaunchedEffect(Unit) { prefs.port.collect { port = it } }
+    LaunchedEffect(Unit) { prefs.sessionCookie.collect { sessionCookie = it } }
 
     fun doSubmit() {
         if (sku.isBlank() || name.isBlank()) {
@@ -198,7 +233,8 @@ fun AddItemScreen(
             isAssemblable = isAssemblable,
             imagePath = imagePath,
         )
-        val client = ApiClient(serverUrl, apiToken)
+        val serverUrl = PreferencesManager.serverUrl(mode, site, port)
+        val client = ApiClient(serverUrl, sessionCookie = sessionCookie, sitename = site)
         scope.launch {
             try {
                 // If we have a photo, upload it first
@@ -549,61 +585,38 @@ fun BarcodeScreen(
 // ── Settings Screen ──
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onLoggedOut: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember { PreferencesManager(context) }
-    var serverUrl by remember { mutableStateOf("") }
-    var apiToken by remember { mutableStateOf("") }
-    var saved by remember { mutableStateOf(false) }
+    var mode by remember { mutableStateOf(PreferencesManager.MODE_LAN) }
+    var site by remember { mutableStateOf(PreferencesManager.DEFAULT_SITENAME) }
+    var port by remember { mutableStateOf(PreferencesManager.DEFAULT_PORT) }
+    var username by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) {
-        prefs.serverUrl.collect { serverUrl = it }
-    }
-    LaunchedEffect(Unit) {
-        prefs.apiToken.collect { apiToken = it }
-    }
+    LaunchedEffect(Unit) { prefs.networkMode.collect { mode = it } }
+    LaunchedEffect(Unit) { prefs.sitename.collect { site = it } }
+    LaunchedEffect(Unit) { prefs.port.collect { port = it } }
+    LaunchedEffect(Unit) { prefs.username.collect { username = it } }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack) { Text("← Back") }
             Text("Settings", style = MaterialTheme.typography.titleLarge)
         }
-        Spacer(Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = serverUrl,
-            onValueChange = { serverUrl = it },
-            label = { Text("Server URL") },
-            placeholder = { Text("http://workstation.local:4001") },
-            modifier = Modifier.fillMaxWidth()
+        Text("Signed in as $username")
+        Text(PreferencesManager.serverUrl(mode, site, port))
+        Text(
+            if (mode == PreferencesManager.MODE_ZEROTIER) "ZeroTier only (.zero)" else "LAN only (.local)",
+            style = MaterialTheme.typography.bodySmall
         )
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
-            value = apiToken,
-            onValueChange = { apiToken = it },
-            label = { Text("API Token") },
-            placeholder = { Text("Bearer token from /api/generate-token") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                scope.launch {
-                    prefs.setServerUrl(serverUrl)
-                    prefs.setApiToken(apiToken)
-                    saved = true
-                }
-            }) { Text("💾 Save") }
-            if (saved) {
-                Text("✓ Saved", color = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.CenterVertically))
+        Text("API token is not used. Log out and sign in again to switch network or site.", style = MaterialTheme.typography.bodySmall)
+        Button(onClick = {
+            scope.launch {
+                prefs.logout()
+                onLoggedOut()
             }
-        }
-
-        Spacer(Modifier.height(24.dp))
-        Text("Connection Info", style = MaterialTheme.typography.titleSmall)
-        Text("The app connects to your Comserv server over ZeroTier (plain HTTP). Make sure the server URL is reachable from this device. Generate an API token on the server at /api/generate-token (requires web login first).", style = MaterialTheme.typography.bodySmall)
+        }) { Text("Log out") }
     }
 }
 
