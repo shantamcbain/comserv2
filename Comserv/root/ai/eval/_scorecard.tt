@@ -1,0 +1,52 @@
+[%# Model scorecard (Oct 10 2026). Data: Comserv::Model::AI2::ModelScorecard %]
+<section id="model-scorecard" class="card" style="margin:1em 0;padding:0.8em;">
+  <h2>Model scorecard <small>(last [% scorecard.cfg.days %] days, since [% scorecard.since_pt | html %]; built [% scorecard.generated_pt | html %] -
+    <a href="?scorecard_refresh=1#model-scorecard">refresh</a>)</small></h2>
+  [% IF scorecard.error %]<p class="alert alert-warning">Scorecard unavailable: [% scorecard.error | html %]</p>[% ELSE %]
+  <p style="font-size:0.9em">
+    <b>Measured</b> (Hermes agent.log + state.db): sessions, calls, data requests (tool calls), wall time (user message &rarr; turn end), tokens, OpenRouter $, Super Grok quota % ([% scorecard.cfg.quota_pct_per_mtok %]%/M tokens, &times;[% scorecard.cfg.long_ctx_weight %] over 200K).
+    <b>Heuristic</b> (treat as hints): task type (title/cwd regex), outcome (committed = git commit in the session's repo during the session; abandoned = no finished turn or user spoke last; user-corrected = 2+ correction phrases), clarifications (assistant question phrases), thrash (3+ identical tool calls in a row), tests (PASS/FAIL text in tool output), reverts (later "Revert" commit naming the session's commit).
+    Multi-model sessions: the outcome goes to the model of the last turn; earlier models show <i>switched_away</i>.
+  </p>
+  [% IF scorecard.speed.size %]
+  <h3>Time to done per turn (all tasks)</h3>
+  <table class="table table-sm" style="width:auto">
+    <tr><th>Model</th><th>Turns</th><th>Median s</th><th>p90 s</th><th>API calls / turn</th></tr>
+    [% FOREACH s IN scorecard.speed %]
+    <tr[% IF s.model.match('glm-5.3-flash|grok-4.7|grok-build') %] style="font-weight:bold"[% END %]><td>[% s.model | html %]</td><td>[% s.turns %]</td><td>[% s.median_s %]</td><td>[% s.p90_s %]</td><td>[% s.calls_per_turn %]</td></tr>
+    [% END %]
+  </table>
+  [% END %]
+  <h3>Per model &times; task</h3>
+  <div style="overflow-x:auto">
+  <table class="table table-sm table-striped" style="font-size:0.85em">
+    <tr><th>Task</th><th>Model</th><th>Rating</th><th>Sess</th><th>Calls</th><th>Data req</th><th>Thrash</th><th>Wall h</th><th>Tok M (cached%)</th><th>$</th><th>SG quota %</th>
+        <th>Median turn s</th><th>Max-iter turns</th><th>Outcomes</th><th>Corrections</th><th>Clarify</th><th>Tests P/F</th><th>Commits / reverts</th><th>Quality</th><th>$-equiv / result</th><th>min / result</th></tr>
+    [% FOREACH r IN scorecard.rows %]
+    <tr>
+      <td>[% r.task %]</td><td>[% r.model | html %]</td>
+      <td><b>[% r.rating.defined ? r.rating : '-' %]</b>[% IF r.rating_note %] <small>([% r.rating_note %])</small>[% END %]</td>
+      <td>[% r.sessions %]</td><td>[% r.calls %]</td><td>[% r.data_requests %]</td><td>[% r.thrash %]</td><td>[% r.wall_h %]</td>
+      <td>[% r.tokens_m %] ([% r.cached_pct %]%)</td><td>[% r.usd %]</td><td>[% r.quota_pct %]</td>
+      <td>[% r.median_turn_s.defined ? r.median_turn_s : '-' %]</td><td>[% r.max_iter_turns %]</td>
+      <td>[% FOREACH k IN r.outcomes.keys.sort %][% k %]=[% r.outcomes.$k %] [% END %]</td>
+      <td>[% r.corrections %]</td><td>[% r.clarifications %]</td><td>[% r.tests_pass %]/[% r.tests_fail %]</td><td>[% r.commits %] / [% r.reverts %]</td>
+      <td>[% r.quality %]</td><td>[% r.cost_per_result %]</td><td>[% r.time_per_result_min %]</td>
+    </tr>
+    [% END %]
+  </table>
+  </div>
+  <form method="post" action="[% c.uri_for('/ai/eval/scorecard_weights') %]" style="margin-top:0.5em">
+    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+    <b>Rating weights</b> (rating = weighted mean of time score, cost score, quality; time/cost scores are relative to the best model in the same task = 100):
+    time <input name="w_time" size="3" value="[% scorecard.cfg.weights.time %]">
+    cost <input name="w_cost" size="3" value="[% scorecard.cfg.weights.cost %]">
+    quality <input name="w_quality" size="3" value="[% scorecard.cfg.weights.quality %]">
+    &nbsp; 1% Super Grok quota = $<input name="quota_pct_usd" size="4" value="[% scorecard.cfg.quota_pct_usd %]">
+    &nbsp; days <input name="days" size="3" value="[% scorecard.cfg.days %]">
+    <button type="submit" class="btn btn-sm btn-primary">Save</button>
+    <small>Stored in data/ai_model_scorecard.json.</small>
+  </form>
+  [% IF scorecard.notes.size %]<p><small>Notes: [% scorecard.notes.join('; ') | html %]</small></p>[% END %]
+  [% END %]
+</section>

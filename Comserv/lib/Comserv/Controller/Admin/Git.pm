@@ -589,6 +589,7 @@ PROMPT
             $requested_model,
             $messages,
             can_select => 1,
+            log_usage  => 'git_commit_message',
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,

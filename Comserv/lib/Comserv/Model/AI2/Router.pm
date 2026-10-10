@@ -1404,12 +1404,55 @@ sub dispatch_chat {
     my ($self, $c, $requested_model, $messages, %opts) = @_;
 
     my $can_select = delete $opts{can_select} // 1;
+    # log_usage => 'purpose': write the success row to the one ledger
+    # (Model::AI::Usage::log -> /ai/usage, tagged branch/sitename/username) for
+    # callers that do not log themselves (git commit message, GitFix, TodoRank,
+    # CoA generate). Failures are already ledgered by chat_with_fallback.
+    my $log_purpose = delete $opts{log_usage};
     my ($provider_name, $use_model) = $self->select_model($c,
         requested_model => $requested_model, can_select => $can_select);
 
     # Remaining opts (purpose, failover => 0, request_type, ...) go to the
     # failover walk (AISYSTEM plan §5e).
-    return $self->chat_with_fallback($c, $provider_name, $use_model, $messages, %opts);
+    my $t0   = Time::HiRes::time();
+    my $resp = $self->chat_with_fallback($c, $provider_name, $use_model, $messages, %opts);
+    $self->log_dispatch_usage($c, $resp, $log_purpose, int((Time::HiRes::time() - $t0) * 1000))
+        if $log_purpose;
+    return $resp;
+}
+
+# One success row per dispatch for callers without their own usage logging.
+# OpenRouter answers are skipped: Provider::OpenRouter already writes an audit
+# row for every call (would double count). Returns 1 when a row was written.
+sub log_dispatch_usage {
+    my ($self, $c, $resp, $purpose, $duration_ms) = @_;
+    return 0 unless ref $c && ref $resp eq 'HASH' && $resp->{success};
+    my $provider = $resp->{provider} // 'unknown';
+    return 0 if lc $provider eq 'openrouter';
+    my $u  = ref $resp->{usage} eq 'HASH' ? $resp->{usage} : {};
+    my $pt = $u->{prompt_tokens}     // $u->{prompt_eval_count} // $u->{input_tokens}  // 0;
+    my $ct = $u->{completion_tokens} // $u->{eval_count}        // $u->{output_tokens} // 0;
+    my %row = (
+        provider          => $provider,
+        model             => $resp->{model} // 'unknown',
+        prompt_tokens     => $pt,
+        completion_tokens => $ct,
+        duration_ms       => $duration_ms,
+        request_type      => substr($purpose, 0, 50),
+        status            => 'success',
+        response_text     => $resp->{response},
+        (ref $resp->{fallover} eq 'HASH' ? (fallover => $resp->{fallover}) : ()),
+        metadata          => { purpose => $purpose, surface => $purpose, via => 'AI2::Router::dispatch_chat' },
+    );
+    my $ok = eval {
+        my $ai = eval { $c->model('AI') };
+        if ($ai && $ai->can('log_usage')) { $ai->log_usage($c, %row) }
+        else { require Comserv::Model::AI::Usage; Comserv::Model::AI::Usage->new->log($c, %row) }
+        1;
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'log_dispatch_usage',
+        "usage log failed for $purpose: $@") unless $ok;
+    return $ok ? 1 : 0;
 }
 
 # #2380 — live failover list for diagnostics / auto-sync (no hardcoded slugs).

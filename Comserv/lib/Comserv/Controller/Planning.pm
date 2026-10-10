@@ -765,6 +765,7 @@ sub daily :Path('/planning/daily') :Args {
                         model       => $dec_cache->{model},
                         computed_at => $dec_cache->{computed_at},
                         gate        => $dec_cache->{gate},
+                        weights     => $dec_cache->{weights},
                         used        => $used,
                         scored      => $scored,
                     };

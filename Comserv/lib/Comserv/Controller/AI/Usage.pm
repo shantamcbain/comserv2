@@ -81,6 +81,30 @@ sub live :Path('/ai/usage_live') :Args(0) {
     $c->response->body(encode_json({ success => JSON::true, org => $org }));
 }
 
+=head2 pacing_json
+
+GET /ai/usage_pacing_json - just the Super Grok pacing block (daily budget,
+alerts, meter). Same access as /ai/usage_live. Read by
+~/.hermes/scripts/supergrok_daily_guard.py every 5 min (the daily switch owner).
+
+=cut
+
+sub pacing_json :Path('/ai/usage_pacing_json') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    unless ($self->_is_operator($c) || $c->session->{user_id}) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'login required' }));
+        return;
+    }
+    my $sp = eval { Comserv::Model::AI2::UsageMonitor->new->supergrok_pacing($c) };
+    if (!$sp) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'pacing_json', "$@");
+        $c->response->body(encode_json({ success => JSON::false, error => 'pacing failed' }));
+        return;
+    }
+    $c->response->body(encode_json({ success => JSON::true, supergrok_pacing => $sp }));
+}
+
 sub _can_see_fallover {
     my ($self, $c) = @_;
     my $roles = $c->session->{roles} || [];
@@ -215,7 +239,7 @@ sub page :Path('/ai/usage_org') :Args(0) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'page',
             "Eval summary failed: $@") if $@;
     }
-    my $ai_health = $is_admin ? eval { Comserv::Model::AI2::UsageMonitor->new->ai_health($c, days => $days) } : undef;
+    my $ai_health = $is_admin ? eval { Comserv::Model::AI2::UsageMonitor->new->ai_health($c, days => $days, pacing_jobs => ($c->req->param("pacing_jobs") ? 1 : 0)) } : undef;
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'page', "ai_health failed: $@") if $is_admin && $@;
     my @providers = qw(ollama grok supergrok openrouter openai hermes xai-oauth opencode-free);
     my @sites;
@@ -283,6 +307,35 @@ sub reading :Path('/ai/usage_reading') :Args(0) {
         $err ? "reading rejected: $err" : "reading $rd->{consumer}=$rd->{value} $rd->{kind} at $rd->{at_pt} by " . ($c->session->{username} // '?'));
     require URI::Escape;
     $c->response->redirect($back . ($err ? '?reading_error=' . URI::Escape::uri_escape($err) : '?reading=saved') . '#usage-estimator');
+}
+
+=head2 pacing_toggle
+
+POST /ai/usage_pacing_toggle - admin-only Super Grok auto-queue switch
+(data/supergrok_pacing.json, default OFF). CSRF: session ai_eval_csrf.
+
+=cut
+
+sub pacing_toggle :Path('/ai/usage_pacing_toggle') :Args(0) {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    $roles = [ split /,/, $roles ] unless ref $roles eq 'ARRAY';
+    unless ($c->session->{username} && grep { /^admin$/i } @$roles) {
+        $c->response->status(403); $c->response->body('Admin only'); return;
+    }
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405); $c->response->body('POST only'); return;
+    }
+    my $want = $c->session->{ai_eval_csrf} // '';
+    my $got  = $c->req->body_params->{csrf_token} // '';
+    unless (length $want && length $got && $got eq $want) {
+        $c->response->status(403); $c->response->body('Bad or missing CSRF token - reload /ai/usage and try again'); return;
+    }
+    my $on  = ($c->req->body_params->{auto_queue} // '') eq '1' ? 1 : 0;
+    my $err = Comserv::Model::AI2::UsageMonitor->new->set_auto_queue($c, $on, $c->session->{username});
+    $self->logging->log_with_details($c, $err ? 'warn' : 'info', __FILE__, __LINE__, 'pacing_toggle',
+        $err ? "auto-queue toggle failed: $err" : 'Super Grok auto-queue ' . ($on ? 'ON' : 'OFF') . ' by ' . $c->session->{username});
+    $c->response->redirect('/ai/usage?pacing=' . ($err ? 'error' : 'saved') . '#supergrok-pacing');
 }
 
 __PACKAGE__->meta->make_immutable;

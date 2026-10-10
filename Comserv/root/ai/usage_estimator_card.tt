@@ -27,6 +27,23 @@
         [% FOREACH n IN e.notes %]<div>[% n | html %]</div>[% END %]
       </td></tr>
       [% END %]
+      [% IF e.bot_burn && e.bot_burn.lines.size %][% bb = e.bot_burn %]
+      <tr id="est-grok-bot-burn"><td></td><td colspan="7" style="font-size:0.85em;">
+        <strong>Grok Bot burn since the latest reading</strong>
+        <span class="doc-muted">([% bb.hours_since | html %] h ago · method: [% bb.method | html %][% IF bb.pct_per_event.defined && bb.method == 'per_event' %] · [% bb.pct_per_event | format('%.2f') %] %/event[% END %][% IF bb.pct_per_hour.defined %] · [% bb.pct_per_hour | format('%.2f') %] %/h between readings[% END %])</span>
+        <table class="table table-sm" style="width:auto;margin:4px 0;">
+          <thead><tr><th>Line</th><th>Events</th><th>Failed</th><th>%</th><th>Basis</th></tr></thead>
+          <tbody>
+          [% FOREACH l IN bb.lines %]
+            <tr id="bot-burn-[% l.kind | html %]"[% IF l.kind == 'csc_helpdesk' %] style="border-top:2px solid var(--border-color,#ccc);"[% END %]><td>[% l.label | html %]</td><td>[% l.events | html %]</td><td>[% l.failed | html %]</td><td>[% l.pct | format('%.2f') %]</td><td>counted</td></tr>
+          [% END %]
+            <tr><td>Uncounted activity (time-based)</td><td>—</td><td>—</td><td>[% bb.estimated_pct | format('%.2f') %]</td><td>estimated</td></tr>
+            <tr><td><strong>Estimate now</strong></td><td colspan="2">latest [% bb.latest_used | html %] %</td><td><strong>[% bb.estimate | format('%.1f') %]</strong></td><td>[% bb.counted_pct | format('%.2f') %] counted + [% bb.estimated_pct | format('%.2f') %] est.</td></tr>
+          </tbody>
+        </table>
+        [% IF bb.pairs.size %]<div class="doc-muted">Calibration intervals: [% FOREACH p IN bb.pairs %][% p.from_pt | html %] → [% p.to_pt | html %]: +[% p.delta | html %] % over [% p.hours | html %] h, [% p.events | html %] events[% UNLESS loop.last %]; [% END %][% END %]</div>[% END %]
+      </td></tr>
+      [% END %]
     [% END %]
     </tbody>
   </table>

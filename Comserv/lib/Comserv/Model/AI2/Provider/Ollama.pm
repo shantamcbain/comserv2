@@ -8,6 +8,7 @@ use Try::Tiny;
 use JSON qw(encode_json decode_json);
 
 use Comserv::Util::Logging;
+use Comserv::Util::OllamaModelResolver;
 use Comserv::Model::Ollama;   # Moose model composing Connection/Chat/Models roles
 
 has 'logging' => (
@@ -144,6 +145,15 @@ sub chat {
     my $host     = $args{host}     || $rhost;
     my $port     = $args{port}     || $rport;
 
+    # Apply OllamaModelResolver at the provider layer (every caller benefits).
+    # Uses the host/port chosen by resolve_host.
+    my ($use_model, $note) = Comserv::Util::OllamaModelResolver::resolve_for_host($host, $port, $model);
+    if (defined $use_model && $use_model ne $model) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'ollama_model_resolve',
+            "Requested model '$model' not available on $host:$port; using '$use_model' ($note)");
+        $model = $use_model;
+    }
+
     # Fail fast when resolve_host already proved the endpoint dead. Without
     # this guard, get_running_models/chat use 120–480s timeouts and the UI
     # sticks on "Thinking… (Ollama/fast)" (CSC-20260831-1585 / docker).
@@ -206,6 +216,7 @@ sub chat {
         response => $r->{response},
         model    => $r->{model} || $model,
         usage    => {},
+        model_fallback_note => $note || ($r->{model_fallback_note} // ''),
     };
 }
 

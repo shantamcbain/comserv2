@@ -267,4 +267,101 @@ sub price_tokens {
     return $t;
 }
 
+# ---------------------------------------------------------------------------
+# Grok Bot burn (Oct 6 2026). The app only sees a few Grok Bot events, so the
+# estimate counts every event that IS logged - Grok Bot turns, routine runs
+# (failed ones too), teammate wakes, CSC developer-agent HelpDesk activations -
+# and fits a per-event % from consecutive manual readings in the same cycle:
+#   pct_per_event = sum(delta %) / sum(weighted events between the readings)
+# When no interval has events the fit falls back to % per hour from the same
+# reading deltas (marked estimated). Readings stay as spoken; no refunds.
+our @BOT_EVENT_KINDS = qw(turn routine_run wake csc_helpdesk);
+our %BOT_EVENT_LABEL = (turn => 'Grok Bot turns', routine_run => 'Routine runs (incl. failed)',
+                        wake => 'Teammate wakes', csc_helpdesk => 'CSC developer agent (HelpDesk ticket queue)');
+our %BOT_EVENT_WEIGHT = (turn => 1, routine_run => 1, wake => 1, csc_helpdesk => 1);
+our $BOT_DEFAULT_PCT_PER_EVENT = 0.5;
+
+sub _bot_weighted {
+    my ($events, $from, $to, $w) = @_;
+    my $n = 0;
+    for my $e (@{ $events || [] }) {
+        next unless $e->{at} > $from && $e->{at} <= $to;
+        $n += $w->{ $e->{kind} } // 1;
+    }
+    return $n;
+}
+
+# pure. in: readings (grok_bot, sorted), events [{at, kind, status}], now, weights.
+# out: { method => per_event|per_hour|default|none, pct_per_event, pct_per_hour, pairs => [...],
+#        since => {kind => n}, counted_pct, estimated_pct, estimate, lines => [...], notes => [...] }
+sub bot_burn {
+    my (%in) = @_;
+    my $now = $in{now} // time;
+    my $w   = { %BOT_EVENT_WEIGHT, %{ $in{weights} || {} } };
+    my @ev  = sort { $a->{at} <=> $b->{at} } grep { ref $_ eq 'HASH' && $_->{at} && $_->{kind} } @{ $in{events} || [] };
+    my @rd  = grep { $_->{kind} ne 'unconfirmed' } @{ $in{readings} || [] };
+    my @pairs; my ($sd, $sn, $sh) = (0, 0, 0);
+    for my $i (1 .. $#rd) {
+        my ($p, $q) = @rd[$i - 1, $i];
+        my ($pu, $qu) = (used_of($p), used_of($q));
+        next unless defined $pu && defined $qu && $q->{at} > $p->{at};
+        next if $qu < $pu;                         # new cycle (meter reset) - not a burn interval
+        my $n = _bot_weighted(\@ev, $p->{at}, $q->{at}, $w);
+        my $h = ($q->{at} - $p->{at}) / 3600;
+        push @pairs, { from_pt => $p->{at_pt}, to_pt => $q->{at_pt}, delta => $qu - $pu, events => $n, hours => sprintf('%.1f', $h) };
+        $sd += $qu - $pu; $sn += $n; $sh += $h;
+    }
+    my $out = { pairs => \@pairs, weights => $w, notes => [], lines => [] };
+    my $latest = $rd[-1];
+    my $lu = used_of($latest);
+    my %since = map { ($_ => 0) } @BOT_EVENT_KINDS;
+    my %failed;
+    for my $e (@ev) {
+        next unless $latest && $e->{at} > $latest->{at} && $e->{at} <= $now;
+        $since{ $e->{kind} }++;
+        $failed{ $e->{kind} }++ if ($e->{status} // 'success') !~ /^(success|ok)$/;
+    }
+    $out->{since} = \%since; $out->{failed_since} = \%failed;
+    if ($sn > 0) {
+        $out->{method} = 'per_event';
+        $out->{pct_per_event} = $sd / $sn;
+    } elsif ($sh > 0 && $sd > 0) {
+        $out->{method} = 'per_hour';
+        $out->{pct_per_hour} = $sd / $sh;
+        push @{ $out->{notes} }, 'No logged Grok Bot events between readings - per-event rate cannot be fitted yet; using % per hour from reading deltas (estimated).';
+    } else {
+        $out->{method} = @rd ? 'default' : 'none';
+        $out->{pct_per_event} = $BOT_DEFAULT_PCT_PER_EVENT;
+        push @{ $out->{notes} }, "Fewer than two same-cycle readings - default $BOT_DEFAULT_PCT_PER_EVENT %/event until more readings.";
+    }
+    $out->{pct_per_hour} //= $sh > 0 ? $sd / $sh : undef;
+    return $out unless $latest && defined $lu;
+    my $hours_since = ($now - $latest->{at}) / 3600;
+    my $ppe = $out->{pct_per_event};
+    my $counted = 0;
+    for my $k (@BOT_EVENT_KINDS) {
+        my $n = $since{$k};
+        my $pct = defined $ppe ? $n * ($w->{$k} // 1) * $ppe : 0;
+        $counted += $pct;
+        push @{ $out->{lines} }, { kind => $k, label => $BOT_EVENT_LABEL{$k}, events => $n, failed => $failed{$k} // 0,
+                                   pct => $pct, pct_fmt => _fmt($pct, '%'), basis => 'counted' };
+    }
+    # Time-based share for activity that leaves no event in the app (estimated).
+    my $est = 0;
+    if ($out->{method} eq 'per_hour') { $est = $hours_since * $out->{pct_per_hour}; $counted = 0 }
+    elsif (defined $out->{pct_per_hour}) {
+        # Floor: never below the time-based burn between readings (events can go unlogged);
+        # the shortfall is shown as an estimated, uncounted remainder.
+        my $tb = $hours_since * $out->{pct_per_hour};
+        $est = $tb - $counted if $tb > $counted;
+    }
+    $out->{counted_pct}   = $counted;
+    $out->{estimated_pct} = $est;
+    $out->{hours_since}   = sprintf('%.1f', $hours_since);
+    $out->{latest_used}   = $lu;
+    $out->{estimate}      = $lu + $counted + $est;
+    $out->{estimate_fmt}  = _fmt($out->{estimate}, '%');
+    return $out;
+}
+
 1;

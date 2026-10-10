@@ -27,6 +27,7 @@ use DateTime;
 use LWP::UserAgent;
 use Comserv::Util::Logging;
 use Comserv::Util::ModelCatalog;
+use Comserv::Util::OllamaModelResolver;
 use Comserv::Model::Ollama;
 use Comserv::Model::Grok;
 use Comserv::Util::SystemInfo;
@@ -724,6 +725,9 @@ sub grok_cli :Local :Args(0) {
             . ' stderr_len=' . length($stderr || '') . ' api_key=' . ($self->_grok_cli_api_key($c) ? 'yes' : 'no'));
 
     $stdout =~ s/\A\s+|\s+\z//g if defined $stdout;
+    $self->_log_ai_usage($c, provider => 'grok_cli', model => 'grok-cli', request_type => 'grok_cli',
+        status => (($stdout // '') =~ /\S/ ? 'success' : 'error'), response_text => ($stdout // ''),
+        metadata => { surface => 'ai_editor_grok_cli', backend => 'grok_cli', exit => $exit });
     if (!$stdout || $stdout !~ /\S/) {
         my $err = $self->_grok_cli_stderr_message($stderr)
                || "grok exited with code " . (defined $exit ? $exit : 'unknown')
@@ -833,14 +837,20 @@ sub _grok_cli_via_api {
         { role => 'user',   content => $prompt },
     ]);
 
+    my $u = (ref $resp eq 'HASH' && ref $resp->{usage} eq 'HASH') ? $resp->{usage} : {};
+    my %usage_row = (provider => 'grok', model => ((ref $resp eq 'HASH' && $resp->{model}) || $model),
+        prompt_tokens => $u->{prompt_tokens} // 0, completion_tokens => $u->{completion_tokens} // 0,
+        request_type => 'grok_cli', metadata => { surface => 'ai_editor_grok_cli', backend => 'grok_api' });
     unless ($resp && ref $resp eq 'HASH' && $resp->{success}) {
         my $err = $grok->last_error || 'Grok API request failed';
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
             'grok_cli', "xAI API fallback error: $err");
+        $self->_log_ai_usage($c, %usage_row, status => 'error', error_message => substr($err, 0, 500));
         return { error => $err };
     }
 
     my $text = $resp->{response} || '';
+    $self->_log_ai_usage($c, %usage_row, status => 'success', response_text => $text);
     unless ($text =~ /\S/) {
         return { error => 'Grok API returned an empty response' };
     }
@@ -1202,6 +1212,17 @@ sub generate :Local :Args(0) {
             'generate', "Pipe-delimited model detected: provider=$pipe_provider, model=$pipe_model");
     }
 
+    # Normalize swapped provider/model (the root cause of Bug #83) and bare provider
+    # tokens. Uses pure helper so the same logic is available to chat() and tests.
+    # Must come AFTER pipe normalization.
+    my ($norm_provider, $norm_model) = Comserv::Util::OllamaModelResolver::normalize_provider_model($provider, $model);
+    if ($norm_provider ne ($provider // '') || $norm_model ne ($model // '')) {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+            'generate', "Normalized provider/model: '$provider'/'$model' -> '$norm_provider'/'$norm_model'");
+        $provider = $norm_provider;
+        $model    = $norm_model;
+    }
+
     # Fall back to session-stored conversation_id if not provided in request
     unless ($conversation_id) {
         $conversation_id = $c->session->{current_conversation_id};
@@ -1210,7 +1231,7 @@ sub generate :Local :Args(0) {
                 'generate', "Using session-stored conversation_id: $conversation_id");
         }
     }
-    
+
     # DEBUG: Log conversation_id status
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
         'generate', "BEFORE_VALIDATION: conversation_id is " . (defined($conversation_id) ? "'$conversation_id'" : "undef"));
@@ -1752,13 +1773,29 @@ sub generate :Local :Args(0) {
             }
             my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
             $active_ollama_host = $current_host;
-            
+
             # ── 3-Tier model selection: start small, escalate if needed ─────────
             # Tier 1 = tier_small (fastest / lightest installed model)
             # Tier 2 = tier_large (escalated only if Tier-1 quality is poor)
             my ($tier_small, $tier_large) = $self->_pick_ollama_tier(
                 $installed_models, $current_model, $agent_id, $page_context);
             my $manual_model = ($model && $can_select_model_gen) ? $model : '';
+
+            # Resolve manual model (e.g. from UI picker that sent uninstalled or swapped token)
+            # against the installed list returned by _get_current... . If not present,
+            # fall back instead of letting Ollama 404 "model not found".
+            if ($manual_model) {
+                # $installed_models may be array of hashrefs {name=>} or strings
+                my @inst_names = map { ref($_) ? ($_->{name} // '') : $_ } @$installed_models;
+                my ($resolved, $note) = Comserv::Util::OllamaModelResolver::resolve($manual_model, \@inst_names);
+                if (defined $resolved && $resolved ne $manual_model) {
+                    push @trace, "🔄 Model fallback: $note";
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'generate', "manual_model '$manual_model' resolved via OllamaModelResolver: $note");
+                    $manual_model = $resolved;
+                }
+            }
+
             # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
             my $force_large = (!$is_guest && !$manual_model &&
                 $normalized_agent_type =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
@@ -2635,6 +2672,10 @@ sub result :Local :Args(0) {
         
         $ai_response = $response->{response} || '';
         my $response_time = int((time() - $start_time) * 1000); # milliseconds
+        $self->_log_ai_usage($c, provider => 'ollama', model => ($response->{model} || $ollama->model),
+            prompt_tokens => $response->{prompt_eval_count} // 0, completion_tokens => $response->{eval_count} // 0,
+            duration_ms => $response_time, request_type => 'query_form', response_text => $ai_response,
+            metadata => { surface => 'ai_query_form' });
         
         $response_metadata = {
             model => $response->{model} || $ollama->model,
@@ -2926,6 +2967,17 @@ sub chat :Local :Args(0) {
     if ($model && $model =~ /^(openrouter|external|supergrok|grok|openai|ollama)$/i) {
         $provider = lc($model) if !$provider || $provider eq 'ollama';
         $model = '';
+    }
+
+    # Call the shared pure normalizer after the chat endpoint's existing (partial)
+    # pipe/slash/bare handling. Keeps prior behaviour while making consistent with
+    # generate() and covering the swapped case.
+    my ($norm_provider, $norm_model) = Comserv::Util::OllamaModelResolver::normalize_provider_model($provider, $model);
+    if ($norm_provider ne ($provider // '') || $norm_model ne ($model // '')) {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+            'chat', "Normalized provider/model: '$provider'/'$model' -> '$norm_provider'/'$norm_model'");
+        $provider = $norm_provider;
+        $model    = $norm_model;
     }
 
     # Record structured page_links if the client sent them (from extractPageLinks JS helper).
@@ -12902,7 +12954,7 @@ sub usage :Local :Args(0) {
     if ($is_admin) {
         $ai_health = eval {
             require Comserv::Model::AI2::UsageMonitor;
-            Comserv::Model::AI2::UsageMonitor->new->ai_health($c, days => $days);
+            Comserv::Model::AI2::UsageMonitor->new->ai_health($c, days => $days, pacing_jobs => ($c->req->param("pacing_jobs") ? 1 : 0));
         };
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
             "ai_health failed: $@") if $@;
@@ -13234,102 +13286,18 @@ Safe: never throws; logs errors to system log only.
 
 sub _log_ai_usage {
     my ($self, $c, %args) = @_;
-
-    eval {
-        my $schema = $c->model('DBEncy')->schema;
-        return unless $schema;
-
-        my $user_id     = $args{user_id}     // $c->session->{user_id};
-        my $site_id     = $args{site_id}     // $c->session->{SiteID};
-        my $guest_id    = $args{guest_session_id} // $c->session->{guest_session_id};
-        my $provider    = $args{provider}    // 'ollama';
-        my $model       = $args{model}       // 'unknown';
-        my $pt          = $args{prompt_tokens}     // 0;
-        my $ct          = $args{completion_tokens} // 0;
-        my $tot         = $args{total_tokens}      // ($pt + $ct);
-        my $dur_ms      = $args{duration_ms};
-        my $req_type    = $args{request_type} // 'chat';
-        my $conv_id     = $args{conversation_id};
-        my $status      = $args{status} // 'success';
-        my $err_msg     = $args{error_message};
-        my $ollama_host = $args{ollama_host};
-        my $ip          = $c->request ? $c->request->address : undef;
-        my $meta        = $args{metadata} || {};
-
-        # Ensure numeric
-        $pt  += 0; $ct += 0; $tot += 0;
-
-        my $cost = $args{estimated_cost_usd};
-        unless (defined $cost) {
-            $cost = $self->_estimate_ai_cost_usd($provider, $model, $pt, $ct);
-        }
-
-        # === Wire in plan quota for "free calls" harmony ===
-        my $plan_id = undef;
-        my $plan_quota = 0;
-        my $within_free = 1;
-        my $bill_status = 'free';
-
-        eval {
-            my $memb_model = $c->model('Membership');
-            if ($memb_model && $site_id) {
-                $plan_quota = $memb_model->get_ai_daily_quota_for_site($c, $site_id, $user_id) || 0;
-
-                # Get active membership to snapshot plan_id (prefer membership id or plan? we store plan_id but using membership id is common in this codebase)
-                my $active_mem = $memb_model->get_active_plan($c, $user_id, $site_id);
-                $plan_id = $active_mem ? $active_mem->id : undef;
-
-                my ($is_within, $used_today) = $memb_model->is_ai_call_within_free_quota($c, $site_id, $provider, $user_id);
-                $within_free = $is_within ? 1 : 0;
-
-                my $is_paid_provider = $provider && lc($provider) ne 'ollama';
-                if ($is_paid_provider) {
-                    $bill_status = 'paid_provider';  # always cost-tracked
-                } elsif ($plan_quota > 0 && !$within_free) {
-                    $bill_status = 'overage';
-                } else {
-                    $bill_status = 'free';
-                }
-
-                # Update meta for visibility
-                $meta->{plan_quota} = $plan_quota;
-                $meta->{used_today_before_this} = $used_today;
-                $meta->{within_free_quota} = $within_free;
-            }
-        };
-
-        $schema->resultset('AiUsageLog')->create({
-            user_id                 => $user_id,
-            site_id                 => $site_id,
-            guest_session_id        => $guest_id,
-            provider                => $provider,
-            model                   => $model,
-            prompt_tokens           => $pt,
-            completion_tokens       => $ct,
-            total_tokens            => $tot,
-            estimated_cost_usd      => $cost,
-            duration_ms             => $dur_ms,
-            request_type            => $req_type,
-            conversation_id         => $conv_id,
-            status                  => $status,
-            error_message           => $err_msg,
-            ip_address              => $ip,
-            ollama_host             => $ollama_host,
-            plan_id                 => $plan_id,
-            plan_ai_requests_per_day=> $plan_quota,
-            within_free_quota       => $within_free,
-            billing_status          => $bill_status,
-            metadata                => (ref($meta) ? encode_json($meta) : $meta),
-        });
-
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_log_ai_usage',
-            sprintf("Logged AI usage: provider=%s model=%s tokens=%s/%s cost=%.6f site=%s user=%s status=%s",
-                $provider, $model, $pt, $ct, $cost, $site_id//'-', $user_id//'-', $status));
+    # One ledger: delegate to Model::AI::Usage::log (branch/sitename/username
+    # tags, :free cost zeroing, grounding/fallover metadata). This used to be
+    # a stale copy that wrote rows without those tags (Oct 8 2026 audit).
+    my $ok = eval {
+        my $ai = eval { $c->model('AI') };
+        if ($ai && $ai->can('log_usage')) { $ai->log_usage($c, %args) }
+        else { require Comserv::Model::AI::Usage; Comserv::Model::AI::Usage->new->log($c, %args) }
+        1;
     };
-    if ($@) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_log_ai_usage',
-            "Failed to write ai_usage_logs: $@");
-    }
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_log_ai_usage',
+        "Failed to write ai_usage_logs: $@") unless $ok;
+    return;
 }
 
 __PACKAGE__->meta->make_immutable;

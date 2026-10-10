@@ -80,5 +80,36 @@ is scalar @$all, 3, 'read back 3'; is $all->[0]{value}, 43, 'sorted by time';
     is scalar @{$e->{conflicts}}, 0, 'no conflict across new cycle';
 }
 
+# ---- Oct 6: Grok Bot burn from events, calibrated on reading deltas ----
+{
+    my $pt = $E->can('parse_time');
+    my $now = $pt->('2026-10-06 07:30');
+    my @rd = map { ($mk->(consumer => 'grok_bot', value => $_->[0], at => $_->[1], source => 'spoken', now => $now))[0] }
+        [43, '2026-10-01 09:23'], [1, '2026-10-05 08:03'], [9, '2026-10-05 10:04'], [12, '2026-10-06 07:01'];
+    my $bb = $E->can('bot_burn');
+    # no events logged at all -> per-hour from deltas (1->9 in 2h, 9->12 in 21h)
+    my $r = $bb->(readings => \@rd, events => [], now => $now);
+    is $r->{method}, 'per_hour', 'no events -> per-hour fallback';
+    is scalar @{ $r->{pairs} }, 2, '43->1 reset skipped; two burn intervals';
+    ok abs($r->{pct_per_hour} - 11 / ((($pt->('2026-10-06 07:01') - $pt->('2026-10-05 08:03')) / 3600))) < 1e-9, 'pct/h = 11% / 23h';
+    ok $r->{estimate} > 12 && $r->{estimated_pct} > 0 && $r->{counted_pct} == 0, 'estimate above latest, all estimated';
+
+    # events: 4 between 1% and 9%, 2 between 9% and 12% (one failed routine) -> 11%/6 events
+    my $ev = [ (map { { at => $pt->('2026-10-05 08:30') + $_ * 60, kind => 'turn' } } 1 .. 4),
+               { at => $pt->('2026-10-05 16:00'), kind => 'routine_run', status => 'error' },
+               { at => $pt->('2026-10-06 06:00'), kind => 'wake' },
+               { at => $pt->('2026-10-06 07:10'), kind => 'csc_helpdesk' },
+               { at => $pt->('2026-10-06 07:20'), kind => 'turn' } ];
+    $r = $bb->(readings => \@rd, events => $ev, now => $now);
+    is $r->{method}, 'per_event', 'events -> per-event fit';
+    ok abs($r->{pct_per_event} - 11 / 6) < 1e-9, 'per-event % = 11/6 (failed routine counted)';
+    is $r->{since}{csc_helpdesk}, 1, 'CSC HelpDesk activation counted separately';
+    my ($csc) = grep { $_->{kind} eq 'csc_helpdesk' } @{ $r->{lines} };
+    ok abs($csc->{pct} - 11 / 6) < 1e-9, 'CSC line % = 1 event x fit';
+    ok abs($r->{counted_pct} - 2 * 11 / 6) < 1e-9, 'counted since 12% reading = 2 events';
+    ok $r->{estimate} >= 12 + $r->{counted_pct} - 1e-9, 'estimate >= latest + counted';
+    $r = $bb->(readings => [ $rd[-1] ], events => [], now => $now);
+    is $r->{method}, 'default', 'single reading -> default rate';
+}
 
 done_testing;

@@ -1,0 +1,83 @@
+[%# Super Grok use-it-up pacing (admin). Data: ai_health.supergrok_pacing
+  # (UsageMonitor::supergrok_pacing / Util::AI::SuperGrokPacing). Weekly cycle
+  # Thu 10:31 PT -> Thu 10:31 PT. Toggle posts to /ai/usage_pacing_toggle. No JS. %]
+[% sp = ai_health.supergrok_pacing %]
+<div class="card" id="supergrok-pacing" style="margin:12px 0;padding:12px;border:1px solid var(--border-color,#ccc);border-radius:6px;">
+  <h3>Super Grok — use it up this week</h3>
+  [% IF c.req.params.pacing == 'saved' %]<div class="alert alert-success" role="status">Auto-queue setting saved.</div>[% END %]
+  [% db = sp.daily_budget; g = sp.guard %]
+  [% IF g.off_today || db.switch_off %]
+  <div class="alert alert-danger" role="alert" id="supergrok-daily-switch" style="border:2px solid #b91c1c;">
+    <strong>Super Grok daily budget used[% IF !g.off_today %] (switch pending: the guard runs every 5 min)[% END %]:</strong>
+    [% (g.lock_reason || db.reason) | html %].
+    New Hermes sessions use <code>[% (g.switch_alias || 'openrouter/z-ai/glm-5.3-flash') | html %]</code> (default + code/coder) until midnight PT, then grok-4.7 comes back automatically.
+    <br><strong>Open sessions keep their model:</strong> run <code>/model glm</code> (= [% (g.switch_alias || 'openrouter/z-ai/glm-5.3-flash') | html %]) in each open TUI.
+    <br><span class="doc-muted">Need more today? In <code>data/supergrok_pacing.json</code> set <code>"daily": {"extra_today_pct": 3, "extra_today_date": "[% db.date | html %]"}</code>
+      or <code>"allow_overrun_date": "[% db.date | html %]"</code>; the guard picks it up within 5 min.</span>
+  </div>
+  [% END %]
+  [% IF sp.alerts.size %]
+  <div class="alert alert-danger" role="alert" id="supergrok-burn-alert" style="border:2px solid #b91c1c;">
+    <strong>Super Grok burn warning:</strong>
+    <ul style="margin:4px 0 0 18px;">[% FOREACH al IN sp.alerts %]<li>[% al.message | html %]</li>[% END %]</ul>
+    <span class="doc-muted">Today since [% sp.day_from_pt | html %]: [% sp.used_day_start_pct | html %]% → [% sp.used_pct | html %]% (+[% sp.day_rise_pct | html %] points).
+      Limits: [% sp.alert_config.day_rise_pts | html %] points/day; [% sp.alert_config.noon_ahead_pts | html %] points ahead of pace after [% sp.alert_config.noon_hour | html %]:00 PT
+      (data/supergrok_pacing.json "alerts"). No model switch is made.</span>
+  </div>
+  [% END %]
+  [% IF sp.meter.stale %]
+  <div class="alert alert-warning" role="alert" id="supergrok-meter-prompt">
+    <strong>Meter reading needed:</strong> [% sp.meter.prompt | html %]
+    <a href="[% sp.meter.form_url | html %]">Enter a manual reading</a>
+  </div>
+  [% END %]
+  [% IF sp.used_pct.defined %]
+  <table class="table table-sm" style="width:100%;font-size:0.9em;">
+    <tbody>
+      <tr><th style="width:30%">Cycle</th><td>[% sp.cycle_start_pt | html %] → reset [% sp.reset_pt | html %] ([% sp.days_left | html %] days left)</td></tr>
+      <tr><th>Used now (estimate)</th><td><strong>[% sp.used_pct | html %]%</strong> used, [% sp.left_pct | html %]% left
+        <br><span class="doc-muted">Base: [% sp.base_reading.value | html %]% at [% sp.base_reading.at_pt | html %] ([% sp.base_reading.source | html %])
+        + [% sp.mtok_since_reading | html %] M Hermes Super Grok tokens since × [% sp.rate_pct_per_mtok | html %] %/M tokens</span></td></tr>
+      <tr><th>Pace</th><td>
+        [% IF sp.pace == 'behind' %]<span style="color:#b45309;font-weight:bold;">Behind</span>
+        [% ELSIF sp.pace == 'ahead' %]<span style="color:#15803d;font-weight:bold;">Ahead</span>
+        [% ELSE %]<span style="font-weight:bold;">On pace</span>[% END %]
+        ([% sp.pace_delta | html %] points vs [% sp.expected_pct | html %]% expected by now on a straight line)</td></tr>
+      [% IF db %]<tr><th>Daily budget</th><td><strong>[% db.used_today_pct | html %]% of [% db.effective_budget_pct | html %]%</strong> used today
+        ([% db.remaining_today_pct | html %]% left[% IF db.extra_pct > 0 %], incl. +[% db.extra_pct | html %]% extra[% END %][% IF db.allow_overrun %], overrun allowed today[% END %])
+        <br><span class="doc-muted">([% db.week_off_at | html %]% week cutoff − [% db.used_day_start_pct | html %]% at midnight) ÷ [% db.days_left_at_day_start | html %] days left.
+        Hermes: [% IF g.off_today %]<strong>off Super Grok today</strong>[% ELSE %]on [% g.mode | html %][% END %][% IF g.checked %] (guard checked [% g.checked | html %])[% END %]</span></td></tr>[% END %]
+      <tr><th>Today</th><td>+[% sp.day_rise_pct | html %] points since [% sp.day_from_pt | html %] (alert above [% sp.alert_config.day_rise_pts | html %])</td></tr>
+      <tr><th>Daily target</th><td><strong>[% sp.daily_target_pct | html %]%/day</strong>
+        ≈ [% sp.daily_target_mtok | html %] M tokens ≈ [% sp.daily_target_calls | html %] Hermes grok-4.7 calls/day (left ÷ days left)</td></tr>
+      <tr><th>Calibration</th><td>[% sp.rate_pct_per_mtok | html %] % per M tokens
+        [% IF sp.calibration.fitted %]fitted from [% sp.calibration.pairs.size %] reading interval(s): [% sp.calibration.delta_sum | html %] points over [% sp.calibration.mtok_sum | format('%.0f') %] M tokens[% ELSE %](default — not enough readings)[% END %]</td></tr>
+    </tbody>
+  </table>
+  [% END %]
+  [% FOREACH w IN sp.warnings %][% NEXT IF w == sp.meter.prompt %]<div class="alert alert-warning" role="alert">[% w | html %]</div>[% END %]
+  [% IF sp.jobs.size %]
+  <h4 style="margin-top:8px;">Backlog for Hermes on grok-4.7[% UNLESS sp.endgame %] (preview)[% END %]</h4>
+  <table class="table table-sm" style="width:100%;font-size:0.85em;">
+    <thead><tr><th>#</th><th>Job</th><th>Why</th><th>Hermes command (copy, run yourself)</th></tr></thead>
+    <tbody>
+    [% FOREACH j IN sp.jobs %]
+      <tr><td>[% j.rank %]</td><td><a href="[% j.url | html %]">[% j.title | html %]</a></td><td>[% j.why | html %]</td>
+          <td><code style="font-size:0.85em;word-break:break-all;">[% j.hermes | html %]</code></td></tr>
+    [% END %]
+    </tbody>
+  </table>
+  [% ELSIF !sp.endgame %]
+  <p class="doc-muted">The ranked backlog list appears in the last 36 h before reset when more than 20% is left
+    (<a href="/ai/usage?pacing_jobs=1#supergrok-pacing">preview it now</a>).</p>
+  [% END %]
+  <form method="post" action="/ai/usage_pacing_toggle" style="margin-top:8px;">
+    <input type="hidden" name="csrf_token" value="[% ai_health.estimator.csrf | html %]">
+    <input type="hidden" name="auto_queue" value="[% sp.auto_queue ? 0 : 1 %]">
+    Auto-queue (endgame only, one Hermes job at a time via <code>script/supergrok_autoqueue.pl</code>):
+    <strong>[% sp.auto_queue ? 'ON' : 'OFF' %]</strong>
+    <button type="submit" class="btn btn-sm btn-secondary">Turn [% sp.auto_queue ? 'OFF' : 'ON' %]</button>
+    <span class="doc-muted">Default OFF. Nothing is launched from this page.</span>
+  </form>
+  [% IF sp.errors.size %]<p class="doc-muted">Notes: [% sp.errors.join('; ') | html %]</p>[% END %]
+</div>

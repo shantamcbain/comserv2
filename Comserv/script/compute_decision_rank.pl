@@ -23,18 +23,19 @@ use Comserv::Util::AI::DecisionRank;
 binmode(STDOUT, ':utf8');
 binmode(STDERR, ':utf8');
 
-my ($branch, $model, $gate, $window, $api, $dry, $print, $help);
+my ($branch, $model, $gate, $window, $api, $dry, $print, $help, $wcontent);
 GetOptions(
-    'branch=s'  => \$branch,
-    'model=s'   => \$model,
-    'gate=f'    => \$gate,
-    'window=i'  => \$window,
-    'api=s'     => \$api,
-    'dry-run'   => \$dry,
-    'print'     => \$print,
-    'help'      => \$help,
+    'branch=s'        => \$branch,
+    'model=s'         => \$model,
+    'gate=f'          => \$gate,
+    'window=i'        => \$window,
+    'api=s'           => \$api,
+    'dry-run'         => \$dry,
+    'print'           => \$print,
+    'weight-content=f'=> \$wcontent,
+    'help'            => \$help,
 ) or die "bad options\n";
-die "usage: $0 --branch <name> [--model nimble:latest] [--gate 0.30] [--window 20] [--dry-run] [--print]\n"
+die "usage: $0 --branch <name> [--model nimble:latest] [--gate 0.30] [--window 20] [--weight-content 0.7] [--dry-run] [--print]\n"
     if $help || !$branch;
 
 $api    ||= 'http://127.0.0.1:4006';
@@ -127,7 +128,8 @@ printf "candidates=%d (open, post-exclusion)  branch=%s  window=%d\n\n",
 print "asking $model (one batched call)...\n";
 my $t0 = time;
 my $entry = Comserv::Util::AI::DecisionRank->score_branch($branch, \@by_code,
-    model => $model, gate => $gate, window => $window);
+    model => $model, gate => $gate, window => $window,
+    (defined $wcontent ? (weight_content => $wcontent) : ()));
 my $elapsed = time - $t0;
 
 if ($entry->{error}) {
@@ -150,20 +152,28 @@ if ($print) {
         print "apply_order returned nothing - cannot show applied order\n";
     }
     else {
-        printf "%-5s %-5s %-6s %-7s %-6s %-5s %s\n",
-            'was', 'now', 'move', 'coded', 'dec', 'conf', 'todo';
-        print '-' x 104, "\n";
+        printf "%-5s %-5s %-6s %-6s %-7s %-6s %-22s %s\n",
+            'was', 'now', 'move', 'field', 'content', 'blend', 'why', 'subject';
+        print '-' x 110, "\n";
+        my @sc = grep { ref($entry->{rows}{$_}) eq 'HASH' && defined $entry->{rows}{$_}{content} } map { $_->{record_id} } @by_code;
+        my $n = scalar @sc;
+        my %pos; $pos{ $sc[$_] } = $_ for 0 .. $#sc;
         my @head = @$applied[0 .. ($#$applied > 24 ? 24 : $#$applied)];
         for my $i (0 .. $#head) {
             my $r  = $head[$i];
             my $id = $r->{record_id};
             my $w  = $was{$id} // '?';
             my $mv = ($w =~ /^\d+$/) ? ($w - ($i + 1)) : 0;
-            printf "%-5s %-5s %-6s %-7.3f %-6s %-5s %s%s\n",
+            my $fs = exists $pos{$id} ? sprintf('%.3f', Comserv::Util::AI::DecisionRank->field_score($r, $pos{$id}, $n)) : '-';
+            my $cont = defined $r->{decision_content} ? sprintf('%.3f', $r->{decision_content}) : '-';
+            my $bl   = defined $r->{decision_score}   ? sprintf('%.3f', $r->{decision_score})   : '-';
+            my $why  = $r->{decision_reason} ? substr($r->{decision_reason}, 0, 20) : '-';
+            printf "%-5s %-5s %-6s %-6s %-7s %-6s %-22s %s%s\n",
                 $w, $i + 1, ($mv > 0 ? "+$mv" : $mv),
-                ($r->{ap_score} // 0),
-                (defined $r->{decision_score} ? sprintf('%.3f', $r->{decision_score}) : '-'),
-                (defined $r->{decision_conf} ? sprintf('%.2f', $r->{decision_conf}) : '-'),
+                $fs,
+                $cont,
+                $bl,
+                $why,
                 substr(($r->{subject} // ''), 0, 44),
                 ($r->{decision_used} ? '  <- MODEL' : '');
         }
@@ -196,8 +206,8 @@ if ($dry) {
     if ($final) {
         my @coded = map { $_->{record_id} } @by_code[0 .. ($#by_code > 19 ? 19 : $#by_code)];
         my @model = map { $_->{record_id} } sort {
-            ($entry->{rows}{ $b->{record_id} }{score} // -1)
-                <=> ($entry->{rows}{ $a->{record_id} }{score} // -1)
+            ($entry->{rows}{ $b->{record_id} }{content} // -1)
+                <=> ($entry->{rows}{ $a->{record_id} }{content} // -1)
         } @by_code[0 .. ($#by_code > 19 ? 19 : $#by_code)];
         my @fin = map { $_->{record_id} } @$final[0 .. ($#$final > 19 ? 19 : $#$final)];
         my $passed = grep { $_->{decision_used} } @$final;
@@ -213,6 +223,8 @@ if ($dry) {
             coded_order => \@coded,
             model_order => \@model,
             final_order => \@fin,
+            weights     => $entry->{weights},
+            reasons     => { map { ($_ => $entry->{rows}{$_}{reason}) } grep { ref $entry->{rows}{$_} eq 'HASH' && $entry->{rows}{$_}{reason} } @fin },
         });
         print "apply record appended to ", Comserv::Util::AI::DecisionRank->call_log_file, "\n";
     }

@@ -4,6 +4,7 @@ use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];
 use Try::Tiny;
 use JSON qw(decode_json encode_json);
+use JSON::PP ();
 use DateTime;
 
 use Comserv::Util::Logging;
@@ -1793,6 +1794,8 @@ sub ai_health {
     $out->{meters} = Comserv::Util::AI::HealthChecks::meters(app_root => $root, openrouter => $or);
     Comserv::Util::AI::HealthChecks::log_stale_meters($out->{meters}, sub { $self->_log($c, $_[0], 'ai_health', $_[1]) });
     $out->{supergrok_estimate} = Comserv::Util::AI::HealthChecks::supergrok_estimate(app_root => $root);
+    $out->{supergrok_pacing} = eval { $self->supergrok_pacing($c, with_jobs => $a{pacing_jobs}) }
+        || { errors => [ "supergrok_pacing: " . ($@ || 'unknown') ] };
     try {
         my $g = $c->model('AI2::Router')->supergrok_guard($c);
         delete $g->{path};
@@ -1865,6 +1868,185 @@ Pure maths in Comserv::Util::AI::UsageEstimator.
 
 =cut
 
+# ---------------------------------------------------------------------------
+# Super Grok use-it-up pacing (Oct 8 2026) - Util::AI::SuperGrokPacing.
+# Units = Hermes xai-oauth tokens per call from agent.log (zone-aware parse,
+# HermesOverrunGuard::parse_api_calls) + app Ledger provider=supergrok tokens.
+# Calibrated against Super Grok readings (manual form + grok.com add-on history).
+# ---------------------------------------------------------------------------
+our %SG_CALLS_CACHE;   # { key => "file:mtime|...", at => epoch, calls => [...] }
+
+sub _hermes_xai_calls {
+    my ($self, %a) = @_;
+    my $dir = $a{log_dir} || ($ENV{HERMES_HOME} || (($ENV{HOME} || '/home/shanta') . '/.hermes')) . '/logs';
+    my @files = grep { -r $_ } map { "$dir/agent.log$_" } ('.3', '.2', '.1', '');
+    my $key = join '|', map { $_ . ':' . ((stat $_)[9] // 0) } @files;
+    return $SG_CALLS_CACHE{calls}
+        if $SG_CALLS_CACHE{key} && $SG_CALLS_CACHE{key} eq $key && time - ($SG_CALLS_CACHE{at} // 0) < 60;
+    require Comserv::Util::AI::HermesOverrunGuard;
+    my @c;
+    for my $f (@files) {
+        open my $fh, '<', $f or next;
+        local $/; my $t = <$fh>; close $fh;
+        push @c, grep { $_->{provider} eq 'xai-oauth' }
+            @{ Comserv::Util::AI::HermesOverrunGuard::parse_api_calls($t, undef, all => 1, anchor => (stat $f)[9]) };
+    }
+    my %seen;
+    @c = sort { $a->{t} <=> $b->{t} } grep { !$seen{"$_->{t}|$_->{session}|$_->{in}|$_->{out}"}++ } @c;
+    %SG_CALLS_CACHE = (key => $key, at => time, calls => \@c);
+    return \@c;
+}
+
+sub _supergrok_readings {
+    my ($self, $root) = @_;
+    require Comserv::Util::AI::UsageEstimator;
+    require Comserv::Util::AI::HealthChecks;
+    my @rd = grep { $_->{consumer} eq 'supergrok' } @{ Comserv::Util::AI::UsageEstimator::read_readings($root) };
+    # grok.com add-on history (Build %) - the readings the add-on posts.
+    if (open my $fh, '<', "$root/root/static/ai/grokcom_usage_history.jsonl") {
+        while (my $l = <$fh>) {
+            my $d = eval { JSON::PP->new->decode($l) } or next;
+            next unless defined $d->{build} && $d->{build} =~ /^\d+(?:\.\d+)?$/;
+            my $at = Comserv::Util::AI::HealthChecks::iso_epoch($d->{at}) or next;
+            push @rd, { at => $at, value => 0 + $d->{build}, kind => 'used',
+                        source => (($d->{reason} // '') =~ /^derived/ ? 'derived' : 'addon') };
+        }
+        close $fh;
+    }
+    return \@rd;
+}
+
+# Cheap meter freshness for /ai/eval (no agent.log parse).
+sub supergrok_meter {
+    my ($self, $c, %a) = @_;
+    require Comserv::Util::AI::SuperGrokPacing;
+    my $root = eval { $c->path_to('') . '' } // '.';
+    $root =~ s{/$}{};
+    return Comserv::Util::AI::SuperGrokPacing::meter_status(readings => $self->_supergrok_readings($root), now => $a{now} // time);
+}
+
+sub supergrok_pacing {
+    my ($self, $c, %a) = @_;
+    require Comserv::Util::AI::SuperGrokPacing;
+    require Comserv::Util::AI::UsageEstimator;
+    require Comserv::Util::AI::HealthChecks;
+    my $P   = 'Comserv::Util::AI::SuperGrokPacing';
+    my $now = $a{now} // time;
+    my $root = eval { $c->path_to('') . '' } // '.';
+    $root =~ s{/$}{};
+    my @err;
+    my @rd = @{ $self->_supergrok_readings($root) };
+    my $anchor = $P->can('default_anchor')->();
+    my $calls = $a{calls} || eval { $self->_hermes_xai_calls(%a) } || [];
+    push @err, "agent.log: $@" if $@;
+    my $utc = sub { my @t = gmtime $_[0]; sprintf('%04d-%02d-%02d %02d:%02d:%02d', $t[5] + 1900, $t[4] + 1, @t[3, 2, 1, 0]) };
+    my $ledger_tok = sub {
+        my ($from, $to) = @_;
+        return 0 if $a{no_ledger};
+        my $r = eval {
+            $self->_base_rs($c, $utc->($from), { 'me.provider' => 'supergrok',
+                'me.created_at' => { '>=' => $utc->($from), '<' => $utc->($to) } })
+                ->search({}, { select => [ { sum => 'me.total_tokens' } ], as => ['t'] })->first;
+        };
+        return $r ? 0 + ($r->get_column('t') // 0) : 0;
+    };
+    my $units = sub {
+        my ($from, $to) = @_;
+        my $t = 0;
+        my $w = $P->can('call_weight');
+        for (@$calls) { next if $_->{t} < $from; last if $_->{t} >= $to; $t += ($_->{in} + $_->{out}) * $w->($_) }
+        return ($t + $ledger_tok->($from, $to)) / 1e6;
+    };
+    my $fit = $P->can('fit_rate')->(readings => \@rd, units => $units, now => $now, anchor => $anchor);
+    my $p = $P->can('pacing')->(readings => \@rd, units => $units, rate => $fit->{rate}, now => $now, anchor => $anchor,
+        alert_cfg => (eval { $self->pacing_config($c)->{alerts} } || {}),
+        daily_cfg => (eval { $self->pacing_config($c)->{daily} } || {}));
+    $p->{calibration} = $fit;
+    $p->{meter} = $P->can('meter_status')->(readings => \@rd, now => $now);
+    # Daily switch state written by ~/.hermes/scripts/supergrok_daily_guard.py (owner).
+    if (open my $gfh, '<', "$root/root/static/ai/supergrok_guard.json") {
+        local $/; my $g = eval { JSON::PP->new->decode(<$gfh>) } || {}; close $gfh;
+        $p->{guard} = { map { ($_ => $g->{$_}) } qw(mode off_today lock_reason lock_date switch_alias switch_model checked decision_source daily_cap used_today) };
+    }
+    push @{ $p->{warnings} }, $p->{meter}{prompt} if $p->{meter}{stale};
+    my $cfg = $self->pacing_config($c);
+    $p->{auto_queue} = $cfg->{auto_queue} ? 1 : 0;
+    if ($p->{endgame} || $a{with_jobs}) {
+        $p->{jobs} = eval { $self->_pacing_jobs($c) } || [];
+        push @err, "jobs: $@" if $@;
+        $_->{hermes} = $P->can('hermes_command')->($_, worktree => $cfg->{worktree}) for @{ $p->{jobs} };
+    }
+    $p->{errors} = \@err;
+    $p->{source} = 'Hermes agent.log xai-oauth tokens + Ledger supergrok tokens, calibrated on Super Grok readings';
+    return $p;
+}
+
+sub pacing_config_file { my ($self, $c) = @_; my $r = eval { $c->path_to('') . '' } // '.'; $r =~ s{/$}{}; "$r/data/supergrok_pacing.json" }
+
+sub pacing_config {
+    my ($self, $c) = @_;
+    my $f = $self->pacing_config_file($c);
+    my $d = {};
+    if (open my $fh, '<', $f) { local $/; $d = eval { JSON::PP->new->decode(<$fh>) } || {}; close $fh }
+    return { auto_queue => ($d->{auto_queue} ? 1 : 0), worktree => $d->{worktree}, alerts => (ref $d->{alerts} eq 'HASH' ? $d->{alerts} : {}),
+             daily => { map { ($_ => $d->{$_}) } grep { defined $d->{$_} } qw(week_off_at extra_today_pct extra_today_date allow_overrun_date) },
+             updated_by => $d->{updated_by}, updated_at => $d->{updated_at} };
+}
+
+sub set_auto_queue {
+    my ($self, $c, $on, $by) = @_;
+    my $f = $self->pacing_config_file($c);
+    my $d = {};
+    if (open my $fh, '<', $f) { local $/; $d = eval { JSON::PP->new->decode(<$fh>) } || {}; close $fh }
+    $d->{auto_queue} = $on ? JSON::PP::true() : JSON::PP::false();
+    $d->{updated_by} = $by;
+    $d->{updated_at} = time;
+    open my $out, '>', "$f.tmp" or return "cannot write $f: $!";
+    print $out JSON::PP->new->canonical->pretty->encode($d);
+    close $out;
+    rename "$f.tmp", $f or return "rename failed: $!";
+    $self->_log($c, 'info', 'set_auto_queue', 'Super Grok auto-queue ' . ($on ? 'ON' : 'OFF') . ' by ' . ($by // '?'));
+    return undef;
+}
+
+# Backlog for the endgame list (DBIx::Class only).
+sub _pacing_jobs {
+    my ($self, $c) = @_;
+    my $schema = $self->_schema($c);
+    my (@tickets, @props, @todos);
+    eval {
+        @tickets = map { { id => $_->id, number => $_->ticket_number, subject => $_->subject, priority => $_->priority, status => $_->status } }
+            $schema->resultset('SupportTicket')->search({ status => { -in => [qw(open in_progress pending new)] } },
+                { order_by => { -desc => 'created_at' }, rows => 30 })->all;
+    };
+    eval {
+        @props = map { { id => $_->id, title => $_->title, status => $_->status, change_type => $_->change_type, report_id => $_->report_id } }
+            $schema->resultset('AiEvalProposal')->search({ status => { -in => [qw(proposed approved)] } },
+                { order_by => { -desc => 'id' }, rows => 30 })->all;
+    };
+    my $root = eval { $c->path_to('') . '' } // '.'; $root =~ s{/$}{};
+    my %rank;
+    if (open my $fh, '<', "$root/data/ai_rank_order.json") {
+        local $/; my $d = eval { JSON::PP->new->decode(<$fh>) } || {}; close $fh;
+        for my $b (values %{ $d->{branches} || {} }) {
+            for my $id (keys %{ $b->{rows} || {} }) {
+                my $r = $b->{rows}{$id};
+                $rank{$id} = { score => $r->{score}, reason => $r->{reason} }
+                    if !$rank{$id} || ($r->{score} // 0) > ($rank{$id}{score} // 0);
+            }
+        }
+    }
+    eval {
+        my @ids = keys %rank;
+        my @rows = @ids ? $schema->resultset('Todo')->search(
+            { record_id => { -in => \@ids }, status => { -not_in => [ 3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done' ] } },
+            { columns => [qw(record_id subject priority)] })->all : ();
+        @todos = map { { id => $_->record_id, subject => $_->subject, priority => $_->priority,
+                         rank_score => $rank{ $_->record_id }{score}, reason => $rank{ $_->record_id }{reason} } } @rows;
+    };
+    return Comserv::Util::AI::SuperGrokPacing::recommend_jobs(tickets => \@tickets, proposals => \@props, todos => \@todos);
+}
+
 sub usage_estimator {
     my ($self, $c, %a) = @_;
     require Comserv::Util::AI::UsageEstimator;
@@ -1913,15 +2095,77 @@ sub usage_estimator {
     my $W_OL  = q{COALESCE(billing_provider,'') LIKE 'ollama%' OR COALESCE(billing_provider,'') = 'custom'};
     my $read = sub { my $f = shift; open my $fh, '<', $f or return {}; local $/; my $d = eval { JSON::PP->new->decode(<$fh>) }; ref $d eq 'HASH' ? $d : {} };
 
-    # ---- Grok Bot: Ledger grok_bot ingests (none yet) x default rate.
+    # ---- Grok Bot: every logged Bot event (turns, routine runs incl. failed, teammate
+    # wakes, CSC developer agent HelpDesk activations) x a per-event % fitted from
+    # manual reading deltas (UsageEstimator::bot_burn); % per hour when no events.
     {
-        my $rate = 0.5;
-        my $f = { 'me.request_type' => 'grok_bot' };
-        my $units = sub { ($ledger->($_[0], $f, $_[1]))[0] };
-        my ($n24) = $ledger->($now - 86400, $f);
+        require Time::Local;
+        my $since = $now - 21 * 86400;
+        my $epoch = sub {
+            my $v = shift; return undef unless defined $v;
+            $v = "$v"; $v =~ s/T/ /;
+            my @p = $v =~ /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)/ or return undef;
+            return Time::Local::timegm($p[5], $p[4], $p[3], $p[2], $p[1] - 1, $p[0]);
+        };
+        my %kind_map = (turn => 'turn', grok_bot => 'turn', chat => 'turn',
+            routine_run => 'routine_run', routine => 'routine_run', daily_eval => 'routine_run', eval => 'routine_run',
+            wake => 'wake', teammate_wake => 'wake', teammate => 'wake',
+            csc_helpdesk => 'csc_helpdesk', helpdesk => 'csc_helpdesk', csc => 'csc_helpdesk', csc_developer => 'csc_helpdesk');
+        my (@events, %src);
+        my @rows = eval {
+            $self->_base_rs($c, $utc->($since), { 'me.request_type' => [qw(grok_bot daily_eval)] })->search({}, {
+                columns => [qw(created_at status metadata request_type)], order_by => 'me.created_at' })->all;
+        };
+        push @{ $out->{errors} }, "bot events: $@" if $@;
+        for my $r (@rows) {
+            my $at = $epoch->($r->get_column('created_at')) or next;
+            my $meta = eval { JSON::PP->new->decode($r->get_column('metadata') // '{}') } || {};
+            my $rt = $r->get_column('request_type') // '';
+            my $k = $rt eq 'daily_eval' ? 'routine_run' : ($kind_map{ lc($meta->{event} // $meta->{kind} // 'turn') } // 'turn');
+            push @events, { at => $at, kind => $k, status => $r->get_column('status') // 'success', from => "ledger:$rt" };
+            $src{"ledger $rt"}++;
+        }
+        # Routine runs that only left an eval report (no daily_eval Ledger row within 2 h).
+        my @reps = eval {
+            $self->_schema($c)->resultset('AiEvalReport')->search({ 'me.created_at' => { '>=' => $utc->($since) } },
+                { columns => [qw(created_at updated_at source)] })->all;
+        };
+        for my $r (@reps) {
+            my %seen;
+            for my $col (qw(created_at updated_at)) {
+                my $at = $epoch->($r->get_column($col)) or next;
+                next if $seen{$at}++;
+                next if grep { $_->{kind} eq 'routine_run' && abs($_->{at} - $at) < 7200 } @events;
+                push @events, { at => $at, kind => 'routine_run', status => 'success', from => 'eval_report' };
+                $src{'eval reports'}++;
+            }
+        }
+        my $bb = $E->can('bot_burn')->(readings => $by{grok_bot} || [], events => \@events, now => $now);
+        my $rate = $bb->{pct_per_event} // 0.5;
+        my $units = sub { my ($s, $u) = @_; scalar grep { $_->{at} > $s && (!defined $u || $_->{at} <= $u) } @events };
+        my $n24 = $units->($now - 86400);
         my $e = $E->can('estimate')->(consumer => 'grok_bot', now => $now, readings => $by{grok_bot} || [], rate => $rate,
             units_since => sub { $units->($_[0]) }, burn_24h => $n24,
-            notes => [ "App-side: Ledger request_type=grok_bot ingests x $rate %/call (default rate; no Grok Bot ingests yet, so the estimate is the latest reading)" ]);
+            (defined $bb->{pct_per_hour} && $bb->{method} eq 'per_hour' ? (burn_per_hour => $bb->{pct_per_hour}) : ()),
+            notes => [
+                sprintf('Counted: %d Bot events in 21 d (%s). Event kinds: Grok Bot turns, routine runs (failed included), teammate wakes, CSC developer agent HelpDesk activations - post them to /ai/usage_ingest source=grok_bot request_type=turn|routine_run|wake|csc_helpdesk.',
+                    scalar(@events), (%src ? join(', ', map { "$_ $src{$_}" } sort keys %src) : 'none logged')),
+                ($bb->{method} eq 'per_event'
+                    ? sprintf('Calibration: %.2f %% per event fitted from %d reading interval(s).', $bb->{pct_per_event}, scalar @{ $bb->{pairs} })
+                    : $bb->{method} eq 'per_hour'
+                    ? sprintf('Calibration: no events between readings, so %.2f %%/h from %d reading interval(s) - ESTIMATED, not counted.', $bb->{pct_per_hour}, scalar @{ $bb->{pairs} })
+                    : 'Calibration: not enough same-cycle readings yet (default 0.5 %/event).'),
+                @{ $bb->{notes} || [] } ]);
+        if (defined $bb->{estimate}) {
+            $e->{estimate} = $bb->{estimate};
+            $e->{estimate_fmt} = $bb->{estimate_fmt} . ($bb->{estimated_pct} > 0 ? ' (est.)' : '');
+            if (defined $e->{burn_per_hour} && defined $e->{hours_to_reset}) {
+                $e->{projection} = $bb->{estimate} + $e->{burn_per_hour} * $e->{hours_to_reset};
+                $e->{projection_fmt} = sprintf('%.1f%%', $e->{projection});
+                $e->{over_at_reset} = $e->{projection} >= 100 ? 1 : 0;
+            }
+        }
+        $e->{bot_burn} = $bb;
         push @{ $out->{consumers} }, $e;
     }
     # ---- Super Grok: Hermes xai-oauth calls + app supergrok chat x 0.05 %; add-on reading.
