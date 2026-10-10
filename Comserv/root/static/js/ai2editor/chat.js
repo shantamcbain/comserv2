@@ -47,9 +47,38 @@
         return '';
     }
 
+    // Returns context distinguishing the *open editable file* from the *current page / endpoint*.
+    // Important: the file clicked to open AI Editor is often the page itself, but not always
+    // (e.g. error on page X, open editor from page Y to fix X; error message usually provided).
+    function getEditorContext() {
+        const openFile = currentFilePath();
+        let currentPage = '';
+        try {
+            currentPage = window.location.pathname || '';
+            // If opened from a different surface, try referer as hint
+            if (!currentPage || currentPage.includes('/ai2/')) {
+                const ref = document.referrer ? new URL(document.referrer).pathname : '';
+                if (ref && !ref.includes('/ai2/')) currentPage = ref;
+            }
+        } catch (e) {}
+        return { openFile, currentPage, pageVsFileDiffer: !!(openFile && currentPage && openFile.toLowerCase() !== currentPage.toLowerCase()) };
+    }
+
     function setActiveFile(path) {
         _activeFile = path || '';
         if (path) window.AI2_FILE_TO_LOAD = path;
+    }
+
+    // Stub for early preload called from core openFile.
+    // Beefs up auto-pipeline: pre-fetches related controller(s) so they are ready when chat starts.
+    // Uses the strengthened infer that handles open-file vs page and errors.
+    async function preloadRelatedPipeline(path, extraHint = '') {
+        try {
+            const paths = await inferRelatedPipelineFiles(path, extraHint);
+            // Fire the loads so cache / network is warm; chat will re-use via filesP later
+            await Promise.all(paths.map(p => fetchLoadFile(p).catch(() => null)));
+            console.log('[AI2Chat] preloaded pipeline for', path, paths);
+        } catch (e) { /* non-fatal */ }
     }
 
     function escapeHtml(s) {
@@ -252,6 +281,31 @@ function ensureThinkingStyles(doc) {
     function recordMessage(who, html) {
         chatLog.push({ who: who, html: html });
         refreshChatViews();
+    }
+
+    // Build conversation history for the model — strips HTML to plain text
+    // and returns [{role:'user'|'assistant', content}] for the last N exchanges.
+    // This lets the AI editor maintain context across turns (like Hermes).
+    // Skipped thinking entries (client-only), keeps only user+assistant.
+    var _lastConversationId = '';
+    function buildConversationHistory(maxExchanges) {
+        maxExchanges = maxExchanges || 8;
+        var history = [];
+        var count = 0;
+        for (var i = chatLog.length - 1; i >= 0 && count < maxExchanges; i--) {
+            var entry = chatLog[i];
+            if (!entry || entry.who === 'Think') continue;
+            var role = (entry.who === 'You') ? 'user' : 'assistant';
+            // Strip HTML tags for clean history
+            var content = String(entry.html || '');
+            content = content.replace(/<[^>]+>/g, ' ');
+            content = content.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+            content = content.replace(/\s+/g, ' ').trim();
+            if (!content) continue;
+            history.unshift({ role: role, content: content });
+            count++;
+        }
+        return history;
     }
 
     // Live thinking trail in chat (visible + kept for daily agent analysis).
@@ -582,6 +636,92 @@ function ensureThinkingStyles(doc) {
         'lib/Comserv/Model/AI2/Router.pm'
     ];
 
+    // Infer related controller / pipeline files from an opened template or page path.
+    // Beefed up: uses getEditorContext() to handle cases where the *open file* (the one being edited)
+    // differs from the *analyzed page/endpoint* (e.g. fix a failing page by opening editor elsewhere;
+    // error message usually provided in prompt).
+    // Also extracts file paths from error messages/stack traces.
+    // Prefers AI2 paths during legacy->AI2 refactor. Tries legacy resolve_route for accuracy if available.
+    // Enables earlier auto-knowledge of the "background pipeline" (controller action, stash population,
+    // models, includes, date logic, action bars, etc.).
+    async function inferRelatedPipelineFiles(openPath, promptHint = '') {
+        const related = [];
+        const ctx = getEditorContext();
+        const primary = openPath || ctx.openFile || '';
+        if (!primary && !ctx.currentPage) return related;
+
+        const candidates = new Set();
+        if (primary) candidates.add(primary);
+        if (ctx.currentPage) candidates.add(ctx.currentPage);
+        if (ctx.pageVsFileDiffer) {
+            // When they differ, still try to resolve the "real" page
+            candidates.add(ctx.currentPage);
+        }
+
+        // Error message / stack trace extraction (common when fixing load failures)
+        if (promptHint) {
+            const errPaths = promptHint.match(/(?:lib|root|script|Comserv)\/[\w\/.-]+\.(?:pm|tt|js|pl)/gi) || [];
+            errPaths.forEach(p => candidates.add(p.replace(/^Comserv\//, '')));
+            // Also look for common error indicators pointing at Planning etc.
+            if (/planning|daily|DailyPlan/i.test(promptHint)) {
+                candidates.add('lib/Comserv/Controller/Planning.pm');
+            }
+        }
+
+        for (let cand of candidates) {
+            if (!cand) continue;
+            const p = cand.toLowerCase();
+
+            // Try to get better mapping via legacy resolve_route (still useful during AI2 refactor;
+            // returns controller + template). Non-blocking.
+            try {
+                const url = '/ai/resolve_route?path=' + encodeURIComponent(cand);
+                const r = await fetch(url, { credentials: 'include' }).then(res => res.ok ? res.json() : null).catch(() => null);
+                if (r && r.controller) {
+                    const ctrlPath = r.controller.replace(/\./g, '/').replace('Comserv::Controller::', 'lib/Comserv/Controller/') + '.pm';
+                    if (ctrlPath && !related.includes(ctrlPath)) related.push(ctrlPath);
+                }
+                if (r && r.template) {
+                    if (!related.includes(r.template)) related.push(r.template);
+                }
+            } catch (e) { /* ignore, fall back to heuristics */ }
+
+            // Template -> controller heuristics (Catalyst / TT conventions)
+            if (p.endsWith('.tt') || p.includes('/root/')) {
+                if (p.includes('dailyplan') || p.includes('planning/daily')) {
+                    related.push('lib/Comserv/Controller/Planning.pm');
+                }
+                const match = p.match(/root\/(?:admin\/)?([^\/]+)\/.*\.tt$/);
+                if (match) {
+                    let ctrl = 'lib/Comserv/Controller/' + match[1].charAt(0).toUpperCase() + match[1].slice(1) + '.pm';
+                    if (!related.includes(ctrl)) related.push(ctrl);
+                }
+                if (p.includes('/admin/')) {
+                    const adminMatch = p.match(/root\/admin\/([^\/]+)\//);
+                    if (adminMatch) {
+                        const ctrl = 'lib/Comserv/Controller/Admin/' + adminMatch[1].charAt(0).toUpperCase() + adminMatch[1].slice(1) + '.pm';
+                        if (!related.includes(ctrl)) related.push(ctrl);
+                    }
+                }
+            } else if (p.endsWith('.pm')) {
+                // If a controller is primary, pull its likely template too for context
+                if (!related.includes(cand)) related.push(cand);
+                // crude reverse
+                const ctrlName = cand.split('/').pop().replace('.pm', '');
+                const possibleTpl = 'root/' + ctrlName.toLowerCase() + '/' + ctrlName.toLowerCase() + '.tt'; // rough
+                // better: we already have the open file
+            }
+
+            // Always consider core AI/editor files (prefer AI2 during refactor)
+            DEFAULT_APP_PATHS.forEach(f => {
+                if (!related.includes(f)) related.push(f);
+            });
+        }
+
+        // Dedup
+        return [...new Set(related)];
+    }
+
     function isEvaluatePrompt(text) {
         const p = String(text || '').toLowerCase();
         if (/\bevaluat/.test(p)) return true;
@@ -674,11 +814,20 @@ function ensureThinkingStyles(doc) {
 
 
     // --- Agent + phase (clarify → analyze → plan → verify → implement) ---
-    // Budget: clarify + most analyze/plan stay on free models; implement uses a free
-    // code model by default. Header model select still overrides when set.
-    const CLARIFY_MODEL = 'openrouter|google/gemma-4-31b-it:free';
-    const ANALYZE_MODEL = 'openrouter|google/gemma-4-31b-it:free';
-    const IMPLEMENT_MODEL = 'openrouter|cohere/north-mini-code:free';
+    // Budget: clarify + most analyze/plan stay on cheap/fast models; implement uses a code model.
+    // Header model select always overrides.
+    //
+    // New local Ollama models (as of this session):
+    // - nimble (9B, Bespoke Labs): involved in todo/decision ranking + daily planning sort (compute_decision_rank.pl, Util/AI/DecisionRank).
+    //   Good for planning/analyze phases on DailyPlan, focus queue, priorities, audits.
+    // - tev1 (4B / 0.8B): used in Focus-Tune / decision chains; fast local option.
+    //
+    // Not fully tested yet — prefer as cheap local fallbacks for analyze/plan on planning code.
+    // OpenRouter frees still available as backup. Local preferred for speed/cost/privacy in editor.
+    const CLARIFY_MODEL = 'ollama|tev1:0.8b';  // or nimble for heavier clarify
+    const ANALYZE_MODEL = 'ollama|nimble';     // strong for pipeline + planning analysis (DailyPlan etc.)
+    const PLAN_MODEL    = 'ollama|nimble';     // explicit for plan phase on todo/daily planning
+    const IMPLEMENT_MODEL = 'openrouter|cohere/north-mini-code:free';  // or local code model when ready
     let _editorPhase = 'analyze'; // clarify | analyze | plan | implement
     let _planApproved = false;
     // Pending clarify session: original vague ask + gap questions awaiting answers.
@@ -707,21 +856,33 @@ function ensureThinkingStyles(doc) {
     }
 
     function resolveEditorModel(phase) {
-        // Header model select always wins when user picks something other than empty.
+        const filePath = currentFilePath() || '';
+        const isPlanningContext = /dailyplan|planning|todo.*sort|focus.*queue/i.test(filePath) ||
+                                  /daily.*plan|planning.*page/i.test(document.title || '');
+
+        // Header model select usually wins, but for planning/DailyPlan analysis we bias
+        // hard toward local nimble (the model actually used for todo/daily planning sort).
         const picked = (window.ComservChat && ComservChat.modelSelect)
             ? ComservChat.modelSelect.getSelectedValue()
             : '';
+
+        // Strong bias for planning work
+        if (isPlanningContext && (phase === 'plan' || phase === 'analyze')) {
+            return picked || 'ollama|nimble';  // prefer the one that actually sorts daily planning
+        }
+
         if (phase === 'clarify') {
             return picked || CLARIFY_MODEL;
         }
-        // Analyze worker stays on the cheap analyze model unless user overrides.
         if (currentEditorAgentId() === 'analyze') {
             return picked || ANALYZE_MODEL;
         }
         if (phase === 'implement') {
             return picked || IMPLEMENT_MODEL;
         }
-        // analyze / plan: prefer cheap free model; keep user pick if set
+        if (phase === 'plan') {
+            return picked || PLAN_MODEL;
+        }
         return picked || ANALYZE_MODEL;
     }
 
@@ -862,8 +1023,11 @@ function ensureThinkingStyles(doc) {
             'B) plan — short plan for user verify; docs/changelog notes only as text; do not create todos; end by asking for "approve plan".',
             'C) implement — code suggestion only after plan approval (or explicit implement request).'
         ];
+        // Note on open file vs analyzed page (key during refactoring and error fixing)
+        lines.push('CONTEXT NOTE: Primary open file (buffer) is usually the clicked page, but can differ (e.g. open editor from stable page to fix a broken one). Error messages are often supplied — use them + auto-attached pipeline controllers.');
+
         if (agentId === 'analyze') {
-            lines.push('You are the Analyze worker: read open buffers and named paths; explain root cause and a short plan only. Never emit ## FIX, never rewrite files, never ask the user to paste files already loaded via /ai2/load_file.');
+            lines.push('You are the Analyze worker: read open buffers and named paths; explain root cause and a short plan only. Never emit ## FIX, never rewrite files, never ask the user to paste files already loaded via /ai2/load_file. Use auto-attached controller for pipeline understanding.');
         } else if (agentId === 'documentation') {
             lines.push('You are in documentation mode: prefer docs/changelog/planning guidance; do not emit code file rewrites unless asked.');
         } else {
@@ -874,7 +1038,7 @@ function ensureThinkingStyles(doc) {
         } else if (phase === 'analyze') {
             lines.push('Current phase ANALYZE: respond with analysis only. Prefer evidence from loaded files and Comserv patterns (features/modules/nav).');
         } else if (phase === 'plan') {
-            lines.push('Current phase PLAN: propose the plan; wait for user "approve plan" / Verify before code.');
+            lines.push('Current phase PLAN: propose the plan; wait for user "approve plan" / Verify before code. Reference background pipeline from auto-loaded files.');
         } else {
             lines.push('Current phase IMPLEMENT: provide concrete code suggestion for Approve/Reject.');
         }
@@ -1007,22 +1171,57 @@ function ensureThinkingStyles(doc) {
             liveThink.addStep('Loaded editor buffer' + (fileContent && fileContent.length
                 ? ' (' + fileContent.length + ' chars)' : ' (empty)'));
             const wantEval = isEvaluatePrompt(prompt);
-            const filesP = wantEval
+            let filesP = wantEval
                 ? loadFilesForEval(filePath, fileContent)
                 : Promise.resolve(fileContent && fileContent.length
                     ? [{ path: filePath, content: fileContent }] : []);
+
+            // NEW: Auto-load related pipeline files (controller etc.) early for .tt / page analysis.
+            // This gives the AI direct knowledge of the background pipeline (stash population,
+            // models, includes, date logic, etc.) before clarify/analyze/plan. Greatly improves
+            // self-direction and planning accuracy.
+            if (!wantEval && filePath) {
+                // Beefed up inference is async (tries resolve_route + error extraction)
+                filesP = filesP.then(async function (baseFiles) {
+                    const promptForHint = prompt || '';
+                    const pipelinePaths = await inferRelatedPipelineFiles(filePath, promptForHint);
+                    const extra = await Promise.all(pipelinePaths.map(function (rp) {
+                        if (rp === filePath) return null;
+                        return fetchLoadFile(rp);
+                    })).then(function (extras) { return extras.filter(Boolean); });
+
+                    const seen = new Set(baseFiles.map(function (f) { return f.path; }));
+                    extra.forEach(function (ef) {
+                        if (!seen.has(ef.path)) {
+                            baseFiles.push(ef);
+                            seen.add(ef.path);
+                        }
+                    });
+                    return baseFiles;
+                });
+            }
+
             return filesP.then(function (files) {
                 const blob = filesToPromptBlob(files);
                 const contract = phaseContract(phase, agentId) + todoStartReminder();
+                const ctx = getEditorContext();
+                let contextNote = '';
+                if (ctx.pageVsFileDiffer) {
+                    contextNote = '\n[EDITOR CONTEXT] Open file for editing: ' + (ctx.openFile || 'none') +
+                        ' | Analyzed / current page: ' + (ctx.currentPage || 'unknown') +
+                        ' (may differ when fixing errors from another surface; error details usually in prompt)';
+                }
                 const fullPrompt = blob
-                    ? (contract + '\n\n' + prompt + '\n\n---\nThese files were loaded live from this app via GET /ai2/load_file. They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n' + blob)
-                    : (contract + '\n\n' + prompt);
+                    ? (contract + contextNote + '\n\n' + prompt + '\n\n---\nThese files were loaded live from this app via GET /ai2/load_file (including auto pipeline controllers). They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n' + blob)
+                    : (contract + contextNote + '\n\n' + prompt);
                 if (files.length) {
                     liveThink.addStep('Attached files: ' + files.map(function (f) { return f.path; }).join(', '));
                     if (target.status) target.status('Loaded ' + files.map(function (f) { return f.path; }).join(', '));
                 }
                 liveThink.addStep('Calling /ai2/chat (waiting on provider)…');
                 if (target.status) target.status('Asking AI…');
+                const history = buildConversationHistory(8);
+
                 return fetch('/ai2/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1033,13 +1232,19 @@ function ensureThinkingStyles(doc) {
                         phase: phase,
                         page_path: filePath || (files[0] && files[0].path) || '',
                         page_title: filePath ? filePath.split('/').pop() : '',
-                        page_content: (files[0] && files[0].content) || fileContent || ''
+                        page_content: (files[0] && files[0].content) || fileContent || '',
+                        history: history,
+                        conversation_id: _lastConversationId || ''
                     })
                 });
             });
         }).then(function (res) { return res.json(); })
           .then(function (data) {
               if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+              // Remember conversation_id for next turn
+              if (data && data.conversation_id) {
+                  _lastConversationId = String(data.conversation_id);
+              }
               if (!data || data.success === 0 || data.error) {
                   const err = (data && data.error) ? data.error : 'No response';
                   const serverSteps = (data && data.thinking && data.thinking.length) ? data.thinking : [];
@@ -1177,6 +1382,11 @@ function ensureThinkingStyles(doc) {
             if (data && data.success) {
                 if (saveBtn) { saveBtn.style.display = 'none'; }
                 setStatus('Saved');
+                // Success hook for learning: a good analysis + approved change was applied.
+                // Future: POST to a learning endpoint or log compact record (original prompt + files + outcome)
+                // so future sessions can retrieve "[SUCCESSFUL PIPELINE ANALYSIS]" patterns.
+                // Ties into comserv2-ai-learning-system (DB for app, skills for agent-side).
+                console.log('[AI Editor Success] Approved & saved for', filePath);
             } else {
                 const msg = 'Save failed: ' + ((data && (data.error || data.detail)) || 'unknown error');
                 setStatus(msg, true);
@@ -1411,7 +1621,9 @@ function ensureThinkingStyles(doc) {
                 window._aiChatWin = null;
             }
             applyViewState();
-        }
+        },
+        // Exposed for core.js early preload and external use during AI2 refactor / testing.
+        preloadRelatedPipeline: preloadRelatedPipeline
     };
     window[NS] = window.AI2Chat;
 })();

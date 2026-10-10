@@ -175,6 +175,11 @@
                     if (window.AI2Chat && typeof window.AI2Chat.setActiveFile === 'function') {
                         window.AI2Chat.setActiveFile(path);
                     }
+                    // Beefed-up: trigger early pipeline preload in chat for auto-related controller knowledge
+                    // (handles open-file vs analyzed-page distinction during testing/fixes).
+                    if (window.AI2Chat && typeof window.AI2Chat.preloadRelatedPipeline === 'function') {
+                        window.AI2Chat.preloadRelatedPipeline(path).catch(() => {});
+                    }
                     console.log(`[${NS}] opened file: ${path}`);
                     // The editor area may have just been revealed / resized
                     // (e.g. Project panel opened) — ask Ace to recompute its

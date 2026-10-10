@@ -83,8 +83,28 @@
     </tr>
     <tr>
       <th><label for="barcode">Barcode</label></th>
-      <td><input type="text" id="barcode" name="barcode" maxlength="100">
-          <small>UPC / EAN / QR / Code128</small></td>
+      <td><input type="text" id="barcode" name="barcode" maxlength="100" placeholder="Scan or enter">
+          <small>UPC / EAN / QR / Code128 / internal</small></td>
+    </tr>
+    <tr>
+      <th><label for="barcode_type">Barcode Type</label></th>
+      <td>
+        <select id="barcode_type" name="barcode_type">
+          <option value="">— unknown —</option>
+          <option value="upc">UPC</option>
+          <option value="ean">EAN</option>
+          <option value="qr">QR</option>
+          <option value="internal">Internal / custom</option>
+          <option value="other">Other</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="image_path">Image / Visual</label></th>
+      <td>
+        <input type="text" id="image_path" name="image_path" maxlength="500" placeholder="http://... or /data/nfs/... (leave blank to capture)">
+        <small>External URL for universal items (e.g. can of beans) or NFS path after capture. Use camera below for specific photo (optional — only if you want to keep the picture).</small>
+      </td>
     </tr>
     <tr>
       <th><label for="reorder_point">Reorder Point</label></th>
@@ -237,6 +257,88 @@
     cat.addEventListener('input', toggle3d);
     cat.addEventListener('change', toggle3d);
     toggle3d();
+})();
+</script>
+
+<!-- Camera / Barcode Capture (P2) -->
+<div style="margin:1rem 0; padding:1rem; border:1px solid var(--border-color); border-radius:6px; background:var(--bg-secondary);">
+  <strong>Camera Capture (optional — only keep the picture if you want a specific visual)</strong>
+  <div>
+    <button type="button" id="start-cam" style="margin:0.5rem 0;">📷 Start Camera</button>
+    <button type="button" id="capture-photo" disabled>Capture Photo (for visual)</button>
+    <button type="button" id="scan-barcode" disabled>Scan Barcode</button>
+    <video id="cam-video" style="display:none; max-width:300px; border:1px solid var(--border-color);" autoplay></video>
+    <canvas id="cam-canvas" style="display:none;"></canvas>
+    <img id="photo-preview" style="display:none; max-width:200px; margin-top:0.5rem; border:1px solid var(--border-color);" alt="Captured photo preview">
+  </div>
+  <small>Use external URL above for universal items (e.g. stock photo of "can of beans") to save space. Captured photos go to NFS via File Manager (manual or future auto).</small>
+</div>
+
+<script>
+(function() {
+  var video = document.getElementById('cam-video');
+  var canvas = document.getElementById('cam-canvas');
+  var preview = document.getElementById('photo-preview');
+  var startBtn = document.getElementById('start-cam');
+  var captureBtn = document.getElementById('capture-photo');
+  var scanBtn = document.getElementById('scan-barcode');
+  var stream = null;
+
+  startBtn.addEventListener('click', async function() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+      video.style.display = 'block';
+      captureBtn.disabled = false;
+      scanBtn.disabled = false;
+      startBtn.textContent = 'Stop Camera';
+    } catch(e) {
+      alert('Camera access failed: ' + e.message + ' (use HTTPS or localhost)');
+    }
+  });
+
+  captureBtn.addEventListener('click', function() {
+    if (!stream) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    var dataUrl = canvas.toDataURL('image/jpeg');
+    preview.src = dataUrl;
+    preview.style.display = 'block';
+    // For now set a placeholder path; real flow: upload blob to /file/upload_file targeting NFS dir then set the returned path
+    var imgInput = document.getElementById('image_path');
+    if (imgInput && !imgInput.value) {
+      imgInput.value = 'data:image/jpeg;base64,' + dataUrl.split(',')[1].substring(0,100) + '... (capture saved to NFS via File Manager)';
+    }
+    alert('Photo captured. In full impl this would POST to File Manager for /data/nfs path. For now the preview is shown and path noted.');
+  });
+
+  scanBtn.addEventListener('click', function() {
+    if (!stream) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    var barcodeInput = document.getElementById('barcode');
+    if (barcodeInput) {
+      // Placeholder for real decode (jsQR / BarcodeDetector / server)
+      barcodeInput.value = 'SCAN-' + Date.now().toString().slice(-8);
+      // Simulate lookup + duplicate handling
+      setTimeout(function() {
+        alert('Barcode scanned (placeholder decode). In full: lookup by barcode, if exists offer:\n- Edit existing item\n- New stock (receive)\n- Location adjust (count)\n\nCurrent: form has duplicate redirect on submit.');
+      }, 100);
+    }
+  });
+
+  // On barcode field change, could trigger AJAX lookup in full impl
+  var bc = document.getElementById('barcode');
+  if (bc) {
+    bc.addEventListener('blur', function() {
+      if (bc.value.length > 4) {
+        // Placeholder for real /api lookup
+        console.log('Would lookup barcode: ' + bc.value);
+      }
+    });
+  }
 })();
 </script>
 

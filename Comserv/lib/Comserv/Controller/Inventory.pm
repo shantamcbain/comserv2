@@ -392,6 +392,24 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
 
     if ($c->req->method eq 'POST') {
         my $params = $c->req->body_parameters;
+        my $sitename = $self->_sitename($c);
+        my $schema   = $self->_schema($c);
+
+        # Check for existing by barcode (for scanned items) before create
+        if ($params->{barcode}) {
+            my $existing = eval {
+                $schema->resultset('Accounting::InventoryItem')->search({
+                    sitename => $sitename,
+                    barcode  => $params->{barcode}
+                })->first;
+            };
+            if ($existing) {
+                $c->flash->{success_msg} = 'Item with this barcode already exists — switching to edit form.';
+                $c->res->redirect($c->uri_for('/Inventory/item/edit', [$existing->id]));
+                return;
+            }
+        }
+
         my $new_item;
         eval {
             $new_item = $self->_create_item($c, $params);
@@ -461,6 +479,8 @@ sub _create_item {
         unit_cost           => $p->{unit_cost}  || undef,
         unit_price          => $p->{unit_price} || undef,
         barcode             => $p->{barcode}    || undef,
+        barcode_type        => $p->{barcode_type} || undef,
+        image_path          => $p->{image_path} || undef,
         reorder_point       => $p->{reorder_point} || 0,
         reorder_quantity    => $p->{reorder_quantity} || 0,
         status              => $p->{status} || 'active',
@@ -642,6 +662,7 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
                 unit_cost          => $params->{unit_cost}  || undef,
                 unit_price         => $params->{unit_price} || undef,
                 barcode            => $params->{barcode}    || undef,
+                barcode_type       => $params->{barcode_type} || undef,
                 reorder_point      => $params->{reorder_point} || 0,
                 reorder_quantity   => $params->{reorder_quantity} || 0,
                 status             => $params->{status} || 'active',
@@ -2140,6 +2161,8 @@ sub inventory_count :Path('/Inventory/count') :Args(0) {
                 item_id      => $item->id,
                 sku          => $item->sku,
                 name         => $item->name,
+                barcode      => $item->barcode,
+                barcode_type => $item->barcode_type,
                 category     => $item->category,
                 unit_of_measure => $item->unit_of_measure,
                 location_id  => $loc,

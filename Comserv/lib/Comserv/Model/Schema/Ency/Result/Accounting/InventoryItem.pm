@@ -84,6 +84,12 @@ __PACKAGE__->add_columns(
         size        => 100,
         is_nullable => 1,
     },
+    barcode_type => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 1,
+        comment     => 'upc, ean, qr, internal, other',
+    },
     image_path => {
         data_type   => 'varchar',
         size        => 500,

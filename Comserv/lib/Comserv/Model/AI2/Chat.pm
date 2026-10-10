@@ -68,12 +68,12 @@ sub build_agent_prompt {
         helpdesk => "You are a helpful support agent for the Comserv system. Be concise and practical.",
         ency     => "You are an encyclopedia assistant. Provide clear, factual answers.",
         bmaster  => "You are a business master / project assistant. Be professional and concise.",
-        planning => "You are the Comserv Planning Assistant (also covers Project Manager and Task Assistant). Use LIVE TODO/PROJECT data when injected. The TODO ACTION contract is already in the system prompt — after a provider retry never say you have no todo tool. Confirm server-created todos; do not invent a form.",
+        planning => "You are the Comserv Planning Assistant (also covers Project Manager and Task Assistant). Use LIVE TODO/PROJECT data when injected. The TODO ACTION contract is already in the system prompt — after a provider retry never say you have no todo tool. Confirm server-created todos; do not invent a form. Local Ollama models (nimble for decision/todosort, tev1) may be available and are good for planning analysis.",
         todo     => "You are the Comserv Task Assistant (agent id=todo). The system prompt already contains the TODO ACTION contract and live project catalog. After a provider retry or fallback you MUST keep using that contract — never say you have no todo tool. When the user wants a todo created, the server may already have done it; confirm the result, do not invent a form.",
         code     => "You are a coding assistant for the Comserv2 Catalyst app. The server already loads source into [FILE:] blocks. NEVER say you lack filesystem access or ask the user to paste files. Load other sources with [READ_FILE: lib/...] (optional :START-END). Prefer concise examples and one fenced code block so Approve can apply it.",
-        programming => "You are the AI Editor programming agent for Comserv2. Use loaded [FILE:] buffers; never claim no filesystem access. Plan then code only when phase is implement. Never create todos, never emit [ACTION: create_todo], never file HelpDesk tickets or invoices.",
+        programming => "You are the AI Editor programming agent for Comserv2. Use loaded [FILE:] buffers (including any auto-attached related pipeline files such as the controller for an opened .tt template). Never claim no filesystem access. Understand the background pipeline: the controller action populates the stash (e.g. todos, dates, open_log_entry, audit data) which the template and its includes consume. Plan then code only when phase is implement. Never create todos, never emit [ACTION: create_todo], never file HelpDesk tickets or invoices.",
         documentation => "You are the AI Editor documentation agent. Prefer docs/changelog/planning guidance; avoid code file rewrites unless asked.",
-        analyze => "You are the AI Editor Analyze worker. Read loaded [FILE:] buffers and named paths only. Return root cause + short plan. Never rewrite files, never emit ## FIX / full-file patches, never ask the user to paste files already provided.",
+        analyze => "You are the AI Editor Analyze worker. Read loaded [FILE:] buffers and auto-attached pipeline files (the controller and related sources for the page/template). Return root cause + short plan. Use the controller source to understand exactly how data reaches the template. Never rewrite files, never emit ## FIX / full-file patches, never ask the user to paste files already provided.",
         nav      => "You are a navigation assistant. Help the user find the right page or feature in Comserv.",
     );
     return $agent{$aid} if exists $agent{$aid};
@@ -281,6 +281,12 @@ sub process {
     require Comserv::Model::AI2::ChatIntent;
     my $editor_todo_skip = Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id})
         || $args{skip_app_writes};
+
+    # Declare early so visible for both enrich skipping and the later editor
+    # process trace append (the latter was causing the "Global symbol" compile error).
+    my $surface   = $args{surface} || '';
+    my $is_editor = ($surface eq 'editor')
+        || Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id});
 
     # HelpDesk-ticket AGENT first — must beat TodoCreate when the prompt
     # mentions both "ticket" and "todo" (3180 / 6510 hijack).
@@ -663,9 +669,13 @@ sub process {
         }
         my $site_audit = ($prompt =~ /\b(navigate|navigation|crawl|audit|failed\s+links?|each\s+page|readable|theme|look and content|site and report|broken\s+links?)\b/i) ? 1 : 0;
         my $lookup_intent = ($prompt =~ /\b(find|look\s*up|search\s+for|what\s+is|who\s+is|tell\s+me\s+about|tell\s+me\s+what|information\s+on|info\s+on|used\s+for)\b/i) ? 1 : 0;
+        # $surface / $is_editor declared at top of process() (wider scope for editor trace)
+        $surface = $args{surface} || '';
+        $is_editor = ($surface eq 'editor') || ($args{agent_id} && $args{agent_id} =~ /^(programming|coding|code|documentation|analyze)$/i);
         my $need = $can_enrich && $resp && $resp->{success}
             && ($quality eq 'poor' || $site_audit || $lookup_intent)
-            && !$args{use_search};
+            && !$args{use_search}
+            && !$is_editor;  # editor already has the raw buffer + CodeRead; avoid polluting with unexpanded TT links
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
             "auto_enrich check: can=$can_enrich quality=$quality site_audit=$site_audit lookup_intent=$lookup_intent need=$need");
         push @thinking, "auto_enrich: quality=$quality site_audit=$site_audit lookup_intent=$lookup_intent need=$need";
@@ -718,6 +728,8 @@ sub process {
                     . "Do NOT claim all pages are identical just because chrome matches.\n";
                 my %finger;
                 for my $url (@fetch) {
+                    # Skip literal TT template fragments that came from raw .tt buffer in editor
+                    next if $url =~ /\[\s*\%|%]/ || $url =~ /selected_date|prev_date|next_date|current_date_str/;
                     my $req = HTTP::Request->new(GET => $url);
                     $req->header('Host' => $origin_host . ( ($c->req->uri->port && $c->req->uri->port !~ /^(80|443)$/) ? (':' . $c->req->uri->port) : '' ));
                     $req->header('Cookie' => $cookie) if length $cookie;
@@ -1017,9 +1029,30 @@ sub process {
             "Failed to record AI usage: $@");
     }
 
+    my $final_response = $resp->{response} // '';
+
+    # For AI Editor (programming/analyze/etc. agents or surface=editor): append a short
+    # transparent process trace so the user sees exactly what model/agent/enrich path
+    # produced the answer. This addresses "the visible reply does not contain the
+    # background process".
+    if ($is_editor || $surface eq 'editor') {
+        my $proc = "\n\n---\n[process] agent=" . ($args{agent_id} // 'general')
+                 . " phase=" . ($args{phase} // 'n/a')
+                 . " model=" . ($resp->{model} || $use_model || 'unknown')
+                 . " provider=" . ($resp->{provider} || $provider_name || 'unknown');
+        if (@thinking) {
+            my @key = grep { /enrich|fetch|search|files_read|CodeRead|model|Dispatch/i } @thinking;
+            $proc .= "\n" . join("\n", @key[0..4]) if @key;
+        }
+        if ($citations && @$citations) {
+            $proc .= "\n citations=" . scalar(@$citations);
+        }
+        $final_response .= $proc;
+    }
+
     return {
         success         => 1,
-        response        => $resp->{response} // '',
+        response        => $final_response,
         model           => $resp->{model} || $use_model,
         provider        => $resp->{provider} || $provider_name,
         usage           => $resp->{usage} || {},
