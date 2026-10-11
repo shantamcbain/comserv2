@@ -88,6 +88,13 @@
             </div>
 
             [%# Math challenge for guests. Never render blank "What is + ?". %]
+            <input type="hidden" name="hd_ft" value="[% hd_fill_token | html %]">
+            [% IF turnstile_site_key %]
+            <div class="form-group turnstile-challenge">
+                <div class="cf-turnstile" data-sitekey="[% turnstile_site_key | html %]"></div>
+                <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+            </div>
+            [% ELSE %]
             [% IF is_public_guest || !c.session.user_id %]
             <div class="form-group math-challenge">
                 [% IF math_a && math_b %]
@@ -107,6 +114,7 @@
                 <p class="error">Security check could not be loaded. Please <a href="[% c.uri_for('/HelpDesk/ticket/new') %]">reload this page</a> before submitting.</p>
                 [% END %]
             </div>
+            [% END %]
             [% END %]
 
 

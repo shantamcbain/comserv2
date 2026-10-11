@@ -90,6 +90,14 @@
 
             <!-- Math challenge - session-based arithmetic question -->
 
+            
+            <input type="hidden" name="hd_ft" value="[% hd_fill_token | html %]">
+            [% IF turnstile_site_key %]
+            <div class="form-group turnstile-challenge">
+                <div class="cf-turnstile" data-sitekey="[% turnstile_site_key | html %]"></div>
+                <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+            </div>
+            [% ELSE %]
             <div class="form-group math-challenge">
                 [% IF num1 %]
                 <label for="math_challenge_ans">Security Question: What is [% num1 %] + [% num2 %]?</label>
@@ -102,6 +110,7 @@
                 <p class="error">Security check could not be loaded. Please <a href="[% c.uri_for('/HelpDesk/contact') %]">reload this page</a> before submitting.</p>
                 [% END %]
             </div>
+            [% END %]
 
 
 

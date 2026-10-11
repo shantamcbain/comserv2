@@ -8824,6 +8824,7 @@ sub action :Local :Args(0) {
                 priority      => $priority,
                 status        => 'open',
                 created_at    => $now_str,
+                metadata      => eval { JSON->new->canonical->encode({ entry_path => "chat_ai", client_ip => (scalar($c->req->header("CF-Connecting-IP")) || $c->req->address), remote_addr => $c->req->address, user_agent => scalar($c->req->user_agent), sitename => $site_name }) },
             });
         };
         if ($@ || !$new_ticket) {
