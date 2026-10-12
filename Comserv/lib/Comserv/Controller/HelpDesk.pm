@@ -385,7 +385,7 @@ sub _is_staff {
     my $roles = $c->session->{roles};
     return 0 unless $roles;
     return ref($roles) eq 'ARRAY'
-        ? (grep { $_ eq 'admin' || $_ eq 'helpdesk' } @$roles) ? 1 : 0
+        ? (grep { my $r = lc($_ // q{}); $r =~ s/^\s+|\s+$//g; $r eq q{admin} || $r eq q{helpdesk} } @$roles) ? 1 : 0
         : ($roles =~ /\b(?:admin|helpdesk)\b/i ? 1 : 0);
 }
 
