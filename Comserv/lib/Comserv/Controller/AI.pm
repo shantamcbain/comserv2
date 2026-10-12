@@ -3403,6 +3403,15 @@ sub chat :Local :Args(0) {
             }
 
             $ai_response = $or_response->{response} // '';
+            # 3D-20260907-6510: free OpenRouter models (e.g. nemotron :free) sometimes
+            # return success with EMPTY content; the widget then showed nothing. Retry once.
+            unless ($ai_response =~ /\S/) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'chat', "OpenRouter model $model returned empty content; retrying once");
+                push @chat_trace, "⚠️ OpenRouter $model returned an empty reply — retrying once";
+                my $retry = eval { $or->chat($c, model => $model, messages => \@or_messages, api_key => $or_api_key) };
+                $ai_response = $retry->{response} // '' if $retry && $retry->{success};
+            }
             $model_used  = $or_response->{model} || $model;
             $response = { response => $ai_response, model => $model_used, usage => $or_response->{usage} };
             $response_eval_count = ($or_response->{usage} && $or_response->{usage}{total_tokens})
@@ -3682,6 +3691,15 @@ sub chat :Local :Args(0) {
             $response_eval_count = $response->{eval_count} || 0;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'chat', "Chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars");
+        }
+
+        # 3D-20260907-6510: never save/show a blank assistant turn.
+        unless (defined $ai_response && $ai_response =~ /\S/) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'chat', "Empty AI response from model " . ($model_used // '?') . " — substituting notice");
+            $ai_response = "Sorry — the AI model (" . ($model_used || 'unknown') . ") returned an empty reply. "
+                . "Please send your question again, or pick a different model. If it keeps happening, "
+                . "report it via the HelpDesk.";
         }
 
         # Save conversation to database
@@ -6194,6 +6212,17 @@ sub _build_navigation_command_guide {
             [ 'Seed / import COA',          '/Accounting/coa/seed'      ],
             [ 'Merge COA seed',             '/Accounting/coa/seed_merge'],
             [ 'General ledger',             '/Accounting/gl'            ],
+        ]],
+        [ '3D printing & Manufacturing (Traveler)', 'admin', [
+            [ 'Manufacturing travelers (open orders) — "open traveler"', '/Accounting/manufacturing' ],
+            [ 'View one traveler (order id)',  '/Accounting/manufacturing/traveler_view/ORDER_ID' ],
+            [ 'Print one traveler (order id)', '/Accounting/manufacturing/traveler_print/ORDER_ID' ],
+            [ '3D print queue',             '/3d/queue'                 ],
+            [ '3D admin dashboard',         '/3d/admin'                 ],
+            [ '3D printers (LAN control)',  '/3d/printers'              ],
+            [ '3D models library',          '/3d/models'                ],
+            [ '3D store / browse',          '/3d/browse'                ],
+            [ 'My 3D orders',               '/3d/my_orders'             ],
         ]],
         [ 'Site management (admin)', 'admin', [
             [ 'Site list / setup',          '/site'                     ],
