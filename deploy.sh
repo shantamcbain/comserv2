@@ -1025,6 +1025,11 @@ with open("version.json", "w", encoding="utf-8") as fh:
     fh.write("\n")
 PY
     echo "Build stamp: branch=$branch commit=${commit}${dirty} date=$build_date host=$build_host"
+    # Export for docker compose build args (OCI image labels)
+    export GIT_COMMIT="${commit}${dirty}"
+    export GIT_BRANCH="$branch"
+    export BUILD_DATE="$build_date"
+    export BUILD_HOST="$build_host"
 }
 
 registry_config_digest() {
