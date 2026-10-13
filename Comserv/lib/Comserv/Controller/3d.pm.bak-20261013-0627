@@ -1,0 +1,3654 @@
+package Comserv::Controller::3d;
+use Moose;
+use namespace::autoclean;
+use POSIX qw(strftime);
+use JSON qw(encode_json);
+use URI::Escape qw(uri_escape);
+use Try::Tiny;
+use Comserv::Util::Logging;
+use Comserv::Util::SignGenerator;
+use Comserv::Util::Printing3d;
+use Comserv::Util::NfsPath;
+use Comserv::Util::CategoryManager;
+use Comserv::Util::AppTime;
+
+has 'logging' => (
+    is      => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
+
+BEGIN { extends 'Catalyst::Controller'; }
+
+=head1 NAME
+
+Comserv::Controller::3d - Catalyst Controller for the 3D Printing add-on module
+
+=head1 DESCRIPTION
+
+Site add-on module providing 3D printing services.
+
+Module name in site_modules table: C<printing_3d>
+
+All inventory movements (filament reservation, consumption, item sales) are
+recorded as transactions in the C<inventory_transactions> table, keeping the
+Inventory accounting system as the single source of truth.
+
+Transaction types used:
+  reserve         — filament reserved when a print job is placed
+  reserve_release — reservation reversed when a job is cancelled
+  issue           — filament consumed when job completes / item sold to customer
+
+Reference number format:
+  3D-JOB-{id}    — print job transactions
+  3D-SALE-{id}   — direct store sale transactions
+
+=cut
+
+# ============================================================
+# Private helpers
+# ============================================================
+
+sub _sitename {
+    my ($self, $c) = @_;
+    return $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+}
+
+sub _schema {
+    my ($self, $c) = @_;
+    return $c->model('DBEncy');
+}
+
+# UTC DATETIME for DB columns — see Comserv::Util::AppTime (one app clock).
+sub _now {
+    return Comserv::Util::AppTime->now_utc;
+}
+
+sub _is_module_enabled {
+    my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
+    my $mod;
+    eval {
+        $mod = $self->_schema($c)->resultset('SiteModule')->find(
+            { sitename => $sitename, module_name => 'printing_3d', enabled => 1 }
+        );
+    };
+    return $mod ? 1 : 0;
+}
+
+sub _require_module {
+    my ($self, $c) = @_;
+    unless ($self->_is_module_enabled($c)) {
+        $c->stash->{error_msg} = '3D Printing module is not enabled for this site.';
+        $c->stash->{template}  = '3d/index.tt';
+        $c->detach;
+    }
+}
+
+# True for a catalog card: labeled printable parts, plus the two HDRY
+# orderable units. Other assemblies and pack 3MF plates stay on the BOM page.
+sub _browse_is_printable {
+    my ($self, $schema, $model) = @_;
+    return 0 unless $model;
+    if (my $iid = $model->item_id) {
+        my $it = eval { $schema->resultset('Accounting::InventoryItem')->find($iid) };
+        if ($it) {
+            my $sku = $it->sku // '';
+            return 1 if $sku eq 'INT-HDRY-001-P36787'   # Base unit
+                     || $sku eq 'INT-HDRY-001-P36788';  # Add-on module
+            return 0 if $it->is_assemblable;
+        }
+    }
+    my $name = $model->name // '';
+    my $ft   = lc($model->file_type // '');
+    my $src  = $model->source // '';
+    if ($ft eq '3mf' && $src eq 'project_import' && $name !~ /\([A-Z]{2,4}\d{2}/) {
+        return 0;
+    }
+    return 1;
+}
+
+# product = orderable HDRY units; sign = sign_generator; part = labeled STL/3MF.
+sub _browse_kind {
+    my ($self, $schema, $model) = @_;
+    return 'sign' if ($model->source // '') eq 'sign_generator';
+    my $name = $model->name // '';
+    return 'part' if $name =~ /\([A-Z]{2,4}\d{2}/;
+    return 'product';
+}
+
+# Public catalog vs in-house. Visibility columns are authoritative:
+#   is_public=1                       -> Public (everyone, incl. anonymous)
+#   owner_user_id=<uid>               -> Individual (only that user, incl. their own upload)
+#   neither                           -> In-house (farm internal; hidden from browse)
+# Legacy tags (vis:public / owner:<uid>) still honoured so nothing flips until
+# the columns are backfilled.
+sub _browse_visible {
+    my ($self, $model, $uid) = @_;
+    return 0 unless $model;
+    my $tags = lc($model->tags || '');
+    my $name = lc($model->name || '');
+    return 1 if $model->column_info('is_public') && $model->is_public;
+    return 1 if $tags =~ /(?:^|\s)vis:public(?:\s|$)/;
+    return 1 if $uid && $model->column_info('owner_user_id') && $model->owner_user_id
+        && $model->owner_user_id == $uid;
+    return 1 if $uid && $tags =~ /(?:^|\s)owner:\Q$uid\E(?:\s|$)/;
+    return 1 if $name =~ /bee\s*hotel|bee\s*house|chip\s*clip\s*9000|pepper\s*mill\s*funnel|spice\s*funnel|jar\s*sprout/;
+    return 0;
+}
+
+# Panels = side/door skins. Connectors = corners, bottoms, rollers.
+sub _part_theme_role {
+    my ($self, $sku) = @_;
+    $sku ||= '';
+    $sku =~ s/^INT-HDRY-//;
+    return 'panel' if $sku =~ /^(FLS|FRS|BLS|BRS|FFL|FFR)/i;
+    return 'connector';
+}
+
+sub _bom_line_is_printed {
+    my ($self, $comp) = @_;
+    return 0 unless $comp;
+    my $sku = $comp->sku || '';
+    return 1 if ($comp->item_origin || '') eq '3d_printed';
+    return 1 if $sku =~ /^INT-HDRY-[A-Z]{2,4}\d/;
+    return 0;
+}
+
+sub _filament_available {
+    my ($self, $item) = @_;
+    return 0 unless $item;
+    my $avail = 0;
+    eval {
+        for my $sl ($item->stock_levels->all) {
+            $avail += (($sl->quantity_on_hand || 0) - ($sl->quantity_reserved || 0));
+        }
+    };
+    return $avail;
+}
+
+# Explode an assemblable unit into print jobs (required printed BOM + chosen options).
+# Colour theme: panel vs connector. Out-of-stock filament can backorder (~18h/part).
+sub _order_unit {
+    my ($self, $c, $schema, $sitename, $model, $parent) = @_;
+    my $p = $c->req->params;
+    my $qty_units = $p->{quantity} || 1;
+    $qty_units = 1 if $qty_units < 1;
+
+    my $panel_id     = $p->{panel_filament_id}     || '';
+    my $conn_id      = $p->{connector_filament_id} || '';
+    my $allow_bo     = $p->{allow_backorder} ? 1 : 0;
+    my $notes        = $p->{notes} || '';
+    my @opt_ids      = $c->req->param('option_item_id');
+    my %opt          = map { $_ => 1 } grep { $_ } @opt_ids;
+
+    unless ($panel_id && $conn_id) {
+        $c->flash->{error_msg} = 'Choose a filament for panels and a contrasting filament for connectors.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    my $panel_fil = eval { $schema->resultset('Accounting::InventoryItem')->find($panel_id) };
+    my $conn_fil  = eval { $schema->resultset('Accounting::InventoryItem')->find($conn_id) };
+    unless ($panel_fil && $conn_fil) {
+        $c->flash->{error_msg} = 'One of the chosen filaments was not found.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    my $panel_avail = $self->_filament_available($panel_fil);
+    my $conn_avail  = $self->_filament_available($conn_fil);
+    my $need_bo = ($panel_avail <= 0 || $conn_avail <= 0);
+    if ($need_bo && !$allow_bo) {
+        $c->flash->{error_msg} =
+            'Chosen colour is not in stock. Pick another combination, or tick backorder '
+          . '(~18 hours per part — enough to receive filament). '
+          . 'Panel avail=' . $panel_avail . ', connector avail=' . $conn_avail . '.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    my @lines = $schema->resultset('Accounting::InventoryItemBOM')->search(
+        { parent_item_id => $parent->id },
+        { prefetch => 'component_item' },
+    )->all;
+
+    my @print_jobs;
+    my @buy_notes;
+    for my $line (@lines) {
+        my $comp = $line->component_item or next;
+        my $is_opt = $line->is_optional ? 1 : 0;
+        next if $is_opt && !$opt{ $comp->id };
+        if ($self->_bom_line_is_printed($comp)) {
+            my $pm = $schema->resultset('Printing3dModel')->search(
+                { item_id => $comp->id, sitename => $sitename, is_active => 1 },
+                { rows => 1 },
+            )->first;
+            push @print_jobs, {
+                comp     => $comp,
+                model    => $pm,
+                qty      => ($line->quantity || 1) * $qty_units,
+                role     => $self->_part_theme_role($comp->sku),
+                optional => $is_opt,
+            };
+        }
+        else {
+            push @buy_notes, sprintf('%s x%s', $comp->sku || $comp->name, $line->quantity || 1);
+        }
+    }
+
+    unless (@print_jobs) {
+        $c->flash->{error_msg} = 'No printable parts to queue for this unit.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    my $idle_printer = eval {
+        $schema->resultset('Printing3dPrinter')->search(
+            { sitename => $sitename, status => 'idle' }, { rows => 1 }
+        )->first
+    };
+    my $first = 1;
+    my @created;
+    my $user_id  = $c->session->{user_id};
+    my $username = $c->session->{username} || '';
+
+    eval {
+        $schema->txn_do(sub {
+            for my $pj (@print_jobs) {
+                unless ($pj->{model}) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_order_unit',
+                        'No 3D model for '.$pj->{comp}->sku.' — skipped print job');
+                    next;
+                }
+                my $fil = $pj->{role} eq 'panel' ? $panel_fil : $conn_fil;
+                my ($ftype, $fcolor) = Comserv::Util::Printing3d->new->infer_type_color($fil);
+                my $job_notes = join(' | ', grep { $_ } (
+                    $notes,
+                    'unit='.$parent->sku,
+                    'theme_role='.$pj->{role},
+                    ($need_bo ? 'BACKORDER filament' : ()),
+                    (@buy_notes ? 'buy='.join(',', @buy_notes) : ()),
+                ));
+                my $status = ($first && $idle_printer && !$need_bo) ? 'assigned' : 'queued';
+                my $stamp = _now();
+                my $job = $schema->resultset('Printing3dJob')->create({
+                    sitename           => $sitename,
+                    model_id           => $pj->{model}->id,
+                    user_id            => $user_id,
+                    username           => $username,
+                    printer_id         => ($status eq 'assigned') ? $idle_printer->id : undef,
+                    status             => $status,
+                    filament_item_id   => $fil->id,
+                    filament_quantity  => $pj->{qty},
+                    filament_color     => $fcolor || '',
+                    quantity           => $pj->{qty},
+                    notes              => $job_notes,
+                    inventory_reserved => 0,
+                    source_type        => 'project',
+                    source_item_id     => $parent->id,
+                    created_at         => $stamp,
+                    ( $status eq 'assigned' ? ( started_at => $stamp ) : () ),
+                });
+                if ($status eq 'assigned') {
+                    $idle_printer->update({
+                        status         => 'printing',
+                        current_job_id => $job->id,
+                        updated_at     => $stamp,
+                    });
+                    $first = 0;
+                }
+                push @created, { job => $job, fil => $fil, qty => $pj->{qty} };
+            }
+        });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_order_unit',
+            "unit order failed: $@");
+        $c->flash->{error_msg} = "Could not create print jobs: $@";
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    my @attach_ids = $c->req->param('attach_job_id');
+    my $attached = 0;
+    for my $jid (grep { $_ } @attach_ids) {
+        my $old = eval { $schema->resultset('Printing3dJob')->find($jid) } or next;
+        next unless ($old->sitename || '') eq $sitename;
+        next unless ($old->status || '') =~ /^(queued|assigned|printing)$/;
+        my $note = $old->notes || '';
+        $note .= ' | attached to unit='.$parent->sku unless $note =~ /unit=\Q$parent->sku\E/;
+        eval {
+            $old->update({
+                source_type    => 'project',
+                source_item_id => $parent->id,
+                notes          => $note,
+            });
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_order_unit',
+                "attach job $jid failed: $@");
+        } else {
+            $attached++;
+        }
+    }
+
+    unless ($need_bo) {
+        for my $cj (@created) {
+            my $fil = $cj->{fil};
+            my $job = $cj->{job};
+            my $first_stock = eval { ($fil->stock_levels->all)[0] };
+            eval {
+                $self->_inventory_transaction($c,
+                    schema           => $schema,
+                    sitename         => $sitename,
+                    item_id          => $fil->id,
+                    location_id      => $first_stock ? $first_stock->location_id : undef,
+                    transaction_type => 'reserve',
+                    quantity         => $cj->{qty},
+                    reference_number => '3D-JOB-' . $job->id,
+                    notes            => 'Filament reserved for unit job #'.$job->id,
+                    performed_by     => $username || 'system',
+                );
+                $job->update({ inventory_reserved => 1 });
+            };
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_order_unit',
+                "reserve failed job ".$job->id.": $@") if $@;
+        }
+    }
+
+    my $n = scalar @created;
+    my $msg = $need_bo
+        ? "$n print job(s) queued as backorder (filament on order / incoming)."
+        : "$n print job(s) created for this unit. One printer — extras wait in the queue.";
+    $msg .= " Attached $attached existing job(s)." if $attached;
+    $c->flash->{success_msg} = $msg;
+    $c->res->redirect($c->uri_for('/3d/my_orders'));
+    $c->detach;
+}
+
+# Signs: body (plate) one colour, text another. Same backorder rule as units.
+sub _order_two_colour {
+    my ($self, $c, $schema, $sitename, $model) = @_;
+    my $p = $c->req->params;
+    my $body_id = $p->{panel_filament_id}     || $p->{filament_item_id} || '';
+    my $text_id = $p->{connector_filament_id} || '';
+    my $allow_bo = $p->{allow_backorder} ? 1 : 0;
+    unless ($body_id && $text_id) {
+        $c->flash->{error_msg} = 'Choose a filament for the sign body and another for the text.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+    my $body_fil = eval { $schema->resultset('Accounting::InventoryItem')->find($body_id) };
+    my $text_fil = eval { $schema->resultset('Accounting::InventoryItem')->find($text_id) };
+    unless ($body_fil && $text_fil) {
+        $c->flash->{error_msg} = 'One of the chosen filaments was not found.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+    my $need_bo = ($self->_filament_available($body_fil) <= 0
+                || $self->_filament_available($text_fil) <= 0);
+    if ($need_bo && !$allow_bo) {
+        $c->flash->{error_msg} =
+            'Chosen colour is not in stock. Pick another pair, or tick backorder.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    my $idle = eval {
+        $schema->resultset('Printing3dPrinter')->search(
+            { sitename => $sitename, status => 'idle' }, { rows => 1 }
+        )->first
+    };
+    my ($bt, $bc) = Comserv::Util::Printing3d->new->infer_type_color($body_fil);
+    my ($tt, $tc) = Comserv::Util::Printing3d->new->infer_type_color($text_fil);
+    my $qty = $p->{quantity} || 1;
+    my $notes = join(' | ', grep { $_ } (
+        $p->{notes},
+        "sign_body_id=".$body_fil->id,
+        "sign_body=$bc $bt",
+        "sign_text_id=".$text_fil->id,
+        "sign_text=$tc $tt",
+        ($need_bo ? 'BACKORDER filament' : ()),
+    ));
+    my $status = ($idle && !$need_bo) ? 'assigned' : 'queued';
+    my $job;
+    my $stamp = _now();
+    eval {
+        $job = $schema->resultset('Printing3dJob')->create({
+            sitename           => $sitename,
+            model_id           => $model->id,
+            source_type        => 'sign',
+            item_name          => $model->name,
+            user_id            => $c->session->{user_id},
+            username           => $c->session->{username} || '',
+            printer_id         => $status eq 'assigned' ? $idle->id : undef,
+            status             => $status,
+            filament_item_id   => $body_fil->id,
+            filament_quantity  => $qty,
+            filament_color     => "body:$bc text:$tc",
+            filament_type      => join('+', grep { $_ } $bt, $tt) || undef,
+            quantity           => $qty,
+            notes              => $notes,
+            inventory_reserved => 0,
+            created_at         => $stamp,
+            ( $status eq 'assigned' ? ( started_at => $stamp ) : () ),
+        });
+        if ($status eq 'assigned') {
+            $idle->update({
+                status => 'printing', current_job_id => $job->id, updated_at => $stamp,
+            });
+        }
+    };
+    if ($@ || !$job) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_order_two_colour',
+            "sign order failed: $@");
+        $c->flash->{error_msg} = "Could not create print job: $@";
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+    unless ($need_bo) {
+        my $fs = eval { ($body_fil->stock_levels->all)[0] };
+        eval {
+            $self->_inventory_transaction($c,
+                schema => $schema, sitename => $sitename, item_id => $body_fil->id,
+                location_id => $fs ? $fs->location_id : undef,
+                transaction_type => 'reserve', quantity => $qty,
+                reference_number => '3D-JOB-'.$job->id,
+                notes => 'Sign body filament reserved',
+                performed_by => $c->session->{username} || 'system',
+            );
+            $job->update({ inventory_reserved => 1 });
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_order_two_colour',
+            "reserve failed: $@") if $@;
+    }
+
+    my $sg = Comserv::Util::SignGenerator->new;
+    my $built = $sg->render_for_order($c,
+        model    => $model,
+        body_fil => $body_fil,
+        text_fil => $text_fil,
+        job      => $job,
+    );
+    if ($built && !$built->{error} && $built->{filename}) {
+        eval {
+            $job->update({
+                notes => join(' | ', grep { $_ } ($job->notes, 'order_3mf='.$built->{filename})),
+            });
+        };
+        $c->flash->{success_msg} = $need_bo
+            ? 'Sign queued as backorder. Two-colour 3MF is ready to download.'
+            : 'Sign print job created. Download the two-colour 3MF to slice.';
+    }
+    else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_order_two_colour',
+            'order 3MF failed: '.(($built && $built->{error}) || 'unknown'));
+        $c->flash->{success_msg} = 'Sign job created, but the two-colour file could not be built yet. Open the job page and download again.';
+        $c->flash->{error_msg} = $built->{error} if $built && $built->{error};
+    }
+    $c->res->redirect($c->uri_for('/signgenerator/ordered', [$job->id]));
+    $c->detach;
+}
+
+sub _require_login {
+    my ($self, $c) = @_;
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in to continue.';
+        $c->res->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        $c->detach;
+    }
+}
+
+sub _require_admin {
+    my ($self, $c) = @_;
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { $_ eq 'admin' } @{$roles};
+    unless ($is_admin) {
+        $c->stash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/3d'));
+        $c->detach;
+    }
+}
+
+# Farm-role gate: admin now; add 'print_farm' here when farm workers get a role.
+# This is the single extension point for non-admin print-farm staff.
+sub _require_farm_role {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    my $ok    = grep { $_ eq 'admin' || $_ eq 'print_farm' } @{$roles};
+    unless ($ok) {
+        $c->stash->{error_msg} = 'Print-farm access required.';
+        $c->res->redirect($c->uri_for('/3d'));
+        $c->detach;
+    }
+}
+
+# ============================================================
+# Inventory accounting helper
+# Records a transaction AND updates stock level in one txn
+# ============================================================
+
+sub _inventory_transaction {
+    my ($self, $c, %p) = @_;
+    # Required: schema, sitename, item_id, transaction_type, quantity, reference_number
+    # Optional: location_id, unit_cost, notes, performed_by
+    my $schema   = $p{schema};
+    my $sitename = $p{sitename};
+    my $now      = _now();
+
+    $schema->txn_do(sub {
+
+        # Record the transaction in the ledger
+        $schema->resultset('Accounting::InventoryTransaction')->create({
+            item_id          => $p{item_id},
+            location_id      => $p{location_id}  || undef,
+            transaction_type => $p{transaction_type},
+            quantity         => $p{quantity},
+            unit_cost        => $p{unit_cost}     || undef,
+            reference_number => $p{reference_number},
+            sitename         => $sitename,
+            notes            => $p{notes}         || '',
+            performed_by     => $p{performed_by}  || 'system',
+            transaction_date => $now,
+            created_at       => $now,
+        });
+
+        # Update the stock level
+        my %find = (item_id => $p{item_id});
+        $find{location_id} = $p{location_id} if $p{location_id};
+
+        my $stock;
+        if ($p{location_id}) {
+            $stock = $schema->resultset('Accounting::InventoryStockLevel')->find_or_create(
+                { item_id => $p{item_id}, location_id => $p{location_id} },
+                { default => {
+                    quantity_on_hand => 0,
+                    quantity_reserved => 0,
+                    quantity_on_order => 0,
+                }}
+            );
+        } else {
+            # No location — work with the first stock level row for this item
+            $stock = $schema->resultset('Accounting::InventoryStockLevel')->search(
+                { item_id => $p{item_id} }
+            )->first;
+        }
+
+        return unless $stock;
+
+        my $type = $p{transaction_type};
+        my $qty  = $p{quantity};
+
+        if ($type eq 'reserve') {
+            $stock->update({ quantity_reserved => $stock->quantity_reserved + $qty });
+        } elsif ($type eq 'reserve_release') {
+            my $new_res = $stock->quantity_reserved - $qty;
+            $new_res = 0 if $new_res < 0;
+            $stock->update({ quantity_reserved => $new_res });
+        } elsif ($type eq 'issue') {
+            my $new_hand = $stock->quantity_on_hand - $qty;
+            my $new_res  = $stock->quantity_reserved - $qty;
+            $new_hand = 0 if $new_hand < 0;
+            $new_res  = 0 if $new_res  < 0;
+            $stock->update({
+                quantity_on_hand  => $new_hand,
+                quantity_reserved => $new_res,
+            });
+        } elsif ($type eq 'return') {
+            # Reverse of 'issue' — stock goes back on hand (job reopened, etc.)
+            $stock->update({ quantity_on_hand => $stock->quantity_on_hand + $qty });
+        } elsif ($type eq 'receive') {
+            $stock->update({ quantity_on_hand => $stock->quantity_on_hand + $qty });
+        }
+    });
+}
+
+# ============================================================
+# Landing page
+# ============================================================
+
+sub index :Path :Args(0) {
+    my ($self, $c) = @_;
+
+    my $sitename       = $self->_sitename($c);
+    my $schema         = $self->_schema($c);
+    my $module_enabled = $self->_is_module_enabled($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        "3D index site=$sitename enabled=$module_enabled");
+
+    my ($model_count, $public_model_count, $printer_count, $my_open_jobs, $store_item_count) = (0, 0, 0, 0, 0);
+
+    if ($module_enabled) {
+        eval {
+            $model_count = $schema->resultset('Printing3dModel')->search(
+                { sitename => $sitename, is_active => 1 })->count;
+            # Public hub shows the public catalog only. The full library count is admin-only.
+            $public_model_count = $schema->resultset('Printing3dModel')->search({
+                sitename  => $sitename,
+                is_active => 1,
+                tags      => { -like => '%vis:public%' },
+            })->count;
+            $printer_count = $schema->resultset('Printing3dPrinter')->search(
+                { sitename => $sitename, status => 'idle' })->count;
+            $store_item_count = $schema->resultset('Accounting::InventoryItem')->search(
+                { sitename => $sitename, show_in_shop => 1, status => 'active' }
+            )->count;
+            if ($c->session->{user_id}) {
+                $my_open_jobs = $schema->resultset('Printing3dJob')->search(
+                    { sitename => $sitename, user_id => $c->session->{user_id},
+                      status   => { -in => ['queued','assigned','printing'] } }
+                )->count;
+            }
+        };
+    }
+
+    $c->stash(
+        sitename         => $sitename,
+        module_enabled   => $module_enabled,
+        model_count        => $model_count,
+        public_model_count => $public_model_count // 0,
+        printer_count    => $printer_count,
+        my_open_jobs     => $my_open_jobs,
+        store_item_count => $store_item_count,
+        template         => '3d/index.tt',
+    );
+}
+
+# ============================================================
+# Customer Store — buy ready-made printed items from inventory
+# ============================================================
+
+sub store :Path('/3d/store') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->redirect($c->uri_for('/shop', { category => '3dStock' }));
+    $c->detach;
+}
+
+# ============================================================
+# Buy — purchase a printed item from stock
+# Creates an inventory "issue" transaction (accounting entry)
+# ============================================================
+
+sub buy :Path('/3d/buy') :Args(0) {
+    my ($self, $c) = @_;
+    my $item_id  = $c->req->params->{item_id};
+    my $quantity = $c->req->params->{quantity} || 1;
+    if ($item_id) {
+        $c->res->redirect($c->uri_for('/Cart/add',
+            { item_id => $item_id, quantity => $quantity, return_to => '/shop' }));
+    } else {
+        $c->res->redirect($c->uri_for('/shop'));
+    }
+    $c->detach;
+}
+
+# ============================================================
+# Browse / Search 3D Models
+# ============================================================
+
+sub browse :Path('/3d/browse') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $q   = $c->req->params->{q}   || '';
+    my $kind = $c->req->params->{kind} || '';
+    my $cat  = $c->req->params->{cat}  || '';
+    my $page = $c->req->params->{page} || 1;
+    $page    = 1 unless $page =~ /^\d+$/ && $page >= 1;
+    my $per_page = 24;
+    $kind = 'all' unless $kind =~ /^(all|product|part|sign)$/;
+
+    # Build category tree for filter dropdown (whether or not cat is selected)
+    my $cat_tree = [];
+    my %item_category_ids;  # item_id => [category_ids]
+    eval {
+        $cat_tree = Comserv::Util::CategoryManager->new->tree($schema, $sitename);
+        # Preload all item→category mappings for fast filtering
+        if ($cat_tree && @$cat_tree) {
+            my @links = $schema->resultset('Accounting::InventoryItemCategory')->search(
+                {},
+                { columns => [qw(item_id category_id)] }
+            )->all;
+            for my $l (@links) {
+                push @{ $item_category_ids{ $l->item_id } }, $l->category_id;
+            }
+        }
+    };
+
+    my @all_models;
+    eval {
+        my %search = (sitename => $sitename, is_active => 1);
+        if ($q) {
+            # Keyword extraction for broad matching (especially with deep=1)
+            my @terms;
+            my %stop = map { $_ => 1 } qw(
+                need want find show me get for the model models
+                that this with from have what when where which about
+                please can you do does did are is am be been was were
+                it its they them their our my your his her a an
+            );
+            for my $w (split(/\W+/, lc($q))) {
+                next if length($w) < 3;
+                next if $stop{$w};
+                push @terms, $w;
+            }
+            # Full raw query as broadest match
+            my @or = (
+                { name        => { -like => "%$q%" } },
+                { description => { -like => "%$q%" } },
+                { tags        => { -like => "%$q%" } },
+            );
+            # Per-keyword matches (hits partial names like "stackable" in "Stackable Box")
+            for my $t (@terms) {
+                push @or,
+                    { name        => { -like => "%$t%" } },
+                    { description => { -like => "%$t%" } },
+                    { tags        => { -like => "%$t%" } };
+            }
+            $search{-or} = \@or;
+        }
+        @all_models = $schema->resultset('Printing3dModel')->search(
+            \%search, { order_by => { -asc => 'name' } }
+        )->all;
+        # Browse is the printable-part catalog. Assemblies (Has BOM) and
+        # pack 3MF plates belong on the item/BOM page, not here.
+        @all_models = grep { $self->_browse_is_printable($schema, $_) } @all_models;
+        # Public browse: vis:public tag, the named public models, or the
+        # logged-in owner's own upload (tag owner:<user_id>). In-house stays hidden.
+        my $uid = $c->session->{user_id} || 0;
+        @all_models = grep { $self->_browse_visible($_, $uid) } @all_models;
+
+        if ($kind ne 'all') {
+            @all_models = grep { $self->_browse_kind($schema, $_) eq $kind } @all_models;
+        }
+        # Category filter: model must have item_id and item must be in the selected category or its descendants
+        if ($cat && %item_category_ids) {
+            my @desc_ids = ($cat);
+            if ($cat && $cat ne '0') {
+                @desc_ids = Comserv::Util::CategoryManager->new->descendant_ids($schema, $cat);
+            }
+            my %desc_set = map { $_ => 1 } @desc_ids;
+            @all_models = grep {
+                my $iid = $_->item_id;
+                $iid && $item_category_ids{$iid} && grep { $desc_set{$_} } @{ $item_category_ids{$iid} };
+            } @all_models;
+        }
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading models: $@" if $@;
+
+    my $total_models = scalar @all_models;
+    my $total_pages  = $total_models > 0
+        ? int(($total_models + $per_page - 1) / $per_page)
+        : 1;
+    $page = $total_pages if $page > $total_pages;
+
+    my $offset = ($page - 1) * $per_page;
+    my @models = @all_models[$offset .. ($offset + $per_page - 1 < $#all_models ? $offset + $per_page - 1 : $#all_models)];
+    @models = () if $offset > $#all_models;
+
+    # For herb signs, attach the stored sign layout (sidecar JSON) so the
+    # browse cards can show the PDF and identify each build by size/colour.
+    # Only load sign_meta for models on the current page.
+    my $signutil = Comserv::Util::SignGenerator->new;
+    my %sign_meta;
+    for my $m (@models) {
+        next unless $m->source && $m->source eq 'sign_generator';
+        my $meta = try { $signutil->load_metadata($m) } || {};
+        $sign_meta{ $m->id } = $meta if %$meta;
+    }
+
+    # ── AI Web Search (if query present) ──────────────────────────────────
+    my $deep           = $c->req->params->{deep} || 0;
+    my $model_id_param = $c->req->params->{model_id} || 0;
+    my $site_param     = $c->req->params->{site} || '';
+    my $web_results    = [];
+    my $search_provider = '';
+    my $augmented_q    = '';
+    if (length $q && $deep) {
+        ($web_results, $search_provider, $augmented_q) =
+            $self->_run_web_search_for_browse($c, $q, $model_id_param, $site_param);
+    }
+
+    # Always-visible branded entry cards for external model repositories.
+    # When a query exists, prebuild each site's REAL search URL (site's own
+    # endpoint + escaped term, augmented by the AI when a deep search ran).
+    # Built in Perl — TT2's | uri filter does not escape reliably here.
+    my $external_sites = $self->_external_sites;
+    if (length $q) {
+        my $term = ($deep && $augmented_q) ? $augmented_q : $q;
+        my $esc  = URI::Escape::uri_escape($term // $q);
+        for my $s (@$external_sites) {
+            $s->{search_href} = $s->{search} . $esc;
+        }
+    }
+
+    $c->stash(
+        sitename        => $sitename,
+        models          => \@models,
+        sign_meta       => \%sign_meta,
+        q               => $q,
+        kind            => $kind,
+        cat             => $cat,
+        cat_tree        => $cat_tree,
+        page            => $page,
+        total_pages     => $total_pages,
+        total_models    => $total_models,
+        per_page        => $per_page,
+        deep            => $deep,
+        site            => $site_param,
+        external_sites  => $external_sites,
+        web_results     => $web_results,
+        search_provider => $search_provider,
+        augmented_q     => $augmented_q,
+        template        => '3d/browse.tt',
+    );
+}
+
+# ── _external_sites ────────────────────────────────────────────────────
+# Single source of truth for the external model repositories the deep web
+# search targets. Shared by _run_web_search_for_browse (site: filters) and
+# browse.tt (the branded "External Sites" card grid at the bottom of the
+# page). code maps to the site-* CSS classes + site icons in browse.tt.
+sub _external_sites {
+    my ($self) = @_;
+    return [
+        # search = the site's OWN search page base; param = its query-string
+        # field. Cards link seeds + escaped term, so a click searches the
+        # external site itself — never the app's local/SearXNG page.
+        { domain => 'printables.com/model',         label => 'Printables',   code => 'prtbl', url => 'https://www.printables.com', search => 'https://www.printables.com/search/all-models?q=', param => 'q' },
+        { domain => 'makerworld.com/en/models',     label => 'MakerWorld',   code => 'mkwld', url => 'https://makerworld.com', search => 'https://makerworld.com/en/search?q=', param => 'q' },
+        { domain => 'thangs.com/designer',          label => 'Thangs',       code => 'thngs', url => 'https://www.thangs.com', search => 'https://www.thangs.com/search?q=', param => 'q' },
+        { domain => 'cults3d.com/en/3d-model',      label => 'Cults3D',      code => 'cult3', url => 'https://cults3d.com', search => 'https://cults3d.com/en/search?q=', param => 'q' },
+        { domain => 'thingiverse.com/thing',        label => 'Thingiverse',  code => 'thing', url => 'https://www.thingiverse.com', search => 'https://www.thingiverse.com/search?q=', param => 'q' },
+        { domain => 'myminifactory.com/object',     label => 'MyMiniFactory', code => 'mymin', url => 'https://www.myminifactory.com', search => 'https://www.myminifactory.com/search?q=', param => 'q' },
+        { domain => 'cgtrader.com/3d-print-models', label => 'CGTrader',     code => 'cgtrd', url => 'https://www.cgtrader.com', search => 'https://www.cgtrader.com/search?q=', param => 'q' },
+        { domain => 'gambody.com/3d-models',        label => 'Gambody',      code => 'gambd', url => 'https://www.gambody.com', search => 'https://www.gambody.com/search?q=', param => 'q' },
+        { domain => 'pinshape.com/items',           label => 'Pinshape',     code => 'pnshp', url => 'https://pinshape.com', search => 'https://pinshape.com/items?search=', param => 'search' },
+        { domain => 'youmagine.com/designs',        label => 'YouMagine',    code => 'ymagn', url => 'https://www.youmagine.com', search => 'https://www.youmagine.com/search?q=', param => 'q' },
+        { domain => 'makeronline.com/model',        label => 'Anycubic',     code => 'anycu', url => 'https://www.makeronline.com', search => 'https://makeronline.com/search?q=', param => 'q' },
+    ];
+}
+
+# ── _run_web_search_for_browse ──────────────────────────────────────────
+# Asks aisystem (SearchString + Controller::AI::_do_web_search) to augment
+# the query and run a web search.  Returns ([web_result_cards], provider, augmented_q).
+# Persists hits to WebSearchResult (non-fatal).
+sub _run_web_search_for_browse {
+    my ($self, $c, $raw_query, $model_id, $site_code) = @_;
+    my @results;
+
+    # 1. Load model context for query augmentation
+    my ($model_name, $model_tags);
+    if ($model_id) {
+        eval {
+            my $schema = $self->_schema($c);
+            my $model = $schema->resultset('Printing3dModel')->find({
+                id => $model_id,
+                sitename => $self->_sitename($c),
+            });
+            if ($model) {
+                $model_name = $model->name // '';
+                $model_tags = $model->tags // '';
+            }
+        };
+    }
+
+    # 2. Ask aisystem to create the augmented search string
+    my $augmented;
+    eval {
+        require Comserv::Model::AI2::SearchString;
+        $augmented = Comserv::Model::AI2::SearchString->augment(
+            raw_query => $raw_query,
+            context   => '3d_model',
+            tags      => $model_tags // '',
+            name      => $model_name  // '',
+        );
+    };
+    $augmented = $raw_query unless length($augmented // '');
+
+    # 3. Search model sites for individual STL listings via SearXNG.
+    #    site: filters target model detail pages (/model/, /models/, /thing/)
+    #    instead of tag/collection pages. Each query finds individual files
+    #    with thumbnails from a specific model repository.
+    my $provider = 'Web';
+    eval {
+        require Comserv::Model::AI2::Search;
+        my $svc = Comserv::Model::AI2::Search->new;
+        if ($svc->enabled($c)) {
+            # Each site query finds individual model pages, not tag pages.
+            # Site-branded cards: label is the CSS key; domain is the site: filter.
+            # Short codes (4-6 chars) map to CSS classes in browse.tt.
+            # The list is the same one browse.tt renders as the bottom
+            # "External Sites" card grid; single source of truth.
+            my $sites = $self->_external_sites;
+            my %seen;
+
+            for my $site (@$sites) {
+                next if $site_code && $site->{code} ne $site_code;
+                my $site_q = "site:$site->{domain} $augmented";
+                my $r = $svc->query($c, query => $site_q);
+                next unless $r && $r->{success} && $r->{results};
+                for my $hit (@{ $r->{results} }) {
+                    last if @results >= 24;
+                    next unless $hit->{url};
+                    next if $seen{$hit->{url}}++;
+                    push @results, {
+                        title     => $hit->{title}    // '',
+                        url       => $hit->{url}      // '',
+                        snippet   => substr($hit->{content} // '', 0, 200),
+                        thumbnail => $hit->{thumbnail} // '',
+                        site      => $site->{label},
+                        site_code => $site->{code},
+                        site_url  => $hit->{url},
+                        cost      => '',
+                        file_type => 'STL',
+                    };
+                }
+            }
+        }
+    };
+
+    # Fallback: generic SearXNG search if site-specific queries returned nothing
+    if (!@results) {
+        $provider = 'Web (broad)';
+        eval {
+            require Comserv::Model::AI2::Search;
+            my $svc = Comserv::Model::AI2::Search->new;
+            if ($svc->enabled($c)) {
+                my $r = $svc->query($c, query => $augmented);
+                if ($r && $r->{success} && $r->{results}) {
+                    for my $hit (@{ $r->{results} }) {
+                        last if @results >= 24;
+                        next unless $hit->{url};
+                        push @results, {
+                            title     => $hit->{title}     // '',
+                            url       => $hit->{url}       // '',
+                            snippet   => substr($hit->{content} // '', 0, 250),
+                            thumbnail => $hit->{thumbnail}  // '',
+                            site      => '',
+                        };
+                    }
+                }
+            }
+        };
+    }
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+        'web_search', "Web search error: $@") if $@;
+
+    # 5. Persist to WebSearchResult (search index) — non-fatal
+    if (@results) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            my $uid    = $c->session->{user_id} || 0;
+            for my $r (@results) {
+                my $exists = $schema->resultset('WebSearchResult')->search(
+                    { result_url => $r->{url}, query => $augmented },
+                    { rows => 1 }
+                )->single;
+                next if $exists;
+                $schema->resultset('WebSearchResult')->create({
+                    query            => substr($augmented, 0, 500),
+                    result_title     => substr($r->{title}, 0, 512),
+                    result_url       => substr($r->{url}, 0, 1000),
+                    result_snippet   => substr($r->{snippet}, 0, 65000),
+                    source_type      => 'web',
+                    found_by_user_id => $uid,
+                    is_verified      => 0,
+                });
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'web_search', "WebSearchResult persist: $@") if $@;
+    }
+
+    return (\@results, $provider || '', $augmented);
+}
+
+# ============================================================
+# Model Detail
+# ============================================================
+
+sub model_detail :Path('/3d/model') :Args(1) {
+    my ($self, $c, $id) = @_;
+    $self->_require_module($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $model;
+    eval {
+        $model = $schema->resultset('Printing3dModel')->find(
+            { id => $id, sitename => $sitename }
+        );
+    };
+    unless ($model) {
+        $c->stash->{error_msg} = 'Model not found.';
+        $c->res->redirect($c->uri_for('/3d/browse'));
+        $c->detach;
+    }
+
+    # Load actual filament inventory items for the order form
+    my @filaments;
+    eval {
+        @filaments = $schema->resultset('Accounting::InventoryItem')->search(
+            { sitename => $sitename, category => '3d_filament', status => 'active' },
+            { prefetch => 'stock_levels', order_by => 'name' }
+        )->all;
+    };
+    my @filament_spools = Comserv::Util::Printing3d->new->list_filaments($schema, $sitename);
+
+    my $printer_count = 0;
+    eval {
+        $printer_count = $schema->resultset('Printing3dPrinter')->search(
+            { sitename => $sitename }
+        )->count;
+    };
+
+    # Build available qty per filament
+    my %fil_available;
+    for my $f (@filaments) {
+        my $avail = 0;
+        for my $sl ($f->stock_levels->all) {
+            $avail += ($sl->quantity_on_hand - $sl->quantity_reserved);
+        }
+        $fil_available{ $f->id } = $avail;
+    }
+
+    my $inv_item;
+    my @bom_admin;
+    eval {
+        if ($model->item_id) {
+            $inv_item = $schema->resultset('Accounting::InventoryItem')->find(
+                { id => $model->item_id },
+                { prefetch => [
+                    'stock_levels',
+                    { 'bom_components' => { 'component_item' => 'stock_levels' } },
+                ]},
+            );
+        }
+        if ($inv_item && $inv_item->is_assemblable) {
+            for my $line ($inv_item->bom_components->all) {
+                my $comp = $line->component_item;
+                my ($on_hand, $reserved) = (0, 0);
+                if ($comp) {
+                    for my $sl ($comp->stock_levels->all) {
+                        $on_hand  += ($sl->quantity_on_hand  || 0);
+                        $reserved += ($sl->quantity_reserved || 0);
+                    }
+                }
+                my $thumb = '';
+                if ($comp && $comp->image_path) {
+                    $thumb = $comp->image_path;
+                }
+                elsif ($comp) {
+                    my $pm = $schema->resultset('Printing3dModel')->search(
+                        { item_id => $comp->id, sitename => $sitename, is_active => 1 },
+                        { rows => 1 },
+                    )->first;
+                    $thumb = $pm->thumbnail_url if $pm && $pm->thumbnail_url;
+                }
+                push @bom_admin, {
+                    sku         => $comp ? $comp->sku  : '',
+                    name        => $comp ? $comp->name : ('#'.$line->component_item_id),
+                    item_id     => $comp ? $comp->id   : $line->component_item_id,
+                    origin      => $comp ? ($comp->item_origin || '') : '',
+                    quantity    => int($line->quantity || 1),
+                    unit        => $line->unit,
+                    is_optional => $line->is_optional ? 1 : 0,
+                    on_hand     => $on_hand,
+                    reserved    => $reserved,
+                    available   => $on_hand - $reserved,
+                    image       => $thumb,
+                    print_role  => $self->_part_theme_role($comp ? $comp->sku : ''),
+                    is_printed  => $self->_bom_line_is_printed($comp),
+                };
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'model_detail',
+            "BOM/stock load failed for model $id: $@");
+    }
+
+    my @attachable_jobs;
+    eval {
+        my $uid = $c->session->{user_id};
+        my $rs = $schema->resultset('Printing3dJob')->search(
+            {
+                sitename => $sitename,
+                status   => { -in => [qw(queued assigned printing)] },
+                ($uid ? (user_id => $uid) : ()),
+            },
+            { order_by => { -desc => 'id' }, rows => 40, prefetch => 'model' },
+        );
+        while (my $j = $rs->next) {
+            my $mn = eval { $j->model ? $j->model->name : '' } || '';
+            push @attachable_jobs, {
+                id     => $j->id,
+                name   => $mn || ('job #'.$j->id),
+                status => $j->status,
+                qty    => $j->quantity || 1,
+                linked => ($j->source_item_id && $inv_item && $j->source_item_id == $inv_item->id) ? 1 : 0,
+            };
+        }
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'model_detail',
+        "attachable jobs load failed: $@") if $@;
+
+    # ── \"More like this\" — similar models via AI search ──────────────
+    my $similar_param = $c->req->params->{similar} || 0;
+    my $similar_models = [];
+    my $similar_web    = [];
+    my $similar_provider = '';
+    if ($similar_param) {
+        # Build query from model name + tags
+        my $sim_q = join(' ', grep { length } ($model->name // '', $model->tags // ''));
+        if (length $sim_q) {
+            ($similar_web, $similar_provider, my $dummy) =
+                $self->_run_web_search_for_browse($c, $sim_q, $model->id);
+            # Also search local models with similar name/tags
+            eval {
+                my @like;
+                for my $term (split(/\s+/, $sim_q)) {
+                    next if length($term) < 3;
+                    push @like,
+                        { name => { -like => "%$term%" } },
+                        { tags => { -like => "%$term%" } };
+                }
+                if (@like) {
+                    $similar_models = [
+                        $schema->resultset('Printing3dModel')->search(
+                            {
+                                sitename => $sitename,
+                                is_active => 1,
+                                id => { '!=' => $model->id },
+                                -or => \@like,
+                            },
+                            { order_by => { -asc => 'name' }, rows => 12 }
+                        )->all
+                    ];
+                }
+            };
+        }
+    }
+
+    $c->stash(
+        sitename          => $sitename,
+        model             => $model,
+        inv_item          => $inv_item,
+        bom_admin         => \@bom_admin,
+        filaments         => \@filaments,
+        filament_spools   => \@filament_spools,
+        printer_count     => $printer_count,
+        attachable_jobs   => \@attachable_jobs,
+        similar           => $similar_param,
+        similar_models    => $similar_models,
+        similar_web       => $similar_web,
+        similar_provider  => $similar_provider,
+        template          => '3d/model_detail.tt',
+    );
+}
+
+# ============================================================
+# Model Download — serve model file to logged-in users
+# ============================================================
+
+sub model_download :Path('/3d/model_download') :Args(1) {
+    my ($self, $c, $id) = @_;
+    $self->_require_module($c);
+    $self->_require_login($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $model = eval { $schema->resultset('Printing3dModel')->find({ id => $id, sitename => $sitename }) };
+    unless ($model && $model->nfs_path) {
+        $c->flash->{error_msg} = 'Model file not found.';
+        $c->res->redirect($c->uri_for('/3d/browse'));
+        $c->detach;
+    }
+
+    # Resolve through NfsPath so workstation and every Docker node use the same
+    # /data/nfs tree. A raw -f on the stored path fails when the container's
+    # /data/nfs is not the shared NFS volume.
+    my $path = eval { Comserv::Util::NfsPath->new->resolve_path($model->nfs_path) } || '';
+    unless ($path && -f $path && -r $path) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'model_download',
+            "STL not visible at stored nfs_path=" . ($model->nfs_path // '') .
+            " resolved=" . ($path || '<empty>'));
+        $c->flash->{error_msg} = 'File not found on server: ' . $model->nfs_path;
+        $c->res->redirect($c->uri_for('/3d/model', [$id]));
+        $c->detach;
+    }
+
+    require File::Basename;
+    my $filename = File::Basename::basename($path);
+    # Download name = SKU + human part name, e.g.
+    #   INT-HDRY-BBL01_Dryer_Bottom_Back_Left_L1.stl
+    # so the file identifies itself in the Downloads folder / slicer.
+    my $item_code = eval {
+        my $mi = $model->item_id or return undef;
+        my $it = $schema->resultset('Accounting::InventoryItem')->find($mi) or return undef;
+        $it->sku;
+    };
+    my $part_name = $model->name // '';
+    $part_name =~ s/\s*\([A-Za-z0-9]+\)\s*$//;          # strip trailing "(BBL01)"
+    $part_name =~ s/[^\w]+/_/g;                          # non-word -> underscore
+    $part_name =~ s/^_+|_+$//g;
+    $part_name = "Dryer_" . $part_name if $part_name && $part_name !~ /^Dryer/i;
+    my $dl_name = join("_", grep { $_ } ($item_code, $part_name));
+    $dl_name = $filename unless $dl_name;                # fallback: original basename
+    $dl_name .= ".stl" if $dl_name !~ /\.[A-Za-z0-9]+$/; # keep an extension
+    my ($ext) = ($filename =~ /\.([^.]+)$/);
+    my %mime_map = (
+        stl   => 'application/vnd.ms-pki.stl',
+        '3mf' => 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml',
+        obj   => 'application/x-tgif',
+        gcode => 'text/plain',
+        step  => 'application/step',
+        stp   => 'application/step',
+    );
+    my $mime = $mime_map{lc($ext // '')} || 'application/octet-stream';
+
+    open(my $fh, '<:raw', $path) or do {
+        $c->flash->{error_msg} = "Cannot read file: $!";
+        $c->res->redirect($c->uri_for('/3d/model', [$id]));
+        $c->detach;
+    };
+    $c->response->content_type($mime);
+    $c->response->header('Content-Disposition' => "attachment; filename=\"$dl_name\"");
+    $c->response->header('Content-Length' => -s $path);
+    $c->response->header('Cache-Control' => 'no-cache, no-store, must-revalidate');
+    $c->response->header('Pragma' => 'no-cache');
+    $c->response->header('Expires' => '0');
+    local $/ = undef;
+    $c->response->body(<$fh>);
+    close $fh;
+    $c->detach;
+}
+
+# ============================================================
+# Order a Print — reserves filament in inventory
+# ============================================================
+
+sub order :Path('/3d/order') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_login($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    if ($c->req->method eq 'POST') {
+        my $model_id         = $c->req->params->{model_id};
+        my $filament_item_id = $c->req->params->{filament_item_id} || undef;
+        my $filament_quantity= $c->req->params->{filament_quantity} || 1;
+        my $filament_color   = $c->req->params->{filament_color}    || '';
+        my $quantity         = $c->req->params->{quantity}           || 1;
+        my $notes            = $c->req->params->{notes}              || '';
+
+        my $model;
+        eval {
+            $model = $schema->resultset('Printing3dModel')->find(
+                { id => $model_id, sitename => $sitename, is_active => 1 }
+            );
+        };
+        unless ($model) {
+            $c->stash->{error_msg} = 'Invalid model selected.';
+            $c->res->redirect($c->uri_for('/3d/browse'));
+            $c->detach;
+        }
+
+        my $parent_item = eval {
+            $model->item_id
+                ? $schema->resultset('Accounting::InventoryItem')->find($model->item_id)
+                : undef
+        };
+        if ($parent_item && $parent_item->is_assemblable) {
+            $self->_order_unit($c, $schema, $sitename, $model, $parent_item);
+            return;
+        }
+        if (($model->source || '') eq 'sign_generator') {
+            $self->_order_two_colour($c, $schema, $sitename, $model);
+            return;
+        }
+
+        # Validate filament stock if a specific filament was selected
+        if ($filament_item_id) {
+            my $fil;
+            eval { $fil = $schema->resultset('Accounting::InventoryItem')->find($filament_item_id); };
+            if ($fil) {
+                my $avail = 0;
+                for my $sl ($fil->stock_levels->all) {
+                    $avail += ($sl->quantity_on_hand - $sl->quantity_reserved);
+                }
+                if ($avail < $filament_quantity) {
+                    $c->stash->{error_msg} =
+                        "Insufficient filament stock (" . $fil->name . "): "
+                        . "$avail " . $fil->unit_of_measure . " available.";
+                    $c->stash->{template} = '3d/model_detail.tt';
+                    $c->stash->{model}    = $model;
+                    return;
+                }
+            }
+        }
+
+        # Find idle printer
+        my $idle_printer;
+        eval {
+            $idle_printer = $schema->resultset('Printing3dPrinter')->search(
+                { sitename => $sitename, status => 'idle' }, { rows => 1 }
+            )->first;
+        };
+        my $job_status = $idle_printer ? 'assigned' : 'queued';
+
+        my $job;
+        my $stamp = _now();
+        eval {
+            $schema->txn_do(sub {
+                $job = $schema->resultset('Printing3dJob')->create({
+                    sitename           => $sitename,
+                    model_id           => $model_id,
+                    user_id            => $c->session->{user_id},
+                    username           => $c->session->{username} || '',
+                    printer_id         => $idle_printer ? $idle_printer->id : undef,
+                    status             => $job_status,
+                    filament_item_id   => $filament_item_id || undef,
+                    filament_quantity  => $filament_quantity,
+                    filament_color     => $filament_color,
+                    quantity           => $quantity,
+                    notes              => $notes,
+                    inventory_reserved => 0,
+                    created_at         => $stamp,
+                    ( $job_status eq 'assigned' ? ( started_at => $stamp ) : () ),
+                });
+
+                if ($idle_printer) {
+                    $idle_printer->update({
+                        status         => 'printing',
+                        current_job_id => $job->id,
+                        updated_at     => $stamp,
+                    });
+                }
+            });
+        };
+        if ($@) {
+            $c->stash->{error_msg} = "Error creating print job: $@";
+            $c->stash->{template}  = '3d/model_detail.tt';
+            $c->stash->{model}     = $model;
+            return;
+        }
+
+        # Reserve filament in inventory (outside the job txn so job id is available)
+        if ($filament_item_id && $job) {
+            my $fil;
+            eval { $fil = $schema->resultset('Accounting::InventoryItem')->find($filament_item_id); };
+            my $first_stock = eval { ($fil->stock_levels->all)[0] } if $fil;
+            my $loc_id      = $first_stock ? $first_stock->location_id : undef;
+
+            eval {
+                $self->_inventory_transaction($c,
+                    schema           => $schema,
+                    sitename         => $sitename,
+                    item_id          => $filament_item_id,
+                    location_id      => $loc_id,
+                    transaction_type => 'reserve',
+                    quantity         => $filament_quantity,
+                    reference_number => '3D-JOB-' . $job->id,
+                    notes            => 'Filament reserved for print job #' . $job->id,
+                    performed_by     => $c->session->{username} || 'system',
+                );
+                $job->update({ inventory_reserved => 1 });
+            };
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'order',
+                "Filament reservation failed for job " . $job->id . ": $@") if $@;
+        }
+
+        my $msg = $job_status eq 'assigned'
+            ? 'Print job created and assigned to a printer!'
+            : 'Print job queued — a printer will be assigned when one is available.';
+        $c->flash->{success_msg} = $msg;
+        $c->res->redirect($c->uri_for('/3d/my_orders'));
+        $c->detach;
+    }
+
+    # One order form: the model page (unit theme, sign body/text, or single part).
+    my $model_id = $c->req->params->{model_id};
+    if ($model_id) {
+        $c->res->redirect($c->uri_for('/3d/model', [$model_id]));
+    } else {
+        $c->res->redirect($c->uri_for('/3d/browse'));
+    }
+    $c->detach;
+}
+
+# ============================================================
+# Reorder a finished-goods item — queue a reprint to restock
+# (admin / farm role). Called from the item view and order pages.
+# ============================================================
+sub reorder_item :Path('/3d/reorder_item') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_farm_role($c);
+
+    my $item_id = $c->req->params->{item_id};
+    my $return_to = $c->req->params->{return_to}
+        || ($item_id ? $c->uri_for('/Inventory/item/view', [$item_id]) : $c->uri_for('/3d'));
+
+    unless ($item_id) {
+        $c->flash->{error_msg} = 'No item specified.';
+        $c->res->redirect($c->uri_for('/3d'));
+        $c->detach;
+    }
+
+    my $util = Comserv::Util::Printing3d->new;
+    my $res  = $util->reorder_item($c, $item_id);
+
+    if ($res->{ok}) {
+        $c->flash->{success_msg} =
+            "Reorder queued (job #" . $res->{job_id} . "). Check the print queue.";
+    } else {
+        $c->flash->{error_msg} = $res->{error};
+    }
+    $c->res->redirect($return_to);
+    $c->detach;
+}
+
+# ============================================================
+# My Orders
+# ============================================================
+
+sub my_orders :Path('/3d/my_orders') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_login($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my @jobs;
+    eval {
+        @jobs = $schema->resultset('Printing3dJob')->search(
+            { sitename => $sitename, user_id => $c->session->{user_id} },
+            {
+                prefetch => ['model', 'printer', 'filament_item'],
+                order_by => { -desc => 'created_at' },
+            }
+        )->all;
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading jobs: $@" if $@;
+
+    $c->stash(
+        sitename => $sitename,
+        jobs     => \@jobs,
+        template => '3d/my_orders.tt',
+    );
+}
+
+# ============================================================
+# Admin — Print Queue (with inventory accounting on status change)
+# ============================================================
+
+sub queue :Path('/3d/queue') :Args(0) {
+    my ($self, $c) = @_;
+    $c->stash( manufacturing_traveler_link => $c->uri_for('/Accounting/manufacturing') );
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    if ($c->req->method eq 'POST') {
+        my $job_id     = $c->req->params->{job_id};
+        my $printer_id = $c->req->params->{printer_id};
+        my $action     = $c->req->params->{action} || '';
+
+        eval {
+            my $job = $schema->resultset('Printing3dJob')->find($job_id);
+            return unless $job;
+
+            if ($action eq 'assign' && $printer_id) {
+                my $printer = $schema->resultset('Printing3dPrinter')->find($printer_id);
+                if ($printer) {
+                    my $stamp = _now();
+                    my %job_upd = (
+                        printer_id => $printer_id,
+                        status     => 'assigned',
+                    );
+                    # Only stamp started_at once (first assign).
+                    $job_upd{started_at} = $stamp
+                        unless defined $job->started_at && length $job->started_at;
+                    $job->update(\%job_upd);
+                    $printer->update({
+                        status         => 'printing',
+                        current_job_id => $job_id,
+                        updated_at     => $stamp,
+                    });
+                }
+
+            } elsif ($action eq 'complete') {
+                my $printer    = $job->printer;
+
+                # ---- Auto-fetch print time from printer LAN (if linked) ----
+                my $lan_host = '';
+                if ($printer && (my $pn = $printer->notes // '')) {
+                    $lan_host = $1 if $pn =~ /\[LAN_HOST:([0-9.]+)\]/;
+                }
+                my $lan_print_time_min;
+                if ($lan_host) {
+                    require Comserv::Util::Printing3d::Adapter::Anycubic;
+                    my $adapter = Comserv::Util::Printing3d::Adapter::Anycubic->new;
+                    my $st = eval { $adapter->fetch_state($c, $lan_host, 18910) };
+                    if ($st && $st->{ok} && defined $st->{print_time_min}
+                        && $st->{print_time_min} !~ /^\\s*$/) {
+                        $lan_print_time_min = 0 + $st->{print_time_min};
+                    }
+
+                    # Write full current printer state to JSON for monitoring / error detection.
+                    # This is the raw data from the printer (info + temp + print + mqtt status).
+                    # Location chosen to be accessible and consistent with other 3d data.
+                    if ($lan_host && $st && ref($st) eq 'HASH') {
+                        eval {
+                            require File::Path;
+                            my $dir = '/data/nfs/3d/printer_states';
+                            File::Path::make_path($dir);
+                            my $safe_id = $printer ? $printer->id : 'unknown';
+                            my $json_file = "$dir/printer_${safe_id}.json";
+                            my $full = {
+                                printer_id     => $safe_id,
+                                fetched_at     => _now(),
+                                lan_host       => $lan_host,
+                                state          => $st,
+                            };
+                            # Pretty for humans + machines
+                            require JSON;
+                            my $json = JSON->new->pretty->canonical->encode($full);
+                            open(my $fh, '>', $json_file) or die $!;
+                            print $fh $json;
+                            close $fh;
+                            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'queue_complete',
+                                "wrote full printer state to $json_file");
+                        };
+                        if ($@) {
+                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue_complete',
+                                "failed to write printer state json: $@");
+                        }
+                    }
+                }
+
+                my $grams_used = $c->req->params->{filament_grams} || undef;
+                $grams_used = undef if defined $grams_used && $grams_used !~ /^\d+\.?\d*$/;
+
+                my $print_hours;
+                # If LAN time is available, use it (printer's own elapsed is ground truth).
+                if (defined $lan_print_time_min && $lan_print_time_min > 0) {
+                    $print_hours = $lan_print_time_min / 60;
+                }
+                # Fall back to manual only when no LAN time.
+                if (!defined $print_hours || $print_hours <= 0) {
+                    my $ph_h = $c->req->params->{print_hours_h};
+                    my $ph_m = $c->req->params->{print_hours_m};
+                    if (defined $ph_h || defined $ph_m) {
+                        $ph_h = 0 + ($ph_h || 0);
+                        $ph_m = 0 + ($ph_m || 0);
+                        my $total = $ph_h + $ph_m / 60;
+                        $print_hours = $total > 0 ? $total : undef;
+                    } else {
+                        $print_hours = $c->req->params->{print_hours} || undef;
+                        $print_hours = undef if defined $print_hours && $print_hours !~ /^\d+\.?\d*$/;
+                    }
+                }
+
+                # ---- Auto-fill filament grams from model STL weight if not manually entered ----
+                if (!$grams_used) {
+                    my $model = eval { $job->model };
+                    if ($model && $model->stl_weight_g && $model->stl_weight_g > 0) {
+                        $grams_used = $model->stl_weight_g;
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'queue',
+                            "complete job=$job_id auto-fill grams from model stl_weight_g=$grams_used");
+                    }
+                }
+
+                # ---- Cost calculation ----
+                my ($filament_cost, $printer_cost, $elec_cost, $total_cost);
+
+                # Filament cost: grams_used * unit_cost/g  (or /1000 if still tracked per spool)
+                if ($job->filament_item_id && $grams_used) {
+                    my $fil = eval { $job->filament_item };
+                    if ($fil && $fil->unit_cost) {
+                        my $uom = lc($fil->unit_of_measure || 'g');
+                        $filament_cost = ($uom eq 'g')
+                            ? $grams_used * $fil->unit_cost
+                            : ($grams_used / 1000) * $fil->unit_cost;
+                    }
+                }
+
+                # Printer depreciation cost: hours * depreciation_per_hour from equipment
+                if ($printer && $print_hours && $printer->inventory_item_id) {
+                    my $inv_item = eval { $printer->inventory_item };
+                    if ($inv_item) {
+                        my $eq = eval { $inv_item->equipment };
+                        if ($eq) {
+                            if ($eq->depreciation_per_hour) {
+                                $printer_cost = $print_hours * $eq->depreciation_per_hour;
+                            }
+                            if ($eq->wattage) {
+                                my $kwh_rate = 0.15;
+                                $elec_cost   = $print_hours * $eq->wattage * $kwh_rate / 1000;
+                            }
+                        }
+                    }
+                }
+
+                $total_cost = ($filament_cost || 0) + ($printer_cost || 0) + ($elec_cost || 0);
+                $total_cost = undef unless $total_cost;
+
+                $job->update({
+                    status            => 'completed',
+                    completed_at      => _now(),
+                    print_hours       => $print_hours,
+                    filament_quantity => $grams_used,
+                    filament_cost     => $filament_cost,
+                    printer_cost      => $printer_cost,
+                    electricity_cost  => $elec_cost,
+                    total_cost        => $total_cost,
+                });
+
+                if ($printer) {
+                    $printer->update({
+                        status         => 'idle',
+                        current_job_id => undef,
+                        updated_at     => _now(),
+                    });
+                }
+
+                # Inventory accounting: issue (consume) filament used
+                # Always issue on completion using actual grams — inventory_reserved only
+                # matters for advance reservation (not always set for queue-sync jobs).
+                if ($job->filament_item_id && $grams_used) {
+                    my $fil  = eval { $job->filament_item };
+                    my $fsl  = eval { ($fil->stock_levels->all)[0] } if $fil;
+                    my $fil_uom   = $fil ? lc($fil->unit_of_measure || 'g') : 'g';
+                    my $issue_qty = Comserv::Util::Printing3d->new->stock_qty_from_grams($fil, $grams_used);
+                    eval {
+                        $self->_inventory_transaction($c,
+                            schema           => $schema,
+                            sitename         => $sitename,
+                            item_id          => $job->filament_item_id,
+                            location_id      => $fsl ? $fsl->location_id : undef,
+                            transaction_type => 'issue',
+                            quantity         => $issue_qty,
+                            unit_cost        => $filament_cost ? ($filament_cost / $issue_qty) : undef,
+                            reference_number => '3D-JOB-' . $job->id,
+                            notes            => sprintf('Filament used: %sg (%.4f %s) — print job #%d completed', $grams_used, $issue_qty, $fil_uom, $job->id),
+                            performed_by     => $c->session->{username} || 'system',
+                        );
+                    };
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+                        "Filament issue transaction failed for job $job_id: $@") if $@;
+                }
+
+                # Inventory accounting: record printer depreciation against asset
+                if ($printer && $printer->inventory_item_id && $printer_cost) {
+                    eval {
+                        $self->_inventory_transaction($c,
+                            schema           => $schema,
+                            sitename         => $sitename,
+                            item_id          => $printer->inventory_item_id,
+                            transaction_type => 'depreciation',
+                            quantity         => $print_hours || 1,
+                            unit_cost        => $printer_cost / ($print_hours || 1),
+                            reference_number => '3D-JOB-' . $job->id,
+                            notes            => sprintf('Printer depreciation: %.2fh @ job #%d', $print_hours || 0, $job->id),
+                            performed_by     => $c->session->{username} || 'system',
+                        );
+                    };
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+                        "Depreciation transaction failed for job $job_id: $@") if $@;
+                }
+
+                # Inventory: add finished printed PART to stock (receive = goods in).
+                # Prefer printing_3d_models.item_id — that is the component that was printed.
+                # source_item_id is often the parent unit/order (e.g. base assembly) and must
+                # NOT receive the finished part or wheel-half stock stays at 0 forever.
+                my $printed_item_id;
+                if ($job->model_id) {
+                    my $model = eval { $job->model };
+                    $printed_item_id = $model->item_id
+                        if $model && eval { $model->item_id };
+                }
+                if (!$printed_item_id && $job->source_item_id) {
+                    # Fallback only when there is no model→item link
+                    $printed_item_id = $job->source_item_id;
+                }
+                if (!$printed_item_id && $job->consignment_line_id) {
+                    $printed_item_id = eval {
+                        $schema->storage->dbh->selectrow_array(
+                            'SELECT item_id FROM inventory_consignment_lines WHERE id = ?',
+                            undef, $job->consignment_line_id)
+                    };
+                }
+                if ($printed_item_id) {
+                    my $default_loc = eval {
+                        $schema->storage->dbh->selectrow_array(
+                            'SELECT id FROM inventory_locations WHERE sitename = ? ORDER BY id LIMIT 1',
+                            undef, $sitename)
+                    };
+                    if ($default_loc) {
+                        eval {
+                            $self->_inventory_transaction($c,
+                                schema           => $schema,
+                                sitename         => $sitename,
+                                item_id          => $printed_item_id,
+                                location_id      => $default_loc,
+                                transaction_type => 'receive',
+                                quantity         => $job->quantity || 1,
+                                unit_cost        => $total_cost   || undef,
+                                reference_number => '3D-JOB-' . $job->id,
+                                notes            => sprintf('Printed: %d unit(s) completed — job #%d (item %d)',
+                                                        $job->quantity || 1, $job->id, $printed_item_id),
+                                performed_by     => $c->session->{username} || 'system',
+                            );
+                        };
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+                            "Finished goods receipt failed for job $job_id: $@") if $@;
+                    } else {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+                            "Finished goods receipt skipped job $job_id: no inventory_locations for '$sitename'");
+                    }
+                } else {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'queue',
+                        "Job $job_id completed with no printable item_id (model.item_id / source_item_id empty) — stock not received");
+                }
+
+            } elsif ($action eq 'reopen') {
+                # Undo a mis-clicked complete/cancel: back to queued + reverse the
+                # inventory side effects (filament issue, finished-goods receipt).
+                # Logic lives in Util::Printing3d (3d.pm is at its size limit).
+                my $res = Comserv::Util::Printing3d->new->reopen_job($c, $job, $self);
+                if ($res && $res->{ok}) {
+                    my $rev = $res->{reversed} || [];
+                    $c->flash->{success_msg} = 'Job #' . $job_id
+                        . ' reopened — back in the queue.'
+                        . (@$rev ? ' Reversed: ' . join('; ', @$rev) . '.' : '');
+                } else {
+                    $c->flash->{error_msg} = 'Could not reopen job #' . $job_id
+                        . ': ' . (($res && $res->{error}) || 'unknown error');
+                }
+
+            } elsif ($action eq 'cancel') {
+                my $printer = $job->printer;
+                $job->update({ status => 'cancelled', completed_at => _now() });
+
+                if ($printer && ($printer->current_job_id // 0) == $job_id) {
+                    $printer->update({
+                        status         => 'idle',
+                        current_job_id => undef,
+                        updated_at     => _now(),
+                    });
+                }
+
+                # Inventory accounting: release the filament reservation
+                if ($job->filament_item_id && $job->inventory_reserved) {
+                    my $fil  = $job->filament_item;
+                    my $fsl  = eval { ($fil->stock_levels->all)[0] };
+                    eval {
+                        $self->_inventory_transaction($c,
+                            schema           => $schema,
+                            sitename         => $sitename,
+                            item_id          => $job->filament_item_id,
+                            location_id      => $fsl ? $fsl->location_id : undef,
+                            transaction_type => 'reserve_release',
+                            quantity         => $job->filament_quantity || 1,
+                            reference_number => '3D-JOB-' . $job->id,
+                            notes            => 'Filament reservation released — job #' . $job->id . ' cancelled',
+                            performed_by     => $c->session->{username} || 'system',
+                        );
+                        $job->update({ inventory_reserved => 0 });
+                    };
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+                        "Filament release failed for job $job_id: $@") if $@;
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+            "Queue action error: $@") if $@;
+
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    my $dbh = $schema->storage->dbh;
+
+    my $history_limit = $c->req->params->{history} || 10;
+    $history_limit = int($history_limit);
+    $history_limit = 10  if $history_limit < 1;
+    $history_limit = 500 if $history_limit > 500;
+
+    my (@queued_jobs, @active_jobs, @idle_printers, @recent_completed);
+    my @farm_printers;   # ALL printers for the live-state section (assigned or not)
+    my $queue_error;
+
+    eval {
+        my $sql = q{
+            SELECT j.id, j.sitename, j.status, j.item_name, j.username, j.user_id,
+                   j.quantity, j.filament_color, j.filament_type, j.filament_quantity,
+                   j.filament_item_id, j.printer_id, j.model_id,
+                   j.source_type, j.consignment_id, j.consignment_line_id,
+                   j.notes, j.admin_notes,
+                   j.print_hours, j.filament_cost, j.printer_cost, j.total_cost,
+                   j.inventory_reserved, j.created_at, j.started_at, j.completed_at,
+                   fi.name  AS filament_name,
+                   fi.sku   AS filament_sku,
+                   pr.name  AS printer_name,
+                   pr.model AS printer_model,
+                   mo.name  AS model_name,
+                   mo.nfs_path AS model_file,
+                   mi.sku AS item_sku,
+                   parent.print_time_hours AS bom_print_hours,
+                   fil_bom.quantity        AS bom_filament_grams,
+                   fil_bom_item.name       AS bom_filament_name
+            FROM printing_3d_jobs j
+            LEFT JOIN inventory_items fi ON fi.id = j.filament_item_id
+            LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
+            LEFT JOIN printing_3d_models  mo ON mo.id = j.model_id
+            LEFT JOIN inventory_items mi ON mi.id = mo.item_id
+            LEFT JOIN inventory_consignment_lines cl ON cl.id = j.consignment_line_id
+            LEFT JOIN inventory_items parent ON parent.id = COALESCE(j.source_item_id, cl.item_id)
+            LEFT JOIN inventory_item_bom fil_bom
+                   ON fil_bom.parent_item_id = parent.id AND fil_bom.unit = 'g'
+            LEFT JOIN inventory_items fil_bom_item ON fil_bom_item.id = fil_bom.component_item_id
+            WHERE j.sitename = ?
+              AND j.status = ?
+            ORDER BY j.created_at ASC
+        };
+        my $q_rows = $dbh->selectall_arrayref($sql, { Slice => {} }, $sitename, 'queued');
+        @queued_jobs = @{ $q_rows // [] };
+
+        my $a_rows = $dbh->selectall_arrayref($sql =~ s/AND j\.status = \?/AND j.status IN ('assigned','printing')/r,
+            { Slice => {} }, $sitename);
+        @active_jobs = @{ $a_rows // [] };
+    };
+
+    # Elapsed time is computed SERVER-SIDE by Comserv::Util::AppTime — the one
+    # time authority. Templates must never do JS Date math: a stored UTC stamp
+    # parsed with new Date('YYYY-MM-DD HH:MM:SS') is read as browser-local time,
+    # which produced wildly wrong runtimes (the ~95h bug). We pass pre-computed
+    # values so the view just renders them.
+    for my $job (@active_jobs) {
+        my $hm = Comserv::Util::AppTime->duration_hm( $job->{started_at} );
+        $job->{elapsed_h}       = $hm->{h};
+        $job->{elapsed_m}       = $hm->{m};
+        $job->{elapsed_human}   = Comserv::Util::AppTime->duration_human( $job->{started_at} );
+        my $d = Comserv::Util::AppTime->elapsed_since( $job->{started_at} );
+        $job->{elapsed_hours}   = $d ? $d->{total_hours} : undef;
+        $job->{elapsed_days}    = $d ? $d->{days} : undef;
+    }
+
+    # Fetch fresh state from ALL LAN printers (active or idle) and write full JSON.
+    # This populates /data/nfs/3d/printer_states/*.json reliably on every /3d/queue load
+    # (for monitoring, error detection, and remain_time-based polling decisions).
+    # Active jobs get current_job context; others get basic printer info.
+    # Full raw printer response (incl. remain_time_min, print_time_min) is preserved.
+    # The same snapshot is passed to the template (%real_state) so the queue shows
+    # the printer's REAL state, not the DB status that assign-click wrote.
+    my %real_state;
+    eval {
+        require Comserv::Util::Printing3d::Adapter::Anycubic;
+        my $adapter = Comserv::Util::Printing3d::Adapter::Anycubic->new;
+        my %seen;
+        # Active first (with job context)
+        for my $job (@active_jobs) {
+            next unless $job->{printer_id};
+            next if $seen{ $job->{printer_id} }++;
+            my $pr = $schema->resultset('Printing3dPrinter')->find($job->{printer_id});
+            next unless $pr;
+            my $notes = $pr->notes // '';
+            my $lan_host = $1 if $notes =~ /\[LAN_HOST:([0-9.]+)\]/;
+            next unless $lan_host;
+
+            my $st = eval { $adapter->fetch_state($c, $lan_host, 18910) };
+            $real_state{ $pr->id } = $st;   # recorded even when unreachable (ok=0)
+            next unless $st && $st->{ok};
+
+            require File::Path;
+            my $dir = '/data/nfs/3d/printer_states';
+            File::Path::make_path($dir);
+            my $json_file = "$dir/printer_" . $pr->id . ".json";
+            my $inv_item = eval { $pr->inventory_item };
+            my $printer_sku = $inv_item ? $inv_item->sku : undef;
+            my $full = {
+                printer_id   => $pr->id,
+                sku          => $printer_sku,
+                name         => $pr->name,
+                fetched_at   => _now(),
+                lan_host     => $lan_host,
+                current_job  => {
+                    id            => $job->{id},
+                    item_id       => $job->{source_item_id},
+                    status        => $job->{status},
+                    started_at    => $job->{started_at},
+                },
+                printer_state => $st,
+            };
+            require JSON;
+            open(my $fh, '>', $json_file) or next;
+            print $fh JSON->new->pretty->canonical->encode($full);
+            close $fh;
+        }
+        # Also write for any other LAN printers (idle, to ensure JSONs are always present)
+        my @all_printers = $schema->resultset('Printing3dPrinter')->search({ sitename => $sitename })->all;
+        for my $pr (@all_printers) {
+            push @farm_printers, $pr;   # every printer appears on the queue, assigned or not
+            next if $seen{ $pr->id }++;
+            my $notes = $pr->notes // '';
+            my $lan_host = $1 if $notes =~ /\[LAN_HOST:([0-9.]+)\]/;
+            next unless $lan_host;
+            my $st = eval { $adapter->fetch_state($c, $lan_host, 18910) };
+            $real_state{ $pr->id } = $st;   # recorded even when unreachable (ok=0)
+            next unless $st && $st->{ok};
+
+            require File::Path;
+            my $dir = '/data/nfs/3d/printer_states';
+            File::Path::make_path($dir);
+            my $json_file = "$dir/printer_" . $pr->id . ".json";
+            my $inv_item = eval { $pr->inventory_item };
+            my $printer_sku = $inv_item ? $inv_item->sku : undef;
+            my $full = {
+                printer_id   => $pr->id,
+                sku          => $printer_sku,
+                name         => $pr->name,
+                fetched_at   => _now(),
+                lan_host     => $lan_host,
+                current_job  => undef,
+                printer_state => $st,
+            };
+            require JSON;
+            open(my $fh, '>', $json_file) or next;
+            print $fh JSON->new->pretty->canonical->encode($full);
+            close $fh;
+        }
+    };
+    $queue_error = $@ if $@;
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+        "Queue fetch error: $queue_error") if $queue_error;
+
+    eval {
+        @idle_printers = $schema->resultset('Printing3dPrinter')->search(
+            { sitename => $sitename, status => 'idle' }
+        )->all;
+    };
+
+    # Availability is REAL, not just the DB status written by assign-click:
+    # a DB-idle printer that the LAN query says is busy is NOT offered for
+    # assignment; unreachable printers stay offered but are flagged as
+    # unverified in the dropdown. %real_state gives the template the detail.
+    my (@assignable_printers, @unavailable_printers);
+    for my $pr (@idle_printers) {
+        my $st = $real_state{ $pr->id };
+        if ($st && $st->{ok} && ($st->{print_state} || '') eq 'busy') {
+            push @unavailable_printers, $pr;
+        } else {
+            push @assignable_printers, $pr;
+        }
+    }
+
+    eval {
+        my $r_sql = "
+            SELECT j.id, j.item_name, j.username, j.filament_color, j.filament_type,
+                   j.quantity, j.print_hours, j.filament_quantity,
+                   j.filament_cost, j.printer_cost, j.electricity_cost, j.total_cost,
+                   j.completed_at,
+                   j.model_id, j.source_type,
+                   mo.nfs_path AS model_file,
+                   pr.name AS printer_name,
+                   fi.name AS filament_name,
+                   mo.name AS model_name
+            FROM printing_3d_jobs j
+            LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
+            LEFT JOIN printing_3d_models  mo ON mo.id = j.model_id
+            LEFT JOIN inventory_items     fi ON fi.id = j.filament_item_id
+            WHERE j.sitename = ? AND j.status IN ('completed','cancelled')
+            ORDER BY j.completed_at DESC
+            LIMIT $history_limit
+        ";
+        my $rc_rows = $dbh->selectall_arrayref($r_sql, { Slice => {} }, $sitename);
+        @recent_completed = @{ $rc_rows // [] };
+    };
+
+    $c->stash(
+        sitename             => $sitename,
+        queued_jobs          => \@queued_jobs,
+        active_jobs          => \@active_jobs,
+        idle_printers        => \@idle_printers,
+        assignable_printers  => \@assignable_printers,
+        unavailable_printers => \@unavailable_printers,
+        printer_states       => \%real_state,
+        farm_printers        => \@farm_printers,
+        recent_completed     => \@recent_completed,
+        queue_error          => $queue_error,
+        history_limit        => $history_limit,
+        template             => '3d/queue.tt',
+    );
+}
+
+# ============================================================
+# Admin — Printable Queue View (no nav/header/footer)
+# ============================================================
+
+sub queue_print :Path('/3d/queue_print') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $dbh      = $schema->storage->dbh;
+
+    my (@queued_jobs, @active_jobs, @recent_completed);
+
+    my $sql = q{
+        SELECT j.id, j.sitename, j.status, j.item_name, j.username,
+               j.quantity, j.filament_color, j.filament_type, j.filament_quantity,
+               j.print_hours, j.filament_cost, j.printer_cost, j.electricity_cost, j.total_cost,
+               j.created_at, j.started_at, j.completed_at,
+               fi.name  AS filament_name,
+               pr.name  AS printer_name,
+               mo.name  AS model_name
+        FROM printing_3d_jobs j
+        LEFT JOIN inventory_items      fi ON fi.id = j.filament_item_id
+        LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
+        LEFT JOIN printing_3d_models   mo ON mo.id = j.model_id
+        WHERE j.sitename = ? AND j.status = ?
+        ORDER BY j.created_at ASC
+    };
+
+    eval {
+        my $q = $dbh->selectall_arrayref($sql, { Slice => {} }, $sitename, 'queued');
+        @queued_jobs = @{ $q // [] };
+        my $a = $dbh->selectall_arrayref(
+            $sql =~ s/AND j\.status = \?/AND j.status IN ('assigned','printing')/r,
+            { Slice => {} }, $sitename);
+        @active_jobs = @{ $a // [] };
+    };
+
+    eval {
+        my $r = $dbh->selectall_arrayref(q{
+            SELECT j.id, j.item_name, j.username,
+                   j.quantity, j.filament_color, j.filament_type, j.filament_quantity,
+                   j.print_hours, j.filament_cost, j.printer_cost, j.electricity_cost, j.total_cost,
+                   j.completed_at,
+                   pr.name AS printer_name,
+                   fi.name AS filament_name,
+                   mo.name AS model_name
+            FROM printing_3d_jobs j
+            LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
+            LEFT JOIN printing_3d_models   mo ON mo.id = j.model_id
+            LEFT JOIN inventory_items      fi ON fi.id = j.filament_item_id
+            WHERE j.sitename = ? AND j.status = 'completed'
+            ORDER BY j.completed_at DESC
+            LIMIT 30
+        }, { Slice => {} }, $sitename);
+        @recent_completed = @{ $r // [] };
+    };
+
+    $c->stash(
+        sitename         => $sitename,
+        queued_jobs      => \@queued_jobs,
+        active_jobs      => \@active_jobs,
+        recent_completed => \@recent_completed,
+        print_date       => _now(),
+        no_wrapper       => 1,
+        template         => '3d/queue_print.tt',
+    );
+}
+
+# ============================================================
+# Admin — Printer Farm
+# ============================================================
+
+sub printers :Path('/3d/printers') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->params->{action} || '';
+        eval {
+            if ($action eq 'add') {
+                my $name              = $c->req->params->{name}              || '';
+                my $model_name        = $c->req->params->{model}             || '';
+                my $nozzle            = $c->req->params->{nozzle_diameter}   || '0.40';
+                my $bed               = $c->req->params->{bed_size}          || '';
+                my $notes             = $c->req->params->{notes}             || '';
+                my $purchase_price    = $c->req->params->{purchase_price}    || undef;
+                my $depr_per_hour     = $c->req->params->{depreciation_per_hour} || undef;
+                my $wattage           = $c->req->params->{wattage}           || undef;
+                my $inv_item_id       = $c->req->params->{inventory_item_id} || undef;
+
+                $schema->txn_do(sub {
+                    # Auto-create inventory asset if cost details supplied and no existing item linked
+                    unless ($inv_item_id) {
+                        if ($purchase_price || $depr_per_hour) {
+                            my $sku = '3DPRINTER-' . uc($sitename) . '-' . time();
+                            my $inv_item = $schema->resultset('Accounting::InventoryItem')->create({
+                                sitename        => $sitename,
+                                sku             => $sku,
+                                name            => $name . ($model_name ? " ($model_name)" : ''),
+                                category        => '3d_printer',
+                                item_origin     => 'purchased',
+                                unit_of_measure => 'each',
+                                unit_cost       => $purchase_price || 0,
+                                status          => 'active',
+                                notes           => "3D Printer: $model_name. $notes",
+                                created_by      => $c->session->{username} || 'system',
+                            });
+                            $schema->resultset('Accounting::InventoryEquipment')->create({
+                                item_id              => $inv_item->id,
+                                purchase_price       => $purchase_price  || undef,
+                                depreciation_per_hour => $depr_per_hour  || undef,
+                                wattage              => $wattage         || undef,
+                            });
+                            $inv_item_id = $inv_item->id;
+                        }
+                    }
+
+                    $schema->resultset('Printing3dPrinter')->create({
+                        sitename          => $sitename,
+                        name              => $name,
+                        model             => $model_name,
+                        status            => 'idle',
+                        nozzle_diameter   => $nozzle,
+                        bed_size          => $bed,
+                        notes             => $notes,
+                        inventory_item_id => $inv_item_id || undef,
+                        created_at        => _now(),
+                    });
+                });
+            } elsif ($action eq 'import_from_inventory') {
+                my $inv_item_id = $c->req->params->{inventory_item_id};
+                my $inv_item    = $schema->resultset('Accounting::InventoryItem')->find($inv_item_id)
+                    if $inv_item_id;
+                die "Inventory item not found (id=$inv_item_id)\n" unless $inv_item;
+                $schema->resultset('Printing3dPrinter')->create({
+                    sitename          => $sitename,
+                    name              => $c->req->params->{name}            || $inv_item->name,
+                    model             => $c->req->params->{model}           || '',
+                    status            => 'idle',
+                    nozzle_diameter   => $c->req->params->{nozzle_diameter} || '0.40',
+                    bed_size          => $c->req->params->{bed_size}        || '',
+                    notes             => $inv_item->notes                   || '',
+                    inventory_item_id => $inv_item->id,
+                    created_at        => _now(),
+                });
+            } elsif ($action eq 'update_status') {
+                my $printer = $schema->resultset('Printing3dPrinter')->find(
+                    $c->req->params->{printer_id}
+                );
+                $printer->update({
+                    status     => $c->req->params->{status},
+                    updated_at => _now(),
+                }) if $printer;
+            } elsif ($action eq 'delete') {
+                my $printer = $schema->resultset('Printing3dPrinter')->find(
+                    $c->req->params->{printer_id}
+                );
+                if ($printer) {
+                    # Unassign any jobs still referencing this printer
+                    my @jobs = $schema->resultset('Printing3dJob')->search(
+                        { printer_id => $printer->id, status => ['assigned', 'printing'] }
+                    )->all;
+                    for my $j (@jobs) {
+                        $j->update({ printer_id => undef, status => 'queued' });
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'printers',
+                            "Unassigned job #$j->id from printer #$printer->id ($printer->name) before delete");
+                    }
+                    $printer->delete;
+                }
+            } elsif ($action eq 'pause_lan' || $action eq 'resume_lan') {
+                my $printer = $schema->resultset('Printing3dPrinter')->find(
+                    $c->req->params->{printer_id}
+                );
+                if ($printer) {
+                    my $notes = $printer->notes || '';
+                    my $today = strftime('%Y-%m-%d', localtime);
+                    if ($action eq 'pause_lan') {
+                        unless ($notes =~ /\[LAN_PAUSED:/) {
+                            $notes .= " [LAN_PAUSED:$today]";
+                            $printer->update({ notes => $notes, updated_at => _now() });
+                        }
+                        $c->flash->{success_msg} = 'LAN connect paused for this printer today.';
+                    } else {
+                        $notes =~ s/\s*\[LAN_PAUSED:[^\]]+\]//g;
+                        $printer->update({ notes => $notes, updated_at => _now() });
+                        $c->flash->{success_msg} = 'LAN connect resumed for this printer.';
+                    }
+                }
+            }
+        };
+        if ($@) {
+            my $err = $@; $err =~ s/\s+$//;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'printers', "Action '$action' failed: $err");
+            $c->flash->{error_msg} = "Could not complete action '$action': $err";
+        } else {
+            $c->flash->{success_msg} = 'Done.' if $action =~ /^(import_from_inventory|add)$/;
+        }
+        $c->res->redirect($c->uri_for('/3d/printers'));
+        $c->detach;
+    }
+
+    my (@printers, @unregistered_inv_printers);
+
+    eval {
+        @printers = $schema->resultset('Printing3dPrinter')->search(
+            { sitename => $sitename },
+            { order_by => { -asc => 'name' } }
+        )->all;
+    };
+    if ($@) {
+        my $lvl = ($@ =~ /doesn't exist/i) ? 'info' : 'error';
+        $self->logging->log_with_details($c, $lvl, __FILE__, __LINE__, 'printers', "Farm query error: $@");
+    }
+
+    eval {
+        my %already_linked = map { $_->inventory_item_id => 1 }
+                             grep { $_->inventory_item_id } @printers;
+
+        my %inv_where = (
+            sitename => $sitename,
+            status   => 'active',
+            -or => [
+                { category => { -like => '%printer%' } },
+                { category => { -like => '%3d_print%' } },
+                { category => '3d_printer' },
+                { category => { -like => '%equipment%' } },
+                { category => { -like => '%3d_equip%' } },
+            ],
+        );
+        $inv_where{id} = { -not_in => [ keys %already_linked ] }
+            if %already_linked;
+
+        @unregistered_inv_printers = $schema->resultset('Accounting::InventoryItem')->search(
+            \%inv_where,
+            { order_by => 'name' }
+        )->all;
+    };
+    if ($@) {
+        my $lvl = ($@ =~ /doesn't exist/i) ? 'info' : 'error';
+        $self->logging->log_with_details($c, $lvl, __FILE__, __LINE__, 'printers', "Unregistered query error: $@");
+    }
+
+    $c->stash(
+        sitename                   => $sitename,
+        printers                   => \@printers,
+        unregistered_inv_printers  => \@unregistered_inv_printers,
+        template                   => '3d/printers.tt',
+    );
+}
+
+# ============================================================
+# Admin Dashboard
+# ============================================================
+
+sub admin :Path('/3d/admin') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+    $c->stash( manufacturing_traveler_link => $c->uri_for('/Accounting/manufacturing') );
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my ($total_printers, $idle_printers, $total_models,
+        $queued_jobs, $active_jobs, $store_items);
+    eval {
+        $total_printers = $schema->resultset('Printing3dPrinter')->search(
+            { sitename => $sitename })->count;
+        $idle_printers  = $schema->resultset('Printing3dPrinter')->search(
+            { sitename => $sitename, status => 'idle' })->count;
+        $total_models   = $schema->resultset('Printing3dModel')->search(
+            { sitename => $sitename, is_active => 1 })->count;
+        $queued_jobs    = $schema->resultset('Printing3dJob')->search(
+            { sitename => $sitename, status => 'queued' })->count;
+        $active_jobs    = $schema->resultset('Printing3dJob')->search(
+            { sitename => $sitename, status => { -in => ['assigned','printing'] } })->count;
+        $store_items    = $schema->resultset('Accounting::InventoryItem')->search(
+            { sitename => $sitename, category => '3d_printed_item', status => 'active' })->count;
+    };
+
+    $c->stash(
+        sitename       => $sitename,
+        total_printers => $total_printers || 0,
+        idle_printers  => $idle_printers  || 0,
+        total_models   => $total_models   || 0,
+        queued_jobs    => $queued_jobs    || 0,
+        active_jobs    => $active_jobs    || 0,
+        store_items    => $store_items    || 0,
+        template       => '3d/admin.tt',
+    );
+}
+
+# ============================================================
+# Deeper Search — AI / Web Search stub
+# BLOCKED: Requires AIChatSystem extension
+# ============================================================
+
+sub search_deeper :Path('/3d/search_deeper') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+
+    my $q        = $c->req->params->{q} || '';
+    my $model_id = $c->req->params->{model_id} || '';
+    my $kind     = $c->req->params->{kind} || 'all';
+
+    # Redirect to browse with deep=1 — browse() now runs both local + web search
+    my $uri = $c->uri_for('/3d/browse', {
+        q        => $q,
+        deep     => 1,
+        kind     => $kind,
+        ($model_id ? (model_id => $model_id) : ()),
+    });
+    $c->res->redirect($uri);
+    $c->detach;
+}
+
+# Change filament / grams on an open job. Logic in Util::Printing3d.
+# Lives here (not Controller::3d::Job) so Catalyst -r registers the Path
+# without a process restart.
+sub job_filament :Path('/3d/job/filament') :Args(1) {
+    my ($self, $c, $job_id) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $util     = Comserv::Util::Printing3d->new;
+    my $job;
+    eval { $job = $schema->resultset('Printing3dJob')->find($job_id) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'job_filament', "job find $job_id failed: $@");
+    }
+    unless ($job && ($job->sitename || '') eq $sitename) {
+        $c->flash->{error_msg} = 'Print job not found.';
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $res = $util->change_filament(
+            $c, $job,
+            $c->req->params->{filament_item_id},
+            $c->req->params->{filament_grams},
+            $self,
+        );
+        if ($res->{ok}) {
+            my $gmsg = $res->{grams}
+                ? sprintf(' (~%sg reserved)', $res->{grams})
+                : ' (no grams — enter grams so stock issues on complete)';
+            $c->flash->{success_msg} = 'Job #' . $job->id . ' filament updated.' . $gmsg;
+        } else {
+            $c->flash->{error_msg} = $res->{error} || 'Could not change filament.';
+        }
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    my $model = $util->resolve_model_for_job($schema, $job);
+    my @filaments = $util->list_filaments($schema, $sitename);
+    my $sel_id    = $job->filament_item_id || 0;
+    my $sel_type  = $job->filament_type || '';
+    unless ($sel_type) {
+        my ($match) = grep { $_->{id} == $sel_id } @filaments;
+        $sel_type = $match->{type} if $match;
+    }
+    $c->stash(
+        template  => '3d/job_filament.tt',
+        job       => $job,
+        model     => $model,
+        filaments => \@filaments,
+        estimate  => $util->estimate_grams($model, $sel_type),
+        sitename  => $sitename,
+    );
+}
+
+# ============================================================
+# STL Parser — calculate volume and weight from STL file
+# ============================================================
+
+sub _parse_stl {
+    my ($self, $filepath) = @_;
+    return undef unless $filepath && -r $filepath;
+
+    my ($volume_cm3, $triangle_count) = (0, 0);
+
+    open my $fh, '<:raw', $filepath or return undef;
+    my $header;
+    read($fh, $header, 80) or do { close $fh; return undef; };
+
+    my $is_ascii = ($header =~ /^solid\s/i && $header !~ /\x00/);
+    if (!$is_ascii) {
+        my $buf;
+        read($fh, $buf, 4) or do { close $fh; return undef; };
+        $triangle_count = unpack('V', $buf);
+
+        for my $i (1 .. $triangle_count) {
+            my $tri;
+            read($fh, $tri, 50) or last;
+            my (undef, $x1,$y1,$z1, $x2,$y2,$z2, $x3,$y3,$z3) =
+                unpack('f<3 f<3 f<3 f<3', $tri);
+            $volume_cm3 += ($x1*($y2*$z3 - $y3*$z2)
+                          - $y1*($x2*$z3 - $x3*$z2)
+                          + $z1*($x2*$y3 - $x3*$y2)) / 6.0;
+        }
+    } else {
+        seek $fh, 0, 0;
+        my @vertices;
+        while (my $line = <$fh>) {
+            if ($line =~ /^\s*vertex\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)/i) {
+                push @vertices, [$1+0, $2+0, $3+0];
+                if (@vertices == 3) {
+                    my ($v1,$v2,$v3) = @vertices;
+                    $volume_cm3 += ($v1->[0]*($v2->[1]*$v3->[2] - $v3->[1]*$v2->[2])
+                                  - $v1->[1]*($v2->[0]*$v3->[2] - $v3->[0]*$v2->[2])
+                                  + $v1->[2]*($v2->[0]*$v3->[1] - $v3->[0]*$v2->[1])) / 6.0;
+                    @vertices = ();
+                    $triangle_count++;
+                }
+            }
+        }
+    }
+    close $fh;
+
+    $volume_cm3 = abs($volume_cm3) / 1000.0;
+    return { volume_cm3 => $volume_cm3, triangles => $triangle_count };
+}
+
+# ============================================================
+# Model Manager — upload STL, link to inventory item
+# ============================================================
+
+sub models :Path('/3d/models') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $dbh      = $schema->storage->dbh;
+
+    my $cat      = $c->req->params->{cat}  || '';
+
+    my @all_items = eval {
+        $schema->resultset('Accounting::InventoryItem')->search(
+            { sitename => $sitename, status => 'active',
+              -or => [
+                item_origin => { -like => '%3d_print%' },
+                item_origin => { -like => '%printed%'  },
+                category    => { -like => '%3d_print%' },
+                category    => { -like => '%printed%'  },
+              ] },
+            { columns => [qw(id name sku)], order_by => 'name' }
+        )->all;
+    };
+
+    my $total_models = 0;
+    my @models;
+    eval {
+        my $cat_join  = '';
+        my $cat_where = '';
+        my @bind;
+        if ($cat && $cat ne '0') {
+            my @all_ids = Comserv::Util::CategoryManager->new->descendant_ids($schema, $cat);
+            my $placeholders = join(',', ('?') x @all_ids);
+            $cat_join  = ' JOIN inventory_item_categories ic ON ic.item_id = m.item_id';
+            $cat_where = " AND ic.category_id IN ($placeholders)";
+            @bind      = ($sitename, @all_ids);
+        } elsif ($cat && $cat eq '0') {
+            # Uncategorized: models with no item OR item has no categories
+            $cat_where = q{ AND (m.item_id IS NULL OR m.item_id NOT IN (
+                SELECT DISTINCT item_id FROM inventory_item_categories))};
+            @bind      = ($sitename);
+        } else {
+            @bind      = ($sitename);
+        }
+        ($total_models) = $dbh->selectrow_array(
+            "SELECT COUNT(*) FROM printing_3d_models m$cat_join WHERE m.sitename = ?$cat_where",
+            undef, @bind);
+        my $rows = $dbh->selectall_arrayref(
+            "SELECT m.id, m.name, m.description, m.nfs_path, m.file_type,
+                     m.stl_volume_cm3, m.stl_weight_g, m.print_time_hours,
+                     m.item_id, m.created_at, m.is_active,
+                     m.thumbnail_url,
+                     i.name AS item_name, i.sku AS item_sku
+              FROM printing_3d_models m
+              LEFT JOIN inventory_items i ON i.id = m.item_id
+              $cat_join
+              WHERE m.sitename = ?$cat_where
+              ORDER BY m.name",
+            { Slice => {} }, @bind
+        );
+        @models = @{ $rows // [] };
+    };
+
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->params->{action} || '';
+
+        if ($action eq 'upload') {
+            my $upload  = $c->req->upload('stl_file');
+            my $name    = $c->req->params->{model_name} || '';
+            my $desc    = $c->req->params->{model_desc} || '';
+            my $tags    = $c->req->params->{model_tags} || '';
+            if ($c->req->params->{public_browse}) {
+                $tags = join(' ', grep { length } ($tags, 'vis:public'));
+            }
+            my $item_id = $c->req->params->{item_id}    || undef;
+            my $print_h = $c->req->params->{print_hours} || undef;
+
+            unless ($upload && $name) {
+                $c->flash->{error_msg} = 'Model name and a file are required.';
+                $c->res->redirect($c->uri_for('/3d/models'));
+                $c->detach;
+            }
+
+            my ($orig_name) = ($upload->filename =~ /([^\/\\]+)$/);
+            my ($ext) = ($orig_name =~ /\.([^.]+)$/);
+            $ext = lc($ext // '');
+
+            my ($file_row, $upload_err) =
+                $c->model('File')->upload_and_record($c, $upload, 'path:/data/nfs/3d/models');
+            if ($upload_err) {
+                $c->flash->{error_msg} = "Upload failed: $upload_err";
+                $c->res->redirect($c->uri_for('/3d/models'));
+                $c->detach;
+            }
+
+            my $nfs_stored = $file_row->nfs_path || $file_row->file_path || '';
+
+            my ($vol_cm3, $weight_g, $tri_count);
+            if ($ext eq 'stl' && $nfs_stored && -r $nfs_stored) {
+                my $stl_info = $self->_parse_stl($nfs_stored);
+                if ($stl_info) {
+                    my $v = $stl_info->{volume_cm3};
+                    if (defined $v && $v == $v && $v > 0) {
+                        $vol_cm3  = $v;
+                        $weight_g = sprintf('%.3f', $v * 1.24);
+                        $tri_count = $stl_info->{triangles};
+                    }
+                }
+            }
+
+            eval {
+                $schema->resultset('Printing3dModel')->create({
+                    sitename         => $sitename,
+                    name             => $name,
+                    description      => $desc || undef,
+                    tags             => $tags || undef,
+                    file_id          => $file_row->id,
+                    nfs_path         => $nfs_stored,
+                    file_type        => $ext || 'unknown',
+                    source           => 'upload',
+                    added_by         => $c->session->{username} || 'admin',
+                    item_id          => $item_id || undef,
+                    stl_volume_cm3   => $vol_cm3  // undef,
+                    stl_weight_g     => $weight_g // undef,
+                    print_time_hours => $print_h  || undef,
+                    is_active        => 1,
+                    created_at       => _now(),
+                });
+            };
+            if ($@) {
+                $c->flash->{error_msg} = "Could not save model record: $@";
+            } else {
+                my $msg = "Model '$name' uploaded (.$ext, file id " . $file_row->id . ").";
+                if ($vol_cm3) {
+                    $msg .= " STL: ${vol_cm3} cm³ → ~${weight_g} g PLA ($tri_count triangles).";
+                } elsif ($ext ne 'stl') {
+                    $msg .= " Volume calculation is STL-only; set grams manually or via BOM wizard.";
+                }
+                $c->flash->{success_msg} = $msg;
+            }
+            $c->res->redirect($c->uri_for('/3d/models'));
+            $c->detach;
+
+        } elsif ($action eq 'link') {
+            my $model_id = $c->req->params->{model_id} or do {
+                $c->flash->{error_msg} = 'No model specified.';
+                $c->res->redirect($c->uri_for('/3d/models', {$cat ? (cat => $cat) : ()}));
+                $c->detach;
+            };
+            my $item_id      = $c->req->params->{item_id}      || undef;
+            my $print_h      = $c->req->params->{print_hours}  || undef;
+
+            eval {
+                my $m = $schema->resultset('Printing3dModel')->find($model_id);
+                $m->update({
+                    item_id          => $item_id || undef,
+                    print_time_hours => $print_h  || undef,
+                }) if $m;
+            };
+            $c->flash->{$@ ? 'error_msg' : 'success_msg'} =
+                $@ ? "Update failed: $@" : 'Model updated.';
+            $c->res->redirect($c->uri_for('/3d/models', {$cat ? (cat => $cat) : ()}));
+            $c->detach;
+
+        } elsif ($action eq 'deactivate') {
+            my $model_id = $c->req->params->{model_id};
+            eval { $schema->resultset('Printing3dModel')->find($model_id)->update({ is_active => 0 }) } if $model_id;
+            $c->flash->{success_msg} = 'Model deactivated.';
+            $c->res->redirect($c->uri_for('/3d/models'));
+            $c->detach;
+
+        } elsif ($action eq 'assign_cat') {
+            my $item_id  = $c->req->params->{item_id};
+            my $model_id = $c->req->params->{model_id};
+            my @cat_ids  = $c->req->param('category_ids');
+
+            # Auto-create inventory item for unlinked models
+            if (!$item_id && $model_id && @cat_ids) {
+                my $model = $schema->resultset('Printing3dModel')->find($model_id);
+                if ($model) {
+                    my $sku = '3D-' . $model->id;
+                    my $new_item = $schema->resultset('Accounting::InventoryItem')->create({
+                        sitename      => $sitename,
+                        sku           => $sku,
+                        name          => $model->name || '3D Model ' . $model->id,
+                        item_origin   => '3d_printed',
+                        unit_of_measure => 'ea',
+                        status        => 'active',
+                        show_in_shop        => 0,
+                        hide_stock_count    => 0,
+                        list_in_marketplace => 0,
+                    });
+                    $model->update({ item_id => $new_item->id });
+                    $item_id = $new_item->id;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'assign_cat', "Auto-created item $item_id for model $model_id");
+                }
+            }
+
+            if ($item_id) {
+                eval { Comserv::Util::CategoryManager->new->set_item_categories($schema, $item_id, \@cat_ids); };
+                $c->flash->{success_msg} = $@ ? "Category update failed: $@" : 'Categories updated.';
+            }
+            $c->res->redirect($c->uri_for('/3d/models', {$cat ? (cat => $cat) : ()}));
+            $c->detach;
+        }
+
+        elsif ($action eq 'auto_categorize') {
+            my ($assigned, $items_created, $total) = (0, 0, 0);
+            my $mgr = Comserv::Util::CategoryManager->new;
+            my $cat_tree = $mgr->tree($schema, $sitename);
+            my %cat_lookup = _build_path_category_map($cat_tree);
+
+            my $models_rs = $schema->resultset('Printing3dModel')->search(
+                { sitename => $sitename, nfs_path => { '!=' => undef } }
+            );
+            while (my $m = $models_rs->next) {
+                $total++;
+                my $path = $m->nfs_path || '';
+                my @dirs = grep { $_ && $_ !~ /\.(stl|3mf|obj|step|gcode|STL)$/i }
+                           split('/', $path);
+                my @cat_ids;
+                for my $d (@dirs) {
+                    my $lc = lc($d);
+                    $lc =~ s/[-_]+/ /g;
+                    $lc =~ s/s$//;  # singularize
+                    if (my $cid = $cat_lookup{$lc}) {
+                        push @cat_ids, $cid;
+                    }
+                }
+                next unless @cat_ids;
+
+                my $item_id = $m->item_id;
+                if (!$item_id) {
+                    my $sku = '3D-' . $m->id;
+                    eval {
+                        my $item = $schema->resultset('Accounting::InventoryItem')->create({
+                            sitename => $sitename, sku => $sku,
+                            name => $m->name || '3D Model ' . $m->id,
+                            item_origin => '3d_printed', unit_of_measure => 'ea',
+                            status => 'active', show_in_shop => 0,
+                            hide_stock_count => 0, list_in_marketplace => 0,
+                        });
+                        $m->update({ item_id => $item->id });
+                        $item_id = $item->id;
+                        $items_created++;
+                    };
+                }
+                if ($item_id) {
+                    eval { $mgr->set_item_categories($schema, $item_id, \@cat_ids); };
+                    $assigned++ unless $@;
+                }
+            }
+            $c->flash->{success_msg} = "Auto-categorized $assigned of $total models ($items_created items created). Refresh to see results.";
+            $c->res->redirect($c->uri_for('/3d/models'));
+            $c->detach;
+        }
+    }
+
+    # Load category tree and item-category mappings for displayed models
+    my $cat_tree = eval { Comserv::Util::CategoryManager->new->tree($schema, $sitename) } || [];
+    my %item_cats;
+    my %cat_name;
+    for my $m (@models) {
+        next unless $m->{item_id};
+        my $ids = eval { Comserv::Util::CategoryManager->new->item_category_ids($schema, $m->{item_id}) } || [];
+        $item_cats{ $m->{item_id} } = $ids if @$ids;
+    }
+    _flatten_cat_names($cat_tree, \%cat_name);
+
+    # Build category-grouped model containers
+    my $category_groups = _build_category_groups($cat_tree, \@models, \%item_cats, \%cat_name);
+
+    $c->stash(
+        sitename        => $sitename,
+        models          => \@models,
+        all_items       => \@all_items,
+        cat_tree        => $cat_tree,
+        cat_name        => \%cat_name,
+        item_cats       => \%item_cats,
+        category_groups => $category_groups,
+        cat             => $cat,
+        total_models    => $total_models,
+        template        => '3d/models.tt',
+    );
+}  # end of models
+
+sub _flatten_cat_names {
+    my ($tree, $map) = @_;
+    for my $n (@$tree) {
+        $map->{ $n->{id} } = $n->{name};
+        _flatten_cat_names($n->{children}, $map) if $n->{children};
+    }
+}
+
+# Build nested category → model groups for container view.
+# Returns arrayref of { id, name, model_count, models, children }
+sub _build_category_groups {
+    my ($tree, $models, $item_cats, $cat_name) = @_;
+
+    # Group models by category ID, track which models are categorized
+    my %cat_models;
+    my %seen_model;  # model_id => 1 if categorized
+    for my $m (@$models) {
+        next unless $m->{item_id};
+        my $cat_ids = $item_cats->{ $m->{item_id} } || [];
+        if (@$cat_ids) {
+            $seen_model{ $m->{id} } = 1;
+            for my $cid (@$cat_ids) {
+                push @{ $cat_models{$cid} }, $m;
+            }
+        }
+    }
+
+    my @groups = @{ _build_group_tree($tree, \%cat_models) };
+
+    # Add uncategorized models as a group at the top
+    my @uncategorized = grep { !$seen_model{ $_->{id} } } @$models;
+    if (@uncategorized) {
+        unshift @groups, {
+            id          => 0,
+            name        => 'Uncategorized',
+            model_count => scalar(@uncategorized),
+            models      => \@uncategorized,
+            children    => [],
+        };
+    }
+
+    return \@groups;
+}
+
+sub _build_group_tree {
+    my ($nodes, $cat_models) = @_;
+    my @out;
+    for my $n (@$nodes) {
+        my $models = $cat_models->{ $n->{id} } || [];
+        my $children = _build_group_tree($n->{children} || [], $cat_models);
+        my $child_count = 0;
+        for my $c (@$children) { $child_count += $c->{model_count} }
+        push @out, {
+            id          => $n->{id},
+            name        => $n->{name},
+            model_count => scalar(@$models) + $child_count,
+            models      => $models,
+            children    => $children,
+        };
+    }
+    return \@out;
+}
+
+# Build a lowercase-name → category_id map for path matching
+sub _build_path_category_map {
+    my ($tree) = @_;
+    my %map;
+    _add_cat_map($tree, \%map);
+    return %map;
+}
+
+sub _add_cat_map {
+    my ($nodes, $map) = @_;
+    for my $n (@$nodes) {
+        my $lc = lc($n->{name});
+        $lc =~ s/s$//;
+        $map->{$lc} = $n->{id};
+        $map->{lc($n->{name})} = $n->{id};
+        _add_cat_map($n->{children} || [], $map) if $n->{children};
+    }
+}
+
+sub model_stl_info :Path('/3d/model_stl_info') :Args(1) {
+    my ($self, $c, $model_id) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $schema = $self->_schema($c);
+    my $model  = eval { $schema->resultset('Printing3dModel')->find($model_id) };
+    unless ($model && $model->nfs_path) {
+        $c->res->body(encode_json({ error => 'Model not found or no file' }));
+        $c->res->content_type('application/json');
+        $c->detach;
+    }
+
+    my $info = $self->_parse_stl($model->nfs_path) // {};
+    my $vol  = $info->{volume_cm3} // 0;
+    my $w_pla  = $vol * 1.24;
+    my $w_petg = $vol * 1.27;
+    my $w_abs  = $vol * 1.05;
+
+    eval {
+        $model->update({
+            stl_volume_cm3 => $vol || undef,
+            stl_weight_g   => $w_pla ? sprintf('%.3f', $w_pla) : undef,
+        }) if $vol;
+    };
+
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        volume_cm3    => sprintf('%.4f', $vol),
+        triangles     => $info->{triangles} // 0,
+        weight_pla_g  => sprintf('%.2f', $w_pla),
+        weight_petg_g => sprintf('%.2f', $w_petg),
+        weight_abs_g  => sprintf('%.2f', $w_abs),
+    }));
+    $c->detach;
+}
+
+# ============================================================
+# Upload replacement STL for an existing model (overwrites the file on NFS)
+# POST /3d/model_upload/{model_id}  multipart: stl_file
+# ============================================================
+
+sub model_upload :Path('/3d/model_upload') :Args(1) {
+    my ($self, $c, $id) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $model = eval { $schema->resultset('Printing3dModel')->find({ id => $id, sitename => $sitename }) };
+    unless ($model) {
+        $c->flash->{error_msg} = 'Model not found.';
+        $c->res->redirect($c->uri_for('/3d/models'));
+        $c->detach;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->flash->{error_msg} = 'POST required.';
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    my $upload = $c->req->upload('stl_file');
+    unless ($upload) {
+        $c->flash->{error_msg} = 'No file provided.';
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    my ($orig_name) = ($upload->filename =~ /([^\/\\]+)$/);
+    my ($ext) = ($orig_name =~ /\.([^.]+)$/);
+    $ext = lc($ext // '');
+
+    my ($file_row, $upload_err) =
+        $c->model('File')->upload_and_record($c, $upload, 'path:/data/nfs/3d/models');
+    if ($upload_err) {
+        $c->flash->{error_msg} = "Upload failed: $upload_err";
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    my $nfs_stored = $file_row->nfs_path || $file_row->file_path || '';
+
+    # Resolve the path via NfsPath so we find it on any runtime (Docker/workstation)
+    my $resolved_path = '';
+    if ($nfs_stored) {
+        eval { $resolved_path = Comserv::Util::NfsPath->new->resolve_path($nfs_stored) };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'model_upload',
+            "model=$id stored=$nfs_stored resolved=$resolved_path size=" . ($upload->size // '?') . " orig=$orig_name");
+    }
+
+    my ($vol_cm3, $weight_g);
+    if ($ext eq 'stl' && $resolved_path && -r $resolved_path) {
+        my $file_size_kb = -s $resolved_path;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'model_upload',
+            "file on disk: $resolved_path size=${file_size_kb}b") if defined $file_size_kb && $file_size_kb > 0;
+
+        my $stl_info = $self->_parse_stl($resolved_path);
+        if ($stl_info) {
+            my $v = $stl_info->{volume_cm3};
+            if (defined $v && $v == $v && $v > 0) {
+                $vol_cm3  = $v;
+                $weight_g = sprintf('%.3f', $v * 1.24);
+            }
+        }
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'model_upload',
+            "File not visible at resolved path after upload — stl=$nfs_stored resolved=$resolved_path");
+        $c->flash->{error_msg} = 'Upload landed but the file is not visible on the server filesystem. Try again or check NFS mount.';
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    eval {
+        $model->update({
+            file_id          => $file_row->id,
+            nfs_path         => $nfs_stored,
+            file_type        => $ext || 'unknown',
+            stl_volume_cm3   => $vol_cm3  // undef,
+            stl_weight_g     => $weight_g // undef,
+        });
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Could not update model record: $@";
+    } else {
+        my $msg = "STL replaced for '$model->name' — uploaded $orig_name";
+        if ($vol_cm3) {
+            $msg .= " (${vol_cm3} cm³ → ~${weight_g} g PLA)";
+        }
+        $c->flash->{success_msg} = $msg;
+    }
+
+    # Redirect back to where they came from (queue page most likely)
+    my $ref = $c->req->referer || $c->uri_for('/3d/queue');
+    $c->res->redirect($ref);
+    $c->detach;
+}
+
+# ============================================================
+# JSON API: create a printable part (model + inventory item + BOM + optional job)
+# Reuses Inventory::_create_item so inventory creation logic lives in ONE place.
+# Body (JSON or form): code, name, src, qty, parent (sku), queue (0/1)
+# ============================================================
+
+sub api_model_create :Path('/3d/api/model_create') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my $p = {};
+    # Accept either JSON body or form-encoded body parameters
+    my $raw_body = $c->request->body;
+    if ($raw_body) {
+        my $raw;
+        if (ref($raw_body) && $raw_body->can('seek')) {
+            seek($raw_body, 0, 0);
+            $raw = do { local $/; <$raw_body> };
+        } else {
+            $raw = $raw_body;
+        }
+        if ($raw && $raw =~ /^\s*[{\[]/) {
+            eval { $p = decode_json($raw); };
+        }
+    }
+    # form params (always available, fill any keys JSON didn't set)
+    my %form = %{ $c->req->body_parameters };
+    for my $k (keys %form) {
+        $p->{$k} = $form{$k} unless exists $p->{$k};
+    }
+
+    my $code   = $p->{code}   or return _json_err($c, 'code required');
+    my $name   = $p->{name}   or return _json_err($c, 'name required');
+    my $src    = $p->{src}    or return _json_err($c, 'src required');
+    my $qty    = $p->{qty}    or return _json_err($c, 'qty required');
+    my $parent = $p->{parent} || 'INT-HDRY-001';
+    my $queue  = $p->{queue}  || 0;
+
+    my $sku = "INT-HDRY-$code";
+
+    # parent assembly must exist
+    my $parent_item = $schema->resultset('Accounting::InventoryItem')->find(
+        { sitename => $sitename, sku => $parent }
+    );
+    unless ($parent_item) {
+        return _json_err($c, "parent assembly $parent not found");
+    }
+
+    # 1) inventory item — via Inventory's own create helper (no duplication)
+    my $inv_ctl = $c->controller('Inventory');
+    my $item;
+    eval {
+        $item = $inv_ctl->_create_item($c, {
+            sku           => $sku,
+            name          => "$name ($code)",
+            description   => "HDRY dryer printed part $code from $src.3mf",
+            unit_of_measure => 'each',
+            is_assemblable => 0,
+            status        => 'active',
+            notes         => "project:hdry src:$src",
+        });
+    };
+    if ($@) {
+        return _json_err($c, "item create failed: $@");
+    }
+
+    # 2) printing_3d_models row, linked to the inventory item
+    my $model = $schema->resultset('Printing3dModel')->create({
+        sitename     => $sitename,
+        name         => "$name ($code)",
+        description   => "HDRY dryer printable part $code from $src.3mf",
+        file_type    => '3mf',
+        tags         => 'project:hdry',
+        source       => 'project_import',
+        item_id      => $item->id,
+        added_by     => $c->session->{username} || 'system',
+        is_active    => 1,
+    });
+
+    # 3) BOM: component (this part) -> parent assembly
+    $schema->resultset('Accounting::InventoryItemBOM')->create({
+        parent_item_id    => $parent_item->id,
+        component_item_id => $item->id,
+        quantity          => $qty,
+    });
+
+    # 4) optional print job
+    my $job_id;
+    if ($queue) {
+        my $job = $schema->resultset('Printing3dJob')->create({
+            sitename       => $sitename,
+            model_id       => $model->id,
+            source_type    => 'project',
+            source_item_id => $parent_item->id,
+            quantity       => $qty,
+            status         => 'queued',
+            username       => $c->session->{username} || 'system',
+        });
+        $job_id = $job->id;
+    }
+
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success   => 1,
+        code      => $code,
+        sku       => $sku,
+        item_id   => $item->id,
+        model_id  => $model->id,
+        job_id    => $job_id,
+        queued    => $queue ? 1 : 0,
+    }));
+    $c->detach;
+}
+
+sub _json_err {
+    my ($c, $msg) = @_;
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => 0, error => $msg }));
+    $c->detach;
+}
+
+# ============================================================
+# Queue Sync — detect items needing printing from inventory
+# and consignments, then create queued print jobs
+# ============================================================
+
+sub queue_sync :Path('/3d/queue_sync') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $username = $c->session->{username} || 'system';
+    my $dbh      = $schema->storage->dbh;
+
+    # ----------------------------------------------------------
+    # Load all filament spools via raw SQL — safe regardless of
+    # whether the filament_color/type migration has been applied
+    # ----------------------------------------------------------
+    my @all_filaments;
+    eval {
+        my $rows = $dbh->selectall_arrayref(
+            'SELECT i.id, i.name, i.sku,
+                    COALESCE(SUM(sl.quantity_on_hand), 0) AS qty_on_hand,
+                    COALESCE(SUM(sl.quantity_reserved), 0) AS qty_reserved
+             FROM inventory_items i
+             LEFT JOIN inventory_stock_levels sl ON sl.item_id = i.id
+             WHERE i.sitename = ?
+               AND (i.category LIKE ? OR i.category LIKE ? OR i.name LIKE ?)
+               AND i.status = ?
+             GROUP BY i.id, i.name, i.sku
+             ORDER BY i.name',
+            { Slice => {} },
+            $sitename, '%filament%', '%3d_fil%', '%ilament%', 'active'
+        );
+        my %fil_details;
+        eval {
+            my $drows = $dbh->selectall_arrayref(
+                'SELECT id, filament_color, filament_type FROM inventory_items WHERE sitename = ?',
+                { Slice => {} }, $sitename
+            );
+            %fil_details = map { $_->{id} => $_ } @$drows;
+        };
+        for my $r (@$rows) {
+            my $d = $fil_details{ $r->{id} } || {};
+            $r->{color}  = $d->{filament_color} || '';
+            $r->{type}   = $d->{filament_type}  || '';
+            $r->{avail}  = ($r->{qty_on_hand} || 0) - ($r->{qty_reserved} || 0);
+            push @all_filaments, $r;
+        }
+    };
+
+    # ----------------------------------------------------------
+    # Helper: find best matching filament from @all_filaments
+    # ----------------------------------------------------------
+    my $_find_filament = sub {
+        my ($req_color, $req_type) = @_;
+        my ($best, $best_score) = (undef, -1);
+        for my $fil (@all_filaments) {
+            next unless ($fil->{avail} || 0) > 0;
+            my $score = 0;
+            if ($req_color && $fil->{color}) {
+                $score += 2 if lc($fil->{color}) eq lc($req_color);
+                $score += 1 if index(lc($fil->{color}), lc($req_color)) >= 0;
+            }
+            if ($req_type && $fil->{type}) {
+                $score += 2 if lc($fil->{type}) eq lc($req_type);
+                $score += 1 if index(lc($fil->{type}), lc($req_type)) >= 0;
+            }
+            if (!$best || $score > $best_score) {
+                $best       = $fil;
+                $best_score = $score;
+            }
+        }
+        return ($best && ($best_score > 0 || (!$req_color && !$req_type))) ? $best : undef;
+    };
+
+    # ----------------------------------------------------------
+    # POST — create the selected jobs
+    # ----------------------------------------------------------
+    if ($c->req->method eq 'POST') {
+        my @job_keys = grep { /^create_job_/ } keys %{ $c->req->params };
+        my $created  = 0;
+
+        for my $key (@job_keys) {
+            my $val        = $c->req->params->{$key} || '';
+            my ($src_type, $src_id) = split /:/, $val;
+            next unless $src_type && $src_id;
+
+            my ($item_name, $req_color, $req_type, $qty, $cons_id, $cons_line_id);
+
+            if ($src_type eq 'restock') {
+                my @safe_cols = qw(id name reorder_quantity);
+                my $item = eval {
+                    $schema->resultset('Accounting::InventoryItem')->find($src_id, { columns => \@safe_cols })
+                };
+                next unless $item;
+                $item_name = $item->get_column('name');
+                $req_color = eval { $dbh->selectrow_array(
+                    'SELECT filament_color FROM inventory_items WHERE id = ?', undef, $src_id) };
+                $req_type  = eval { $dbh->selectrow_array(
+                    'SELECT filament_type FROM inventory_items WHERE id = ?',  undef, $src_id) };
+                $qty = eval { $dbh->selectrow_array(
+                    'SELECT reorder_quantity FROM inventory_items WHERE id = ?', undef, $src_id) } || 1;
+
+            } elsif ($src_type eq 'consignment') {
+                my $line = eval { $schema->resultset('Accounting::InventoryConsignmentLine')->find($src_id) };
+                next unless $line;
+                my @safe_cols = qw(id name);
+                my $item = eval {
+                    $schema->resultset('Accounting::InventoryItem')->find(
+                        $line->item_id, { columns => \@safe_cols })
+                };
+                $item_name    = $item ? $item->get_column('name') : "Item #" . $line->item_id;
+                $req_color    = eval { $dbh->selectrow_array(
+                    'SELECT filament_color FROM inventory_items WHERE id = ?', undef, $line->item_id) };
+                $req_type     = eval { $dbh->selectrow_array(
+                    'SELECT filament_type FROM inventory_items WHERE id = ?',  undef, $line->item_id) };
+                $qty          = $line->quantity_outstanding || 1;
+                $cons_id      = $line->consignment_id;
+                $cons_line_id = $line->id;
+
+                # Parse filament color/type from consignment line notes — takes priority
+                # over item-level defaults. Supports [FIL:type,color] or plain keywords.
+                my $line_notes = $line->notes || '';
+                if ($line_notes) {
+                    my ($n_type, $n_color);
+                    if ($line_notes =~ /\[FIL:([^,\]]*),([^\]]*)\]/) {
+                        $n_type  = $1 || undef;
+                        $n_color = $2 || undef;
+                    } else {
+                        my @known_types  = qw(PLA PLA+ PETG ABS ASA TPU Nylon PC Resin);
+                        my @known_colors = qw(Black White Red Blue Green Yellow Orange Purple
+                                              Grey Gray Silver Gold Clear Natural Transparent
+                                              Pink Brown Copper Bronze);
+                        my $uc = uc($line_notes);
+                        for my $t (@known_types)  { if (index($uc, uc($t)) >= 0) { $n_type  = $t; last; } }
+                        for my $co (@known_colors) { if (index(lc($line_notes), lc($co)) >= 0) { $n_color = $co; last; } }
+                    }
+                    $req_color = $n_color if $n_color;
+                    $req_type  = $n_type  if $n_type;
+                }
+            }
+
+            # Admin can override filament via the picker modal
+            my $override_fil_id = $c->req->params->{"filament_override_${src_type}_${src_id}"} || '';
+            my ($filament_id, $fil_color, $fil_type);
+            if ($override_fil_id) {
+                my ($f) = grep { $_->{id} == $override_fil_id } @all_filaments;
+                if ($f) {
+                    $filament_id = $f->{id};
+                    $fil_color   = $f->{color} || $req_color;
+                    $fil_type    = $f->{type}  || $req_type;
+                }
+            }
+            unless ($filament_id) {
+                my $filament = $_find_filament->($req_color, $req_type);
+                if ($filament) {
+                    $filament_id = $filament->{id};
+                    $fil_color   = $req_color || $filament->{color};
+                    $fil_type    = $req_type  || $filament->{type};
+                }
+            }
+
+            my $job;
+            eval {
+                $job = $schema->resultset('Printing3dJob')->create({
+                    sitename            => $sitename,
+                    model_id            => undef,
+                    user_id             => $c->session->{user_id} || 0,
+                    username            => $username,
+                    status              => 'queued',
+                    source_type         => $src_type,
+                    source_item_id      => ($src_type eq 'restock' ? $src_id : undef),
+                    consignment_id      => $cons_id,
+                    consignment_line_id => $cons_line_id,
+                    item_name           => $item_name,
+                    filament_item_id    => $filament_id,
+                    filament_color      => $fil_color,
+                    filament_type       => $fil_type,
+                    filament_quantity   => undef,
+                    quantity            => $qty || 1,
+                    inventory_reserved  => 0,
+                    created_at          => _now(),
+                    notes               => '',
+                });
+                $created++;
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue_sync',
+                    "Job create failed: $@");
+                $c->flash->{error_msg} = "Error creating job: $@";
+            } elsif ($job && $src_type eq 'restock' && $src_id) {
+                # First-come, first-served assignment to an open manufacturing order.
+                # The job is "attached" to the oldest order that needs this item.
+                # Cancel releases it globally so other orders can claim.
+                eval {
+                    my @open_cos = $schema->resultset('Accounting::InventoryCustomerOrder')->search({
+                        sitename => $sitename,
+                        status => { -not_in => [qw(cancel cancelled void)] },
+                    }, { order_by => 'created_at' })->all;
+                    my $assigned = 0;
+                    for my $co (@open_cos) {
+                        for my $ln ($co->lines->all) {
+                            if (($ln->item_id || 0) == $src_id) {
+                                my $n = $job->notes || '';
+                                $job->update({ notes => $n . ' mfg_order:' . $co->id });
+                                $assigned = 1;
+                                last;
+                            }
+                        }
+                        last if $assigned;
+                    }
+                };
+            }
+        }
+
+        if ($created) {
+            $c->flash->{success_msg} = "$created print job(s) added to queue.";
+        } else {
+            $c->flash->{error_msg} = ($c->flash->{error_msg} || '') . ' No jobs were selected or created. Check that checkboxes are ticked.';
+        }
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    # ----------------------------------------------------------
+    # GET — scan for items needing printing
+    # ----------------------------------------------------------
+
+    # Active or completed job source ids (to avoid duplicate queuing)
+    # completed = already printed, no need to re-queue; cancelled = OK to re-queue
+    my %active_restock_items;
+    my %active_cons_lines;
+    eval {
+        my @active = $schema->resultset('Printing3dJob')->search(
+            { sitename => $sitename, status => { -in => [qw(queued assigned printing completed)] } }
+        )->all;
+        for my $j (@active) {
+            $active_restock_items{ $j->source_item_id }    = 1 if $j->source_item_id;
+            $active_cons_lines{ $j->consignment_line_id } = 1 if $j->consignment_line_id;
+        }
+    };
+
+    # 1. Restock: any 3D-printed item (by item_origin OR category) at or below reorder_point
+    my @restock_needed;
+    eval {
+        my @items = $schema->resultset('Accounting::InventoryItem')->search(
+            {
+                sitename      => $sitename,
+                status        => 'active',
+                reorder_point => { '>' => 0 },
+                -or => [
+                    item_origin => { -like => '%3d_print%' },
+                    item_origin => { -like => '%printed%'  },
+                    category    => { -like => '%3d_print%' },
+                    category    => { -like => '%printed%'  },
+                ],
+            },
+            { prefetch => 'stock_levels' }
+        )->all;
+        for my $item (@items) {
+            next if $active_restock_items{ $item->id };
+            my $fil_color = eval { $dbh->selectrow_array(
+                'SELECT filament_color FROM inventory_items WHERE id = ?', undef, $item->id) };
+            my $fil_type  = eval { $dbh->selectrow_array(
+                'SELECT filament_type  FROM inventory_items WHERE id = ?', undef, $item->id) };
+            my $avail = 0;
+            eval {
+                ($avail) = $dbh->selectrow_array(
+                    'SELECT COALESCE(SUM(quantity_on_hand),0) - COALESCE(SUM(quantity_reserved),0)
+                     FROM inventory_stock_levels WHERE item_id = ?', undef, $item->id);
+            };
+            if ($avail <= $item->reorder_point) {
+                push @restock_needed, {
+                    item     => $item,
+                    avail    => $avail,
+                    needed   => ($item->reorder_quantity || 1),
+                    filament => scalar $_find_filament->($fil_color, $fil_type),
+                };
+            }
+        }
+    };
+
+    # 2. Consignment: open lines where item is 3d_printed and qty outstanding > 0
+    my @consignment_needed;
+    my $cons_error;
+
+    # Fetch ALL open consignment lines for this site — filter in Perl so a missing
+    # DB column (requires_printing not yet migrated) never silently kills the block
+    # Safe columns — only what we know exists in all DB versions
+    my @safe_item_cols = qw(id sitename sku name description category
+                            item_origin unit_cost unit_price status notes
+                            reorder_point reorder_quantity);
+
+    my @cons_lines;
+    eval {
+        # Do NOT prefetch 'item' — it SELECTs all result-class columns including
+        # new ones (filament_color etc.) that may not be in the DB yet
+        @cons_lines = $schema->resultset('Accounting::InventoryConsignmentLine')->search(
+            {
+                'consignment.sitename' => $sitename,
+                'consignment.status'   => { -in => [qw(open partially_settled)] },
+            },
+            {
+                join     => 'consignment',
+                prefetch => 'consignment',
+            }
+        )->all;
+    };
+    $cons_error = $@ if $@;
+
+    for my $line (@cons_lines) {
+        next if $active_cons_lines{ $line->id };
+
+        # Fetch item with only safe columns so missing DB columns never error
+        my $item_id = $line->item_id;
+        my $item = eval {
+            $schema->resultset('Accounting::InventoryItem')->find(
+                $item_id,
+                { columns => \@safe_item_cols }
+            );
+        };
+        next unless $item;
+
+        my $origin    = lc($item->get_column('item_origin') || '');
+        my $category  = lc($item->get_column('category')    || '');
+
+        # Also try the new columns — they may or may not exist
+        # Try new 3D columns via raw SQL (safe — silently returns undef if not migrated)
+        my $req_print = eval { $dbh->selectrow_array(
+            'SELECT requires_printing FROM inventory_items WHERE id = ?', undef, $item_id) } // 0;
+        my $fil_color = eval { $dbh->selectrow_array(
+            'SELECT filament_color FROM inventory_items WHERE id = ?', undef, $item_id) };
+        my $fil_type  = eval { $dbh->selectrow_array(
+            'SELECT filament_type FROM inventory_items WHERE id = ?',  undef, $item_id) };
+
+        # Include if ANY of these match (broad — catch 3d_printed_item, 3d_printed, printed_item, etc.)
+        my $is_3d_item =
+               CORE::index($origin,   '3d_print')  >= 0
+            || CORE::index($origin,   'printed')    >= 0
+            || CORE::index($category, '3d_print')   >= 0
+            || CORE::index($category, 'printed')    >= 0
+            || CORE::index($category, 'filament')   >= 0
+            || $req_print;
+
+        next unless $is_3d_item;
+
+        my $outstanding = $line->quantity_outstanding;
+        next unless $outstanding > 0;
+
+        my $avail_stock = eval { $dbh->selectrow_array(
+            'SELECT COALESCE(SUM(sl.quantity_on_hand),0) - COALESCE(SUM(sl.quantity_reserved),0)
+             FROM inventory_stock_levels sl
+             WHERE sl.item_id = ?',
+            undef, $item_id) } // 0;
+
+        # Parse consignment line notes FIRST — consignment-specific choice takes priority
+        # over item-level defaults. Format: [FIL:type,color] followed by optional user notes
+        my $line_notes = $line->notes || '';
+        my ($notes_type, $notes_color);
+        if ($line_notes) {
+            if ($line_notes =~ /\[FIL:([^,\]]*),([^\]]*)\]/) {
+                $notes_type  = $1 || undef;
+                $notes_color = $2 || undef;
+            } else {
+                my @known_types  = qw(PLA PLA+ PETG ABS ASA TPU Nylon PC Resin);
+                my @known_colors = qw(Black White Red Blue Green Yellow Orange Purple Grey Gray
+                                      Silver Gold Clear Natural Transparent Pink Brown Copper Bronze);
+                my $uc = uc($line_notes);
+                for my $t (@known_types)  { if (CORE::index($uc, uc($t)) >= 0) { $notes_type  = $t; last; } }
+                for my $co (@known_colors) { if (CORE::index(lc($line_notes), lc($co)) >= 0) { $notes_color = $co; last; } }
+            }
+        }
+        # Consignment note wins; fall back to item-level filament defaults
+        $fil_color = $notes_color || $fil_color;
+        $fil_type  = $notes_type  || $fil_type;
+
+        push @consignment_needed, {
+            line          => $line,
+            item          => $item,
+            outstanding   => $outstanding,
+            avail_stock   => $avail_stock,
+            item_name     => $item->get_column('name'),
+            item_category => $category,
+            item_origin   => $origin,
+            line_notes    => $line_notes,
+            req_print     => $req_print,
+            fil_color     => $fil_color,
+            fil_type      => $fil_type,
+            filament      => scalar $_find_filament->($fil_color, $fil_type),
+        };
+    }
+
+    $c->stash(
+        sitename              => $sitename,
+        restock_needed        => \@restock_needed,
+        consignment_needed    => \@consignment_needed,
+        cons_error            => $cons_error,
+        all_filaments         => \@all_filaments,
+        all_filaments_json    => encode_json(\@all_filaments),
+        cons_lines_total      => scalar @cons_lines,
+        template              => '3d/queue_sync.tt',
+    );
+}
+
+=encoding utf8
+
+=head1 AUTHOR
+
+Shanta McBain
+
+=head1 LICENSE
+
+This library is free software. You can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
+
+
+# ============================================================
+# /3d/copy — Save a web search result as a local model card.
+# No file download — just metadata + link back to the source.
+# The user downloads/pays on the external site, then uploads the
+# STL here for printing. Copyright: the external site's license
+# governs whether the model can be kept for reprint or added to
+# printing stock.
+# ============================================================
+
+sub copy :Path('/3d/copy') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    unless ($c->req->method eq 'POST') {
+        $c->flash->{error_msg} = 'POST required.';
+        $c->res->redirect($c->uri_for('/3d/browse'));
+        $c->detach;
+    }
+
+    my $title       = $c->req->params->{title}       || '';
+    my $url         = $c->req->params->{url}         || '';
+    my $thumbnail   = $c->req->params->{thumbnail}   || '';
+    my $site        = $c->req->params->{site}        || '';
+    my $description = $c->req->params->{description} || '';
+    my $tags        = $c->req->params->{tags}        || '';
+    my $file_type   = $c->req->params->{file_type}   || 'STL';
+
+    unless (length $title && length $url) {
+        $c->flash->{error_msg} = 'Title and URL are required.';
+        $c->res->redirect($c->uri_for('/3d/browse'));
+        $c->detach;
+    }
+
+    # Truncate long fields to DB column sizes
+    $title       = substr($title, 0, 255);
+    $url         = substr($url,   0, 1000);
+    $thumbnail   = substr($thumbnail, 0, 1000);
+    $description = substr($description, 0, 500);
+    $tags        = substr($tags, 0, 500);
+
+    # Build tags from site + user-supplied
+    my $tag_str = join(', ', grep { length } ($site, $tags));
+
+    my $model_id;
+    eval {
+        my $model = $schema->resultset('Printing3dModel')->create({
+            sitename      => $sitename,
+            name          => $title,
+            description   => $description || undef,
+            file_type     => lc($file_type) || 'stl',
+            tags          => $tag_str || undef,
+            thumbnail_url => $thumbnail || undef,
+            source        => 'web_import',
+            source_url    => $url,
+            added_by      => $c->session->{username} || 'web_import',
+            is_active     => 1,
+            nfs_path      => undef,        # no file — link-only card
+            file_id       => undef,
+            item_id       => undef,        # no inventory item yet
+            created_at    => _now(),
+        });
+        $model_id = $model->id;
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'copy',
+            "web_import save failed: $@");
+        $c->flash->{error_msg} = "Could not save model card: $@";
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'copy',
+            "web_import model_id=$model_id title=$title site=$site");
+        $c->flash->{success_msg} =
+            "Saved \"$title\" to catalog (model #$model_id). "
+          . "Download the STL from $site, then upload it on the Model Manager page.";
+    }
+
+    # Redirect back to browse preserving the search
+    my $q = $c->req->params->{q} || '';
+    $c->res->redirect($c->uri_for('/3d/browse', {
+        ($q ? (q => $q) : ()),
+        deep => 1,
+    }));
+    $c->detach;
+}
+
+# ============================================================
+
+sub sign_delete :Path('/3d/sign/delete') :Args(1) {
+    my ($self, $c, $model_id) = @_;
+    $self->_require_login($c);
+
+    my $schema = $self->_schema($c);
+    my $model = eval { $schema->resultset('Printing3dModel')->find($model_id) };
+    unless ($model && ($model->source || '') eq 'sign_generator') {
+        $c->flash->{error_msg} = 'Sign not found.';
+        $c->res->redirect($c->uri_for('/3d/browse', { q => 'sign', kind => 'sign' }));
+        $c->detach;
+    }
+
+    my $username = $c->session->{username} || '';
+    my $is_admin = $self->_is_admin($c);
+    unless ($is_admin || ($model->added_by || '') eq $username) {
+        $c->flash->{error_msg} = 'Not allowed to delete this sign.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    # Unlink files using the util (works even in offline mode for file cleanup)
+    my $sg = Comserv::Util::SignGenerator->new;
+    $sg->unlink_sign_files($c, $model, []);
+
+    eval { $model->delete };
+    $c->flash->{success_msg} = 'Sign removed.';
+    $c->res->redirect($c->uri_for('/3d/browse', { q => 'sign', kind => 'sign' }));
+    $c->detach;
+}
+
+
+__PACKAGE__->meta->make_immutable;
+
+1;

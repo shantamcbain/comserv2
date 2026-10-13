@@ -116,6 +116,26 @@ sub _browse_kind {
     return 'product';
 }
 
+# Public catalog vs in-house. Visibility columns are authoritative:
+#   is_public=1                       -> Public (everyone, incl. anonymous)
+#   owner_user_id=<uid>               -> Individual (only that user, incl. their own upload)
+#   neither                           -> In-house (farm internal; hidden from browse)
+# Legacy tags (vis:public / owner:<uid>) still honoured so nothing flips until
+# the columns are backfilled.
+sub _browse_visible {
+    my ($self, $model, $uid) = @_;
+    return 0 unless $model;
+    my $tags = lc($model->tags || '');
+    my $name = lc($model->name || '');
+    return 1 if $model->column_info('is_public') && $model->is_public;
+    return 1 if $tags =~ /(?:^|\s)vis:public(?:\s|$)/;
+    return 1 if $uid && $model->column_info('owner_user_id') && $model->owner_user_id
+        && $model->owner_user_id == $uid;
+    return 1 if $uid && $tags =~ /(?:^|\s)owner:\Q$uid\E(?:\s|$)/;
+    return 1 if $name =~ /bee\s*hotel|bee\s*house|chip\s*clip\s*9000|pepper\s*mill\s*funnel|spice\s*funnel|jar\s*sprout/;
+    return 0;
+}
+
 # Panels = side/door skins. Connectors = corners, bottoms, rollers.
 sub _part_theme_role {
     my ($self, $sku) = @_;
@@ -597,12 +617,18 @@ sub index :Path :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
         "3D index site=$sitename enabled=$module_enabled");
 
-    my ($model_count, $printer_count, $my_open_jobs, $store_item_count) = (0, 0, 0, 0);
+    my ($model_count, $public_model_count, $printer_count, $my_open_jobs, $store_item_count) = (0, 0, 0, 0, 0);
 
     if ($module_enabled) {
         eval {
             $model_count = $schema->resultset('Printing3dModel')->search(
                 { sitename => $sitename, is_active => 1 })->count;
+            # Public hub shows the public catalog only. The full library count is admin-only.
+            $public_model_count = $schema->resultset('Printing3dModel')->search({
+                sitename  => $sitename,
+                is_active => 1,
+                tags      => { -like => '%vis:public%' },
+            })->count;
             $printer_count = $schema->resultset('Printing3dPrinter')->search(
                 { sitename => $sitename, status => 'idle' })->count;
             $store_item_count = $schema->resultset('Accounting::InventoryItem')->search(
@@ -620,7 +646,8 @@ sub index :Path :Args(0) {
     $c->stash(
         sitename         => $sitename,
         module_enabled   => $module_enabled,
-        model_count      => $model_count,
+        model_count        => $model_count,
+        public_model_count => $public_model_count // 0,
         printer_count    => $printer_count,
         my_open_jobs     => $my_open_jobs,
         store_item_count => $store_item_count,
@@ -672,7 +699,6 @@ sub browse :Path('/3d/browse') :Args(0) {
     my $page = $c->req->params->{page} || 1;
     $page    = 1 unless $page =~ /^\d+$/ && $page >= 1;
     my $per_page = 24;
-    $kind = 'product' if $kind eq '' && $sitename eq '3d';
     $kind = 'all' unless $kind =~ /^(all|product|part|sign)$/;
 
     # Build category tree for filter dropdown (whether or not cat is selected)
@@ -730,6 +756,11 @@ sub browse :Path('/3d/browse') :Args(0) {
         # Browse is the printable-part catalog. Assemblies (Has BOM) and
         # pack 3MF plates belong on the item/BOM page, not here.
         @all_models = grep { $self->_browse_is_printable($schema, $_) } @all_models;
+        # Public browse: vis:public tag, the named public models, or the
+        # logged-in owner's own upload (tag owner:<user_id>). In-house stays hidden.
+        my $uid = $c->session->{user_id} || 0;
+        @all_models = grep { $self->_browse_visible($_, $uid) } @all_models;
+
         if ($kind ne 'all') {
             @all_models = grep { $self->_browse_kind($schema, $_) eq $kind } @all_models;
         }
@@ -1798,6 +1829,7 @@ sub queue :Path('/3d/queue') :Args(0) {
     $history_limit = 500 if $history_limit > 500;
 
     my (@queued_jobs, @active_jobs, @idle_printers, @recent_completed);
+    my @farm_printers;   # ALL printers for the live-state section (assigned or not)
     my $queue_error;
 
     eval {
@@ -1815,6 +1847,7 @@ sub queue :Path('/3d/queue') :Args(0) {
                    pr.model AS printer_model,
                    mo.name  AS model_name,
                    mo.nfs_path AS model_file,
+                   mi.sku AS item_sku,
                    parent.print_time_hours AS bom_print_hours,
                    fil_bom.quantity        AS bom_filament_grams,
                    fil_bom_item.name       AS bom_filament_name
@@ -1822,6 +1855,7 @@ sub queue :Path('/3d/queue') :Args(0) {
             LEFT JOIN inventory_items fi ON fi.id = j.filament_item_id
             LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
             LEFT JOIN printing_3d_models  mo ON mo.id = j.model_id
+            LEFT JOIN inventory_items mi ON mi.id = mo.item_id
             LEFT JOIN inventory_consignment_lines cl ON cl.id = j.consignment_line_id
             LEFT JOIN inventory_items parent ON parent.id = COALESCE(j.source_item_id, cl.item_id)
             LEFT JOIN inventory_item_bom fil_bom
@@ -1859,6 +1893,9 @@ sub queue :Path('/3d/queue') :Args(0) {
     # (for monitoring, error detection, and remain_time-based polling decisions).
     # Active jobs get current_job context; others get basic printer info.
     # Full raw printer response (incl. remain_time_min, print_time_min) is preserved.
+    # The same snapshot is passed to the template (%real_state) so the queue shows
+    # the printer's REAL state, not the DB status that assign-click wrote.
+    my %real_state;
     eval {
         require Comserv::Util::Printing3d::Adapter::Anycubic;
         my $adapter = Comserv::Util::Printing3d::Adapter::Anycubic->new;
@@ -1874,6 +1911,7 @@ sub queue :Path('/3d/queue') :Args(0) {
             next unless $lan_host;
 
             my $st = eval { $adapter->fetch_state($c, $lan_host, 18910) };
+            $real_state{ $pr->id } = $st;   # recorded even when unreachable (ok=0)
             next unless $st && $st->{ok};
 
             require File::Path;
@@ -1904,11 +1942,13 @@ sub queue :Path('/3d/queue') :Args(0) {
         # Also write for any other LAN printers (idle, to ensure JSONs are always present)
         my @all_printers = $schema->resultset('Printing3dPrinter')->search({ sitename => $sitename })->all;
         for my $pr (@all_printers) {
+            push @farm_printers, $pr;   # every printer appears on the queue, assigned or not
             next if $seen{ $pr->id }++;
             my $notes = $pr->notes // '';
             my $lan_host = $1 if $notes =~ /\[LAN_HOST:([0-9.]+)\]/;
             next unless $lan_host;
             my $st = eval { $adapter->fetch_state($c, $lan_host, 18910) };
+            $real_state{ $pr->id } = $st;   # recorded even when unreachable (ok=0)
             next unless $st && $st->{ok};
 
             require File::Path;
@@ -1941,6 +1981,37 @@ sub queue :Path('/3d/queue') :Args(0) {
             { sitename => $sitename, status => 'idle' }
         )->all;
     };
+    # 2026-10-13: the DB status can be stale (Kobra 3 row stayed 'printing'
+    # after a job ended), which hid a really idle printer ("No available
+    # printers"). A printer whose LAN answer is ok and not busy counts as idle
+    # whatever the DB says. Read-only: the DB status is not rewritten here.
+    {
+        my %have = map { $_->id => 1 } @idle_printers;
+        for my $pr (@farm_printers) {
+            next if $have{ $pr->id };
+            next if ($pr->status || '') =~ /^(maintenance|offline|retired)$/;
+            my $st = $real_state{ $pr->id };
+            next unless $st && $st->{ok};
+            my $ps = lc($st->{print_state} || '');
+            next unless $ps =~ /^(free|finished|stoped|stopped|idle)$/;
+            push @idle_printers, $pr;
+            $have{ $pr->id } = 1;
+        }
+    }
+
+    # Availability is REAL, not just the DB status written by assign-click:
+    # a DB-idle printer that the LAN query says is busy is NOT offered for
+    # assignment; unreachable printers stay offered but are flagged as
+    # unverified in the dropdown. %real_state gives the template the detail.
+    my (@assignable_printers, @unavailable_printers);
+    for my $pr (@idle_printers) {
+        my $st = $real_state{ $pr->id };
+        if ($st && $st->{ok} && ($st->{print_state} || '') eq 'busy') {
+            push @unavailable_printers, $pr;
+        } else {
+            push @assignable_printers, $pr;
+        }
+    }
 
     eval {
         my $r_sql = "
@@ -1966,14 +2037,18 @@ sub queue :Path('/3d/queue') :Args(0) {
     };
 
     $c->stash(
-        sitename          => $sitename,
-        queued_jobs       => \@queued_jobs,
-        active_jobs       => \@active_jobs,
-        idle_printers     => \@idle_printers,
-        recent_completed  => \@recent_completed,
-        queue_error       => $queue_error,
-        history_limit     => $history_limit,
-        template          => '3d/queue.tt',
+        sitename             => $sitename,
+        queued_jobs          => \@queued_jobs,
+        active_jobs          => \@active_jobs,
+        idle_printers        => \@idle_printers,
+        assignable_printers  => \@assignable_printers,
+        unavailable_printers => \@unavailable_printers,
+        printer_states       => \%real_state,
+        farm_printers        => \@farm_printers,
+        recent_completed     => \@recent_completed,
+        queue_error          => $queue_error,
+        history_limit        => $history_limit,
+        template             => '3d/queue.tt',
     );
 }
 
@@ -2487,6 +2562,9 @@ sub models :Path('/3d/models') :Args(0) {
             my $name    = $c->req->params->{model_name} || '';
             my $desc    = $c->req->params->{model_desc} || '';
             my $tags    = $c->req->params->{model_tags} || '';
+            if ($c->req->params->{public_browse}) {
+                $tags = join(' ', grep { length } ($tags, 'vis:public'));
+            }
             my $item_id = $c->req->params->{item_id}    || undef;
             my $print_h = $c->req->params->{print_hours} || undef;
 
@@ -2875,7 +2953,17 @@ sub model_upload :Path('/3d/model_upload') :Args(1) {
     }
 
     my ($vol_cm3, $weight_g);
-    if ($ext eq 'stl' && $resolved_path && -r $resolved_path) {
+    # 2026-10-13: was `if ($ext eq 'stl' && -r ...) ... else { "not visible" }`,
+    # so every .gcode / .3mf upload hit the "not visible" error even though the
+    # file was on disk. Now only a missing file is an error; STL is parsed for volume.
+    unless ($resolved_path && -r $resolved_path) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'model_upload',
+            "File not visible at resolved path after upload — stored=$nfs_stored resolved=$resolved_path");
+        $c->flash->{error_msg} = 'Upload landed but the file is not visible on the server filesystem. Try again or check NFS mount.';
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+    if ($ext eq 'stl') {
         my $file_size_kb = -s $resolved_path;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'model_upload',
             "file on disk: $resolved_path size=${file_size_kb}b") if defined $file_size_kb && $file_size_kb > 0;
@@ -2888,12 +2976,6 @@ sub model_upload :Path('/3d/model_upload') :Args(1) {
                 $weight_g = sprintf('%.3f', $v * 1.24);
             }
         }
-    } else {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'model_upload',
-            "File not visible at resolved path after upload — stl=$nfs_stored resolved=$resolved_path");
-        $c->flash->{error_msg} = 'Upload landed but the file is not visible on the server filesystem. Try again or check NFS mount.';
-        $c->res->redirect($c->uri_for('/3d/queue'));
-        $c->detach;
     }
 
     eval {
@@ -2908,7 +2990,7 @@ sub model_upload :Path('/3d/model_upload') :Args(1) {
     if ($@) {
         $c->flash->{error_msg} = "Could not update model record: $@";
     } else {
-        my $msg = "STL replaced for '$model->name' — uploaded $orig_name";
+        my $msg = "File replaced for '" . ($model->name // '') . "' — uploaded $orig_name";
         if ($vol_cm3) {
             $msg .= " (${vol_cm3} cm³ → ~${weight_g} g PLA)";
         }
