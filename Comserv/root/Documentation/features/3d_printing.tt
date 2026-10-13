@@ -1,4 +1,4 @@
-[% PageVersion = 'Documentation/features/3d_printing.tt,v 1.01 2026/09/24 hermes-agent Exp' %]
+[% PageVersion = 'Documentation/features/3d_printing.tt,v 1.02 2026/10/05 hermes-agent Exp (NFS thumbnails, merge fix)' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 [% META title = '3D Printing System' %]
@@ -16,7 +16,7 @@
     ·
     <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">MASTER_PLAN</a>
 </p>
-<p><em>Last updated: September 24, 2026</em></p>
+<p><em>Last updated: 2026-10-05 (NFS thumbnail migration + merge resolution documented)</em></p>
 
 <h2>Overview</h2>
 <p>
@@ -49,12 +49,15 @@ Each model record stores:
 </p>
 <ul>
     <li><strong>Name</strong> — display name</li>
-    <li><strong>File path</strong> — where the uploaded file is stored</li>
+    <li><strong>File path</strong> / <code>nfs_path</code> — where the uploaded STL/3MF/etc. is stored (via File manager on NFS)</li>
+    <li><strong>thumbnail_url</strong> — preview image (small PNG; see asset storage note below)</li>
     <li><strong>Linked inventory item</strong> — the finished-goods inventory item this model produces</li>
     <li><strong>Geometry info</strong> — triangle count and estimated bounding box (from STL parser)</li>
     <li><strong>show_in_shop</strong> — whether this model appears in the public store</li>
 </ul>
 <p>Browse the public model gallery at <a href="/3d/browse">/3d/browse</a>. Click a model for its detail page.</p>
+
+<p class="doc-body"><strong>Asset storage (thumbnails &amp; generated images):</strong> Large or generated images (e.g. STL-derived previews) must never be committed to git. Thumbnails for the model library and browse cards are stored as compact PNG files on the NFS volume under <code>/data/nfs/3d/thumbnails/library/</code> (migrated 2026-10-05). They are referenced via the <code>thumbnail_url</code> column and resolved/served consistently with other 3D assets using <code>Comserv::Util::NfsPath</code> and the File manager. The old <code>root/static/images/3d/library/</code> location (and any SVGs) is deprecated and ignored by git. Use <code>/file/admin_browser</code> or the 3D upload paths for managing such assets.</p>
 
 <hr>
 

@@ -149,6 +149,8 @@
                                 <span class="section-info"><i class="fas fa-check"></i> in sync with [% tracking.base | html %]</span>
                             [% END %]
                             <span class="section-info-muted">no GitHub upstream — local-merge workflow (merge into main, don't push per-branch)</span>
+                        [% ELSIF current_branch == 'main' OR current_branch == 'master' %]
+                            <span class="section-info"><i class="fas fa-upload"></i> origin/[% current_branch | html %] — Push publishes this checkout</span>
                         [% ELSE %]
                             <span class="section-info-warn">no upstream</span>
                         [% END %]
@@ -158,8 +160,8 @@
                     [% END %]
                 </div>
 
-                [%# ---- Remote actions: ONLY relevant for branches with a GitHub upstream ---- %]
-                [% IF tracking.upstream %]
+                [%# ---- Remote actions: GitHub upstream, or the primary main checkout (:3001) ---- %]
+                [% IF tracking.upstream OR current_branch == 'main' OR current_branch == 'master' %]
                 <div class="git-card git-card--fit">
                     <h4>Remote</h4>
                     <div class="git-inline">
