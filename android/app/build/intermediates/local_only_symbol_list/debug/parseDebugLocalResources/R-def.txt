@@ -1,0 +1,7 @@
+R_DEF: Internal format may change without notice
+local
+color on_primary
+color primary
+color surface
+string app_name
+style Theme.ComservInventory

@@ -57,7 +57,7 @@
             <h2 class="doc-h2">1. Two records, one product</h2>
             <p class="doc-body">A printable thing is usually <strong>two rows</strong>:</p>
             <ul class="doc-body">
-                <li><code>printing_3d_models</code> — file, <code>nfs_path</code> (STL/3MF for download), thumbnail, source.</li>
+                <li><code>printing_3d_models</code> — file, <code>nfs_path</code> (STL/3MF for download), <code>thumbnail_url</code> (small PNG on NFS under <code>/data/nfs/3d/thumbnails/library/</code> since 2026-10-05 migration; never large git blobs), source.</li>
                 <li><code>inventory_items</code> — SKU, stock, reorder, optional BOM. Linked by <code>printing_3d_models.item_id</code>.</li>
             </ul>
             <p class="doc-body">A 3MF plate is not a product. An assemblable inventory item (Has BOM) is the unit.

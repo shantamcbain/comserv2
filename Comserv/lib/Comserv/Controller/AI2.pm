@@ -1105,6 +1105,29 @@ sub chat :Local :Args(0) {
         }
     }
 
+    # Git path rejection fixer — Router chooses models per sub-step + decision models.
+    # Triggered from AI editor when user pastes "Rejected unsafe or unknown path(s)" error.
+    my $gitfix_hit = eval {
+        require Comserv::Model::AI2::GitFix;
+        my $brain = eval { $c->model('AI2::GitFix') } || Comserv::Model::AI2::GitFix->new;
+        $brain->try_chat_fix($c, prompt => $prompt);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ai2_chat', "GitFix threw: $@");
+    }
+    if ($gitfix_hit && $gitfix_hit->{handled}) {
+        $c->res->body(encode_json({
+            success => $gitfix_hit->{success} ? 1 : 0,
+            response => $gitfix_hit->{response} // '',
+            model => $gitfix_hit->{model} // '(router-gitfix)',
+            provider => $gitfix_hit->{provider} // 'ai2-gitfix',
+            git_fix_proposal => $gitfix_hit->{git_fix_proposal} || 0,
+            verification_steps => $gitfix_hit->{verification_steps} || [],
+            conversation_id => $conversation_id,
+        }));
+        return;
+    }
+
     # ── Focus-Tune agent: "what are my top 5 todos by function?" ──
     # Delegates to Model::AI2::FocusTune (the SAME brain the /api/focus/top5
     # UI button uses) so the question is answerable from Chat-with-AI too.

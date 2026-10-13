@@ -87,6 +87,25 @@
           <small>UPC / EAN / QR / Code128</small></td>
     </tr>
     <tr>
+      <th><label for="barcode_type">Barcode Type</label></th>
+      <td>
+        <select id="barcode_type" name="barcode_type">
+          <option value="">— unknown —</option>
+          <option value="upc">UPC</option>
+          <option value="ean">EAN</option>
+          <option value="qr">QR</option>
+          <option value="internal">Internal / custom</option>
+          <option value="other">Other</option>
+        </select>
+        <small> (camera scan will help set this)</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="image_path">Image / Photo Path</label></th>
+      <td><input type="text" id="image_path" name="image_path" maxlength="500" placeholder="NFS path or https://...">
+          <small>Optional visual. <strong>On ZeroTier (no HTTPS):</strong> Use your phone's camera app to take the photo, then upload it via File Manager to get an NFS path (e.g. /data/nfs/inventory/xxx.jpg). Paste that path here. External URLs also work for common items.</small></td>
+    </tr>
+    <tr>
       <th><label for="reorder_point">Reorder Point</label></th>
       <td><input type="number" id="reorder_point" name="reorder_point" value="0" min="0"></td>
     </tr>
@@ -225,6 +244,29 @@
     </tr>
   </table>
 </form>
+
+<!-- Camera / scan for visual + barcode (optional) -->
+<div style="margin: 1rem 0; padding: 0.75rem; border: 1px solid var(--border-color, #ccc); border-radius: 4px; font-size: 0.9em;">
+  <strong>📷 Camera (photo for visual reference + scan barcode)</strong><br>
+  <small><strong>Important for ZeroTier users:</strong> In-browser camera requires HTTPS. On ZeroTier (plain HTTP) this is blocked on phones/tablets. The buttons below will show a friendly message. See recommended mobile workflow below.</small><br>
+
+  <div style="margin-top:0.5rem; padding:0.4rem; background:#f8f8f8; border-radius:3px; font-size:0.85em;">
+    <strong>Recommended on phone/tablet via ZeroTier:</strong><br>
+    1. Use your device's native Camera app to take the photo.<br>
+    2. Upload the photo using the File Manager (gets you a /data/nfs/... path).<br>
+    3. Paste the path into the "Image / Photo Path" field above.<br>
+    4. For barcode: Use a free barcode scanner app on your phone, then type or paste the result into the Barcode field.
+  </div>
+  <button type="button" id="start-cam">Start Camera (desktop/HTTPS only)</button>
+  <button type="button" id="stop-cam">Stop</button>
+  <button type="button" id="capture">Capture Photo</button>
+  <button type="button" id="scan-barcode">Simulate Scan (works everywhere)</button>
+  <video id="video" style="display:none; max-width: 220px; vertical-align: middle;"></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+  <img id="preview" style="display:none; max-width: 120px; vertical-align: middle;">
+  <div id="cam-status" style="font-size:0.8em; color:#666; margin-top:0.25rem;"></div>
+</div>
+
 <script>
 (function() {
     var cat = document.getElementById('category');
@@ -237,6 +279,70 @@
     cat.addEventListener('input', toggle3d);
     cat.addEventListener('change', toggle3d);
     toggle3d();
+
+    // Camera + scan helpers (getUserMedia + placeholder decode)
+    // Note: Camera requires a secure context (HTTPS). On Android/mobile over plain HTTP it often fails.
+    var video = document.getElementById('video');
+    var canvas = document.getElementById('canvas');
+    var preview = document.getElementById('preview');
+    var status = document.getElementById('cam-status');
+    var stream = null;
+
+    function cameraSupported() {
+        return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    }
+
+    document.getElementById('start-cam').addEventListener('click', async function() {
+        if (!cameraSupported()) {
+            status.textContent = 'Camera disabled (ZeroTier/HTTP has no HTTPS). Use phone camera app + File Manager instead.';
+            alert('In-browser camera is blocked on ZeroTier (no HTTPS). On phones/tablets use your native camera app and the File Manager to upload photos, then paste the NFS path.');
+            return;
+        }
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            video.srcObject = stream;
+            video.style.display = 'inline';
+            status.textContent = 'Camera active. Position item or barcode.';
+        } catch (e) {
+            status.textContent = 'Camera error: ' + e.message;
+            alert('Could not access camera: ' + e.message);
+        }
+    });
+
+    document.getElementById('stop-cam').addEventListener('click', function() {
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+            stream = null;
+        }
+        video.style.display = 'none';
+        status.textContent = '';
+    });
+
+    document.getElementById('capture').addEventListener('click', function() {
+        if (!stream) { 
+            status.textContent = 'Start camera first (or use manual entry on mobile).'; 
+            return; 
+        }
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        preview.src = canvas.toDataURL('image/jpeg');
+        preview.style.display = 'inline';
+        status.textContent = 'Photo captured. Use File Manager to save to NFS (/data/nfs) and paste path into Image Path field (or use external URL).';
+    });
+
+    document.getElementById('scan-barcode').addEventListener('click', function() {
+        // Scan button can be used as a simulator even without live camera
+        var bc = document.getElementById('barcode');
+        var bt = document.getElementById('barcode_type');
+        if (bc) {
+            bc.value = 'SCAN-' + Date.now().toString().slice(-8);
+            if (bt) bt.value = 'internal';
+            status.textContent = 'Placeholder scan (camera not required for this). Submit to test duplicate switch or create.';
+        } else if (!stream) {
+            status.textContent = 'Start camera first for live capture, or just type the barcode manually.';
+        }
+    });
 })();
 </script>
 
