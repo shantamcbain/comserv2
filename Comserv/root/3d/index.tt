@@ -101,8 +101,8 @@
 
 <div class="printing-3d-stats">
     <div class="stat-card">
-        <div class="stat-number">[% model_count || 0 %]</div>
-        <div class="stat-label">Models Available</div>
+        <div class="stat-number">[% public_model_count || 0 %]</div>
+        <div class="stat-label">Public models</div>
     </div>
     <div class="stat-card">
         <div class="stat-number">[% printer_count || 0 %]</div>
@@ -118,6 +118,12 @@
         <div class="stat-number">[% store_item_count || 0 %]</div>
         <div class="stat-label">Items in Store</div>
     </div>
+    [% IF c.session.roles.grep('admin').size %]
+    <div class="stat-card">
+        <div class="stat-number">[% model_count || 0 %]</div>
+        <div class="stat-label">All models (admin)</div>
+    </div>
+    [% END %]
 </div>
 
 <div class="printing-3d-actions">
@@ -135,7 +141,7 @@
 
 <h2>How It Works</h2>
 <ol>
-    <li><strong>Browse</strong> our catalog of 3D model files.</li>
+    <li><strong>Bring your own file.</strong> On <a href="/3d/browse">Browse</a>, search a model site, download the STL, and upload it. It stays private to you. We read the mesh for a filament estimate and queue it. The farm slices it before the printer starts.</li>
     <li><strong>Select</strong> a model and choose your filament preferences.</li>
     <li><strong>Order</strong> — the system assigns your job to an available printer automatically, or queues it for the next available slot.</li>
     <li><strong>Track</strong> your order status under <em>My Orders</em>.</li>

@@ -349,9 +349,11 @@
 
 <div class="browse-3d-header">
     <h1>Browse 3D Models</h1>
+    <p class="browse-3d-search">Search our catalog, or search a site below and upload the file you download. Uploads stay private to your account.</p>
     <div class="browse-3d-search">
         <form method="get" action="/3d/browse">
             <input type="hidden" name="kind" value="[% kind | html %]">
+            [% IF cat %]<input type="hidden" name="cat" value="[% cat | html %]">[% END %]
             <input type="text" name="q" value="[% q | html %]" placeholder="Search models…">
             <button type="submit"><i class="icon-search"></i> Search</button>
             <label style="font-size:0.85em;color:var(--muted-color,var(--text-color));cursor:pointer;display:inline-flex;align-items:center;gap:0.25em;margin-left:0.3em;">
@@ -363,35 +365,20 @@
     </div>
 </div>
 
-<p class="browse-3d-filters">
-    [% SET kinds = [ { id => 'product', label => 'Units' },
-                     { id => 'part',    label => 'Printable parts' },
-                     { id => 'sign',    label => 'Signs' },
-                     { id => 'all',     label => 'All' } ] %]
-    [% FOREACH k IN kinds %]
-    <a href="/3d/browse?kind=[% k.id %][% IF q %]&amp;q=[% q | uri %][% END %][% IF deep %]&amp;deep=1[% END %]"
-       class="btn-sm[% UNLESS kind == k.id %] secondary[% END %]">[% k.label %]</a>
-    [% END %]
-</p>
-
 [% IF cat_tree && cat_tree.size %]
 <p class="browse-3d-filters">
     <span style="color:var(--muted-color,#888);font-size:0.85em;margin-right:0.3em;">Category:</span>
-    [% MACRO cat_options(tree, depth) BLOCK %]
-        [% FOREACH node IN tree %]
-            <option value="[% node.id %]"[% IF cat == node.id %] selected[% END %]>
-                [% "&nbsp;&nbsp;" | repeat(depth) %][% node.name | html %] ([% node.item_count %])</option>
-            [% IF node.children && node.children.size %]
-                [% cat_options(node.children, depth + 1) %]
-            [% END %]
-        [% END %]
-    [% END %]
-    <select name="cat" onchange="var v=this.value;var u=window.location.href.split('?')[0]+'?kind=[% kind | uri %]&q=[% q | uri %]';if(v)u+='&cat='+v;window.location=u;" style="padding:0.4em 0.8em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg, var(--secondary-color));color:var(--text-color);max-width:280px;">
+    [%# Top-level categories only — children are included in the filter via
+        descendant_ids in the controller, so picking "Beekeeping" shows all
+        its subcategory models too. %]
+    <select name="cat" onchange="var v=this.value;var u=window.location.href.split('?')[0]+'?q=[% q | uri %][% IF deep %]&amp;deep=1[% END %][% IF kind && kind != 'all' %]&amp;kind=[% kind | uri %][% END %]';if(v)u+='&amp;cat='+v;window.location=u;" style="padding:0.4em 0.8em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg, var(--secondary-color));color:var(--text-color);max-width:280px;">
         <option value="">All categories</option>
-        [% cat_options(cat_tree, 0) %]
+        [% FOREACH node IN cat_tree %]
+        <option value="[% node.id %]"[% IF cat == node.id %] selected[% END %]>[% node.name | html %] ([% node.item_count %])</option>
+        [% END %]
     </select>
     [% IF cat %]
-    <a href="/3d/browse?kind=[% kind | uri %][% IF q %]&amp;q=[% q | uri %][% END %][% IF deep %]&amp;deep=1[% END %]" class="btn-sm secondary">Clear</a>
+    <a href="/3d/browse?[% IF kind && kind != 'all' %]kind=[% kind | uri %]&amp;[% END %][% IF q %]q=[% q | uri %]&amp;[% END %][% IF deep %]deep=1&amp;[% END %]" class="btn-sm secondary">Clear</a>
     [% END %]
 </p>
 [% END %]
@@ -611,6 +598,23 @@ window.saveWebModel = function(btn) {
     [% END %]
 </div>
 [% END %]
+
+[%# Customer upload: file found on an external search, or one they made. Always private. %]
+<div class="ext-sites-section">
+    <h3>Print a file you found</h3>
+    <p class="ext-sites-note">Search a site below, download the STL, 3MF, or OBJ, then upload it here. It is marked private and is not added to the public catalog. We read an STL for volume and filament weight, then queue the print. The farm slices it before a printer starts.</p>
+    [% IF c.session.user_id %]
+    <form method="post" action="/3d/print_upload" enctype="multipart/form-data" class="browse-3d-search">
+        <input type="text" name="model_name" required placeholder="Name for this print" maxlength="120">
+        <input type="file" name="stl_file" required accept=".stl,.3mf,.obj,model/stl,application/octet-stream">
+        <input type="number" name="quantity" value="1" min="1" max="20" title="Quantity">
+        <input type="text" name="notes" placeholder="Color or notes" maxlength="200">
+        <button type="submit">Upload and queue</button>
+    </form>
+    [% ELSE %]
+    <p class="ext-sites-note"><a href="/user/login?destination=/3d/browse">Log in</a> to upload a private file and queue a print.</p>
+    [% END %]
+</div>
 
 [%# ── External Sites: branded entry cards (always visible) ─────────────── %]
 [%# One link per card, no second action to confuse the click target:       %]
