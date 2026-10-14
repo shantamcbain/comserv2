@@ -655,6 +655,26 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
         return;
     }
 
+    # CSC-20260928-9565: guests must give a valid contact email (server-side check).
+    $email =~ s/^\s+|\s+$//g;
+    my $guest_name = $c->req->params->{guest_name} // '';
+    $guest_name =~ s/^\s+|\s+$//g;
+    $guest_name = substr($guest_name, 0, 100);
+    if (!$c->session->{user_id} && $email !~ /^[^\s\@]+\@[^\s\@]+\.[^\s\@]+$/) {
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
+        $c->stash(
+            template      => 'CSC/HelpDesk/new_ticket.tt',
+            error_msg     => 'Please enter a valid email address so we can reply to your ticket.',
+            title         => 'Create New Support Ticket',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
+            guest_name => $guest_name, guest_email_in => $email,
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
     unless ($subject && $description) {
         my ($n1, $n2) = $self->_issue_math_challenge($c);
         $c->stash(
@@ -712,6 +732,7 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
             created_at    => Comserv::Util::AppTime->now_utc,
             metadata      => $self->_build_ticket_metadata($c,
                 entry_path   => 'web_form',
+                (length $guest_name ? (contact_name => $guest_name) : ()),
                 spam_score   => $spam_score,
                 spam_reasons => $spam_reasons,
                 quarantine   => $quarantine,

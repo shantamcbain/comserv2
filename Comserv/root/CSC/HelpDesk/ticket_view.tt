@@ -419,6 +419,9 @@
 
             <div class="reply-actions">
 
+                [% IF is_staff && !ticket.email && !guest_email %]
+                <p class="warning" style="color:#a94442;margin:0 0 6px;">⚠ No customer email on this ticket — the reply will be saved but no email can be sent.</p>
+                [% END %]
                 <button type="submit" class="btn btn-primary">
 
                     [% IF is_staff %]Send Reply &amp; Email Customer[% ELSE %]Send Reply[% END %]
