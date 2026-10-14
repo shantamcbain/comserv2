@@ -2406,7 +2406,9 @@ sub job_filament :Path('/3d/job/filament') :Args(1) {
             $self,
         );
         if ($res->{ok}) {
-            my $gmsg = $res->{grams}
+            my $gmsg = $res->{recosted}
+                ? sprintf(' (%sg re-issued, cost recalculated)', $res->{grams})
+                : $res->{grams}
                 ? sprintf(' (~%sg reserved)', $res->{grams})
                 : ' (no grams — enter grams so stock issues on complete)';
             $c->flash->{success_msg} = 'Job #' . $job->id . ' filament updated.' . $gmsg;

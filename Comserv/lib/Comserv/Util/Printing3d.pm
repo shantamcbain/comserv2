@@ -524,9 +524,12 @@ sub change_filament {
     my ($self, $c, $job, $filament_item_id, $grams, $ctl) = @_;
     return { ok => 0, error => 'Job not found.' } unless $job;
     my $st = $job->status || '';
-    return { ok => 0, error => 'Job is not open (queued/assigned/printing).' }
-        unless $st =~ /^(queued|assigned|printing)$/;
+    return { ok => 0, error => 'Job is not open (queued/assigned/printing) or completed.' }
+        unless $st =~ /^(queued|assigned|printing|completed)$/;
     return { ok => 0, error => 'Select a filament.' } unless $filament_item_id;
+    # 3D-20260907-4807: completed job had the wrong spool; re-cost it in place.
+    return $self->recost_completed_filament($c, $job, $filament_item_id, $grams, $ctl)
+        if $st eq 'completed';
 
     my $schema   = $c->model('DBEncy');
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || '';
@@ -602,6 +605,95 @@ sub change_filament {
         grams   => $grams,
         reserved => $grams ? 1 : 0,
     };
+}
+
+# Correct filament / grams on a COMPLETED job (3D-20260907-4807).
+# Returns the old spool's issued stock, issues the new spool, and recomputes
+# filament_cost and total_cost (printer/electricity costs are kept).
+sub recost_completed_filament {
+    my ($self, $c, $job, $filament_item_id, $grams, $ctl) = @_;
+    my $schema   = $c->model('DBEncy');
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    my $irs      = $schema->resultset('Accounting::InventoryItem');
+    my $fil;
+    try { $fil = $irs->find($filament_item_id) }
+        catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'recost_completed_filament', "filament find failed: $_");
+        };
+    return { ok => 0, error => 'Filament item not found.' } unless $fil;
+    return { ok => 0, error => 'Filament is not on this site.' }
+        if $fil->sitename && $sitename && $fil->sitename ne $sitename;
+    $grams = undef if defined $grams && $grams !~ /^\d+(?:\.\d+)?$/;
+    $grams = undef if defined $grams && $grams <= 0;
+    $grams //= $job->filament_quantity;
+    return { ok => 0, error => 'Enter the grams actually used.' } unless $grams && $grams > 0;
+
+    my ($type, $color) = $self->infer_type_color($fil);
+    my $old_id   = $job->filament_item_id;
+    my $old_g    = $job->filament_quantity;
+    my $old_cost = $job->filament_cost || 0;
+    my $new_cost;
+    if ($fil->unit_cost) {
+        my $uom = lc($fil->unit_of_measure || 'g');
+        $new_cost = ($uom eq 'g') ? $grams * $fil->unit_cost : ($grams / 1000) * $fil->unit_cost;
+    }
+    my $other = ($job->total_cost || 0) - $old_cost;
+    $other = 0 if $other < 0;
+    my $new_total = $other + ($new_cost || 0);
+    my $user = $c->session->{username} || 'system';
+    my $ref  = '3D-JOB-' . $job->id;
+
+    my $err;
+    try {
+        $schema->txn_do(sub {
+            if ($ctl && $old_id && $old_g) {
+                my $old_fil = $irs->find($old_id);
+                my $sl = $old_fil ? eval { ($old_fil->stock_levels->all)[0] } : undef;
+                $ctl->_inventory_transaction($c,
+                    schema => $schema, sitename => $sitename, item_id => $old_id,
+                    location_id => $sl ? $sl->location_id : undef,
+                    transaction_type => 'return',
+                    quantity => $self->stock_qty_from_grams($old_fil, $old_g),
+                    reference_number => $ref,
+                    notes => sprintf('Filament correction: return %sg wrongly issued to job #%d', $old_g, $job->id),
+                    performed_by => $user,
+                );
+            }
+            if ($ctl) {
+                my $sl  = eval { ($fil->stock_levels->all)[0] };
+                my $qty = $self->stock_qty_from_grams($fil, $grams);
+                $ctl->_inventory_transaction($c,
+                    schema => $schema, sitename => $sitename, item_id => $filament_item_id,
+                    location_id => $sl ? $sl->location_id : undef,
+                    transaction_type => 'issue',
+                    quantity => $qty,
+                    unit_cost => ($new_cost && $qty) ? $new_cost / $qty : undef,
+                    reference_number => $ref,
+                    notes => sprintf('Filament correction: %sg issued for completed job #%d', $grams, $job->id),
+                    performed_by => $user,
+                );
+            }
+            $job->update({
+                filament_item_id  => $filament_item_id,
+                filament_type     => $type || undef,
+                filament_color    => $color || undef,
+                filament_quantity => $grams,
+                filament_cost     => $new_cost,
+                total_cost        => $new_total || undef,
+            });
+        });
+    }
+    catch {
+        $err = "$_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'recost_completed_filament', "job " . $job->id . " failed: $err");
+    };
+    return { ok => 0, error => $err } if $err;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'recost_completed_filament',
+        sprintf('job %d filament %s/%sg -> %s/%sg cost %.2f -> %.2f', $job->id,
+            $old_id // '-', $old_g // '-', $filament_item_id, $grams, $old_cost, $new_cost || 0));
+    return { ok => 1, job_id => $job->id, grams => $grams, recosted => 1 };
 }
 
 # Re-open a job that was marked complete (or cancelled) by mistake.

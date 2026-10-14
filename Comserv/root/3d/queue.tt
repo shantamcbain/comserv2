@@ -400,6 +400,8 @@
                 [% ELSE %]
                 <span style="font-size:0.8em;color:#b71c1c;">No model file</span>
                 [% END %]
+                <a href="/3d/job/filament/[% job.id %]" style="font-size:0.8em;display:block;"
+                   title="Wrong spool or grams? Correct it and re-cost this completed job">🧵 Fix filament / cost</a>
                 <form method="post" action="/3d/queue" style="display:inline;"
                       onsubmit="return confirm('Reopen job #[% job.id %]? It goes back to the queue and the filament issue / stock receipt are reversed.')">
                     <input type="hidden" name="job_id" value="[% job.id %]">
