@@ -73,6 +73,17 @@
     <div class="contact-form">
 
         <h2>Send Us a Message</h2>
+[%# Validation feedback: banner + field highlight + focus (HelpDesk forms). %]
+[% IF error_msg %]
+<div class="hd-alert-error hd-form-error" role="alert" id="hd-form-error"
+     style="border:2px solid #c62828;background:#fdecea;color:#b71c1c;padding:10px 14px;border-radius:6px;margin:0 0 12px;">
+    <strong>Your request was not sent.</strong> [% error_msg | html %]
+</div>
+[% END %]
+[% IF success_msg %]
+<div class="hd-alert-success" role="status" style="border:2px solid #2e7d32;background:#edf7ed;color:#1b5e20;padding:10px 14px;border-radius:6px;margin:0 0 12px;">[% success_msg | html %]</div>
+[% END %]
+
 
         <form method="post" action="[% c.uri_for('/HelpDesk/contact') %]">
 
@@ -118,7 +129,7 @@
 
                 <label for="name">Your Name:</label>
 
-                <input type="text" id="name" name="name" class="form-control" required>
+                <input type="text" id="name" name="name" value="[% c.req.params.name | html %]" class="form-control" required>
 
             </div>
 
@@ -128,7 +139,7 @@
 
                 <label for="email">Email Address:</label>
 
-                <input type="email" id="email" name="email" class="form-control" required>
+                <input type="email" id="email" name="email" value="[% c.req.params.email | html %]" class="form-control" required>
 
             </div>
 
@@ -138,7 +149,7 @@
 
                 <label for="subject">Subject:</label>
 
-                <input type="text" id="subject" name="subject" class="form-control" required>
+                <input type="text" id="subject" name="subject" value="[% c.req.params.subject | html %]" class="form-control" required>
 
             </div>
 
@@ -148,7 +159,7 @@
 
                 <label for="message">Message:</label>
 
-                <textarea id="message" name="message" class="form-control" rows="6" required></textarea>
+                <textarea id="message" name="message" class="form-control" rows="6" required>[% c.req.params.message | html %]</textarea>
 
             </div>
 
@@ -451,3 +462,20 @@
     }
 
 </style>
+
+[% IF error_msg %]
+<style>.hd-field-error{border:2px solid #c62828 !important;}.hd-field-msg{color:#b71c1c;font-size:.9em;display:block;margin-top:3px;}</style>
+<script>
+(function(){
+  var f = "[% hd_error_field | html %]", msg = document.getElementById('hd-form-error');
+  var el = f && f !== 'form' && f !== 'turnstile' ? document.getElementById(f) : null;
+  if (el) {
+    el.classList.add('hd-field-error');
+    var s = document.createElement('span'); s.className = 'hd-field-msg';
+    s.textContent = msg ? msg.textContent.replace('Your request was not sent.','').trim() : '';
+    el.insertAdjacentElement('afterend', s);
+    try { el.focus(); } catch(e) {}
+  } else if (msg) { msg.scrollIntoView(); }
+})();
+</script>
+[% END %]

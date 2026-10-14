@@ -326,6 +326,7 @@ sub _process_contact_post {
         $c->stash(
             template        => 'CSC/HelpDesk/contact.tt',
             error_msg       => 'All fields are required.',
+            hd_error_field  => (!$name ? 'name' : !$email ? 'email' : !$subject ? 'subject' : 'message'),
             title           => 'Contact Support',
             math_a => $n1, num1 => $n1,
             math_b => $n2, num2 => $n2,
@@ -665,6 +666,7 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
         $c->stash(
             template      => 'CSC/HelpDesk/new_ticket.tt',
             error_msg     => 'Please enter a valid email address so we can reply to your ticket.',
+            hd_error_field => 'email',
             title         => 'Create New Support Ticket',
             math_a => $n1, num1 => $n1,
             math_b => $n2, num2 => $n2,
@@ -680,6 +682,7 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
         $c->stash(
             template      => 'CSC/HelpDesk/new_ticket.tt',
             error_msg     => 'Subject and description are required.',
+            hd_error_field => ($subject ? 'description' : 'subject'),
             title         => 'Create New Support Ticket',
             math_a => $n1, num1 => $n1,
             math_b => $n2, num2 => $n2,
@@ -2154,6 +2157,7 @@ sub _spam_guard_fail {
         if ($st ne 'ok') {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
                 "Fill-time token rejected ($st " . ($age // '') . ") ip=$ip");
+            $c->stash->{hd_error_field} = 'form';
             return $st eq 'fast'
                 ? 'That was quicker than we expected. Please take a moment to check your details, then submit again.'
                 : 'Your form session expired. Please review your details and submit again.';
@@ -2174,6 +2178,7 @@ sub _spam_guard_fail {
             return 'Our security check service is unavailable right now. Please answer the arithmetic question below and submit again.';
         } else {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event, "Turnstile failed ip=$ip");
+            $c->stash->{hd_error_field} = 'turnstile';
             return 'Security check failed. Please complete the verification and submit again.';
         }
     }
@@ -2201,7 +2206,8 @@ sub _spam_guard_fail {
                 "Math challenge failed ($why; submitted='$ans', expected='"
                 . (defined $expected ? $expected : '') . "') from ip=$ip");
             $clear_challenge->();
-            return 'Security check failed. Please reload the form and solve the arithmetic question correctly.';
+            $c->stash->{hd_error_field} = 'math_challenge_ans';
+            return 'The answer to the security question was not correct. Please answer the new question below and submit again.';
         };
 
         # Fail closed: no challenge issued, expired (>2h), or inconsistent operands
