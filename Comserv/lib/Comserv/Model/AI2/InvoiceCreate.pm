@@ -862,6 +862,125 @@ sub _clamp_description {
     return $cut;
 }
 
+sub _auto_create_supplier {
+    my ($self, $c, $schema, $args) = @_;
+    my $name = $args->{name} || '';
+    $name =~ s/^\s+|\s+$//g;
+    return undef unless length $name >= 2;
+
+    my $sitename = $args->{sitename} || $self->sitename($c);
+    my $user     = $args->{user} || 'ai';
+    my $now      = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
+
+    # Check for an existing supplier with this name before creating
+    my $existing;
+    eval {
+        $existing = $schema->resultset('Accounting::InventorySupplier')->search({
+            sitename => $sitename,
+            name     => $name,
+        })->first;
+    };
+    if ($existing) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto_create_supplier',
+            "Supplier '$name' already exists on $sitename");
+        return { id => 0 + $existing->id, name => $existing->name // '' };
+    }
+
+    # Attempt web lookup to enrich supplier data
+    my $enriched = $self->_web_lookup_supplier($c, $name);
+
+    my $supplier;
+    eval {
+        $supplier = $schema->resultset('Accounting::InventorySupplier')->create({
+            sitename     => $sitename,
+            name         => $name,
+            contact_name => $enriched->{contact_name} || undef,
+            email        => $enriched->{email} || undef,
+            phone        => $enriched->{phone} || undef,
+            address      => $enriched->{address} || undef,
+            website      => $enriched->{website} || undef,
+            status       => 'active',
+            notes        => $args->{notes} || 'Auto-created from Chat-with-AI invoice entry.',
+            created_by   => $user,
+            created_at   => $now,
+            updated_at   => $now,
+        });
+    };
+    if ($@ || !$supplier) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'auto_create_supplier', "Failed: $@");
+        return undef;
+    }
+
+    # If web lookup returned extra fields not in the initial insert, update
+    if ($enriched && ($enriched->{contact_name} || $enriched->{email} || $enriched->{phone} || $enriched->{address} || $enriched->{website})) {
+        my %update;
+        $update{contact_name} = $enriched->{contact_name} if $enriched->{contact_name};
+        $update{email}        = $enriched->{email}        if $enriched->{email};
+        $update{phone}        = $enriched->{phone}        if $enriched->{phone};
+        $update{address}      = $enriched->{address}      if $enriched->{address};
+        $update{website}      = $enriched->{website}      if $enriched->{website};
+        eval { $supplier->update(\%update) };
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto_create_supplier',
+        "Auto-created supplier #$supplier->id '$name' on $sitename" . ($enriched ? ' (web-enriched)' : ''));
+    return { id => 0 + $supplier->id, name => $supplier->name // '' };
+}
+
+sub _web_lookup_supplier {
+    my ($self, $c, $name) = @_;
+    my $q = "supplier contact info $name email phone address website";
+    my $ua = LWP::UserAgent->new(timeout => 10);
+    $ua->agent('Comserv/2.0');
+
+    my %result;
+    eval {
+        my $url = 'https://api.duckduckgo.com/?q='
+                . uri_escape($q)
+                . '&format=json&no_html=1&skip_disambig=1';
+        my $req  = HTTP::Request->new(GET => $url);
+        my $resp = $ua->request($req);
+        if ($resp->is_success) {
+            my $data = JSON::decode_json($resp->decoded_content);
+            # Grab the best abstract as a starting point
+            if ($data->{AbstractText} && $data->{AbstractURL}) {
+                my $abstract = $data->{AbstractText};
+                # Try to extract email from abstract/related topics
+                if ($abstract =~ /[\w.-]+@[\w.-]+\.\w+/) {
+                    $result{email} = $1;
+                }
+                # Try to extract phone-like patterns
+                if ($abstract =~ /(\+?[\d\s\-\(\)]{7,20})/) {
+                    $result{phone} = $1;
+                }
+            }
+            # Search related topics for more specific info
+            for my $t (@{ $data->{RelatedTopics} || [] }) {
+                next unless ref($t) eq 'HASH' && $t->{Text} && $t->{FirstURL};
+                last if keys %result >= 4;  # stop when we have enough
+                my $text = $t->{Text};
+                if ($text =~ /[\w.-]+@[\w.-]+\.\w+/) {
+                    $result{email} = $1;
+                }
+                elsif ($text =~ /(\+?[\d\s\-\(\)]{7,20})/) {
+                    $result{phone} = $1;
+                }
+                elsif ($t->{Text} =~ /address/i && $t->{Text} =~ /[\w\s,]+\s+\w+/) {
+                    # Could be an address — too noisy, skip
+                }
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'web_lookup_supplier', "DDG lookup failed for '$name': $@");
+        return undef;
+    }
+    return \%result if keys %result;
+    return undef;
+}
+
 sub _insert_supplier {
     my ($self, $c, $schema, $args) = @_;
     my $now = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
