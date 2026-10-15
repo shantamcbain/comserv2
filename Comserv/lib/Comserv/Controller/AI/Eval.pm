@@ -142,6 +142,10 @@ sub index :Path :Args(0) {
         supergrok_meter => (eval { require Comserv::Model::AI2::UsageMonitor; Comserv::Model::AI2::UsageMonitor->new->supergrok_meter($c) } || undef),
         # Model scorecard (Oct 10 2026), cached 10 min; ?scorecard_refresh=1 forces.
         scorecard => (eval { $self->_scorecard($c)->build(force => ($c->req->params->{scorecard_refresh} ? 1 : 0)) } || { error => "$@" }),
+        # Cost per Done task from rated Hermes tasks (/ai/tasks, eval #36).
+        task_cost => (eval { require Comserv::Model::AI2::TaskTracker;
+            my $r = ''.$c->path_to(''); $r =~ s{/$}{};
+            Comserv::Model::AI2::TaskTracker->new(root => $r)->build } || { error => "$@" }),
     );
 }
 

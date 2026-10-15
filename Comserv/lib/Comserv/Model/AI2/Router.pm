@@ -420,10 +420,27 @@ sub select_model {
     #    User explicit strong picks (or header) still honored.
     my $is_editor_agent = $agent_id =~ /^(programming|coding|code|documentation|analyze)$/i;
     my $is_cheap_default = $requested =~ /cohere\/north-mini|gemma-4-31b-it:free|nemotron-3\.5-lightning:free|north-mini-code:free/i;
-    if ($requested && $requested !~ /^(auto|router|let.?router|'')$/i && !($is_editor_agent && $is_cheap_default)) {
+    # 2026-10-15: editor chain. analyze/plan/clarify -> north-mini-code:free
+    # (gemma-4-31b:free is the junk-retry fallback, sent explicitly by chat.js);
+    # implement -> Super Grok grok-4.7 when it has budget, else north-mini.
+    # An explicit cheap pick is honoured in analyze/plan (that is the retry path).
+    my $editor_read_phase = ($is_editor_agent && lc($phase) =~ /^(analyze|plan|clarify)$/) ? 1 : 0;
+    if ($requested && $requested !~ /^(auto|router|let.?router|'')$/i
+        && !($is_editor_agent && $is_cheap_default && !$editor_read_phase)) {
         my ($prov, $model) = $self->_detect_provider($requested);
         ($prov, $model) = $self->_prefer_supergrok($c, $prov, $model);
         return ($prov, $model);
+    }
+
+    if ($editor_read_phase) {
+        return ('openrouter', 'cohere/north-mini-code:free');
+    }
+    if ($is_editor_agent && lc($phase) eq 'implement') {
+        my $g = $self->supergrok_guard($c);
+        if (!$g->{locked} && $self->_external_default_available($c, 'supergrok|grok-4.7')) {
+            return ('supergrok', 'grok-4.7');
+        }
+        return ('openrouter', 'cohere/north-mini-code:free');
     }
 
     # 1.5) SuperGrok weekly/daily credits (per guard from 15min eval) BEFORE paid.

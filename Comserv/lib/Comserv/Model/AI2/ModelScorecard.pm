@@ -178,6 +178,16 @@ sub _segments {
     push @{ $by_sess{ $_->{session} } }, $_ for @{ $calls->{calls} };
     push @{ $turns_by{ $_->{session} } }, $_ for @{ $calls->{turns} };
     my %usage;   # main-loop $ per session/model
+    # proposal #34c, eval report 35: paid OpenRouter rows Hermes logged at $0 are priced from OpenRouter list rates
+    my $orp = $s->{or_prices} // eval { require Comserv::Util::AI::OpenRouterPrices; Comserv::Util::AI::OpenRouterPrices::load($s->root) } // {};
+    my $n_or_priced = 0;
+    my $or_fill = sub {
+        my ($g) = @_;
+        return unless ($g->{provider} // '') eq 'openrouter' && !($g->{usd} // 0) && ($g->{model} // '') !~ /:free\z/;
+        my $u = Comserv::Util::AI::OpenRouterPrices::usd_for($orp, $g->{model}, $g->{tokens_in}, $g->{tokens_out}, $g->{tokens_cache});
+        return unless $u && $u > 0;
+        $g->{usd} = $u; $g->{usd_source} = 'openrouter_list_price'; $n_or_priced++;
+    };
     my @segs;
     for my $u (@{ $db->{usage} }) {
         if ($u->{task} ne '') {
@@ -187,6 +197,7 @@ sub _segments {
                           tokens_in => ($u->{input_tokens} // 0) + ($u->{cache_read_tokens} // 0), tokens_out => $u->{output_tokens} // 0,
                           tokens_cache => $u->{cache_read_tokens} // 0, usd => $u->{usd} // 0, outcome => 'aux', aux_task => $u->{task},
                           weighted_mtok => (($u->{billing_provider} // '') =~ /xai/ ? (($u->{input_tokens} // 0) + ($u->{cache_read_tokens} // 0) + ($u->{output_tokens} // 0)) / 1e6 : 0) };
+            $or_fill->($segs[-1]);
             next;
         }
         $usage{ $u->{session_id} }{ $u->{model} // '' } += $u->{usd} // 0;
@@ -259,6 +270,7 @@ sub _segments {
             $g->{thrash} = Comserv::Util::AI::ModelScorecard::thrash_episodes(@{ delete $g->{sigs} });
             $g->{usd} = $usage{$sid}{ $g->{model} } // 0;
             $g->{usd} = 0 if $g->{provider} =~ /^(?:xai-oauth|xai|supergrok|ollama|ollama-launch|custom)$/;
+            $or_fill->($g);
             if ($g->{model} eq $last_model) {
                 $g->{outcome} = $oc;
                 $g->{commits} = $commits ? scalar @$commits : 0;
@@ -269,6 +281,7 @@ sub _segments {
             push @segs, $g;
         }
     }
+    push @$notes, "$n_or_priced paid OpenRouter segment(s) logged at \$0 by Hermes were priced from OpenRouter list rates (data/ai_openrouter_prices.json)" if $n_or_priced && ref $notes eq 'ARRAY';
     return @segs;
 }
 

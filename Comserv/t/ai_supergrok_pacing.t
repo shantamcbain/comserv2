@@ -102,19 +102,34 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
     local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
     my $ten = Time::Local::timelocal(0, 0, 10, 8, 9, 2026);
     my $seven_pm = Time::Local::timelocal(0, 5, 19, 8, 9, 2026);
-    is $P->can('day_start')->($seven_pm), Time::Local::timelocal(0, 0, 0, 8, 9, 2026), 'day_start = PT midnight';
-    my $a = $P->can('burn_alerts')->(used => 41, used_day_start => 0, day_from => $ten, expected => 5, now => $seven_pm);
-    is scalar(@$a), 2, 'Oct 8 case: day rise and noon-ahead both fire';
+    is $P->can('day_start')->($seven_pm), Time::Local::timelocal(0, 0, 5, 8, 9, 2026), 'day_start = 05:00 PT (work day, Oct 11 2026)';
+    is $P->can('day_start')->(Time::Local::timelocal(0, 0, 3, 9, 9, 2026)), Time::Local::timelocal(0, 0, 5, 8, 9, 2026), '03:00 belongs to the previous work day';
+    is $P->can('day_start')->($seven_pm, 0), Time::Local::timelocal(0, 0, 0, 8, 9, 2026), 'day_start_hour 0 = midnight';
+    is $P->can('pt_date')->(Time::Local::timelocal(0, 59, 4, 11, 9, 2026)), '2026-10-10', 'pt_date 04:59 -> previous work day';
+    is $P->can('pt_date')->(Time::Local::timelocal(0, 0, 5, 11, 9, 2026)), '2026-10-11', 'pt_date 05:00 -> new work day';
+    my $five = Time::Local::timelocal(0, 0, 5, 8, 9, 2026);
+    my $a = $P->can('burn_alerts')->(used => 41, used_day_start => 0, day_from => $five, expected => 5, now => $seven_pm, budget_pct => 10);
+    is scalar(@$a), 2, 'Oct 8 case: day rise and work-window both fire';
     is $a->[0]{kind}, 'day_rise', '... day_rise first';
     is $a->[0]{level}, 'critical', '... critical';
     like $a->[0]{message}, qr/burned 41 points today/, '... message';
-    is $a->[1]{kind}, 'noon_ahead', '... noon_ahead';
+    is $a->[1]{kind}, 'work_window', '... work_window (>60% of budget by 09:00)';
+    my $nine = Time::Local::timelocal(0, 5, 9, 8, 9, 2026);
+    my $eight = Time::Local::timelocal(0, 55, 8, 8, 9, 2026);
+    $a = $P->can('burn_alerts')->(used => 4, used_day_start => 0, day_from => $five, now => $nine, budget_pct => 6);
+    is_deeply [map { $_->{kind} } @$a], ['work_window'], '09:05, 4 of 6 points (67%) -> work_window';
+    $a = $P->can('burn_alerts')->(used => 4, used_day_start => 0, day_from => $five, now => $eight, budget_pct => 6);
+    is scalar(@$a), 0, '08:55: before check_hour, quiet';
+    $a = $P->can('burn_alerts')->(used => 3, used_day_start => 0, day_from => $five, now => $nine, budget_pct => 6);
+    is scalar(@$a), 0, '09:05, 50% of budget: quiet';
+    $a = $P->can('burn_alerts')->(used => 3, used_day_start => 0, day_from => $five, now => $eight, budget_pct => 6, cfg => { check_hour => 8, budget_fraction => 0.4 });
+    is_deeply [map { $_->{kind} } @$a], ['work_window'], 'check_hour / budget_fraction configurable';
     $a = $P->can('burn_alerts')->(used => 30, used_day_start => 0, day_from => $ten, expected => 1, now => Time::Local::timelocal(0, 0, 11, 8, 9, 2026));
     is_deeply [map { $_->{kind} } @$a], ['day_rise'], 'before noon: only day_rise';
     $a = $P->can('burn_alerts')->(used => 20, used_day_start => 8, day_from => $ten, expected => 15, now => $seven_pm);
     is scalar(@$a), 0, '12-point day, 5 ahead: quiet';
-    $a = $P->can('burn_alerts')->(used => 20, used_day_start => 8, day_from => $ten, expected => 15, now => $seven_pm, cfg => { day_rise_pts => 10, noon_ahead_pts => '4' });
-    is scalar(@$a), 2, 'configurable thresholds';
+    $a = $P->can('burn_alerts')->(used => 20, used_day_start => 8, day_from => $ten, expected => 15, now => $seven_pm, cfg => { day_rise_pts => 10 });
+    is scalar(@$a), 1, 'configurable day_rise threshold';
     is $P->can('alert_config')->({ day_rise_pts => 'x' })->{day_rise_pts}, 15, 'bad config value ignored';
     # pacing() wires it: 0% at reset 10:31, units give 41 points by 19:05
     my $reset = Time::Local::timelocal(0, 31, 10, 8, 9, 2026);
@@ -204,8 +219,8 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
               { at => Time::Local::timelocal(0, 4, 19, 8, 9, 2026), value => 41, kind => 'used', source => 'spoken' },
               { at => Time::Local::timelocal(0, 12, 8, 9, 9, 2026), value => 54, kind => 'used', source => 'spoken' });
     my $p = $P->can('pacing')->(readings => \@rd, units => sub { ($_[1] - $_[0]) / 3600 }, rate => 0.55, now => $now, anchor => $cs);
-    my $exp = 41 + 13 * ((Time::Local::timelocal(0, 0, 0, 9, 9, 2026) - $rd[1]{at}) / ($rd[2]{at} - $rd[1]{at}));
-    ok abs($p->{daily_budget}{used_day_start_pct} - $exp) < 0.11, "day start interpolated between readings ($exp)";
+    my $exp = 41 + 13 * ((Time::Local::timelocal(0, 0, 5, 9, 9, 2026) - $rd[1]{at}) / ($rd[2]{at} - $rd[1]{at}));
+    ok abs($p->{daily_budget}{used_day_start_pct} - $exp) < 0.11, "05:00 day start interpolated between readings ($exp)";
     ok exists $p->{daily_budget}{budget_pct}, 'pacing returns daily_budget';
     POSIX::tzset();
 }

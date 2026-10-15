@@ -37,6 +37,13 @@ else {
 my $d  = decode_json($content);
 my $sp = $d->{org}{health}{supergrok_pacing} or die "no org.health.supergrok_pacing in response (operator access?)\n";
 my @alerts = @{ $sp->{alerts} || [] };
+# Oct 13 2026 (Shanta): Grok Bot usage next to Super Grok (display only; from /ai/usage_pacing_json).
+my $gb = $d->{grok_bot};
+unless ($gb || $json_file) {
+    my $r2 = HTTP::Tiny->new(timeout => 90)->get("$base/ai/usage_pacing_json");
+    $gb = eval { decode_json($r2->{content})->{grok_bot} } if $r2->{success};
+}
+$gb ||= { ok => 0, line => 'Grok Bot: usage not available' };
 my @lines = (
     map({ "ALERT: $_->{message}" } @alerts),
     sprintf('Super Grok %s%% used, %s%% left; cycle %s -> reset %s (%s days left)', @$sp{qw(used_pct left_pct cycle_start_pt reset_pt days_left)}),
@@ -44,12 +51,14 @@ my @lines = (
     sprintf('Pace: %s (%s points vs %s%% expected). Daily target %s%%/day (~%s M tokens, ~%s grok-4.7 calls)',
         map { $_ // '?' } @$sp{qw(pace pace_delta expected_pct daily_target_pct daily_target_mtok daily_target_calls)}),
     sprintf('Calibration %s %%/M Hermes xai tokens; base %s%% at %s', $sp->{rate_pct_per_mtok}, $sp->{base_reading}{value}, $sp->{base_reading}{at_pt}),
+    $gb->{line},
     map({ "WARN: $_" } @{ $sp->{warnings} || [] }),
     map({ sprintf('JOB %d: %s (%s)', $_->{rank}, $_->{title}, $_->{why}) } @{ $sp->{jobs} || [] }),
 );
 print "$_\n" for @lines;
 
-my $date = strftime('%Y-%m-%d', localtime);
+# Oct 11 2026: alerts dedupe per WORK day (starts day_start_hour PT, default 05:00).
+my $date = do { my $h = $sp->{day_start_hour} // 5; strftime('%Y-%m-%d', localtime(time - $h * 3600)) };
 my $now_pt = strftime('%a %b %d %H:%M PT', localtime);
 
 sub write_inbox {
@@ -61,6 +70,7 @@ sub write_inbox {
         metrics     => { supergrok_pacing => { map { ($_ => $sp->{$_}) } qw(used_pct left_pct expected_pct pace pace_delta daily_target_pct
                              daily_target_mtok daily_target_calls days_left rate_pct_per_mtok reset_pt endgame midweek_warning auto_queue
                              day_rise_pct used_day_start_pct) },
+                         grok_bot => $gb,
                          alerts => \@alerts, meter => $sp->{meter} },
         markdown    => "# Super Grok pacing $date\n\n" . join("\n", map { "- $_" } @lines) . "\n"
                      . ($sp->{meter}{stale} ? "\n**Meter reading needed:** $sp->{meter}{prompt} Form: /ai/usage#usage-estimator\n" : ''),

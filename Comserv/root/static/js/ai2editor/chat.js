@@ -600,23 +600,57 @@ function ensureThinkingStyles(doc) {
             .catch(function () { return null; });
     }
 
-    function loadFilesForEval(openPath, openContent) {
-        const paths = DEFAULT_APP_PATHS.slice();
+    // eval #31: only attach the AI2 chat/router sources when the ask is about
+    // the AI editor/chat itself. Before, every "review/evaluate" ask about any
+    // page got ~190K chars of AI2 code, so free models answered about AI2.
+    function isAboutAiEditor(text, openPath) {
+        const p = String(text || '').toLowerCase() + ' ' + String(openPath || '').toLowerCase();
+        return /\bai2\b|ai editor|ai-editor|chat with ai|\bchat\.pm\b|\brouter\.pm\b|coderead|\/ai2\//.test(p);
+    }
+
+    function loadFilesForEval(openPath, openContent, promptText) {
+        const paths = isAboutAiEditor(promptText, openPath) ? DEFAULT_APP_PATHS.slice() : [];
+        if (openPath && openContent && String(openContent).length
+            && paths.indexOf(openPath) === -1 && !/^(lib|root\/static|sql|script|t)\//.test(openPath)) {
+            // Open .tt or other buffer: send what is in the editor, then the rest.
+            return Promise.all(paths.map(fetchLoadFile)).then(function (rows) {
+                return [{ path: openPath, content: openContent }].concat(rows.filter(Boolean));
+            });
+        }
         if (openPath && /^(lib|root\/static|sql|script|t)\//.test(openPath)
             && paths.indexOf(openPath) === -1) {
             paths.unshift(openPath);
         }
         return Promise.all(paths.map(fetchLoadFile)).then(function (rows) {
-            return rows.filter(Boolean);
+            const got = rows.filter(Boolean);
+            if (!got.length && openPath && openContent && String(openContent).length) {
+                return [{ path: openPath, content: openContent }];
+            }
+            return got;
         });
     }
 
+    // Total cap so a turn never ships 200K+ chars to a free model (eval #31).
+    const MAX_PROMPT_FILE_CHARS = 90000;
     function filesToPromptBlob(files) {
         if (!files || !files.length) return '';
-        return files.map(function (f) {
-            const body = String(f.content || '').slice(0, 48000);
-            return '[FILE: ' + f.path + '] (live /ai2/load_file)\n```\n' + body + '\n```';
-        }).join('\n\n');
+        let left = MAX_PROMPT_FILE_CHARS;
+        const out = [];
+        files.forEach(function (f) {
+            if (left <= 2000) {
+                out.push('[FILE: ' + f.path + '] (not attached: size limit; ask with [READ_FILE: ' + f.path + ':START-END])');
+                return;
+            }
+            const full = String(f.content || '');
+            const cap = Math.min(48000, left);
+            let body = full.slice(0, cap);
+            if (full.length > cap) {
+                body += '\n... [cut at ' + cap + ' of ' + full.length + ' chars; ask with [READ_FILE: ' + f.path + ':START-END]]';
+            }
+            left -= body.length;
+            out.push('[FILE: ' + f.path + '] (live /ai2/load_file)\n```\n' + body + '\n```');
+        });
+        return out.join('\n\n');
     }
 
     function isDiskCapabilityPrompt(text) {
@@ -690,6 +724,17 @@ function ensureThinkingStyles(doc) {
     let _planApproved = false;
     // Pending clarify session: original vague ask + gap questions awaiting answers.
     let _clarifySession = null; // { original, gaps, askedAt }
+    // 2026-10-15: one conversation per open file. Server only knows history we
+    // send, so keep a short raw-text history (no file blobs) and the first ask.
+    let _editorConv = { id: null, file: null, firstAsk: '', history: [] };
+    const EDITOR_RETRY_MODEL = 'openrouter|google/gemma-4-31b-it:free';
+    function editorConvFor(filePath) {
+        const f = filePath || '';
+        if (_editorConv.file !== f) {
+            _editorConv = { id: null, file: f, firstAsk: '', history: [] };
+        }
+        return _editorConv;
+    }
 
     function currentEditorAgentId() {
         const sel = document.getElementById('ai-editor-agent');
@@ -782,11 +827,15 @@ function ensureThinkingStyles(doc) {
         const t = String(text || '').trim();
         if (!t) return true;
         if (looksLikeLogNoise(t)) return true;
+        if (/^\{\s*"source"\s*:/.test(t)) return true;
+        if (/^[\[{]/.test(t) && /[\]}]$/.test(t)) {
+            try { JSON.parse(t); return true; } catch (e) { /* not pure JSON */ }
+        }
         if (/\[ACTION:\s*\{/i.test(t) && t.length < 800) return true;
         if (/^\s*\[ACTION:/i.test(t)) return true;
         if ((phase === 'analyze' || phase === 'plan' || phase === 'clarify')
             && /list_files|read_file|run_terminal/i.test(t)
-            && !/root cause|enabled_modules|SiteModule|can_beekeep/i.test(t)) {
+            && !/root cause/i.test(t)) {
             return true;
         }
         return false;
@@ -812,12 +861,18 @@ function ensureThinkingStyles(doc) {
     }
 
     function synthesizePrompt(original, answers, filePath) {
+        const conv = editorConvFor(filePath);
+        const first = String(conv.firstAsk || '').trim();
+        const orig = String(original || '').trim();
         const lines = [
             '## Refined engineering task (fabricated from clarify)',
-            '',
-            '### Original ask',
-            String(original || '').trim(),
-            '',
+            ''
+        ];
+        if (first && first !== orig) {
+            lines.push('### First ask in this conversation (still required)', first, '');
+        }
+        lines.push('### Latest ask', orig, '');
+        lines.push(
             '### Clarifications from user',
             String(answers || '').trim() || '(none — user skipped; infer carefully from code)',
             '',
@@ -825,12 +880,14 @@ function ensureThinkingStyles(doc) {
             'Open file: ' + (filePath || '(none)'),
             '',
             '### Required output',
-            '1. Reproduce / locate the real gate in Comserv code (not guesswork about DNS/addons unless evidence).',
-            '2. Name root cause with file/symbol references.',
-            '3. Propose the smallest safe fix.',
-            '4. How to verify on aisystem :4006 (no prod deploy).',
-            'Do not invent infrastructure. Prefer site *features* / enabled_modules / nav gating over "paid addon" language unless the code literally says addon.'
-        ];
+            // eval #32: was hard-wired to an old brew/beekeeping "addon gate" bug,
+            // which pushed every refined ask toward that topic.
+            '1. Answer every ask above (first ask and latest ask) about the open file and its controller.',
+            '2. Use evidence from the loaded files (file and sub/line names). If a needed file is missing, request it with [READ_FILE: path].',
+            '3. If something is broken: root cause, then the smallest safe fix.',
+            '4. How to check it on aisystem :4006 (no prod deploy).',
+            'Do not invent infrastructure or tool calls. Do not switch to another topic.'
+        );
         return lines.join('\n');
     }
 
@@ -854,7 +911,8 @@ function ensureThinkingStyles(doc) {
         if (target && target.status) target.status('Clarify — waiting for your answers');
     }
 
-    function phaseContract(phase, agentId) {
+    function phaseContract(phase, agentId, promptText) {
+        const navRelevant = /\b(nav|menu|feature|module|addon|enabled_modules|site_modules)\b/i.test(String(promptText || ''));
         const lines = [
             '[AI Editor agent=' + agentId + ' phase=' + phase + ']',
             'Contract:',
@@ -873,7 +931,8 @@ function ensureThinkingStyles(doc) {
         if (phase === 'clarify') {
             lines.push('Current phase CLARIFY: ask 2–4 short questions about missing context only. No root-cause essay.');
         } else if (phase === 'analyze') {
-            lines.push('Current phase ANALYZE: respond with analysis only. Prefer evidence from loaded files and Comserv patterns (features/modules/nav).');
+            lines.push('Current phase ANALYZE: respond with analysis only. Prefer evidence from loaded files'
+                + (navRelevant ? ' and Comserv patterns (features/modules/nav).' : ' (template, controller, settings).'));
         } else if (phase === 'plan') {
             lines.push('Current phase PLAN: propose the plan; wait for user "approve plan" / Verify before code.');
         } else {
@@ -933,7 +992,8 @@ function ensureThinkingStyles(doc) {
         }
     }
 
-    function sendPrompt(prompt, target) {
+    function sendPrompt(prompt, target, opts) {
+        opts = opts || {};
         target = target || {
             messages: document.getElementById('chat-messages'),
             input: document.getElementById('ai-chat-input'),
@@ -946,7 +1006,8 @@ function ensureThinkingStyles(doc) {
 
         if (target.status) target.status('Starting…');
         // Record to the shared chat log (survives attach/detach).
-        recordMessage('You', escapeHtml(prompt));
+        if (!opts.retry) recordMessage('You', escapeHtml(prompt));
+        const rawAsk = prompt;
 
         if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '...'; }
 
@@ -959,8 +1020,13 @@ function ensureThinkingStyles(doc) {
 
         const filePathEarly = currentFilePath();
 
+        const conv = editorConvFor(filePathEarly);
+        if (!opts.retry && !conv.firstAsk && !_clarifySession) conv.firstAsk = String(prompt).trim();
+
         // Answer an open clarify session → fabricate analyze prompt (no extra clarify model $).
-        if (_clarifySession) {
+        if (opts.retry) {
+            // junk-reply retry: same prompt, fixed model, no clarify/phase changes
+        } else if (_clarifySession) {
             const original = _clarifySession.original;
             const answers = isSkipClarify(prompt) ? '' : prompt;
             _clarifySession = null;
@@ -989,11 +1055,11 @@ function ensureThinkingStyles(doc) {
         }
 
         // Agent + phase first so thinking UI can name model/phase immediately.
-        maybeAdvancePhaseFromUser(prompt);
+        if (!opts.retry) maybeAdvancePhaseFromUser(prompt);
         const agentId = currentEditorAgentId();
         const phase = currentEditorPhase() === 'clarify' ? 'analyze' : currentEditorPhase();
         if (currentEditorPhase() === 'clarify') setEditorPhase('analyze');
-        const model = resolveEditorModel(phase);
+        const model = opts.model || resolveEditorModel(phase);
         const filePath = filePathEarly;
 
         if (target.status) target.status('AI thinking…');
@@ -1009,12 +1075,12 @@ function ensureThinkingStyles(doc) {
                 ? ' (' + fileContent.length + ' chars)' : ' (empty)'));
             const wantEval = isEvaluatePrompt(prompt);
             const filesP = wantEval
-                ? loadFilesForEval(filePath, fileContent)
+                ? loadFilesForEval(filePath, fileContent, prompt)
                 : Promise.resolve(fileContent && fileContent.length
                     ? [{ path: filePath, content: fileContent }] : []);
             return filesP.then(function (files) {
                 const blob = filesToPromptBlob(files);
-                const contract = phaseContract(phase, agentId) + todoStartReminder();
+                const contract = phaseContract(phase, agentId, prompt) + todoStartReminder();
                 const fullPrompt = blob
                     ? (contract + '\n\n' + prompt + '\n\n---\nThese files were loaded live from this app via GET /ai2/load_file. They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n' + blob)
                     : (contract + '\n\n' + prompt);
@@ -1034,6 +1100,8 @@ function ensureThinkingStyles(doc) {
                         page_path: filePath || (files[0] && files[0].path) || '',
                         page_title: filePath ? filePath.split('/').pop() : '',
                         page_content: (files[0] && files[0].content) || fileContent || '',
+                        history: conv.history.slice(-6),
+                        ...(conv.id ? { conversation_id: conv.id } : {}),
                         ...(model ? { model: model } : {})
                     })
                 });
@@ -1049,6 +1117,7 @@ function ensureThinkingStyles(doc) {
                   if (target.status) target.status('AI error: ' + err, true);
                   return;
               }
+              if (data.conversation_id && conv.file === (filePath || '')) conv.id = data.conversation_id;
               const usedModel = (data.model ? data.model + (data.provider ? ' (' + data.provider + ')' : '') : EDITOR_MODEL);
               const resp = data.response || '';
               const serverSteps = (data.thinking && data.thinking.length) ? data.thinking : [];
@@ -1066,6 +1135,16 @@ function ensureThinkingStyles(doc) {
                   : { cleanText: resp, actions: [] };
               const display = extracted.cleanText || resp;
               // Prefix the reply with the model actually used, for transparency.
+              if (looksLikeJunkAnalyzeReply(display, phase) && !opts.retry) {
+                  // 2026-10-15: retry once on the next model in the chain before giving up.
+                  const nextModel = /gemma-4-31b/i.test(String(data.model || model || ''))
+                      ? 'openrouter|cohere/north-mini-code:free' : EDITOR_RETRY_MODEL;
+                  liveThink.finalize(false, ['Rejected junk reply from ' + (data.model || 'model') + '; retrying on ' + nextModel]);
+                  recordMessage('AI', '<span style="color:#f88;font-size:0.85em;">[rejected junk reply from '
+                      + escapeHtml(data.model || 'model') + ' — retrying once on ' + escapeHtml(nextModel) + ']</span>');
+                  sendPrompt(prompt, target, { retry: true, model: nextModel });
+                  return;
+              }
               if (looksLikeJunkAnalyzeReply(display, phase)) {
                   liveThink.finalize(false, ['Rejected junk/log-like model reply']);
                   recordMessage('AI',
@@ -1081,18 +1160,16 @@ function ensureThinkingStyles(doc) {
                   if (target.status) target.status('Rejected junk model reply', true);
                   // Re-open clarify on the last real user ask (not fabricated blob) when possible.
                   if (!_clarifySession) {
-                      var gaps = [
-                          'Confirm the bug in one sentence (e.g. brew+beekeeping nav show on sitename 3d but should not).',
-                          'Where do you see it — top nav, Features menu, or /brew page?',
-                          'Expected: those features hidden/disabled for 3d — correct?'
-                      ];
-                      beginClarifySession(
-                          'Brew and beekeeping features appear for sitename 3d but should not (not subscribed / not enabled).',
-                          gaps, target, sendBtn
-                      );
+                      // 2026-10-15: was a hard-coded brew/3d ask; reuse the user's real ask.
+                      beginClarifySession(conv.firstAsk || rawAsk, [
+                          'Confirm what should change, in one sentence.',
+                          'Name any file, setting or URL you already know is involved.'
+                      ], target, sendBtn);
                   }
                   return;
               }
+              conv.history.push({ role: 'user', content: String(rawAsk).slice(0, 4000) });
+              conv.history.push({ role: 'assistant', content: String(display).slice(0, 4000) });
               var bodyHtml = escapeHtml(display).replace(/\n/g, '<br>');
               recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + bodyHtml);
 

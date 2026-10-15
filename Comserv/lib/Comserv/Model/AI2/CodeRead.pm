@@ -104,11 +104,19 @@ sub parse_read_spec {
 
 sub extract_read_requests {
     my ($self, $text) = @_;
-    return [] unless defined $text && $text =~ /\[READ_FILE:/i;
+    return [] unless defined $text && length $text;
+    my @raw;
+    # Official form.
+    while ($text =~ /\[READ_FILE:\s*([^\]]+)\]/gi) { push @raw, $1; }
+    # Forms free models invent instead (eval #30): [LOAD_FILE: x], [OPEN_FILE: x],
+    # [**read_file x**], [**load_file x**], and a bare [FILE: x] with no code under it.
+    while ($text =~ /\[(?:LOAD|OPEN)_FILE:\s*([^\]]+)\]/gi) { push @raw, $1; }
+    while ($text =~ /\[\*\*\s*(?:read_file|load_file|open_file)\s+([^\]*]+?)\s*\*\*\]/gi) { push @raw, $1; }
+    while ($text =~ /\[FILE:\s*([^\]\s]+)\](?!\s*\((?:load failed|live|open-editor|disk))(?!\s*\n?\s*```)/gi) { push @raw, $1; }
     my @out;
     my %seen;
-    while ($text =~ /\[READ_FILE:\s*([^\]]+)\]/gi) {
-        my $spec = $self->parse_read_spec($1);
+    for my $r (@raw) {
+        my $spec = $self->parse_read_spec($r);
         next unless $spec;
         my $key = lc($spec->{path});
         next if $seen{$key}++;
@@ -116,6 +124,17 @@ sub extract_read_requests {
         last if @out >= $MAX_FILES;
     }
     return \@out;
+}
+
+# Tool calls the editor cannot run (search, list_directory, run/shell). Free
+# models print these and stop, so the user gets no answer (eval #30).
+sub extract_unsupported_tools {
+    my ($self, $text) = @_;
+    return [] unless defined $text && length $text;
+    my @hits;
+    push @hits, $1 while $text =~ /\[\*\*\s*(search|list_directory|list_files|run_terminal|grep)\b[^\]]*\]/gi;
+    push @hits, 'run' while $text =~ /\[run,\s*cwd=[^\]]*\]/gi;
+    return \@hits;
 }
 
 sub extract_path_mentions {
@@ -536,18 +555,123 @@ sub follow_up_context {
     my ($self, $c, $reply, $skip) = @_;
     $skip ||= {};
     my $need = $self->extract_read_requests($reply // '');
-    return unless @$need;
-    my $loaded = $self->load_paths($c, $need, skip => $skip);
-    return unless $loaded->{blocks};
-    my $user = "Loaded files you requested:\n\n"
-        . $loaded->{blocks}
-        . "\n\nContinue with the original request. Do not re-request files already loaded.";
-    return {
-        user_message => $user,
-        files_read   => $loaded->{files_read} || [],
-        skip         => $loaded->{skip} || $skip,
-    };
+    my $loaded = @$need ? $self->load_paths($c, $need, skip => $skip) : {};
+    if ($loaded->{blocks}) {
+        my $user = "Loaded files you requested:\n\n"
+            . $loaded->{blocks}
+            . "\n\nContinue with the original request. Do not re-request files already loaded.";
+        return {
+            user_message => $user,
+            files_read   => $loaded->{files_read} || [],
+            skip         => $loaded->{skip} || $skip,
+        };
+    }
+    my $tools = $self->extract_unsupported_tools($reply // '');
+    if (@$tools && !$skip->{__tool_nudge}++) {
+        return {
+            user_message => "The tools you tried (" . join(', ', @$tools) . ") do not exist here; nothing ran. "
+                . "The only tool is [READ_FILE: path] for files under lib/, root/, sql/, script/, t/. "
+                . "Now answer the original request directly from the files already in this conversation. "
+                . "Do not print tool calls or describe what you would do next.",
+            files_read   => [],
+            skip         => $skip,
+        };
+    }
+    return;
 }
 
 __PACKAGE__->meta->make_immutable;
+# 2026-10-15: "how the code works" context for the AI Editor. For an open .tt,
+# find the controller sub that renders it; add Site.pm when the ask is about a
+# site setting; add the AI chat/widget route when the ask is about chat.
+# Pure (no $c): $root is the app root; returns [ {path,start,end}, ... ].
+sub related_specs {
+    my ($self, $root, $prompt, $open) = @_;
+    $prompt //= ''; $open //= '';
+    my @out;
+    my $_sub_window = sub {
+        my ($rel, $want_line) = @_;
+        my $abs = "$root/$rel";
+        open my $fh, '<', $abs or return;
+        my @lines = <$fh>; close $fh;
+        my $s = $want_line;
+        $s-- while $s > 1 && $lines[$s-1] !~ /^sub\s/;
+        my $e = $want_line;
+        $e++ while $e < @lines && $lines[$e] !~ /^sub\s/;
+        $e = $s + 150 if $e - $s > 150;
+        push @out, { path => $rel, start => $s, end => $e };
+    };
+    if ($open =~ m{^root/(.+\.tt)$}) {
+        my $tpl = $1;
+        my $dir = "$root/lib/Comserv/Controller";
+        my @pm;
+        if (opendir(my $dh, $dir)) {
+            my @todo = ($dir);
+            while (my $d = shift @todo) {
+                opendir(my $h, $d) or next;
+                for my $f (readdir $h) {
+                    next if $f =~ /^\./;
+                    my $p = "$d/$f";
+                    if (-d $p) { push @todo, $p; next }
+                    push @pm, $p if $f =~ /\.pm$/;
+                }
+                closedir $h;
+            }
+            closedir $dh;
+        }
+        my $hits = 0;
+        for my $p (sort @pm) {
+            open my $fh, '<', $p or next;
+            my $ln = 0;
+            while (my $l = <$fh>) {
+                $ln++;
+                if (index($l, $tpl) >= 0 && $l =~ /template|\.tt/) {
+                    (my $rel = $p) =~ s{^\Q$root\E/}{};
+                    $_sub_window->($rel, $ln);
+                    $hits++;
+                    last;
+                }
+            }
+            close $fh;
+            last if $hits >= 2;
+        }
+    }
+    if ($prompt =~ /\b(site\s*name|sitename|site\s+setting|site\s+config|support\s+address|mail_from|site_config)\b/i) {
+        push @out, { path => 'lib/Comserv/Model/Schema/Ency/Result/Site.pm' };
+    }
+    if ($prompt =~ /\bchat\b/i) {
+        my $rel = 'lib/Comserv/Controller/AI.pm';
+        if (open my $fh, '<', "$root/$rel") {
+            my $ln = 0;
+            while (my $l = <$fh>) {
+                $ln++;
+                if ($l =~ /^sub widget\b/) { close $fh; $_sub_window->($rel, $ln); last }
+            }
+        }
+    }
+    return \@out;
+}
+
+# Load related_specs within a char budget (total editor prompt cap 90K).
+sub related_context {
+    my ($self, $c, %args) = @_;
+    my $budget = $args{budget} // 0;
+    return { blocks => '', files_read => [] } if $budget < 2000;
+    my $root = eval { abs_path(q{}.$c->path_to(q{})) };
+    return { blocks => q{}, files_read => [] } unless $root && -d $root;
+    my $specs = $self->related_specs($root, $args{prompt}, $args{open} // '');
+    my @blocks; my @files;
+    for my $s (@$specs) {
+        next if $args{skip} && $args{skip}{lc $s->{path}};
+        my $got = $self->read_snippet($c, $s);
+        next unless $got && $got->{content};
+        my $b = $self->format_file_block($got->{path}, $got->{content}, source => 'related');
+        last if length($b) > $budget;
+        $budget -= length $b;
+        push @blocks, $b; push @files, $got->{path};
+    }
+    return { blocks => join("\n\n", @blocks), files_read => \@files };
+}
+
+
 1;

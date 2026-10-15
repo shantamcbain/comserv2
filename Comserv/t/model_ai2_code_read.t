@@ -69,4 +69,20 @@ ok(!$m->detect_inspect_prompt('please fix the login bug'), 'not inspect: fix req
 
 is($m->first_lines("a\nb\nc\nd\n", 2), "a\nb\n... (truncated)", 'first_lines truncates');
 
+# eval #30: invented file-request forms are honoured; fake tools get a nudge.
+{
+    my $r = $m->extract_read_requests("[LOAD_FILE: lib/Comserv/Model/AI2/Chat.pm]\n[**read_file root/ai/usage.tt**]\nLet's load it.[FILE: root/ai/eval/detail.tt]");
+    is_deeply([ map { $_->{path} } @$r ],
+        ['lib/Comserv/Model/AI2/Chat.pm', 'root/ai/usage.tt', 'root/ai/eval/detail.tt'],
+        'alternate read forms parsed');
+    my $r2 = $m->extract_read_requests("[FILE: root/x.tt]\n```\ncode\n```\n[FILE: root/y.tt] (load failed: nope)");
+    is(scalar @$r2, 0, 'real FILE blocks and failed loads are not re-requested');
+    my $t = $m->extract_unsupported_tools('[**search** query:"quota" source:workspace] [**list_directory /workspace/aisystem**] [run, cwd=/x, request=git status]');
+    is(scalar @$t, 3, 'fake tool calls detected');
+    my $fu = $m->follow_up_context(undef, '[**list_directory /workspace**]', {});
+    like($fu->{user_message}, qr/do not exist here/, 'nudge sent for fake tools');
+    my $sk = { __tool_nudge => 1 };
+    ok(!$m->follow_up_context(undef, '[**list_directory /workspace**]', $sk), 'nudge only once');
+}
+
 done_testing();

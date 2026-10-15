@@ -50,3 +50,22 @@
   [% IF scorecard.notes.size %]<p><small>Notes: [% scorecard.notes.join('; ') | html %]</small></p>[% END %]
   [% END %]
 </section>
+
+[%# Cost per Done task (eval #36). Data: Model::AI2::TaskTracker (rated tasks on /ai/tasks). %]
+[% IF task_cost %]
+<section id="task-cost" class="card" style="margin:1em 0;padding:0.8em;">
+  <h2>Cost per finished task <small>(last [% task_cost.days %] days; rate tasks on <a href="[% c.uri_for('/ai/tasks') %]">/ai/tasks</a>)</small></h2>
+  [% IF task_cost.error %]<p class="alert alert-warning">Unavailable: [% task_cost.error | html %]</p>[% ELSE %]
+  <p style="font-size:0.9em">Tasks are grouped from Hermes sessions and credited to the model of the last session. <b>$ per Done</b> = all OpenRouter $ on that model's tasks (failed ones included) / tasks you rated Done. Super Grok (xai-oauth) and Ollama cost $0 here, so compare them by tokens per Done. [% task_cost.rated %] of [% task_cost.tasks.size %] tasks rated.</p>
+  <table class="table table-sm table-striped" style="font-size:0.85em;width:auto">
+    <tr><th>Model</th><th>Tasks</th><th>Rated</th><th>Done</th><th>Partial</th><th>Failed</th><th>Done %</th><th>$ total</th><th><b>$ per Done</b></th><th>Tok M per Done</th><th>Active min per Done</th><th>Corrections</th><th>Rewrites 3+</th></tr>
+    [% FOREACH g IN task_cost.summary %]
+    <tr><td>[% g.model | html %]</td><td>[% g.tasks %]</td><td>[% g.rated %]</td><td>[% g.done %]</td><td>[% g.partial %]</td><td>[% g.failed %]</td>
+      <td>[% g.done_rate_pct.defined ? g.done_rate_pct _ '%' : '-' %]</td><td>[% g.usd %]</td>
+      <td><b>[% g.usd_per_done.defined ? g.usd_per_done : '-' %]</b></td><td>[% g.mtok_per_done.defined ? g.mtok_per_done : '-' %]</td>
+      <td>[% g.min_per_done.defined ? g.min_per_done : '-' %]</td><td>[% g.corrections %]</td><td>[% g.rewrites %]</td></tr>
+    [% END %]
+  </table>
+  [% END %]
+</section>
+[% END %]

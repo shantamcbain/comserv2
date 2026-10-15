@@ -23,7 +23,7 @@ our @CONSUMERS = (
 );
 our %CONSUMER = map { ($_->{id} => $_) } @CONSUMERS;
 our @KINDS   = qw(used left unconfirmed);
-our @SOURCES = qw(manual addon api spoken screenshot other);
+our @SOURCES = qw(manual addon api spoken screenshot auto other);
 
 my $J = JSON::PP->new->canonical->utf8;
 
@@ -362,6 +362,57 @@ sub bot_burn {
     $out->{estimate}      = $lu + $counted + $est;
     $out->{estimate_fmt}  = _fmt($out->{estimate}, '%');
     return $out;
+}
+
+# pure (Oct 13 2026, Shanta: "grok bot usage ... along with super grok usage").
+# Grok Bot summary for the Super Grok check outputs. in: est => grok_bot estimate()
+# hash (may be undef), readings => grok_bot readings (sorted), now.
+# Soft pace = used % / elapsed days vs 100/7 % per day. Display only - no switching.
+sub grok_bot_pace {
+    my (%in) = @_;
+    my $now = $in{now} // time;
+    my $e   = $in{est} || {};
+    my @rd  = grep { ($_->{kind} // '') ne 'unconfirmed' } @{ $in{readings} || [] };
+    my $latest = $rd[-1];
+    my $reset = $e->{reset_at} // next_reset($latest ? $latest->{reset_at} : undef, $now, 7);
+    return { ok => 0, line => 'Grok Bot: no usage readings yet (enter one at /ai/usage#usage-estimator)' }
+        unless $latest || defined $reset;
+    my $start = defined $reset ? $reset - 7 * 86400 : undef;
+    my $lu    = used_of($latest);
+    my $in_cycle = $latest && defined $start && $latest->{at} >= $start ? 1 : 0;
+    my $used  = defined $e->{estimate} ? $e->{estimate} : $in_cycle ? $lu : undef;
+    my $elapsed = defined $start ? ($now - $start) / 86400 : undef;
+    $elapsed = 1 / 24 if defined $elapsed && $elapsed < 1 / 24;
+    my $days_left = defined $reset ? ($reset - $now) / 86400 : undef;
+    my $target = 100 / 7;
+    my $per_day = (defined $used && $elapsed) ? $used / $elapsed : undef;
+    my $expected = defined $elapsed ? $elapsed * $target : undef;
+    my $delta = (defined $used && defined $expected) ? $used - $expected : undef;
+    my $pace = !defined $delta ? 'unknown' : $delta > 5 ? 'ahead' : $delta < -5 ? 'behind' : 'on_pace';
+    my $f = sub { defined $_[0] ? sprintf('%.1f', $_[0]) : '?' };
+    my $o = {
+        ok => 1,
+        latest_pct => $lu, latest_at_pt => ($latest ? $latest->{at_pt} // pt($latest->{at}) : undef),
+        latest_in_cycle => $in_cycle,
+        used_pct => (defined $used ? 0 + sprintf('%.1f', $used) : undef), left_pct => (defined $used ? 0 + sprintf('%.1f', 100 - $used) : undef),
+        cycle_start_pt => pt($start), reset_pt => pt($reset), reset_at => $reset,
+        days_left => (defined $days_left ? 0 + sprintf('%.1f', $days_left) : undef),
+        elapsed_days => (defined $elapsed ? 0 + sprintf('%.2f', $elapsed) : undef),
+        pace_pct_per_day => (defined $per_day ? 0 + sprintf('%.1f', $per_day) : undef),
+        target_pct_per_day => 0 + sprintf('%.1f', $target),
+        expected_pct => (defined $expected ? 0 + sprintf('%.1f', $expected) : undef),
+        pace_delta => (defined $delta ? sprintf('%+.1f', $delta) : undef), pace => $pace,
+        burn_per_hour => $e->{burn_per_hour}, burn_fmt => $e->{burn_fmt},
+        projection_pct => (defined $e->{projection} ? 0 + sprintf('%.1f', $e->{projection}) : undef),
+        over_at_reset => $e->{over_at_reset} ? 1 : 0,
+        burn_method => ($e->{bot_burn} ? $e->{bot_burn}{method} : undef),
+        source => 'data/ai_usage_readings.jsonl consumer grok_bot via UsageEstimator',
+    };
+    $o->{line} = sprintf('Grok Bot %s%% used (latest reading %s%% at %s), reset %s (%s days left). Soft pace %s%%/day vs %s%%/day (%s, %s pts). Burn %s, projected %s%% at reset%s',
+        $f->($used), $f->($lu), $o->{latest_at_pt} // '?', $o->{reset_pt} // '?', $f->($days_left),
+        $f->($per_day), $o->{target_pct_per_day}, $pace, $o->{pace_delta} // '?',
+        ($e->{burn_fmt} || '?'), $f->($e->{projection}), ($o->{over_at_reset} ? ' - OVER before reset' : ''));
+    return $o;
 }
 
 1;

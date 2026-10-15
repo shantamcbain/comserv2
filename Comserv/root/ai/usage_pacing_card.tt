@@ -10,7 +10,7 @@
   <div class="alert alert-danger" role="alert" id="supergrok-daily-switch" style="border:2px solid #b91c1c;">
     <strong>Super Grok daily budget used[% IF !g.off_today %] (switch pending: the guard runs every 5 min)[% END %]:</strong>
     [% (g.lock_reason || db.reason) | html %].
-    New Hermes sessions use <code>[% (g.switch_alias || 'openrouter/z-ai/glm-5.3-flash') | html %]</code> (default + code/coder) until midnight PT, then grok-4.7 comes back automatically.
+    New Hermes sessions use <code>[% (g.switch_alias || 'openrouter/z-ai/glm-5.3-flash') | html %]</code> (default + code/coder) until [% (sp.day_start_hour.defined ? sp.day_start_hour : 5) | format('%02d') %]:00 PT, then grok-4.7 comes back automatically.
     <br><strong>Open sessions keep their model:</strong> run <code>/model glm</code> (= [% (g.switch_alias || 'openrouter/z-ai/glm-5.3-flash') | html %]) in each open TUI.
     <br><span class="doc-muted">Need more today? In <code>data/supergrok_pacing.json</code> set <code>"daily": {"extra_today_pct": 3, "extra_today_date": "[% db.date | html %]"}</code>
       or <code>"allow_overrun_date": "[% db.date | html %]"</code>; the guard picks it up within 5 min.</span>
@@ -21,7 +21,7 @@
     <strong>Super Grok burn warning:</strong>
     <ul style="margin:4px 0 0 18px;">[% FOREACH al IN sp.alerts %]<li>[% al.message | html %]</li>[% END %]</ul>
     <span class="doc-muted">Today since [% sp.day_from_pt | html %]: [% sp.used_day_start_pct | html %]% → [% sp.used_pct | html %]% (+[% sp.day_rise_pct | html %] points).
-      Limits: [% sp.alert_config.day_rise_pts | html %] points/day; [% sp.alert_config.noon_ahead_pts | html %] points ahead of pace after [% sp.alert_config.noon_hour | html %]:00 PT
+      Limits: [% sp.alert_config.day_rise_pts | html %] points/day; more than [% sp.alert_config.budget_fraction * 100 %]% of today's budget gone by [% sp.alert_config.check_hour | html %]:00 PT
       (data/supergrok_pacing.json "alerts"). No model switch is made.</span>
   </div>
   [% END %]
@@ -45,7 +45,7 @@
         ([% sp.pace_delta | html %] points vs [% sp.expected_pct | html %]% expected by now on a straight line)</td></tr>
       [% IF db %]<tr><th>Daily budget</th><td><strong>[% db.used_today_pct | html %]% of [% db.effective_budget_pct | html %]%</strong> used today
         ([% db.remaining_today_pct | html %]% left[% IF db.extra_pct > 0 %], incl. +[% db.extra_pct | html %]% extra[% END %][% IF db.allow_overrun %], overrun allowed today[% END %])
-        <br><span class="doc-muted">([% db.week_off_at | html %]% week cutoff − [% db.used_day_start_pct | html %]% at midnight) ÷ [% db.days_left_at_day_start | html %] days left.
+        <br><span class="doc-muted">([% db.week_off_at | html %]% week cutoff − [% db.used_day_start_pct | html %]% at the [% db.day_start_hour | format('%02d') %]:00 PT day start) ÷ [% db.days_left_at_day_start | html %] days left.
         Hermes: [% IF g.off_today %]<strong>off Super Grok today</strong>[% ELSE %]on [% g.mode | html %][% END %][% IF g.checked %] (guard checked [% g.checked | html %])[% END %]</span></td></tr>[% END %]
       <tr><th>Today</th><td>+[% sp.day_rise_pct | html %] points since [% sp.day_from_pt | html %] (alert above [% sp.alert_config.day_rise_pts | html %])</td></tr>
       <tr><th>Daily target</th><td><strong>[% sp.daily_target_pct | html %]%/day</strong>

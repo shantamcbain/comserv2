@@ -428,7 +428,10 @@ sub process {
     my $code_read;
     my $code_skip;
     my $uname = $c->session->{username} || '';
-    my $code_ok = (lc($args{agent_id} // '') eq 'code')
+    # AI Editor sends agent_id=programming/analyze; they need [READ_FILE:] too
+    # (eval #30: they were left out, so models asked users to paste code or
+    # printed fake tool calls that nobody ran).
+    my $code_ok = (lc($args{agent_id} // '') =~ /^(code|programming|analyze)$/)
         && $uname && lc($uname) ne 'guest';
     if ($code_ok) {
         $code_read = eval {
@@ -443,13 +446,21 @@ sub process {
             $code_read = undef;
         }
         if ($code_read) {
-            my $prep = eval {
-                $code_read->prepare_turn($c,
-                    prompt       => $prompt,
-                    page_path    => $args{page_path} || '',
-                    page_content => $args{page_content} || '',
-                );
-            };
+            # Editor JS already pasted files as [FILE: path] blocks. Then do not
+            # run prepare_turn (it would re-add the open file and also load every
+            # path mentioned inside the pasted code). Only enable [READ_FILE:]
+            # follow-ups, skipping the files already in the message.
+            my %have;
+            while ($prompt =~ /\[FILE:\s*([^\]\s]+)/g) { $have{lc $1} = 1; }
+            my $prep = %have
+                ? { page_context => $code_read->editor_contract, files_read => [], skip => \%have }
+                : eval {
+                    $code_read->prepare_turn($c,
+                        prompt       => $prompt,
+                        page_path    => $args{page_path} || '',
+                        page_content => $args{page_content} || '',
+                    );
+                };
             if ($@) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
                     "CodeRead prepare_turn threw: $@");
@@ -458,6 +469,22 @@ sub process {
                 $args{page_context} = $prep->{page_context} if $prep->{page_context};
                 push @files_read, @{ $prep->{files_read} || [] };
                 $code_skip = $prep->{skip};
+                # 2026-10-15: add the code that shows how the open page works
+                # (rendering controller sub, Site.pm, chat route), 90K total cap.
+                my $rel = eval {
+                    $code_read->related_context($c,
+                        prompt => $prompt,
+                        open   => $args{page_path} || '',
+                        skip   => { %{ $prep->{skip} || {} }, %have },
+                        budget => 90000 - length($prompt),
+                    );
+                };
+                if ($rel && $rel->{blocks}) {
+                    $prompt .= "\n\n---\nRelated code the server loaded so you can see how this page works "
+                        . "(controller that renders it, settings, routes):\n\n" . $rel->{blocks};
+                    push @files_read, @{ $rel->{files_read} || [] };
+                    push @thinking, 'related code loaded: ' . join(', ', @{ $rel->{files_read} || [] });
+                }
                 if ($prep->{user_files} && length $prep->{user_files}) {
                     $prompt .= "\n\n---\nThe server already loaded these files from disk. "
                         . "They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n"
@@ -515,10 +542,13 @@ sub process {
     my $quota_msg = '';
     if ($cl->{quota_warning}) {
         my $next = $cl->{suggested_next_model} || 'a free/cheap model (e.g. openrouter/cohere/north-mini-code:free or local ollama)';
-        $quota_msg = "⚠ SYSTEM WARNING: " . $cl->{quota_warning} . " Switch to $next. Update your Hermes config (default, editor, director, git aliases) to stop using grok-build-0.1 / xai-oauth as default. This applies to both SuperGrok and paid OpenRouter daily quotas.";
-        push @thinking, 'QUOTA: ' . $quota_msg;
+        # Plain message for web users (eval #31). Config steps stay in the log only.
+        $quota_msg = "Today's allowance for the main AI model is used up, so this answer came from a free backup model. "
+            . "It may be less detailed. The main model comes back after the daily reset (5:00 AM PT).";
+        push @thinking, 'QUOTA: ' . $cl->{quota_warning} . " (using $next)";
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'process',
-            'Daily quota hit in classify: ' . $cl->{quota_warning} . ' suggested=' . $next . ' (or_over=' . ($cl->{openrouter_over_daily}||0) . ', sg_locked=' . ($cl->{supergrok_locked}||0) . ')');
+            'Daily quota hit in classify: ' . $cl->{quota_warning} . ' suggested=' . $next . ' (or_over=' . ($cl->{openrouter_over_daily}||0) . ', sg_locked=' . ($cl->{supergrok_locked}||0) . ')'
+            . '. Admin: check Hermes default/editor/director/git aliases are not pinned to grok-build-0.1 / xai-oauth.');
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
         "AI2 chat dispatch: user=$username provider=$provider_name model="
@@ -690,6 +720,9 @@ sub process {
         my $need = $can_enrich && $resp && $resp->{success}
             && ($quality eq 'poor' || $site_audit || $lookup_intent)
             && !$args{use_search};
+        # 2026-10-15: AI Editor agents never auto web-search; the re-answer
+        # overwrote code analysis with junk (helpdesk contact.tt session).
+        $need = 0 if Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id});
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
             "auto_enrich check: can=$can_enrich quality=$quality site_audit=$site_audit lookup_intent=$lookup_intent need=$need");
         push @thinking, "auto_enrich: quality=$quality site_audit=$site_audit lookup_intent=$lookup_intent need=$need";
@@ -720,6 +753,9 @@ sub process {
             $base =~ s{/$}{};
             for my $h (@hrefs) {
                 next if $seen{$h}++;
+                # Skip links that still hold unrendered template code, e.g.
+                # /todo/details?record_id=[% p.todo_id | uri %] (always 500s).
+                next if $h =~ /\[%|%\]|%5B%25|%25%5D|\{\{|\}\}/i;
                 my $url = $h;
                 $url = $base . $h if $h =~ m{^/};
                 next unless $url =~ m{^https?://}i;

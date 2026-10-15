@@ -102,7 +102,18 @@ sub pacing_json :Path('/ai/usage_pacing_json') :Args(0) {
         $c->response->body(encode_json({ success => JSON::false, error => 'pacing failed' }));
         return;
     }
-    $c->response->body(encode_json({ success => JSON::true, supergrok_pacing => $sp }));
+    # Oct 13 2026 (Shanta): Grok Bot usage next to Super Grok. Display only.
+    my $gb = eval { $self->_grok_bot_pace($c) } || { ok => 0, line => 'Grok Bot: estimate failed' };
+    $c->response->body(encode_json({ success => JSON::true, supergrok_pacing => $sp, grok_bot => $gb }));
+}
+
+sub _grok_bot_pace {
+    my ($self, $c) = @_;
+    require Comserv::Util::AI::UsageEstimator;
+    my $root = $c->path_to('') . ''; $root =~ s{/$}{};
+    my $est = eval { (grep { ($_->{consumer} // '') eq 'grok_bot' } @{ Comserv::Model::AI2::UsageMonitor->new->usage_estimator($c)->{consumers} || [] })[0] };
+    my @rd = grep { $_->{consumer} eq 'grok_bot' } @{ Comserv::Util::AI::UsageEstimator::read_readings($root) };
+    return Comserv::Util::AI::UsageEstimator::grok_bot_pace(est => $est, readings => \@rd);
 }
 
 sub _can_see_fallover {
@@ -336,6 +347,63 @@ sub pacing_toggle :Path('/ai/usage_pacing_toggle') :Args(0) {
     $self->logging->log_with_details($c, $err ? 'warn' : 'info', __FILE__, __LINE__, 'pacing_toggle',
         $err ? "auto-queue toggle failed: $err" : 'Super Grok auto-queue ' . ($on ? 'ON' : 'OFF') . ' by ' . $c->session->{username});
     $c->response->redirect('/ai/usage?pacing=' . ($err ? 'error' : 'saved') . '#supergrok-pacing');
+}
+
+
+=head2 auto_reading
+
+POST /ai/usage_auto - grok.com usage add-on (Firefox Dev Edition) posts the
+Super Grok Build/Chat % and Grok Bot % it read. Loopback only, JSON body, and
+header X-Comserv-Grokcom: 1 (forces a CORS preflight, so web pages cannot
+send it; the add-on can). Hands the numbers to script/firefox-grokcom-usage/
+native_host.py so the files written are the same as the native path.
+Oct 14 2026.
+
+=cut
+
+sub auto_reading :Path('/ai/usage_auto') :Args(0) {
+    my ($self, $c) = @_;
+    my $res = $c->response;
+    $res->content_type('application/json');
+    my $addr = $c->req->address // '';
+    unless ($addr =~ /^(?:127\.|::1$|::ffff:127\.)/) {
+        $res->status(403); $res->body('{"ok":false,"error":"loopback only"}'); return;
+    }
+    unless ($c->req->method eq 'POST' && ($c->req->header('X-Comserv-Grokcom') // '') eq '1') {
+        $res->status(405); $res->body('{"ok":false,"error":"POST with X-Comserv-Grokcom: 1 only"}'); return;
+    }
+    require JSON::MaybeXS;
+    my $raw = '';
+    if (my $fh = $c->req->body) { local $/; seek($fh, 0, 0); $raw = <$fh> // ''; }
+    my $msg = eval { JSON::MaybeXS::decode_json($raw) };
+    unless (ref $msg eq 'HASH') {
+        $res->status(400); $res->body('{"ok":false,"error":"bad json"}'); return;
+    }
+    my %clean;
+    for my $k (qw(build chat bot)) {
+        my $v = $msg->{$k};
+        $clean{$k} = (defined $v && $v =~ /^\d{1,3}(?:\.\d+)?$/ && $v <= 100) ? 0 + $v : undef;
+    }
+    for my $k (qw(bot_reset at reason)) {
+        my $v = $msg->{$k};
+        $clean{$k} = (defined $v && !ref $v) ? substr("$v", 0, 80) : undef;
+    }
+    my $root = $c->path_to('') . ''; $root =~ s{/$}{};
+    my $host = "$root/script/firefox-grokcom-usage/native_host.py";
+    require IPC::Open2;
+    my $json = JSON::MaybeXS::encode_json(\%clean);
+    my $out = '';
+    my $ok = eval {
+        my $pid = IPC::Open2::open2(my $rd, my $wr, '/usr/bin/python3', $host);
+        binmode $wr; binmode $rd;
+        print {$wr} pack('V', length $json) . $json; close $wr;
+        local $/; my $buf = <$rd> // ''; waitpid($pid, 0);
+        $out = length($buf) > 4 ? substr($buf, 4) : '{"ok":false,"error":"no reply"}';
+        1;
+    };
+    $out = '{"ok":false,"error":"host failed"}' unless $ok;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto_reading', "grokcom add-on post $json -> $out");
+    $res->body($out);
 }
 
 __PACKAGE__->meta->make_immutable;

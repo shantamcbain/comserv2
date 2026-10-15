@@ -38,12 +38,13 @@ our @CANDIDATES = (
     { name => 'openrouter/cohere/north-mini-code:free', provider => 'openrouter',
       default => 'cohere/north-mini-code:free', base_url => 'https://openrouter.ai/api/v1',
       api_mode => 'chat_completions', health => 'openrouter|cohere/north-mini-code:free', free => 1 },
-    { name => 'openrouter/nvidia/nemotron-3.5-lightning:free', provider => 'openrouter',
-      default => 'nvidia/nemotron-3.5-lightning:free', base_url => 'https://openrouter.ai/api/v1',
-      api_mode => 'chat_completions', health => 'openrouter|nvidia/nemotron-3.5-lightning:free', free => 1 },
+    # Oct 13 2026 (Shanta): north-mini free, then 64K Ollama, then the rest.
     { name => 'ollama-launch/gemma4-64k:latest', provider => 'ollama-launch',
       default => 'gemma4-64k:latest', base_url => 'http://127.0.0.1:11434/v1',
       api_mode => 'chat_completions', ollama => 'gemma4-64k:latest', free => 1 },
+    { name => 'openrouter/nvidia/nemotron-3.5-lightning:free', provider => 'openrouter',
+      default => 'nvidia/nemotron-3.5-lightning:free', base_url => 'https://openrouter.ai/api/v1',
+      api_mode => 'chat_completions', health => 'openrouter|nvidia/nemotron-3.5-lightning:free', free => 1 },
     { name => 'ollama-launch/qwen2.5-coder:14b', provider => 'ollama-launch',
       default => 'qwen2.5-coder:14b', base_url => 'http://127.0.0.1:11434/v1',
       api_mode => 'chat_completions', ollama => 'qwen2.5-coder:14b', free => 1 },
@@ -53,7 +54,19 @@ our @CANDIDATES = (
 our %SUPERGROK = ( name => 'xai-oauth/grok-build-0.1', provider => 'xai-oauth',
     default => 'grok-build-0.1', base_url => 'https://api.x.ai/v1', api_mode => 'codex_responses',
     supergrok => 1 );
+# Proposal #34a (eval report 35, Oct 13 2026, Shanta: 'Yes, do all three'): when the OpenRouter $ cap trips and
+# Super Grok still has daily budget (supergrok_daily_guard daily_budget), go to grok-4.7.
+our %SUPERGROK_CAPS = ( %SUPERGROK, name => 'xai-oauth/grok-4.7', default => 'grok-4.7', sg_budget => 1 );
 our $BANNED_RE      = qr/deepseek-v4-pro/i;   # never written anywhere by the guard
+# Paid models whose recent use (last 10 min) trips the guard early once the day is
+# at $NEAR_CAP_FRAC of the cap (proposal #34b adds tencent/hy4-preview).
+our @PAID_WATCH     = ('deepseek-v4-pro', 'tencent/hy4-preview', 'x-ai/grok');
+# Oct 15 2026 (Shanta): grok only through xai-oauth (Super Grok). Any OpenRouter grok id is
+# BLOCKED, not just watched: set_model/set_aliases/write_fallback_providers rewrite it, and
+# every run sweeps config default, aliases, fallback, auxiliary and delegation (or_grok_block_plan).
+our $OR_GROK_RE     = qr{(?:^openrouter/.*grok|^x-ai/|/x-ai/|^~?x-ai/)}i;
+our $FREE_SAFE      = { provider => 'openrouter', default => 'cohere/north-mini-code:free' };
+our $PAID_WATCH_RE  = do { my $a = join '|', map { quotemeta } @PAID_WATCH; qr/$a/i };
 our $OR_MODELS_URL  = 'https://openrouter.ai/api/v1/models';
 our $OR_CACHE_TTL   = 6 * 3600;
 our $OR_CACHE_STALE = 7 * 86400;
@@ -137,7 +150,9 @@ sub decide {
         my $dv = $or->{day_usd} // 0;
         my $dc = $caps->{day};
         if (defined $dc && $dv >= $NEAR_CAP_FRAC * $dc && $dv < $dc) {
-            push @r, sprintf('OpenRouter v4-pro active near cap: day $%.2f >= $%.2f', $dv, $NEAR_CAP_FRAC * $dc);
+            my $wm = $in{watch_model} // 'v4-pro';
+            $wm = 'v4-pro' if $wm =~ /deepseek-v4-pro/i;
+            push @r, sprintf('OpenRouter %s active near cap: day $%.2f >= $%.2f', $wm, $dv, $NEAR_CAP_FRAC * $dc);
         }
     }
     my $over = @r ? 1 : 0;
@@ -218,6 +233,26 @@ sub supergrok_available {
     return 1;
 }
 
+# pure: Super Grok has daily budget left per supergrok_daily_guard (daily_budget block of
+# supergrok_guard_state.json). Unlike supergrok_available this ignores 'mode', which is
+# 'openrouter' whenever Hermes was moved off Super Grok (e.g. by this guard). (proposal #34a, eval report 35)
+sub supergrok_budget_left {
+    my ($sg) = @_;
+    return 0 unless ref $sg eq 'HASH' && %$sg;
+    return 0 if $sg->{locked} || $sg->{off_today};
+    my $b = $sg->{daily_budget};
+    unless (ref $b eq 'HASH' && %$b) {
+        # app pacing unreachable: trust the daily guard's own call. deferred_mode 'grok' means it
+        # wanted Super Grok but held off because this guard had tripped.
+        my $want = ($sg->{mode} // '') eq 'grok' || ($sg->{deferred_mode} // '') eq 'grok';
+        return ($want && ($sg->{remaining} // 0) > 5) ? 1 : 0;
+    }
+    return 0 if $b->{over} || $b->{switch_off} || $b->{week_off};
+    my $rem = $b->{remaining_today_pct};
+    $rem = ($b->{effective_budget_pct} // 0) - ($b->{used_today_pct} // 0) unless defined $rem && $rem =~ /^-?[\d.]+$/;
+    return ($rem =~ /^-?[\d.]+$/ && $rem > 0) ? 1 : 0;
+}
+
 # pure: is candidate $c writable right now? Validated id, never banned, never double-prefixed.
 # Oct 10 2026: Hermes needs ~64K context. An Ollama model qualifies only if its
 # effective context (Modelfile PARAMETER num_ctx, else OLLAMA_CONTEXT_LENGTH, else
@@ -252,6 +287,7 @@ sub candidate_ok {
     my $d = $c->{default} // '';
     return 0 if !length $d || $d =~ $BANNED_RE;
     return 0 if normalize_model_id($c->{provider}, $d) ne $d;
+    return supergrok_budget_left($in{supergrok}) if $c->{sg_budget};
     return supergrok_available($in{supergrok}) if $c->{supergrok};
     if ($c->{ollama}) {
         my $t = $in{ollama_models};
@@ -268,18 +304,23 @@ sub candidate_ok {
 }
 
 # pure: candidate order. thrash: Super Grok first; $ caps: free first, then Super Grok, then Ollama.
+# $ caps + Super Grok daily budget left: grok-4.7 first (proposal #34a, eval report 35).
 sub candidate_order {
-    my ($kind, $cands) = @_;
+    my ($kind, $cands, $sg) = @_;
     my @c  = @{ $cands || \@CANDIDATES };
     my @or = grep { !$_->{ollama} } @c;
     my @ol = grep {  $_->{ollama} } @c;
-    return ($kind // 'thrash') eq 'caps' ? (@or, {%SUPERGROK}, @ol) : ({%SUPERGROK}, @or, @ol);
+    if (($kind // 'thrash') eq 'caps') {
+        return ({%SUPERGROK_CAPS}, @or, {%SUPERGROK}, @ol) if supergrok_budget_left($sg);
+        return (@or, {%SUPERGROK}, @ol);
+    }
+    return ({%SUPERGROK}, @or, @ol);
 }
 
 # pure: first usable candidate for this trip kind, or undef (pause).
 sub pick_target {
     my (%in) = @_;
-    for my $c (candidate_order($in{kind}, $in{candidates})) {
+    for my $c (candidate_order($in{kind}, $in{candidates}, $in{supergrok})) {
         return { %$c } if candidate_ok($c, %in);
     }
     return undef;
@@ -384,7 +425,9 @@ sub clean_saved_aliases {
 sub supergrok_daily_off {
     my ($sg, $now) = @_;
     return 0 unless ref $sg eq 'HASH' && $sg->{off_today} && ($sg->{mode} // 'grok') ne 'grok';
-    my $today = do { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset(); my $d = POSIX::strftime('%Y-%m-%d', localtime($now // time)); $d };
+    # Oct 11 2026: the lock lasts for the WORK day (starts day_start_hour PT, default 5).
+    my $h = (defined $sg->{day_start_hour} && $sg->{day_start_hour} =~ /^\d+$/) ? $sg->{day_start_hour} : 5;
+    my $today = do { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset(); my $d = POSIX::strftime('%Y-%m-%d', localtime(($now // time) - $h * 3600)); $d };
     POSIX::tzset();
     return (($sg->{lock_date} // '') eq $today) ? 1 : 0;
 }
@@ -392,9 +435,9 @@ sub supergrok_daily_off {
 # pure: the daily guard's cheap model (from its state file), never banned.
 sub supergrok_daily_target {
     my ($sg) = @_;
-    my $m = { provider => $sg->{switch_provider} || 'openrouter', default => $sg->{switch_model} || 'z-ai/glm-5.3-flash',
+    my $m = { provider => $sg->{switch_provider} || 'openrouter', default => $sg->{switch_model} || 'cohere/north-mini-code:free',
               base_url => $sg->{switch_base_url} || 'https://openrouter.ai/api/v1', api_mode => $sg->{switch_api_mode} || 'chat_completions' };
-    $m->{default} = 'z-ai/glm-5.3-flash' if $m->{default} =~ $BANNED_RE;
+    $m->{default} = 'cohere/north-mini-code:free' if $m->{default} =~ $BANNED_RE || $m->{default} =~ /glm/i;   # Oct 13: glm removed
     return $m;
 }
 
@@ -437,8 +480,89 @@ sub assert_safe_model {
     return 1;
 }
 
+# pure: is (provider, model) an OpenRouter grok?
+sub is_or_grok {
+    my ($provider, $model) = @_;
+    $provider //= ''; $model //= '';
+    return 0 unless length $model;
+    return 1 if $model =~ $OR_GROK_RE;
+    return 1 if $provider eq 'openrouter' && $model =~ /grok/i;
+    return 0;
+}
+
+# pure: Super Grok usable right now (supergrok_daily_guard state: mode grok, no hard cap).
+sub supergrok_open {
+    my ($sg) = @_;
+    return 0 unless ref $sg eq 'HASH' && %$sg;
+    return 0 if $sg->{hard_cap} || ($sg->{mode} // '') ne 'grok';
+    return 1;
+}
+
+# pure: replacement {provider, default} for an OpenRouter grok id.
+sub or_grok_replacement {
+    my ($model, $sg) = @_;
+    (my $bare = bare_model_id($model // '')) =~ s{^~?x-ai/}{};
+    $bare =~ s/:.*\z//;
+    return { %$FREE_SAFE } unless supergrok_open($sg) && $bare =~ /^grok[\w.-]*\z/;
+    return { %SUPERGROK, default => $bare };
+}
+
+# pure: alias value with any OpenRouter grok rewritten.
+sub fix_alias_value {
+    my ($v, $sg) = @_;
+    return $v unless defined $v && $v =~ m{^([^/]+)/(.+)$};
+    return $v unless is_or_grok($1, $2) || is_or_grok('', $v);
+    return alias_value(or_grok_replacement($2, $sg));
+}
+
+# pure: what the per-run block would rewrite. in: current_model, aliases, current_fallback,
+# auxiliary, delegation, supergrok. out: { model, aliases, fallback, auxiliary, delegation, why }.
+sub or_grok_block_plan {
+    my (%c) = @_;
+    my $sg = $c{supergrok};
+    my (%out, @why);
+    my $cm = $c{current_model} || {};
+    if (is_or_grok($cm->{provider}, $cm->{default})) {
+        my $r = or_grok_replacement($cm->{default}, $sg);
+        $out{model} = { map { ($_ => $r->{$_}) } @MODEL_KEYS };
+        push @why, "model $cm->{provider}/$cm->{default} -> $r->{provider}/$r->{default}";
+    }
+    my %al;
+    for my $a (sort keys %{ $c{aliases} || {} }) {
+        my $v = $c{aliases}{$a}; my $n = fix_alias_value($v, $sg);
+        next if !defined $v || $n eq $v;
+        $al{$a} = $n; push @why, "alias $a $v -> $n";
+    }
+    $out{aliases} = \%al if %al;
+    my $fb = $c{current_fallback} || [];
+    if (grep { is_or_grok($_->{provider}, $_->{model}) } @$fb) {
+        my (@n, %seen);
+        for my $e (@$fb) {
+            my $x = is_or_grok($e->{provider}, $e->{model})
+                ? do { my $r = or_grok_replacement($e->{model}, $sg); { provider => $r->{provider}, model => $r->{default} } } : $e;
+            push @n, $x unless $seen{"$x->{provider}/$x->{model}"}++;
+        }
+        $out{fallback} = \@n; push @why, 'fallback had OpenRouter grok';
+    }
+    my %ax;
+    for my $t (sort keys %{ $c{auxiliary} || {} }) {
+        my $e = $c{auxiliary}{$t};
+        next unless is_or_grok($e->{provider}, $e->{model});
+        $ax{$t} = { provider => $FREE_SAFE->{provider}, model => $FREE_SAFE->{default} };
+        push @why, "auxiliary $t $e->{provider}/$e->{model} -> north-mini";
+    }
+    $out{auxiliary} = \%ax if %ax;
+    my $dl = $c{delegation} || {};
+    if (is_or_grok($dl->{provider}, $dl->{model})) {
+        $out{delegation} = { provider => $FREE_SAFE->{provider}, model => $FREE_SAFE->{default} };
+        push @why, "delegation $dl->{model} -> north-mini";
+    }
+    $out{why} = \@why;
+    return \%out;
+}
+
 # Aliases that must not point at paid coding models while tripped.
-our @DANGEROUS_ALIASES = qw(code coder code-paid flash delegate glm hy3);
+our @DANGEROUS_ALIASES = qw(code coder code-paid flash delegate hy3);   # Oct 13: glm alias removed
 # Already-safe aliases we never rewrite.
 our @SAFE_ALIAS_KEEP = qw(cheap director local xai git reasoner editor deepseek);
 
@@ -650,7 +774,7 @@ sub live_spend {
     my %by;
     my $usd = 0;
     my $unp = 0;
-    my $last_v4;
+    my ($last_v4, $last_watch);
     my %epc; # model -> eps
     for my $c (@$calls) {
         my $m = $c->{model} // '';
@@ -670,8 +794,8 @@ sub live_spend {
             my $fb = ($c->{in} // 0) * $UNPRICED_IN + ($c->{out} // 0) * $UNPRICED_OUT;
             $usd += $fb; $by{$m}{usd} += $fb;
         }
-        if ($m =~ $BANNED_RE) {
-            $last_v4 = $c->{t} if !defined $last_v4 || $c->{t} > $last_v4;
+        if ($m =~ $PAID_WATCH_RE) {
+            if (!defined $last_v4 || $c->{t} > $last_v4) { $last_v4 = $c->{t}; $last_watch = $m }
         }
     }
     return {
@@ -680,7 +804,8 @@ sub live_spend {
         calls => scalar(@$calls),
         unpriced => $unp,
         by_model => \%by,
-        last_v4pro_at => $last_v4,
+        last_v4pro_at => $last_v4,          # last call to any @PAID_WATCH model (name kept for compat)
+        last_watch_model => $last_watch,
     };
 }
 
@@ -880,7 +1005,7 @@ sub set_aliases {
     return [] unless ref $map eq 'HASH' && %$map;
     my @done;
     for my $a (sort keys %$map) {
-        my $v = $map->{$a};
+        my $v = fix_alias_value($map->{$a}, $s->supergrok_state);   # never write an OpenRouter grok
         die "refusing banned alias $a=$v\n" if $v =~ $BANNED_RE;
         $s->config_set("model.aliases.$a", $v);
         push @done, "$a=$v";
@@ -949,7 +1074,21 @@ sub context {
             (defined $ctx ? (ollama_ctx => $ctx) : ()),
             or_ids => $s->openrouter_model_ids, supergrok => $s->supergrok_state,
             aliases => $s->read_aliases, auxiliary => $s->read_auxiliary,
-            current_model => $s->current_model, current_fallback => $s->read_fallback_providers);
+            current_model => $s->current_model, current_fallback => $s->read_fallback_providers,
+            delegation => $s->read_delegation);
+}
+
+sub read_delegation {
+    my ($s) = @_;
+    open my $fh, '<', $s->{config} or return {};
+    my (%d, $in);
+    while (my $l = <$fh>) {
+        if ($l =~ /^delegation:\s*$/) { $in = 1; next }
+        next unless $in;
+        last if $l =~ /^\S/;
+        $d{$1} = $2 if $l =~ /^  (provider|model):\s*['"]?(.*?)['"]?\s*$/;
+    }
+    return \%d;
 }
 
 sub read_fallback_providers {
@@ -971,6 +1110,9 @@ sub write_fallback_providers {
     my ($s, $list) = @_;
     return [] unless ref $list eq 'ARRAY' && @$list;
     for (@$list) { die "refusing banned fallback $_->{model}\n" if ($_->{model} // '') =~ $BANNED_RE }
+    $list = [ map { is_or_grok($_->{provider}, $_->{model})
+        ? do { my $r = or_grok_replacement($_->{model}, $s->supergrok_state); +{ provider => $r->{provider}, model => $r->{default} } }
+        : $_ } @$list ];
     # Hermes ~64K context floor for Ollama entries (Oct 10 2026); applies to every write,
     # including restores of saved_fallback.
     my ($kept, $dropped) = filter_ollama_ctx($list, $s->{ollama_ctx} // $s->ollama_ctx_map);
@@ -1055,6 +1197,10 @@ sub desktop_notify {
 
 sub set_model {
     my ($s, $m) = @_;
+    if (ref $m eq 'HASH' && is_or_grok($m->{provider}, $m->{default})) {
+        my $r = or_grok_replacement($m->{default}, $s->supergrok_state);
+        $m = { map { ($_ => $r->{$_}) } @MODEL_KEYS };
+    }
     assert_safe_model($m);
     my $cur = $s->current_model;
     my @done;
@@ -1108,7 +1254,8 @@ sub run {
     my $live = exists $o{live} ? $o{live} : $s->live_spend;
     $or = merge_live($or, $live);
     my $v4pro_recent = (ref $live eq 'HASH' && $live->{ok} && $live->{last_v4pro_at} && $t - $live->{last_v4pro_at} < 600) ? 1 : 0;
-    my $d = decide(thrash_by_class => $tbc, limits => $lims, thrash => $thrash, openrouter => $or, state => $st, v4pro_recent => $v4pro_recent);
+    my $d = decide(thrash_by_class => $tbc, limits => $lims, thrash => $thrash, openrouter => $or, state => $st, v4pro_recent => $v4pro_recent,
+                   watch_model => (ref $live eq 'HASH' ? $live->{last_watch_model} : undef));
     $d->{thrash} = $thrash;
     if (ref $tbc eq 'HASH' && $tbc->{ok}) {
         $d->{thrash_by_class} = $tbc->{counts};
@@ -1143,6 +1290,7 @@ sub run {
             restore => { decision => $rp->{decision}{reason}, model => $rp->{model}, aliases => $rp->{aliases},
                          fallback_providers => $rp->{fallback}, auxiliary => $rp->{auxiliary} },
             sanitize => sanitize_plan(%ctx),
+            or_grok_block => or_grok_block_plan(%ctx),
         };
         $d->{state} = $st;
         return $d;
@@ -1267,6 +1415,31 @@ sub run {
     }
     if ($d->{action} eq 'hold') {
         $st->{reasons} = $d->{reasons} if @{ $d->{reasons} };
+    }
+    # Oct 15 2026: block OpenRouter grok every run (re-read config: trip/restore may have written).
+    {
+        my %c2 = (current_model => $s->current_model, aliases => $s->read_aliases,
+                  current_fallback => $s->read_fallback_providers, auxiliary => $s->read_auxiliary,
+                  delegation => $s->read_delegation, supergrok => $s->supergrok_state);
+        my $bp = or_grok_block_plan(%c2);
+        if (@{ $bp->{why} }) {
+            my $bak = $s->backup_config; my @errs;
+            eval { $s->set_model($bp->{model}) } if $bp->{model}; push @errs, $@ if $@;
+            eval { $s->set_aliases($bp->{aliases}) } if $bp->{aliases}; push @errs, $@ if $@;
+            eval { $s->write_fallback_providers($bp->{fallback}) } if $bp->{fallback}; push @errs, $@ if $@;
+            eval { $s->set_auxiliary($bp->{auxiliary}) } if $bp->{auxiliary}; push @errs, $@ if $@;
+            if ($bp->{delegation}) { for my $k (qw(provider model)) { eval { $s->config_set("delegation.$k", $bp->{delegation}{$k}) }; push @errs, $@ if $@ } }
+            my $msg = sprintf('Hermes overrun guard BLOCKED OpenRouter grok %s: %s. Backup: %s', pt($t), join('; ', @{ $bp->{why} }), $bak // 'FAILED');
+            $s->log_line($msg . (@errs ? ' set_error=' . join(' ', @errs) : ''));
+            _append($s->{events_file}, $J->encode({ at => $t, at_pt => pt($t), action => 'or_grok_block', why => $bp->{why}, backup => $bak }));
+            $d->{or_grok_blocked} = $bp->{why};
+        }
+        # saved_* (restored later) must not carry OpenRouter grok either
+        for my $a (keys %{ $st->{saved_aliases} || {} }) { $st->{saved_aliases}{$a} = fix_alias_value($st->{saved_aliases}{$a}, $c2{supergrok}) }
+        if (ref $st->{saved_model} eq 'HASH' && is_or_grok($st->{saved_model}{provider}, $st->{saved_model}{default})) {
+            my $r = or_grok_replacement($st->{saved_model}{default}, $c2{supergrok});
+            $st->{saved_model} = { map { ($_ => $r->{$_}) } @MODEL_KEYS };
+        }
     }
     $s->write_state($st);
     $d->{state} = $st;

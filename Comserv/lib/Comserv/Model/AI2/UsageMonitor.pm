@@ -1989,7 +1989,7 @@ sub pacing_config {
     my $d = {};
     if (open my $fh, '<', $f) { local $/; $d = eval { JSON::PP->new->decode(<$fh>) } || {}; close $fh }
     return { auto_queue => ($d->{auto_queue} ? 1 : 0), worktree => $d->{worktree}, alerts => (ref $d->{alerts} eq 'HASH' ? $d->{alerts} : {}),
-             daily => { map { ($_ => $d->{$_}) } grep { defined $d->{$_} } qw(week_off_at extra_today_pct extra_today_date allow_overrun_date) },
+             daily => { map { ($_ => $d->{$_}) } grep { defined $d->{$_} } qw(week_off_at extra_today_pct extra_today_date allow_overrun_date day_start_hour) },
              updated_by => $d->{updated_by}, updated_at => $d->{updated_at} };
 }
 

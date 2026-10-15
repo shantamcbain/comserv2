@@ -287,7 +287,7 @@ for my $t (@types) {
     # Everything skipped (no calls at all) is also all_exhausted.
     %SCRIPT = ();
     ($r) = run(guard => { locked => 1 }, provider => 'supergrok', model => 'grok-4.6',
-               chains => chains(chain_chat => [ 'openrouter|paid/x' ]), spend => { ok => 1, day => 9, week => 9, month => 9, by_model_day => {} });
+               chains => chains(chain_chat => [ 'openrouter|paid/x' ], supergrok_locked_coding_model => ''), spend => { ok => 1, day => 9, week => 9, month => 9, by_model_day => {} });
     ok($r->{all_exhausted} && !@CALLS, 'all candidates blocked -> all_exhausted without any call');
 }
 

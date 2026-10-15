@@ -60,10 +60,14 @@ sub call_weight {
 
 # Burn alerts (Oct 8 2026: 41 points burned 10:31-19:05 PT with no warning).
 # Overridable per key from data/supergrok_pacing.json {"alerts": {...}}.
+# Oct 11 2026: Shanta works 05:00-12:00 PT, so the "day" is the WORK day
+# starting at day_start_hour (default 5) and the old noon ahead-of-pace check is
+# replaced by a work-window check: at/after check_hour PT, alert if more than
+# budget_fraction of today's daily budget is already gone.
 our %ALERT_DEFAULTS = (
-    day_rise_pts   => 15,   # used % rise within one PT calendar day
-    noon_ahead_pts => 10,   # at/after noon_hour PT: used - straight-line expected
-    noon_hour      => 12,
+    day_rise_pts    => 15,    # used % rise within one work day
+    check_hour      => 9,     # work-window check from this PT hour (same work day)
+    budget_fraction => 0.6,   # ... alert when used_today > fraction x effective daily budget
 );
 sub alert_config {
     my ($cfg) = @_;
@@ -78,10 +82,22 @@ sub alert_config {
 # data/supergrok_pacing.json keys: week_off_at (90), extra_today_pct +
 # extra_today_date (YYYY-MM-DD PT), allow_overrun_date (YYYY-MM-DD PT).
 our $WEEK_OFF_AT = 90;
+our $DAY_START_HOUR = 5;
+sub day_start_hour {
+    my ($cfg) = @_;
+    my $h = ref $cfg eq 'HASH' ? $cfg->{day_start_hour} : undef;
+    return (defined $h && $h =~ /^\d+$/ && $h <= 23) ? 0 + $h : $DAY_START_HOUR;
+}
+# PT date of the work day containing $e (a day starts at $h:00 PT; $h=0 -> calendar day).
 sub pt_date {
-    my ($e) = @_;
+    my ($e, $h) = @_;
+    $h //= $DAY_START_HOUR;
     local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
-    return strftime('%Y-%m-%d', localtime $e);
+    my @l = localtime $e;
+    my $d = ($l[2] < $h) ? strftime('%Y-%m-%d', localtime(timelocal(0, 0, 12, @l[3, 4, 5]) - 86400))
+                         : strftime('%Y-%m-%d', @l);
+    POSIX::tzset();
+    return $d;
 }
 
 # Pure. in: used, used_day_start, day_from, reset, now, cfg.
@@ -90,7 +106,8 @@ sub daily_budget {
     my $cfg   = ref $in{cfg} eq 'HASH' ? $in{cfg} : {};
     my $num   = sub { defined $_[0] && $_[0] =~ /^\d+(?:\.\d+)?$/ ? 0 + $_[0] : undef };
     my $woa   = $num->($cfg->{week_off_at}) // $WEEK_OFF_AT;
-    my $today = pt_date($in{now});
+    my $dsh   = day_start_hour($cfg);
+    my $today = pt_date($in{now}, $dsh);
     my $days  = ($in{reset} - $in{day_from}) / 86400;
     $days = 0.25 if $days < 0.25;
     my $budget = ($woa - $in{used_day_start}) / $days;
@@ -103,7 +120,7 @@ sub daily_budget {
     my $over  = (!$allow && $used_today >= $eff) ? 1 : 0;
     my $week_off = $in{used} >= $woa ? 1 : 0;
     return {
-        date => $today, week_off_at => $woa, days_left_at_day_start => sprintf('%.2f', $days),
+        date => $today, day_start_hour => $dsh, week_off_at => $woa, days_left_at_day_start => sprintf('%.2f', $days),
         used_day_start_pct => sprintf('%.1f', $in{used_day_start}), used_now_pct => sprintf('%.1f', $in{used}),
         budget_pct => sprintf('%.1f', $budget), extra_pct => sprintf('%.1f', $extra),
         effective_budget_pct => sprintf('%.1f', $eff), used_today_pct => sprintf('%.1f', $used_today),
@@ -116,12 +133,14 @@ sub daily_budget {
     };
 }
 
-# PT midnight at or before $now.
+# Start of the work day (h:00 PT, default 05:00) at or before $now.
 sub day_start {
-    my ($now) = @_;
+    my ($now, $h) = @_;
+    $h //= $DAY_START_HOUR;
     local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
     my @l = localtime $now;
-    my $t = timelocal(0, 0, 0, @l[3, 4, 5]);
+    my $t = timelocal(0, 0, $h, @l[3, 4, 5]);
+    if ($t > $now) { my @y = localtime(timelocal(0, 0, 12, @l[3, 4, 5]) - 86400); $t = timelocal(0, 0, $h, @y[3, 4, 5]) }
     POSIX::tzset();
     return $t;
 }
@@ -138,12 +157,17 @@ sub burn_alerts {
                    message => sprintf('Super Grok burned %.0f points today (since %s; limit %s): now %.0f%% used. Slow down or stop the big sessions.',
                                       $rise, pt($in{day_from}), $c->{day_rise_pts}, $in{used}) };
     }
-    my $hour = do { local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset(); my $h = (localtime $in{now})[2]; POSIX::tzset(); $h };
-    my $ahead = $in{used} - $in{expected};
-    if ($hour >= $c->{noon_hour} && $ahead > $c->{noon_ahead_pts}) {
-        push @a, { kind => 'noon_ahead', level => 'warning', value => sprintf('%.1f', $ahead),
-                   message => sprintf('Super Grok is %.0f points ahead of pace (%.0f%% used vs %.0f%% expected by now; limit %s).',
-                                      $ahead, $in{used}, $in{expected}, $c->{noon_ahead_pts}) };
+    # Work-window check: hours since the work-day start >= check_hour - day_start_hour.
+    my $dsh = $in{day_start_hour} // $DAY_START_HOUR;
+    my $hrs_in = defined $in{day_from} ? ($in{now} - $in{day_from}) / 3600 : 0;
+    my $budget = $in{budget_pct};
+    if (defined $budget && $budget > 0 && $hrs_in >= $c->{check_hour} - $dsh) {
+        my $frac = $rise / $budget;
+        if ($frac > $c->{budget_fraction}) {
+            push @a, { kind => 'work_window', level => 'warning', value => sprintf('%.2f', $frac),
+                       message => sprintf('By %02d:00 PT %.0f%% of today\'s Super Grok budget is gone (%.1f of %.1f points; limit %.0f%%). Pace the rest of the work window or switch big jobs to glm.',
+                                          $c->{check_hour}, 100 * $frac, $rise, $budget, 100 * $c->{budget_fraction}) };
+        }
     }
     return \@a;
 }
@@ -228,7 +252,8 @@ sub pacing {
     my $units = $in{units}->($base->{at}, $now) // 0;
     my $used = _used($base) + $units * $rate;
     $used = 100 if $used > 100;
-    my $day_from = day_start($now);
+    my $dsh = day_start_hour($in{daily_cfg});
+    my $day_from = day_start($now, $dsh);
     $day_from = $cs if $day_from < $cs;
     # Normalized to readings: with a reading on each side of day_from, split the
     # meter delta by weighted tokens (time if no tokens); else extrapolate.
@@ -272,11 +297,13 @@ sub pacing {
         day_from_pt => pt($day_from), used_day_start_pct => sprintf('%.1f', $used_day_start),
         day_rise_pct => sprintf('%.1f', $used - $used_day_start),
     );
-    $o{alerts} = burn_alerts(used => $used, used_day_start => $used_day_start, day_from => $day_from,
-                             expected => $expected, now => $now, cfg => $in{alert_cfg});
-    $o{alert_config} = alert_config($in{alert_cfg});
     $o{daily_budget} = daily_budget(used => $used, used_day_start => $used_day_start, day_from => $day_from,
                                     reset => $reset, now => $now, cfg => $in{daily_cfg});
+    $o{day_start_hour} = $dsh;
+    $o{alerts} = burn_alerts(used => $used, used_day_start => $used_day_start, day_from => $day_from,
+                             expected => $expected, now => $now, cfg => $in{alert_cfg},
+                             day_start_hour => $dsh, budget_pct => $o{daily_budget}{effective_budget_pct});
+    $o{alert_config} = alert_config($in{alert_cfg});
     if (($dow == 1 || $dow == 2) && $delta < -$MIDWEEK_BEHIND) {
         push @{ $o{warnings} }, sprintf('Midweek: Super Grok is %.0f points behind pace (%.0f%% used, %.0f%% expected by now). Use about %.0f%%/day (~%s M tokens, ~%s %s calls) to finish the week.',
             -$delta, $used, $expected, $target_day, $o{daily_target_mtok} // '?', $o{daily_target_calls} // '?', $JOB_MODEL);

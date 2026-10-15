@@ -64,7 +64,7 @@ like do { local (@ARGV, $/) = $r->{backup}; <> }, qr/deepseek-v4-pro/, 'backup h
 is $g->current_model->{default}, 'cohere/north-mini-code:free', 'config now cheap (valid id, no double prefix)';
 unlike do { local (@ARGV, $/) = "$h/.hermes/config.yaml"; <> }, qr/v4-pro/, 'no v4-pro anywhere in config after trip';
 is_deeply [ map { "$_->{provider}/$_->{model}" } @{ $g->read_fallback_providers } ],
-    [ 'openrouter/cohere/north-mini-code:free', 'openrouter/nvidia/nemotron-3.5-lightning:free', 'ollama-launch/gemma4-64k:latest' ], # qwen2.5-coder dropped: context < 64K (Oct 10 2026)
+    [ 'openrouter/cohere/north-mini-code:free', 'ollama-launch/gemma4-64k:latest', 'openrouter/nvidia/nemotron-3.5-lightning:free' ], # Oct 13: north-mini > 64K Ollama > rest; qwen2.5-coder dropped: context < 64K (Oct 10 2026)
     'trip wrote free/Ollama fallback chain (Super Grok unavailable)';
 my $st = $g->read_state;
 ok $st->{tripped}, 'state tripped'; is $st->{saved_model}{default}, 'openrouter/deepseek/deepseek-v4-pro', 'saved old model';
@@ -191,7 +191,8 @@ is $G->can('restore_model_decision')->(current_default => 'openrouter/cohere/nor
 
     my $t = $pick->(or_ids => $IDS, supergrok => $SG_OK, kind => 'thrash', ollama_models => []);
     is $t->{provider}, 'xai-oauth', 'thrash prefers Super Grok'; is $t->{default}, 'grok-build-0.1', 'Super Grok id';
-    is $pick->(or_ids => $IDS, supergrok => $SG_OK, kind => 'caps')->{default}, 'cohere/north-mini-code:free', '$ caps prefers free';
+    is $pick->(or_ids => $IDS, supergrok => $SG_OK, kind => 'caps')->{default}, 'grok-4.7', '$ caps + Super Grok budget -> grok-4.7 (proposal #34a, eval report 35)';
+    is $pick->(or_ids => $IDS, supergrok => { %$SG_OK, locked => 1 }, kind => 'caps')->{default}, 'cohere/north-mini-code:free', '$ caps, Super Grok locked -> free';
     is $pick->(or_ids => $IDS, supergrok => { %$SG_OK, locked => 1 }, kind => 'thrash')->{default}, 'cohere/north-mini-code:free', 'locked Super Grok -> free';
     is $pick->(or_ids => $IDS, supergrok => { %$SG_OK, mode => 'openrouter' }, kind => 'thrash')->{default}, 'cohere/north-mini-code:free', 'Super Grok exhausted -> free';
     is $pick->(or_ids => { 'nvidia/nemotron-3.5-lightning:free' => 1 }, kind => 'caps')->{default}, 'nvidia/nemotron-3.5-lightning:free', 'id missing from OR list skipped';
@@ -199,8 +200,8 @@ is $G->can('restore_model_decision')->(current_default => 'openrouter/cohere/nor
 
     my $fc = $G->can('fallback_chain')->(or_ids => $IDS, supergrok => $SG_OK, ollama_models => undef);
     is_deeply [ map { "$_->{provider}/$_->{model}" } @$fc ],
-        [ 'xai-oauth/grok-build-0.1', 'openrouter/cohere/north-mini-code:free', 'openrouter/nvidia/nemotron-3.5-lightning:free',
-          'ollama-launch/gemma4-64k:latest' ], 'permanent chain: Super Grok > free > Ollama';
+        [ 'xai-oauth/grok-build-0.1', 'openrouter/cohere/north-mini-code:free', 'ollama-launch/gemma4-64k:latest',
+          'openrouter/nvidia/nemotron-3.5-lightning:free' ], 'permanent chain: Super Grok > north-mini > 64K Ollama > nemotron';
     ok !grep({ $_->{model} =~ /v4-pro/ } @$fc), 'chain never v4-pro';
 
     my $bad = $G->can('fallback_bad')->(or_ids => $IDS, current => [
@@ -233,7 +234,6 @@ model:
     code: xai-oauth/grok-build-0.1
     coder: xai-oauth/grok-build-0.1
     delegate: openrouter/deepseek/deepseek-v4-flash
-    glm: openrouter/z-ai/glm-5.3-flash
     hy3: openrouter/tencent/hy3
   default: grok-build-0.1
   provider: xai-oauth
@@ -538,7 +538,7 @@ sub cb_for {
     my $now = do { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset(); my $t = Time::Local::timelocal(0, 0, 15, 9, 9, 2026); $t };
     POSIX::tzset();
     my $sg = { mode => 'openrouter', off_today => 1, lock_date => '2026-10-09', switch_provider => 'openrouter',
-               switch_model => 'z-ai/glm-5.3-flash', switch_base_url => 'https://openrouter.ai/api/v1', switch_api_mode => 'chat_completions' };
+               switch_model => 'cohere/north-mini-code:free', switch_base_url => 'https://openrouter.ai/api/v1', switch_api_mode => 'chat_completions' };
     ok $G->can('supergrok_daily_off')->($sg, $now), 'daily lock today detected';
     ok !$G->can('supergrok_daily_off')->({ %$sg, lock_date => '2026-10-08' }, $now), 'yesterday lock ignored';
     ok !$G->can('supergrok_daily_off')->({ %$sg, mode => 'grok', off_today => 0 }, $now), 'not locked';
@@ -547,12 +547,51 @@ sub cb_for {
                saved_aliases => { code => 'xai-oauth/grok-4.7', coder => 'xai-oauth/grok-4.7' } };
     my %ctx = (current_model => { provider => 'openrouter', default => 'cohere/north-mini-code:free' }, or_ids => undef, health => {}, ollama_models => undef);
     my $p = $G->can('build_restore_plan')->(%ctx, state => $st, supergrok => $sg, now => $now);
-    is $p->{model}{default}, 'z-ai/glm-5.3-flash', 'restore during daily lock -> cheap model, not grok-4.7';
-    is $p->{aliases}{code}, 'openrouter/z-ai/glm-5.3-flash', '... code alias cheap';
+    is $p->{model}{default}, 'cohere/north-mini-code:free', 'restore during daily lock -> cheap model, not grok-4.7';
+    is $p->{aliases}{code}, 'openrouter/cohere/north-mini-code:free', '... code alias cheap';
+    is $G->can('supergrok_daily_target')->({ switch_model => 'z-ai/glm-5.3-flash' })->{default}, 'cohere/north-mini-code:free', 'stale glm switch_model -> north-mini (Oct 13)';
     ok $p->{daily_lock}, '... flagged';
     $p = $G->can('build_restore_plan')->(%ctx, state => $st, supergrok => { %$sg, lock_date => '2026-10-08' }, now => $now);
     is $p->{model}{default}, 'grok-4.7', 'new PT day -> restore grok-4.7';
     is $p->{aliases}{code}, 'xai-oauth/grok-4.7', '... aliases grok-4.7';
 }
 
+# Oct 11 2026: daily lock lasts for the work day (05:00 PT boundary)
+{
+    require Time::Local; local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset();
+    my $sg = { off_today => 1, mode => 'openrouter', lock_date => '2026-10-10', day_start_hour => 5 };
+    is Comserv::Util::AI::HermesOverrunGuard::supergrok_daily_off($sg, Time::Local::timelocal(0, 30, 3, 11, 9, 2026)), 1, 'lock still on at 03:30 next calendar day';
+    is Comserv::Util::AI::HermesOverrunGuard::supergrok_daily_off($sg, Time::Local::timelocal(0, 1, 5, 11, 9, 2026)), 0, 'lock released at 05:01';
+    POSIX::tzset();
+}
+
+# Oct 15 2026: OpenRouter grok is blocked, not just watched.
+{
+    my $G = 'Comserv::Util::AI::HermesOverrunGuard';
+    my $open = { mode => 'grok', hard_cap => 0 };
+    my $shut = { mode => 'openrouter' };
+    ok $G->can('is_or_grok')->('openrouter', 'x-ai/grok-4.7'), 'openrouter x-ai/grok-4.7 is OR grok';
+    ok $G->can('is_or_grok')->('', 'openrouter/x-ai/grok-4.7'), 'alias form is OR grok';
+    ok !$G->can('is_or_grok')->('xai-oauth', 'grok-4.7'), 'xai-oauth grok-4.7 allowed';
+    ok !$G->can('is_or_grok')->('', 'xai-oauth/grok-4.7'), 'xai-oauth alias allowed';
+    is $G->can('fix_alias_value')->('openrouter/x-ai/grok-4.7', $open), 'xai-oauth/grok-4.7', 'alias -> Super Grok when open';
+    is $G->can('fix_alias_value')->('openrouter/x-ai/grok-4.7', $shut), 'openrouter/cohere/north-mini-code:free', 'alias -> north-mini when Super Grok shut';
+    is $G->can('fix_alias_value')->('openrouter/tencent/hy3', $open), 'openrouter/tencent/hy3', 'non-grok untouched';
+    my $p = $G->can('or_grok_block_plan')->(
+        current_model => { provider => 'openrouter', default => 'x-ai/grok-4.7', base_url => 'https://openrouter.ai/api/v1', api_mode => 'chat_completions' },
+        aliases => { code => 'xai-oauth/grok-4.7', paidgrok => 'openrouter/x-ai/grok-4.6' },
+        current_fallback => [ { provider => 'openrouter', model => 'x-ai/grok-4.7' }, { provider => 'openrouter', model => 'cohere/north-mini-code:free' } ],
+        auxiliary => { vision => { provider => 'openrouter', model => 'x-ai/grok-4.7' } },
+        delegation => { provider => 'openrouter', model => 'deepseek/deepseek-v4-flash' },
+        supergrok => $shut);
+    is $p->{model}{provider}, 'openrouter', 'model rewritten';
+    is $p->{model}{default}, 'cohere/north-mini-code:free', 'to north-mini when shut';
+    is_deeply [ keys %{ $p->{aliases} } ], ['paidgrok'], 'only the grok alias rewritten';
+    is scalar @{ $p->{fallback} }, 1, 'fallback grok replaced and deduped';
+    ok $p->{auxiliary}{vision}, 'aux grok rewritten';
+    ok !$p->{delegation}, 'non-grok delegation untouched';
+    my $q = $G->can('or_grok_block_plan')->(current_model => { provider => 'xai-oauth', default => 'grok-4.7' },
+        aliases => { code => 'xai-oauth/grok-4.7' }, current_fallback => [], auxiliary => {}, delegation => {}, supergrok => $open);
+    is scalar @{ $q->{why} }, 0, 'Super Grok config left alone';
+}
 done_testing();
