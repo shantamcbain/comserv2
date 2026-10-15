@@ -1,0 +1,118 @@
+{
+  "report_date": "2026-10-08",
+  "source": "Super Grok burn trace + burn alerts (Grok Bot)",
+  "created_by": "Grok Bot (executor)",
+  "created_at": "2026-10-08T19:12:00-07:00",
+  "summary": "About 41 points of Super Grok were used between the 10:31 PT reset and 19:05 PT. All of it came from 3 Hermes grok-4.7 TUI sessions: 324 calls, 62.9M tokens, 48% of calls with prompts over 200K. Top spender: 20261008_153835_360010 'Manage anycubic printer files' (3d worktree), 205 calls, 45.0M tokens, ~27-30 points. The big contexts came from the 500K window plus compression.threshold 0.95, which only compresses at ~471K. The token estimate now weights prompts over 200K at 1.3x and reads 41.3% vs the 41% meter. Burn alerts (more than 15 points per PT day, or more than 10 points ahead of pace after noon) now notify-send, show a banner on /ai/usage and add an inbox line. They would have fired at about 16:30 PT today.",
+  "metrics": {
+    "since": "Thu Oct 08 10:31 PT",
+    "until": "Thu Oct 08 19:05 PT",
+    "xai_calls": 324,
+    "mtok": 62.9,
+    "calls_prompt_ge_200k": 153,
+    "mtok_prompt_ge_200k": 40.0,
+    "sessions": [
+      {
+        "id": "20261008_153835_360010",
+        "title": "Manage anycubic printer files",
+        "cwd": "~/.comserv/worktrees/3d/Comserv",
+        "window_pt": "10:58-17:49",
+        "calls": 205,
+        "models": "grok-4.7 185, grok-build-0.1 20",
+        "in_m": 44.87,
+        "out_k": 142,
+        "cached_pct": 95,
+        "mtok": 45.01,
+        "est_pts": "26.7 flat / ~29 weighted"
+      },
+      {
+        "id": "20261008_183535_9a950f",
+        "title": "Fix android studio installation for barcode scanning",
+        "cwd": "~/.comserv/worktrees/InventoryAccounting/Comserv",
+        "window_pt": "11:39-19:04+",
+        "calls": 99,
+        "models": "grok-4.7",
+        "in_m": 15.11,
+        "out_k": 88,
+        "cached_pct": 95,
+        "mtok": 15.2,
+        "est_pts": "9.0 flat / ~10 weighted"
+      },
+      {
+        "id": "20261008_081656_7c3b53",
+        "title": "Git upstream not showing on github",
+        "window_pt": "10:56-11:01",
+        "calls": 20,
+        "models": "grok-4.7",
+        "in_m": 2.65,
+        "out_k": 18,
+        "cached_pct": 89,
+        "mtok": 2.66,
+        "est_pts": "1.6"
+      }
+    ],
+    "flat_estimate_pct": 37.3,
+    "weighted_estimate_pct": 41.3,
+    "meter_pct": 41,
+    "fit_cv_lc1_0": 0.09,
+    "fit_cv_lc1_3": 0.06,
+    "rate_pct_per_mtok": 0.551,
+    "alert_would_have_fired_pt": "~16:30 (estimate 18%)",
+    "hourly_mtok_pt": {
+      "10": 2.8,
+      "11": 13.4,
+      "12": 0.2,
+      "13": 2.1,
+      "15": 1.8,
+      "16": 21.5,
+      "17": 9.8,
+      "18": 10.5,
+      "19": 0.7
+    }
+  },
+  "proposals": [
+    {
+      "title": "Super Grok burn alerts: >15 points per PT day or >10 points ahead after noon -> notify-send + /ai/usage banner + eval inbox line",
+      "change_type": "code",
+      "target": "lib/Comserv/Util/AI/SuperGrokPacing.pm, lib/Comserv/Model/AI2/UsageMonitor.pm, root/ai/usage_pacing_card.tt, script/supergrok_pacing.pl (--alert), t/ai_supergrok_pacing.t",
+      "rationale": "Oct 8: 41 points burned with no warning. pacing() now returns day_rise_pct (from the later of PT midnight and the cycle start) and alerts. day_rise is critical above day_rise_pts (15). noon_ahead fires at or after noon_hour (12) when used minus straight-line expected exceeds noon_ahead_pts (10). Both are configurable in data/supergrok_pacing.json {\"alerts\":{\"day_rise_pts\":15,\"noon_ahead_pts\":10,\"noon_hour\":12,\"renotify_pts\":10}}. Cron every 10 min runs supergrok_pacing.pl --alert. It notifies once per kind per day (again after +10 points) with notify-send (DISPLAY :0 + user D-Bus), falls back to log only, and always writes data/supergrok_alerts.log, data/supergrok_alert_notice.txt and today's data/ai_eval_inbox/<date>-supergrok-pacing.json with an ALERT summary line. A stale meter (more than 24 h) still asks for a manual reading once a day. It never switches models and doesn't touch the guards. 65 tests pass. Fired for real at 19:08 PT.",
+      "payload": {
+        "status": "applied, uncommitted; cron installed",
+        "test": "http://localhost:4006/ai/usage#supergrok-pacing (red 'Super Grok burn warning' banner)",
+        "undo": "cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && for f in SuperGrokPacing.pm:lib/Comserv/Util/AI UsageMonitor.pm:lib/Comserv/Model/AI2 usage_pacing_card.tt:root/ai supergrok_pacing.pl:script ai_supergrok_pacing.t:t; do cp ~/.comserv/backups/aisystem-20261008/${f%%:*}.pre-r5 ${f#*:}/${f%%:*}; done; crontab -l | grep -v 'supergrok_pacing.pl --alert' | grep -v 'Super Grok burn alerts' | crontab -"
+      }
+    },
+    {
+      "title": "Estimator: weight prompts >= 200K tokens at 1.3x (Super Grok long-context)",
+      "change_type": "code",
+      "target": "lib/Comserv/Util/AI/SuperGrokPacing.pm call_weight",
+      "rationale": "xAI bills prompts of 200K+ at 2x. A sweep of the long-context weight over 8 reading intervals: CV 0.09 (1.0), 0.07 (1.2), 0.06 (1.3/1.4), 0.07 (1.5). At 1.3, the 10:31-19:05 burn estimates 41.1-41.3% vs the 41% meter; flat weighting gives 37.3%. Rate is now 0.551 %/M weighted tokens.",
+      "payload": {
+        "status": "applied, uncommitted",
+        "undo": "set $LONG_CTX_WEIGHT = 1.0 in lib/Comserv/Util/AI/SuperGrokPacing.pm (or restore SuperGrokPacing.pm.pre-r5)"
+      }
+    },
+    {
+      "title": "Seed Super Grok reading 41% at Thu Oct 8 19:04 PT",
+      "change_type": "other",
+      "target": "data/ai_usage_readings.jsonl",
+      "rationale": "Shanta's meter reading via the AI usage monitor. The live estimate just before seeding was 41.3%, so they agree.",
+      "payload": {
+        "status": "applied",
+        "undo": "cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && cp ~/.comserv/backups/aisystem-20261008/ai_usage_readings.jsonl.pre-r5 data/ai_usage_readings.jsonl"
+      }
+    },
+    {
+      "title": "Hermes: compress grok-4.x context below 200K (compression.model_thresholds grok-4: 0.38)",
+      "change_type": "config",
+      "target": "~/.hermes/config.yaml compression.model_thresholds",
+      "rationale": "The real burn driver. compression.threshold 0.95 x the 500K grok-4.7 window = 471K, so TUI prompts grew to 250-588K (153 of today's 324 calls were over 200K, 40M of 62.9M tokens), each billed at long-context weight. grok-build's 256K window used to cap this at ~243K. Hermes supports per-model thresholds (agent/context_compressor.py resolve_model_threshold). 0.38 x 500K = 190K keeps every call under the 200K tier. Estimated saving: roughly a third of today's burn for the same work. Trade-off: more frequent summaries in long sessions. Not applied; needs Shanta's OK.",
+      "payload": {
+        "status": "proposed",
+        "apply": "cp ~/.hermes/config.yaml ~/.hermes/config.yaml.bak-$(date +%Y%m%d-%H%M) && hermes config set compression.model_thresholds.grok-4 0.38",
+        "undo": "restore the config.yaml backup (or hermes config set compression.model_thresholds {})"
+      }
+    }
+  ],
+  "markdown": "Burn trace Oct 8: 3 grok-4.7 TUI sessions, 62.9M tokens, ~41 points; the anycubic/3d session is ~70% of it. No non-Hermes gap: the weighted estimate matches the meter. Alerts are live; the context-cap proposal needs approval."
+}

@@ -27,6 +27,7 @@ RECOMMENDED=(
     "gemma4:12b"
     "gemma4:4b"
     "llama3.1:latest"
+    "clef-flash:latest"
     "nimble:latest"
     "phi4:14b"
     "phi4-mini:3.8b"

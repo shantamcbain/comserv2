@@ -226,3 +226,8 @@ Comserv/root/static/android/
 # APK binaries are huge and rebuilt constantly — serve them from
 # /data/nfs/inventory-apks via symlink, keep out of git
 Comserv/root/static/app/*.apk
+# The Android app is its own project (canonical copy is the InventoryAccounting
+# worktree until it is extracted). Do not commit the source tree, Gradle output,
+# or a built APK dropped under the web static tree.
+/android/
+Comserv/root/static/android/

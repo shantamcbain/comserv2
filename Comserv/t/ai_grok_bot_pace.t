@@ -1,0 +1,16 @@
+use strict; use warnings; use Test::More;
+use Comserv::Util::AI::UsageEstimator;
+my $f = \&Comserv::Util::AI::UsageEstimator::grok_bot_pace;
+my $start = 1_791_816_720; my $reset = $start + 7 * 86400;
+my @rd = ({ consumer => 'grok_bot', at => $start, at_pt => 'Mon Oct 12 07:52 PT', kind => 'used', unit => '%', value => 1, reset_at => $reset });
+my $o = $f->(readings => \@rd, now => $start + 86400);
+is $o->{used_pct}, 1, 'readings only: latest used';
+is $o->{days_left}, 6, 'days left';
+is $o->{target_pct_per_day}, 14.3, '100/7';
+is $o->{pace}, 'behind', 'behind pace';
+$o = $f->(readings => \@rd, now => $start + 86400, est => { estimate => 16.6, reset_at => $reset, burn_per_hour => 0.65, burn_fmt => '0.7%/h', projection => 110.5, over_at_reset => 1 });
+is $o->{used_pct}, 16.6, 'uses burn estimate';
+is $o->{pace}, 'on_pace', 'on pace';
+like $o->{line}, qr/Grok Bot 16\.6% used.*reset .*6\.0 days left.*Soft pace 16\.6%\/day vs 14\.3%\/day.*Burn 0\.7%\/h, projected 110\.5% at reset - OVER/, 'line';
+ok !$f->(readings => [], now => time)->{ok}, 'no readings -> ok 0';
+done_testing;

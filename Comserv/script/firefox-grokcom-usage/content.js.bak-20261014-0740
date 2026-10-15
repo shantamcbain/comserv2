@@ -1,0 +1,101 @@
+/* Watch grok.com Settings → Usage. Read visible %. Never touch cookies. */
+(function () {
+    var timer = null;
+
+    function scrape() {
+        var text = (document.body && document.body.innerText) || '';
+        text = String(text).replace(/\s+/g, ' ');
+        var build = null;
+        var chat = null;
+        var m = text.match(/\bBuild\b[^%]{0,120}?(\d{1,3})\s*%/i);
+        if (m) build = Number(m[1]);
+        m = text.match(/\bChat\b[^%]{0,120}?(\d{1,3})\s*%/i);
+        if (m) chat = Number(m[1]);
+        if (build == null) {
+            m = text.match(/\b(coding|code)\b[^%]{0,120}?(\d{1,3})\s*%/i);
+            if (m) build = Number(m[2]);
+        }
+        // Oct 13 2026: Grok Bot % and its reset, when the Usage page shows them.
+        var bot = null, botReset = null;
+        m = text.match(/\b(?:Grok\s*)?Bot\b[^%]{0,120}?(\d{1,3}(?:\.\d)?)\s*%/i);
+        if (m) bot = Number(m[1]);
+        if (bot != null) {
+            var seg = text.slice(text.search(/\b(?:Grok\s*)?Bot\b/i), text.search(/\b(?:Grok\s*)?Bot\b/i) + 260);
+            var r = seg.match(/\bResets?\b[^A-Za-z0-9]{0,4}(?:on|in|at)?\s*([^%|]{3,60}?)(?=\s{2}|\.|$|\b(?:Build|Chat|Upgrade)\b)/i);
+            if (r) botReset = r[1].trim();
+        }
+        var botOk = typeof bot === 'number' && bot >= 0 && bot <= 100;
+        var buildOk = typeof build === 'number' && build >= 0 && build <= 100;
+        var chatOk = typeof chat === 'number' && chat >= 0 && chat <= 100;
+        if (!buildOk && !chatOk && !botOk) return null;
+        return {
+            build: buildOk ? build : null,
+            chat: chatOk ? chat : null,
+            bot: botOk ? bot : null,
+            bot_reset: botOk ? botReset : null,
+            href: location.href,
+            title: document.title || '',
+            at: new Date().toISOString()
+        };
+    }
+
+    function send() {
+        var row = scrape();
+        if (!row) return;
+        try { browser.runtime.sendMessage({ type: 'grokcom_usage', payload: row }); } catch (e) {}
+    }
+
+    function schedule() {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(send, 800);
+    }
+
+    // TEMP DEBUG Oct 14 2026
+    function debugDump() {
+        var root = document.querySelector('[role="dialog"]') || document.body;
+        var t = (root.innerText || '').slice(0, 2500);
+        if (!/%/.test(t)) return;
+        function hasMeter(n) {
+            return /%/.test(n.textContent || '') ||
+                !!n.querySelector('[role="progressbar"],[aria-valuenow]') ||
+                n.getAttribute('role') === 'progressbar' || n.hasAttribute('aria-valuenow');
+        }
+        function snippet(needle) {
+            var label = null;
+            root.querySelectorAll('*').forEach(function (n) {
+                var tc = n.textContent || '';
+                if (!label && tc.indexOf(needle) >= 0 && tc.length < 200) label = n;
+            });
+            if (!label) return '[' + needle + ' label not found]';
+            var box = label, pick = null;
+            for (var i = 0; i < 6 && box.parentElement; i++) {
+                box = box.parentElement;
+                if (hasMeter(box)) { pick = box; break; }
+            }
+            pick = pick || box;
+            return '(label <' + label.tagName.toLowerCase() + '>, up ' + i + ')\n' +
+                pick.outerHTML.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<svg[\s\S]*?<\/svg>/gi, '<svg/>').slice(0, 2000);
+        }
+        var bars = [];
+        root.querySelectorAll('[role="progressbar"],[aria-valuenow]').forEach(function (n) {
+            bars.push(n.tagName.toLowerCase() + ' valuenow=' + n.getAttribute('aria-valuenow') +
+                ' label=' + n.getAttribute('aria-label') + ' style=' + (n.getAttribute('style') || '').slice(0, 60) +
+                ' text=' + (n.textContent || '').replace(/\s+/g, ' ').slice(0, 60));
+        });
+        var dump = (root.getAttribute('role') === 'dialog' ? '[dialog]' : '[body]') + ' v1.4.3\n' + t +
+            '\n--- Grok Build ---\n' + snippet('Grok Build') +
+            '\n--- Weekly Grok Bot Limit ---\n' + snippet('Weekly Grok Bot Limit') +
+            '\n--- progressbars (' + bars.length + ') ---\n' + bars.join('\n');
+        fetch('http://127.0.0.1:4006/ai/usage_auto', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Comserv-Grokcom': '1' }, body: JSON.stringify({ debug_text: dump.slice(0, 8000) }) }).catch(function () {});
+    }
+    window.setInterval(debugDump, 10000);
+    send();
+    window.setInterval(send, 15000);
+    window.addEventListener('popstate', schedule);
+    window.addEventListener('hashchange', schedule);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) send(); });
+    var obs = new MutationObserver(schedule);
+    if (document.body) {
+        obs.observe(document.body, { childList: true, subtree: true, characterData: true });
+    }
+}());

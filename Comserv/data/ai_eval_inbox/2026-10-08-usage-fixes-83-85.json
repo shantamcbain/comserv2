@@ -1,0 +1,80 @@
+{
+ "report_date": "2026-10-08",
+ "source": "AI usage fixes #83 #85 + entry-point logging (Grok Bot)",
+ "created_by": "Grok Bot (executor)",
+ "created_at": "2026-10-08T09:00:00-07:00",
+ "summary": "#83: AI Editor/in-form helper sent provider=<OpenRouter id>, model='openrouter' (fields swapped). /ai/generate fell into the Ollama branch, and the admin manual model 'openrouter' went to Ollama. Fixed with provider/model normalization and an app-wide installed-model resolver (/api/tags cached 300 s; an uninstalled model falls back to gemma4-64k/qwen2.5-coder, never blocked). #85: there were 18 trips since Mon (17 thrash, 1 caps). 14 thrash trips were normal Super Grok agent loops (20-37 calls/15 min), all before the Wed ~07:12 PT change. After it the 3 trips were v4-pro (paid) and north-mini (free), so the change worked. The eval still showed it open because ingest always creates 'proposed' and the monitor's title differed. Thrash limits are now per provider and configurable (supergrok 240, openrouter_paid 30, openrouter_free 60, ollama 120, other 20). The agent.log mixed UTC/local timestamps that broke the live estimate and thrash counts are fixed. Usage logging: Controller::AI::_log_ai_usage was a stale copy with no branch/site/user tags. It now delegates to Model::AI::Usage. The git commit message, GitFix, TodoRank, CoA generate, ErrorAudit, grok_cli and query_form surfaces now write ledger rows.",
+ "metrics": {
+  "thrash_trips_since_mon": {
+   "total": 18,
+   "thrash": 17,
+   "caps": 1,
+   "on_supergrok_sessions": 14,
+   "after_supergrok_exclusion": 3,
+   "thrash_trips_under_new_limits": 0
+  },
+  "supergrok_calls_15min_now": 113,
+  "wed_v4pro_manual_model_switch_usd": 1.77
+ },
+ "resolves": [
+  {
+   "title": "Skip thrash trips when already on Super Grok",
+   "note": "Done Oct 7 ~07:12 PT (0 Super Grok trips since). Now per-provider limits supergrok 240/15min (runaway brake only), configurable in ~/.hermes/overrun_guard_limits.json."
+  },
+  {
+   "title": "Overrun guard: Super Grok calls excluded from thrash (eval proposal 3)",
+   "note": "Live since Oct 7; replaced Oct 8 by per-call per-provider thrash limits (session table mis-attributed switched sessions)."
+  },
+  {
+   "title": "Overrun guard: live per-call OpenRouter estimate + 1-min watcher + v4-pro near-cap trip",
+   "note": "Live; Oct 8 fix: agent.log lines are written in mixed UTC/local time, now parsed per line (anchor = file mtime)."
+  },
+  {
+   "title": "Fix AI Editor generate sending 'openrouter' as Ollama model",
+   "note": "Oct 8: OllamaModelResolver.normalize_provider_model in /ai/generate and /ai/chat + installed-model fallback in Ollama::Chat and AI2::Provider::Ollama. t/ai_ollama_model_resolver.t."
+  }
+ ],
+ "proposals": [
+  {
+   "title": "Ollama: only call installed models, fall back to an installed chat model (app-wide) + fix provider/model swap",
+   "change_type": "code",
+   "target": "lib/Comserv/Util/OllamaModelResolver.pm (new), lib/Comserv/Model/Ollama/Chat.pm, lib/Comserv/Model/AI2/Provider/Ollama.pm, lib/Comserv/Controller/AI.pm, t/ai_ollama_model_resolver.t",
+   "rationale": "Oct 7 11:52 PT on :3001: provider='nvidia/nemotron-3.5-lightning:free', model='openrouter' -> Ollama 'model openrouter not found' (same Sep 10 with cohere/north-mini). Resolver: /api/tags cached 300 s (failures 30 s); exact or :latest match; otherwise gemma4-64k:latest, qwen2.5-coder:14b, then the first non-decision/non-embed model. If tags are unreachable the request goes through unchanged (never blocks). Covers phi4:14b. 18 tests.",
+   "payload": {
+    "status": "applied, uncommitted; live on :4006 (auto-reload)",
+    "undo": "cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && git restore lib/Comserv/Model/Ollama/Chat.pm lib/Comserv/Model/AI2/Provider/Ollama.pm && rm lib/Comserv/Util/OllamaModelResolver.pm t/ai_ollama_model_resolver.t  (AI.pm also has the logging change below; restore it with: cp ~/.comserv/backups/aisystem-20261008/AI.pm.pre-logging lib/Comserv/Controller/AI.pm then git restore to drop both)"
+   }
+  },
+  {
+   "title": "Overrun guard: per-provider thrash limits (configurable) + mixed-timezone agent.log parsing",
+   "change_type": "code",
+   "target": "lib/Comserv/Util/AI/HermesOverrunGuard.pm, t/ai_hermes_overrun_guard.t (181 tests); override file ~/.hermes/overrun_guard_limits.json {\"thrash_per_15min\":{...}}",
+   "rationale": "20 calls/15 min tripped 14 times on normal Super Grok grok-build loops. Limits per class from agent.log per-call provider: supergrok 240, openrouter_paid 30, openrouter_free 60, ollama 120, other 20. A Super Grok thrash trip goes to free models first. agent.log switched to mixed UTC/local timestamps on Oct 7 13:03 UTC; parse_api_calls(anchor=>mtime) picks per line. Replaying the 18 trips reproduces the old counts exactly. Live via the every-minute cron (uses this worktree).",
+   "payload": {
+    "status": "applied, uncommitted; LIVE (cron)",
+    "undo": "cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && cp ~/.comserv/backups/aisystem-20261008/HermesOverrunGuard.pm.pre-r3 lib/Comserv/Util/AI/HermesOverrunGuard.pm && cp ~/.comserv/backups/aisystem-20261008/ai_hermes_overrun_guard.t.pre-r3 t/ai_hermes_overrun_guard.t"
+   }
+  },
+  {
+   "title": "Eval ingest: 'resolves' closes implemented code proposals; Revert reopens them",
+   "change_type": "code",
+   "target": "lib/Comserv/Model/AI2/EvalReports.pm, t/ai_eval_reports.t",
+   "rationale": "Root cause of 'still open': ingest always creates status 'proposed'; only the admin UI moves status, and the monitor's title differed from the implementer's. Now a report may carry resolves:[{title, note}]. Matching open (proposed/approved) code/workstation/other proposals in any report become 'applied' with the note in the audit trail. Config proposals are untouched (warning). Revert on an applied code proposal sets 'reverted' (button now shown).",
+   "payload": {
+    "status": "applied, uncommitted",
+    "undo": "cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && cp ~/.comserv/backups/aisystem-20261008/EvalReports.pm.pre-r3 lib/Comserv/Model/AI2/EvalReports.pm && cp ~/.comserv/backups/aisystem-20261008/ai_eval_reports.t.pre-r3 t/ai_eval_reports.t ; status undo per proposal: Revert on /ai/eval"
+   }
+  },
+  {
+   "title": "Usage ledger: every AI entry point logs to /ai/usage with branch/sitename/username",
+   "change_type": "code",
+   "target": "Controller/AI.pm, Model/AI2/Router.pm, Controller/Admin/Git.pm, Model/AI2/GitFix.pm, Model/AI2/TodoRank.pm, Util/Accounting/CoaAiGenerate.pm, Util/ErrorAudit.pm, t/ai_router_dispatch_usage.t",
+   "rationale": "Controller::AI::_log_ai_usage (used by /ai/generate and /ai/chat) was an old copy of Model::AI::Usage::log: no branch/site/user tags, no :free cost zeroing. It now delegates (one ledger). Surfaces with no ledger row unless routed to OpenRouter now pass dispatch_chat(log_usage=>purpose): git_commit_message, git_fix, todo_rank, coa_generate. ErrorAudit, AI Editor grok_cli (API + local CLI) and legacy query_form log directly. OpenRouter is skipped in log_dispatch_usage because the provider already writes an audit row.",
+   "payload": {
+    "status": "applied, uncommitted; live on :4006",
+    "undo": "cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && for f in Model/AI2/Router.pm Controller/Admin/Git.pm Model/AI2/TodoRank.pm Util/Accounting/CoaAiGenerate.pm Util/ErrorAudit.pm; do git restore lib/Comserv/$f; done && cp ~/.comserv/backups/aisystem-20261008/GitFix.pm.pre-logging lib/Comserv/Model/AI2/GitFix.pm && cp ~/.comserv/backups/aisystem-20261008/AI.pm.pre-logging lib/Comserv/Controller/AI.pm && rm t/ai_router_dispatch_usage.t"
+   }
+  }
+ ],
+ "markdown": "# AI usage fixes 2026-10-08\n\n## Thrash trips since Mon Oct 5 (replayed against agent.log, zone-fixed)\n\n| When (PT) | Kind | Calls/15 min | Class |\n|---|---|---|---|\n| Mon 07:30 | thrash | 21 | openrouter_paid |\n| Mon 08:45-12:50 (7 trips) | thrash | 20-29 | supergrok |\n| Tue 07:15, 07:35, 08:40, 08:50 | thrash | 20-37 | supergrok |\n| Tue 09:40 | caps | - | openrouter_paid |\n| Wed 06:25, 06:50 | thrash | 20 | supergrok |\n| Wed 10:00 | thrash | 20 | openrouter_paid (manual /model v4-pro, $1.77) |\n| Wed 17:46, 18:22 | thrash | 20-21 | openrouter_free |\n\nWith the new limits none of the 17 thrash trips would fire. Supergrok was at 113/15 min this morning with two agents running.\n"
+}

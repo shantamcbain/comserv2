@@ -1,0 +1,159 @@
+{
+  "report_date": "2026-10-10",
+  "source": "AI usage monitor",
+  "created_by": "Grok Bot (executor, Sat morning rerun)",
+  "created_at": "2026-10-10T07:51:27-07:00",
+  "compares_to": "2026-10-08",
+  "summary": "MIXED: daily Super Grok switch worked Fri (fired 09:30 at 5.7% budget \u2192 glm-5.3-flash; restored Sat 00:00 to grok-4.7). App quiet Fri\u2013Sat (0 real calls since Fri; 2 AI Editor generate errors Thu after Oct 8 report). 7d real ok_rate 72.7% (16/22) vs 90.7% \u2014 AI Editor bugs. OpenRouter day $0.17/$1.65, week $6.37/$11.50, month $25.63/$50, balance $11.40; no v4-pro since Fri. Super Grok est 59.6% (reading 54% Fri 08:12), +0.8% today vs 5.7% daily budget, still ahead of week pace (+32.6). Grok Bot spoken 50% Sat 06:47, 3 days left (stale until ~08:30); reset ~Mon Oct 12 08:00; soft ~17%/day; land ~58\u201380%. HelpDesk 25 open, 0 changes; CSC developer wakes 0.",
+  "markdown": "# Daily AI Eval - 2026-10-10 (~7:50 AM PT) \u2014 morning rerun\n\n**Answer: MIXED.** The daily Super Grok switch did its job Friday, and OpenRouter is under all caps. App chat was quiet, but 7-day real ok_rate fell (AI Editor generate bugs), and Super Grok is still far ahead of the week pace from Thursday/Friday burn. Saturday morning's first eval failed because the workstation was offline; this is the rerun with :4006/:3001 up (:5000 still down, skipped).\n\n## Budget\n- **OpenRouter** (auth key, ~7:46 AM PT): day **$0.17/$1.65**, week **$6.37/$11.50**, month **$25.63/$50**, balance **$11.40** (was $12.76 on Oct 8). Under all soft caps. No deepseek-v4-pro since Friday. Hermes logged ~$2.48 on z-ai/glm-5.3-flash Friday after the daily switch; week billed\u2013logged gap ~$2.63 (not a new Relace spike today).\n- **Super Grok**: last spoken reading **54% used** (Fri Oct 9 08:12 PT). Token estimate now **~59.6%** used (~40.4% left), **+0.8% today** vs daily budget **5.7%**. Pace **ahead** (expected ~27%, delta **+32.6**). Reset **Thu Oct 15 10:31 PT** (~5.1 days). Daily switch: **fired Fri 09:30** (today 5.7% \u2265 budget \u2192 openrouter/z-ai/glm-5.3-flash); **restored Sat 00:00** to xai-oauth/grok-4.7. Mode this morning: **grok**, not locked. grok.com add-on still stale (~97h); signing abandoned.\n- **Grok Bot** (spoken Sat Oct 10 06:47 AM PT): **50% used**, meter shows **3 days left** (days-left updates ~08:30 each morning). Reset **~Mon Oct 12 ~8 AM PT**. Burn: 31% (Thu 08:21) \u2192 46% (Fri 08:12) \u2192 50% (Sat 06:47). Soft room **~17%/day**. Projected at reset **~58%** (light ~4%/day) to **~80%** (another heavy ~15%/day). No early-warning trip yet; a second 15-point day would be tight. CSC developer HelpDesk line: **0** wakes since last report.\n- **HelpDesk**: **25 open**, **0** status/create changes since Fri; unchanged from Oct 8.\n\n## Scorecard\n- App since Fri (excluding hermes status / guard / snapshot): **0 real calls**. Since Oct 8 report: **2** AI Editor generate errors Thu 15:53 PT \u2014 clef-flash \"does not support chat\", and OpenRouter \"Please log in\". Cost $0.\n- 7d real app ok_rate **72.7% (16/22)** vs Oct 8's **90.7%**. Failure buckets: openrouter-as-Ollama (2, Wed), phi4:14b not found (2, Mon), clef-flash/login (2, Thu). No app thrash.\n- Hermes since Fri: **6 sessions** (+1 open Android-branch TUI on glm). API by model: glm-5.3-flash **290**, grok-4.7 **89**, grok-build-0.1 **19**, north-mini:free **2**, nemotron-lightning:free **6**. Default now **xai-oauth/grok-4.7**. Est OpenRouter cost ~$2.48 (glm).\n- Overrun guard since Fri: **5 thrash trips**, all restored (06:10/06:15 grok-4.7\u2194build; 10:09/10:34/15:29 glm paid thrash \u2192 north-mini, restore glm). Targets valid.\n- Super Grok daily switch: **yes, fired** Fri; restored overnight. Today under budget (0.8/5.7).\n- Tasks: Fri desktop-after-upgrade + Hermes :9101 fixes; Android barcode/update branch continued on glm; Sat morning guest/planning access session on grok-4.7 (~06:24\u201307:09). Daily switch code live on :4006 (uncommitted). :4006 hand-started after power outage; :5000 still down. No new aisystem commits.\n\n## Proposals (top)\n1. Auto-start aisystem :4006 (and :5000) after reboot/power loss so the morning eval and pacing API stay up.\n2. Fix AI Editor generate provider routing (still sends 'openrouter' / non-chat Ollama models; login gate for OpenRouter).\n3. Cap grok-4.7 context compress earlier (~190K) so heavy TUI days don't burn past the 5.7% daily Super Grok budget before the switch can help open sessions.\n",
+  "metrics": {
+    "app": {
+      "since_prev_real_calls": 2,
+      "since_prev_ok": 0,
+      "since_fri_real_calls": 0,
+      "ok_rate_7d_excl_guard": 72.7,
+      "prev_ok_rate_7d_excl_guard": 90.7,
+      "errors": [
+        {
+          "model": "ai_editor generate / ollama clef-flash",
+          "count": 1,
+          "reason": "Ollama query failed: \"clef-flash:latest\" does not support chat"
+        },
+        {
+          "model": "ai_editor generate / openrouter",
+          "count": 1,
+          "reason": "Please log in to use external AI models (OpenRouter)."
+        }
+      ],
+      "thrash_windows": 0,
+      "cost_since_prev": 0.0,
+      "note": "since_prev = since Oct 8 full report (no Oct 9 full monitor). Fri\u2013Sat real app calls = 0; Oct 9/10 by_day rows are hermes status only."
+    },
+    "openrouter": {
+      "day_usd": 0.1661,
+      "week_usd": 6.3688,
+      "month_usd": 25.6274,
+      "balance_usd": 11.3981,
+      "billed_since_prev_report_usd": 1.36,
+      "hermes_est_fri_usd": 2.482,
+      "caps": {
+        "day_usd": 1.65,
+        "week_usd": 11.5,
+        "month_usd": 50
+      },
+      "over_caps": [],
+      "v4_pro_used": false,
+      "v4_pro_calls": 0,
+      "relace_suspected": false,
+      "week_billed_vs_logged_gap_usd": 2.63
+    },
+    "hermes": {
+      "sessions_since_fri": 6,
+      "default_model": "xai-oauth/grok-4.7",
+      "api_calls_by_model": {
+        "z-ai/glm-5.3-flash": 290,
+        "grok-4.7": 89,
+        "grok-build-0.1": 19,
+        "nvidia/nemotron-3.5-lightning:free": 6,
+        "cohere/north-mini-code:free": 2
+      },
+      "guard_trips_since_fri": 5,
+      "guard_thrash_trips": 5,
+      "guard_cap_trips": 0,
+      "guard_targets_valid": true,
+      "supergrok_daily_switch_fired": true,
+      "supergrok_daily_switch_events": [
+        "Fri Oct 9 09:30 PT OFF -> openrouter/z-ai/glm-5.3-flash (today 5.7% >= budget 5.7%)",
+        "Sat Oct 10 00:00 PT ON -> xai-oauth/grok-4.7 (new PT day)"
+      ],
+      "supergrok_guard_switch_model": "openrouter/z-ai/glm-5.3-flash",
+      "open_sessions": 1,
+      "open_session_note": "20261009_155425_ac40e9 Android branch TUI on glm-5.3-flash, inactive"
+    },
+    "supergrok": {
+      "last_reading_pct_used": 54,
+      "last_reading_at_pt": "Fri Oct 09 08:12 PT",
+      "estimate_pct_used": 59.6,
+      "day_rise_pct": 0.8,
+      "daily_budget_pct": 5.7,
+      "daily_remaining_pct": 4.9,
+      "pace": "ahead",
+      "pace_delta": 32.6,
+      "expected_pct": 27.0,
+      "addon_meter_stale_h": 96.8,
+      "reset_at": "2026-10-15T10:31:00-07:00",
+      "estimated": true,
+      "mode": "grok",
+      "off_today": false
+    },
+    "bot": {
+      "last_reading": "50% used Sat 2026-10-10 06:47 PT, 3 days left (days-left updates ~08:30)",
+      "reset_estimate": "Mon 2026-10-12 ~08:00 PT",
+      "burn_observed": "31% (Thu 08:21) -> 46% (Fri 08:12) -> 50% (Sat 06:47)",
+      "burn_fri_to_sat_pct": 4,
+      "burn_thu_to_fri_pct": 15,
+      "estimated_now_pct": 50,
+      "days_left": 3,
+      "days_left_note": "meter figure stale until ~08:30; expect ~2 after update",
+      "soft_room_pct_day": 17,
+      "projected_at_reset_pct": "58 (light ~4%/day) to 80 (heavy ~15%/day)",
+      "early_warning": false,
+      "early_warning_note": "A second ~15-point day would land near/over soft room into Monday",
+      "estimated": false,
+      "reading_requested": false,
+      "csc_developer_line": "0 CSC developer HelpDesk wakes since last report (estimator bot_burn.since.csc_helpdesk=0)"
+    },
+    "helpdesk": {
+      "open": 25,
+      "changes": 0,
+      "checked_at_pt": "Sat Oct 10 07:50 PT",
+      "csc_developer_bot_cost": "none; 0 CSC developer audit/ingest events since last report",
+      "source": "ency.support_tickets via production_forager DB"
+    },
+    "ports": {
+      "4006": "up (hand-started after outage)",
+      "3001": "up",
+      "5000": "down (skipped)"
+    },
+    "eval_note": "06:35 PT run failed (workstation offline). This is the rerun."
+  },
+  "proposals": [
+    {
+      "title": "Auto-start aisystem :4006 (and :5000) after reboot/power loss",
+      "change_type": "workstation",
+      "target": "systemd user unit or Comserv startup for :4006/:5000",
+      "rationale": "Sat 06:35 daily eval failed while workstation was offline/ports down; :4006 was hand-started; :5000 still down. Pacing JSON and ingest need :4006.",
+      "payload": {}
+    },
+    {
+      "title": "Fix AI Editor generate provider/model routing",
+      "change_type": "code",
+      "target": "AI Editor generate (Ollama/OpenRouter path)",
+      "rationale": "Still failing: Wed 'openrouter' as Ollama model; Thu clef-flash non-chat + OpenRouter login gate. Drove 7d real ok_rate 90.7%->72.7%.",
+      "payload": {}
+    },
+    {
+      "title": "Compress grok-4.7 sessions earlier (~190K tokens)",
+      "change_type": "config",
+      "target": "~/.hermes/config.yaml compression / context for xai-oauth grok-4.7",
+      "rationale": "Thu/Fri Super Grok burn left week +32.6 ahead of pace. Daily switch helps new sessions but open TUI keeps the model; earlier compress cuts $/MTok before the 5.7% day budget trips.",
+      "payload": {
+        "compress_at_tokens": 190000
+      }
+    },
+    {
+      "title": "Remove or pull ollama phi4:14b from app chain",
+      "change_type": "config",
+      "target": "app Ollama chain",
+      "rationale": "Carried forward; 2 not-found errors still in 7d window.",
+      "payload": {}
+    },
+    {
+      "title": "Reload or permanently sign grok.com usage add-on",
+      "change_type": "workstation",
+      "target": "Firefox add-on comserv_grokcom_usage",
+      "rationale": "Carried forward; meter stale ~97h. Signing blocked on AMO issuer; user paused. Spoken readings remain source of truth.",
+      "payload": {}
+    }
+  ]
+}

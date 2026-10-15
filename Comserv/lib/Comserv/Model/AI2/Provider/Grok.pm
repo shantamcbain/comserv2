@@ -15,6 +15,7 @@ use Comserv::Util::Logging;
 # Used when the live /v1/models call fails but the prepaid OAuth token is present
 # so the picker still offers the same set this workstation chats with.
 my @SUPERGROK_CHAT_FALLBACK = qw(
+    grok-4.7
     grok-4.6
     grok-build-0.1
     grok-4.3
@@ -314,6 +315,17 @@ sub list_models {
     }
     return { success => 0, error => 'No active SuperGrok/Grok credential found' } unless $api_key;
 
+    # eval #33: when the live list fails (OAuth often 403s /v1/models) the
+    # page poll retried every ~20 s, waiting up to 8 s and logging a warning
+    # each time (1,846 warnings in 7 days). Remember the failure for 15 min.
+    our %LIVE_FAIL_UNTIL;
+    my $fail_key = $mode . '|' . substr($api_key, -6);
+    if (($LIVE_FAIL_UNTIL{$fail_key} || 0) > time && $self->is_prepaid_source) {
+        my @out = $self->_label_models(@SUPERGROK_CHAT_FALLBACK);
+        return { success => 1, models => \@out, count => scalar @out,
+                 source => $self->{_last_cred_source} || '', fallback => 1 };
+    }
+
     my $ua  = LWP::UserAgent->new(timeout => 8);
     my $res = try {
         $ua->get('https://api.x.ai/v1/models',
@@ -342,9 +354,11 @@ sub list_models {
     # catalog). Still offer the Hermes SuperGrok chat set so the picker works.
     if ($self->is_prepaid_source) {
         my @out = $self->_label_models(@SUPERGROK_CHAT_FALLBACK);
+        $LIVE_FAIL_UNTIL{$fail_key} = time + 15 * 60;
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
             'grok_list_models',
-            'Live x.AI model list failed; using SuperGrok prepaid fallback catalog');
+            'Live x.AI model list failed (HTTP ' . ($res ? $res->code : 'none')
+            . '); using SuperGrok prepaid fallback catalog for 15 min');
         return { success => 1, models => \@out, count => scalar @out,
                  source => $self->{_last_cred_source} || '', fallback => 1 };
     }

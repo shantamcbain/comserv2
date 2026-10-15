@@ -258,7 +258,7 @@ sub daily_model_summary {
         my $since = DateTime->now->subtract(days => $days)->ymd . ' 00:00:00';
         my $rs = $schema->resultset('AiUsageLog')->search({
             created_at    => { '>=' => $since },
-            request_type  => { -not_in => [qw(grok_balance_check provider_snapshot)] },
+            request_type  => { -not_in => [qw(grok_balance_check provider_snapshot openrouter_call)] },
         }, { order_by => { -desc => 'created_at' }, rows => 2000 });
         my %by;
         while (my $log = $rs->next) {
@@ -411,7 +411,7 @@ sub supergrok_month_status {
         my $rs = $schema->resultset('AiUsageLog')->search({
             provider     => 'supergrok',
             created_at   => { '>=' => $start },
-            request_type => { -not_in => [qw(grok_balance_check provider_snapshot)] },
+            request_type => { -not_in => [qw(grok_balance_check provider_snapshot openrouter_call)] },
             status       => 'success',
         });
         while (my $row = $rs->next) {
@@ -456,7 +456,7 @@ sub grok_month_status {
         my $rs = $schema->resultset('AiUsageLog')->search({
             provider     => 'grok',
             created_at   => { '>=' => $start },
-            request_type => { -not_in => [qw(grok_balance_check provider_snapshot)] },
+            request_type => { -not_in => [qw(grok_balance_check provider_snapshot openrouter_call)] },
             status       => 'success',
         });
         while (my $row = $rs->next) {
