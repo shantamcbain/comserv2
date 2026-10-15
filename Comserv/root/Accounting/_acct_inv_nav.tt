@@ -28,6 +28,8 @@
   <a href="/Inventory/seed_filaments?sitename=[% sitename | uri %]" style="color:#fcd34d;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;" title="Seed/update filament inventory">&#128230; Seed Filaments</a>
   <span style="color:#475569;">|</span>
   <a href="/Accounting/setup" style="color:#fcd34d;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;" title="Site configuration">&#9881; Setup</a>
+  <span style="color:#475569;">|</span>
+  <a href="/static/app/ComservInventory.apk" style="color:#86efac;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;" title="Download the inventory phone app">Phone app</a>
 </nav>
 
 <!-- NEW: AI Vision Testing Navigation -->

@@ -217,8 +217,14 @@ Comserv/data/ai_hermes_overrun*.json
 Comserv/root/static/ai/*usage*.json*
 Comserv/root/static/ai/*monitor*.json*
 
-# Android inventory app APK binaries are huge (35MB+) and rebuilt constantly —
-# serve them from /data/nfs/inventory-apks via symlink, keep out of git
+# Phone app source lives in its own repo:
+# /home/shanta/PycharmProjects/comserv-inventory-android
+# Do not re-add the Gradle project or its build output here.
+/android/
+Comserv/root/static/android/
+
+# APK binaries are huge and rebuilt constantly — serve them from
+# /data/nfs/inventory-apks via symlink, keep out of git
 Comserv/root/static/app/*.apk
 # The Android app is its own project (canonical copy is the InventoryAccounting
 # worktree until it is extracted). Do not commit the source tree, Gradle output,
