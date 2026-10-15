@@ -46,7 +46,16 @@
         <div class="card-header">#[% p.id | html %] · [% p.title | html %]
           · <strong>[% p.status | html %]</strong> · [% p.change_type | html %]</div>
         <div class="card-body">
-          [% IF p.rationale %]<p class="doc-body" style="white-space:pre-wrap;">[% p.rationale | html %]</p>[% END %]
+          [%# Problem / Impact / Solution / Risk (Oct 10 2026) %]
+          <table class="data-table" style="margin-bottom:8px;">
+            <tbody>
+              [% FOREACH f IN ['problem','impact','solution','risk'] %]
+              <tr><th style="width:9em">[% f == 'risk' ? 'Risk / undo' : f.ucfirst %][% IF p.format.derived.grep('^' _ f _ '$').size %] <small class="doc-muted">(derived)</small>[% END %]</th>
+                  <td style="white-space:pre-wrap;">[% p.format.$f | html %]</td></tr>
+              [% END %]
+            </tbody>
+          </table>
+          [% IF p.rationale && p.format.derived.grep('^problem$').size == 0 %]<details><summary>Original rationale</summary><p class="doc-body" style="white-space:pre-wrap;">[% p.rationale | html %]</p></details>[% END %]
           <table class="data-table">
             <tbody>
               <tr><th>Target</th><td><code>[% p.target || '—' | html %]</code>

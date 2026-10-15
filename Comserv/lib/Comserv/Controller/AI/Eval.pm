@@ -138,7 +138,37 @@ sub index :Path :Args(0) {
         allow_list  => $m->allow_list($c)->describe,
         auto_changes => $m->auto_changes($c, limit => 30),
         latest_eval  => $m->latest_summary($c),
+        # Super Grok meter >24 h stale -> ask for a manual reading (Oct 8 2026).
+        supergrok_meter => (eval { require Comserv::Model::AI2::UsageMonitor; Comserv::Model::AI2::UsageMonitor->new->supergrok_meter($c) } || undef),
+        # Model scorecard (Oct 10 2026), cached 10 min; ?scorecard_refresh=1 forces.
+        scorecard => (eval { $self->_scorecard($c)->build(force => ($c->req->params->{scorecard_refresh} ? 1 : 0)) } || { error => "$@" }),
+        # Cost per Done task from rated Hermes tasks (/ai/tasks, eval #36).
+        task_cost => (eval { require Comserv::Model::AI2::TaskTracker;
+            my $r = ''.$c->path_to(''); $r =~ s{/$}{};
+            Comserv::Model::AI2::TaskTracker->new(root => $r)->build } || { error => "$@" }),
     );
+}
+
+sub _scorecard {
+    my ($self, $c) = @_;
+    require Comserv::Model::AI2::ModelScorecard;
+    return Comserv::Model::AI2::ModelScorecard->new(root => $c->config->{home} || $c->path_to('')->stringify);
+}
+
+=head2 scorecard_weights
+
+POST /ai/eval/scorecard_weights - edit the cost-per-result weights
+(data/ai_model_scorecard.json). Admin + CSRF.
+
+=cut
+
+sub scorecard_weights :Local :Args(0) {
+    my ($self, $c) = @_;
+    my $back = $c->uri_for('/ai/eval');
+    return unless $self->_post_guard($c, $back);
+    my $err = $self->_scorecard($c)->save_config($c->req->body_params, $self->_username($c));
+    $c->flash->{ $err ? 'ai_eval_err' : 'ai_eval_msg' } = $err ? "Scorecard weights not saved: $err" : 'Scorecard weights saved.';
+    $c->response->redirect($back . '#model-scorecard');
 }
 
 =head2 latest

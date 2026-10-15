@@ -85,40 +85,41 @@ ok($p eq 'openrouter' || $p eq 'external', 'non-grok OpenRouter is openrouter (l
     is($seen, $msgs, 'fallback hop received the original messages array (Task Assistant prompt intact)');
 }
 
-# 429 on a Google :free model must try a different family before the sibling
-# in the same upstream pool, and must keep going until a hop answers.
+# 429 on a Google :free model: chat_with_fallback walks the purpose chain
+# (data/ai_model_chains.json, AISYSTEM plan 5e), not fallback_hops(). The
+# chain below mirrors the live order (north-mini-code -> nemotron-3.5-lightning
+# -> ollama), which matches the Hermes fallback order. Gemma is in "removed"
+# in the live file, so it must never be the next hop. (eval #32)
 {
     my @tried;
     no warnings 'redefine';
-    local *Comserv::Model::AI2::Router::fallback_hops = sub {
-        return (
-            { provider => 'openrouter', model => 'nvidia/nemotron-3-nano-30b-a3b:free' },
-            { provider => 'openrouter', model => 'google/gemma-4-31b-it:free' },
-            { provider => 'ollama', model => 'phi4:14b' },
-        );
-    };
+    require Comserv::Util::AI::ModelChains;
+    require Comserv::Util::AI::ModelHealth;
+    my $d = Comserv::Util::AI::ModelChains->perl_default;
+    $d->{chain_chat} = [
+        'openrouter|cohere/north-mini-code:free',
+        'openrouter|nvidia/nemotron-3.5-lightning:free',
+        'ollama|auto',
+    ];
+    $d->{removed} = [ 'openrouter|google/gemma-4-31b-it:free' ];
     local *Comserv::Model::AI2::Router::_chat_one_with_retry = sub {
         my ($self, $c, $provider_name, $use_model) = @_;
         push @tried, "$provider_name/$use_model";
         if (($use_model // '') =~ /gemma/) {
-            return {
-                success => 0,
-                error   => 'OpenRouter provider error: 429 Too Many Requests',
-                provider => $provider_name,
-            };
+            return { success => 0, error => 'OpenRouter provider error: 429 Too Many Requests',
+                     provider => $provider_name };
         }
-        return {
-            success  => 1,
-            response => 'ok',
-            provider => $provider_name,
-            model    => $use_model,
-        };
+        return { success => 1, response => 'ok', provider => $provider_name, model => $use_model };
     };
     my $out = $r->chat_with_fallback(undef, 'openrouter', 'google/gemma-4-26b-a4b-it:free',
-        [ { role => 'user', content => 'hi' } ]);
-    ok($out && $out->{success}, '429 on gemma falls through to a different family');
-    is($out->{model}, 'nvidia/nemotron-3-nano-30b-a3b:free', 'first successful hop is nemotron, not the other gemma');
-    is($tried[1], 'openrouter/nvidia/nemotron-3-nano-30b-a3b:free', 'sibling gemma is not the first fallback hop');
+        [ { role => 'user', content => 'hi' } ],
+        chains  => { data => $d, source => 'file' },
+        health  => Comserv::Util::AI::ModelHealth->new(path => undef),
+        signals => { verdicts => {}, anomalies => [] },
+        guard   => { locked => 0 });
+    ok($out && $out->{success}, '429 on gemma falls through to the chain');
+    is($out->{model}, 'cohere/north-mini-code:free', 'first successful hop is chain step 1 (north-mini-code)');
+    ok(!grep({ /gemma-4-31b/ } @tried), 'removed sibling gemma is never tried');
 }
 
 {

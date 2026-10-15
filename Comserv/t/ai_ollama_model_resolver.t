@@ -1,0 +1,31 @@
+use strict; use warnings; use Test::More;
+use Comserv::Util::OllamaModelResolver;
+my $R = 'Comserv::Util::OllamaModelResolver';
+my @inst = qw(clef-flash:latest nimble:latest tev1:0.8b tev1:latest gemma4-64k:latest qwen2.5-coder:14b nomic-embed-text:latest);
+no strict 'refs';
+my $res = \&{"${R}::resolve"};
+my $norm = \&{"${R}::normalize_provider_model"};
+is_deeply([ $res->('qwen2.5-coder:14b', \@inst) ], ['qwen2.5-coder:14b', ''], 'exact installed');
+is(( $res->('gemma4-64k', \@inst) )[0], 'gemma4-64k:latest', ':latest added');
+my ($m, $note) = $res->('phi4:14b', \@inst);
+is($m, 'gemma4-64k:latest', 'uninstalled phi4 -> preferred chat model');
+like($note, qr/phi4:14b.*not installed/, 'note explains fallback');
+is(( $res->('openrouter', \@inst) )[0], 'gemma4-64k:latest', 'provider token never used as Ollama model');
+is(( $res->('nvidia/nemotron-3.5-lightning:free', \@inst) )[0], 'gemma4-64k:latest', 'OpenRouter id never used as Ollama model');
+is(( $res->('nimble:latest', \@inst) )[0], 'nimble:latest', 'decision model allowed when explicitly requested');
+is(( $res->('phi4:14b', [qw(nimble:latest tev1:0.8b nomic-embed-text:latest llama3.1:8b)]) )[0], 'llama3.1:8b', 'fallback skips decision/embedding models');
+is(( $res->('phi4:14b', [qw(nimble:latest nomic-embed-text:latest)]) )[0], undef, 'no chat model -> undef (caller keeps request)');
+is(( $res->('phi4:14b', []) )[0], undef, 'empty installed -> undef');
+# resolve_for_host: tags unreadable -> unchanged (never block Ollama)
+$Comserv::Util::OllamaModelResolver::INSTALLED_CACHE{'h:1'} = [ time, undef ];
+is_deeply([ &{"${R}::resolve_for_host"}('h', 1, 'phi4:14b') ], ['phi4:14b', ''], 'tags unavailable -> request unchanged');
+$Comserv::Util::OllamaModelResolver::INSTALLED_CACHE{'h:2'} = [ time, [@inst] ];
+is(( &{"${R}::resolve_for_host"}('h', 2, 'openrouter') )[0], 'gemma4-64k:latest', 'cached tags used');
+# Bug #83: provider/model swapped by the in-form helper
+is_deeply([ $norm->('nvidia/nemotron-3.5-lightning:free', 'openrouter') ], ['openrouter', 'nvidia/nemotron-3.5-lightning:free'], 'Oct 7 swapped pair fixed');
+is_deeply([ $norm->('ollama', 'phi4:14b') ], ['ollama', 'phi4:14b'], 'normal ollama unchanged');
+is_deeply([ $norm->('openrouter', 'z-ai/glm-5.3-flash') ], ['openrouter', 'z-ai/glm-5.3-flash'], 'normal openrouter unchanged');
+is_deeply([ $norm->('grok', 'openrouter') ], ['grok', ''], 'bare token model with known provider -> model cleared');
+is_deeply([ $norm->('ollama', 'openrouter') ], ['openrouter', ''], 'ollama + bare openrouter -> openrouter, no model');
+is_deeply([ $norm->('cohere/north-mini-code:free', '') ], ['openrouter', 'cohere/north-mini-code:free'], 'model id sent as provider');
+done_testing;

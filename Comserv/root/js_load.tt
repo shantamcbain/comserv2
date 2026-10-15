@@ -241,6 +241,7 @@
 <script src="/static/js/planning/daily-plan-gantt.js?v=[% cv %]" defer></script>
 <script src="/static/js/planning/daily-plan-deploy-center.js?v=[% cv %]" defer></script>
 <script src="/static/js/planning/daily-plan-utils.js?v=[% cv %]" defer></script>
+<script src="/static/js/planning/decision-resort.js?v=[% cv %]" defer></script>
 <script src="/static/js/project/project-search.js?v=[% cv %]" defer></script>
 [% END %]
 

@@ -1,0 +1,73 @@
+{
+  "report_date": "2026-10-09",
+  "source": "Super Grok daily switch (Grok Bot)",
+  "created_by": "Grok Bot (executor)",
+  "created_at": "2026-10-09T08:20:00-07:00",
+  "summary": "Daily Super Grok switch. supergrok_daily_guard.py (cron every 5 min) is the single switch owner. It reads daily_budget from the aisystem app (new GET /ai/usage_pacing_json): budget = (week_off_at 90 - used% at PT midnight) / days left. Today: (90-53.0)/6.44 = 5.7%/day; 1.0% used so far; live 54.0% matches the 54% reading. When today's use reaches the budget, Hermes default + code/coder -> openrouter/z-ai/glm-5.3-flash and the grok-build fallback is dropped. It restores grok-4.7 + grok-build fallback on the first run after midnight PT. The overrun guard restore now respects the daily lock.",
+  "metrics": {
+    "budget_pct": 5.7,
+    "used_today_pct": 1.0,
+    "used_day_start_pct": 53.0,
+    "days_left_at_day_start": 6.44,
+    "live_used_pct": 54.0,
+    "reading_pct": 54,
+    "rate_pct_per_mtok": 0.57,
+    "would_switch_now": false,
+    "openrouter_glm": "z-ai/glm-5.3-flash $0.15/M in, $0.50/M out, 1M ctx (Relace in provider list but ignored by provider_routing)"
+  },
+  "proposals": [
+    {
+      "title": "Super Grok daily budget in pacing + /ai/usage_pacing_json + banner",
+      "change_type": "code",
+      "target": "lib/Comserv/Util/AI/SuperGrokPacing.pm, lib/Comserv/Model/AI2/UsageMonitor.pm, lib/Comserv/Controller/AI/Usage.pm, root/ai/usage_pacing_card.tt, t/ai_supergrok_pacing.t",
+      "rationale": "daily_budget() is pure. It uses (week_off_at - used at PT midnight) / fractional days left. The day-start value is normalized to readings: when there is a reading on each side of midnight, the meter delta is split by weighted tokens (1.3x for prompts over 200K). Overrides live in data/supergrok_pacing.json under \"daily\": week_off_at, extra_today_pct + extra_today_date, allow_overrun_date. allow_overrun releases the daily lock only; the week cutoff still applies. The card shows a 'Daily budget' row and a red banner when the budget is used: open sessions keep their model, so run /model glm. GET /ai/usage_pacing_json (same access as usage_live) returns just this block for the guard.",
+      "payload": {
+        "status": "applied, uncommitted; live on :4006",
+        "test": "http://localhost:4006/ai/usage#supergrok-pacing and http://127.0.0.1:4006/ai/usage_pacing_json",
+        "undo": "cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && for f in SuperGrokPacing.pm:lib/Comserv/Util/AI UsageMonitor.pm:lib/Comserv/Model/AI2 Usage.pm:lib/Comserv/Controller/AI usage_pacing_card.tt:root/ai ai_supergrok_pacing.t:t; do cp ~/.comserv/backups/aisystem-20261009/${f%%:*}.pre-r6 ${f#*:}/${f%%:*}; done"
+      }
+    },
+    {
+      "title": "supergrok_daily_guard.py: daily switch to openrouter/z-ai/glm-5.3-flash from app numbers; midnight restore to grok-4.7",
+      "change_type": "config",
+      "target": "~/.hermes/scripts/supergrok_daily_guard.py, ~/.hermes/scripts/test_supergrok_daily_guard.py",
+      "rationale": "The guard is the single owner of the switch. It uses supergrok_pacing.daily_budget instead of the add-on meter (stale: Build 1/40%) and the flat 0.05%/call estimate. The old 'yesterday over cap' rule is retired; yesterday's overspend is already in the smaller budget. When the budget is used, the lock is sticky for the PT day. The switch sets provider/default/base_url/api_mode, sets code/coder to openrouter/z-ai/glm-5.3-flash, and removes the xai grok-build fallback, leaving north-mini/nemotron :free and then Ollama. It never writes v4-pro. On a new PT day, or an override for today, it restores grok-4.7, the code/coder aliases and the grok-build fallback. If the app is down it keeps an existing lock and takes no new one. Each switch sends notify-send telling Shanta to run /model glm (or /model code on restore) in open sessions, writes ~/.hermes/supergrok_notice.txt, adds an inbox line in data/ai_eval_inbox/<date>-supergrok-daily-switch.json, and writes a ledger row. 24 python tests pass (4 stale tests updated).",
+      "payload": {
+        "status": "applied (cron */5 unchanged)",
+        "undo": "cp ~/.hermes/scripts/supergrok_daily_guard.py.bak-20261009-0814 ~/.hermes/scripts/supergrok_daily_guard.py && cp ~/.hermes/scripts/test_supergrok_daily_guard.py.bak-20261009-0814 ~/.hermes/scripts/test_supergrok_daily_guard.py (if a switch happened: cp ~/.hermes/config.yaml.bak-20261009-0814 ~/.hermes/config.yaml)"
+      }
+    },
+    {
+      "title": "Overrun guard restore respects the daily Super Grok lock",
+      "change_type": "code",
+      "target": "lib/Comserv/Util/AI/HermesOverrunGuard.pm (supergrok_daily_off, build_restore_plan), t/ai_hermes_overrun_guard.t",
+      "rationale": "If the overrun guard trips while on grok-4.7 and the daily lock is taken during the trip, restore now writes the daily guard's cheap model (from supergrok_guard_state.json switch_*), sets code/coder to the same model, and drops Super Grok from the fallback (already done via supergrok_available). This happens only while lock_date is today PT; on the next day it restores grok-4.7 as before. 191 tests pass.",
+      "payload": {
+        "status": "applied, uncommitted",
+        "undo": "cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && cp ~/.comserv/backups/aisystem-20261009/HermesOverrunGuard.pm.pre-r6 lib/Comserv/Util/AI/HermesOverrunGuard.pm && cp ~/.comserv/backups/aisystem-20261009/ai_hermes_overrun_guard.t.pre-r6 t/ai_hermes_overrun_guard.t"
+      }
+    },
+    {
+      "title": "Seed Super Grok reading 54% at Fri Oct 9 08:12 PT",
+      "change_type": "other",
+      "target": "data/ai_usage_readings.jsonl",
+      "rationale": "Shanta via the AI usage monitor. Before seeding, the estimate's last anchor was 41% at 19:04. Interpolating by tokens puts 53.0% at midnight, so 1.0% used today.",
+      "payload": {
+        "status": "applied",
+        "undo": "cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && cp ~/.comserv/backups/aisystem-20261009/ai_usage_readings.jsonl.pre-r6 data/ai_usage_readings.jsonl"
+      }
+    },
+    {
+      "title": "Autostart the :4006 aisystem server after reboot (the daily switch depends on it)",
+      "change_type": "workstation",
+      "target": "crontab @reboot or a systemd user unit",
+      "rationale": "The workstation rebooted at 06:31 PT; :4006 was down until 08:15, so the burn alerts (599 errors) and the new daily switch were blind. I started it with nohup (same command as shell history). It will not survive the next reboot. Not applied.",
+      "payload": {
+        "status": "proposed",
+        "apply": "@reboot sleep 60 && cd /home/shanta/.comserv/worktrees/aisystem/Comserv/Comserv && PATH=/home/shanta/perl5/perlbrew/perls/perl-5.40.0/bin:$PATH PERL5LIB=/home/shanta/perl5/lib/perl5 CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4006 -r >> /home/shanta/.comserv/logs/aisystem-4006.log 2>&1",
+        "undo": "remove the @reboot line"
+      }
+    }
+  ],
+  "markdown": "Daily Super Grok switch live (guard cron */5). Budget today 5.7%, used 1.0%. Override: data/supergrok_pacing.json {\"daily\":{\"extra_today_pct\":N,\"extra_today_date\":\"YYYY-MM-DD\"}} or {\"daily\":{\"allow_overrun_date\":\"YYYY-MM-DD\"}}."
+}
