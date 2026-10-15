@@ -199,3 +199,6 @@ Comserv/root/session/**
 # Hermes agent scratch plans (local working notes, not project source)
 .hermes/plans/
 .hermes/plans/**
+# SQLite WAL/shared-memory side files
+Comserv/data/*.db-shm
+Comserv/data/*.db-wal
