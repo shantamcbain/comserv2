@@ -1577,7 +1577,18 @@ sub get_recent_activity {
 # Get system notifications for the admin dashboard
 sub get_system_notifications {
     my ($self, $c) = @_;
-    
+    # #2197: one brain — AdminDashboard already builds this list. Duplicate
+    # inline copy here drifted from the dashboard util and the stash was never
+    # rendered on admin/index.tt.
+    my $from_dash = eval {
+        Comserv::Util::AdminDashboard->new->system_notifications($c);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'get_system_notifications', "AdminDashboard notifications failed: $@");
+    }
+    return $from_dash if $from_dash && ref($from_dash) eq 'ARRAY';
+
     my @notifications = ();
     
     # Check for pending user registrations
@@ -4134,14 +4145,35 @@ sub find_orphaned_result_files_v2 {
                 $result_schema = $self->parse_result_file_schema($c, $result_info->{result_path});
             };
             
+            my $columns = $result_schema->{columns} || {};
+            my @pks = @{ $result_schema->{primary_keys} || [] };
+            my %pk_lookup = map { $_ => 1 } @pks;
+            my @fields;
+            foreach my $cname (sort keys %$columns) {
+                my $cinfo = $columns->{$cname} || {};
+                $cinfo->{is_primary_key} = 1 if $pk_lookup{$cname};
+                push @fields, {
+                    name => $cname,
+                    data_type => $cinfo->{data_type} // '',
+                    size => $cinfo->{size},
+                    is_nullable => defined $cinfo->{is_nullable} ? $cinfo->{is_nullable} : 1,
+                    is_auto_increment => $cinfo->{is_auto_increment} ? 1 : 0,
+                    is_primary_key => $cinfo->{is_primary_key} ? 1 : 0,
+                    default_value => $cinfo->{default_value},
+                    docs => $cinfo->{docs} // $cinfo->{documentation} // $cinfo->{comment} // '',
+                };
+                $columns->{$cname} = $cinfo;
+            }
             push @orphaned_results, {
                 result_name => $result_info->{result_name},
                 result_path => $result_info->{result_path},
                 expected_table_name => $table_name,
                 actual_table_name => $table_name,
                 last_modified => $result_info->{last_modified},
-                columns => $result_schema->{columns},
-                primary_keys => $result_schema->{primary_keys} || [],
+                columns => $columns,
+                fields => [ @fields ],
+                field_count => scalar(@fields),
+                primary_keys => [ @pks ],
                 relationships => $result_schema->{relationships} || {},
                 raw_package_calls => $result_schema->{raw_package_calls} || []
             };
@@ -7873,6 +7905,25 @@ sub branch_server_action :Path('/admin/branch_server_action') :Args(0) {
         my $res = $ctrl->open_or_start($branch, $port);
         $c->response->body(encode_json($res));
     }
+    elsif ($action eq 'hermes') {
+        my $res = eval { $ctrl->open_or_start_hermes($branch, $port) };
+        if ($@ || !$res) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'branch_server_action', "hermes start failed branch=$branch: $@");
+            $c->response->body(encode_json({ ok => 0, error => "$@"}));
+            return;
+        }
+        if (!$res->{ok}) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'branch_server_action', "hermes start refused branch=$branch: " . ($res->{error} // ''));
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'branch_server_action',
+                "hermes branch=$branch port=" . ($res->{hermes_port} // '') .
+                " started=" . ($res->{started} // 0) . " cwd=" . ($res->{cwd} // ''));
+        }
+        $c->response->body(encode_json($res));
+    }
     else {
         $c->response->body(encode_json({ok=>0, error=>'Unknown action'}));
     }
@@ -7890,11 +7941,16 @@ sub branch_server_log :Path('/admin/branch_server_log') :Args(0) {
 
     my $file = $c->req->param('file') || '';
     my $branch = $c->req->param('branch') || '';
+    my $kind = $c->req->param('kind') || '';
 
-    # Resolve to /tmp/branch-<branch>.log. Prefer the branch param; if a full file
-    # path was supplied, only honor it when it matches the locked pattern.
+    # Resolve to /tmp/branch-<branch>.log (or hermes-dash when kind=hermes).
+    # Prefer the branch param; if a full file path was supplied, only honor it
+    # when it matches the locked pattern.
     my $path;
-    if ($branch =~ m{^[A-Za-z0-9._/-]+$} && $branch !~ m{\.\./} && $branch !~ m{^/}) {
+    if ($kind eq 'hermes' && $branch =~ m{^[A-Za-z0-9._-]+$}) {
+        $path = "/tmp/hermes-dash-$branch.log";
+    }
+    elsif ($branch =~ m{^[A-Za-z0-9._/-]+$} && $branch !~ m{\.\./} && $branch !~ m{^/}) {
         $path = "/tmp/branch-$branch.log";
     }
     elsif ($file =~ m{^/tmp/branch-[A-Za-z0-9._-]+\.log$}) {

@@ -16,7 +16,7 @@
 [% INCLUDE 'Navigation/TopDropListPlanning.tt' %]
 [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
 [% INCLUDE 'Navigation/TopDropListWorkshop.tt' %]
-[% INCLUDE 'Navigation/TopDropListBeekeeping.tt' %]
+[% IF c.stash.can_beekeep %][% INCLUDE 'Navigation/TopDropListBeekeeping.tt' %][% END %]
 [% IF c.stash.enabled_modules.item('brew') || c.stash.enabled_modules.brew || c.stash.brew_addon_active || c.stash.is_brew_host %]
     [% INCLUDE 'Navigation/TopDropListBrew.tt' %]
 [% END %]

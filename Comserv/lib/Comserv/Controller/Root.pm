@@ -196,6 +196,14 @@ sub _normalize_debug_msg {
 sub auto :Private {
     my ($self, $c) = @_;
 
+    # Cheap assets and probe URLs must not run site/DB auto (~1s+). One HTML
+    # page pulls many /static/js files; on a single worker that serializes into
+    # minutes when mixed with WAN scanners.
+    my $path = $c->req->path // '';
+    if ($path =~ m{^(?:static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
+        return 1;
+    }
+
     # External monitoring trigger endpoints (hardware_monitor run/watchdog/
     # report_down/report_error/ingest) are called by the cron script on proxmox720
     # (and other nodes) WITHOUT a browser session, so they MUST skip the admin-role
@@ -213,8 +221,19 @@ sub auto :Private {
     }
 
     # LAYER 0: Require admin role for sensitive paths
-    if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site/(?:add|modify|delete)|themetest|file/admin)}) {
+    # site (full Site Management), themetest, Weather configuration (+ related write/test
+    # endpoints) — guests must never reach these (CSC-20260831-3242 / 6513 / 4599).
+    if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site(?:/|$)|themetest|file/admin|Weather/(?:configuration|test_config|save_configuration|poll|test_location|lookup_postal)(?:/|$))}) {
         unless ($c->user_exists && $c->check_user_roles('admin')) {
+            $c->response->redirect($c->uri_for('/user/login'));
+            return 0;
+        }
+    }
+
+    # LAYER 0b: Login required for staff/internal pages (any authenticated user)
+    # IT infra docs + hosted tenant inventory (CSC-20260831-2970 / 1151).
+    if ($c->req->path =~ m{^(?:it(?:/|$)|hosted(?:/|$))}i) {
+        unless ($c->user_exists) {
             $c->response->redirect($c->uri_for('/user/login'));
             return 0;
         }
@@ -329,22 +348,8 @@ sub auto :Private {
             $c->stash->{debug} = $c->session->{debug_mode};
         }
         
-        # Set up site name with timeout protection
-        eval {
-            local $SIG{ALRM} = sub { die "Site name fetch timeout\n"; };
-            alarm(3);  # 3 second timeout for site name fetch
-            $self->fetch_and_set($c, 'SiteName');
-            alarm(0);
-        };
-        alarm(0);  # Make sure alarm is cancelled
-        if ($@) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
-                "Site name fetch timed out or failed: $@. Using default site name.");
-            $c->stash->{SiteName} = 'default';
-        }
-        
-        # Set up theme using canonical ThemeConfig model with timeout protection
-        my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+        # Set up site name for theme resolution
+            my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
 
         # css_v is set once per server start at the top of auto() (ASSET_EPOCH);
         # do NOT reset it per-request or browsers cache stale JS/CSS.
@@ -708,6 +713,7 @@ sub auto :Private {
         eval {
             my $mod_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
             my %enabled;
+            my $hosting;
 
             # Site-wide module resolution (SiteModule + HostingAccount addons) is
             # identical for every visitor to a site and costs several DB round-trips,
@@ -731,8 +737,8 @@ sub auto :Private {
                     $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
                 }
 
-                # Check hosting account for subscribed addons to enable them by default
-                my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                # Hosting requested_* column historically named "addons"; treat as site features.
+                $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
                     -or => [
                         { sitename => $mod_site },
                         { sitename => lc($mod_site) },
@@ -744,6 +750,14 @@ sub auto :Private {
                     my @addons = split(/\s*,\s*/, $hosting->requested_addons);
                     for my $a (@addons) {
                         my $lc_addon = lc($a);
+                        # Brew / Beekeeping: site_modules (or Brew/BMaster / brew.*)
+                        # only — never from hosting requested_addons. Skip BEFORE
+                        # the generic enable so a missing row cannot re-open them.
+                        if ($lc_addon eq 'brew' || $lc_addon eq 'brewhouse'
+                            || $lc_addon eq 'beekeeping' || $lc_addon eq 'apiary'
+                            || $lc_addon eq 'bmaster') {
+                            next;
+                        }
                         $enabled{$lc_addon} = 1 unless exists $enabled{$lc_addon};
                         if ($lc_addon eq 'printing_3d' || $lc_addon eq '3d') {
                             $enabled{'3d'} = 1 unless exists $enabled{'3d'};
@@ -753,13 +767,6 @@ sub auto :Private {
                             $enabled{'workshop'} = 1 unless exists $enabled{'workshop'};
                             $enabled{'workshops'} = 1 unless exists $enabled{'workshops'};
                         }
-                        if ($lc_addon eq 'brew' || $lc_addon eq 'brewhouse') {
-                            $enabled{'brew'} = 1 unless exists $enabled{'brew'};
-                        }
-                        if ($lc_addon eq 'beekeeping' || $lc_addon eq 'apiary' || $lc_addon eq 'bmaster') {
-                            $enabled{'beekeeping'} = 1 unless exists $enabled{'beekeeping'};
-                            $enabled{'apiary'}     = 1 unless exists $enabled{'apiary'};
-                        }
                     }
                 }
 
@@ -767,7 +774,9 @@ sub auto :Private {
                 $_site_modules_cache{$mod_site} = { modules => { %enabled }, at => $now_sm };
             }
 
-            # Brew site / brew.* hostnames / brew addon → nav + brew home
+            # Brew feature: brew.* host / Brew sitename, or site_modules.brew=1.
+            # Brew is a site FEATURE (not a paid "addon" gate). Hosting requested_addons
+            # must not auto-enable brew (see skip above) — that leaked Brew nav onto 3d.
             my $req_host = $c->req->uri->host || '';
             $req_host =~ s/^www\.//i;
             my $is_brew_host = ($req_host =~ /^brew\./i) ? 1 : 0;
@@ -778,9 +787,10 @@ sub auto :Private {
                 $enabled{accounting} = 1 unless exists $enabled{accounting};
             }
 
-            # Show Brew menu when site_modules or hosting lists the brew addon
+            # Nav/templates still read brew_addon_active (legacy stash key).
             if ($enabled{brew}) {
                 $c->stash->{brew_addon_active} = 1;
+                $c->stash->{brew_feature_active} = 1;
             }
 
             # Apply per-user overrides from user_module_access
@@ -1247,14 +1257,18 @@ sub auto :Private {
         $c->stash->{ai_role_tier} = Comserv::Util::ModelCatalog->_role_tier($c);
         $c->stash->{ai_is_guest} = Comserv::Util::ModelCatalog->is_guest_tier($c) ? 1 : 0;
         $c->stash->{ai_can_select_model} = $c->stash->{ai_is_priv};
-        $c->stash->{ai_chat_page} ||= $c->request->path;
+        my $ai_page = eval {
+            my $r = $c->model('AI2::Router');
+            $r && $r->can('infer_page') ? $r->infer_page($c->request->path) : 'chat';
+        } || 'chat';
+        $c->stash->{ai_chat_page} ||= $ai_page;
         # Pre-selected model. Guests/members get a FREE OpenRouter model (no cost,
         # and no load on the already-saturated workstation GPU); privileged users
         # on a coding surface get the pinned coding model. Without this the
         # browser just selects the first option alphabetically, which silently
         # sent every guest to a local Ollama model.
         $c->stash->{ai_default_model}
-            = Comserv::Util::ModelCatalog->default_for($c, page => 'chat');
+            = Comserv::Util::ModelCatalog->default_for($c, page => $ai_page);
 
         return 1; # Continue processing
     };
@@ -1386,7 +1400,7 @@ sub index :Path('/') :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "View parameter detected: $view");
         }
 
-        # Brew addon or brew.* host → brewing dashboard as site home (/)
+        # Brew sitename or brew.* host → brewing dashboard as site home (/)
         my $brew_home = 0;
         eval {
             my $em = $c->stash->{enabled_modules};
@@ -1394,7 +1408,8 @@ sub index :Path('/') :Args(0) {
             my $site_lc = lc( $c->stash->{SiteName} || $c->session->{SiteName} || '' );
             my $host = $c->req->uri->host || '';
             $host =~ s/^www\.//i;
-            if ( $em->{brew} || $site_lc eq 'brew' || $host =~ /^brew\./i ) {
+            # em->{brew} alone must NOT steal / for other sitenames (e.g. 3d).
+            if ( $site_lc eq 'brew' || $host =~ /^brew\./i ) {
                 $brew_home = 1;
             }
         };
@@ -2514,6 +2529,9 @@ sub begin :Private {
     # Skip all site/session setup for health check endpoints.
     # Health checks run every 30s from Docker — no DB, no session, no logging needed.
     if ($c->req->path =~ m{^/?health(?:/|$)}) {
+        return;
+    }
+    if (($c->req->path // '') =~ m{^(?:static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
         return;
     }
 

@@ -155,7 +155,8 @@
                     Download uses <code>/3d/model_download</code> via NfsPath. Both production1 and
                     workstation Docker must mount <code>comserv2_nfs_data_nfs</code> (NFS
                     192.168.1.175:/mnt/data). See
-                    <a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]" class="doc-link">DEPLOY_WORKFLOW</a>.</li>
+                    <a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]" class="doc-link">DEPLOY_WORKFLOW</a>.
+                    Legacy <code>printing_3d_models.nfs_path</code> records may be stale after restructure (diagnosed 2026-09-10; use model_upload to correct).</li>
                 <li><strong>Signs / browse</strong> — after import+queue are honest; do not rebuild tables.</li>
                 <li><strong>Commerce</strong> — shop/cart/order stay on Inventory; 3d is the production provider.</li>
             </ol>

@@ -31,6 +31,10 @@
           <option value="Supplies">Supplies</option>
           <option value="Apiary">Apiary</option>
           <option value="Garden">Garden</option>
+          <option value="food">Food</option>
+          <option value="herb">Herb</option>
+          <option value="spice">Spice</option>
+          <option value="produce">Produce</option>
           <option value="Craft">Craft</option>
           <option value="Electronics">Electronics</option>
           <option value="Office">Office</option>
@@ -80,6 +84,24 @@
       <th><label for="barcode">Barcode</label></th>
       <td><input type="text" id="barcode" name="barcode" maxlength="100" value="[% item.barcode | html %]">
           <small>UPC / EAN / QR / Code128</small></td>
+    </tr>
+    <tr>
+      <th><label for="barcode_type">Barcode Type</label></th>
+      <td>
+        <select id="barcode_type" name="barcode_type">
+          <option value="">— unknown —</option>
+          <option value="upc" [% IF item.barcode_type == 'upc' %]selected[% END %]>UPC</option>
+          <option value="ean" [% IF item.barcode_type == 'ean' %]selected[% END %]>EAN</option>
+          <option value="qr" [% IF item.barcode_type == 'qr' %]selected[% END %]>QR</option>
+          <option value="internal" [% IF item.barcode_type == 'internal' %]selected[% END %]>Internal / custom</option>
+          <option value="other" [% IF item.barcode_type == 'other' %]selected[% END %]>Other</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="image_path">Image / Photo Path</label></th>
+      <td><input type="text" id="image_path" name="image_path" maxlength="500" value="[% item.image_path | html %]">
+          <small>Optional visual. NFS path or external URL.</small></td>
     </tr>
     <tr>
       <th><label for="reorder_point">Reorder Point</label></th>

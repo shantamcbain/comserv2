@@ -1,0 +1,6 @@
+<div id="2026-09-12-health-json-and-hardware-metrics-api" class="cl-entry">
+<h3>2026-09-12 — Fix /health JSON endpoints + read-only hardware_metrics API (NONE-20260912-7978)</h3>
+<p class="doc-body"><strong>What.</strong> Fixed <code>/health/status</code>, <code>/health/app_health</code>, and <code>/health/recent_errors</code> 500s caused by nonexistent <code>Comserv-&gt;json</code>; responses now use <code>JSON::MaybeXS::encode_json</code> (same pattern as working API endpoints). Added <code>GET /api/hardware_metrics</code> with localhost/LAN admin bypass matching <code>/api/system_logs</code>, query params hostname/metric_name/since/until/limit (year-long history, default limit 2000, max 5000), returning timestamp/hostname/system_identifier/metric_name/metric_value/unit/level.</p>
+<p class="doc-body"><strong>Why.</strong> Agent and monitoring callers need reliable JSON health status and historical hardware metrics without Bearer tokens from 127.0.0.1 / trusted LAN, and without requiring aiusagemonitor admin UI login.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/lib/Comserv/Controller/Health.pm</code>, <code>Comserv/lib/Comserv/Controller/Api.pm</code>, <code>Comserv/root/Documentation/changelog/entries/2026-09-12-health-json-and-hardware-metrics-api.inc</code></p>
+</div>

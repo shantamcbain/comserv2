@@ -5,6 +5,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::Manufacturing::Traveler;
+use Comserv::Util::AppTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -28,6 +29,14 @@ sub _sitename {
 
 sub auto :Private {
     my ($self, $c) = @_;
+
+    my $path = $c->req->path // '';
+    if ($path =~ m{(?:^|/)Accounting/manufacturing/api/}i) {
+        my $address  = $c->req->address // '';
+        my $is_local = ($address eq '127.0.0.1' || $address eq '::1'
+            || $address =~ /^192\.168\.1\./);
+        return 1 if $is_local;
+    }
 
     my $sitename = $self->_sitename($c);
     unless ($self->admin_auth->administers_site($c, $sitename)
@@ -166,6 +175,161 @@ sub traveler_print :Local :Args(1) {
     return $self->_render_print($c, $order_id);
 }
 
+# POST /Accounting/manufacturing/cancel/<order_id>
+# Cancels the manufacturing order, cancels non-running jobs for its items,
+# releases reservations. Global release so other orders can claim.
+sub cancel :Local :Args(1) {
+    my ($self, $c, $order_id_param) = @_;
+    my $schema = $c->model('DBEncy');
+    my $sitename = $self->_sitename($c);
+    my $cancelled_jobs = 0;
+    my $now = Comserv::Util::AppTime->now_utc;
+
+    if ($order_id_param =~ /^item-(\d+)$/i) {
+        # Handle synthetic in-house "order" (e.g. item-51, item-52, item-53 from Traveler)
+        my $item_id = $1;
+
+        eval {
+            $schema->txn_do(sub {
+                # Cancel active jobs linked to this inventory item
+                my @jobs = $schema->resultset('Printing3dJob')->search({
+                    sitename => $sitename,
+                    source_item_id => $item_id,
+                    status => { -in => [qw(queued assigned printing)] },
+                })->all;
+
+                for my $job (@jobs) {
+                    my $printer = $job->printer;
+                    $job->update({ status => 'cancelled', completed_at => $now });
+
+                    if ($printer && ($printer->current_job_id // 0) == $job->id) {
+                        $printer->update({ status => 'idle', current_job_id => undef, updated_at => $now });
+                    }
+
+                    if ($job->inventory_reserved) {
+                        $job->update({ inventory_reserved => 0 });
+                    }
+                    $cancelled_jobs++;
+                }
+
+                # Create a real cancelled customer order record so the synthetic is suppressed
+                # and we have history. This makes future loads see a real (cancelled) order.
+                my $has_cancelled = $schema->resultset('Accounting::InventoryCustomerOrder')->search({
+                    sitename => $sitename,
+                    customer_name => 'In-House',
+                    status => 'cancelled',
+                })->search_related('lines', { item_id => $item_id })->count;
+
+                unless ($has_cancelled) {
+                    my $co = $schema->resultset('Accounting::InventoryCustomerOrder')->create({
+                        sitename => $sitename,
+                        customer_name => 'In-House',
+                        status => 'cancelled',
+                        notes => "Cancelled in-house for item $item_id (was synthetic $order_id_param)",
+                        created_by => $c->session->{username} || 'system',
+                        created_at => $now,
+                        updated_at => $now,
+                    });
+                    $co->create_related('lines', {
+                        item_id => $item_id,
+                        quantity => 1,
+                        description => "In-house item $item_id",
+                        line_total => 0,
+                    });
+                }
+            });
+        };
+
+        if ($@) {
+            $c->flash->{error_msg} = "Cancel failed for $order_id_param: $@";
+        } else {
+            eval {
+                require Comserv::Util::Inventory::Purchasing;
+                Comserv::Util::Inventory::Purchasing->new->unreserve_bom($c, {
+                    sitename       => $sitename,
+                    parent_item_id => $item_id,
+                    quantity       => 1,
+                });
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'cancel',
+                    "unreserve $order_id_param: $@");
+            }
+            $c->flash->{success_msg} = "In-house $order_id_param cancelled. $cancelled_jobs job(s) cancelled, reservations released globally.";
+        }
+    } else {
+        # Real numeric customer order ID
+        my $order;
+        eval {
+            $order = $schema->resultset('Accounting::InventoryCustomerOrder')->find($order_id_param, {
+                prefetch => { lines => 'item' }
+            });
+        };
+        unless ($order && $order->sitename eq $sitename) {
+            $c->flash->{error_msg} = 'Order not found or wrong site.';
+            $c->res->redirect($c->uri_for('/Accounting/manufacturing'));
+            $c->detach;
+        }
+
+        my @item_ids = map { $_->item_id } grep { $_->item_id } $order->lines->all;
+
+        eval {
+            $schema->txn_do(sub {
+                $order->update({ status => 'cancelled', updated_at => $now });
+
+                if (@item_ids) {
+                    my @jobs = $schema->resultset('Printing3dJob')->search({
+                        sitename => $sitename,
+                        source_item_id => { -in => \@item_ids },
+                        status => { -in => [qw(queued assigned printing)] },
+                    })->all;
+
+                    for my $job (@jobs) {
+                        my $printer = $job->printer;
+                        $job->update({ status => 'cancelled', completed_at => $now });
+
+                        if ($printer && ($printer->current_job_id // 0) == $job->id) {
+                            $printer->update({ status => 'idle', current_job_id => undef, updated_at => $now });
+                        }
+
+                        if ($job->inventory_reserved) {
+                            $job->update({ inventory_reserved => 0 });
+                        }
+                        $cancelled_jobs++;
+                    }
+                }
+            });
+        };
+
+        if ($@) {
+            $c->flash->{error_msg} = "Cancel failed: $@";
+        } else {
+            eval {
+                require Comserv::Util::Inventory::Purchasing;
+                my $purch = Comserv::Util::Inventory::Purchasing->new;
+                for my $line ($order->lines->all) {
+                    my $item = eval { $line->item };
+                    next unless $item && $item->id;
+                    $purch->unreserve_bom($c, {
+                        sitename          => $sitename,
+                        parent_item_id    => $item->id,
+                        quantity          => $line->quantity || 1,
+                        customer_order_id => $order->id,
+                    });
+                }
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'cancel',
+                    "unreserve order $order_id_param: $@");
+            }
+            $c->flash->{success_msg} = "Order #$order_id_param cancelled. $cancelled_jobs job(s) cancelled and reservations released.";
+        }
+    }
+
+    $c->res->redirect($c->uri_for('/Accounting/manufacturing'));
+    $c->detach;
+}
+
 # POST /Accounting/manufacturing/api/update_part
 # JSON: part_id (item_id), status (printed|in_pick_box|qc_passed), traveler_id, quantity?
 sub api_update_part :Path('api/update_part') :Args(0) {
@@ -215,6 +379,163 @@ sub api_update_part :Path('api/update_part') :Args(0) {
 
     $c->res->content_type('application/json');
     $c->res->body(JSON::encode_json($result));
+    $c->detach;
+}
+
+# POST /Accounting/manufacturing/api/reserve
+# JSON: order_id (customer id, item-N, or inventory item id), parent_sku?, parent_item_id?,
+#       quantity?, dry_run?, force?, sitename?, customer_order_id?
+# Calls Purchasing::reserve_bom (idempotent RSV-{parent}-x{qty}). GET traveler does not reserve.
+sub api_reserve :Path('api/reserve') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+    require Comserv::Util::Inventory::Purchasing;
+
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body('{"success":0,"error":"POST required"}');
+        $c->detach;
+    }
+
+    my $p = {};
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $p = JSON::decode_json($raw) if $raw;
+            } else {
+                $p = JSON::decode_json($body);
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_reserve',
+            "JSON parse failed: $@");
+        $p = {};
+    }
+    $p = {} unless ref($p) eq 'HASH';
+    for my $k (keys %{ $c->req->parameters || {} }) {
+        $p->{$k} = $c->req->parameters->{$k} unless exists $p->{$k};
+    }
+
+    my $sitename = $p->{sitename} || $self->_sitename($c);
+    my $order_id = $p->{order_id} // $p->{traveler_id} // '';
+    my $purch    = Comserv::Util::Inventory::Purchasing->new;
+    my @calls;
+
+    if ($p->{parent_item_id} || $p->{parent_sku}) {
+        push @calls, {
+            sitename           => $sitename,
+            parent_item_id     => $p->{parent_item_id},
+            parent_sku         => $p->{parent_sku},
+            quantity           => $p->{quantity} || 1,
+            dry_run            => $p->{dry_run} ? 1 : 0,
+            force              => $p->{force} ? 1 : 0,
+            customer_order_id  => $p->{customer_order_id},
+        };
+    } elsif ($order_id =~ /^item-(\d+)$/i) {
+        push @calls, {
+            sitename       => $sitename,
+            parent_item_id => 0 + $1,
+            quantity       => $p->{quantity} || 1,
+            dry_run        => $p->{dry_run} ? 1 : 0,
+            force          => $p->{force} ? 1 : 0,
+        };
+    } elsif ($order_id =~ /^\d+$/) {
+        my $co = eval {
+            $c->model('DBEncy')->resultset('Accounting::InventoryCustomerOrder')->find(
+                { id => 0 + $order_id },
+                { prefetch => { lines => 'item' } },
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_reserve',
+                "order lookup: $@");
+        }
+        if ($co) {
+            for my $line ($co->lines->all) {
+                my $item = eval { $line->item };
+                next unless $item && $item->id;
+                push @calls, {
+                    sitename          => $sitename,
+                    parent_item_id    => $item->id,
+                    parent_sku        => eval { $item->sku },
+                    quantity          => $line->quantity || 1,
+                    dry_run           => $p->{dry_run} ? 1 : 0,
+                    force             => $p->{force} ? 1 : 0,
+                    customer_order_id => $co->id,
+                };
+            }
+        } else {
+            push @calls, {
+                sitename       => $sitename,
+                parent_item_id => 0 + $order_id,
+                quantity       => $p->{quantity} || 1,
+                dry_run        => $p->{dry_run} ? 1 : 0,
+                force          => $p->{force} ? 1 : 0,
+            };
+        }
+    }
+
+    unless (@calls) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({
+            success => 0,
+            error   => 'order_id, parent_item_id or parent_sku required',
+        }));
+        $c->detach;
+    }
+
+    my (@ok, @already, @fail);
+    my $n_buy = 0;
+    my $n_print = 0;
+    my $n_reserved = 0;
+    for my $args (@calls) {
+        my $res = eval { $purch->reserve_bom($c, $args) };
+        if ($@ || !$res) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_reserve',
+                $@ || 'reserve_bom returned undef');
+            push @fail, { error => $@ || 'reserve_bom failed', parent_item_id => $args->{parent_item_id} };
+            next;
+        }
+        if ($res->{already}) {
+            push @already, $res;
+            next;
+        }
+        unless ($res->{ok}) {
+            push @fail, $res;
+            next;
+        }
+        push @ok, $res;
+        $n_buy      += scalar @{ $res->{buy} || [] };
+        $n_print    += scalar @{ $res->{print} || [] };
+        $n_reserved += scalar @{ $res->{reserved} || [] };
+    }
+
+    my $success = (@fail == 0 && (@ok || @already));
+    unless ($success) {
+        $c->res->status(400);
+    }
+    $self->logging->log_with_details($c, $success ? 'info' : 'warn', __FILE__, __LINE__, 'api_reserve',
+        sprintf('order=%s ok=%d already=%d fail=%d buy=%d print=%d',
+            $order_id, scalar(@ok), scalar(@already), scalar(@fail), $n_buy, $n_print));
+
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json({
+        success     => $success ? 1 : 0,
+        order_id    => $order_id,
+        reserved    => $n_reserved,
+        buy         => $n_buy,
+        print       => $n_print,
+        already     => scalar(@already),
+        results     => [ @ok, @already ],
+        errors      => [ map { $_->{error} } @fail ],
+        error       => @fail ? ($fail[0]{error} || 'reserve failed') : undef,
+    }));
     $c->detach;
 }
 

@@ -14,6 +14,8 @@
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container">
+
+    [% INCLUDE 'ai/_admin_eval_links.tt' %]
     [% INCLUDE 'admin/documentation/_doc_header.tt'
         page_title   = 'AI Modern Agent Evolution — masterplan'
         site_name    = site_name

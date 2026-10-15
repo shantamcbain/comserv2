@@ -12,6 +12,13 @@
     "container": "comserv2-whisper (planned, port 8082)",
     "notes": "Not yet containerized — transcription still via whisper_nfs_worker.pl on workstation."
   },
+  "search": {
+    "url": "http://workstation.local:8084",
+    "enabled": 1,
+    "timeout": 20,
+    "container": "comserv2-search",
+    "notes": "Self-hosted SearXNG metasearch. DISABLED until the container is running (cd services/search && docker compose up -d --build). Enabled=0 means no network traffic. Why self-hosted: OpenRouter's search_domain_filter is silently ignored, so scope control needs a service we run. Source: services/search/"
+  },
   "ollama": {
     "url": "http://workstation.local:11434",
     "timeout": 300,

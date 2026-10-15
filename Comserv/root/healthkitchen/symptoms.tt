@@ -1,0 +1,93 @@
+[% META
+   title = "Health Kitchen symptoms"
+   description = "Active symptoms overlay on ENCY Symptom; resolved drop out of planner input"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "HealthKitchen"
+   page_version = "0.01"
+   last_updated = "2026-09-24"
+%]
+[% PageVersion = 'healthkitchen/symptoms.tt,v 0.01 2026/09/24 hermes-agent Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Active symptoms</h1>
+        <p>
+            <a href="[% c.uri_for('/healthkitchen') %]">Health Kitchen</a>
+            ·
+            <a href="[% c.uri_for('/healthkitchen/pantry') %]">Pantry</a>
+            ·
+            <a href="[% c.uri_for('/healthkitchen/recipes') %]">Recipes</a>
+        </p>
+        <p class="doc-muted">Wellness overlay only — not a diagnosis. Resolving a symptom removes it from the next match.</p>
+    </div>
+
+    [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+
+    [% IF !hk_symptom_ready %]
+        <div class="alert alert-warning">Create table <code>HealthKitchen::UserActiveSymptom</code> (and UserHealthProfile) via Schema Compare first.</div>
+    [% ELSE %]
+        <form method="post" action="[% c.uri_for('/healthkitchen/symptoms') %]" class="content-section">
+            <input type="hidden" name="hk_action" value="add" />
+            <label>Symptom
+                <select name="symptom_id" required>
+                    <option value="">— pick from ENCY —</option>
+                    [% FOREACH s IN hk_symptoms %]
+                        <option value="[% s.id %]">[% s.name | html %][% IF s.common_name %] ([% s.common_name | html %])[% END %]</option>
+                    [% END %]
+                </select>
+            </label>
+            <label>Severity <input type="text" name="severity" /></label>
+            <button type="submit" class="btn btn-primary">Set active</button>
+        </form>
+
+        [% IF hk_active && hk_active.size %]
+            <table class="table">
+                <tr><th>Symptom</th><th>Severity</th><th></th></tr>
+                [% FOREACH a IN hk_active %]
+                    <tr>
+                        <td><a href="[% c.uri_for('/ENCY/Symptom') %]">[% a.name || a.symptom_id | html %]</a></td>
+                        <td>[% a.severity | html %]</td>
+                        <td>
+                            <form method="post" action="[% c.uri_for('/healthkitchen/symptoms') %]">
+                                <input type="hidden" name="hk_action" value="resolve" />
+                                <input type="hidden" name="id" value="[% a.id %]" />
+                                <button type="submit" class="btn btn-sm btn-secondary">Resolve</button>
+                            </form>
+                        </td>
+                    </tr>
+                [% END %]
+            </table>
+        [% ELSE %]
+            <p class="doc-muted">No active symptoms.</p>
+        [% END %]
+    [% END %]
+
+    [% IF hk_profile_ready %]
+        <form method="post" action="[% c.uri_for('/healthkitchen/symptoms') %]" class="content-section">
+            <input type="hidden" name="hk_action" value="profile" />
+            <h2>Profile</h2>
+            <label>Diet flags <input type="text" name="diet_flags" value="[% hk_profile.diet_flags | html %]" /></label>
+            <label>Allergies <textarea name="allergies">[% hk_profile.allergies | html %]</textarea></label>
+            <label>Goals <textarea name="goals">[% hk_profile.goals | html %]</textarea></label>
+            <button type="submit" class="btn btn-primary">Save profile</button>
+        </form>
+    [% END %]
+
+    [% IF hk_match %]
+        <div class="content-section">
+            <h2>Pantry match (no LLM)</h2>
+            [% IF hk_match.herbs && hk_match.herbs.size %]
+                <ul>
+                    [% FOREACH h IN hk_match.herbs %]
+                        <li><a href="[% c.uri_for('/ENCY/Herb') %]/[% h.herb_id %]">[% h.name || h.herb_id | html %]</a></li>
+                    [% END %]
+                </ul>
+            [% ELSE %]
+                <p class="doc-muted">No in-pantry herb matches for the active set.</p>
+            [% END %]
+        </div>
+    [% END %]
+</div>

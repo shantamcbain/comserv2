@@ -39,6 +39,9 @@ Required/important args:
 
 Optional:
     guest_session_id, estimated_cost_usd
+    grounding (hashref from Comserv::Model::AI2::Grounding::ledger_fields —
+      grounded, golden_hit_count, candidate_hit_count, snippet_ids,
+      flagged_count, feature; see Comserv::Util::AI::Ledger)
 
 This method also reads the current membership plan and writes:
     plan_id, plan_ai_requests_per_day, within_free_quota, billing_status
@@ -69,11 +72,48 @@ sub log {
         my $ip          = $c->request ? $c->request->address : undef;
         my $meta        = $args{metadata} || {};
 
+        # Ledger grounding fields (Golden Data / Anti-Hallucination). Always
+        # mirrored into metadata.grounding; real columns only once schema-compare
+        # has added them to ai_usage_logs (see Comserv::Util::AI::Ledger).
+        require Comserv::Util::AI::Ledger;
+        my $ledger_cols = Comserv::Util::AI::Ledger->prepare($schema, $args{grounding}, $meta);
+
         $pt  += 0; $ct += 0; $tot += 0;
+
+        # Model failover (AISYSTEM plan §5e): attempt/fallback facts ride in
+        # metadata.fallover, like metadata.grounding.
+        $meta->{fallover} = $args{fallover} if ref $args{fallover} eq 'HASH';
+        # One-ledger tags (AISYSTEM item 4): every row says which worktree /
+        # branch served it, for which site and user, unless the caller set them.
+        $meta->{branch}   //= _app_branch($c);
+        $meta->{sitename} //= (eval { $c->session->{SiteName} } || eval { $c->stash->{SiteName} });
+        $meta->{username} //= eval { $c->session->{username} };
+        delete $meta->{$_} for grep { !defined $meta->{$_} } qw(branch sitename username);
+        # A "success" with no text is not a success (Ollama and some
+        # providers answer 200 with nothing). With text but 0 tokens the
+        # provider just did not report usage: keep success, flag it.
+        if ($status eq 'success' && exists $args{response_text}) {
+            (my $txt = $args{response_text} // '') =~ s/^\s+|\s+$//g;
+            if (!length $txt) {
+                $status  = 'error';
+                $err_msg = $err_msg || 'empty_output: provider returned success with no text';
+                $meta->{empty_output} = 1;
+            } elsif (!$tot) {
+                $meta->{tokens_unreported} = 1;
+            }
+        }
 
         my $cost = $args{estimated_cost_usd};
         unless (defined $cost) {
             $cost = $self->_estimate_cost_usd($provider, $model, $pt, $ct);
+        }
+        # :free slugs cost $0 unless the provider actually charged
+        # (actual_cost_usd > 0). Token-rate estimates must not book dollars.
+        if ($model =~ /:free\z/) {
+            my $actual = $args{actual_cost_usd};
+            my $was = $cost;
+            $cost = (defined $actual && $actual > 0) ? $actual : 0;
+            $meta->{cost_zeroed_free} = 0 + $was if !$cost && $was && $was > 0;
         }
 
         # === Plan quota integration ===
@@ -130,11 +170,13 @@ sub log {
             within_free_quota        => $within_free,
             billing_status           => $bill_status,
             metadata                 => (ref($meta) ? encode_json($meta) : $meta),
+            %$ledger_cols,
         });
 
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'log',
             sprintf("Logged AI usage: provider=%s model=%s tokens=%s/%s cost=%.6f site=%s user=%s status=%s",
-                $provider, $model, $pt, $ct, $cost, $site_id//'-', $user_id//'-', $status));
+                $provider, $model, $pt, $ct, $cost, $site_id//'-', $user_id//'-', $status)
+            . Comserv::Util::AI::Ledger->log_suffix($args{grounding}));
     };
     if ($@) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'log',
@@ -176,6 +218,7 @@ sub _estimate_cost_usd {
 
     my $p = lc($provider);
     my $m = lc($model);
+    return sprintf('%.6f', 0) if $m =~ /:free\z/;
 
     my $rates = $pricing{$p} && $pricing{$p}{$m} ? $pricing{$p}{$m} : $pricing{$p}{default};
     $rates ||= { prompt => 0, completion => 0 };
@@ -251,8 +294,37 @@ sub daily_model_summary {
     return \@rows;
 }
 
+# Git branch of the serving app tree, read once from .git/HEAD (no git exec).
+my $APP_BRANCH;
+sub _app_branch {
+    my ($c) = @_;
+    return $APP_BRANCH if defined $APP_BRANCH;
+    $APP_BRANCH = '';
+    eval {
+        my $dir = $c->path_to('') . '';
+        for (1 .. 4) {
+            my $g = "$dir/.git";
+            if (-f $g) {   # worktree: "gitdir: /path/.git/worktrees/<name>"
+                open my $fh, '<', $g or die; my $l = <$fh>; close $fh;
+                ($g) = $l =~ /^gitdir:\s*(\S+)/ or die;
+            }
+            if (-d $g && -f "$g/HEAD") {
+                open my $fh, '<', "$g/HEAD" or die; my $h = <$fh>; close $fh;
+                $APP_BRANCH = $h =~ m{^ref:\s*refs/heads/(\S+)} ? $1 : substr($h, 0, 12);
+                last;
+            }
+            $dir =~ s{/[^/]+/?$}{} or last;
+        }
+        1;
+    };
+    return $APP_BRANCH;
+}
+
+our %OR_STATUS_CACHE;   # 60s: usage_live, the page and every paid failover candidate ask
 sub fetch_openrouter_status {
     my ($self, $c) = @_;
+    return { %{ $OR_STATUS_CACHE{data} }, cached => 1 }
+        if $OR_STATUS_CACHE{at} && time - $OR_STATUS_CACHE{at} < 60;
     my $out = { provider => 'openrouter', source => 'openrouter_auth_key', ok => 0 };
     my $key;
     eval {
@@ -292,6 +364,30 @@ sub fetch_openrouter_status {
         $out->{pct} = sprintf('%.1f', 100 * $out->{usage} / $out->{limit});
     }
     $out->{exhausted} = (defined $out->{remaining} && $out->{remaining} <= 0) ? 1 : 0;
+    # Key spend windows as OpenRouter reports them (UTC day/week/month).
+    for my $w (qw(daily weekly monthly)) {
+        $out->{"usage_$w"} = 0 + $d->{"usage_$w"} if defined $d->{"usage_$w"};
+    }
+    $out->{day_usd}   = $out->{usage_daily}   if defined $out->{usage_daily};
+    $out->{week_usd}  = $out->{usage_weekly}  if defined $out->{usage_weekly};
+    $out->{month_usd} = $out->{usage_monthly} if defined $out->{usage_monthly};
+    # Account balance: GET /api/v1/credits (total_credits - total_usage).
+    my $cr = eval {
+        my $r = $ua->get('https://openrouter.ai/api/v1/credits',
+            Authorization => "Bearer $key", Accept => 'application/json');
+        $r && $r->is_success ? decode_json($r->decoded_content) : undef;
+    };
+    if (ref $cr eq 'HASH') {
+        my $cd = $cr->{data} || $cr;
+        if (defined $cd->{total_credits}) {
+            $out->{total_credits} = 0 + $cd->{total_credits};
+            $out->{total_usage}   = 0 + ($cd->{total_usage} // 0);
+            $out->{balance_usd}   = 0 + sprintf('%.4f', $out->{total_credits} - $out->{total_usage});
+            $out->{exhausted}     = 1 if $out->{balance_usd} <= 0;
+        }
+    }
+    $out->{fetched_at} = time;
+    %OR_STATUS_CACHE = (at => time, data => { %$out });
     return $out;
 }
 

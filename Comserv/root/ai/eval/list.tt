@@ -1,0 +1,63 @@
+[%# Daily AI Eval Reports — list (admin only). Controller::AI::Eval::index.
+  # Data: Model::AI2::EvalReports->list_reports (DBIx::Class). No JS, no CDNs. %]
+[% el = eval_list %]
+<div class="ai-eval-page" style="max-width:1200px;margin:0 auto;padding:1rem;">
+  <h1>Daily AI Eval Reports</h1>
+  <p class="doc-muted">Admin review of the AI usage monitor's daily report. Approve or reject each proposal;
+    only approved, allow-listed config changes can be applied, and only when you press Apply.
+    Code / workstation proposals become todos in project AISYSTEM. Back to
+    <a href="[% c.uri_for('/ai/usage') %]#agent-effectiveness">AI Usage monitor</a>.</p>
+  <p style="display:flex;gap:10px;flex-wrap:wrap;">
+    [% IF latest_eval.latest %]<a class="btn btn-primary" href="/ai/eval/report/[% latest_eval.latest.id | uri %]">Open latest report ([% latest_eval.latest.report_date | html %], #[% latest_eval.latest.id | html %])</a>[% END %]
+    <a class="btn btn-secondary" href="#auto-changes">Auto-changes</a>
+    <a class="btn btn-secondary" href="/ai/usage">AI Usage</a>
+  </p>
+
+  [% table_missing = el.table_missing %]
+  [% INCLUDE 'ai/eval/_messages.tt' %]
+  [% IF el.error %]<div class="alert alert-error">Could not read reports: [% el.error | html %]</div>[% END %]
+  [% IF el.proposal_table_missing %]<div class="doc-warning">Proposal table (<code>AiEvalProposal</code>) not created yet — run schema compare.</div>[% END %]
+
+  [% IF ! el.table_missing %]
+  <table class="data-table">
+    <thead><tr>
+      <th>Date</th><th>Source</th><th>Bot % left</th><th>OpenRouter balance</th><th>OpenRouter month</th>
+      <th>Chat usable / calls</th><th>0-token “OK”</th><th>404s</th>
+      <th>Proposals (open / total)</th><th>Summary</th>
+    </tr></thead>
+    <tbody>
+    [% FOREACH r IN el.rows %]
+      <tr>
+        <td><a href="/ai/eval/report/[% r.id | uri %]">[% r.report_date | html %]</a></td>
+        <td>[% r.source | html %]</td>
+        <td>[% IF r.key.bot_pct_left.defined %][% r.key.bot_pct_left | html %]%[% ELSE %]—[% END %]</td>
+        <td>[% IF r.key.openrouter_balance.defined %]$[% r.key.openrouter_balance | html %][% ELSE %]—[% END %]</td>
+        <td>[% IF r.key.openrouter_month.defined %]$[% r.key.openrouter_month | html %][% ELSE %]—[% END %]</td>
+        <td>[% r.key.chat_usable.defined ? r.key.chat_usable : '—' | html %] / [% r.key.chat_calls.defined ? r.key.chat_calls : '—' | html %]</td>
+        <td>[% r.key.chat_zero_token.defined ? r.key.chat_zero_token : '—' | html %]</td>
+        <td>[% r.key.chat_404.defined ? r.key.chat_404 : '—' | html %]</td>
+        <td>[% r.counts.proposed + r.counts.approved %] / [% r.counts.total %]</td>
+        <td>[% r.summary | truncate(140) | html %]</td>
+      </tr>
+    [% END %]
+    [% IF ! el.rows.size %]<tr><td colspan="10" class="doc-muted">No reports yet. The AI usage monitor posts to <code>POST /ai/eval/ingest</code>, or import the inbox below.</td></tr>[% END %]
+    </tbody>
+  </table>
+  [% END %]
+
+  <div class="card" style="margin:16px 0;">
+    <div class="card-header">Import inbox (data/ai_eval_inbox)</div>
+    <div class="card-body">
+      <p class="doc-body">Files waiting: [% IF inbox_files.size %][% FOREACH f IN inbox_files %]<code>[% f | html %]</code> [% END %][% ELSE %]none[% END %].
+        Same JSON shape and same code as <code>POST /ai/eval/ingest</code>; re-importing is an idempotent upsert (no duplicate proposals). Files are left in place.</p>
+      <form method="post" action="/ai/eval/import_inbox">
+        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+        <button type="submit" class="btn btn-primary">Import inbox</button>
+      </form>
+    </div>
+  </div>
+
+  [% INCLUDE 'ai/eval/_auto_changes.tt' %]
+
+  [% INCLUDE 'ai/eval/_allowlist.tt' %]
+</div>

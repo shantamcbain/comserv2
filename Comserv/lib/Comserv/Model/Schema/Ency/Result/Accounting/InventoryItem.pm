@@ -84,16 +84,22 @@ __PACKAGE__->add_columns(
         size        => 100,
         is_nullable => 1,
     },
+    barcode_type => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 1,
+        comment     => 'upc, ean, qr, internal, other',
+    },
     image_path => {
         data_type   => 'varchar',
         size        => 500,
         is_nullable => 1,
     },
     discount_percent => {
-        data_type     => 'decimal',
-        size          => [5, 2],
-        is_nullable   => 1,
-        default_value => 0,
+        data_type => 'decimal',
+        size => [10, 0],
+        is_nullable => 1,
+        default_value => '0',
     },
     shop_options => {
         data_type   => 'text',
@@ -221,7 +227,11 @@ __PACKAGE__->add_columns(
     });
 
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint(unique_sku => ['sku']);
+# SKU must be unique WITHIN a sitename. A given SKU (e.g. INT-HDRY-BBL01) may exist on
+# different sites (CSC vs 3d) but never twice in the same site. Enforced here for DBIC
+# create/update awareness AND as the canonical declaration for the DB unique index
+# (add the matching UNIQUE INDEX (sitename, sku) via the schema-compare / migration flow).
+__PACKAGE__->add_unique_constraint(unique_sku_per_site => ['sitename', 'sku']);
 
 __PACKAGE__->belongs_to(
     'marketplace_listing',
@@ -324,6 +334,16 @@ __PACKAGE__->has_many(
     'bom_used_in' => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItemBOM',
     { 'foreign.component_item_id' => 'self.id' },
     { cascade_delete => 0 }
+);
+
+__PACKAGE__->has_many(
+    'category_links' => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItemCategory',
+    { 'foreign.item_id' => 'self.id' },
+    { cascade_delete => 1 }
+);
+
+__PACKAGE__->many_to_many(
+    'categories' => 'category_links', 'category'
 );
 
 1;

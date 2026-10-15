@@ -1,4 +1,4 @@
-[% PageVersion = 'Shop/index.tt v0.01 2026/04/16 shanta Exp' %]
+[% PageVersion = 'Shop/index.tt v0.02 2026/09/24 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="app-container">
@@ -147,8 +147,13 @@
           View Details →
         </a>
         [% IF display_price > 0 && (total_stock > 0 || item.hide_stock_count) %]
-        <form method="POST" action="/Cart/add" style="margin-left:auto">
+        <form method="POST" action="/Cart/add" style="margin-left:auto;display:flex;gap:0.4em;align-items:center">
           <input type="hidden" name="item_id" value="[% item.id %]">
+          <label style="font-size:var(--font-size-small,0.8rem);color:var(--text-color);font-family:var(--body-font)">
+            Qty
+            <input type="number" name="quantity" value="1" min="1" [% IF total_stock > 0 && !item.hide_stock_count %]max="[% total_stock %]"[% END %]
+                   style="width:56px;padding:3px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+          </label>
           <button type="submit" style="padding:3px 10px;background:var(--primary-color);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font);font-size:var(--font-size-small,0.85rem)">
             <i class="fas fa-cart-plus"></i> [% IF item.hide_stock_count %]Order[% ELSE %]Add to Cart[% END %]
           </button>

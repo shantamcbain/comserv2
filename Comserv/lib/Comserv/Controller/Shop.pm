@@ -2,7 +2,7 @@ package Comserv::Controller::Shop;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
-use POSIX qw(strftime);
+use Comserv::Util::AppTime;
 use JSON qw(decode_json encode_json);
 
 has 'logging' => (
@@ -13,7 +13,7 @@ has 'logging' => (
 BEGIN { extends 'Catalyst::Controller'; }
 
 sub _schema   { return $_[1]->model('DBEncy') }
-sub _now      { return strftime('%Y-%m-%d %H:%M:%S', localtime) }
+sub _now      { return Comserv::Util::AppTime->now_utc }
 sub _sitename {
     my ($self, $c) = @_;
     return $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';

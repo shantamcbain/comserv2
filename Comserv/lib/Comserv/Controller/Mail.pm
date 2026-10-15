@@ -14,7 +14,6 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
-
 # Thin wrapper to reduce repetitive log_with_details calls while keeping full depth
 sub _log_error {
     my ($self, $c, $action, $msg) = @_;
@@ -910,7 +909,6 @@ sub send_test_email :Local {
 
     $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
 }
-
 
 # ─────────────────────────────────────────────────────────────
 #  MAILING LIST MANAGEMENT
@@ -1979,7 +1977,6 @@ sub _get_list_recipients {
     return @recipients;
 }
 
-
 # ─────────────────────────────────────────────────────────────
 #  DEFAULT LIST AUTO-SYNC
 #  Runs every time /mail/lists is loaded.
@@ -2811,5 +2808,158 @@ sub admin_unsubscribe_user :Local :Args(1) {
     $c->response->redirect($c->req->referer || $c->uri_for('/mail/lists'));
 }
 
-__PACKAGE__->meta->make_immutable;
+;
 1;
+
+# ============================================================
+# Invoice Classification Actions
+# ============================================================
+
+sub classify_invoices :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $is_admin = grep { $_ eq 'admin' } @{$c->session->{roles} || []};
+    unless ($is_admin) {
+        $c->res->status(403);
+        $c->response->body('Access denied');
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'classify_invoices',
+        "Starting mail invoice classification");
+    
+    try {
+        require Comserv::Util::MailInvoiceClassifier;
+        my $classifier = Comserv::Util::MailInvoiceClassifier->new();
+        my $result = $classifier->classify_all_mail(
+            source => 'maildir',
+            first_run => 1,
+        );
+        
+        $c->stash(
+            classification_result => $result,
+            template => 'mail/mail.classify_results.tt',
+        );
+        $c->forward($c->view('TT'));
+    } catch {
+        $self->_log_error($c, 'classify_invoices', "Classification failed: $_");
+        $c->res->status(500);
+        $c->response->body("Classification failed: $_");
+    };
+}
+
+sub invoice_api :Path('/mail/invoice/api') :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $is_admin = grep { $_ eq 'admin' } @{$c->session->{roles} || []};
+    unless ($is_admin) {
+        $c->res->status(403);
+        $c->response->body('Access denied');
+        return;
+    }
+    
+    my $schema = $c->model('DBEncy');
+    
+    # Get all sites for dropdown
+    my $sites_rs = $schema->resultset('Site')->search({}, { order_by => 'name' });
+    my @sites;
+    while (my $site = $sites_rs->next) {
+        push @sites, { id => $site->id, name => $site->name, description => $site->description };
+    }
+    
+    # Check if classified_invoices.json exists
+    my $json_file = 'Comserv/root/data/invoices/classified_invoices.json';
+    my $classification_data;
+    if (-f $json_file) {
+        open my $fh, '<', $json_file or die "Cannot read $json_file: $!";
+        local $/;
+        my $json_text = <$fh>;
+        close $fh;
+        eval { $classification_data = decode_json($json_text); };
+        if ($@) {
+            $classification_data = { error => "Failed to parse JSON: $@" };
+        }
+    }
+    
+    $c->stash(
+        sites => \@sites,
+        classification_data => $classification_data,
+        template => 'mail/mail.invoice_view.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub invoice_api_data :Path('/mail/invoice/api/data') :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $is_admin = grep { $_ eq 'admin' } @{$c->session->{roles} || []};
+    unless ($is_admin) {
+        $c->res->status(403);
+        $c->response->body('Access denied');
+        return;
+    }
+    
+    my $json_file = 'Comserv/root/data/invoices/classified_invoices.json';
+    unless (-f $json_file) {
+        $c->res->status(404);
+        $c->response->body('No classified invoices found. Run classification first.');
+        return;
+    }
+    
+    open my $fh, '<', $json_file or die "Cannot read $json_file: $!";
+    local $/;
+    my $json_text = <$fh>;
+    close $fh;
+    
+    $c->res->content_type('application/json');
+    $c->res->body($json_text);
+}
+
+sub invoice_sort :Path('/mail/invoice/sort') :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $is_admin = grep { $_ eq 'admin' } @{$c->session->{roles} || []};
+    unless ($is_admin) {
+        $c->res->status(403);
+        $c->response->body('Access denied');
+        return;
+    }
+    
+    my $schema = $c->model('DBEncy');
+    my $site_id = $self->_get_site_id($c);
+    
+    # Get all sites
+    my $sites_rs = $schema->resultset('Site')->search({}, { order_by => 'name' });
+    my @sites;
+    while (my $site = $sites_rs->next) {
+        push @sites, { id => $site->id, name => $site->name };
+    }
+    
+    $c->stash(
+        sites => \@sites,
+        template => 'mail/mail.invoice_sort.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+# ============================================================
+sub classify_invoices_cron :Private {
+    my ($self, $c) = @_;
+    
+    # Cron-accessible classification
+    try {
+        require Comserv::Util::MailInvoiceClassifier;
+        my $classifier = Comserv::Util::MailInvoiceClassifier->new();
+        my $result = $classifier->classify_all_mail(
+            source => 'maildir',
+            first_run => 0,
+        );
+        return $result;
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'classify_invoices_cron',
+            "Cron classification failed: $_");
+        return undef;
+    };
+}
+
+__PACKAGE__->meta->make_immutable;

@@ -17,9 +17,21 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
-# Simple test page that doesn't require authentication
+# CSC-20260831-4599: themetest is staff/admin only (Root LAYER 0 also gates)
+sub _require_theme_admin {
+    my ($self, $c) = @_;
+    my $root = $c->controller('Root');
+    unless ($root && $root->user_exists($c) && $root->check_user_roles($c, 'admin')) {
+        $c->flash->{error_msg} = 'Administrator access required for theme testing.';
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        $c->detach;
+    }
+    return 1;
+}
+
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
+    $self->_require_theme_admin($c);
 
     # Log that we've entered the index method
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "***** THEMETEST INDEX METHOD CALLED *****");
@@ -48,9 +60,9 @@ sub index :Path :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "***** RENDERING TEMPLATE: themetest.tt *****");
 }
 
-# Test CSS editor that doesn't require authentication
 sub edit_css :Path('edit_css') :Args(1) {
     my ($self, $c, $theme_name) = @_;
+    $self->_require_theme_admin($c);
     
     # Log that we've entered the edit_css method
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', "***** THEMETEST EDIT_CSS METHOD CALLED FOR $theme_name *****");
@@ -154,6 +166,7 @@ sub edit_css :Path('edit_css') :Args(1) {
 # Help page
 sub help :Path('help') :Args(0) {
     my ($self, $c) = @_;
+    $self->_require_theme_admin($c);
     
     # Log that we've entered the help method
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'help', 

@@ -144,6 +144,12 @@
 [% IF c.request.uri.match('/admin/git') %]
 [% END %]
 
+<!-- Printer LAN camera player. Loaded only on the control page. -->
+[% IF c.request.uri.match('/3d/printer_lan/control') %]
+<script src="/static/js/vendor/flv.min.js?v=[% cv %]" defer></script>
+<script src="/static/js/printer-lan-camera.js?v=[% cv %]" defer></script>
+[% END %]
+
 <!-- Herb Sign Generator live preview -->
 [% IF c.request.uri.match('/signgenerator') %]
 <script src="/static/js/sign-preview.js?v=[% cv %]" defer></script>
@@ -184,7 +190,7 @@
      git-dashboard.js so ComservGitDiff exists when bindFileDiff() runs. -->
 <script src="/static/js/git-diff-viewer.js?v=[% cv %]" defer></script>
 <link rel="stylesheet" href="/static/css/components/git-diff-viewer.css?v=[% cv %]">
-<script src="/static/js/git-dashboard.js?v=[% cv %]" defer></script>
+<script src="/static/js/git-dashboard.js?v=[% cv %]-h9101e" defer></script>
 <script>
     // Give the git dashboard the same canonical catalog (with price_* / tier)
     // so model-select.js uses the fast path and shows real per-token cost,
@@ -211,6 +217,7 @@
 <script src="/static/js/ai2editor/file-diff.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/project-tree.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/chat.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/hermes-run.js?v=[% cv %]" defer></script>
 [% END %]
 
 <!-- Other feature modules -->
@@ -254,6 +261,10 @@
 <!-- File Manager (convert/move helpers) -->
 [% IF c.request.uri.match('/file/') %]
 <script src="/static/js/file/convert.js?v=[% cv %]" defer></script>
+[% END %]
+
+[% IF c.request.uri.match('CustomerOrder') %]
+<script src="/static/js/CustomerOrder/order-form.js?v=[% cv %]" defer></script>
 [% END %]
 
 <!-- Docker container management pages -->

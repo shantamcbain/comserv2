@@ -263,6 +263,7 @@ sub _default_addon_catalog {
         { key => 'planning', name => 'AI Planning & Project System', owner => 'CSC', description => 'Advanced project planning, todo tracking, and AI-assisted workflows.', route => '/todo' },
         { key => 'accounting', name => 'Accounting & Ledger System', owner => 'CSC', description => 'Chart of accounts, general ledger entries, inventory items, and suppliers.', route => '/Accounting' },
         { key => 'ency', name => 'Encyclopedia & Herbal Database', owner => 'ENCY', description => 'Share scientific crop data, botanical encyclopedia, and medicinal herb logs.', route => '/ency' },
+        { key => 'healthkitchen', name => 'Health Kitchen', owner => 'ENCY', description => 'Personal pantry of foods and herbs, ENCY-linked knowledge, and wellness menus from active symptoms.', route => '/healthkitchen' },
         { key => 'ecommerce', name => 'E-Commerce & Store', owner => 'CSC', description => 'Sell products, list items, handle currency checkout, and manage shipping.', route => '/shop' },
         { key => 'helpdesk', name => 'HelpDesk Support & Guide system', owner => 'CSC', description => 'Issue ticket tracking, linux guides, and support desk system.', route => '/helpdesk' },
         { key => 'foraging', name => 'Foraging & Wild Harvesting Log', owner => 'Forager', description => 'Map and log foraging spots, wild harvest logs, and seasonal wild botany.', route => '/foraging' },

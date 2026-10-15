@@ -737,30 +737,33 @@ Worktrees are *linked* to the main (PyCharm) repo's .git, so a branch in a
 worktree IS the same ref as that branch in the PyCharm repo — the AI commits
 in the worktree, the user verifies and commits, then merges into `main`.
 
-We therefore compute the relationship in two layers:
+We therefore compute the relationship in three layers:
 
   1. GitHub upstream (@{u}) if it exists — the classic ahead/behind.
-  2. FALLBACK when there is no @{u} (the normal local-merge case): compare the
-     current branch against `main` using a local-only `rev-list --count` (no
-     fetch, no network — `main` is a local branch in the shared repo). This is
-     the signal the dashboard needs: "is my branch behind main?" so the branch
-     can be updated before new work starts.
+  2. PRIMARY checkout (`main`/`master`) with no @{u}: compare against
+     `origin/<branch>` anyway. Port 3001 is that checkout; admin push to
+     origin must not disappear just because `branch.main.merge` was unset
+     (filter-repo drops it). Worktrees do not get this path.
+  3. FALLBACK for every other branch with no @{u} (the local-merge case):
+     compare against `main` using a local-only `rev-list --count` (no fetch).
+     "is my branch behind main?" so the branch can be updated before new work.
 
-Returns { upstream, ahead, behind, base, base_ahead, base_behind } where the
-`base*` fields describe the relationship to `main` (or whatever integration
-base we pick) regardless of whether a GitHub upstream is configured.
+Returns { upstream, upstream_configured, ahead, behind, base, base_ahead,
+base_behind }. `upstream_configured` is true only for a real @{u}. The
+`base*` fields describe the relationship to `main` regardless of GitHub.
 
 =cut
 
 sub get_tracking_info {
     my ($self, $c) = @_;
     my $info = {
-        upstream     => undef,
-        ahead        => 0,
-        behind       => 0,
-        base         => undef,   # integration base we fell back to (e.g. 'main')
-        base_ahead   => 0,       # commits in branch not in base
-        base_behind  => 0,       # commits in base not in branch (branch is stale)
+        upstream             => undef,
+        upstream_configured  => 0,  # 1 only when @{u} is actually set
+        ahead                => 0,
+        behind               => 0,
+        base                 => undef,   # integration base we fell back to (e.g. 'main')
+        base_ahead           => 0,       # commits in branch not in base
+        base_behind          => 0,       # commits in base not in branch (branch is stale)
     };
 
     # --- Layer 1: GitHub-style upstream if configured -------------------
@@ -769,6 +772,7 @@ sub get_tracking_info {
     chomp $upstream if defined $upstream;
     if ($r->{success} && $upstream && $upstream !~ /fatal|no upstream/i) {
         $info->{upstream} = $upstream;
+        $info->{upstream_configured} = 1;
         my $cr = $self->_run($c, 'rev-list', '--left-right', '--count', '@{u}...HEAD');
         my $counts = $cr->{output};
         chomp $counts if defined $counts;
@@ -779,10 +783,29 @@ sub get_tracking_info {
         return $info;
     }
 
-    # --- Layer 2: local-merge fallback vs integration base -----------------
+    # --- Layer 2: primary checkout publishes to origin even with no @{u} --
+    # :3001 is main. Hiding Push because branch.main.merge is unset made the
+    # git page look like there was nothing to send, while origin/main was behind.
+    my $current = $self->get_current_branch($c);
+    if (defined $current && ($current eq 'main' || $current eq 'master')) {
+        my $origin_ref = "origin/$current";
+        my $has = $self->_run($c, 'rev-parse', '--verify', '--quiet', "refs/remotes/$origin_ref");
+        $info->{upstream} = $origin_ref;
+        if ($has->{success} && length($has->{output} // '')) {
+            my $cr = $self->_run($c, 'rev-list', '--left-right', '--count', "$origin_ref...HEAD");
+            my $counts = $cr->{output};
+            chomp $counts if defined $counts;
+            if ($counts && $counts =~ /^(\d+)\s+(\d+)$/) {
+                $info->{behind} = $1;
+                $info->{ahead}  = $2;
+            }
+        }
+        return $info;
+    }
+
+    # --- Layer 3: local-merge fallback vs integration base -----------------
     # Pick a base branch: `main` if it exists, else `master`, else the repo's
     # first existing local branch that is not the current branch.
-    my $current = $self->get_current_branch($c);
     my $base;
     for my $cand (qw(main master)) {
         my $br = $self->_run($c, 'rev-parse', '--verify', '--quiet', $cand);
@@ -792,7 +815,7 @@ sub get_tracking_info {
         }
     }
     return $info unless defined $base;          # no base to compare against
-    return $info if defined $current && $current eq $base;  # already on base
+    return $info if defined $current && $current eq $base;  # already on base (layer 2 returned)
 
     $info->{base} = $base;
     my $cr = $self->_run($c, 'rev-list', '--left-right', '--count', "$base...HEAD");
@@ -1399,13 +1422,19 @@ sub build_worktree_list {
         # Do NOT pass -w: Comserv worktrees ARE the isolation. `hermes chat -w`
         # creates a nested hermes/hermes-* branch (often from origin/main) and
         # the agent then edits the wrong tree.
-        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && hermes chat',
+        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2 && hermes dashboard --isolated --host 0.0.0.0 --port 9119 --no-open --skip-build',
+        hermes_port => 9119,
+        hermes_cwd => '/home/shanta/PycharmProjects/comserv2',
     };
 
     my $cfg = eval { _worktree_config() } // { branches => {} };
     my $branches = $cfg->{branches} // {};
     for my $name (sort keys %$branches) {
         my $b = $branches->{$name} // {};
+        my $hp = eval {
+            require Comserv::Util::BranchServerControl;
+            Comserv::Util::BranchServerControl->new->hermes_port_for($name, $b->{port} // 0);
+        } || (9100 + int(($b->{port} // 0) % 100));
         push @list, {
             name  => $name,
             port  => $b->{port} // 0,
@@ -1413,9 +1442,11 @@ sub build_worktree_list {
             url   => $b->{url}   // '/planning/daily',
             cmd   => "cd $base/$name/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p "
                    . ($b->{port} // 0) . ' -r',
-            # Branch Hermes: cwd = the worktree git root so its .hermes.md loads.
-            # No -w — see main hermes_cmd comment above.
-            hermes_cmd => "cd $base/$name/Comserv && hermes chat",
+            # Branch Hermes: isolated dashboard in the worktree git root so
+            # .hermes.md loads and 9119 (main) is not reused. No hermes -w.
+            hermes_port => $hp,
+            hermes_cmd => "cd $base/$name/Comserv && hermes dashboard --isolated --host 0.0.0.0 --port $hp --no-open --skip-build",
+            hermes_cwd => "$base/$name/Comserv",
             project_id => $b->{project_id} // undef,
             host       => $b->{host} // undef,
             sitename   => $b->{sitename} // undef,
@@ -1928,7 +1959,7 @@ sub run_test_gate {
             my $msg = "Test gate REFUSED: checkout '$wt_dir' has $n uncommitted change(s) "
                     . "($preview...). The gate would test code that is not committed to "
                     . "the branch being merged. Commit (or stash) the changes first, then re-run the gate.";
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'test_gate',
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'test_gate',
                 "run_test_gate: dirty checkout for '$branch' — $n uncommitted changes");
             return { success => 0, dirty => 1, output => $msg };
         }

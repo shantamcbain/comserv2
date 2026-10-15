@@ -1,0 +1,35 @@
+# comserv2-search — standalone compose
+#
+# Mirrors services/openscad/docker-compose.yml so the search service can run
+# on ANY docker host (workstation, services VM, production1) independently of
+# the web stack.
+#
+#   docker compose up -d --build
+#
+# Moving hosts: rebuild there, or
+#   docker save comserv2-search:latest | ssh <host> docker load
+#
+# The app reaches it via Comserv/root/config/services.json (FULL URL only —
+# never a container name), so relocating = editing one URL.
+
+services:
+  search:
+    build: .
+    image: comserv2-search:latest
+    container_name: comserv2-search
+    restart: unless-stopped
+    ports:
+      - "8084:8080"
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8084/
+    # The upstream searxng image has NO curl and NO wget, so a CMD curl
+    # healthcheck can never pass — the container is marked unhealthy even
+    # though it serves queries fine, and Docker may restart it away.
+    # Use the Python that ships in the image to probe /healthz instead.
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/healthz', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s

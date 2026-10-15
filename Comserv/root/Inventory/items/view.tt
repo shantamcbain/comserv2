@@ -66,6 +66,82 @@
   <tr><th>Created By</th><td>[% item.created_by || '-' %]</td></tr>
 </table>
 
+[% IF traveler_state %]
+<h2>Workflow Status</h2>
+<div style="border:2px solid [% traveler_state.color %];border-radius:8px;padding:1em 1.2em;margin-bottom:1em;background:[% traveler_state.color %]10;">
+  <div style="display:flex;align-items:center;gap:0.8em;flex-wrap:wrap;">
+    <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:[% traveler_state.color %];"></span>
+    <strong style="font-size:1.1em;color:[% traveler_state.color %];">[% traveler_state.label %]</strong>
+    [% IF traveler_state.qty > 0 %]
+    <span style="font-size:0.95em;color:var(--text-color);">— qty: <strong>[% traveler_state.qty %]</strong></span>
+    [% END %]
+  </div>
+  [% IF queue_jobs && queue_jobs.size > 0 %]
+  <div style="margin-top:0.6em;font-size:0.9em;">
+    <strong>Print Queue Jobs:</strong>
+    <table style="margin-top:0.3em;border-collapse:collapse;width:100%;">
+      <thead>
+        <tr style="background:var(--secondary-color,#eee);">
+          <th style="padding:0.3em 0.5em;text-align:left;border:1px solid var(--border-color);">#</th>
+          <th style="padding:0.3em 0.5em;text-align:left;border:1px solid var(--border-color);">Status</th>
+          <th style="padding:0.3em 0.5em;text-align:left;border:1px solid var(--border-color);">Qty</th>
+          <th style="padding:0.3em 0.5em;text-align:left;border:1px solid var(--border-color);">Created</th>
+          <th style="padding:0.3em 0.5em;text-align:left;border:1px solid var(--border-color);">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      [% FOREACH j IN queue_jobs %]
+        <tr>
+          <td style="padding:0.3em 0.5em;border:1px solid var(--border-color);">[% j.id %]</td>
+          <td style="padding:0.3em 0.5em;border:1px solid var(--border-color);">
+            <span style="display:inline-block;padding:0.1em 0.4em;border-radius:3px;font-size:0.85em;font-weight:bold;
+              [% SWITCH j.status %]
+                [% CASE 'queued' %]background:#ffc107;color:#333;
+                [% CASE 'assigned' %]background:#17a2b8;color:#fff;
+                [% CASE 'printing' %]background:#007bff;color:#fff;
+                [% CASE 'completed' %]background:#28a745;color:#fff;
+                [% CASE %]background:#6c757d;color:#fff;
+              [% END %]">[% j.status %]</span>
+          </td>
+          <td style="padding:0.3em 0.5em;border:1px solid var(--border-color);">[% j.quantity %]</td>
+          <td style="padding:0.3em 0.5em;border:1px solid var(--border-color);font-size:0.85em;">[% j.created_at %]</td>
+          <td style="padding:0.3em 0.5em;border:1px solid var(--border-color);">
+            <a href="/3d/queue" style="font-size:0.85em;">Queue</a>
+          </td>
+        </tr>
+      [% END %]
+      </tbody>
+    </table>
+  </div>
+  [% END %]
+  [% IF po_lines && po_lines.size > 0 %]
+  <div style="margin-top:0.6em;font-size:0.9em;">
+    <strong>Purchase Orders:</strong>
+    <table style="margin-top:0.3em;border-collapse:collapse;width:100%;">
+      <thead>
+        <tr style="background:var(--secondary-color,#eee);">
+          <th style="padding:0.3em 0.5em;text-align:left;border:1px solid var(--border-color);">PO #</th>
+          <th style="padding:0.3em 0.5em;text-align:left;border:1px solid var(--border-color);">Qty Ordered</th>
+          <th style="padding:0.3em 0.5em;text-align:left;border:1px solid var(--border-color);">Qty Received</th>
+          <th style="padding:0.3em 0.5em;text-align:left;border:1px solid var(--border-color);">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+      [% FOREACH pl IN po_lines %]
+        <tr>
+          <td style="padding:0.3em 0.5em;border:1px solid var(--border-color);">[% pl.purchase_order.id %]</td>
+          <td style="padding:0.3em 0.5em;border:1px solid var(--border-color);">[% pl.quantity_ordered %]</td>
+          <td style="padding:0.3em 0.5em;border:1px solid var(--border-color);">[% pl.quantity_received || 0 %]</td>
+          <td style="padding:0.3em 0.5em;border:1px solid var(--border-color);">[% pl.purchase_order.status %]</td>
+        </tr>
+      [% END %]
+      </tbody>
+    </table>
+  </div>
+  [% END %]
+</div>
+[% END %]
+
 <h2>Accounting Links</h2>
 <table border="1" cellpadding="4">
   <tr>

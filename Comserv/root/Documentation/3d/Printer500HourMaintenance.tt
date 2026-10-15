@@ -1,0 +1,186 @@
+[% META
+    title = "Kobra 3 — 500-hour printer maintenance"
+    description = "Between-print 500-hour service for the stock Anycubic Kobra 3 on LAN. Hours come from queue JSON snapshots plus completed jobs, never from Anycubic cloud. Jobs stay manual — the JSON does not auto-complete a print."
+    roles = "admin,developer"
+    TemplateType = "Documentation"
+    category = "3d-printing,maintenance,printer-farm"
+    last_updated = "2026-09-24"
+    page_version = "0.1"
+    site_specific = "false"
+    project_id = "206"
+    project_code = "3DPRINT"
+%]
+[% PageVersion = 'Documentation/3d/Printer500HourMaintenance.tt,v 0.1 2026/09/24 hermes-agent Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'Kobra 3 — 500-hour printer maintenance'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+    <div class="doc-success">
+        <p class="doc-body"><strong>Tracking.</strong>
+            <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-link">project #206 3DPRINT</a>
+            ·
+            <a href="[% c.uri_for('/todo') %]?project_id=206" class="doc-link">project todos</a>
+            ·
+            <a href="[% c.uri_for('/todo/details') %]?record_id=2376" class="doc-link">todo #2376</a>
+            ·
+            <a href="[% c.uri_for('/project') %]" class="doc-link">all projects</a>
+        </p>
+    </div>
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <div class="doc-navrow">
+                <a href="#now" class="doc-navlink">Now</a>
+                <a href="#hours" class="doc-navlink">Hours</a>
+                <a href="#service" class="doc-navlink">500-hour service</a>
+                <a href="#between" class="doc-navlink">Between prints</a>
+                <a href="#log" class="doc-navlink">Log it</a>
+                <a href="#out" class="doc-navlink">Out of scope</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="now" class="doc-h2">Now</h2>
+            <p class="doc-body">Farm printer id=1 is the stock Anycubic Kobra 3 on LAN
+            (<code>[LAN_HOST:192.168.2.53]</code>). Cloud hour-counters do not run while LAN Mode is on.
+            There is <strong>no</strong> in-app alarm that blocks a printer at 500 hours. The worker
+            reads the snapshot JSON (and completed job times), then does the service by hand
+            <em>before the next job</em>.</p>
+            <p class="doc-body">Live pages:
+                <a href="[% c.uri_for('/3d/printers') %]" class="doc-link">/3d/printers</a>
+                ·
+                <a href="[% c.uri_for('/3d/printer_lan/control') %]?printer_id=1" class="doc-link">/3d/printer_lan/control?printer_id=1</a>
+                ·
+                <a href="[% c.uri_for('/3d/queue') %]" class="doc-link">/3d/queue</a>
+            </p>
+            <p class="doc-body">Related:
+                <a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a>
+                ·
+                <a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing</a>
+                ·
+                <a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-link">3dPrintingPlan</a>
+            </p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="hours" class="doc-h2">How hours are counted</h2>
+            <ol class="doc-body">
+                <li>On <code>/3d/queue</code> load (and on complete), LAN printers write a snapshot under
+                    <code>/data/nfs/3d/printer_states/printer_&lt;id&gt;.json</code>.</li>
+                <li>Fields used for hours: <code>printer_state.print_time_min</code> (this job, minutes),
+                    <code>accumulated_hours</code>, <code>hours_since_last_service</code>,
+                    <code>last_service_at</code> when present.</li>
+                <li>Add completed <code>Printing3dJob</code> print times for the same printer. Pre-LAN
+                    (early September 2026) is a short back-fill (~2–3 jobs) from notes/logs — do not invent
+                    cloud hours.</li>
+                <li>The printer does not push finished/error. Pull only. Never treat JSON
+                    <code>print_state=finished</code> as a queue complete — workers mark Printed / pick-box
+                    by hand.</li>
+            </ol>
+            <p class="doc-info">If the JSON is missing, visit <code>/3d/queue</code> once while the
+            printer has <code>[LAN_HOST:…]</code> and is reachable. Idle printers with no current job
+            may still need that visit to seed the file.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="service" class="doc-h2">500-hour service (Kobra 3, power off)</h2>
+            <p class="doc-body">Do this when <code>hours_since_last_service</code> is at or past 500,
+            or sooner if belts slip, PTFE kinks, or axes chatter. Power off. Cool nozzle and bed.</p>
+            <table class="doc-table">
+                <tr><th class="doc-th">Step</th><th class="doc-th">What</th></tr>
+                <tr>
+                    <td class="doc-td">1. Axes</td>
+                    <td class="doc-td">Wipe old grease. Light coat of the grease Anycubic shipped (or equivalent lithium) on Z lead screw and XY rods. Do not soak linear bearings.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">2. Belts</td>
+                    <td class="doc-td">XY belt tension: guitar-string taut, no skipped teeth. Replace if frayed.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">3. PTFE</td>
+                    <td class="doc-td">Pull the bowden, look for heat-creep flare or chew marks at the coupler. Replace if oval or scored. Reseat fully in the hotend and ACE path.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">4. Hotend / nozzle</td>
+                    <td class="doc-td">Cold-pull if oozing. Swap nozzle if the orifice is oval. Check silicone sock.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">5. Fans / ducts</td>
+                    <td class="doc-td">Part-cooling and hotend fans spin freely. Dust the ACE dryer intake if the box is in use.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">6. Plate / screws</td>
+                    <td class="doc-td">Wash PEI with dish soap if adhesion drifted. Snug frame and gantry screws — do not strip.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">7. ACE (if attached)</td>
+                    <td class="doc-td">ACE is not a farm printer. Clear filament dust from hubs. Do not treat ACE as a second <code>printing_3d_printers</code> row.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">8. Prove</td>
+                    <td class="doc-td">Power on, LAN Mode still on, Control page MQTT state <code>free</code>, short dry-run or first real job after a bed wipe.</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="between" class="doc-h2">Every job (not 500 hours)</h2>
+            <ul class="doc-body">
+                <li>Correct filament loaded; spool matches the job.</li>
+                <li>Plate clean; previous part is in the pick box, not on the bed.</li>
+                <li>Nozzle not clogged. Belts not slack to the eye.</li>
+                <li>Control page temps look sane (idle ~room, not a stuck 200 °C target).</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="log" class="doc-h2">Log the service</h2>
+            <ol class="doc-body">
+                <li>Farm row notes: date, hours at service, what was replaced (nozzle / PTFE / belt).</li>
+                <li>If the JSON has <code>last_service_at</code> / <code>hours_since_last_service</code>,
+                    reset those on the next queue snapshot after you edit notes — do not hand-DDL.</li>
+                <li>Do not add host/port/service columns on <code>printing_3d_printers</code> until schema-compare on the schema branch.</li>
+            </ol>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="out" class="doc-h2">Out of scope</h2>
+            <ul class="doc-body">
+                <li>No auto-pause or auto-complete from hours or MQTT state.</li>
+                <li>No Anycubic cloud login to recover old hour totals.</li>
+                <li>No in-browser camera as a maintenance check (HTTP-FLV is VLC after Start camera).</li>
+                <li>Rinkhals / Moonraker / rooted firmware.</li>
+            </ul>
+            <p class="doc-footer">Todo #2376 · project #206 3DPRINT · coordinator
+                <a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-link">3dPrintingPlan</a>.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+</div>

@@ -13,6 +13,7 @@
     { "accno": "2000", "description": "Accounts Payable",               "charttype": "A", "category": "L", "link": "AP", "gifi_accno": "2620" },
     { "accno": "2100", "description": "GST/HST Payable",                "charttype": "A", "category": "L", "link": "AR_tax AP_tax", "gifi_accno": "2640" },
     { "accno": "2200", "description": "Accrued Liabilities",            "charttype": "A", "category": "L", "link": "", "gifi_accno": "2650" },
+    { "accno": "2400", "description": "Shareholder Loan / Due to Owner", "charttype": "A", "category": "L", "link": "", "gifi_accno": "2700" },
     { "accno": "3000", "description": "Owner's Equity",                 "charttype": "A", "category": "Q", "link": "", "gifi_accno": "3600" },
     { "accno": "3100", "description": "Retained Earnings",              "charttype": "A", "category": "Q", "link": "", "gifi_accno": "3620" },
     { "accno": "4200", "description": "Service Revenue",                "charttype": "A", "category": "I", "link": "AR_amount IC_sale", "gifi_accno": "8299" },

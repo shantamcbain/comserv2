@@ -3,10 +3,10 @@
    description = "How the AI Chat system reads prompts, selects agents and models, and handles different request types"
    roles = "user,admin,developer,helpdesk"
    category = "AI Module"
-   page_version = "1.1"
-   last_updated = "2026-08-26"
+   page_version = "1.2"
+   last_updated = "2026-09-28"
 %]
-[% PageVersion = 'Documentation/AIChatSystemUserGuide.tt,v 1.1 2026/08/26 shanta' %]
+[% PageVersion = 'Documentation/AIChatSystemUserGuide.tt,v 1.2 2026/09/28 shanta' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -67,6 +67,7 @@
 <nav id="ai_guide_nav" style="margin-bottom:1.5em;">
     <strong>Quick Navigation:</strong>
     <a href="#how-it-works">How It Works</a> |
+    <a href="#harm-refusal">What we will not answer</a> |
     <a href="#prompt-types">Prompt Types</a> |
     <a href="#agents">Agents</a> |
     <a href="#models">Model Selection</a> |
@@ -112,6 +113,14 @@
         <div><strong>Response &amp; Action</strong> — The AI responds with text, a navigation link, or a pre-filled form action. The widget then executes the action (navigating the page, filling form fields, etc.).</div>
     </div>
 </div>
+</div>
+
+<hr>
+
+<div class="ai-doc-section" id="harm-refusal">
+<h2>What we will not answer</h2>
+<p>Before a prompt is sent to Grok, OpenRouter, Ollama, or the local Grok CLI, the app runs a local check (<code>Comserv::Util::AI::HarmRefusal</code>). If the prompt asks for help harming a person, building a weapon to hurt people, sexual content involving a child, or a method of suicide, the app answers with a refusal and does not call the model.</p>
+<p>Herbal questions, plant safety, and garden or beekeeping pest control are not in that set. A refusal does not call the police, does not freeze your ability to delete a chat, and does not change how long chats are kept. The prompt text is not written to the log.</p>
 </div>
 
 <hr>

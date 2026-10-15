@@ -356,12 +356,17 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     elsif ($op eq 'push') {
         my $branch = $self->get_current_branch($c);
         my $tracking = $self->get_tracking_info($c);
-        if (!$tracking->{upstream} && !$c->req->param('set_upstream')) {
+        # main/master on the primary checkout (:3001) always publishes to origin.
+        # Worktree branches still require an explicit set-upstream checkbox.
+        my $publish = ($branch eq 'main' || $branch eq 'master');
+        if (!$tracking->{upstream} && !$publish && !$c->req->param('set_upstream')) {
             $msg = "Branch '$branch' has no upstream. Re-submit with 'set upstream' checked to push.";
         }
         else {
             my @cmd = ('push');
-            push @cmd, '--set-upstream' if !$tracking->{upstream};
+            # Restore branch.<name>.merge when it is missing so the next load
+            # uses @{u} instead of the origin/<branch> inference.
+            push @cmd, '--set-upstream' if !$tracking->{upstream_configured};
             push @cmd, 'origin', $branch;
             my ($out, $code) = $self->_git_list($c, @cmd);
             $ok = ($code == 0);
@@ -562,13 +567,11 @@ Diff${\ ($truncated ? ' (truncated)' : '')}:
 $diff
 PROMPT
 
-    # An explicit model from the Git dashboard wins. The dropdown offers the
-    # FULL catalog (Ollama + Grok + OpenRouter); the selected value is
-    # "provider|model" (e.g. "openrouter|cohere/north-mini-code:free"). If empty, the Router
-    # falls back to the app-wide default (openrouter|cohere/north-mini-code:free) unless no
-    # external key is configured, in which case it uses local Ollama — so the
-    # behavior is consistent with the chat widget and editor.
-    my $requested_model = $c->req->param('model') || '';
+    # An explicit model from the Git dashboard wins. For commit message suggestion
+    # we default to north-mini-code:free (cheap, reliable coding model) rather than
+    # letting routing pick Grok/SuperGrok. The dropdown offers the full catalog;
+    # value is "provider|model".
+    my $requested_model = $c->req->param('model') || 'openrouter|cohere/north-mini-code:free';
     $requested_model = '' if $requested_model =~ /[\x00\r\n]/;
 
     # SINGLE dispatch brain — identical code path to the chat widget and the
@@ -602,7 +605,12 @@ PROMPT
         my $err = ($resp && $resp->{error}) ? $resp->{error} : 'AI returned no message';
         # UI surfaces this verbatim — never dump full OAuth JSON / JWT bodies.
         $err =~ s/\s+/ /g;
-        if ($err =~ /unauthenticated|bad-credentials|token could not be validated/i
+        if ($err =~ /spending.?limit|personal-team-blocked|out of credits|add credits|upgrade at/i
+            && $err !~ /unauthenticated|bad-credentials|token could not be validated/i) {
+            # Not a credential problem — re-auth would be a waste of time.
+            $err = 'SuperGrok/xAI quota or spending limit reached — add credits or wait for the reset; another model was tried automatically';
+        }
+        elsif ($err =~ /unauthenticated|bad-credentials|token could not be validated/i
             || ($resp && $resp->{auth_failed})) {
             $err = 'SuperGrok/xAI login expired or invalid — re-auth Hermes (xai-oauth), then run script/sync_supergrok_token.pl';
         }
@@ -706,6 +714,11 @@ sub index :Path('/admin/git') :Args(0) {
     $c->stash(
         repo_path       => $self->repo_path($c),
         current_branch  => $self->get_current_branch($c),
+        # current_worktree = registry key from app_workflow (path-based worktree dir name under ~/.comserv/worktrees/).
+        # Used to highlight the matching row in Develop Servers / Branch Servers list (b.name).
+        # This can differ from current_branch (live git) if a feature branch was checked out inside a worktree slot.
+        # The list itself is registry-driven; highlighting marks "this running server".
+        current_worktree => $c->stash->{app_workflow} || 'main',
         local_branches  => $self->get_local_branches($c),
         branch_details  => $self->git_service->get_branch_details($c),
         recent_commits  => $self->get_recent_commits($c),

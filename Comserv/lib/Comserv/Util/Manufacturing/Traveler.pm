@@ -3,7 +3,7 @@ package Comserv::Util::Manufacturing::Traveler;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
-use POSIX qw(strftime);
+use Comserv::Util::AppTime;
 use URI::Escape qw(uri_escape uri_unescape);
 
 # HDRY system master assembly (in-house / product):
@@ -11,6 +11,12 @@ use URI::Escape qw(uri_escape uri_unescape);
 
 use constant HDRY_SYSTEM_ID  => 51;
 use constant HDRY_SYSTEM_SKU => 'INT-HDRY-001';
+
+# Base and Add-on sub-assemblies for separate in-house orders:
+use constant HDRY_BASE_ID  => 52;
+use constant HDRY_BASE_SKU => 'INT-HDRY-001-P36787';
+use constant HDRY_ADDON_ID  => 53;
+use constant HDRY_ADDON_SKU => 'INT-HDRY-001-P36788';
 
 # Order statuses that still need manufacturing / picking
 use constant OPEN_ORDER_STATUSES => qw(
@@ -29,7 +35,7 @@ sub _sitename {
 }
 
 sub _today {
-    return strftime('%Y-%m-%d', localtime);
+    return Comserv::Util::AppTime->today_utc_ymd;
 }
 
 sub _fmt_date {
@@ -239,9 +245,10 @@ sub _list_bom {
 }
 
 sub _explode_to_leaves {
-    my ($self, $c, $parent_id, $parent_sku, $mult, $seen_parents) = @_;
+    my ($self, $c, $parent_id, $parent_sku, $mult, $seen_parents, $seen_leaves) = @_;
     $mult         = 1 unless defined $mult;
     $seen_parents ||= {};
+    $seen_leaves  ||= {};
     return () if $parent_id && $seen_parents->{$parent_id}++;
 
     my $res   = $self->_list_bom($c, $parent_id, $parent_sku);
@@ -257,6 +264,10 @@ sub _explode_to_leaves {
         if (@$child_lines) {
             push @nested, { line => $ln, child_id => $cid, child_sku => $ln->{sku} };
         } else {
+            # Leaf at this path. A component reachable via two paths (e.g. a direct
+            # child of the parent AND a descendant of a sub-assembly) must only be
+            # counted once, otherwise the traveler double-adds it.
+            next if $seen_leaves->{$cid}++;
             push @flat, $ln;
         }
     }
@@ -266,15 +277,10 @@ sub _explode_to_leaves {
         for my $n (@nested) {
             my $q = 0 + ($n->{line}{quantity} // 1);
             push @leaves, $self->_explode_to_leaves(
-                $c, $n->{child_id}, $n->{child_sku}, $mult * $q, $seen_parents
+                $c, $n->{child_id}, $n->{child_sku}, $mult * $q, $seen_parents, $seen_leaves
             );
         }
         for my $ln (@flat) {
-            my $sku = $ln->{sku} // '';
-            next if $sku =~ /^INT-HDRY-(BBL|BBR|BL|BLS|BR|BRS|FL|FLS|FR|FRS|FFL|FFR|SBR|SRC|SRL|SRR)/i;
-            next if $sku =~ /^HW-(M4|M3|608|MAG|GASKET|POLY|WASHER|BOLT|SPACER)/i;
-            next if $sku =~ /^INT-HDRY-GSK/i;
-            next if $sku =~ /^INT-HDRY-WHEEL/i;
             push @leaves, $self->_leaf_from_line($ln, $mult);
         }
     } else {
@@ -497,11 +503,6 @@ sub _parts_from_leaves {
         my $sku    = $meta->{sku}  || $ln->{sku}  || '';
         my $name   = $meta->{name} || $ln->{name} || '';
 
-        # Structure parts are always printed even if origin was left wrong at import.
-        if ($origin ne '3d_printed' && $sku =~ /^INT-HDRY-(BBL|BBR|BL|BLS|BR|BRS|FL|FLS|FR|FRS|FFL|FFR|SBR|SBL|SRC|SRL|SRR|WHEEL)/i) {
-            $origin = '3d_printed';
-        }
-
         my $is_print = ($origin eq '3d_printed' || $origin =~ /print/i) ? 1 : 0;
         my $model    = ($cid && $model_by_item{$cid}) ? $model_by_item{$cid} : {};
 
@@ -509,48 +510,71 @@ sub _parts_from_leaves {
         # green = in pick box, blue = printed ready to pick,
         # red = already in print queue, purple = need print but NOT queued yet
         my ($row_state, $status_display, $status);
-        # Priority order for traveler display:
-        # 1. need_print (purple) — shortfall, nothing queued yet
-        # 2. in_queue (red) — already on print farm queue
-        # 3. in_box (green) — in pick box / in stock
-        if ($is_print && $short > 0 && $in_queue <= 0) {
-            $row_state       = 'need_print';       # purple — shortfall, nothing queued
-            $status          = 'pending';
-            $status_display  = 'Need print (not queued)';
-        } elsif ($is_print && $in_queue > 0 && $short == 0) {
-            # Extra queue while stock already covered
-            $row_state       = 'in_queue';         # red — already on farm queue
-            $status          = 'pending';
-            $status_display  = "In print queue ($in_queue)";
-        } elsif ($is_print && $short > 0 && $in_queue > 0) {
-            $row_state       = 'in_queue';         # red — already on farm queue
-            $status          = 'pending';
-            $status_display  = "In print queue ($in_queue)";
-        } elsif ($qty > 0 && $on_hand >= $qty) {
-            $row_state       = 'in_box';          # green
-            $status          = 'in_stock';
-            $status_display  = 'In pick box';
-        } elsif ($from_queue >= $qty && $qty > 0 && $on_hand < $qty) {
-            $row_state       = 'printed_ready';   # blue
-            $status          = 'printed';
-            $status_display  = 'Printed — ready to pick into box';
-        } elsif ($from_queue > $on_hand && $short == 0) {
-            $row_state       = 'printed_ready';
-            $status          = 'printed';
-            $status_display  = 'Printed — ready to pick into box';
-        } elsif (!$is_print && $short > 0) {
-            $row_state       = 'need_buy';         # amber
-            $status          = 'pending';
-            $status_display  = 'Need purchase';
-        } elsif ($on_hand > 0) {
-            $row_state       = 'in_box';
-            $status          = 'in_stock';
-            $status_display  = 'In pick box / partial stock';
-        } else {
-            $row_state       = 'in_box';
-            $status          = 'in_stock';
-            $status_display  = 'OK';
-        }
+                # Priority order for traveler display (user requested):
+                # 1. need_buy (amber) — items to be ordered
+                # 2. need_print (purple) — items to add to queue / need to print
+                # 3. in_queue (red) — picked items / already in queue / need to be picked
+                # 4. printed_ready (blue) — printed items that needs picking
+                # Priority order for traveler display (user requested):
+                # 1. need_buy (amber) — items to be ordered
+                # 2. need_print (purple) — items to add to queue / need to print
+                # 3. in_queue (red) — picked items / already in queue / need to be picked
+                # 4. printed_ready (blue) — printed items that needs picking
+                #    Now also includes items that have arrived into stock (on_hand > 0)
+                #    but have not yet been picked/allocated into the pick box for this build.
+                # 5. in_box (green) — items in the pick box / picked items — LAST group
+                #
+                # Stock truth wins: if recorded on_hand already covers the need, the part is
+                # IN THE BOX (green) even if more are still printing.
+                if (!$is_print && $short > 0 && $on_hand < $qty) {
+                    $row_state       = 'need_buy';         # amber — items to be ordered
+                    $status          = 'pending';
+                    $status_display  = 'Need purchase';
+                } elsif ($on_hand >= $qty && $qty > 0) {
+                    # Already satisfied from stock — it is in the pick box.
+                    $row_state       = 'in_box';          # green — items in the pick box / picked items
+                    $status          = 'in_stock';
+                    $status_display  = 'In pick box';
+                    if ($in_queue > 0) {
+                        # Some extra qty still printing — note it, but do NOT override green.
+                        $status_display .= " (+$in_queue printing)";
+                    }
+                } elsif ($is_print && $short > 0 && $in_queue <= 0 && $from_queue <= $on_hand) {
+                    $row_state       = 'need_print';       # purple — items to add to queue
+                    $status          = 'pending';
+                    # Label must never claim "not queued" when something IS queued/printing.
+                    $status_display  = ($in_queue > 0 || $from_queue > $on_hand)
+                        ? 'Need print (queued: ' . ($in_queue || 0) . ')'
+                        : 'Need print (not queued)';
+                } elsif ($is_print && $short > 0 && $in_queue > 0) {
+                    $row_state       = 'in_queue';         # red — picked items / already in queue
+                    $status          = 'pending';
+                    $status_display  = "In print queue ($in_queue)";
+                } elsif ($is_print && $short > 0 && ($from_queue > $on_hand || $on_hand > 0)) {
+                    # Printed arrived: includes completed prints not yet in stock,
+                    # AND items that are in stock (on_hand > 0) but not yet picked for this build.
+                    $row_state       = 'printed_ready';   # blue — printed / arrived items
+                    $status          = 'printed';
+                    if ($on_hand > 0) {
+                        $status_display  = 'Printed — arrived (in stock, not picked)';
+                    } else {
+                        $status_display  = 'Printed — needs picking';
+                    }
+                } elsif ($is_print && $qty > 0 && $on_hand == 0 && $in_queue == 0 && $from_queue == 0) {
+                    # Zero-stock needed printed item must never appear as satisfied "OK" or in in_box.
+                    # It belongs in need_print until a job is queued or stock appears.
+                    $row_state       = 'need_print';
+                    $status          = 'pending';
+                    $status_display  = 'Need print (no stock / no credit)';
+                } elsif ($on_hand > 0) {
+                    $row_state       = 'in_box';
+                    $status          = 'in_stock';
+                    $status_display  = 'In pick box / partial stock';
+                } else {
+                    $row_state       = 'in_box';
+                    $status          = 'in_stock';
+                    $status_display  = 'OK';
+                }
 
         if ($is_print && $model->{file_warn}) {
             $status_display = ($status_display ? "$status_display — " : '') . $model->{file_warn};
@@ -589,6 +613,8 @@ sub _parts_from_leaves {
 }
 
 # Receive completed-print lag into inventory so "In Stock" / pick box matches shop floor.
+# Accepts optional location_name: 'Print Farm Pick Box', 'Print Farm Stock', 'On Printer'
+# Defaults to 'Print Farm Pick Box' for backward compat.
 # Returns { ok, received, on_hand, error }
 #
 # Error audit (2026-09-03, item=84, site 3d): location_id NULL on INSERT to inventory_stock_levels.
@@ -596,9 +622,10 @@ sub _parts_from_leaves {
 # before any stock create. See changelog 2026-09-04-traveler-location-null.
 # Verified perl -c + code review 2026-09-05. CODER_READY (no re-plan needed for similar location issues).
 sub put_part_in_pick_box {
-    my ($self, $c, $item_id, $qty_hint) = @_;
+    my ($self, $c, $item_id, $qty_hint, $location_name) = @_;
     $item_id = 0 + ($item_id // 0);
     return { ok => 0, error => 'item_id required' } unless $item_id;
+    $location_name ||= 'Print Farm Pick Box';
 
     my $schema = eval { $c->model('DBEncy') };
     return { ok => 0, error => 'no schema' } unless $schema;
@@ -635,23 +662,24 @@ sub put_part_in_pick_box {
             };
 
             my $sitename = $self->_sitename($c);
+            # Look up or create the requested location
             my $loc = $schema->resultset('Accounting::InventoryLocation')->search(
-                { sitename => $sitename, status => 'active' },
+                { sitename => $sitename, name => $location_name, status => 'active' },
                 { order_by => 'id', rows => 1 },
             )->first;
             unless ($loc) {
                 $loc = $schema->resultset('Accounting::InventoryLocation')->search(
-                    { sitename => $sitename },
+                    { sitename => $sitename, name => $location_name },
                     { order_by => 'id', rows => 1 },
                 )->first;
             }
             unless ($loc) {
                 $loc = $schema->resultset('Accounting::InventoryLocation')->create({
                     sitename      => $sitename,
-                    name          => 'Print Farm Pick Box',
+                    name          => $location_name,
                     location_type => 'warehouse',
                     status        => 'active',
-                    notes         => 'Auto-created for traveler pick-box receives',
+                    notes         => 'Auto-created for traveler receives',
                     created_by    => $c->session->{username} || 'system',
                     created_at    => $now,
                     updated_at    => $now,
@@ -728,11 +756,30 @@ sub queue_part_print {
     my $from_q  = 0 + ($printed->{$item_id} // 0);
     my $in_q    = 0 + ($queued->{$item_id} // 0);
     my $have    = $from_q > $on_hand ? $from_q : $on_hand;
-    # Caller qty wins; else leave room for anything already queued
-    my $need = defined $qty && $qty > 0 ? (0 + $qty) : 1;
-    if (!defined $qty || $qty <= 0) {
-        # If traveler passed no qty, queue at least 1 (UI should pass shortfall)
-        $need = 1;
+
+    # $qty (if passed) is the traveler's qty_needed for this part in the build.
+    # Queue ONLY the true remainder so a second click never double-queues:
+    #   remainder = qty_needed - on_hand - already_queued
+    # If the caller passed an explicit qty we treat it as qty_needed; otherwise fall
+    # back to (on_hand already satisfied -> at least 1) for direct/standalone calls.
+    my $qty_needed = (defined $qty && $qty > 0) ? (0 + $qty) : 0;
+    my $need;
+    if ($qty_needed > 0) {
+        $need = $qty_needed - $on_hand - $in_q;
+    } else {
+        # No qty context (e.g. standalone API call): queue 1 unless already covered.
+        $need = $have >= 1 ? 0 : 1;
+    }
+    $need = 0 + int($need);
+    if ($need <= 0) {
+        # Nothing left to queue — already satisfied by stock + what's in the queue.
+        return {
+            ok         => 1,
+            queued     => 0,
+            item_id    => $item_id,
+            sku        => $item ? $item->sku : undef,
+            message    => 'No remainder to queue (stock + existing queue already covers need)',
+        };
     }
 
     my $model = eval {
@@ -886,6 +933,10 @@ sub record_clean_labour {
         '[%s] %s labour %s (%.0fs) by %s — +$%s cost @ %s pts/hr',
         $now, $category, $human, $secs, $username, $labour_cost, $rate
     );
+    my $extra = $args->{notes} // '';
+    $extra =~ s/[\r\n]+/ /g;
+    $extra =~ s/^\s+|\s+$//g;
+    $note_line .= " — $extra" if length $extra;
     my $notes = $item->notes // '';
     $notes = length($notes) ? ($notes . "\n" . $note_line) : $note_line;
     # Keep notes from growing without bound
@@ -1140,7 +1191,12 @@ sub get_customers_with_open_orders {
 
     # Ensure In-House appears when there is an INT-HDRY-001 build to pick/print,
     # even if no inventory_customer_orders row exists yet.
-    my $has_inhouse = grep { lc($_) eq 'in-house' || lc($_) eq 'in house' } keys %by_customer;
+    # Only add synthetic if there are *no* In-House records at all (open or cancelled).
+    # MariaDB has no ILIKE (Postgres). Customer name is stored as 'In-House'.
+    my $has_inhouse = $c->model('DBEncy')->resultset('Accounting::InventoryCustomerOrder')->search({
+        sitename      => $self->_sitename($c),
+        customer_name => 'In-House',
+    })->count > 0;
     unless ($has_inhouse) {
         my $hdry = eval {
             $c->model('DBEncy')->resultset('Accounting::InventoryItem')->find({
@@ -1172,6 +1228,84 @@ sub get_customers_with_open_orders {
                 customer_link => $synthetic->{customer_link},
                 latest_date   => $synthetic->{order_date},
             };
+        }
+
+        # Also add synthetic In-House entries for base and addon sub-units
+        # so separate orders for base unit and top/addon appear in the list.
+        foreach my $sub ( 
+            { id => HDRY_BASE_ID, sku => HDRY_BASE_SKU, name => 'HDRY Base unit (bottom, top, wheels)' },
+            { id => HDRY_ADDON_ID, sku => HDRY_ADDON_SKU, name => 'HDRY Add-on module (stacks, no bottom/top)' }
+        ) {
+            my $sub_item = eval {
+                $c->model('DBEncy')->resultset('Accounting::InventoryItem')->find({
+                    sitename => $self->_sitename($c),
+                    sku      => $sub->{sku},
+                });
+            };
+            my $sid = $sub_item ? $sub_item->id : $sub->{id};
+            my $sname = $sub_item ? $sub_item->name : $sub->{name};
+            my $sub_synthetic = {
+                customer      => 'In-House',
+                order_id      => 'item-' . $sid,
+                order_date    => $self->_today,
+                items         => "$sname (" . $sub->{sku} . ')',
+                status        => 'open',
+                scope_note    => 'In-house ' . ($sub->{id} == HDRY_BASE_ID ? 'base' : 'addon') . ' build',
+                source        => 'in_house_item',
+                link          => $c->uri_for('/Accounting/manufacturing/view/item', $sid),
+                print_link    => $c->uri_for('/Accounting/manufacturing/print/item', $sid),
+                customer_link => $c->uri_for('/Accounting/manufacturing/customer', uri_escape('In-House')),
+            };
+            # Add as additional open order under In-House (don't overwrite the main)
+            push @{ $by_customer{'In-House'}{open_orders} || [] }, $sub_synthetic;
+            push @{ $by_customer{'In-House'}{items_preview} || [] }, $sub_synthetic->{items};
+            $by_customer{'In-House'}{order_count} = ($by_customer{'In-House'}{order_count} || 0) + 1;
+        }
+    }
+
+    # Always add synthetic In-House entries for base and addon sub-assemblies
+    # if there is no real open customer order for that specific item.
+    # This makes in-house builds for base and top appear as separate orders
+    # under the "In-House" customer, just like a regular customer order.
+    foreach my $sub (
+        { id => HDRY_BASE_ID,  sku => HDRY_BASE_SKU,  name => 'HDRY Base unit (bottom, top, wheels)' },
+        { id => HDRY_ADDON_ID, sku => HDRY_ADDON_SKU, name => 'HDRY Add-on module (stacks, no bottom/top)' }
+    ) {
+        my $has_real_open_for_item = $c->model('DBEncy')->resultset('Accounting::InventoryCustomerOrder')->search({
+            sitename      => $self->_sitename($c),
+            customer_name => 'In-House',
+            status => { -in => [qw(pending open processing in_progress confirmed accepted picking manufacturing partial)] },
+        }, { join => 'lines' })->search({
+            'lines.item_id' => $sub->{id},
+        })->count > 0;
+
+        unless ($has_real_open_for_item) {
+            my $sub_item = eval {
+                $c->model('DBEncy')->resultset('Accounting::InventoryItem')->find({
+                    sitename => $self->_sitename($c),
+                    sku      => $sub->{sku},
+                });
+            };
+            my $sid = $sub_item ? $sub_item->id : $sub->{id};
+            my $sname = $sub_item ? $sub_item->name : $sub->{name};
+            my $sub_synthetic = {
+                customer      => 'In-House',
+                order_id      => 'item-' . $sid,
+                order_date    => $self->_today,
+                items         => "$sname (" . $sub->{sku} . ')',
+                status        => 'open',
+                scope_note    => 'In-house ' . ($sub->{id} == HDRY_BASE_ID ? 'base unit' : 'addon/top') . ' build',
+                source        => 'in_house_item',
+                link          => $c->uri_for('/Accounting/manufacturing/view/item', $sid),
+                print_link    => $c->uri_for('/Accounting/manufacturing/print/item', $sid),
+                customer_link => $c->uri_for('/Accounting/manufacturing/customer', uri_escape('In-House')),
+            };
+            push @{ $by_customer{'In-House'}{open_orders} || [] }, $sub_synthetic;
+            push @{ $by_customer{'In-House'}{items_preview} || [] }, $sub_synthetic->{items};
+            $by_customer{'In-House'}{order_count} = ($by_customer{'In-House'}{order_count} || 0) + 1;
+            $by_customer{'In-House'}{customer} ||= 'In-House';
+            $by_customer{'In-House'}{customer_link} ||= $c->uri_for('/Accounting/manufacturing/customer', uri_escape('In-House'));
+            $by_customer{'In-House'}{latest_date} ||= $sub_synthetic->{order_date};
         }
     }
 
@@ -1240,6 +1374,32 @@ sub get_orders_for_customer {
             link       => $c->uri_for('/Accounting/manufacturing/view/item', $hid),
             print_link => $c->uri_for('/Accounting/manufacturing/print/item', $hid),
         };
+
+        # Synthetic for base and addon when viewing In-House customer
+        foreach my $sub (
+            { id => HDRY_BASE_ID, sku => HDRY_BASE_SKU, name => 'HDRY Base unit (bottom, top, wheels)' },
+            { id => HDRY_ADDON_ID, sku => HDRY_ADDON_SKU, name => 'HDRY Add-on module (stacks, no bottom/top)' }
+        ) {
+            my $sub_item = eval {
+                $c->model('DBEncy')->resultset('Accounting::InventoryItem')->find({
+                    sitename => $self->_sitename($c),
+                    sku      => $sub->{sku},
+                });
+            };
+            my $sid = $sub_item ? $sub_item->id : $sub->{id};
+            my $sname = $sub_item ? $sub_item->name : $sub->{name};
+            push @orders, {
+                customer   => 'In-House',
+                order_id   => 'item-' . $sid,
+                order_date => $self->_today,
+                items      => "$sname (" . $sub->{sku} . ')',
+                status     => 'open',
+                scope_note => 'In-house ' . ($sub->{id} == HDRY_BASE_ID ? 'base unit' : 'addon/top') . ' build',
+                source     => 'in_house_item',
+                link       => $c->uri_for('/Accounting/manufacturing/view/item', $sid),
+                print_link => $c->uri_for('/Accounting/manufacturing/print/item', $sid),
+            };
+        }
     }
 
     return {

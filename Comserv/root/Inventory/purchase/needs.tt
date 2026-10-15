@@ -1,0 +1,135 @@
+[% PageVersion = 'Inventory/purchase/needs.tt,v 0.01 2026/09/11 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+  <h1>Items Needing Order — by Supplier</h1>
+
+  [% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg | html %]</p>[% END %]
+  [% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg | html %]</p>[% END %]
+
+  <div class="actions" style="margin-bottom:1rem;">
+    <a href="/Inventory/purchase">⟳ Refresh Needs List</a>
+    &nbsp;|&nbsp;
+    <a href="/Inventory/stock/levels?low_only=1">Stock Levels (Low Only)</a>
+    &nbsp;|&nbsp;
+    <a href="/Inventory/items">All Items</a>
+    &nbsp;|&nbsp;
+    <a href="/Inventory/po">All Purchase Orders</a>
+    &nbsp;|&nbsp;
+    <a href="/Inventory">Dashboard</a>
+  </div>
+
+  <p style="color:var(--text-muted-color,#555);">
+    Low stock items (current ≤ reorder point). Grouped by preferred supplier from item-supplier links.
+    Set quantities and choose how to place the order (online / email / mail / phone).
+    Creates a draft PO; mark sent after placing.
+  </p>
+
+  [% IF total_low == 0 %]
+    <p class="success">No items currently below reorder point. Good!</p>
+  [% END %]
+
+  [%# Groups with suppliers %]
+  [% FOREACH sup IN by_supplier %]
+    <div class="content-section" style="margin-bottom:1.5rem; border-left:4px solid var(--primary-color,#3b82f6);">
+      <h3 style="margin-top:0;">
+        [% sup.supplier_name | html %]
+        <small style="font-weight:normal;">(Supplier ID: [% sup.supplier_id %])</small>
+      </h3>
+
+      <form method="POST" action="/Inventory/po/create" style="margin:0;">
+        <input type="hidden" name="supplier_id" value="[% sup.supplier_id %]">
+
+        <table border="1" cellpadding="4" cellspacing="0" style="width:100%; margin-bottom:0.5rem;">
+          <thead>
+            <tr>
+              <th style="width:3em;">Include</th>
+              <th>SKU</th>
+              <th>Item</th>
+              <th>Category</th>
+              <th>Current</th>
+              <th>Reorder Pt</th>
+              <th>Short</th>
+              <th>Qty to Order</th>
+              <th>Unit Cost</th>
+              <th>Supplier SKU</th>
+            </tr>
+          </thead>
+          <tbody>
+          [% FOREACH item IN sup.items %]
+            <tr>
+              <td><input type="checkbox" name="include" value="[% item.item_id %]" checked></td>
+              <td>[% item.sku | html %]</td>
+              <td><a href="/Inventory/item/view/[% item.item_id %]">[% item.name | html %]</a></td>
+              <td>[% item.category || '-' %]</td>
+              <td>[% item.current_stock %] [% item.unit_of_measure %]</td>
+              <td>[% item.reorder_point %]</td>
+              <td style="color:#b91c1c;">[% item.shortfall %]</td>
+              <td>
+                <input type="number" name="qty_[% item.item_id %]" value="[% item.suggested_qty %]" min="0" step="0.01" style="width:6em;">
+              </td>
+              <td>[% item.unit_cost ? '$' _ item.unit_cost : '-' %]</td>
+              <td>[% item.supplier_sku || '-' %]</td>
+              <!-- hidden for create_po to capture into line -->
+              <input type="hidden" name="supplier_sku_[% item.item_id %]" value="[% item.supplier_sku || '' %]">
+              <input type="hidden" name="unit_cost_[% item.item_id %]" value="[% item.unit_cost || '' %]">
+              <input type="hidden" name="supplier_name_[% item.item_id %]" value="[% item.supplier_name || '' %]">
+            </tr>
+          [% END %]
+          </tbody>
+        </table>
+
+        <label>Order method / Send via:
+          <select name="send_via" style="margin-right:1rem;">
+            <option value="email">Email</option>
+            <option value="online">Online / Portal</option>
+            <option value="mail">Mail / Postal</option>
+            <option value="phone">Phone</option>
+            <option value="internal">Internal / Other</option>
+          </select>
+        </label>
+
+        <label>Notes: <input type="text" name="notes" style="width:30em;" placeholder="e.g. quote #123 or special instructions"></label>
+
+        <input type="submit" value="Create PO for [% sup.supplier_name | html %]" style="background:var(--success-color,#28a745);color:white;padding:0.3rem 0.8rem;border:none;border-radius:4px;cursor:pointer;">
+      </form>
+    </div>
+  [% END %]
+
+  [%# Unassigned items %]
+  [% IF unassigned.size %]
+    <div class="content-section" style="background:#fefce8; border:1px solid #ca8a04;">
+      <h3 style="margin-top:0; color:#854d0e;">Unassigned Items (no preferred supplier)</h3>
+      <p style="font-size:0.85rem;">Assign a supplier on the item's edit page (or via API) to include here. Or create PO manually after adding links.</p>
+      <table border="1" cellpadding="4" cellspacing="0" style="width:100%;">
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Name</th>
+            <th>Current / Reorder</th>
+            <th>Suggested Qty</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+        [% FOREACH item IN unassigned %]
+          <tr>
+            <td>[% item.sku %]</td>
+            <td><a href="/Inventory/item/view/[% item.item_id %]">[% item.name | html %]</a></td>
+            <td>[% item.current_stock %] / [% item.reorder_point %]</td>
+            <td>[% item.suggested_qty %]</td>
+            <td>
+              <a href="/Inventory/item/edit/[% item.item_id %]">Edit Item (add supplier)</a>
+            </td>
+          </tr>
+        [% END %]
+        </tbody>
+      </table>
+    </div>
+  [% END %]
+
+  <p style="margin-top:1rem;font-size:0.8rem;color:#666;">
+    Note: PO created as 'draft'. After placing the order with supplier, use the PO list to mark "sent" and record the method.
+    This flow re-uses existing InventoryPurchaseOrder tables (no new DB columns).
+  </p>
+</div>
