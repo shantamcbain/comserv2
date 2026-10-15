@@ -56,6 +56,7 @@
                             <h4>Email Account Not Active</h4>
                             <p>You do not currently have an active email account. Email accounts are available to members.</p>
                             <p>Contact an administrator to upgrade your account or purchase an email address.</p>
+                            <p><em>Just need replies (e.g. HelpDesk) sent to a different address?</em> That is your contact email, not a mailbox: <a href="/user/settings#email">change it in Account Settings</a>.</p>
                         </div>
                     [% END %]
                 </div>
