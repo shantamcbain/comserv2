@@ -497,10 +497,23 @@ sub process {
         delete $args{use_search};   # no unlabelled provider-side search in a grounded turn
     }
 
-    # Select provider+model (v2 Router)
+    # Select provider+model (v2 Router). The editor cheap-pin is not a user
+    # choice — leave it unset so ModelPick sees SuperGrok, OpenRouter, Ollama.
+    my $requested_model = $args{model};
+    my $user_picked = $args{user_picked} ? 1 : 0;
+    if (!$user_picked && $requested_model) {
+        require Comserv::Model::AI2::ModelPick;
+        $requested_model = undef
+            if Comserv::Model::AI2::ModelPick->is_auto_pin($requested_model);
+    }
     my ($provider_name, $use_model) = $self->select_provider_and_model($c,
-        $args{model}, $can_select,
-        agent_id => $args{agent_id},
+        $requested_model, $can_select,
+        agent_id    => $args{agent_id},
+        prompt      => $prompt,
+        phase       => $args{phase},
+        route       => $args{route},
+        user_picked => $user_picked,
+        surface     => $args{surface},
     );
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
         "AI2 chat dispatch: user=$username provider=$provider_name model="
@@ -531,6 +544,8 @@ sub process {
         # this point, so Grok's search_parameters (Grok.pm) never fired.
         $router->chat_with_fallback($c, $provider_name, $use_model, $messages,
             ($args{use_search} ? (use_search => 1) : ()),
+            (($args{phase} || '') eq 'implement' || ($args{route} || '') eq 'escalate')
+                ? (max_tokens => 8192) : (),
             purpose      => $purpose,
             request_type => 'chat',
             ledger_meta  => $self->_aimps_meta($c, \%args),

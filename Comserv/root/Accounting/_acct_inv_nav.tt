@@ -1,4 +1,4 @@
-[%# Shared navigation bar — included at top of Accounting and Inventory dashboards %]
+<%# Shared navigation bar — included at top of Accounting and Inventory dashboards %>
 <nav style="background:var(--nav-bg,#1e293b);color:#fff;padding:0.4rem 0.8rem;border-radius:6px;margin-bottom:1.2rem;display:flex;flex-wrap:wrap;gap:0.3rem;align-items:center;font-size:0.85rem;">
   <span style="color:#94a3b8;margin-right:0.4rem;">&#128200; Accounting &amp; Inventory:</span>
   <a href="/Accounting"        style="color:#93c5fd;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;" [% IF current_page == 'accounting' %]style="background:rgba(255,255,255,0.15);"[% END %]>Dashboard</a>
@@ -29,3 +29,23 @@
   <span style="color:#475569;">|</span>
   <a href="/Accounting/setup" style="color:#fcd34d;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;" title="Site configuration">&#9881; Setup</a>
 </nav>
+
+<!-- NEW: AI Vision Testing Navigation -->
+[% IF c.session.debug_mode == 1 %]
+<nav style="background:#fef3c7;border:1px solid #fde68a;border-radius:6px;margin:0.8rem 0;padding:0.5rem 0.8rem;font-size:0.8rem;">
+  <div style="font-weight:600;color:#92400e;margin-bottom:0.3rem;display:flex;align-items:center;gap:0.5rem;">
+    🧪 <span>AI Vision Testing (Quick Access)</span>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.3rem;">
+    <a href="/ai/vision" target="_blank" style="background:#e0e7ff;color:#4338ca;padding:0.2rem 0.5rem;border-radius:4px;text-decoration:none;font-size:0.75rem;border:1px solid #c7d2fe;">
+      &#128640; Vision Test
+    </a>
+    <a href="/ai/analyze-image" target="_blank" style="background:#e0e7ff;color:#4338ca;padding:0.2rem 0.5rem;border-radius:4px;text-decoration:none;font-size:0.75rem;border:1px solid #c7d2fe;">
+      📸 Legacy Test
+    </a>
+    <a href="/ai/vision?popup=1" target="_blank" style="background:#dcfce7;color:#166534;padding:0.2rem 0.5rem;border-radius:4px;text-decoration:none;font-size:0.75rem;border:1px solid #86efac;">
+      🔲 Popup Test
+    </a>
+  </div>
+</nav>
+[% END %]

@@ -828,7 +828,8 @@ function ensureThinkingStyles(doc) {
     const ANALYZE_MODEL = 'ollama|nimble';     // strong for pipeline + planning analysis (DailyPlan etc.)
     const PLAN_MODEL    = 'ollama|nimble';     // explicit for plan phase on todo/daily planning
     const IMPLEMENT_MODEL = 'openrouter|cohere/north-mini-code:free';  // or local code model when ready
-    let _editorPhase = 'analyze'; // clarify | analyze | plan | implement
+    let _userPickedModel = false;
+    let _escalatedThisSend = false;
     let _planApproved = false;
     // Pending clarify session: original vague ask + gap questions awaiting answers.
     let _clarifySession = null; // { original, gaps, askedAt }
@@ -945,10 +946,11 @@ function ensureThinkingStyles(doc) {
         if (/\[ACTION:\s*\{/i.test(t) && t.length < 800) return true;
         if (/^\s*\[ACTION:/i.test(t)) return true;
         if ((phase === 'analyze' || phase === 'plan' || phase === 'clarify')
-            && /list_files|read_file|run_terminal/i.test(t)
+            && (/list_files|read_file|run_terminal|\[run,\s*cwd=/i.test(t))
             && !/root cause|enabled_modules|SiteModule|can_beekeep/i.test(t)) {
             return true;
         }
+        if ((t.match(/\[run,\s*cwd=/gi) || []).length >= 3) return true;
         return false;
     }
 
@@ -1157,6 +1159,10 @@ function ensureThinkingStyles(doc) {
         const phase = currentEditorPhase() === 'clarify' ? 'analyze' : currentEditorPhase();
         if (currentEditorPhase() === 'clarify') setEditorPhase('analyze');
         const model = resolveEditorModel(phase);
+        // The header pin is not a user choice. Unless the dropdown was changed,
+        // leave model empty so the server picks from SuperGrok, OpenRouter, Ollama.
+        const sendModel = (_userPickedModel && model) ? model : '';
+        const route = _escalatedThisSend ? 'escalate' : (sendModel ? 'explicit' : 'auto');
         const filePath = filePathEarly;
 
         if (target.status) target.status('AI thinking…');
@@ -1227,7 +1233,9 @@ function ensureThinkingStyles(doc) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         prompt: fullPrompt,
-                        model: model,
+                        model: sendModel,
+                        route: route,
+                        user_picked: _userPickedModel ? 1 : 0,
                         agent_id: agentId,
                         phase: phase,
                         page_path: filePath || (files[0] && files[0].path) || '',
@@ -1271,30 +1279,53 @@ function ensureThinkingStyles(doc) {
               const display = extracted.cleanText || resp;
               // Prefix the reply with the model actually used, for transparency.
               if (looksLikeJunkAnalyzeReply(display, phase)) {
+                  if (!_escalatedThisSend) {
+                      _escalatedThisSend = true;
+                      liveThink.addStep('Reply was junk — asking the router to pick another available model');
+                      recordMessage('AI',
+                          '<span style="color:#ffd27a;">[switch]</span> That reply was not usable. '
+                          + 'Asking the router to pick from the models that are actually available.');
+                      if (target.status) target.status('Switching model…');
+                      return fetch('/ai2/chat', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                              prompt: fullPrompt,
+                              model: '',
+                              route: 'escalate',
+                              user_picked: 0,
+                              agent_id: agentId,
+                              phase: phase,
+                              page_path: filePath || '',
+                              page_title: filePath ? filePath.split('/').pop() : '',
+                              page_content: fileContent || '',
+                              history: history,
+                              conversation_id: _lastConversationId || ''
+                          })
+                      }).then(function (res2) { return res2.json(); }).then(function (data2) {
+                          if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+                          if (data2 && data2.conversation_id) _lastConversationId = String(data2.conversation_id);
+                          const used2 = (data2 && data2.model) ? data2.model : 'router';
+                          const text2 = (data2 && data2.response) || (data2 && data2.error) || '';
+                          if (!data2 || data2.success === 0 || looksLikeJunkAnalyzeReply(text2, phase)) {
+                              recordMessage('AI',
+                                  '<span style="color:#f88;">[rejected reply]</span> '
+                                  + 'The router retry also failed'
+                                  + (used2 ? ' (' + escapeHtml(used2) + ')' : '') + '.');
+                              if (target.status) target.status('Model switch did not produce a usable reply', true);
+                              return;
+                          }
+                          recordMessage('AI',
+                              '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(used2) + ']</span> '
+                              + escapeHtml(text2).replace(/\n/g, '<br>'));
+                          if (target.status) target.status('Reply from ' + used2);
+                      });
+                  }
                   liveThink.finalize(false, ['Rejected junk/log-like model reply']);
                   recordMessage('AI',
                       '<span style="color:#f88;">[rejected reply]</span> '
-                      + 'That model response was shell/SQL log noise or a fake <code>[ACTION:…]</code> — '
-                      + '<strong>not</strong> an analysis of your bug.<br><br>'
-                      + 'Try again with Agent <strong>Analyze</strong>, Phase <strong>A Analyze</strong>, '
-                      + 'and clear the header model (or pick a free analyze model). '
-                      + 'Say <code>clarify</code> if you want gap questions first.<br>'
-                      + '<details style="margin-top:6px;opacity:0.75;"><summary>Show rejected snippet</summary>'
-                      + '<pre style="max-height:120px;overflow:auto;">'
-                      + escapeHtml(display).slice(0, 600) + '</pre></details>');
+                      + 'That model response was not an analysis of the task.');
                   if (target.status) target.status('Rejected junk model reply', true);
-                  // Re-open clarify on the last real user ask (not fabricated blob) when possible.
-                  if (!_clarifySession) {
-                      var gaps = [
-                          'Confirm the bug in one sentence (e.g. brew+beekeeping nav show on sitename 3d but should not).',
-                          'Where do you see it — top nav, Features menu, or /brew page?',
-                          'Expected: those features hidden/disabled for 3d — correct?'
-                      ];
-                      beginClarifySession(
-                          'Brew and beekeeping features appear for sitename 3d but should not (not subscribed / not enabled).',
-                          gaps, target, sendBtn
-                      );
-                  }
                   return;
               }
               var bodyHtml = escapeHtml(display).replace(/\n/g, '<br>');
@@ -1477,6 +1508,12 @@ function ensureThinkingStyles(doc) {
                 pinModel: 'cohere/north-mini-code:free',
                 onReady: function () {
                     console.log('[AI2EditorChat] model-select populated by shared module');
+                    if (!modelSel._userPickWired) {
+                        modelSel._userPickWired = true;
+                        modelSel.addEventListener('change', function () {
+                            _userPickedModel = true;
+                        });
+                    }
                 },
                 onError: function (e) {
                     console.error('[AI2EditorChat] model-select failed', e);

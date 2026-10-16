@@ -96,10 +96,10 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
     },
     discount_percent => {
-        data_type     => 'decimal',
-        size          => [5, 2],
-        is_nullable   => 1,
-        default_value => 0,
+        data_type => 'decimal',
+        size => [10, 0],
+        is_nullable => 1,
+        default_value => '0',
     },
     shop_options => {
         data_type   => 'text',

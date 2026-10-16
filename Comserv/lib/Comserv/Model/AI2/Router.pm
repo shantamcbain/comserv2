@@ -212,19 +212,35 @@ sub select_model {
     my $default     = $ctx{default_model};
     my $context_key = $self->_context_for($ctx{agent_id} // $ctx{page_context} // 'general');
 
-    # 1) Explicit selection wins if the provider can serve it.
+    # 1) A real user pick wins if we are not being asked to route.
     #    Grok-named models use SuperGrok (weekly prepaid) when that
     #    credential exists — never OpenRouter Grok, never xAI pay-per-token first.
+    #    The editor's cheap pin is not a user pick. route=auto|escalate means
+    #    choose from the live SuperGrok / OpenRouter / Ollama lists.
+    my $route_auto = ($ctx{route} || '') =~ /^(auto|escalate)$/;
+    my $auto_pin = 0;
     if ($requested) {
+        require Comserv::Model::AI2::ModelPick;
+        $auto_pin = Comserv::Model::AI2::ModelPick->is_auto_pin($requested);
+    }
+    if ($requested && !$route_auto && !($auto_pin && !$ctx{user_picked})) {
         my ($prov, $model) = $self->_detect_provider($requested);
         ($prov, $model) = $self->_prefer_supergrok($c, $prov, $model);
         return ($prov, $model);
     }
 
-    # 1.5) SuperGrok weekly credits BEFORE any paid OpenRouter hop.
-    # OpenRouter has no auto-fill — do not default the app onto a paid OR model.
-    if ($self->_external_default_available($c, 'supergrok|grok-4.6')) {
-        return ('supergrok', 'grok-4.6');
+    # 1.5) No explicit pick: choose from models that are actually up.
+    # Do not hardcode a Grok slug — prepaid budget and the live lists decide.
+    my $pick = eval {
+        require Comserv::Model::AI2::ModelPick;
+        Comserv::Model::AI2::ModelPick->new->pick($c, %ctx);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'select_model',
+            "ModelPick failed: $@");
+    }
+    elsif ($pick && $pick->{ok} && $pick->{provider} && $pick->{model}) {
+        return ($pick->{provider}, $pick->{model});
     }
 
     # 2) Build a lookup of installed chat models (short name -> full name).
@@ -506,6 +522,7 @@ sub _chat_one {
             # Threaded from Chat.pm: the web-search toggle was set by the
             # widget but dropped here, so Grok's search_parameters never fired.
             ($opts{use_search} ? (use_search => 1) : ()),
+            ($opts{max_tokens} ? (max_tokens => 0 + $opts{max_tokens}) : ()),
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_chat_one',
@@ -994,7 +1011,10 @@ sub chat_with_fallback {
                       path => Comserv::Util::AI::ModelHealth->default_path($c));
     my $signals = $opts{signals} || $self->health_signals($c, $k, $health);
     my $purpose = $opts{purpose} || 'chat';
-    my %pass    = ($opts{use_search} ? (use_search => 1) : ());
+    my %pass    = (
+        ($opts{use_search} ? (use_search => 1) : ()),
+        ($opts{max_tokens} ? (max_tokens => $opts{max_tokens}) : ()),
+    );
 
     my $guard   = $opts{guard} || $self->supergrok_guard($c);
     my %seen;
