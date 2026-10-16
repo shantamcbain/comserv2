@@ -387,6 +387,10 @@ sub api_list_todos :Path('todos') :Args(0) {
                 { description => { 'like', "%$w%" } },
                 { comments    => { 'like', "%$w%" } },
             );
+            # Numeric word (optionally "#2520") also matches the todo id.
+            if ($w =~ /^#?(\d+)$/) {
+                push @field_or, { record_id => $1 };
+            }
         }
         $cond->{'-or'} = \@field_or if @field_or;
     }
