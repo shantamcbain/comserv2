@@ -1,4 +1,9 @@
 #!/usr/bin/env perl
+BEGIN {
+    # Raise soft open-files limit to min(8192, hard); see script/raise_nofile.pl (2026-10-16 :4006 EMFILE).
+    require File::Spec; my $f = File::Spec->rel2abs(__FILE__); $f =~ s{[^/]*$}{raise_nofile.pl};
+    eval { require $f; comserv_raise_nofile(8192); 1 } or print STDERR "[nofile] skipped: $@";
+}
 use Catalyst qw( Static::Simple );
 BEGIN {
     $ENV{CATALYST_SCRIPT_GEN} = 40;
