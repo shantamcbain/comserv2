@@ -8,7 +8,7 @@ use Try::Tiny;
 use Comserv::Util::Logging;
 use Comserv::Util::SignGenerator;
 use Comserv::Util::Printing3d;
-use Comserv::Util::NfsPath;
+use Comserv::Util::Logging;
 use Comserv::Util::CategoryManager;
 use Comserv::Util::AppTime;
 
@@ -601,6 +601,40 @@ sub _inventory_transaction {
             $stock->update({ quantity_on_hand => $stock->quantity_on_hand + $qty });
         }
     });
+}
+
+# Filament rows to issue on complete. Grams come from the sliced file when it
+# has them; a bare STL does not split a multi-color print.
+sub _get_job_filaments {
+    my ($self, $c, $job) = @_;
+    my $schema = $self->_schema($c);
+    my $usage = eval { Comserv::Util::Printing3d->new->usage_for_job($c, $schema, $job) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+            "filament usage lookup failed: $@");
+    }
+    if ($usage && @{ $usage->{unmatched} || [] }) {
+        my $miss = join ', ', map {
+            sprintf('slot %s %sg %s %s', $_->{sequence}, $_->{grams}, $_->{type} || '', $_->{color} || '')
+        } @{ $usage->{unmatched} };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+            "job " . $job->id . " filament slots not matched to stock: $miss");
+    }
+    return $usage->{issue} if $usage && @{ $usage->{issue} || [] };
+
+    if ($job->filament_item_id && $job->filament_quantity) {
+        my $fil = eval { $job->filament_item };
+        if ($fil) {
+            return [{
+                filament_item_id => $job->filament_item_id,
+                filament_item    => $fil,
+                grams_used       => $job->filament_quantity,
+                material_name    => $fil->name || $fil->sku || 'Unknown',
+                sequence         => 1,
+            }];
+        }
+    }
+    return undef;
 }
 
 # ============================================================
@@ -1602,7 +1636,17 @@ sub queue :Path('/3d/queue') :Args(0) {
                     }
                 }
 
-                # ---- Auto-fill filament grams from model STL weight if not manually entered ----
+                # Prefer sliced-file grams over STL weight. STL volume is one material.
+                if (!$grams_used) {
+                    my $usage = eval {
+                        Comserv::Util::Printing3d->new->usage_for_job($c, $schema, $job)
+                    };
+                    if ($usage && $usage->{grams} && ($usage->{source} || '') ne 'job_column') {
+                        $grams_used = $usage->{grams};
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'queue',
+                            "complete job=$job_id grams from $usage->{source}: $grams_used");
+                    }
+                }
                 if (!$grams_used) {
                     my $model = eval { $job->model };
                     if ($model && $model->stl_weight_g && $model->stl_weight_g > 0) {
@@ -1668,27 +1712,30 @@ sub queue :Path('/3d/queue') :Args(0) {
                 # Inventory accounting: issue (consume) filament used
                 # Always issue on completion using actual grams — inventory_reserved only
                 # matters for advance reservation (not always set for queue-sync jobs).
-                if ($job->filament_item_id && $grams_used) {
-                    my $fil  = eval { $job->filament_item };
+                # Handle multi-material prints: iterate through all filaments used by this job
+                my $job_filaments = $self->_get_job_filaments($c, $job);
+                foreach my $job_filament_record (@{ $job_filaments || [] }) {
+                    my $fil = eval { $job_filament_record->{filament_item} };
                     my $fsl  = eval { ($fil->stock_levels->all)[0] } if $fil;
                     my $fil_uom   = $fil ? lc($fil->unit_of_measure || 'g') : 'g';
-                    my $issue_qty = Comserv::Util::Printing3d->new->stock_qty_from_grams($fil, $grams_used);
+                    my $issue_qty = Comserv::Util::Printing3d->new->stock_qty_from_grams($fil, $job_filament_record->{grams_used});
+                    my $reference_number = '3D-JOB-' . $job->id . '-FIL-' . $job_filament_record->{sequence};
                     eval {
                         $self->_inventory_transaction($c,
                             schema           => $schema,
                             sitename         => $sitename,
-                            item_id          => $job->filament_item_id,
+                            item_id          => $job_filament_record->{filament_item_id},
                             location_id      => $fsl ? $fsl->location_id : undef,
                             transaction_type => 'issue',
                             quantity         => $issue_qty,
                             unit_cost        => $filament_cost ? ($filament_cost / $issue_qty) : undef,
-                            reference_number => '3D-JOB-' . $job->id,
-                            notes            => sprintf('Filament used: %sg (%.4f %s) — print job #%d completed', $grams_used, $issue_qty, $fil_uom, $job->id),
+                            reference_number => $reference_number,
+                            notes            => sprintf('Filament used: %sg (%.4f %s) — print job #%d completed (Material %s)', $job_filament_record->{grams_used}, $issue_qty, $fil_uom, $job->id, $job_filament_record->{material_name}),
                             performed_by     => $c->session->{username} || 'system',
                         );
                     };
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
-                        "Filament issue transaction failed for job $job_id: $@") if $@;
+                        "Filament issue transaction failed for job $job_id (filament $job_filament_record->{filament_item_id}): $@") if $@;
                 }
 
                 # Inventory accounting: record printer depreciation against asset
@@ -1897,20 +1944,20 @@ sub queue :Path('/3d/queue') :Args(0) {
     # the printer's REAL state, not the DB status that assign-click wrote.
     my %real_state;
     eval {
-        require Comserv::Util::Printing3d::Adapter::Anycubic;
-        my $adapter = Comserv::Util::Printing3d::Adapter::Anycubic->new;
+        require Comserv::Util::Printing3d::LanMap;
+        my $lanmap = Comserv::Util::Printing3d::LanMap->new;
         my %seen;
-        # Active first (with job context)
+        # Active first (with job context). Stored IP is a cache — if DHCP
+        # moved the printer, LanMap rewrites [LAN_HOST:] before we read state.
         for my $job (@active_jobs) {
             next unless $job->{printer_id};
             next if $seen{ $job->{printer_id} }++;
             my $pr = $schema->resultset('Printing3dPrinter')->find($job->{printer_id});
             next unless $pr;
-            my $notes = $pr->notes // '';
-            my $lan_host = $1 if $notes =~ /\[LAN_HOST:([0-9.]+)\]/;
+            my $resolved = $lanmap->resolve($c, $pr);
+            my $lan_host = $resolved->{host};
             next unless $lan_host;
-
-            my $st = eval { $adapter->fetch_state($c, $lan_host, 18910) };
+            my $st = $resolved->{state};
             $real_state{ $pr->id } = $st;   # recorded even when unreachable (ok=0)
             next unless $st && $st->{ok};
 
@@ -1944,10 +1991,10 @@ sub queue :Path('/3d/queue') :Args(0) {
         for my $pr (@all_printers) {
             push @farm_printers, $pr;   # every printer appears on the queue, assigned or not
             next if $seen{ $pr->id }++;
-            my $notes = $pr->notes // '';
-            my $lan_host = $1 if $notes =~ /\[LAN_HOST:([0-9.]+)\]/;
+            my $resolved = $lanmap->resolve($c, $pr);
+            my $lan_host = $resolved->{host};
             next unless $lan_host;
-            my $st = eval { $adapter->fetch_state($c, $lan_host, 18910) };
+            my $st = $resolved->{state};
             $real_state{ $pr->id } = $st;   # recorded even when unreachable (ok=0)
             next unless $st && $st->{ok};
 
@@ -2406,7 +2453,9 @@ sub job_filament :Path('/3d/job/filament') :Args(1) {
             $self,
         );
         if ($res->{ok}) {
-            my $gmsg = $res->{grams}
+            my $gmsg = $res->{recosted}
+                ? sprintf(' (%sg re-issued, cost recalculated)', $res->{grams})
+                : $res->{grams}
                 ? sprintf(' (~%sg reserved)', $res->{grams})
                 : ' (no grams — enter grams so stock issues on complete)';
             $c->flash->{success_msg} = 'Job #' . $job->id . ' filament updated.' . $gmsg;

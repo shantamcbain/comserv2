@@ -274,7 +274,7 @@
                         [% IF job.bom_print_hours || job.bom_filament_grams %]
                         <small style="color:var(--text-muted-color);font-size:0.78em;" title="BOM estimate available">BOM</small>
                         [% END %]
-                        <button type="submit" class="btn-action btn-complete">Complete</button>
+                        <button type="submit" class="btn-action btn-complete" onclick="return confirmCompleteJob(this)">Complete</button>
                     </form>
                     <form method="post" action="/3d/queue" style="display:inline;margin-left:0.3em;">
                         <input type="hidden" name="job_id" value="[% job.id %]">
@@ -400,6 +400,8 @@
                 [% ELSE %]
                 <span style="font-size:0.8em;color:#b71c1c;">No model file</span>
                 [% END %]
+                <a href="/3d/job/filament/[% job.id %]" style="font-size:0.8em;display:block;"
+                   title="Wrong spool or grams? Correct it and re-cost this completed job">🧵 Fix filament / cost</a>
                 <form method="post" action="/3d/queue" style="display:inline;"
                       onsubmit="return confirm('Reopen job #[% job.id %]? It goes back to the queue and the filament issue / stock receipt are reversed.')">
                     <input type="hidden" name="job_id" value="[% job.id %]">
@@ -715,6 +717,57 @@ function startForm(f, printerId, selected, modelId, fileSource) {
     '<button type="submit" class="btn">' + btnText + ' — start print</button>' +
     '</form>';
   return h;
+}
+
+function confirmCompleteJob(button) {
+    const form = button.closest('form');
+    const jobId = form.querySelector('input[name="job_id"]').value;
+    const jobElement = button.closest('tr');
+    const modelName = jobElement.querySelectorAll('td')[1].textContent.trim();
+    const filamentInfo = jobElement.querySelectorAll('td')[3].textContent.trim();
+    const printerInfo = jobElement.querySelectorAll('td')[4] ? jobElement.querySelectorAll('td')[4].textContent.trim() : 'Unknown';
+    const status = jobElement.querySelectorAll('td')[2] ? jobElement.querySelectorAll('td')[2].textContent.trim() : 'Unknown';
+
+    const actualFilament = prompt("Enter actual filament used (grams):", "");
+    const printTime = prompt("Enter print time (format: HH:MM or hours minutes):", "");
+
+    if (actualFilament === null || printTime === null) {
+        return false; // User cancelled
+    }
+
+    if (!actualFilament || !printTime) {
+        alert("Both filament amount and print time are required for completion.");
+        return false;
+    }
+
+    // Update the form fields with verified values
+    const filamentInput = form.querySelector('input[name="filament_grams"]');
+    const hoursInput = form.querySelector('input[name="print_hours_h"]');
+    const minutesInput = form.querySelector('input[name="print_hours_m"]');
+
+    filamentInput.value = actualFilament;
+
+    // Parse print time (support both HH:MM and hours minutes formats)
+    let hours = 0;
+    let minutes = 0;
+
+    if (printTime.includes(':')) {
+        const parts = printTime.split(':');
+        hours = parseInt(parts[0]) || 0;
+        minutes = parseInt(parts[1]) || 0;
+    } else {
+        const parts = printTime.split(' ');
+        hours = parseInt(parts[0]) || 0;
+        minutes = parseInt(parts[1]) || 0;
+    }
+
+    hoursInput.value = hours;
+    minutesInput.value = minutes;
+
+    return confirm(`Print completion confirmed for Job #${jobId}: ${modelName}\n` +
+        `Actual filament used: ${actualFilament}g\n` +
+        `Print time: ${hours}h ${minutes}m\n\n` +
+        `Click OK to complete the print or Cancel to adjust details.`);
 }
 
 function escapeHtml(s) {

@@ -524,9 +524,12 @@ sub change_filament {
     my ($self, $c, $job, $filament_item_id, $grams, $ctl) = @_;
     return { ok => 0, error => 'Job not found.' } unless $job;
     my $st = $job->status || '';
-    return { ok => 0, error => 'Job is not open (queued/assigned/printing).' }
-        unless $st =~ /^(queued|assigned|printing)$/;
+    return { ok => 0, error => 'Job is not open (queued/assigned/printing) or completed.' }
+        unless $st =~ /^(queued|assigned|printing|completed)$/;
     return { ok => 0, error => 'Select a filament.' } unless $filament_item_id;
+    # 3D-20260907-4807: completed job had the wrong spool; re-cost it in place.
+    return $self->recost_completed_filament($c, $job, $filament_item_id, $grams, $ctl)
+        if $st eq 'completed';
 
     my $schema   = $c->model('DBEncy');
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || '';
@@ -602,6 +605,95 @@ sub change_filament {
         grams   => $grams,
         reserved => $grams ? 1 : 0,
     };
+}
+
+# Correct filament / grams on a COMPLETED job (3D-20260907-4807).
+# Returns the old spool's issued stock, issues the new spool, and recomputes
+# filament_cost and total_cost (printer/electricity costs are kept).
+sub recost_completed_filament {
+    my ($self, $c, $job, $filament_item_id, $grams, $ctl) = @_;
+    my $schema   = $c->model('DBEncy');
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    my $irs      = $schema->resultset('Accounting::InventoryItem');
+    my $fil;
+    try { $fil = $irs->find($filament_item_id) }
+        catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'recost_completed_filament', "filament find failed: $_");
+        };
+    return { ok => 0, error => 'Filament item not found.' } unless $fil;
+    return { ok => 0, error => 'Filament is not on this site.' }
+        if $fil->sitename && $sitename && $fil->sitename ne $sitename;
+    $grams = undef if defined $grams && $grams !~ /^\d+(?:\.\d+)?$/;
+    $grams = undef if defined $grams && $grams <= 0;
+    $grams //= $job->filament_quantity;
+    return { ok => 0, error => 'Enter the grams actually used.' } unless $grams && $grams > 0;
+
+    my ($type, $color) = $self->infer_type_color($fil);
+    my $old_id   = $job->filament_item_id;
+    my $old_g    = $job->filament_quantity;
+    my $old_cost = $job->filament_cost || 0;
+    my $new_cost;
+    if ($fil->unit_cost) {
+        my $uom = lc($fil->unit_of_measure || 'g');
+        $new_cost = ($uom eq 'g') ? $grams * $fil->unit_cost : ($grams / 1000) * $fil->unit_cost;
+    }
+    my $other = ($job->total_cost || 0) - $old_cost;
+    $other = 0 if $other < 0;
+    my $new_total = $other + ($new_cost || 0);
+    my $user = $c->session->{username} || 'system';
+    my $ref  = '3D-JOB-' . $job->id;
+
+    my $err;
+    try {
+        $schema->txn_do(sub {
+            if ($ctl && $old_id && $old_g) {
+                my $old_fil = $irs->find($old_id);
+                my $sl = $old_fil ? eval { ($old_fil->stock_levels->all)[0] } : undef;
+                $ctl->_inventory_transaction($c,
+                    schema => $schema, sitename => $sitename, item_id => $old_id,
+                    location_id => $sl ? $sl->location_id : undef,
+                    transaction_type => 'return',
+                    quantity => $self->stock_qty_from_grams($old_fil, $old_g),
+                    reference_number => $ref,
+                    notes => sprintf('Filament correction: return %sg wrongly issued to job #%d', $old_g, $job->id),
+                    performed_by => $user,
+                );
+            }
+            if ($ctl) {
+                my $sl  = eval { ($fil->stock_levels->all)[0] };
+                my $qty = $self->stock_qty_from_grams($fil, $grams);
+                $ctl->_inventory_transaction($c,
+                    schema => $schema, sitename => $sitename, item_id => $filament_item_id,
+                    location_id => $sl ? $sl->location_id : undef,
+                    transaction_type => 'issue',
+                    quantity => $qty,
+                    unit_cost => ($new_cost && $qty) ? $new_cost / $qty : undef,
+                    reference_number => $ref,
+                    notes => sprintf('Filament correction: %sg issued for completed job #%d', $grams, $job->id),
+                    performed_by => $user,
+                );
+            }
+            $job->update({
+                filament_item_id  => $filament_item_id,
+                filament_type     => $type || undef,
+                filament_color    => $color || undef,
+                filament_quantity => $grams,
+                filament_cost     => $new_cost,
+                total_cost        => $new_total || undef,
+            });
+        });
+    }
+    catch {
+        $err = "$_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'recost_completed_filament', "job " . $job->id . " failed: $err");
+    };
+    return { ok => 0, error => $err } if $err;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'recost_completed_filament',
+        sprintf('job %d filament %s/%sg -> %s/%sg cost %.2f -> %.2f', $job->id,
+            $old_id // '-', $old_g // '-', $filament_item_id, $grams, $old_cost, $new_cost || 0));
+    return { ok => 1, job_id => $job->id, grams => $grams, recosted => 1 };
 }
 
 # Re-open a job that was marked complete (or cancelled) by mistake.
@@ -740,6 +832,242 @@ sub reopen_job {
             $job->id, $who, $st, (@reversed ? join('; ', @reversed) : 'nothing')));
 
     return { ok => 1, job_id => $job->id, reversed => \@reversed };
+}
+
+# Per-tool grams from a sliced file. A bare STL has no slot split.
+# Cura:    ";Filament used: 2.36m" (meters, 1.75mm round)
+# Orca:    "; filament used [g] = 1.2, 3.4" plus filament_type / filament_colour
+# Returns a list of { sequence, grams, type, color, source }.
+sub filament_slots_from_file {
+    my ($self, $path) = @_;
+    return [] unless $path && -f $path;
+    my $text = _slicer_text($path);
+    return [] unless $text;
+    return _slots_from_slicer_text($self, $text);
+}
+
+# Records the complete action can issue. Does not read columns that are not
+# on printing_3d_jobs. Unmatched extra slots are listed in unmatched and are
+# not charged to the job's single spool.
+sub usage_for_job {
+    my ($self, $c, $schema, $job) = @_;
+    my $out = { grams => undef, source => 'none', issue => [], unmatched => [] };
+    return $out unless $job;
+
+    my $model = eval { $self->resolve_model_for_job($schema, $job) };
+    my $path  = $model ? ($model->nfs_path || '') : '';
+    if ($path && !-f $path) {
+        my $resolved = eval {
+            require Comserv::Util::NfsPath;
+            Comserv::Util::NfsPath->new->resolve_path($path);
+        };
+        $path = $resolved if $resolved && -f $resolved;
+    }
+
+    my $slots = $self->filament_slots_from_file($path);
+    my $job_fil = ($job->filament_item_id && $schema)
+        ? eval { $schema->resultset('Accounting::InventoryItem')->find($job->filament_item_id) }
+        : undef;
+
+    if (@$slots) {
+        my @fils = ($schema && $job->sitename) ? $self->list_filaments($schema, $job->sitename) : ();
+        my $total = 0;
+        my %used_item;
+        for my $slot (@$slots) {
+            $total += $slot->{grams};
+            my $item = _match_filament_item($slot, \@fils, $job_fil, \%used_item);
+            if ($item) {
+                $used_item{ $item->id } = 1;
+                push @{ $out->{issue} }, _issue_record($item, $slot);
+            }
+            else {
+                push @{ $out->{unmatched} }, $slot;
+            }
+        }
+        $out->{grams}  = sprintf('%.3f', $total);
+        $out->{source} = $slots->[0]{source} || 'sliced_file';
+        $out->{path}   = $path;
+        # Several tools and none matched: do not charge the whole print to one spool.
+        return $out if @$slots > 1;
+        return $out if @{ $out->{issue} };
+    }
+
+    # No sliced split, or no spool matched: keep the single job filament.
+    if ($job_fil && ($job->filament_quantity || $out->{grams})) {
+        my $g = $out->{grams} || $job->filament_quantity;
+        push @{ $out->{issue} }, _issue_record($job_fil, {
+            sequence => 1,
+            grams    => $g,
+            type     => $job->filament_type || '',
+            color    => $job->filament_color || '',
+            source   => $out->{source} eq 'none' ? 'job_column' : $out->{source},
+        });
+        $out->{grams}  ||= $g;
+        $out->{source} ||= 'job_column';
+    }
+    return $out;
+}
+
+sub _issue_record {
+    my ($item, $slot) = @_;
+    return {
+        filament_item_id => $item->id,
+        filament_item    => $item,
+        grams_used       => $slot->{grams},
+        material_name    => $item->name || $item->sku || 'Unknown',
+        sequence         => $slot->{sequence} || 1,
+        type             => $slot->{type} || '',
+        color            => $slot->{color} || '',
+        source           => $slot->{source} || '',
+    };
+}
+
+sub _match_filament_item {
+    my ($slot, $fils, $job_fil, $used) = @_;
+    my $want_type  = lc($slot->{type} || '');
+    my $want_color = _color_name($slot->{color});
+
+    my @scored;
+    for my $row (@$fils) {
+        next if $used->{ $row->{id} };
+        my $t = lc($row->{type} || '');
+        my $c = _color_name($row->{color});
+        my $score = 0;
+        $score += 2 if $want_type && $t && $t eq $want_type;
+        $score += 2 if $want_color && $c && $c eq $want_color;
+        $score += 1 if $want_color && $c && index($c, $want_color) >= 0;
+        next if $want_type && $t && $t ne $want_type;
+        next unless $score || (!$want_type && !$want_color);
+        push @scored, [ $score, $row ];
+    }
+    @scored = sort { $b->[0] <=> $a->[0] } @scored;
+    if (@scored && $scored[0][0] > 0 && (@scored == 1 || $scored[0][0] > $scored[1][0])) {
+        return $scored[0][1]{item};
+    }
+    # Single-tool file: the spool on the job is the answer.
+    if ($job_fil && !$used->{ $job_fil->id } && ($slot->{sequence} || 1) == 1 && $want_type eq '') {
+        return $job_fil;
+    }
+    if ($job_fil && !$used->{ $job_fil->id } && ($slot->{sequence} || 1) == 1
+        && (!$want_type || lc(($job_fil->filament_type || '')) eq $want_type
+            || ($job_fil->name || '') =~ /\Q$want_type\E/i)) {
+        return $job_fil;
+    }
+    return undef;
+}
+
+sub _color_name {
+    my ($raw) = @_;
+    return '' unless defined $raw && $raw ne '';
+    my $s = lc $raw;
+    $s =~ s/[\[\]\s]//g;
+    if ($s =~ /^#?([0-9a-f]{6})$/) {
+        my %hex = (
+            'ff0000' => 'red', 'f40031' => 'red', 'ffffff' => 'white', '000000' => 'black',
+            '0000ff' => 'blue', '00ff00' => 'green', 'ffff00' => 'yellow', 'ffa500' => 'orange',
+            '808080' => 'gray', 'ffc0cb' => 'pink', '800080' => 'purple', 'a52a2a' => 'brown',
+        );
+        return $hex{$1} || '';
+    }
+    $s =~ s/[^a-z]//g;
+    return $s;
+}
+
+sub _slicer_text {
+    my ($path) = @_;
+    if ($path =~ /\.gcode$/i) {
+        return _read_head_tail($path, 12000);
+    }
+    return '' unless $path =~ /\.3mf$/i;
+    my @members;
+    open my $list, '-|', 'unzip', '-Z1', $path or return '';
+    while (my $line = <$list>) {
+        chomp $line;
+        push @members, $line if $line =~ /\.gcod?e$/i;
+    }
+    close $list;
+    return '' unless @members;
+    open my $fh, '-|', 'unzip', '-p', $path, $members[0] or return '';
+    my $buf = '';
+    while (my $line = <$fh>) {
+        $buf .= $line if $line =~ /filament|Filament used/i || length($buf) < 2500;
+    }
+    close $fh;
+    return $buf;
+}
+
+sub _read_head_tail {
+    my ($path, $n) = @_;
+    open my $fh, '<', $path or return '';
+    my $head = '';
+    while (my $line = <$fh>) {
+        $head .= $line;
+        last if length($head) >= $n;
+    }
+    my $tail = '';
+    my $size = -s $path;
+    if ($size && $size > $n) {
+        seek $fh, -$n, 2;
+        $tail = do { local $/; <$fh> };
+    }
+    close $fh;
+    return $head . "\n" . $tail;
+}
+
+sub _slots_from_slicer_text {
+    my ($self, $text) = @_;
+    return [] unless defined $text && $text ne '';
+    my (@grams, @types, @colors, $source);
+
+    if ($text =~ /;\s*filament used \[g\]\s*=\s*([0-9.,;\s]+)/i) {
+        @grams = grep { $_ > 0 } map { 0 + $_ } split /\s*[,;]\s*/, $1;
+        $source = 'gcode_used_g';
+    }
+    if (!@grams && $text =~ /;\s*Filament used:\s*([^\r\n]+)/i) {
+        for my $part (split /\s*,\s*/, $1) {
+            if ($part =~ /([0-9.]+)\s*m\b/i) {
+                push @grams, 0 + $self->_meters_to_grams($1);
+            }
+            elsif ($part =~ /([0-9.]+)\s*g\b/i) {
+                push @grams, 0 + $1;
+            }
+        }
+        $source = 'cura_filament_used' if @grams;
+    }
+    if (!@grams && $text =~ /;\s*total filament used \[g\]\s*=\s*([0-9.]+)/i) {
+        @grams = (0 + $1);
+        $source = 'gcode_total_g';
+    }
+    return [] unless @grams;
+
+    if ($text =~ /;\s*filament_type\s*=\s*([^\r\n]+)/i) {
+        @types = split /\s*[;,]\s*/, $1;
+    }
+    if ($text =~ /;\s*filament_colou?r\s*=\s*([^\r\n]+)/i) {
+        @colors = split /\s*[;,]\s*/, $1;
+    }
+    my @slots;
+    for my $i (0 .. $#grams) {
+        next unless $grams[$i] && $grams[$i] > 0;
+        push @slots, {
+            sequence => $i + 1,
+            grams    => sprintf('%.3f', $grams[$i]),
+            type     => $types[$i] || '',
+            color    => $colors[$i] || '',
+            source   => $source,
+        };
+    }
+    return \@slots;
+}
+
+# 1.75mm round stock. meters → grams at PLA density unless a type is passed.
+sub _meters_to_grams {
+    my ($self, $meters, $type) = @_;
+    return 0 unless $meters && $meters > 0;
+    # 1.75mm diameter. volume_cm3 = meters * pi * r_mm^2.
+    my $radius = 1.75 / 2;
+    my $cm3 = $meters * 3.14159265 * $radius * $radius;
+    return $cm3 * $self->density_for($type || 'pla');
 }
 
 __PACKAGE__->meta->make_immutable;
