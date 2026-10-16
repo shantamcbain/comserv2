@@ -101,6 +101,10 @@
                 Slicer Print Time
                 <input type="text" name="print_hours" id="print_hours" placeholder="e.g. 1h 47m" style="width:100%;">
             </label>
+            <label style="min-width:160px;">
+                Public browse
+                <span><input type="checkbox" name="public_browse" value="1"> Show to everyone</span>
+            </label>
         </div>
         <div class="form-row">
             <label style="flex:3;min-width:250px;">

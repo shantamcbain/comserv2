@@ -1,0 +1,139 @@
+{
+  "report_date": "2026-10-08",
+  "source": "AI usage monitor",
+  "created_by": "AI usage monitor",
+  "created_at": "2026-10-08T07:05:00-07:00",
+  "compares_to": "2026-10-07",
+  "summary": "MOSTLY BETTER: 7d app ok_rate 75.4%->90.7% (49/54); guard trips 13->3. Cost slip: 46 v4-pro calls Wed 9:58-10:31 PT billed ~$1.47 vs Hermes ~$0.27 (Relace pattern). OpenRouter day $0/$1.65, week $5.01/$11.50, month $24.27/$50, balance $12.76. Super Grok ~54% est (reading 40), add-on stale 48h, resets today 10:31 PT. Bot est ~32-35%, projected ~73-86% at ~Mon Oct 12 reset; reading needed. HelpDesk 25 open unchanged; no CSC developer wakes. New AI Editor bug: 'openrouter' passed as Ollama model.",
+  "markdown": "# Daily AI Eval - 2026-10-08 (~7:05 AM PT)\n\n**Answer: MOSTLY BETTER, with one cost slip.** Reliability improved (7d real app calls 49/54 ok = 90.7%, vs 75.4% last report, partly because Monday's error rows aged out). Hermes guard trips fell from 13 to 3. Cost slipped again Wed: a 46-call deepseek-v4-pro run (9:58-10:31 AM PT Wed, session \"Add picture item and barcode scanning to inventory\", ~235k-token context at 100% cache) billed about $1.47 while Hermes logged ~$0.27. That's the Relace cached-token pattern.\n\n## Budget\n- **OpenRouter** (auth key, 6:50 AM PT): day $0.00/$1.65 (UTC day since 5 PM PT Wed), week $5.01/$11.50, month $24.27/$50, balance $12.76 (was $14.23). Billed since last report $1.47, under Wed's day cap. v4-pro used (46 calls), and Relace is suspected.\n- **Super Grok**: last reading 40% used (Tue Oct 6 7:01 AM PT). Add-on meter stale 47.8h (not reporting). App estimate from 286 Hermes xai calls since then: ~54% used, ~46% left. Resets TODAY 10:31 AM PT. Hermes default is xai-oauth/grok-build-0.1, so hard coding this morning should go there.\n- **Grok Bot** (estimate; newest reading Wed Oct 7 ~7:05 AM PT = 22% used, 6 days left; reset ~Mon Oct 12 ~8 AM PT, possibly Tue Oct 13): observed burn 12% -> 22% = 10%/day, about 13%/day conservative. Unmetered since: the rest of Wed's chat, no CSC developer wakes, and this eval. Estimate now ~32-35% used, ~4 days left, soft room ~16-17%/day. Projected at reset ~73% (10%/day) to ~86% (13%/day), or up to ~99% if the reset is Tue Oct 13. No early warning yet, but a ~30% day would put the Tue-reset case over 100%. Needs a fresh reading.\n- **CSC developer HelpDesk line**: no CSC developer activity since last report (0 audit entries), so no extra Bot cost. Queue: 25 open, no changes (watcher 6:37 AM PT).\n\n## Scorecard\n- App, since last report (excluding guard trip/restore and snapshot rows): 5 real calls, 3 ok. The 2 errors are new: AI Editor generate ~11:52 AM PT Wed failed with \"Ollama query failed: model 'openrouter' not found\" (provider name passed as an Ollama model). Cost $0.00.\n- 7d app ok_rate 90.7% (49/54) vs 75.4%. No app thrash.\n- Hermes since last report: 13 sessions. API calls: grok-build-0.1 (Super Grok) 210, north-mini-code:free 176, deepseek-v4-pro 46, v4-flash-0731 5, plus glm-5.3-flash and gemma4-64k once each. No fallback-to-v4-pro from an invalid ID. v4-pro came from that session's own model.\n- Overrun guard: 3 thrash trips (10:00 AM, 5:46 PM, 6:22 PM PT Wed), all restored. The 10:00 trip didn't stop the in-session v4-pro run. Targets are valid (north-mini-code:free on trip; restore to v4-flash-0731). The Super Grok guard handoff target is now v4-flash-0731 (yesterday's proposal 1 looks applied). Midnight switch put Hermes back on Super Grok.\n- Ollama: tev1:0.8b shows 2 failed calls in the 2-week window and none in 7d; the nimble model doesn't appear in the logs; phi4:14b has 2 old not-found errors.\n- Tasks: main commit a38b0d11a (Wed 1:08 PM PT, runtime AI state ignore + GitFix). Hermes sessions: RankQuality module and tests, daily plan order echo fix, decision-rank content weights, Andromeda window bounds, chip clip STL, InventoryAccounting branch start, picture/barcode inventory, ambiguous index warnings (this morning). aisystem :4006 is down; 36 uncommitted files there.\n\n## Proposals (new)\n1. Fix the AI Editor generate path that sends 'openrouter' as an Ollama model name (2 errors Wed).\n2. When the overrun guard restores and Super Grok has quota, restore to xai-oauth/grok-build-0.1 instead of paid v4-flash-0731.\n\n## Carried forward (unreviewed)\n- Block or warn on in-session /model switches to v4-pro near the day cap (2nd day in a row, ~$1.47 Wed).\n- Reload the grok.com add-on (meter stale ~48h).\n- Remove or pull Ollama phi4:14b.\n- Cap runaway single Hermes sessions (tool_loop_guardrails).\n- Skip thrash trips when already on Super Grok (less urgent now).\n",
+  "metrics": {
+    "app": {
+      "since_prev_real_calls": 5,
+      "since_prev_ok": 3,
+      "ok_rate_7d_excl_guard": 90.7,
+      "prev_ok_rate_7d_excl_guard": 75.4,
+      "errors": [
+        {
+          "model": "ai_editor generate",
+          "count": 2,
+          "reason": "Ollama query failed: model 'openrouter' not found"
+        }
+      ],
+      "thrash_windows": 0,
+      "cost_since_prev": 0.0
+    },
+    "openrouter": {
+      "day_usd": 0.0,
+      "week_usd": 5.011,
+      "month_usd": 24.2696,
+      "balance_usd": 12.7558,
+      "billed_since_prev_report_usd": 1.47,
+      "hermes_est_oct7_usd": 0.269,
+      "caps": {
+        "day_usd": 1.65,
+        "week_usd": 11.5,
+        "month_usd": 50
+      },
+      "over_caps": [],
+      "v4_pro_used": true,
+      "v4_pro_calls": 46,
+      "relace_suspected": true
+    },
+    "hermes": {
+      "sessions_since_prev": 13,
+      "default_model": "xai-oauth/grok-build-0.1",
+      "api_calls_by_model": {
+        "grok-build-0.1": 210,
+        "cohere/north-mini-code:free": 176,
+        "deepseek/deepseek-v4-pro": 46,
+        "deepseek/deepseek-v4-flash-0731": 5
+      },
+      "guard_trips_since_prev": 3,
+      "guard_thrash_trips": 3,
+      "guard_cap_trips": 0,
+      "guard_targets_valid": true,
+      "v4pro_session": "20261007_131125_c9bffb Wed 09:58-10:31 PT",
+      "supergrok_guard_switch_model": "openrouter/deepseek/deepseek-v4-flash-0731"
+    },
+    "supergrok": {
+      "last_reading_pct_used": 40,
+      "last_reading_at_pt": "Tue Oct 06 07:01 PT",
+      "estimate_pct_used": 54,
+      "addon_meter_stale_h": 47.8,
+      "reset_at": "2026-10-08T10:31:00-07:00",
+      "estimated": true
+    },
+    "bot": {
+      "last_reading": "22% used Wed 2026-10-07 ~07:05 PT, 6 days left",
+      "reset_estimate": "Mon 2026-10-12 ~08:03 PT (possibly Tue Oct 13)",
+      "burn_observed_pct_day": 10,
+      "burn_conservative_pct_day": 13,
+      "estimated_now_pct": "32-35",
+      "days_left": 4.05,
+      "soft_room_pct_day": "16-17",
+      "projected_at_reset_pct": "73-86 (up to ~99 if Tue reset)",
+      "early_warning": false,
+      "estimated": true,
+      "reading_requested": true
+    },
+    "helpdesk": {
+      "open": 25,
+      "changes": 0,
+      "checked_at_pt": "Thu Oct 08 06:37 PT",
+      "csc_developer_bot_cost": "none; 0 CSC developer audit entries since last report"
+    }
+  },
+  "proposals": [
+    {
+      "title": "Fix AI Editor generate sending 'openrouter' as Ollama model",
+      "change_type": "code",
+      "target": "AI Editor generate provider routing",
+      "rationale": "2 errors Wed ~11:52 AM PT: Ollama query failed: model 'openrouter' not found.",
+      "payload": {}
+    },
+    {
+      "title": "Guard restore to Super Grok when it has quota",
+      "change_type": "code",
+      "target": "HermesOverrunGuard restore target",
+      "rationale": "Restores went to paid deepseek-v4-flash-0731 while Super Grok had ~46% left.",
+      "payload": {
+        "restore_model_when_supergrok_ok": "xai-oauth/grok-build-0.1"
+      }
+    },
+    {
+      "title": "Warn/block in-place /model switch to v4-pro near OpenRouter day cap",
+      "change_type": "code",
+      "target": "Hermes overrun guard / switch_model hook",
+      "rationale": "Carried forward; 2nd day: 46 v4-pro calls Wed billed ~$1.47 vs ~$0.27 logged.",
+      "payload": {}
+    },
+    {
+      "title": "Reload grok.com usage add-on",
+      "change_type": "workstation",
+      "target": "Firefox add-on",
+      "rationale": "Carried forward; meter stale ~48h.",
+      "payload": {}
+    },
+    {
+      "title": "Remove or pull ollama phi4:14b",
+      "change_type": "config",
+      "target": "app Ollama chain",
+      "rationale": "Carried forward.",
+      "payload": {}
+    },
+    {
+      "title": "Cap runaway single Hermes sessions",
+      "change_type": "workstation",
+      "target": "~/.hermes/config.yaml tool_loop_guardrails",
+      "rationale": "Carried forward, unreviewed.",
+      "payload": {}
+    },
+    {
+      "title": "Skip thrash trips when already on Super Grok",
+      "change_type": "code",
+      "target": "HermesOverrunGuard thrash rule",
+      "rationale": "Carried forward; less urgent (0 such trips since last report).",
+      "payload": {}
+    }
+  ]
+}

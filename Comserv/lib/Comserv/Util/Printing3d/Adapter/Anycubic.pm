@@ -6,10 +6,12 @@ use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];
 use Try::Tiny;
 use HTTP::Tiny;
+use LWP::UserAgent;
 use IO::Socket::INET;
 use Digest::MD5 qw(md5_hex);
 use MIME::Base64 qw(decode_base64);
 use JSON qw(encode_json decode_json);
+use JSON::PP ();   # JSON::PP::true()/false() encode as real JSON booleans under JSON::XS
 use Time::HiRes qw(time);
 use Comserv::Util::Logging;
 
@@ -323,17 +325,27 @@ sub send_command {
             return { ok => 0, error => 'Filename must be a gcode/3mf already on the printer' };
         }
         my $path = _safe_path($opts->{path}) || '/';
+        my $data = {
+            filename => $fn,
+            filepath => $path,
+            taskid   => '-1',
+            filetype => 1,
+        };
+        # Anycubic Slicer Next sends ams_settings (model colour -> ACE slot
+        # mapping) and task_settings (auto leveling, vibration compensation,
+        # flow calibration, timelapse) with every start. Mirroring the captured
+        # payload (2026-10-12, plan 2026-10-12-send-to-printer.md) lets the
+        # queue reproduce the slicer's behaviour.
+        my $ams  = _build_ams_settings($opts);
+        my $task = _build_task_settings($opts);
+        $data->{ams_settings}  = $ams  if $ams;
+        $data->{task_settings} = $task if $task;
         $payload = {
             type      => 'print',
             action    => 'start',
             timestamp => int(time() * 1000),
             msgid     => _rand_alnum(16),
-            data      => {
-                filename => $fn,
-                filepath => $path,
-                taskid   => '-1',
-                filetype => 1,
-            },
+            data      => $data,
         };
     }
     elsif ($cmd eq 'delete_local' || $cmd eq 'delete_udisk') {
@@ -372,6 +384,106 @@ sub send_command {
         ok    => $reports->{ok} ? 1 : 0,
         error => $reports->{error},
         cmd   => $cmd,
+    };
+}
+
+# The Kobra's LAN broker only serves one client at a time. When the connect or
+# the CONNACK fails, the usual cause is Anycubic Slicer Next (or the phone app)
+# still holding the session — say that plainly instead of the raw socket text.
+# The caller logs the raw error, so nothing is hidden from the audit trail.
+sub _mqtt_busy_error {
+    my ($raw) = @_;
+    my $hint = 'Could not talk to the printer over MQTT — another client is probably '
+        . 'already connected (Anycubic Slicer Next or the Anycubic app holds the only '
+        . 'LAN session). Close/disconnect it and try again.';
+    my $detail = defined $raw ? $raw : '';
+    $detail =~ s/\s+$//;
+    return $detail ? "$hint (printer said: $detail)" : $hint;
+}
+
+# ams_settings: map each model paint colour onto a physical ACE slot, the way
+# Anycubic Slicer Next does on every start (captured 2026-10-12).
+#
+# $opts->{ams_mapping} = [
+#   { paint_index => 0, paint_color => [r,g,b,a], ams_index => 1,
+#     ams_color   => [r,g,b,a],      # optional, defaults to paint_color
+#     material_type => 'PLA' },
+#   ... up to 4 entries ...
+# ]
+#
+# Returns undef when nothing is mapped: the caller then sends the plain
+# filename-only start rather than a half-built block. Callers pass an empty
+# mapping deliberately to say "do not use the ACE".
+sub _build_ams_settings {
+    my ($opts) = @_;
+    my $map = $opts->{ams_mapping};
+    return undef unless $map && ref($map) eq 'ARRAY' && @$map;
+
+    my @mapping;
+    my $seq = 0;
+    for my $m (@$map) {
+        next unless $m && ref($m) eq 'HASH';
+        my $slot = (defined $m->{ams_index} && $m->{ams_index} =~ /\A\d+\z/)
+            ? 0 + $m->{ams_index}
+            : $seq;
+        next if $slot < 0 || $slot > 3;
+
+        my @pc = @{ $m->{paint_color} || [255, 255, 255, 255] };
+        @pc = map { (defined $_ && $_ =~ /\A\d+\z/) ? 0 + $_ : 255 } @pc[0 .. 3];
+        my @ac = ($m->{ams_color} && ref($m->{ams_color}) eq 'ARRAY' && @{ $m->{ams_color} })
+            ? @{ $m->{ams_color} }
+            : @pc;
+        @ac = map { (defined $_ && $_ =~ /\A\d+\z/) ? 0 + $_ : 255 } @ac[0 .. 3];
+
+        push @mapping, {
+            paint_index   => (defined $m->{paint_index} && $m->{paint_index} =~ /\A\d+\z/)
+                                ? 0 + $m->{paint_index} : $seq,
+            paint_color   => \@pc,
+            ams_index     => $slot,
+            ams_color     => \@ac,
+            material_type => ($m->{material_type} || 'PLA'),
+        };
+        $seq++;
+    }
+    return undef unless @mapping;
+
+    return {
+        use_ams         => JSON::PP::true(),
+        padding1        => 0,
+        padding2        => 0,
+        padding3        => 0,
+        ams_box_mapping => \@mapping,
+    };
+}
+
+# task_settings: the pre-print options the slicer sends with a start
+# (captured 2026-10-12). auto leveling, vibration (resonance) compensation
+# and flow calibration default ON to match the slicer; time-lapse defaults
+# OFF because it needs the camera and slows the job. Callers override any of
+# them through $opts->{task_settings}.
+sub _build_task_settings {
+    my ($opts) = @_;
+    my $t = $opts->{task_settings} || {};
+    my $flag = sub {
+        my ($v, $default) = @_;
+        return $default unless defined $v && length $v;
+        return $v ? 1 : 0;
+    };
+
+    return {
+        auto_leveling          => $flag->($t->{auto_leveling},          1),
+        vibration_compensation => $flag->($t->{vibration_compensation}, 1),
+        flow_calibration       => $flag->($t->{flow_calibration},      1),
+        dry_mode               => $flag->($t->{dry_mode},              0),
+        timelapse              => {
+            status => $flag->($t->{timelapse}, 0),
+            mode   => 0,
+            type   => 0,
+            count  => 0,
+        },
+        ai_settings     => { status => 0, mode => 0, type => 0, count => 0 },
+        drying_settings => { status => 0, target_temp => 0, duration => 0, remain_time => 0 },
+        model_objects_skip_parts => [],
     };
 }
 
@@ -414,6 +526,101 @@ sub list_files {
         "storage=$storage path=$path n=" . scalar(@$rows) . " keys=$keys"
         . ($reports->{empty} ? ' empty_mqtt=1' : ''));
     return $out;
+}
+
+# Create subdirectory on local or udisk storage.
+sub mkdir {
+    my ($self, $c, $host, $port, $opts) = @_;
+    $opts ||= {};
+    my $storage = lc($opts->{storage} || 'local');
+    $storage = 'local' unless $storage eq 'udisk';
+    my $path = _safe_path($opts->{path}) || '/';
+    my $name = _safe_filename($opts->{name} || $opts->{dirname});
+    return { ok => 0, error => 'Invalid directory name' } unless $name;
+
+    my $hs = $self->handshake($c, $host, $port);
+    return $hs unless $hs->{ok};
+
+    my $action = 'mkdir';
+    my $reports = $self->_mqtt_roundtrip($c, $hs, [{
+        type   => 'file',
+        action => $action,
+        data   => { path => $path, name => $name, storage => $storage },
+    }], 6);
+
+    $self->logging->log_with_details($c, $reports->{ok} ? 'info' : 'error', __FILE__, __LINE__, 'mkdir',
+        "storage=$storage path=$path name=$name ok=" . ($reports->{ok}?1:0));
+
+    return {
+        ok    => $reports->{ok} ? 1 : 0,
+        error => $reports->{error},
+        storage => $storage,
+        path    => $path,
+        name    => $name,
+    };
+}
+
+# Rename a file or dir on the printer storage.
+sub rename_file {
+    my ($self, $c, $host, $port, $opts) = @_;
+    $opts ||= {};
+    my $storage = lc($opts->{storage} || 'local');
+    $storage = 'local' unless $storage eq 'udisk';
+    my $path = _safe_path($opts->{path}) || '/';
+    my $old = _safe_filename($opts->{old} || $opts->{old_name});
+    my $new = _safe_filename($opts->{new} || $opts->{new_name});
+    return { ok => 0, error => 'Invalid old or new name' } unless $old && $new;
+
+    my $hs = $self->handshake($c, $host, $port);
+    return $hs unless $hs->{ok};
+
+    my $reports = $self->_mqtt_roundtrip($c, $hs, [{
+        type   => 'file',
+        action => 'rename',
+        data   => { path => $path, old => $old, new => $new, storage => $storage },
+    }], 6);
+
+    $self->logging->log_with_details($c, $reports->{ok} ? 'info' : 'error', __FILE__, __LINE__, 'rename_file',
+        "storage=$storage path=$path old=$old new=$new ok=" . ($reports->{ok}?1:0));
+
+    return {
+        ok    => $reports->{ok} ? 1 : 0,
+        error => $reports->{error},
+        storage => $storage,
+        path    => $path,
+        old     => $old,
+        new     => $new,
+    };
+}
+
+# Move a file to another path (subdir) on the same storage.
+sub move_file {
+    my ($self, $c, $host, $port, $opts) = @_;
+    $opts ||= {};
+    my $storage = lc($opts->{storage} || 'local');
+    $storage = 'local' unless $storage eq 'udisk';
+    my $from_path = _safe_path($opts->{from_path} || $opts->{path}) || '/';
+    my $filename = _safe_filename($opts->{filename});
+    my $to_path = _safe_path($opts->{to_path});
+    return { ok => 0, error => 'Invalid filename or target path' } unless $filename && $to_path;
+
+    my $hs = $self->handshake($c, $host, $port);
+    return $hs unless $hs->{ok};
+
+    my $reports = $self->_mqtt_roundtrip($c, $hs, [{
+        type   => 'file',
+        action => 'move',
+        data   => { from_path => $from_path, filename => $filename, to_path => $to_path, storage => $storage },
+    }], 6);
+
+    $self->logging->log_with_details($c, $reports->{ok} ? 'info' : 'error', __FILE__, __LINE__, 'move_file',
+        "storage=$storage from=$from_path/$filename to=$to_path ok=" . ($reports->{ok}?1:0));
+
+    return {
+        ok    => $reports->{ok} ? 1 : 0,
+        error => $reports->{error},
+        storage => $storage,
+    };
 }
 
 # Probe TCP 18910 then GET /info. subnet e.g. 192.168.2.0/24 (caller may override).
@@ -485,6 +692,108 @@ sub discover {
     return \@found;
 }
 
+# Follow a printer when DHCP moves it. Identity is the /info serial (cn), not the IP.
+# Tries the stored host first. On failure, scans that host's /24 (then 192.168.2 and
+# 192.168.1) and keeps the device whose serial matches. Does not log tokens.
+sub relocate {
+    my ($self, $c, $host, $serial) = @_;
+    $host   = $self->sanitize_host($host) || '';
+    $serial = '' unless defined $serial;
+    $serial =~ s/\s+//g;
+
+    if ($host) {
+        my $info = $self->fetch_info($c, $host, 18910);
+        if ($info->{ok} && _serial_ok($serial, $info->{serial})) {
+            return {
+                ok     => 1,
+                host   => $info->{host},
+                serial => $info->{serial} || $serial,
+                moved  => 0,
+            };
+        }
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'relocate',
+            "stored host=$host failed; scanning for serial=" . ($serial || '(any Kobra 3)'));
+    }
+
+    # DHCP usually moves the last octet a little. Probe neighbours before a full /24 sweep.
+    if ($host =~ /\A(\d{1,3}\.\d{1,3}\.\d{1,3})\.(\d{1,3})\z/) {
+        my ($prefix, $last) = ($1, $2 + 0);
+        for my $delta (-8 .. 8) {
+            next if $delta == 0;
+            my $n = $last + $delta;
+            next if $n < 1 || $n > 254;
+            my $ip = "$prefix.$n";
+            my $sock = IO::Socket::INET->new(
+                PeerAddr => $ip, PeerPort => 18910, Proto => 'tcp', Timeout => 0.4,
+            );
+            next unless $sock;
+            close $sock;
+            my $st = $self->fetch_info($c, $ip, 18910);
+            next unless $st->{ok} && _serial_ok($serial, $st->{serial});
+            next if !$serial && ($st->{model_id} || '') ne '20024'
+                && ($st->{model_name} || '') !~ /kobra\s*3/i;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'relocate',
+                "neighbour match $host -> $ip");
+            return {
+                ok       => 1,
+                host     => $st->{host},
+                serial   => $st->{serial} || $serial,
+                moved    => 1,
+                previous => $host,
+            };
+        }
+    }
+
+    my @nets;
+    if ($host =~ /\A(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}\z/) {
+        push @nets, "$1.0/24";
+    }
+    push @nets, '192.168.2.0/24', '192.168.1.0/24';
+    my %seen;
+    my @candidates;
+    for my $net (@nets) {
+        next if $seen{$net}++;
+        my $found = $self->discover($c, $net) || [];
+        for my $p (@$found) {
+            my $st = $self->fetch_info($c, $p->{ip}, 18910);
+            next unless $st->{ok};
+            if ($serial) {
+                next unless $st->{serial} && $st->{serial} eq $serial;
+            }
+            elsif (($st->{model_id} || '') ne '20024' && ($st->{model_name} || '') !~ /kobra\s*3/i) {
+                next;
+            }
+            push @candidates, $st;
+        }
+        last if @candidates;
+    }
+
+    if (@candidates > 1 && !$serial) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'relocate',
+            'More than one Kobra 3 and no stored serial; not guessing');
+        return { ok => 0, error => 'Several printers found; serial not stored yet', host => $host };
+    }
+    unless (@candidates) {
+        return { ok => 0, error => 'Printer not found on LAN', host => $host, serial => $serial };
+    }
+    my $hit = $candidates[0];
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'relocate',
+        "moved " . ($host || '(none)') . " -> $hit->{host} serial=" . ($hit->{serial} || ''));
+    return {
+        ok       => 1,
+        host     => $hit->{host},
+        serial   => $hit->{serial} || $serial,
+        moved    => ($host && $hit->{host} ne $host) ? 1 : 0,
+        previous => $host,
+    };
+}
+
+sub _serial_ok {
+    my ($want, $got) = @_;
+    return 1 unless $want;
+    return ($got && $got eq $want) ? 1 : 0;
+}
+
 sub _mqtt_roundtrip {
     my ($self, $c, $hs, $messages, $wait_s) = @_;
     $wait_s ||= 4;
@@ -505,14 +814,14 @@ sub _mqtt_roundtrip {
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_mqtt_roundtrip',
             "TLS connect: $_");
-        $fail = { ok => 0, error => "MQTT TLS connect failed: $_" };
+        $fail = { ok => 0, error => _mqtt_busy_error("TLS connect: $_") };
     };
     return $fail if $fail;
     unless ($sock) {
         my $err = IO::Socket::SSL->errstr || $!;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_mqtt_roundtrip',
             "TLS connect failed: $err");
-        return { ok => 0, error => "MQTT TLS connect failed: $err" };
+        return { ok => 0, error => _mqtt_busy_error("TLS connect failed: $err") };
     }
     $sock->autoflush(1);
     my $cid = 'cs' . _rand_alnum(8);
@@ -530,7 +839,7 @@ sub _mqtt_roundtrip {
         close $sock;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_mqtt_roundtrip',
             "MQTT CONNECT: $err");
-        return { ok => 0, error => "MQTT CONNECT failed: $err" };
+        return { ok => 0, error => _mqtt_busy_error($err) };
     }
     my $mid = $hs->{model_id};
     my $did = $hs->{device_id};
@@ -737,7 +1046,9 @@ sub _fill_ace {
         push @slots, {
             index => $s->{index},
             type  => $s->{type} || '',
+            color => $s->{color} || $s->{color_group} || undef,
             pct   => $s->{consumables_percent},
+            sku   => $s->{sku} || '',
         };
     }
     $out->{ace_slots} = \@slots;
@@ -821,6 +1132,131 @@ sub _first_defined {
         return $v if defined $v;
     }
     return;
+}
+
+# Upload a file to the printer using the fileUploadurl from /info if available.
+# For LAN mode, this typically allows sending gcode/3mf to local storage.
+sub upload_file {
+    my ($self, $c, $host, $port, $filename, $content_or_path) = @_;
+    $filename = _safe_filename($filename);
+    return { ok => 0, error => 'Invalid filename' } unless $filename;
+
+    my $info = $self->fetch_info($c, $host, $port);
+    return $info unless $info->{ok};
+
+    my $upload_url = $info->{_info}{fileUploadurl} || '';
+    unless ($upload_url =~ m{^https?://}) {
+        return { ok => 0, error => 'Printer did not provide a usable fileUploadurl' };
+    }
+
+    my $content;
+    if (ref($content_or_path) eq 'SCALAR' || -f $content_or_path) {
+        if (-f $content_or_path) {
+            open my $fh, '<', $content_or_path or return { ok => 0, error => "Cannot read $content_or_path: $!" };
+            binmode $fh;
+            local $/;
+            $content = <$fh>;
+            close $fh;
+        } else {
+            $content = $$content_or_path;
+        }
+    } else {
+        $content = $content_or_path;
+    }
+
+    # The Kobra 3 upload endpoint expects a multipart/form-data POST with a
+    # "file" field; a raw octet-stream body makes the printer close the
+    # connection (HTTP::Tiny reports that as 599). Use LWP multipart instead.
+    my $ua = LWP::UserAgent->new(timeout => 300);
+    my $res = $ua->post(
+        $upload_url,
+        'X-File-Length' => length($content),
+        Content_Type => 'form-data',
+        Content => [
+            # Field name must be "gcode" (what Anycubic Slicer Next sends). With
+            # "file" the Kobra 3 (fw 2.4.6.7) answers code 19007 "Invalid gcode file"
+            # even for a real sliced file. Verified 2026-10-13.
+            gcode => [ undef, $filename, 'Content-Type' => 'application/octet-stream', Content => $content ],
+        ],
+    );
+
+    my $http_ok = $res->is_success;
+    my $body    = eval { $res->decoded_content } || '';
+    my $json    = eval { JSON::PP::decode_json($body) } || {};
+    my $code    = ref($json) eq 'HASH' ? $json->{code} : undef;
+    my $json_ok = !defined $code || $code == 0 || $code == 200;
+    my $ok      = $http_ok && $json_ok;
+
+    $self->logging->log_with_details($c, $ok ? 'info' : 'error', __FILE__, __LINE__, 'upload_file',
+        "host=$host file=$filename status=" . ($res->code || 0) . ' json_code=' . (defined $code ? $code : 'none'));
+
+    return {
+        ok          => $ok ? 1 : 0,
+        error       => $ok ? undef : ($http_ok ? ($json->{message} || 'Printer rejected upload (code=' . (defined $code ? $code : 'unknown') . ')')
+                                              : 'Upload failed: ' . ($res->code || $res->message || 'unknown')),
+        url         => $upload_url,
+        http_status => $res->code,
+    };
+}
+
+# Helper to get files for a printer (used by queue and control)
+sub get_local_files {
+    my ($self, $c, $host, $port, $storage) = @_;
+    $storage ||= 'local';
+    my $listing = $self->list_files($c, $host, $port, { storage => $storage, path => '/' });
+    return $listing->{names} || [];
+}
+
+# Download a file from the printer (for analysis, 3MF parsing, copying to model system).
+# Uses fileDownloadurl from /info if present, otherwise attempts a reasonable fallback.
+sub download_file {
+    my ($self, $c, $host, $port, $filename, $path, $storage) = @_;
+    $filename = _safe_filename($filename);
+    return { ok => 0, error => 'Invalid filename' } unless $filename;
+    $path = _safe_path($path) || '/';
+    $storage = lc($storage || 'local');
+    $storage = 'local' unless $storage eq 'udisk';
+
+    my $info = $self->fetch_info($c, $host, $port);
+    return $info unless $info->{ok};
+
+    my $download_url = $info->{_info}{fileDownloadurl} || $info->{_info}{file_download_url} || '';
+    my $content;
+
+    if ($download_url =~ m{^https?://}) {
+        # Append filename/path if the url is a base
+        my $full_url = $download_url;
+        if ($full_url !~ /\?/) {
+            $full_url .= '?filename=' . $filename . '&path=' . $path . '&storage=' . $storage;
+        }
+        my $ua = HTTP::Tiny->new(timeout => 60);
+        my $res = $ua->get($full_url);
+        if ($res->{success}) {
+            $content = $res->{content};
+        } else {
+            return { ok => 0, error => 'Download failed: ' . ($res->{status} || $res->{reason} || 'unknown') };
+        }
+    } else {
+        # Fallback: try common Anycubic LAN download path on the printer web port
+        my $fallback = "http://$host:18910/download?filename=" . $filename . "&path=" . $path . "&storage=" . $storage;
+        my $ua = HTTP::Tiny->new(timeout => 60);
+        my $res = $ua->get($fallback);
+        if ($res->{success}) {
+            $content = $res->{content};
+        } else {
+            return { ok => 0, error => 'No download URL provided by printer and fallback failed' };
+        }
+    }
+
+    $self->logging->log_with_details($c, $content ? 'info' : 'error', __FILE__, __LINE__, 'download_file',
+        "host=$host file=$filename path=$path storage=$storage size=" . (defined $content ? length($content) : 0));
+
+    return {
+        ok => defined $content ? 1 : 0,
+        error => defined $content ? undef : 'Download returned no content',
+        content => $content,
+        filename => $filename,
+    };
 }
 
 __PACKAGE__->meta->make_immutable;

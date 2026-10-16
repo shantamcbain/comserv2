@@ -144,6 +144,12 @@
 [% IF c.request.uri.match('/admin/git') %]
 [% END %]
 
+<!-- Printer LAN camera player. Loaded only on the control page. -->
+[% IF c.request.uri.match('/3d/printer_lan/control') %]
+<script src="/static/js/vendor/flv.min.js?v=[% cv %]" defer></script>
+<script src="/static/js/printer-lan-camera.js?v=[% cv %]" defer></script>
+[% END %]
+
 <!-- Herb Sign Generator live preview -->
 [% IF c.request.uri.match('/signgenerator') %]
 <script src="/static/js/sign-preview.js?v=[% cv %]" defer></script>
@@ -235,6 +241,7 @@
 <script src="/static/js/planning/daily-plan-gantt.js?v=[% cv %]" defer></script>
 <script src="/static/js/planning/daily-plan-deploy-center.js?v=[% cv %]" defer></script>
 <script src="/static/js/planning/daily-plan-utils.js?v=[% cv %]" defer></script>
+<script src="/static/js/planning/decision-resort.js?v=[% cv %]" defer></script>
 <script src="/static/js/project/project-search.js?v=[% cv %]" defer></script>
 [% END %]
 

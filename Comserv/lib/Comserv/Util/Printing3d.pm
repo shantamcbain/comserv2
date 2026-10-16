@@ -6,6 +6,10 @@ use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];
 use Try::Tiny;
 use Comserv::Util::Logging;
+use JSON::MaybeXS qw(decode_json from_json);
+use File::Copy qw(copy);
+use File::Basename qw(basename dirname);
+use DateTime;
 
 =head1 NAME
 
@@ -57,7 +61,7 @@ sub reorder_item {
         $job = $schema->resultset('Printing3dJob')->create({
             sitename            => $sitename,
             model_id            => $model ? $model->id : undef,
-            item_id             => $item_id,
+            source_item_id      => $item_id,
             user_id             => $c->session->{user_id} || 0,
             username            => $c->session->{username} || 'admin',
             status              => 'queued',
@@ -96,6 +100,214 @@ sub density_for {
     return $DENSITY{$k} || $DENSITY{pla};
 }
 
+# Parse 3MF files to extract slice info, filament usage, and copy files to model system.
+sub parse_3mf {
+    my ($self, $c, $filepath) = @_;
+    return undef unless $filepath && -f $filepath;
+
+    my $tmp_dir = "/tmp/3mf_extract_" . int(rand(10000));
+    mkdir($tmp_dir) || return undef;
+
+    # 3MF is a zip. Backticks return stdout, not the exit code — use system.
+    my $rc = system('unzip', '-q', '-o', $filepath, '-d', $tmp_dir);
+    return undef if $rc != 0;
+
+    my %metadata;
+    my $slice_info;
+    my $filament_g = undef;
+    my $print_hours = undef;
+
+    # Look for common 3MF structure
+    my $info_file = "$tmp_dir/Metadata/info.json";
+    if (-f $info_file) {
+        my $content = `cat '$info_file' 2>/dev/null`;
+        $slice_info = eval { from_json($content) };
+    }
+
+    # Extract G-code from common locations
+    my $gcode_files = `find '$tmp_dir' -name "*.gcode" -o -name "*.gco" 2>/dev/null`;
+    if ($gcode_files) {
+        my $last_gcode;
+        for my $gpath (split('\n', $gcode_files)) {
+            next unless $gpath && -f $gpath;
+            $last_gcode = $gpath;
+        }
+        if ($last_gcode) {
+            $metadata{gcode_path} = $last_gcode;
+            $metadata{gcode_size} = -s $last_gcode;
+            $metadata{gcode_mtime} = (stat $last_gcode)[9];
+        }
+    }
+
+    # Look for slice data in JSON files
+    my $slice_json = "$tmp_dir/Metadata/slice.json";
+    if (-f $slice_json) {
+        my $content = `cat '$slice_json' 2>/dev/null`;
+        my $slice = eval { from_json($content) };
+        if ($slice) {
+            $metadata{slice_info} = $slice;
+            $filament_g = $slice->{filament_used_g};
+            $print_hours = $slice->{print_time_hours};
+        }
+    }
+
+    # Fallback: try to estimate from gcode if we have it
+    if (!$filament_g && $metadata{gcode_path}) {
+        my $est = $self->estimate_filament_from_gcode($metadata{gcode_path});
+        if ($est) {
+            $filament_g = $est->{grams};
+            $print_hours = $est->{hours};
+        }
+    }
+
+    # Copy files to model system
+    my $copy_result;
+    if ($c && $c->stash->{SiteName}) {
+        $copy_result = $self->copy_3mf_to_model_system($c, $filepath, $tmp_dir);
+    }
+
+    # Clean up
+    my $cleanup_cmd = "rm -rf '$tmp_dir'";
+    system($cleanup_cmd);
+
+    return {
+        metadata    => \%metadata,
+        slice_info  => $slice_info,
+        filament_g  => $filament_g,
+        print_hours => $print_hours,
+        copy_result => $copy_result,
+    };
+}
+
+# Is this file something the Kobra can actually print?
+# The printer rejects unsliced geometry with code 19007 "Invalid gcode file":
+# a .stl is never sliced, and a plain .3mf from the library is geometry only.
+# A sliced job from Anycubic Slicer Next is a .gcode (or a .gcode.3mf holding
+# a .gcode/.gco inside the zip).
+sub is_sliced_file {
+    my ($self, $filepath) = @_;
+    return 0 unless $filepath && -f $filepath;
+
+    return 1 if $filepath =~ /\.gcode$/i;
+
+    if ($filepath =~ /\.3mf$/i) {
+        # Listing the zip is enough — no extraction, no side effects.
+        my $listing = `unzip -l '$filepath' 2>/dev/null`;
+        return 0 if $? && $listing !~ /\S/;
+        return ($listing =~ /\.gcod?e"?\s*$/im) ? 1 : 0;
+    }
+
+    return 0;   # .stl and anything else is geometry, not a print job
+}
+
+# Estimate filament usage and print time from G-code file.
+sub estimate_filament_from_gcode {
+    my ($self, $gcode_path) = @_;
+    return undef unless $gcode_path && -f $gcode_path;
+
+    my $filament_total = 0;
+    my $print_seconds = 0;
+    my $line_count = 0;
+
+    # Read gcode and extract filament usage and time estimate
+    open my $fh, '<', $gcode_path or return undef;
+    while (my $line = <$fh>) {
+        $line_count++;
+        
+        # Extract filament length/grams from common G1 commands
+        if ($line =~ /G91\s.*F(\d+\.?\d*)/i) {
+            # filament feed rate can give hints about usage
+        }
+        
+        # Look for M050, M105 or similar filament measurements
+        if ($line =~ /G1\s.*E(\d+\.?\d*)/i) {
+            $filament_total += $1; # extrude length in mm
+        }
+        
+        # Extract time from G1 commands
+        if ($line =~ /G1\s.*F(\d+\.?\d*)/i) {
+            # estimate time based on filament movement speed
+            my $distance = $1 / 60; # crude approximation
+            $print_seconds += $distance;
+        }
+        
+        # Look for G4 (wait) commands for delay-based time tracking
+        if ($line =~ /G4\s+P(\d+)/i) {
+            $print_seconds += $1 / 1000; # milliseconds to seconds
+        }
+    }
+    close $fh;
+
+    if ($filament_total > 0) {
+        # Estimate grams from extrusion length (typical filament diameter ~1.75mm)
+        my $filament_diameter = 1.75;
+        my $area = 3.1416 * ($filament_diameter / 2) ** 2;
+        my $volume_mm3 = $filament_total * $area;
+        my $volume_cm3 = $volume_mm3 / 1000;
+        
+        # Typical filament density
+        my $density = $self->density_for('PLA');
+        my $grams = $volume_cm3 * $density;
+        
+        # Convert seconds to hours
+        my $hours = $print_seconds / 3600;
+        
+        return {
+            grams => sprintf('%.2f', $grams),
+            hours => sprintf('%.2f', $hours),
+            lines => $line_count,
+        };
+    }
+    
+    return undef;
+}
+
+# Copy the printer file into the model library (/data/nfs/3d/models), same store
+# as Controller::3d model upload. Do not invent a worktree path from SiteName.
+sub copy_3mf_to_model_system {
+    my ($self, $c, $original_path, $tmp_dir) = @_;
+    return { ok => 0, error => 'No Catalyst context or site name' } unless $c && $c->stash->{SiteName};
+
+    my $sitename = $c->stash->{SiteName};
+    my $schema = $c->model('DBEncy');
+    my $src = $original_path;
+    return { ok => 0, error => 'Source file missing' } unless $src && -f $src;
+
+    my $base = basename($src);
+    $base =~ s/[^\w.\-]+/_/g;
+    $base = 'printer-file.3mf' if $base eq '' || $base eq '.' || $base eq '..';
+    my $dest_dir = '/data/nfs/3d/models';
+    unless (-d $dest_dir) {
+        return { ok => 0, error => "Model library $dest_dir is not available" };
+    }
+    my $dest_path = "$dest_dir/$base";
+    if (-e $dest_path) {
+        my $stamp = time();
+        $dest_path = "$dest_dir/${stamp}_$base";
+    }
+    unless (copy($src, $dest_path)) {
+        return { ok => 0, error => "Copy to $dest_path failed: $!" };
+    }
+
+    my $model;
+    my $err;
+    eval {
+        $model = $schema->resultset('Printing3dModel')->create({
+            sitename   => $sitename,
+            name       => $base,
+            nfs_path   => $dest_path,
+            file_type  => ($base =~ /\.3mf$/i ? '3mf' : 'unknown'),
+            source     => 'printer_lan',
+            is_active  => 1,
+            created_at => _now(),
+        });
+    };
+    $err = $@ if $@;
+    return { ok => 0, error => "Copied file but model row failed: $err", path => $dest_path } if $err || !$model;
+    return { ok => 1, copied_models => $base, model_id => $model->id, path => $dest_path };
+}
+
+# Parse STL files to extract volume and triangle count for filament estimation.
 sub parse_stl {
     my ($self, $filepath) = @_;
     return undef unless $filepath && -r $filepath;

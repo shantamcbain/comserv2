@@ -84,6 +84,18 @@ __PACKAGE__->add_columns(
         size          => 20,
         is_nullable   => 1,
         default_value => 'nfs',
+        # Values: 'nfs' (legacy/default, stored on NFS mount),
+        #         'db'  (small files stored as blob in file_data),
+        #         'git' (repo-tracked assets, path in repo_path),
+        #         plus existing semantic labels 'upload','converted',
+        #         'project','sign','web','manufacturing'
+    },
+    repo_path => {
+        data_type     => 'varchar',
+        size          => 1000,
+        is_nullable   => 1,
+        # For source_type='git': repo-relative path, e.g.
+        # 'Documentation/books/api-reference.pdf'
     },
     sitename => {
         data_type   => 'varchar',

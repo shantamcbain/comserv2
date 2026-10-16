@@ -71,7 +71,18 @@
     </div>
 
 
-    <div id="ticket-form-section" class="ticket-form" style="display:none;">
+    <div id="ticket-form-section" class="ticket-form" style="display:[% IF error_msg %]block[% ELSE %]none[% END %];">
+[%# Validation feedback: banner + field highlight + focus (HelpDesk forms). %]
+[% IF error_msg %]
+<div class="hd-alert-error hd-form-error" role="alert" id="hd-form-error"
+     style="border:2px solid #c62828;background:#fdecea;color:#b71c1c;padding:10px 14px;border-radius:6px;margin:0 0 12px;">
+    <strong>Your request was not sent.</strong> [% error_msg | html %]
+</div>
+[% END %]
+[% IF success_msg %]
+<div class="hd-alert-success" role="status" style="border:2px solid #2e7d32;background:#edf7ed;color:#1b5e20;padding:10px 14px;border-radius:6px;margin:0 0 12px;">[% success_msg | html %]</div>
+[% END %]
+
 
         <h2>New Support Ticket</h2>
 
@@ -88,6 +99,26 @@
             </div>
 
             [%# Math challenge for guests. Prefer num1/num2 like contact.tt; math_a/math_b as fallback. Never render blank "What is + ?". %]
+            <input type="hidden" name="hd_ft" value="[% hd_fill_token | html %]">
+            [%# CSC-20260928-9565: guests must leave a contact email so staff can reply. %]
+            [% IF is_public_guest || !c.session.user_id %]
+            <div class="form-group">
+                <label for="guest_name">Your Name</label>
+                <input type="text" id="guest_name" name="guest_name" class="form-control" maxlength="100"
+                       value="[% (guest_name || c.req.params.guest_name) | html %]" autocomplete="name" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Your Email (so we can reply)</label>
+                <input type="email" id="email" name="email" class="form-control" maxlength="255"
+                       value="[% (guest_email_in || c.req.params.email) | html %]" autocomplete="email" required>
+            </div>
+            [% END %]
+            [% IF turnstile_site_key %]
+            <div class="form-group turnstile-challenge">
+                <div class="cf-turnstile" data-sitekey="[% turnstile_site_key | html %]"></div>
+                <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+            </div>
+            [% ELSE %]
             [% IF is_public_guest || !c.session.user_id %]
             <div class="form-group math-challenge">
                 [% IF num1 && num2 %]
@@ -107,13 +138,14 @@
                 [% END %]
             </div>
             [% END %]
+            [% END %]
 
 
             <div class="form-group">
 
                 <label for="subject">Subject:</label>
 
-                <input type="text" id="subject" name="subject" class="form-control" required
+                <input type="text" id="subject" name="subject" value="[% c.req.params.subject | html %]" class="form-control" required
 
                        placeholder="Brief description of your issue">
 
@@ -128,15 +160,15 @@
 
                     <option value="">-- Select a Category --</option>
 
-                    <option value="technical">Technical Issue</option>
+                    <option value="technical"[% IF c.req.params.category %][% IF c.req.params.category == 'technical' %] selected[% END %][% ELSE %][% END %]>Technical Issue</option>
 
-                    <option value="billing">Billing Question</option>
+                    <option value="billing"[% IF c.req.params.category %][% IF c.req.params.category == 'billing' %] selected[% END %][% ELSE %][% END %]>Billing Question</option>
 
-                    <option value="account">Account Management</option>
+                    <option value="account"[% IF c.req.params.category %][% IF c.req.params.category == 'account' %] selected[% END %][% ELSE %][% END %]>Account Management</option>
 
-                    <option value="feature">Feature Request</option>
+                    <option value="feature"[% IF c.req.params.category %][% IF c.req.params.category == 'feature' %] selected[% END %][% ELSE %][% END %]>Feature Request</option>
 
-                    <option value="other">Other</option>
+                    <option value="other"[% IF c.req.params.category %][% IF c.req.params.category == 'other' %] selected[% END %][% ELSE %][% END %]>Other</option>
 
                 </select>
 
@@ -151,13 +183,13 @@
 
                     <option value="">-- Select Priority --</option>
 
-                    <option value="low">Low</option>
-                    <option value="medium" selected>Medium</option>
+                    <option value="low"[% IF c.req.params.priority %][% IF c.req.params.priority == 'low' %] selected[% END %][% ELSE %][% END %]>Low</option>
+                    <option value="medium"[% IF c.req.params.priority %][% IF c.req.params.priority == 'medium' %] selected[% END %][% ELSE %] selected[% END %]>Medium</option>
                     [%# Guests: no high/critical in UI (server also clamps). Staff see full scale. %]
                     [% UNLESS is_public_guest || !c.session.user_id %]
-                    <option value="high">High</option>
+                    <option value="high"[% IF c.req.params.priority %][% IF c.req.params.priority == 'high' %] selected[% END %][% ELSE %][% END %]>High</option>
 
-                    <option value="critical">Critical</option>
+                    <option value="critical"[% IF c.req.params.priority %][% IF c.req.params.priority == 'critical' %] selected[% END %][% ELSE %][% END %]>Critical</option>
                     [% END %]
                 </select>
 
@@ -170,7 +202,7 @@
 
                 <textarea id="description" name="description" class="form-control" rows="6" required
 
-                          placeholder="Provide as much detail as possible about your issue..."></textarea>
+                          placeholder="Provide as much detail as possible about your issue...">[% c.req.params.description | html %]</textarea>
 
             </div>
 
@@ -564,3 +596,20 @@
     }
 
 </style>
+
+[% IF error_msg %]
+<style>.hd-field-error{border:2px solid #c62828 !important;}.hd-field-msg{color:#b71c1c;font-size:.9em;display:block;margin-top:3px;}</style>
+<script>
+(function(){
+  var f = "[% hd_error_field | html %]", msg = document.getElementById('hd-form-error');
+  var el = f && f !== 'form' && f !== 'turnstile' ? document.getElementById(f) : null;
+  if (el) {
+    el.classList.add('hd-field-error');
+    var s = document.createElement('span'); s.className = 'hd-field-msg';
+    s.textContent = msg ? msg.textContent.replace('Your request was not sent.','').trim() : '';
+    el.insertAdjacentElement('afterend', s);
+    try { el.focus(); } catch(e) {}
+  } else if (msg) { msg.scrollIntoView(); }
+})();
+</script>
+[% END %]
