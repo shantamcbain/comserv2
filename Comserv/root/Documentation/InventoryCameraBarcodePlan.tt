@@ -1,0 +1,98 @@
+[% META
+    title = "Inventory Camera Photo + Barcode Capture Plan"
+    description = "Add camera capture for item visuals (optional NFS save via File Manager or external URL for universal items) and barcode scanning (decode + extract info) to the add item page and physical count system. Includes barcode_type column, duplicate detection with switch to edit/receive/adjust, multi-location confirmation."
+    roles = "admin,developer"
+    TemplateType = "Documentation"
+    category = "inventory,planning"
+    page_version = "0.1"
+    last_updated = "2026-10-07"
+    site_specific = "false"
+    project_id = "138"
+    project_code = "PLANNING"
+%]
+[% PageVersion = 'Documentation/InventoryCameraBarcodePlan.tt,v 0.1 2026/10/07 Hermes Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+
+<h1>Inventory: Camera Photo + Barcode Capture</h1>
+
+<div class="last-updated doc-muted">
+    Created: 2026-10-07 &nbsp;|&nbsp; Version: 0.1 &nbsp;|&nbsp; Status: PLANNING
+    &nbsp;|&nbsp; <a href="[% c.uri_for('/todo/details') %]?record_id=2549" class="doc-link" target="_blank">Todo #2549 (time tracking)</a>
+    &nbsp;|&nbsp; <a href="[% c.uri_for('/project/details') %]?project_id=138" class="doc-link" target="_blank">Project #138 PLANNING</a>
+</div>
+
+<p class="doc-body"><strong>Scope.</strong> Extend the add item form (/Inventory/item/add) and physical inventory count sheet (/Inventory/count) with live camera support for:</p>
+<ul>
+    <li>Visual photo of the item or its location (user chooses to keep/save).</li>
+    <li>Barcode scanning (UPC/EAN/QR/internal) with extraction of available data.</li>
+</ul>
+
+<p class="doc-body"><strong>Constraints from user.</strong></p>
+<ul class="doc-body">
+    <li>Images on NFS only via File Manager (no container bloat). Universal items (e.g. can of beans) may use external URL in image_path.</li>
+    <li>Barcode is stored text; add barcode_type column (via schema-compare after Result update).</li>
+    <li>If item exists (by barcode primarily), switch to edit form or offer new stock (receive) vs location adjustment (count/adjust).</li>
+    <li>Items already support multi-location via stock_levels (location_id).</li>
+    <li>Real links only (full domain + /todo/details?record_id=XXXX or c.uri_for). No fake paths.</li>
+</ul>
+
+<h2 id="requirements">Requirements</h2>
+<ul>
+    <li>Camera (getUserMedia) + capture to preview + optional save to NFS image_path.</li>
+    <li>Barcode decode from camera (client preferred; fallback server).</li>
+    <li>Lookup by barcode on scan/focus/submit; if exists, prompt and redirect/switch.</li>
+    <li>Support external image_path URLs for non-unique visuals.</li>
+    <li>Update count sheet to scan-to-locate row + optional photo evidence.</li>
+    <li>barcode_type support in forms, create, update, lookup.</li>
+    <li>Proper plan tracking, changelog, code index sync.</li>
+</ul>
+
+<h2 id="phases">Phases (sub-projects under planning)</h2>
+
+<div class="doc-info">
+    <strong>P0 — Setup &amp; Tracking (this plan + todo)</strong><br>
+    Create this plan doc, link from MASTER_PLAN, confirm todo #2549 started (status 5, log open via /api/todo/open_log), add work order.
+</div>
+
+<div class="doc-info">
+    <strong>P1 — Data Layer</strong><br>
+    Add barcode_type to Result::Accounting::InventoryItem. Update _create_item, item_edit update, forms. Run schema-compare for column.
+</div>
+
+<div class="doc-info">
+    <strong>P2 — Add Item Page</strong> (partial complete)<br>
+    Camera capture section (visual + barcode) with getUserMedia + preview. barcode_type in forms. Duplicate check by barcode (switches to edit). Basic scan populates + lookup note. Image_path supports external or capture note (full NFS upload via File Mgr pending).
+</div>
+
+<div class="doc-info">
+    <strong>P3 — Inventory Count Integration</strong> (basic complete)<br>
+    Barcodes shown in table. Quick scan-to-highlight + focus. Camera for evidence photos. Rows include barcode in controller.
+</div>
+
+<div class="doc-info">
+    <strong>P4 — Polish, Docs, Verification</strong><br>
+    Theming (var(--*)), logging, perl -c, sync-docs.sh, changelog .inc, update views, test multi-location + duplicate flows. Link in nav if needed.
+</div>
+
+<h2 id="links">Real Links (no fiction)</h2>
+<p>Use full domain for chat/TUI or c.uri_for in .tt:</p>
+<ul>
+    <li>Example: <a href="http://workstation.local:4005/todo/details?record_id=2549" target="_blank">http://workstation.local:4005/todo/details?record_id=2549</a></li>
+    <li>Rendered: <code>[% c.uri_for('/todo/details') %]?record_id=2549</code></li>
+</ul>
+
+<h2 id="notes">Notes &amp; Open</h2>
+<ul>
+    <li>Client barcode decode: start with jsQR for QR; for linear use capture + server or manual entry fallback.</li>
+    <li>Photo save: reuse File upload pipeline targeting inventory NFS dir.</li>
+    <li>External images: allow http/https in image_path field with note.</li>
+    <li>3D-specific fields on general table: filament_color, filament_type, print_time_hours, requires_printing. See new todo #2550 for refactor to generic manufacturing table or rename (to avoid confusing AI for woodworking etc.).</li>
+</ul>
+
+<p>Real link to refactor todo: <a href="http://workstation.local:4005/todo/details?record_id=2550" target="_blank">http://workstation.local:4005/todo/details?record_id=2550</a> (started status 5)</p>
+
+<p class="doc-backtop"><a href="#top">↑ Back to Top</a></p>
+
+</div>

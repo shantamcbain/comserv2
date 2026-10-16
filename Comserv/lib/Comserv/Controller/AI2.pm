@@ -1217,6 +1217,8 @@ sub chat :Local :Args(0) {
             skip_app_writes    => $editor_skip_writes ? 1 : 0,
             surface            => $editor_skip_writes ? 'editor' : 'chat',
             phase              => $editor_phase,
+            route              => $json_data->{route} || '',
+            user_picked        => $json_data->{user_picked} ? 1 : 0,
             grounding          => $json_data->{grounding},   # off|shadow|enforce (Model::AI2::Grounding)
             creative           => $json_data->{creative} ? 1 : 0,
         );
