@@ -1,0 +1,486 @@
+{
+  "report_date": "2026-10-04",
+  "source": "AI usage monitor",
+  "created_by": "AI usage monitor",
+  "created_at": "2026-10-04T06:42:00-07:00",
+  "summary": "MIXED: reliability still edging up (7d app ok_rate 59.6%→62.2%; gemma contained; grok.com meter fresh at 22%), but OpenRouter week cost REGRESSED ($15.89→$20.56 / $11.50 — 179% of soft cap). HermesOverrunGuard tripped Sat Oct 3 08:13 PT yet TUI -m / code alias deepseek-v4-pro still burned ~232 API calls / ~$0.66 est after trip; auth-key billed ~$4.68 since yesterday vs Hermes est ~$1.28 (Relace cache-bill gap). Day quiet $0.07/$1.65. Bot: cite 43% @ Oct 1 9:23 → ~98% by Mon Oct 5; also spoken meter 1% @ Oct 3 (conflict, no refund). Super Grok spoken+meter 22% used.",
+  "markdown": "# Daily AI Eval — 2026-10-04 (~6:40 AM PT)\n\n**Core question: is the code making AI usage better or worse?**\n**Answer: MIXED — reliability YES (7d ok 59.6%→62.2%); cost NO (OR week $15.89→$20.56 OVER).**\n\n## Budget\n- **OpenRouter** (live auth_key + credits): day **$0.07 / $1.65** under; week **$20.56 / $11.50 OVER (179%)**; month **$18.39 / $50** under; balance **≈$18.63** (credits 280; topped up +$20 since yesterday's ≈$3.31). Auth-key spend since yesterday report ≈**$4.68**. Fallover spend card day $0.56 / week $20.49.\n- **Hermes overrun guard**: TRIPPED since Sat Oct 3 08:13 PT (week over); target `north-mini-code:free`; backup `config.yaml.bak-overrun-20261003-081305`. Still not stopping explicit `-m deepseek-v4-pro` / code alias sessions.\n- **Grok Bot** (spoken, cite): Thu 2026-10-01 ~9:23 AM PT = **43% used**. Burn ≈**14.1%/day** since Mon Sep 28 ~8 AM PT reset → projected **~98–99%** by Mon Oct 5 ~8 AM PT. Soft daily max now ≈**54%/day** (~1.06 days left). ALSO spoken Oct 3 ~8:07 AM PT meter showed **1% used** (resets in ~2 days) — conflicts with 43%; logged observation, **no refund assumed**. Prefer burn-from-drops / 43% baseline for projections.\n- **Super Grok**: spoken Sat Oct 3 ~8:07 AM PT = **22% used** (user-confirmed). Live grokcom meter refreshed Sun Oct 4 06:34 PT = **build 22% / remaining 78%** (plugin back; no longer stale). Guard remaining 78%; reset Thu Oct 8 10:31 PT.\n\n## Code changes since 2026-10-03 ~06:40 PT\n- **1406d007b** `feat(ai2): usage reading, supergrok guard, editor model auto` (+HermesOverrunGuard, UsageEstimator, Router/UsageMonitor, gemma removed[] committed) — branch `aisystem` — **improved** reliability / observability; **regressed** cost control in practice (guard bypassed).\n- **f19d4195c / 29c1ea6f2** fallover card TT balance display — **no effect** (UI only).\n- **6df5a5413** auto_update_ollama.sh — **too little data** (ops script).\n- Uncommitted on aisystem: `Model/AI2/ModelSiteSearch.pm`, `SearchString.pm` (3d external search) — **too little data** (<10 AI calls).\n\n## Scorecard trend\n- App **7d ok_rate**: yesterday 59.6% → today **62.2%** (28/45) — up.\n- App **1d**: 2 calls / 1 ok = **50%** (thin; 1× Chat grok-4.6 success, 1× Hermes north-mini trip).\n- Chat fallover 7d rates: **22/32 = 68.8%** (still below 80% keep bar when pooled).\n- Oct 2 Chat day still the bright spot (15/16 = 93.8%); Oct 3 nearly quiet.\n- OR week vs cap: yesterday OVER $15.89 → today **OVER $20.56** — worse.\n- Spend since prev report: ~$0.77 yesterday window → ~**$4.68** this window — cost day noisier via Hermes coding.\n\n## Thrash / effectiveness\n- **No thrash**: health last_thrash=16 (<20 / 15 min). Anomalies 1d empty.\n- 7d anomaly: **error_spike** openrouter/`google/gemma-4-31b-it:free` 7/7 (100%) — historical Sep 30–Oct 2; live chains strip via `removed[]`; circuit still open (probe_failed:http_429).\n- Effectiveness (≥10 calls): no new agent×provider×model row ≥10 in last 24h. 7d gemma 7 calls (<10 formal verdict) but already in `removed[]`. north-mini 9/9 ok (borderline keep).\n- Hermes trip row Oct 3 15:13 PT status=trip on north-mini (overrun path).\n\n## Failover health\n- 7d: turns 17, answered_first 15, **answered_after_failover 2**, all_exhausted 6 (mostly Focus-Tune era). Recent failovers: gemma→lightning (Sep 30), nemotron-nano→north-mini (Sep 28).\n- 1d: **0 failovers**, 0 waste; gemma circuit still open but not served (stripped).\n- Live chains (fallover): coding/chat start north-mini → lightning → ollama; gemma NOT in live chat despite still listed in file `chain_chat`/`chain_docs` (stripped by `removed[]`).\n- Real failover working when needed; cost failover to free is undermined by Hermes alias bypass.\n\n## Chat UX sample\n- 2026-10-03 13:07 PT — Chat / SuperGrok `grok-4.6` — success — 2551 tok — $0.0037\n- 2026-10-02 17:50 PT — Chat / SuperGrok `grok-build-0.1` — success — user 178\n- 2026-10-02 16:53 PT — Chat / OR `north-mini-code:free` — success (after gemma 429 at 16:52)\n- Last Chat activity: Oct 3 13:07 PT; agents card: Chat quiet, Editor quiet (last generate 2026-09-11).\n\n## HelpDesk\n- Quiet — no helpdesk `request_type` rows in usage_live 1d/7d.\n\n## Proposals\n1. **Config (allow-list)**: strip `google/gemma-4-31b-it:free` from file `chain_chat` and `chain_docs` lines (already neutralized by `removed[]`, but file still lists it).\n2. **Code/workstation**: Hermes overrun guard must apply to TUI `-m` / `code`/`coder` aliases when week soft-cap exceeded (today bypassed → v4-pro after trip).\n3. **Workstation**: until week under $11.50, prefer free north-mini/lightning or Ollama; do not start Hermes with `-m deepseek-v4-pro`.\n4. **Observability**: keep Relace/cache-bill gap visible (billed ~$4.68 vs Hermes est ~$1.28 this window).\n",
+  "metrics": {
+    "bot": {
+      "spoken_used_pct": 43,
+      "spoken_percent_left": 57,
+      "observed_at": "2026-10-01T09:23:00-07:00",
+      "prior_spoken_used_pct": 27,
+      "prior_spoken_at": "2026-10-01T08:14:00-07:00",
+      "conflicting_spoken_used_pct": 1,
+      "conflicting_spoken_at": "2026-10-03T08:07:00-07:00",
+      "conflicting_note": "Shanta reported Grok Bot meter 1% used / resets in ~2 days; conflicts with 43% @ Oct 1; observation only, no refund assumed",
+      "last_reset": "2026-09-28T08:00:00-07:00",
+      "next_reset": "2026-10-05T08:00:00-07:00",
+      "days_elapsed_at_spoken": 3.06,
+      "days_left_at_spoken": 3.94,
+      "days_left_now": 1.06,
+      "burn_pct_per_day": 14.1,
+      "projected_used_at_reset_pct": 98,
+      "soft_daily_max_pct": 53.9,
+      "implied_used_if_pace_held_pct": 84,
+      "estimator_shows_pct": 1,
+      "estimator_conflict": true,
+      "projection_basis": "43% spoken Oct 1 (prefer burn-from-drops; ignore 1% as refund)"
+    },
+    "openrouter": {
+      "balance_usd": 18.6327,
+      "day_usd": 0.073311144,
+      "week_usd": 20.564711244,
+      "month_usd": 18.392746263,
+      "total_credits": 280,
+      "total_usage": 261.36731238,
+      "auth_key_usage_usd": 259.76849236,
+      "prev_report_auth_key_usage_usd": 255.093352969,
+      "derived_spend_since_prev_report_usd": 4.675139,
+      "derived_window_hours": 24.0,
+      "live_status": "ok openrouter_auth_key + /api/v1/credits",
+      "top_up_inferred_usd": 20,
+      "caps": {
+        "day_usd": 1.65,
+        "week_usd": 11.5,
+        "month_usd": 50
+      },
+      "vs_caps": {
+        "day": "under ($0.07 / $1.65)",
+        "week": "OVER ($20.56 / $11.50) — 179% of soft week cap",
+        "month": "under ($18.39 / $50)"
+      },
+      "fallover_spend": {
+        "day": 0.5559,
+        "week": 20.4914,
+        "month": 19.3452
+      },
+      "overrun_guard": {
+        "tripped": true,
+        "since_pt": "2026-10-03T08:13:00-07:00",
+        "reasons": [
+          "OpenRouter week $20.56 over $11.50 cap"
+        ],
+        "target": "openrouter/cohere/north-mini-code:free",
+        "last_thrash": 16
+      }
+    },
+    "supergrok": {
+      "spoken_used_pct": 22,
+      "spoken_at": "2026-10-03T08:07:00-07:00",
+      "spoken_note": "user-confirmed; browser plugin was down at spoke time",
+      "meter_build": 22,
+      "remaining_pct": 78,
+      "meter_at": "2026-10-04T06:34:00-07:00",
+      "meter_stale": false,
+      "meter_age_h": 0.1,
+      "meter_source": "firefox-extension grokcom_usage.json",
+      "used_today": 0,
+      "daily_cap_pct": 15,
+      "locked_today": false,
+      "mode": "grok",
+      "reset_at": "2026-10-08T10:31:00-07:00",
+      "guard_checked": "2026-10-04T06:35:01-07:00",
+      "estimator_projection_pct": 32.6,
+      "plugin_status": "back (was down Oct 3 morning)"
+    },
+    "hermes": {
+      "window_1d_api_calls": 455,
+      "window_1d_sessions": 9,
+      "window_1d_cost_usd": 0.9679,
+      "window_1d_tokens": 49172769,
+      "window_7d_api_calls": 2426,
+      "window_7d_sessions": 37,
+      "window_7d_cost_usd": 4.9563,
+      "open_sessions": 7,
+      "active_now": {
+        "id": "20261003_162610_e1622c",
+        "model": "deepseek/deepseek-v4-flash-0731",
+        "billing_provider": "openrouter",
+        "api_calls": 130,
+        "started_pt": "2026-10-03 09:28 PT",
+        "last_activity_pt": "2026-10-04 06:29 PT"
+      },
+      "config_default": "deepseek/deepseek-v4-flash-0731",
+      "config_code": "openrouter/deepseek/deepseek-v4-pro",
+      "config_coder": "openrouter/deepseek/deepseek-v4-pro",
+      "config_fallback": "openrouter/deepseek/deepseek-v4-pro",
+      "config_cheap": "openrouter/cohere/north-mini-code:free",
+      "since_prev_report": {
+        "api_calls": 456,
+        "est_usd": 1.2754,
+        "by_model": [
+          {
+            "model": "deepseek/deepseek-v4-pro",
+            "provider": "openrouter",
+            "api_calls": 232,
+            "tok_incl_cache": 20635986,
+            "est_usd": 0.6646
+          },
+          {
+            "model": "deepseek/deepseek-v4-flash-0731",
+            "provider": "openrouter",
+            "api_calls": 163,
+            "tok_incl_cache": 23793604,
+            "est_usd": 0.6107
+          },
+          {
+            "model": "grok-build-0.1",
+            "provider": "xai-oauth",
+            "api_calls": 51,
+            "tok_incl_cache": 4594601,
+            "est_usd": 0.0
+          }
+        ],
+        "note": "auth-key billed ~$4.68 vs Hermes est ~$1.28 — Relace cache-bill gap"
+      },
+      "overrun_bypass_evidence": "Guard tripped 08:13 PT Oct 3; multiple TUI sessions after still on deepseek-v4-pro (memory: -m deepseek-v4-pro bypasses overrun guard)"
+    },
+    "chat": {
+      "window_1d_app_calls": 2,
+      "window_1d_ok": 1,
+      "window_1d_ok_rate": 50.0,
+      "window_1d_errors": 1,
+      "window_1d_cost_usd": 0.0037,
+      "window_7d_app_calls": 45,
+      "window_7d_ok": 28,
+      "window_7d_ok_rate": 62.2,
+      "window_7d_errors": 17,
+      "window_7d_cost_usd": 0.1462,
+      "fallover_chat_7d_ok_rate": 68.8,
+      "fallover_chat_7d": {
+        "ok": 22,
+        "calls": 32
+      },
+      "traffic": "Quiet Oct 3 (1 Chat success + 1 Hermes trip). Oct 2 still main Chat day 15/16 93.8%.",
+      "ux_sample": [
+        {
+          "at": "2026-10-03T13:07:26",
+          "request_type": "chat",
+          "provider": "supergrok",
+          "model": "grok-4.6",
+          "status": "success",
+          "tokens": 2551,
+          "cost": 0.0037
+        },
+        {
+          "at": "2026-10-02T17:50:01",
+          "request_type": "chat",
+          "provider": "supergrok",
+          "model": "grok-build-0.1",
+          "status": "success",
+          "user_id": 178
+        },
+        {
+          "at": "2026-10-02T16:53:42",
+          "request_type": "chat",
+          "provider": "openrouter",
+          "model": "cohere/north-mini-code:free",
+          "status": "success",
+          "note": "after gemma 429 at 16:52"
+        },
+        {
+          "at": "2026-10-02T16:52:47",
+          "request_type": "chat",
+          "provider": "openrouter",
+          "model": "google/gemma-4-31b-it:free",
+          "status": "error",
+          "error": "429"
+        }
+      ]
+    },
+    "helpdesk": {
+      "calls_1d": 0,
+      "calls_7d": 0,
+      "status": "quiet — no helpdesk request_type rows in usage_live 1d/7d"
+    },
+    "anomalies": [
+      {
+        "severity": "high",
+        "kind": "cost_spike",
+        "text": "OpenRouter week_usd $20.56 > soft cap $11.50 (179%); up from $15.89 yesterday. Auth-key spend since prev report ~$4.68. HermesOverrunGuard tripped but v4-pro TUI bypass continued."
+      },
+      {
+        "severity": "high",
+        "kind": "error_spike",
+        "provider": "openrouter",
+        "model": "google/gemma-4-31b-it:free",
+        "text": "7d still 0/7 (100% errors); historical; live chains strip via removed[]; circuit open probe_failed:http_429. File chain_chat/chain_docs still list gemma."
+      },
+      {
+        "severity": "medium",
+        "kind": "overrun_bypass",
+        "text": "HermesOverrunGuard tripped Sat Oct 3 08:13 PT; 232 v4-pro API calls after trip via TUI -m / code alias bypass."
+      },
+      {
+        "severity": "medium",
+        "kind": "bot_burn",
+        "text": "Grok Bot 43% @ Oct 1 9:23 AM PT; burn ~14.1%/day → ~98% by Mon Oct 5; soft daily max ~54%/day (~1.06d left). Conflicting spoken 1% @ Oct 3 — no refund."
+      },
+      {
+        "severity": "info",
+        "kind": "billing_gap",
+        "text": "OR auth-key billed ~$4.68 since yesterday vs Hermes session_model_usage est ~$1.28 (Relace cache tokens billed full input)."
+      },
+      {
+        "severity": "info",
+        "kind": "meter_refreshed",
+        "text": "grokcom_usage.json fresh Oct 4 06:34 PT build=22 (was stale 70.5h yesterday); Super Grok plugin back."
+      }
+    ],
+    "effectiveness": [
+      {
+        "agent": "chat",
+        "provider": "openrouter",
+        "model": "google/gemma-4-31b-it:free",
+        "calls": 7,
+        "ok": 0,
+        "ok_rate": 0.0,
+        "flagged_per_call": 1.0,
+        "verdict": "too little data",
+        "note": "<10 calls this 7d window but already in removed[]; historical replace"
+      },
+      {
+        "agent": "chat",
+        "provider": "openrouter",
+        "model": "cohere/north-mini-code:free",
+        "calls": 9,
+        "ok": 9,
+        "ok_rate": 100.0,
+        "flagged_per_call": 0.0,
+        "verdict": "too little data",
+        "note": "9<10; on track keep"
+      },
+      {
+        "agent": "chat",
+        "provider": "supergrok",
+        "model": "grok-build-0.1",
+        "calls": 6,
+        "ok": 6,
+        "ok_rate": 100.0,
+        "flagged_per_call": 0.0,
+        "verdict": "too little data"
+      },
+      {
+        "agent": "chat",
+        "provider": "router",
+        "model": "all_exhausted",
+        "calls": 6,
+        "ok": 0,
+        "ok_rate": 0.0,
+        "flagged_per_call": 1.0,
+        "verdict": "too little data",
+        "note": "Focus-Tune era Sep 30"
+      },
+      {
+        "agent": "pool",
+        "provider": "app",
+        "model": "7d_aggregate",
+        "calls": 45,
+        "ok": 28,
+        "ok_rate": 62.2,
+        "verdict": "replace",
+        "note": "pooled 7d still <80%; driven by Sep 30 Focus-Tune + gemma; Oct 2 day was 93.8%"
+      }
+    ],
+    "failover": {
+      "window_1d": {
+        "turns": 0,
+        "answered_after_failover": 0,
+        "answered_first": 0,
+        "all_exhausted": 0,
+        "failed_attempts": 0,
+        "fallover_rate_pct": 0.0,
+        "waste": {
+          "http_429": 0,
+          "failed": 0
+        }
+      },
+      "window_7d": {
+        "turns": 17,
+        "answered_first": 15,
+        "answered_after_failover": 2,
+        "all_exhausted": 6,
+        "failed_attempts": 6,
+        "failed_by_reason": {
+          "http_429": 5,
+          "http_404": 1
+        },
+        "chat_ok_rate_pct": 68.8,
+        "recent_failovers": [
+          {
+            "at": "2026-09-30 14:33:14",
+            "from": "google/gemma-4-31b-it:free",
+            "to": "nvidia/nemotron-3.5-lightning:free",
+            "reason": "http_429"
+          },
+          {
+            "at": "2026-09-28 16:40:08",
+            "from": "nvidia/nemotron-3-nano-30b-a3b:free",
+            "to": "cohere/north-mini-code:free",
+            "reason": "http_404"
+          }
+        ]
+      },
+      "circuits_open": [
+        "openrouter|google/gemma-4-31b-it:free"
+      ],
+      "live_chains": {
+        "chat": [
+          "openrouter|cohere/north-mini-code:free",
+          "openrouter|nvidia/nemotron-3.5-lightning:free",
+          "ollama|auto"
+        ],
+        "coding": [
+          "openrouter|cohere/north-mini-code:free",
+          "openrouter|nvidia/nemotron-3.5-lightning:free",
+          "ollama|qwen2.5-coder:14b"
+        ],
+        "removed_includes_gemma": true,
+        "file_chain_chat_still_lists_gemma": true
+      },
+      "health": "App failover OK when invoked; Hermes cost-failover undermined by alias/-m bypass while week over"
+    },
+    "changes": [
+      {
+        "commit": "1406d007b",
+        "branch": "aisystem",
+        "when_pt": "2026-10-03T16:04:00-07:00",
+        "files": [
+          "Model/AI2/Router.pm",
+          "Model/AI2/UsageMonitor.pm",
+          "Util/AI/HermesOverrunGuard.pm",
+          "Util/AI/UsageEstimator.pm",
+          "Model/AI2/Provider/OpenRouter.pm",
+          "data/ai_model_chains.json",
+          "Controller/AI/Usage.pm",
+          "root/ai/usage_estimator_card.tt",
+          "t/ai_hermes_overrun_guard.t"
+        ],
+        "verdict": "improved",
+        "evidence": "Committed prior uncommitted gemma removed[] + smart router + OR/SG banner path + new HermesOverrunGuard + UsageEstimator. Reliability: no new gemma Chat errors; meter/estimator live; 7d ok_rate 59.6→62.2%. Cost side partially failed: guard trips but v4-pro bypass continued — see sibling verdict on bypass."
+      },
+      {
+        "commit": "1406d007b:overrun-bypass",
+        "branch": "aisystem",
+        "when_pt": "2026-10-03T16:04:00-07:00",
+        "files": [
+          "Util/AI/HermesOverrunGuard.pm",
+          "~/.hermes/config.yaml aliases"
+        ],
+        "verdict": "regressed",
+        "evidence": "Guard tripped Oct 3 08:13 PT for week over; afterward 232 deepseek-v4-pro API calls (~$0.66 est, more billed). Confirms -m / code|coder alias bypass. Week $15.89→$20.56."
+      },
+      {
+        "commit": "f19d4195c+29c1ea6f2",
+        "branch": "aisystem",
+        "when_pt": "2026-10-03T19:33:00-07:00",
+        "files": [
+          "root/ai/usage_fallover_card.tt"
+        ],
+        "verdict": "no effect",
+        "evidence": "TT IF/ELSE balance display only; no routing/cost behavior change."
+      },
+      {
+        "commit": "6df5a5413",
+        "branch": "aisystem",
+        "when_pt": "2026-10-03T19:30:00-07:00",
+        "files": [
+          "script/auto_update_ollama.sh"
+        ],
+        "verdict": "too little data",
+        "evidence": "Ollama auto-update script; no AI call scorecard impact yet."
+      },
+      {
+        "commit": "uncommitted:ModelSiteSearch+SearchString",
+        "branch": "aisystem",
+        "when_pt": "2026-10-03",
+        "files": [
+          "Model/AI2/ModelSiteSearch.pm",
+          "Model/AI2/SearchString.pm"
+        ],
+        "verdict": "too little data",
+        "evidence": "New 3d external-site AI helpers uncommitted; <10 related generate calls."
+      }
+    ],
+    "trend": {
+      "improving": "mixed",
+      "core_answer": "MIXED — reliability better (7d app ok_rate 59.6%→62.2%; gemma contained; Super Grok meter fresh 22%); OpenRouter week cost worse ($15.89→$20.56 OVER) via Hermes v4-pro bypass after overrun trip.",
+      "app_ok_rate_1d": {
+        "prev": 94.1,
+        "now": 50.0,
+        "note": "thin 2-call day; not a real regression signal"
+      },
+      "app_ok_rate_7d": {
+        "prev": 59.6,
+        "now": 62.2
+      },
+      "or_week_vs_cap": {
+        "usd": 20.56,
+        "cap": 11.5,
+        "status": "over",
+        "prev_usd": 15.89
+      },
+      "or_spend_since_prev_report_usd": 4.675,
+      "bot_projection_pct": 98,
+      "chat_traffic": "quiet Oct 3; Oct 2 rebound still dominates 7d"
+    }
+  },
+  "proposals": [
+    {
+      "title": "Strip gemma-4-31b from chain_chat and chain_docs file lines",
+      "change_type": "config",
+      "target": "data/ai_model_chains.json:chain_chat",
+      "rationale": "Live chains already omit gemma via removed[], but file chain_chat/chain_docs still list openrouter|google/gemma-4-31b-it:free. Cleaning prevents accidental reintroduction if removed[] drifts. Allow-listed.",
+      "payload": {
+        "chain_chat": [
+          "openrouter|cohere/north-mini-code:free",
+          "openrouter|nvidia/nemotron-3.5-lightning:free",
+          "ollama|auto"
+        ],
+        "also_apply": {
+          "data/ai_model_chains.json:chain_docs": [
+            "openrouter|nvidia/nemotron-3.5-lightning:free",
+            "openrouter|cohere/north-mini-code:free",
+            "ollama|auto"
+          ]
+        }
+      }
+    },
+    {
+      "title": "Hermes overrun guard must cover TUI -m and code/coder aliases",
+      "change_type": "code",
+      "target": "Util/AI/HermesOverrunGuard.pm + Hermes launch wrappers",
+      "rationale": "Guard tripped Oct 3 08:13 PT for week>$11.50 but 232 deepseek-v4-pro API calls continued via -m / aliases. Soft-cap enforcement is ineffective without this. Not on EvalAllowList → todo after admin approve.",
+      "payload": {
+        "behavior": "when week_usd>=11.50 (or day/month caps), rewrite/block code+coder+fallback to free north-mini/lightning even for explicit -m deepseek-v4-pro; log bypass attempts"
+      }
+    },
+    {
+      "title": "Until OR week under $11.50: no Hermes -m deepseek-v4-pro",
+      "change_type": "workstation",
+      "target": "Hermes TUI habit / scripts",
+      "rationale": "Week 179% of soft cap; balance was topped up but soft-cap still over. Use free north-mini/lightning or Ollama until week resets/under.",
+      "payload": {
+        "prefer": [
+          "openrouter/cohere/north-mini-code:free",
+          "openrouter/nvidia/nemotron-3.5-lightning:free",
+          "ollama"
+        ],
+        "avoid": [
+          "deepseek-v4-pro"
+        ]
+      }
+    },
+    {
+      "title": "Surface Relace cache-bill gap on /ai/usage",
+      "change_type": "code",
+      "target": "Model/AI2/UsageMonitor.pm or usage_estimator_card",
+      "rationale": "This window auth-key billed ~$4.68 vs Hermes est ~$1.28. Operators need the gap visible so soft-cap decisions use billed $ not logged $.",
+      "payload": {
+        "show": "billed_minus_hermes_est"
+      }
+    }
+  ]
+}

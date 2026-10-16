@@ -4,8 +4,8 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "ai-systems,security,development-plan,code-quality"
-   page_version = "0.1"
-   last_updated = "Mon Aug 03 10:30:00 UTC 2026"
+   page_version = "0.2"
+   last_updated = "Wed Oct 14 2026"
    site_specific = "false"
 %]
 
@@ -17,6 +17,15 @@
         Intended to become a sub-project under the AI development project (parent ~114, "AI Chat Integration").
         Purpose: define HOW we use AI to write and review Comserv2 code without regressing quality or security.
     </div>
+
+    <h2 id="now">Now (2026-10-14)</h2>
+    <p><strong>Current.</strong> Aikido is installed on this host (<code>aikido-local-scanner</code>) but it is not on the commit path. Its only command is a secrets scan. The live hook is still perl -c plus gitleaks. Aikido does not score a diff for accuracy, security, or effectiveness.</p>
+    <p><strong>Approved, partly built on this worktree only</strong> (<code>/home/shanta/.comserv/worktrees/aisystem/Comserv</code>, port 4006). Not on main. Not committed.</p>
+    <ul>
+        <li>Done in code: <code>CodeReviewer.pm</code> can store a score row, block a high finding (security below 4 or accuracy below 3), and ask <code>deepseek/deepseek-v4-pro</code> for a preview diff. It does not write files itself. <code>data/ai_reviewer.json</code> is <code>mode: block</code>, cap $0.50/day. Reviewer stays Sonnet 5.5, backup GPT-6 Sol. <code>Util/Git.pm</code> can apply a checked patch. <code>Admin/Git.pm</code> no longer commits from the form buttons until a review is confirmed.</li>
+        <li>Not done: the commit page does not yet show the scores, Confirm, override, or Ask fixer. A duplicate <code>=head2 execute_git_commit</code> was left above the real method. The eval scorecard does not read the score file. <code>perl -c</code> was not run after the last edit. Do not treat <code>/admin/git_commit</code> on :4006 as a finished gate.</li>
+    </ul>
+    <p>Working checklist (not a served page): <code>/home/shanta/PycharmProjects/comserv2/.hermes/plans/2026-10-14_061800-code-diff-review.md</code>.</p>
 
     <h2>1. Why this sub-project exists</h2>
     <p>We already use AI heavily: Ollama chat open to all roles, autonomous delegates (claude-code / codex /
@@ -81,7 +90,8 @@
     <ol>
         <li><strong>Plan (cheap model):</strong> propose the change against the existing gates above.</li>
         <li><strong>Execute (better model / delegate):</strong> implement, confined to task scope.</li>
-        <li><strong>Self-check:</strong> pre-commit hook (compile + secrets) runs automatically on commit.</li>
+        <li><strong>Self-check:</strong> pre-commit hook (compile + secrets) runs automatically on a terminal <code>git commit</code>. That hook does not call Aikido and does not call the model reviewer.</li>
+        <li><strong>Diff review (this worktree, unfinished):</strong> the app commit form is supposed to score accuracy, security, and effectiveness with a model that did not write the diff, then refuse a high finding unless an admin overrides with a reason. A third model may propose a preview. Nothing is written until Apply. This is not live yet. See the Now section.</li>
         <li><strong>Gate:</strong> agent runs <code>script/test_gate.sh</code> before reporting done; must be green.</li>
         <li><strong>Review:</strong> human merges to main; deploy runs the security scan when
             <code>COMSERV_SECURITY_GATE=1</code>.</li>
@@ -95,7 +105,7 @@
         <li>Run <code>perlcritic</code> on changed <code>.pm</code> in pre-commit (configurable severity).</li>
         <li>Enforce <code>COMSERV_SECURITY_GATE=1</code> on production deploys by default.</li>
         <li>Wire dev-DB isolation (companion plan) so agent runs are prod-safe by construction.</li>
-        <li>Track AI-introduced regressions via the error-audit pipeline to measure quality over time.</li>
+        <li>Finish the commit-form review (template, remove the duplicate POD, <code>perl -c</code>, then the eval score column). Do not copy it to main until that gate works on :4006.</li>
     </ul>
 
     <p style="margin-top:20px;"><em>Next: promote to a sub-project (parent ~114), then implement the §7 roadmap items

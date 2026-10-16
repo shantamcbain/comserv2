@@ -326,6 +326,7 @@ sub _process_contact_post {
         $c->stash(
             template        => 'CSC/HelpDesk/contact.tt',
             error_msg       => 'All fields are required.',
+            hd_error_field  => (!$name ? 'name' : !$email ? 'email' : !$subject ? 'subject' : 'message'),
             title           => 'Contact Support',
             math_a => $n1, num1 => $n1,
             math_b => $n2, num2 => $n2,
@@ -347,6 +348,7 @@ sub _process_contact_post {
                        . "Message:\n$message\n",
         );
         $self->_record_public_submit($c) if $self->_is_public_guest($c);
+        $self->_hs_ip_rate_record($c) if $self->_is_public_guest($c);
         my ($n1, $n2) = $self->_issue_math_challenge($c);
         $c->stash(
             template        => 'CSC/HelpDesk/contact.tt',
@@ -384,7 +386,7 @@ sub _is_staff {
     my $roles = $c->session->{roles};
     return 0 unless $roles;
     return ref($roles) eq 'ARRAY'
-        ? (grep { $_ eq 'admin' || $_ eq 'helpdesk' } @$roles) ? 1 : 0
+        ? (grep { my $r = lc($_ // q{}); $r =~ s/^\s+|\s+$//g; $r eq q{admin} || $r eq q{helpdesk} } @$roles) ? 1 : 0
         : ($roles =~ /\b(?:admin|helpdesk)\b/i ? 1 : 0);
 }
 
@@ -638,7 +640,8 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
     my $priority    = $self->_normalize_public_priority($c, $c->req->params->{priority});
     my $email       = $c->req->params->{email}       || $c->session->{email} || '';
 
-    my $spam_err = $self->_spam_guard_fail($c, 'submit_ticket', $subject, $description);
+    my $spam_err = $self->_spam_guard_fail($c, 'submit_ticket', $subject, $description,
+        skip_content => $self->_hs_cfg($c, 'quarantine_enabled') ? 1 : 0);
     if ($spam_err) {
         my ($n1, $n2) = $self->_issue_math_challenge($c);
         $c->stash(
@@ -653,11 +656,33 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
         return;
     }
 
+    # CSC-20260928-9565: guests must give a valid contact email (server-side check).
+    $email =~ s/^\s+|\s+$//g;
+    my $guest_name = $c->req->params->{guest_name} // '';
+    $guest_name =~ s/^\s+|\s+$//g;
+    $guest_name = substr($guest_name, 0, 100);
+    if (!$c->session->{user_id} && $email !~ /^[^\s\@]+\@[^\s\@]+\.[^\s\@]+$/) {
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
+        $c->stash(
+            template      => 'CSC/HelpDesk/new_ticket.tt',
+            error_msg     => 'Please enter a valid email address so we can reply to your ticket.',
+            hd_error_field => 'email',
+            title         => 'Create New Support Ticket',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
+            guest_name => $guest_name, guest_email_in => $email,
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
     unless ($subject && $description) {
         my ($n1, $n2) = $self->_issue_math_challenge($c);
         $c->stash(
             template      => 'CSC/HelpDesk/new_ticket.tt',
             error_msg     => 'Subject and description are required.',
+            hd_error_field => ($subject ? 'description' : 'subject'),
             title         => 'Create New Support Ticket',
             math_a => $n1, num1 => $n1,
             math_b => $n2, num2 => $n2,
@@ -670,6 +695,27 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
     my $user_id   = $c->session->{user_id} || undef;
     my $username  = $c->session->{username} || 'guest';
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    my $is_guest_submit = $self->_is_public_guest($c);
+    my ($spam_score, $spam_reasons) = $self->_spam_score($subject, $description, $email, $is_guest_submit);
+    my $threshold  = $self->_hs_cfg($c, 'quarantine_threshold');
+    my $classifier;
+    if ($is_guest_submit && $self->_hs_cfg($c, 'classifier_enabled')
+        && $spam_score >= $self->_hs_cfg($c, 'classifier_min_score') && $spam_score < $threshold) {
+        $classifier = $self->_hs_classify($c, $subject, $description);
+        push @$spam_reasons, 'classifier=' . ($classifier // 'unavailable');
+    }
+    my $quarantine = $self->_hs_cfg($c, 'quarantine_enabled')
+        && ($spam_score >= $threshold || (($classifier // '') eq 'spam')) ? 1 : 0;
+    # Quarantine disabled: keep the old hard reject for known spam patterns.
+    if (!$self->_hs_cfg($c, 'quarantine_enabled') && $self->_looks_like_spam_content($subject, $description)) {
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
+        $c->stash(template => 'CSC/HelpDesk/new_ticket.tt', title => 'Create New Support Ticket',
+            error_msg => 'Your message was blocked by our spam filter.',
+            math_a => $n1, num1 => $n1, math_b => $n2, num2 => $n2, is_public_guest => $is_guest_submit ? 1 : 0);
+        $c->forward($c->view('TT'));
+        return;
+    }
 
     my $ticket_number = uc($site_name) . '-' . Comserv::Util::AppTime->today_utc_ymd_compact . '-' . sprintf('%04d', int(rand(9999)) + 1);
 
@@ -685,14 +731,34 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
             description   => $description,
             category      => $category,
             priority      => $priority,
-            status        => 'open',
+            status        => $quarantine ? 'quarantine' : 'open',
             created_at    => Comserv::Util::AppTime->now_utc,
+            metadata      => $self->_build_ticket_metadata($c,
+                entry_path   => 'web_form',
+                (length $guest_name ? (contact_name => $guest_name) : ()),
+                spam_score   => $spam_score,
+                spam_reasons => $spam_reasons,
+                quarantine   => $quarantine,
+                ($classifier ? (classifier => $classifier) : ())),
         });
+
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'submit_ticket',
             "Ticket created: " . $ticket->ticket_number . " (id=" . $ticket->id . ")");
 
         $self->_record_public_submit($c) if $self->_is_public_guest($c);
+        $self->_hs_ip_rate_record($c) if $self->_is_public_guest($c);
+
+        if ($quarantine) {
+            # Quarantined: no admin email, no webhook, no customer mail. Same thank-you page.
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'submit_ticket',
+                "Ticket quarantined: " . $ticket->ticket_number . " score=$spam_score ("
+                . join(',', @$spam_reasons) . ") ip=" . ($self->_client_ip($c) // ''));
+            $c->stash(template => 'CSC/HelpDesk/ticket_submitted.tt', ticket => $ticket,
+                      ticket_number => $ticket->ticket_number, title => 'Ticket Submitted');
+            $c->forward($c->view('TT'));
+            return;
+        }
 
         my $view_url = $c->uri_for('/HelpDesk/ticket/view/' . $ticket->ticket_number);
         $self->_notify_site_admins($c,
@@ -1960,6 +2026,7 @@ sub _issue_math_challenge {
     $c->session->{math_challenge_b}   = $num2;
     $c->session->{math_challenge_sum} = $sum;
     $c->session->{math_challenge_issued_at} = time();
+    $self->_hs_issue_form_guards($c);
     return ($num1, $num2);
 }
 
@@ -2137,8 +2204,8 @@ sub _looks_like_spam_content {
 # Content filter always runs (even for logged-in users on public forms).
 # Order: honeypot → rate (session+IP) → content → guest math (CSC-20260911-6270)
 sub _spam_guard_fail {
-    my ($self, $c, $event, $subject, $body) = @_;
-    my $ip = $c->req->address || 'unknown';
+    my ($self, $c, $event, $subject, $body, %opt) = @_;
+    my $ip = $self->_client_ip($c) || 'unknown';
     $event ||= 'spam_guard';
 
     my $honeypot = $c->req->params->{website} // '';
@@ -2154,14 +2221,53 @@ sub _spam_guard_fail {
         return 'Too many submissions. Please wait before trying again.';
     }
 
-    if ($self->_looks_like_spam_content($subject, $body)) {
+    if ($self->_is_public_guest($c) && $self->_hs_ip_rate_exceeded($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+            "Per-IP rate limit exceeded ip=$ip");
+        return 'Too many submissions from your network. Please wait an hour before trying again.';
+    }
+
+    # Content check before the guest math (main CSC-20260911-6270); skipped when
+    # quarantine scoring is on (helpdesk), so the ticket is held instead of rejected.
+    if (!$opt{skip_content} && $self->_looks_like_spam_content($subject, $body)) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
             "Spam content rejected from ip=$ip subject=" . substr($subject // '', 0, 80));
         return 'Your message was blocked by our spam filter. If this is a real support request, email support or rephrase without promotional links.';
     }
 
+    if ($self->_hs_cfg($c, 'fill_token_enabled')) {
+        my ($st, $age) = $self->_hs_check_token($self->_hs_secret($c),
+            $c->req->params->{hd_ft}, ($c->sessionid // ''), time,
+            $self->_hs_cfg($c, 'min_fill_seconds'), $self->_hs_cfg($c, 'max_fill_seconds'));
+        if ($st ne 'ok') {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+                "Fill-time token rejected ($st " . ($age // '') . ") ip=$ip");
+            $c->stash->{hd_error_field} = 'form';
+            return $st eq 'fast'
+                ? 'That was quicker than we expected. Please take a moment to check your details, then submit again.'
+                : 'Your form session expired. Please review your details and submit again.';
+        }
+        $c->stash->{hd_fill_seconds} = $age;
+    }
+
     my $is_guest = $self->_is_public_guest($c);
-    if ($is_guest) {
+    my $turnstile_ok = 0;
+    if ($is_guest && $self->_hs_turnstile_active($c)) {
+        my $tv = $self->_hs_turnstile_verify($c);
+        if ($tv eq 'ok') {
+            $turnstile_ok = 1;
+        } elsif ($tv eq 'error') {
+            $c->session->{hd_turnstile_down} = time;
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+                "Turnstile verify unavailable; falling back to math captcha ip=$ip");
+            return 'Our security check service is unavailable right now. Please answer the arithmetic question below and submit again.';
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event, "Turnstile failed ip=$ip");
+            $c->stash->{hd_error_field} = 'turnstile';
+            return 'Security check failed. Please complete the verification and submit again.';
+        }
+    }
+    if ($is_guest && !$turnstile_ok) {
         my $ans = $c->req->params->{math_challenge_ans};
         $ans = '' unless defined $ans;
         $ans =~ s/^\s+|\s+$//g;
@@ -2185,7 +2291,8 @@ sub _spam_guard_fail {
                 "Math challenge failed ($why; submitted='$ans', expected='"
                 . (defined $expected ? $expected : '') . "') from ip=$ip");
             $clear_challenge->();
-            return 'Security check failed. Please reload the form and solve the arithmetic question correctly.';
+            $c->stash->{hd_error_field} = 'math_challenge_ans';
+            return 'The answer to the security question was not correct. Please answer the new question below and submit again.';
         };
 
         # Fail closed: no challenge issued, expired (>2h), or inconsistent operands
@@ -2208,6 +2315,349 @@ sub _spam_guard_fail {
     }
 
     return '';
+}
+
+
+# ======================================================================
+# HelpDesk anti-spam layers (branch helpdesk-spam work on `helpdesk`).
+# All tunables live in comserv.conf <HelpDeskSpam>; see _hs_cfg defaults.
+# ======================================================================
+
+my %HS_DEFAULTS = (
+    metadata_enabled     => 1,
+    real_ip_enabled      => 1,
+    ip_rate_enabled      => 1,
+    ip_rate_per_hour     => 5,
+    fill_token_enabled   => 1,
+    min_fill_seconds     => 4,
+    max_fill_seconds     => 7200,
+    turnstile_enabled    => 0,
+    turnstile_site_key   => '',
+    turnstile_secret     => '',
+    quarantine_enabled   => 1,
+    quarantine_threshold => 5,
+    classifier_enabled   => 0,
+    classifier_min_score => 2,
+    classifier_provider  => 'ollama',
+    classifier_url       => 'http://127.0.0.1:11434/api/generate',
+    classifier_model     => 'qwen2.5:3b',
+    classifier_timeout   => 8,
+);
+
+sub _hs_cfg {
+    my ($self, $c, $key) = @_;
+    my $cfg = (ref $c && $c->can('config')) ? ($c->config->{HelpDeskSpam} || {}) : {};
+    return exists $cfg->{$key} && defined $cfg->{$key} ? $cfg->{$key} : $HS_DEFAULTS{$key};
+}
+
+# --- Layer 2: real client IP -------------------------------------------
+my @HS_CF_V4 = qw(173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22
+    141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20
+    197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13
+    104.24.0.0/14 172.64.0.0/13 131.0.72.0/22);
+my @HS_CF_V6 = qw(2400:cb00: 2606:4700: 2803:f800: 2405:b500: 2405:8100: 2a06:98c0: 2a06:98c1: 2c0f:f248:);
+
+sub _hs_ip4_in_cidr {
+    my ($ip, $cidr) = @_;
+    my ($net, $bits) = split m{/}, $cidr;
+    my @i = split /\./, $ip;  my @n = split /\./, $net;
+    return 0 unless @i == 4 && @n == 4;
+    my $iv = ($i[0] << 24) | ($i[1] << 16) | ($i[2] << 8) | $i[3];
+    my $nv = ($n[0] << 24) | ($n[1] << 16) | ($n[2] << 8) | $n[3];
+    my $mask = $bits == 0 ? 0 : (0xFFFFFFFF << (32 - $bits)) & 0xFFFFFFFF;
+    return (($iv & $mask) == ($nv & $mask)) ? 1 : 0;
+}
+
+sub _hs_trusted_proxy {
+    my ($self, $addr) = @_;
+    return 0 unless defined $addr && length $addr;
+    $addr =~ s/^::ffff://i;
+    return 1 if $addr eq '127.0.0.1' || $addr eq '::1';
+    if ($addr =~ /^\d+\.\d+\.\d+\.\d+$/) {
+        for my $cidr (@HS_CF_V4) { return 1 if _hs_ip4_in_cidr($addr, $cidr) }
+        return 0;
+    }
+    my $lc = lc $addr;
+    for my $p (@HS_CF_V6) { return 1 if CORE::index($lc, $p) == 0 }
+    return 0;
+}
+
+# Pure version for tests: ($remote_addr, $cf_header, $xff_header)
+sub _hs_pick_client_ip {
+    my ($self, $addr, $cf, $xff) = @_;
+    $addr //= '';
+    return $addr unless $self->_hs_trusted_proxy($addr);
+    for my $cand ($cf, (defined $xff ? (split /\s*,\s*/, $xff)[0] : undef)) {
+        next unless defined $cand;
+        $cand =~ s/^\s+|\s+$//g;
+        return $cand if $cand =~ /^[0-9a-fA-F:.]{3,45}$/;
+    }
+    return $addr;
+}
+
+sub _client_ip {
+    my ($self, $c) = @_;
+    my $addr = $c->req->address // '';
+    return $addr unless $self->_hs_cfg($c, 'real_ip_enabled');
+    return $self->_hs_pick_client_ip($addr,
+        scalar $c->req->header('CF-Connecting-IP'),
+        scalar $c->req->header('X-Forwarded-For'));
+}
+
+sub _hs_ip_rate_file {
+    my ($self, $c) = @_;
+    my $dir = '/tmp/comserv_hd_public_rate_ip';
+    mkdir $dir unless -d $dir;
+    (my $ip = $self->_client_ip($c) || 'unknown') =~ s/[^0-9A-Za-z.:_-]/_/g;
+    $ip =~ s/:/_/g;
+    return "$dir/$ip";
+}
+
+sub _hs_ip_rate_exceeded {
+    my ($self, $c) = @_;
+    return 0 unless $self->_hs_cfg($c, 'ip_rate_enabled');
+    my $f = $self->_hs_ip_rate_file($c);
+    open my $fh, '<', $f or return 0;
+    my $now = time;
+    my @recent = grep { /^\d+$/ && $_ > $now - 3600 } map { chomp; $_ } <$fh>;
+    close $fh;
+    return @recent >= $self->_hs_cfg($c, 'ip_rate_per_hour') ? 1 : 0;
+}
+
+sub _hs_ip_rate_record {
+    my ($self, $c) = @_;
+    return unless $self->_hs_cfg($c, 'ip_rate_enabled');
+    my $f = $self->_hs_ip_rate_file($c);
+    my $now = time;
+    my @keep;
+    if (open my $in, '<', $f) { @keep = grep { /^\d+$/ && $_ > $now - 3600 } map { chomp; $_ } <$in>; close $in }
+    push @keep, $now;
+    if (open my $out, '>', $f) { print $out join("\n", @keep), "\n"; close $out }
+}
+
+# --- Layer 1: ticket source metadata -----------------------------------
+my $HS_BRANCH;
+sub _hs_branch {
+    return $HS_BRANCH if defined $HS_BRANCH;
+    $HS_BRANCH = eval {
+        require File::Basename;
+        my $dir = File::Basename::dirname(__FILE__);
+        my $b = `git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null`;
+        chomp $b; $b;
+    } || 'unknown';
+    return $HS_BRANCH;
+}
+
+sub _hs_metadata_hash {
+    my ($self, $c, %extra) = @_;
+    my %m = (
+        entry_path   => 'web_form',
+        client_ip    => $self->_client_ip($c),
+        remote_addr  => $c->req->address,
+        user_agent   => scalar($c->req->user_agent),
+        sitename     => $c->stash->{SiteName} || $c->session->{SiteName} || '',
+        host         => scalar($c->req->header('Host')),
+        branch       => _hs_branch(),
+        fill_seconds => $c->stash->{hd_fill_seconds},
+        spam_score   => undef,
+        %extra,
+    );
+    return \%m;
+}
+
+sub _build_ticket_metadata {
+    my ($self, $c, %extra) = @_;
+    return undef unless $self->_hs_cfg($c, 'metadata_enabled');
+    my $m = $self->_hs_metadata_hash($c, %extra);
+    return JSON->new->canonical->encode($m);
+}
+
+# --- Layer 3: fill-time HMAC token -------------------------------------
+my $HS_SECRET;
+sub _hs_secret {
+    my ($self, $c) = @_;
+    my $s = $c ? $self->_hs_cfg($c, 'token_secret') : undef;
+    return $s if defined $s && length $s;
+    return $HS_SECRET if $HS_SECRET;
+    my $file = ($ENV{HOME} || '/tmp') . '/.comserv/hd_token_secret';
+    if (open my $fh, '<', $file) { $HS_SECRET = <$fh>; close $fh; chomp $HS_SECRET if $HS_SECRET }
+    unless ($HS_SECRET) {
+        $HS_SECRET = join '', map { sprintf '%02x', int rand 256 } 1 .. 32;
+        if (open my $fh, '>', $file) { chmod 0600, $file; print $fh "$HS_SECRET\n"; close $fh }
+    }
+    return $HS_SECRET;
+}
+
+sub _hs_sign_token {
+    my ($self, $secret, $ts, $sid) = @_;
+    require Digest::SHA;
+    return Digest::SHA::hmac_sha256_hex("$ts:" . ($sid // ''), $secret);
+}
+
+# Returns ('ok', $age) | ('bad', reason) | ('fast', $age) | ('expired', $age)
+sub _hs_check_token {
+    my ($self, $secret, $token, $sid, $now, $min, $max) = @_;
+    return ('bad', 'missing') unless defined $token && $token =~ /^(\d+):([0-9a-f]{64})$/;
+    my ($ts, $sig) = ($1, $2);
+    return ('bad', 'signature') unless $sig eq $self->_hs_sign_token($secret, $ts, $sid);
+    my $age = $now - $ts;
+    return ('fast', $age)    if $age < $min;
+    return ('expired', $age) if $max && $age > $max;
+    return ('ok', $age);
+}
+
+sub _hs_issue_form_guards {
+    my ($self, $c) = @_;
+    $c->session->{hd_form_seen} = 1;   # force session creation so sessionid is stable
+    my $sid = $c->sessionid // '';
+    my $ts  = time;
+    $c->stash(
+        hd_fill_token      => "$ts:" . $self->_hs_sign_token($self->_hs_secret($c), $ts, $sid),
+        turnstile_site_key => $self->_hs_turnstile_active($c) ? $self->_hs_cfg($c, 'turnstile_site_key') : '',
+    );
+}
+
+# --- Layer 4: Cloudflare Turnstile -------------------------------------
+sub _hs_turnstile_active {
+    my ($self, $c) = @_;
+    return 0 unless $self->_hs_cfg($c, 'turnstile_enabled');
+    return 0 unless $self->_hs_cfg($c, 'turnstile_site_key') && $self->_hs_cfg($c, 'turnstile_secret');
+    my $down = $c->session->{hd_turnstile_down} || 0;
+    return 0 if $down && time - $down < 600;   # fall back to math for 10 min after an outage
+    return 1;
+}
+
+# Returns 'ok' | 'fail' | 'error'
+sub _hs_turnstile_verify {
+    my ($self, $c) = @_;
+    my $token = $c->req->params->{'cf-turnstile-response'} // '';
+    return 'fail' if $token eq '';
+    my $res = eval {
+        require HTTP::Tiny;
+        HTTP::Tiny->new(timeout => 5)->post_form(
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+            { secret => $self->_hs_cfg($c, 'turnstile_secret'), response => $token,
+              remoteip => $self->_client_ip($c) });
+    };
+    return 'error' if $@ || !$res || !$res->{success};
+    my $j = eval { JSON->new->decode($res->{content}) };
+    return 'error' unless ref $j eq 'HASH';
+    return $j->{success} ? 'ok' : 'fail';
+}
+
+# --- Layer 5: spam score -----------------------------------------------
+# Pure: ($subject, $body, $email, $is_guest) -> ($score, \@reasons)
+sub _spam_score {
+    my ($self, $subject, $body, $email, $is_guest) = @_;
+    my $text = join ' ', map { $_ // '' } ($subject, $body);
+    my ($score, @why) = (0);
+    my $add = sub { my ($n, $r) = @_; $score += $n; push @why, $r };
+
+    $add->(10, 'known_spam_pattern') if $self->_looks_like_spam_content($subject, $body);
+    my $links = () = $text =~ m{https?://}gi;
+    $add->($links >= 3 ? 3 : $links, "links=$links") if $links;
+    $add->(2, 'shortener') if $text =~ m{\b(?:bit\.ly|tinyurl\.com|t\.me|graph\.org|telegra\.ph|rb\.gy|cutt\.ly)\b}i;
+    my @kw = ($text =~ /\b(crypto|bitcoin|btc|usdt|wallet|airdrop|casino|viagra|cialis|seo services|backlinks?|guest post|loan offer|forex|investment opportunity|telegram|whatsapp me|binance|metamask)\b/gi);
+    $add->(scalar(@kw) * 2 > 6 ? 6 : scalar(@kw) * 2, 'keywords=' . join(',', map { lc } @kw)) if @kw;
+    if ($is_guest) {
+        $add->(1, 'guest_no_email') unless defined $email && $email =~ /\@/;
+        $add->(1, 'disposable_email') if defined $email && $email =~ /\@(?:mailinator|guerrillamail|10minutemail|tempmail|yopmail|sharklasers)\./i;
+    }
+    my $letters = () = $text =~ /[A-Za-z]/g;
+    my $caps    = () = $text =~ /[A-Z]/g;
+    $add->(1, 'mostly_caps') if $letters > 30 && $caps / $letters > 0.6;
+    $add->(1, 'cyrillic_mix') if $text =~ /\p{Cyrillic}/ && $text =~ /[A-Za-z]{4}/;
+    $add->(1, 'html_markup') if $text =~ /<a\s+href|\[url=/i;
+    return ($score, \@why);
+}
+
+# --- Layer 6: optional AI classifier -----------------------------------
+# Returns 'spam' | 'ham' | undef (unavailable -> allow)
+sub _hs_classify {
+    my ($self, $c, $subject, $body) = @_;
+    my $model = $self->_hs_cfg($c, 'classifier_model');
+    my $prompt = "You are a spam filter for a small IT company's help desk. "
+        . "Reply with exactly one word: SPAM or HAM.\n\nSubject: " . substr($subject // '', 0, 300)
+        . "\nMessage: " . substr($body // '', 0, 2000) . "\n\nAnswer:";
+    my $t0 = time;
+    my ($verdict, $err, $j);
+    eval {
+        require HTTP::Tiny;
+        my $res = HTTP::Tiny->new(timeout => $self->_hs_cfg($c, 'classifier_timeout'))->post(
+            $self->_hs_cfg($c, 'classifier_url'),
+            { headers => { 'Content-Type' => 'application/json' },
+              content => JSON->new->encode({ model => $model, prompt => $prompt, stream => JSON::false(),
+                                             options => { temperature => 0 } }) });
+        die "HTTP $res->{status}\n" unless $res->{success};
+        $j = JSON->new->decode($res->{content});
+        my $out = uc($j->{response} // '');
+        $verdict = $out =~ /SPAM/ ? 'spam' : $out =~ /HAM/ ? 'ham' : undef;
+        1;
+    } or $err = $@ || 'unknown';
+    eval {
+        $c->model('AI')->log_usage($c,
+            provider          => $self->_hs_cfg($c, 'classifier_provider'),
+            model             => $model,
+            prompt_tokens     => ($j && $j->{prompt_eval_count}) || 0,
+            completion_tokens => ($j && $j->{eval_count}) || 0,
+            duration_ms       => int((time - $t0) * 1000),
+            request_type      => 'helpdesk_spam',
+            status            => $err ? 'error' : 'success',
+            error_message     => $err,
+            metadata          => { source => 'helpdesk_spam', sitename => $c->stash->{SiteName} || '',
+                                   branch => _hs_branch(), verdict => $verdict },
+        );
+    };
+    return $verdict;
+}
+
+# --- Layer 5: quarantine admin -----------------------------------------
+sub admin_quarantine :Chained('base') :PathPart('admin/quarantine') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_admin($c);
+    my @tickets;
+    eval {
+        @tickets = $c->model('DBEncy')->schema->resultset('SupportTicket')->search(
+            { status => 'quarantine' }, { order_by => { -desc => 'created_at' }, rows => 200 })->all;
+    };
+    my @rows = map {
+        my $m = eval { JSON->new->decode($_->metadata || '{}') } || {};
+        { ticket => $_, meta => $m }
+    } @tickets;
+    $c->stash(
+        template    => 'CSC/HelpDesk/admin_quarantine.tt',
+        title       => 'HelpDesk Quarantine',
+        rows        => \@rows,
+        success_msg => delete $c->flash->{hd_q_msg},
+        error_msg   => ($@ ? "Error loading quarantine: $@" : undef),
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub admin_quarantine_act :Chained('base') :PathPart('admin/quarantine') :Args(2) {
+    my ($self, $c, $act, $id) = @_;
+    $self->_require_admin($c);
+    my $msg;
+    if (uc($c->req->method || '') ne 'POST' || $id !~ /^\d+$/ || $act !~ /^(?:release|spam)$/) {
+        $msg = 'Invalid request.';
+    } else {
+        eval {
+            my $t = $c->model('DBEncy')->schema->resultset('SupportTicket')->find($id)
+                or die "not found\n";
+            my $m = eval { JSON->new->decode($t->metadata || '{}') } || {};
+            $m->{quarantine_review} = { action => $act, by => $c->session->{username}, at => time };
+            $m->{quarantine} = 0 if $act eq 'release';
+            $m->{spam} = 1 if $act eq 'spam';
+            $t->update({ status => ($act eq 'release' ? 'open' : 'spam'),
+                         metadata => JSON->new->canonical->encode($m) });
+            $msg = $t->ticket_number . ($act eq 'release' ? ' released to the open queue.' : ' marked as spam (kept, not deleted).');
+            $self->_fire_ticket_webhook($c, event => 'ticket.created', change => 'released', ticket => $t)
+                if $act eq 'release';
+            1;
+        } or $msg = "Action failed: $@";
+    }
+    $c->flash->{hd_q_msg} = $msg;
+    $c->res->redirect($c->uri_for('/HelpDesk/admin/quarantine'));
 }
 
 

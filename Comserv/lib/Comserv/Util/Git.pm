@@ -48,7 +48,7 @@ Logging uses the standard helper; all public methods therefore take C<$c>.
 # Allowed git subcommands. Anything else is refused by _run.
 my %ALLOWED_SUBCMD = map { $_ => 1 } qw(
     status log rev-parse rev-list branch diff fetch pull push ls-files
-    add commit stash checkout show restore rm merge worktree
+    add commit stash checkout show restore rm merge worktree apply
 );
 
 # Per-subcommand allow-list of flags (leading '-'). User values are NEVER flags.
@@ -79,6 +79,7 @@ my %ALLOWED_FLAGS = (
     # Worktree is used by the isolation primitive (create_worktree / remove_worktree):
     # allow add, remove (with --force to clear a dirty checkout), list, prune.
     worktree => { map { $_ => 1 } qw(add remove list prune --porcelain --force) },
+    apply    => { map { $_ => 1 } qw(--check) },
 );
 
 sub new {
@@ -884,6 +885,42 @@ sub commit {
     return { success => 0, error => 'Commit message required' }
         unless defined $message && length $message;
     return $self->_run($c, 'commit', '-m', $message);
+}
+
+=head2 apply_patch($c, $patch_text)
+
+Check then apply a unified diff. Refuses path traversal. Does not commit.
+
+=cut
+
+sub apply_patch {
+    my ($self, $c, $patch_text) = @_;
+    return { success => 0, error => 'empty patch' } unless defined $patch_text && $patch_text =~ /\S/;
+    return { success => 0, error => 'unsafe patch path' }
+        if $patch_text =~ m{(?:^|\n)(?:diff --git|---|\+\+\+) [ab]/(\.\./|/)}
+        || $patch_text =~ m{(?:^|\n)(?:diff --git|---|\+\+\+) [ab]/[^\n]*\.git};
+    my $repo = $self->repo_path($c);
+    return { success => 0, error => 'Repository path could not be resolved' } unless $repo;
+    # Worktrees have .git as a file, so do not write the patch under .git/.
+    my $dir = $ENV{TMPDIR} || '/tmp';
+    my $file = "$dir/comserv-fixer-$$.patch";
+    open my $fh, '>', $file or return { success => 0, error => "cannot write patch: $!" };
+    print $fh $patch_text;
+    close $fh;
+    my $check = $self->_run($c, 'apply', '--check', '--', $file);
+    unless ($check->{success}) {
+        unlink $file;
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'apply_patch',
+            'patch check failed: ' . ($check->{error} || $check->{output} || 'unknown'));
+        return { success => 0, error => 'Patch does not apply: ' . ($check->{error} || $check->{output}) };
+    }
+    my $applied = $self->_run($c, 'apply', '--', $file);
+    unlink $file;
+    unless ($applied->{success}) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'apply_patch',
+            'patch apply failed: ' . ($applied->{error} || $applied->{output} || 'unknown'));
+    }
+    return $applied;
 }
 
 =head2 push_to_origin($c, %opts)

@@ -1,0 +1,32 @@
+{
+  "report_date": "2026-10-10",
+  "source": "Super Grok daily switch",
+  "created_by": "~/.hermes/scripts/supergrok_daily_guard.py",
+  "events": [
+    "00:00 PT Super Grok ON -> xai-oauth/grok-4.7 (new PT day / override)",
+    "09:10 PT Super Grok OFF for today -> openrouter/z-ai/glm-5.3-flash: today 6.9% >= budget 5.7%"
+  ],
+  "summary": "09:10 PT Super Grok OFF for today -> openrouter/z-ai/glm-5.3-flash: today 6.9% >= budget 5.7%",
+  "markdown": "# Super Grok daily switch\n\n- 00:00 PT Super Grok ON -> xai-oauth/grok-4.7 (new PT day / override)\n- 09:10 PT Super Grok OFF for today -> openrouter/z-ai/glm-5.3-flash: today 6.9% >= budget 5.7%\n",
+  "metrics": {
+    "daily_budget": {
+      "allow_overrun": 0,
+      "used_now_pct": "65.7",
+      "reason": "today 6.9% >= budget 5.7%",
+      "used_today_pct": "6.9",
+      "effective_budget_pct": "5.7",
+      "extra_pct": "0.0",
+      "over": 1,
+      "date": "2026-10-10",
+      "remaining_today_pct": "0.0",
+      "week_off_at": 90,
+      "used_day_start_pct": "58.8",
+      "days_left_at_day_start": "5.44",
+      "switch_off": 1,
+      "override_active": 0,
+      "budget_pct": "5.7",
+      "week_off": 0
+    },
+    "mode": "openrouter"
+  }
+}

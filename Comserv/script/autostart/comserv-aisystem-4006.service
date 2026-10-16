@@ -1,0 +1,24 @@
+# PREPARED Oct 10 2026 - NOT enabled. Install with script/autostart/install_autostart.sh
+# :4006 = aisystem worktree (branch aisystem), same command Shanta runs by hand.
+[Unit]
+Description=Comserv aisystem dev server on :4006 (branch aisystem)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/shanta/.comserv/worktrees/aisystem/Comserv/Comserv
+Environment=CATALYST_DEBUG=1
+Environment=COMSERV_NO_HEALTH_LOG=1
+Environment=PERL5LIB=/home/shanta/perl5/lib/perl5
+Environment=PATH=/home/shanta/perl5/perlbrew/perls/perl-5.40.0/bin:/usr/local/bin:/usr/bin:/bin
+# Do not fight a hand-started server: skip if :4006 is already listening.
+ExecCondition=/bin/sh -c '! ss -ltn | grep -q ":4006 "'
+ExecStart=/home/shanta/perl5/perlbrew/perls/perl-5.40.0/bin/perl script/comserv_server.pl -p 4006 -r
+Restart=on-failure
+RestartSec=30
+StandardOutput=append:/home/shanta/.comserv/logs/aisystem_4006.log
+StandardError=append:/home/shanta/.comserv/logs/aisystem_4006.log
+
+[Install]
+WantedBy=default.target

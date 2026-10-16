@@ -61,7 +61,7 @@ sub reorder_item {
         $job = $schema->resultset('Printing3dJob')->create({
             sitename            => $sitename,
             model_id            => $model ? $model->id : undef,
-            item_id             => $item_id,
+            source_item_id      => $item_id,
             user_id             => $c->session->{user_id} || 0,
             username            => $c->session->{username} || 'admin',
             status              => 'queued',

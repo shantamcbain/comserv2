@@ -7,6 +7,7 @@ use JSON ();
 use Digest::SHA qw(sha256_hex);
 use Comserv::Util::AppTime;
 use Comserv::Util::AI::EvalAllowList;
+use Comserv::Util::AI::ProposalFormat;
 
 extends 'Catalyst::Model';
 
@@ -259,6 +260,14 @@ sub validate_payload {
                 if (defined $target && (ref $target || length $target > 255)) { push @err, "$where.target must be a string (max 255)"; next }
                 if (defined $p->{rationale} && ref $p->{rationale}) { push @err, "$where.rationale must be a string"; next }
                 my $payload = exists $p->{payload} ? $p->{payload} : undef;
+                # Problem / Impact / Solution / Risk (Oct 10 2026): taken from the proposal or derived.
+                for my $f (@Comserv::Util::AI::ProposalFormat::FIELDS) {
+                    if (defined $p->{$f} && ref $p->{$f}) { push @err, "$where.$f must be a string"; next }
+                }
+                my $derived;
+                ($payload, $derived) = Comserv::Util::AI::ProposalFormat::fold_into_payload({ %$p, title => $title, change_type => $ct }, $payload);
+                push @warn, "$where ($title): derived " . join('/', @$derived) . ' - send problem/impact/solution/risk explicitly'
+                    if @$derived;
                 my $payload_json = defined $payload ? _json()->encode($payload) : undef;
                 if (defined $payload_json && length $payload_json > 65000) { push @err, "$where.payload too large"; next }
                 my $note;
@@ -281,6 +290,31 @@ sub validate_payload {
         }
     }
     $r{proposals} = \@props;
+
+    # resolves: [{title, note}] - the reporter says an earlier proposal (matched by title,
+    # any report) has been implemented. Only code/workstation/other proposals that are still
+    # proposed/approved are closed as 'applied'; config proposals keep the admin Apply path.
+    my @res;
+    if (defined $data->{resolves}) {
+        if (ref $data->{resolves} ne 'ARRAY') {
+            push @err, 'resolves must be an array';
+        } elsif (@{ $data->{resolves} } > MAX_PROPOSALS) {
+            push @err, 'too many resolves (max ' . MAX_PROPOSALS . ')';
+        } else {
+            my $i = 0;
+            for my $x (@{ $data->{resolves} }) {
+                $i++;
+                my $where = "resolves[$i]";
+                unless (ref $x eq 'HASH' && defined $x->{title} && !ref $x->{title} && $x->{title} =~ /\S/) {
+                    push @err, "$where.title is required"; next;
+                }
+                my $note = $x->{note};
+                if (!defined $note || ref $note || $note !~ /\S/) { push @err, "$where.note is required (what was done)"; next }
+                push @res, { title_key => _title_key($x->{title}), title => $x->{title}, note => substr($note, 0, 2000) };
+            }
+        }
+    }
+    $r{resolves} = \@res;
     return (\%r, \@err, \@warn);
 }
 
@@ -339,8 +373,29 @@ sub ingest {
                 });
                 $made++;
             }
+            my ($resolved, @unmatched) = (0);
+            if (@{ $r->{resolves} || [] }) {
+                my @open = $prs->search({ status => { -in => [qw(proposed approved)] } })->all;
+                for my $x (@{ $r->{resolves} }) {
+                    my @hit = grep { _title_key($_->title) eq $x->{title_key} } @open;
+                    unless (@hit) { push @unmatched, $x->{title}; next }
+                    for my $p (@hit) {
+                        if (($p->change_type // '') eq 'config') {
+                            push @$warnings, "resolves '$x->{title}': proposal " . $p->id . ' is config - use Apply on /ai/eval';
+                            next;
+                        }
+                        my $line = sprintf('resolved as applied by report %s/%s (%s): %s',
+                            $r->{report_date}, $r->{source}, $by, $x->{note});
+                        $p->update({ status => 'applied', applied_by => substr("$by (report)", 0, 100),
+                                     applied_at => $now, result => $self->_append_result($p, $line) });
+                        $resolved++;
+                    }
+                }
+                push @$warnings, map { "resolves '$_': no open proposal with that title" } @unmatched;
+            }
             $out = { ok => 1, http => 200, report_id => 0 + $rep->id, created => $created,
-                     proposals_created => $made, proposals_skipped => $skipped, warnings => $warnings };
+                     proposals_created => $made, proposals_skipped => $skipped,
+                     proposals_resolved => $resolved, warnings => $warnings };
         });
         $self->_log($c, 'info', 'ingest', sprintf('AI eval report %s/%s report_id=%d created=%d proposals +%d (skipped %d) by=%s',
             $r->{report_date}, $r->{source}, $out->{report_id}, $out->{created}, $out->{proposals_created}, $out->{proposals_skipped}, $by));
@@ -440,6 +495,8 @@ sub _proposal_hash {
         target       => $p->target,
         payload_json => $p->payload_json,
         payload_pretty => defined $payload ? JSON->new->pretty->canonical->allow_nonref->encode($payload) : '',
+        format       => Comserv::Util::AI::ProposalFormat::normalize(
+                            { title => $p->title, rationale => $p->rationale, target => $p->target, change_type => $ct }, $payload),
         status       => $st,
         approved_by  => $p->approved_by,
         approved_at  => '' . ($p->get_column('approved_at') // ''),
@@ -453,7 +510,7 @@ sub _proposal_hash {
         can_approve  => (grep { $_ eq $st } @{ $TRANSITION{approve}{from} }) ? 1 : 0,
         can_reject   => (grep { $_ eq $st } @{ $TRANSITION{reject}{from} })  ? 1 : 0,
         can_apply    => ($st eq 'approved' && $ct eq 'config' && $allowed) ? 1 : 0,
-        can_revert   => ($st eq 'applied' && $ct eq 'config') ? 1 : 0,
+        can_revert   => ($st eq 'applied') ? 1 : 0,   # code/other: closed by a report's resolves; revert reopens the status
     };
 }
 
@@ -693,6 +750,14 @@ sub _do_apply {
 
 sub _do_revert {
     my ($self, $c, $p, $by) = @_;
+    # Code/workstation/other proposals closed by a report's "resolves": nothing to
+    # restore here (the code itself is undone in git) - just reopen the status.
+    if (($p->change_type // '') ne 'config') {
+        my $line = "status reverted by $by (undo the code change itself in git)";
+        $p->update({ status => 'reverted', result => $self->_append_result($p, $line) });
+        $self->_log($c, 'info', 'revert', 'AI eval proposal ' . $p->id . ": $line");
+        return { ok => 1, message => 'Status reverted - approve again to reopen as a todo' };
+    }
     my $al = $self->allow_list($c);
     my $target = $p->target;
     my $before = defined $p->before_value ? eval { JSON->new->allow_nonref->decode($p->before_value) } : undef;

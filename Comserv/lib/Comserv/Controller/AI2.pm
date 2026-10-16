@@ -14,6 +14,7 @@ use Comserv::Util::Logging;
 use Comserv::Util::ModelCatalog;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::Git;
+use Comserv::Util::SystemInfo;
 
 BEGIN { extends 'Catalyst::Controller' }
 
@@ -187,6 +188,22 @@ sub editing_widget_popup :Local :Args(0) {
 
     unless ($c->session->{username}) {
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
+    # Require CSC admin access - same security as AI.pm
+    unless ($self->_is_shanta_editor($c)) {
+        $c->res->status(403);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => 'Editor access required - CSC administrator only' }));
+        return;
+    }
+
+    # Verify development environment - same as AI.pm
+    unless ($self->_is_dev_mode($c)) {
+        $c->res->status(403);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => 'The AI Code Editor is only available on development workstations.' }));
         return;
     }
 
@@ -917,6 +934,17 @@ sub chat :Local :Args(0) {
     my $agent_id= $json_data->{agent_id} // '';
     my $agent_id_requested = $agent_id;
     my $editor_phase = lc($json_data->{phase} // '');
+
+    # For editor agents, treat old cheap free defaults as "auto" so Router
+    # classification + Supergrok (when available per guard) can run instead of
+    # forcing the weak model for initial analyze/evaluation.
+    if ($agent_id =~ /^(programming|coding|code|documentation|analyze)$/i) {
+        if ($model =~ /cohere\/north-mini|gemma-4-31b-it:free|nemotron-3\.5-lightning:free|north-mini-code:free/i || $model eq '') {
+            $model = '';
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ai2_chat',
+                "editor agent=$agent_id phase=$editor_phase: treating cheap/empty model as auto for smart router selection");
+        }
+    }
     unless (Comserv::Util::ModelCatalog->agent_allowed($c, $agent_id)) {
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
             'ai2_chat', "Clamped disallowed agent_id='$agent_id' to general");
@@ -1189,6 +1217,8 @@ sub chat :Local :Args(0) {
             skip_app_writes    => $editor_skip_writes ? 1 : 0,
             surface            => $editor_skip_writes ? 'editor' : 'chat',
             phase              => $editor_phase,
+            route              => $json_data->{route} || '',
+            user_picked        => $json_data->{user_picked} ? 1 : 0,
             grounding          => $json_data->{grounding},   # off|shadow|enforce (Model::AI2::Grounding)
             creative           => $json_data->{creative} ? 1 : 0,
         );
@@ -1698,6 +1728,37 @@ sub usage_live :Local :Args(0) {
         } || { errors => [ 'fallover summary failed: ' . ($@ || 'unknown') ] };
     }
     $c->response->body(encode_json({ success => JSON::true, org => $org }));
+}
+
+# Same gates as Controller::AI. editing_widget_popup calls these; they were
+# referenced without definitions, which 500s the popup after the file compiles.
+sub _is_shanta_editor {
+    my ($self, $c) = @_;
+    my $auth = Comserv::Util::AdminAuth->new();
+    return 1 if $auth->is_csc_admin($c);
+    my $username = $c->session->{username} || ($c->user ? $c->user->username : '') || '';
+    return 1 if lc($username) eq 'shanta';
+    if ($self->_is_dev_mode($c)) {
+        return 1 if $c->stash->{is_admin};
+        return 1 if $auth->check_admin_access($c, 'shanta_editor');
+    }
+    return 0;
+}
+
+sub _is_dev_mode {
+    my ($self, $c) = @_;
+    return 1 if $c->config->{developer_mode};
+    return 1 if $ENV{CATALYST_DEBUG};
+    my $hostname = eval { Comserv::Util::SystemInfo::get_server_hostname() };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+            '_is_dev_mode', "hostname lookup failed: $@");
+        $hostname = '';
+    }
+    $hostname //= '';
+    return 1 if $hostname =~ /workstation|localhost/i;
+    return 1 if ($ENV{SYSTEM_IDENTIFIER} || '') =~ /^(dev|development|workstation)/i;
+    return 0;
 }
 
 __PACKAGE__->meta->make_immutable;

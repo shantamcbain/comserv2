@@ -200,6 +200,10 @@ Comserv/root/session/**
 # Hermes agent scratch plans (local working notes, not project source)
 .hermes/plans/
 .hermes/plans/**
+# SQLite WAL/shared-memory side files
+Comserv/data/*.db-shm
+Comserv/data/*.db-wal
+
 # 3d library user-uploaded images (giant SVG re-uploads would exceed GitHub limits; keep out of git)
 Comserv/root/static/images/3d/library/**
 
@@ -226,3 +230,8 @@ Comserv/root/static/android/
 # APK binaries are huge and rebuilt constantly — serve them from
 # /data/nfs/inventory-apks via symlink, keep out of git
 Comserv/root/static/app/*.apk
+# The Android app is its own project (canonical copy is the InventoryAccounting
+# worktree until it is extracted). Do not commit the source tree, Gradle output,
+# or a built APK dropped under the web static tree.
+/android/
+Comserv/root/static/android/

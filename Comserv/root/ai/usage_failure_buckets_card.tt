@@ -1,0 +1,26 @@
+[%# Failure reason buckets (admin). Data: org.failure_buckets from UsageMonitor.
+  # Guard trip/restore rows are excluded from ok_rate and from these buckets. No JS. %]
+[% fb = org.failure_buckets %]
+[% IF is_admin && fb %]
+<div class="card" id="failure-buckets" style="margin:12px 0;padding:12px;border:1px solid var(--border-color,#ccc);border-radius:6px;">
+  <h3>Failure reasons (not just %)</h3>
+  <p class="doc-muted">App Ledger non-success rows in the last [% fb.days || filters.days || 14 %] days. Overrun-guard trip/restore events are excluded from ok_rate and from this table.</p>
+  [% IF fb.total_failures %]
+  <table class="table table-sm" style="width:100%;font-size:0.9em;">
+    <thead><tr><th>Reason</th><th style="text-align:right;">Count</th><th>Top model</th><th>Providers</th></tr></thead>
+    <tbody>
+    [% FOREACH b IN fb.buckets %]
+      <tr><td><code>[% b.reason | html %]</code></td>
+        <td style="text-align:right;">[% b.count %]</td>
+        <td>[% b.top_model | html %]</td>
+        <td class="doc-muted">[% b.providers.join(', ') | html %]</td></tr>
+    [% END %]
+    </tbody>
+  </table>
+  <p class="doc-muted">Total failures: [% fb.total_failures %]. App ok_rate uses success vs other statuses after excluding guard events.</p>
+  [% ELSE %]
+  <p class="doc-muted">No failed AI calls in this window.</p>
+  [% END %]
+  [% IF fb.errors.size %]<p class="doc-muted">[% fb.errors.join('; ') | html %]</p>[% END %]
+</div>
+[% END %]

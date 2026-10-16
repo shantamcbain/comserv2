@@ -42,7 +42,7 @@ our %KNOB_DEFAULTS = (
     # Super Grok daily cap reached (guard locked): coding turns, and turns that
     # asked for Super Grok, go here first (paid, still behind the soft caps).
     # Flash stays for idle/title work only. Empty string = no switch.
-    supergrok_locked_coding_model  => 'openrouter|deepseek/deepseek-v4-pro',
+    supergrok_locked_coding_model  => 'openrouter|cohere/north-mini-code:free',  # was deepseek-v4-pro until 2026-10-15
 );
 
 my %CACHE;   # path => { mtime, size, data, source, errors }

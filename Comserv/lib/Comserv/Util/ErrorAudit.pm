@@ -216,7 +216,7 @@ sub run_audit_scan {
 
                 my @entries = @{ $groups{$sub} };
                 my $ai_subject = _build_error_todo($schema, $sitename, $username, $admin_user_id,
-                    $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
+                    $today, $sub, \@entries, $root_id, $ollama, $system_project_id, $c);
                 if ($ai_subject) {
                     push @subjects, $ai_subject;
                     $todo_created++;
@@ -230,7 +230,7 @@ sub run_audit_scan {
 }
 
 sub _build_error_todo {
-    my ($schema, $sitename, $username, $user_id, $today, $sub, $entries, $root_id, $ollama, $fallback_project_id) = @_;
+    my ($schema, $sitename, $username, $user_id, $today, $sub, $entries, $root_id, $ollama, $fallback_project_id, $c) = @_;
     $fallback_project_id //= 1;
     my @entries  = @$entries;
     my $count    = scalar @entries;
@@ -259,7 +259,25 @@ sub _build_error_todo {
                 . "  3 = WARN — degraded but non-breaking\n"
                 . "Respond with ONLY a JSON object:\n"
                 . '{"subject":"one-line bug title (max 100 chars)","description":"2-3 sentence summary and fix","priority":1}';
+            my $t0   = time;
             my $resp = $ollama->chat(messages => [{ role => 'user', content => $prompt }]);
+            # One ledger row per audit call (/ai/usage), tagged like every other surface.
+            if (ref $c && eval { $c->can('model') }) {
+                eval {
+                    require Comserv::Model::AI::Usage;
+                    Comserv::Model::AI::Usage->new->log($c,
+                        provider      => 'ollama',
+                        model         => (eval { $ollama->model } || 'unknown'),
+                        request_type  => 'error_audit',
+                        duration_ms   => (time - $t0) * 1000,
+                        status        => (defined $resp && length $resp ? 'success' : 'error'),
+                        response_text => $resp,
+                        metadata      => { purpose => 'error_audit', surface => 'ErrorAudit',
+                                           (defined $sitename ? (sitename => $sitename) : ()),
+                                           (defined $username ? (username => $username) : ()) },
+                    );
+                };
+            }
             if ($resp && $resp =~ /\{.*\}/s) {
                 my ($json_str) = ($resp =~ /(\{.*?\})/s);
                 my $parsed = eval { decode_json($json_str) };
