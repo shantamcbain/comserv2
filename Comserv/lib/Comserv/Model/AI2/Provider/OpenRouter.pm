@@ -43,6 +43,22 @@ sub _resolve_api_key {
     }
     return $ENV{OPENROUTER_API_KEY} if $ENV{OPENROUTER_API_KEY} && length $ENV{OPENROUTER_API_KEY};
 
+    # 2026-10-16: servers started without a login shell (Git page button,
+    # systemd) miss OPENROUTER_API_KEY from ~/.bashrc. Fall back to the
+    # workstation secret file (one line, chmod 600) before the DB lookup.
+    if (my $home = $ENV{HOME}) {
+        for my $f ("$home/.comserv/secrets/openrouter_api_key") {
+            next unless -r $f && open(my $fh, '<', $f);
+            my $k;
+            while (my $l = <$fh>) {
+                if ($f =~ /\.env$/) { ($k) = $l =~ /^\s*(?:export\s+)?OPENROUTER_API_KEY\s*=\s*['"]?([^'"\s]+)/ and last; }
+                else { chomp $l; $k = $l if length $l; last; }
+            }
+            close $fh;
+            return $k if $k && length $k;
+        }
+    }
+
     my $user_id = $c->session->{user_id} or return undef;
     my $roles   = $c->session->{roles} || [];
     $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
@@ -116,6 +132,16 @@ sub _per_million {
 # Chat completion against OpenRouter (OpenAI-compatible). Returns the v2 shape.
 sub _chat_http {
     my ($self, $c, %args) = @_;
+
+    # 2026-10-15 last-line guard: OpenRouter is never called for any grok id
+    # or deepseek-v4-pro. Callers should have rerouted grok to Super Grok.
+    require Comserv::Util::AI::PaidBlock;
+    if (Comserv::Util::AI::PaidBlock->blocked_on_openrouter($args{model} // '')) {
+        my $was = $args{model};
+        $args{model} = $Comserv::Util::AI::PaidBlock::FREE_MODEL;
+        eval { $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'openrouter_chat',
+            "Blocked paid OpenRouter model $was; sent $args{model} instead") };
+    }
 
     my $api_key = $self->_resolve_api_key($c, $args{api_key});
     unless ($api_key) {
