@@ -392,6 +392,24 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
 
     if ($c->req->method eq 'POST') {
         my $params = $c->req->body_parameters;
+        my $sitename = $self->_sitename($c);
+        my $schema   = $self->_schema($c);
+
+        # Check for existing by barcode (for scanned items) before create
+        if ($params->{barcode}) {
+            my $existing = eval {
+                $schema->resultset('Accounting::InventoryItem')->search({
+                    sitename => $sitename,
+                    barcode  => $params->{barcode}
+                })->first;
+            };
+            if ($existing) {
+                $c->flash->{success_msg} = 'Item with this barcode already exists — switching to edit form.';
+                $c->res->redirect($c->uri_for('/Inventory/item/edit', [$existing->id]));
+                return;
+            }
+        }
+
         my $new_item;
         eval {
             $new_item = $self->_create_item($c, $params);

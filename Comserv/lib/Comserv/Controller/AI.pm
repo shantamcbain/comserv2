@@ -5986,8 +5986,9 @@ sub _do_web_search {
         if ($provider eq 'ddg') {
             eval {
                 require URI::Escape;
+                my $q = eval { URI::Escape::uri_escape_utf8($query) } || URI::Escape::uri_escape($query);
                 my $url  = 'https://api.duckduckgo.com/?q='
-                         . URI::Escape::uri_escape($query)
+                         . $q
                          . '&format=json&no_html=1&skip_disambig=1';
                 my $req  = HTTP::Request->new(GET => $url);
                 my $resp = $ua->request($req);
