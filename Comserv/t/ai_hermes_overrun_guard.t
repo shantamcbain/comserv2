@@ -594,4 +594,15 @@ sub cb_for {
         aliases => { code => 'xai-oauth/grok-4.7' }, current_fallback => [], auxiliary => {}, delegation => {}, supergrok => $open);
     is scalar @{ $q->{why} }, 0, 'Super Grok config left alone';
 }
+# 2026-10-17: $ cap trip handoff - grok-4.7 under 98 % weekly, free otherwise, never Super Grok build.
+{
+    my $SG = { mode => 'grok', remaining => 50, build => 60, hard_week_cap => 98,
+               daily_budget => { remaining_today_pct => '10', used_now_pct => '60' } };
+    is $pick->(or_ids => $IDS, supergrok => $SG, kind => 'caps')->{default}, 'grok-4.7', 'caps + SG 60% -> grok-4.7 (xai-oauth)';
+    is $pick->(or_ids => $IDS, supergrok => $SG, kind => 'caps')->{provider}, 'xai-oauth', 'grok-4.7 via xai-oauth';
+    my $hi = { %$SG, build => 98, daily_budget => { remaining_today_pct => '10', used_now_pct => '98' } };
+    is $pick->(or_ids => $IDS, supergrok => $hi, kind => 'caps')->{default}, 'cohere/north-mini-code:free', 'caps + SG 98% -> north-mini';
+    is $pick->(or_ids => {}, supergrok => $hi, kind => 'caps', ollama_models => []), undef, 'caps, no SG budget, no free -> pause, not Super Grok build';
+}
+
 done_testing();

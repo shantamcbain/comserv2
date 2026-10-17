@@ -240,6 +240,11 @@ sub supergrok_budget_left {
     my ($sg) = @_;
     return 0 unless ref $sg eq 'HASH' && %$sg;
     return 0 if $sg->{locked} || $sg->{off_today};
+    # 2026-10-17: never hand Hermes to Super Grok at/above the weekly hard stop (~98 %).
+    my $hard = $sg->{hard_week_cap} // 98;
+    for my $u ($sg->{build}, (ref $sg->{daily_budget} eq 'HASH' ? $sg->{daily_budget}{used_now_pct} : undef)) {
+        return 0 if defined $u && $u =~ /^[\d.]+$/ && $hard =~ /^[\d.]+$/ && $u >= $hard;
+    }
     my $b = $sg->{daily_budget};
     unless (ref $b eq 'HASH' && %$b) {
         # app pacing unreachable: trust the daily guard's own call. deferred_mode 'grok' means it
@@ -312,7 +317,9 @@ sub candidate_order {
     my @ol = grep {  $_->{ollama} } @c;
     if (($kind // 'thrash') eq 'caps') {
         return ({%SUPERGROK_CAPS}, @or, {%SUPERGROK}, @ol) if supergrok_budget_left($sg);
-        return (@or, {%SUPERGROK}, @ol);
+        # 2026-10-17: no Super Grok budget -> free models only (north-mini first);
+        # never fall onto Super Grok the daily guard has ruled out.
+        return (@or, @ol);
     }
     return ({%SUPERGROK}, @or, @ol);
 }
