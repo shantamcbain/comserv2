@@ -59,18 +59,20 @@ sub _resolve_api_key {
         }
     }
 
+    # 2026-10-17: every logged-in user's chat may use a shared key (it is only
+    # used server-side, never shown). Order: user's own row -> a row tagged with
+    # this site_id -> the workstation-wide row (site_id NULL, newest first).
+    # user_id is NOT NULL in user_api_keys, so "shared" = site/global scope.
     my $user_id = $c->session->{user_id} or return undef;
-    my $roles   = $c->session->{roles} || [];
-    $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
-    my $is_admin = grep { $_ =~ /^(admin|developer)$/i } @$roles;
-    return undef unless $is_admin;   # key sync is admin-only (per v1)
 
     my $schema = eval { $c->model('DBEncy')->schema } or return undef;
-    my $key_obj = $schema->resultset('UserApiKeys')->search(
-        { user_id => $user_id, service => 'openrouter', is_active => '1' }
-    )->first || $schema->resultset('UserApiKeys')->search(
-        { service => 'openrouter', is_active => '1' }
-    )->first;
+    my $rs = $schema->resultset('UserApiKeys');
+    my %base = (service => 'openrouter', is_active => '1');
+    my %newest = (order_by => { -desc => 'updated_at' }, rows => 1);
+    my $site_id = eval { $c->stash->{site_id} } // eval { $c->session->{site_id} };
+    my $key_obj = $rs->search({ %base, user_id => $user_id }, \%newest)->first
+        || (defined $site_id ? $rs->search({ %base, site_id => $site_id }, \%newest)->first : undef)
+        || $rs->search({ %base, site_id => undef }, \%newest)->first;
 
     return undef unless $key_obj && $key_obj->api_key_encrypted;
     return eval { $key_obj->get_api_key() } || undef;
