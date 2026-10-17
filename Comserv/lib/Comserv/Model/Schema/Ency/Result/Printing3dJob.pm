@@ -165,4 +165,13 @@ __PACKAGE__->belongs_to(
     { join_type => 'left' }
 );
 
+# Child rows live in printing_3d_job_filaments. cascade_delete stays off until
+# that table exists — a delete must not query a missing table.
+__PACKAGE__->has_many(
+    job_filaments => 'Comserv::Model::Schema::Ency::Result::Printing3dJobFilament',
+    'job_id',
+    { cascade_delete => 0 },
+);
+
 1;
+

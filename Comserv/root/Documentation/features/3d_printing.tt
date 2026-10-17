@@ -107,14 +107,24 @@ Items are shown in the shop when their linked inventory item has <code>show_in_s
 <hr>
 
 <h2 id="queue">4. Print Queue</h2>
-<p>
-The print queue at <a href="/3d/queue">/3d/queue</a> lists all pending print jobs, grouped by model and filament.
-Staff use this to plan what to print next. The <strong>Download File</strong> link is
-<code>/3d/model_download/&lt;id&gt;</code>. It resolves the stored <code>nfs_path</code>
-through <code>Comserv::Util::NfsPath</code> and serves the file from the container’s
-<code>/data/nfs</code> tree.
+<p class="doc-body">
+The print queue at <a href="/3d/queue">/3d/queue</a> puts the active job list first.
+Staff complete or cancel a printing job there. The printer strip under that list
+stays closed until opened. Each printer is a card across the row, so another printer
+is another card, not another table row.
 </p>
-<p>
+<p class="doc-body">
+<strong>Complete</strong> opens a dialog. It shows copies, time per copy, and one gram
+amount per filament colour already stored for that job. Staff can change those
+numbers, then confirm. The confirmed amounts are what inventory issues. A job with
+no saved colour plan still asks for a single gram amount in that same dialog.
+There is no blank browser prompt.
+</p>
+<ul class="doc-ul">
+    <li><strong>Download File</strong> — <code>/3d/model_download/&lt;id&gt;</code>. It resolves <code>nfs_path</code> through <code>Comserv::Util::NfsPath</code> and serves the file from <code>/data/nfs</code>.</li>
+    <li><strong>Queue Sync</strong> — <a href="/3d/queue_sync">/3d/queue_sync</a> reconciles the queue with inventory and consignment records.</li>
+</ul>
+<p class="doc-body">
 That tree must be the portable Docker NFS volume <code>comserv2_nfs_data_nfs</code>
 (<code>192.168.1.175:/mnt/data</code>), on both production1 and workstation Docker.
 If Download says <code>File not found on server: /data/nfs/...</code>, check
@@ -124,10 +134,6 @@ If Download says <code>File not found on server: /data/nfs/...</code>, check
 <code>comserv2_nfs_data_nfs</code>. Do not bind a host home path; that is not portable.
 See <a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]">DEPLOY_WORKFLOW</a>.
 </p>
-<ul>
-    <li><strong>Mark as Printed</strong> — POST to <a href="/3d/queue_print">/3d/queue_print</a> to mark a job as completed. This updates the linked inventory stock level.</li>
-    <li><strong>Queue Sync</strong> — <a href="/3d/queue_sync">/3d/queue_sync</a> reconciles the queue with inventory and consignment records, fixing any mismatches from manual edits.</li>
-</ul>
 
 <hr>
 
