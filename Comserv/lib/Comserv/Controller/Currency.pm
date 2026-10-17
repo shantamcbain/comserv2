@@ -78,7 +78,17 @@ sub balance :Path('balance') :Args(0) {
             $lifetime_spent  = $acct->lifetime_spent  + 0;
         }
 
-        @recent = $ps->ledger_for_user($user_id, 5)->all;
+        # CSC-20260831-2248: recent activity is optional. If the ledger query
+        # fails (e.g. point_ledger is missing gl_entry_id in this DB) keep the
+        # balance and show a soft note instead of the page-level error.
+        @recent = eval { $ps->ledger_for_user($user_id, 5)->all };
+        if ($@) {
+            my $lerr = "$@";
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'balance',
+                "Recent activity unavailable: $lerr");
+            $c->stash->{recent_unavailable} = 1;
+            @recent = ();
+        }
 
         $display = $ps->display_amount(
             points    => $bal,
