@@ -1,0 +1,33 @@
+[% PageVersion = 'Inventory/email/setup.tt,v 0.01 2026/10/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% INCLUDE 'Accounting/_acct_inv_nav.tt' current_page='inventory' %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Invoice email addresses — [% sitename | html %]</h1>
+    <p>These addresses are the only ones this site will turn into supplier-invoice drafts. One address per line.</p>
+  </div>
+
+  [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+  [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+
+  <form method="POST" action="[% c.uri_for('/Inventory/email-config') %]" class="content-section">
+    <p><label for="email_addresses"><strong>Email addresses to watch</strong></label></p>
+    <textarea id="email_addresses" name="email_addresses" rows="6" style="width:100%;max-width:40rem;font-family:monospace;">[% email_addresses | html %]</textarea>
+
+    <p style="margin-top:1rem;"><label for="monitored_suppliers"><strong>Supplier addresses</strong> (leave blank to use the watch list)</label></p>
+    <textarea id="monitored_suppliers" name="monitored_suppliers" rows="4" style="width:100%;max-width:40rem;font-family:monospace;">[% monitored_suppliers | html %]</textarea>
+
+    <p style="margin-top:1rem;"><label for="category_filter"><strong>Category filter</strong> (optional, one per line; empty means all categories)</label></p>
+    <textarea id="category_filter" name="category_filter" rows="3" style="width:100%;max-width:40rem;font-family:monospace;">[% category_filter | html %]</textarea>
+
+    <p style="margin-top:1rem;">
+      <button type="submit">Save email addresses</button>
+      <a href="[% c.uri_for('/mail/classify_invoices') %]" style="margin-left:1rem;">Run classification</a>
+      <a href="[% c.uri_for('/mail/invoice/api') %]" style="margin-left:1rem;">View classified invoices</a>
+      <a href="[% c.uri_for('/Inventory') %]" style="margin-left:1rem;">Back to inventory</a>
+    </p>
+    <p style="color:var(--text-muted-color,#666);font-size:0.85rem;">Saved to [% config_file | html %]</p>
+  </form>
+</div>

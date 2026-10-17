@@ -54,19 +54,64 @@ sub auto :Private {
 # Helpers
 # -------------------------------------------------------------------------
 
+
+
 sub _sitename {
     my ($self, $c) = @_;
-    return $c->session->{SiteName} || 'default';
+    return $c->session->{'SiteName'} || 'default';
 }
 
 sub _schema {
     my ($self, $c) = @_;
+    # Use the proper Comserv way to access database models
     return $c->model('DBEncy');
 }
 
 sub _now {
     require Comserv::Util::AppTime;
     return Comserv::Util::AppTime->now_utc;
+}
+
+# Set which mailbox addresses this SiteName watches for supplier invoices.
+sub email_config :Path('/Inventory/email-config') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
+    require Comserv::Util::MailInvoiceClassifier;
+    my $classifier = Comserv::Util::MailInvoiceClassifier->new();
+    my $all = $classifier->load_monitor_config;
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->body_parameters;
+        my @emails = grep { length $_ } map { s/^\s+|\s+$//gr } split /[\r\n,;]+/, ($p->{email_addresses} // '');
+        my @suppliers = grep { length $_ } map { s/^\s+|\s+$//gr } split /[\r\n,;]+/, ($p->{monitored_suppliers} // '');
+        my @cats = grep { length $_ } map { s/^\s+|\s+$//gr } split /[\r\n,;]+/, ($p->{category_filter} // '');
+        @suppliers = @emails unless @suppliers;
+        $all->{sites}{$sitename} = {
+            email_addresses    => \@emails,
+            monitored_suppliers => \@suppliers,
+            category_filter    => \@cats,
+        };
+        my $err = $classifier->save_monitor_config($all);
+        if ($err) {
+            $c->stash->{error_msg} = "Could not save email addresses: $err";
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'email_config',
+                "Saved invoice email watch list for $sitename (" . scalar(@emails) . " addresses)");
+            $c->flash->{success_msg} = 'Invoice email addresses saved for ' . $sitename;
+            $c->res->redirect($c->uri_for('/Inventory/email-config'));
+            return;
+        }
+    }
+
+    my $row = $classifier->config_for_site($all, $sitename);
+    $c->stash(
+        sitename            => $sitename,
+        email_addresses     => join("\n", @{ $row->{email_addresses} || [] }),
+        monitored_suppliers => join("\n", @{ $row->{monitored_suppliers} || [] }),
+        category_filter     => join("\n", @{ $row->{category_filter} || [] }),
+        config_file         => $classifier->monitor_config_file,
+        template            => 'Inventory/email/setup.tt',
+    );
 }
 
 sub _today {
@@ -443,9 +488,6 @@ sub _create_item {
     $consumable = 1 if $cat && $cat =~ /^(food|herb|spice|produce)$/i;
 
     # HARD GUARD: never create a second item with the same (sitename, sku).
-    # Prevents duplicate-SKU data corruption that previously occurred when rows were
-    # written outside the app (e.g. AI/script direct inserts). Returns the existing row
-    # instead of silently creating a twin that breaks BOM explosion / traveler dedup.
     if ($p->{sku}) {
         my $existing = $schema->resultset('Accounting::InventoryItem')->find(
             { sitename => $sitename, sku => $p->{sku} }
@@ -457,7 +499,6 @@ sub _create_item {
         }
     }
 
-    # Also guard / allow switch on barcode (for camera/scan flow)
     if ($p->{barcode}) {
         my $existing = $schema->resultset('Accounting::InventoryItem')->find(
             { sitename => $sitename, barcode => $p->{barcode} }

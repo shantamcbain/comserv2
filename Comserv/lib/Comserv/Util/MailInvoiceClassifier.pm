@@ -22,6 +22,74 @@ sub new {
     return bless $self, $class;
 }
 
+sub monitor_config_file {
+    my ($self) = @_;
+    my $root = $self->{output_dir} || '';
+    $root =~ s{/data/invoices/?$}{};
+    return File::Spec->catfile($root, 'config', 'email_invoice_monitor.json');
+}
+
+sub _default_monitor_config {
+    return {
+        sites => {
+            CSC => {
+                email_addresses     => ['shanta@forager.com', 'paypal@forager.com', 'patrion@forager.com', 'aica@forager.com'],
+                monitored_suppliers => ['shanta@forager.com', 'paypal@forager.com', 'patrion@forager.com', 'aica@forager.com'],
+                category_filter     => ['csc_internet', 'hosting', 'domain'],
+            },
+            '3d' => {
+                email_addresses     => ['mater3d@forager.com'],
+                monitored_suppliers => ['mater3d@forager.com'],
+                category_filter     => ['3d_filament', 'hardware'],
+            },
+        },
+    };
+}
+
+sub load_monitor_config {
+    my ($self) = @_;
+    my $file = $self->monitor_config_file;
+    my $defaults = $self->_default_monitor_config;
+    return $defaults unless -f $file;
+    my $data;
+    eval {
+        open my $fh, '<', $file or die $!;
+        local $/;
+        $data = JSON->new->utf8->decode(<$fh>);
+        close $fh;
+    };
+    return $defaults if $@ || ref($data) ne 'HASH' || ref($data->{sites}) ne 'HASH';
+    return $data;
+}
+
+sub save_monitor_config {
+    my ($self, $data) = @_;
+    return 'config is not a hash' unless ref($data) eq 'HASH';
+    my $file = $self->monitor_config_file;
+    my $dir = File::Spec->catdir((File::Spec->splitpath($file))[1] ? (File::Spec->splitpath($file))[1] : ());
+    # splitpath returns volume, dir, file — dir may be empty-looking but includes trailing slash
+    my (undef, $dirname, undef) = File::Spec->splitpath($file);
+    eval { make_path($dirname) if $dirname && !-d $dirname };
+    eval {
+        open my $fh, '>', $file or die $!;
+        print $fh JSON->new->utf8->pretty->canonical->encode($data);
+        close $fh;
+    };
+    return $@ if $@;
+    return;
+}
+
+sub config_for_site {
+    my ($self, $all, $sitename) = @_;
+    $all ||= $self->load_monitor_config;
+    my $sites = $all->{sites} || {};
+    return $sites->{$sitename} if $sites->{$sitename};
+    for my $key (keys %$sites) {
+        return $sites->{$key} if lc($key) eq lc($sitename || '');
+    }
+    return { email_addresses => [], monitored_suppliers => [], category_filter => [] };
+}
+
 sub classify_all_mail {
     my ($self, %args) = @_;
     my $source = $args{source} || 'maildir';
@@ -324,11 +392,109 @@ sub _category_keywords {
     return [];
 }
 
-# Create draft AP rows from classified mail. Never posts GL.
-# Matches InventorySupplier.email to From:. Skips unmatched + personal.
+# Line item parsing for invoice emails
+sub _parse_invoice_line_items {
+    my ($self, $body_preview, $subject, $from) = @_;
+    return () unless $body_preview;
+    
+    my @line_items;
+    my $text = $body_preview;
+    
+    # Clean up the text
+    $text =~ s/\s+/ /g;
+    $text =~ s/\n/ /g;
+    
+    # Try to extract line items using various patterns
+    # Pattern 1: "SKU: NAME - QUANTITY x PRICE"
+    while ($text =~ /([A-Z]+-\w+)\s*:\s*([^-]+?)\s*-\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/gi) {
+        my ($sku, $name, $qty, $price) = ($1, $2, $3, $4);
+        push @line_items, {
+            sku => $sku,
+            name => $name,
+            quantity => $qty,
+            price => $price,
+            source => 'email_parsing',
+        };
+    }
+    
+    # Pattern 2: "QUANTITY x NAME (SKU) - $PRICE"
+    while ($text =~ /(\d+(?:\.\d+)?)\s*x\s*([A-Za-z0-9\s]+?)\s*\((\w+-\w+)\)\s*-\s*\$(\d+(?:\.\d+)?)/gi) {
+        my ($qty, $name, $sku, $price) = ($1, $2, $3, $4);
+        push @line_items, {
+            sku => $sku,
+            name => $name,
+            quantity => $qty,
+            price => $price,
+            source => 'email_parsing',
+        };
+    }
+    
+    # Pattern 3: "NAME SKU QUANTITY $PRICE"
+    while ($text =~ /([A-Za-z0-9\s]+?)\s+(\w+-\w+)\s+(\d+(?:\.\d+)?)\s*\$(\d+(?:\.\d+)?)/gi) {
+        my ($name, $sku, $qty, $price) = ($1, $2, $3, $4);
+        push @line_items, {
+            sku => $sku,
+            name => $name,
+            quantity => $qty,
+            price => $price,
+            source => 'email_parsing',
+        };
+    }
+    
+    # Pattern 4: "ITEM: NAME - QTY: QUANTITY - PRICE: $PRICE"
+    while ($text =~ /ITEM:\s*([^\n]+?)\s*-\s*QTY:\s*(\d+(?:\.\d+)?)\s*-\s*PRICE:\s*\$(\d+(?:\.\d+)?)/gi) {
+        my ($name, $qty, $price) = ($1, $2, $3);
+        push @line_items, {
+            sku => '',
+            name => $name,
+            quantity => $qty,
+            price => $price,
+            source => 'email_parsing',
+        };
+    }
+    
+    return @line_items;
+}
+
+# Determine item category based on item name
+sub _determine_item_category {
+    my ($self, $name) = @_;
+    
+    $name = lc($name);
+    
+    if ($name =~ /filament|3d|printer|equipment|hardware|tool/) {
+        return 'Equipment';
+    }
+    
+    if ($name =~ /part|component|piece/) {
+        return 'Hardware';
+    }
+    
+    if ($name =~ /material|supply|consumable/) {
+        return 'Supply';
+    }
+    
+    if ($name =~ /data|information|document|file/) {
+        return 'Digital';
+    }
+    
+    return 'General';
+}
+
+# Enhanced draft_supplier_invoices with sitename-based email routing
+# This configuration allows each sitename to define which emails to monitor
+# and which supplier accounts are attached to those addresses.
 sub draft_supplier_invoices {
     my ($self, $c, %args) = @_;
+    
+    # SITENAME-BASED EMAIL MONITORING CONFIGURATION
+    # Each sitename defines:
+    # - email_addresses: Array of email addresses to monitor for this sitename
+    # - monitored_suppliers: Array of supplier IDs/email addresses that belong to this sitename
+    # - category_filter: Optional category filtering (leave empty for no filtering)
+    
     my $sitename = $args{sitename} || ($c && $c->session->{SiteName}) || 'CSC';
+    my $email_monitoring_config = $self->load_monitor_config->{sites} || {};
     my $file = $args{file} || File::Spec->catfile($self->{output_dir}, 'classified_invoices.json');
     my $schema = $c->model('DBEncy');
     my @created;
@@ -357,9 +523,25 @@ sub draft_supplier_invoices {
         next if $cat eq 'personal';
         my $block = $cats->{$cat} || {};
         my $sites = $block->{sites} || [];
-        if (@$sites && !grep { $_ eq 'all' || lc($_) eq lc($sitename) } @$sites) {
+        
+        # SITENAME-BASED FILTERING
+        # Check if this invoice category is allowed for the target sitename
+        my $config = $self->config_for_site({ sites => $email_monitoring_config }, $sitename);
+        my $allowed_categories = $config->{category_filter} || [];
+        
+        if (@$allowed_categories && !grep { $cat eq $_ } @$allowed_categories) {
+            $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, 'draft_supplier_invoices',
+                "Skipping category '$cat' for sitename '$sitename' - not in allowed categories: " . join(', ', @$allowed_categories));
             next;
         }
+        
+        # Only process invoices that should be handled by this sitename
+        if (@$sites && !grep { $_ eq 'all' || lc($_) eq lc($sitename) } @$sites) {
+            $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, 'draft_supplier_invoices',
+                "Skipping invoice for sitename '$sitename' - not in allowed sites: " . join(', ', @$sites));
+            next;
+        }
+        
         for my $inv (@{ $block->{invoices} || [] }) {
             next unless $inv && $inv->{is_invoice};
             my $mail_id = $inv->{id} || '';
@@ -379,6 +561,36 @@ sub draft_supplier_invoices {
             my ($email) = $from =~ /<([^>]+)>/;
             $email ||= $from;
             $email =~ s/^\s+|\s+$//g;
+            
+            # SITENAME-BASED EMAIL VALIDATION
+            # Only process emails that belong to this sitename's monitoring list
+            my $config = $self->config_for_site({ sites => $email_monitoring_config }, $sitename);
+            my $allowed_emails = $config->{email_addresses} || [];
+            my $allowed_suppliers = $config->{monitored_suppliers} || [];
+            
+            my $is_allowed_email = 0;
+            my $is_allowed_supplier = 0;
+            
+            if (@$allowed_emails) {
+                $is_allowed_email = grep { $email eq $_ } @$allowed_emails;
+            } else {
+                $is_allowed_email = 1; # No restriction - allow all emails
+            }
+            
+            if (@$allowed_suppliers) {
+                $is_allowed_supplier = grep { $email eq $_ } @$allowed_suppliers;
+            } else {
+                $is_allowed_supplier = 1; # No restriction - allow all suppliers
+            }
+            
+            if (!$is_allowed_email || !$is_allowed_supplier) {
+                $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, 'draft_supplier_invoices',
+                    "Skipping invoice from email '$email' for sitename '$sitename' - not in allowed emails/suppliers");
+                push @skipped, { id => $mail_id, reason => 'email_not_allowed', email => $email };
+                next;
+            }
+            
+            # Original supplier matching logic
             my $supplier;
             if ($email && $email =~ /@/) {
                 $supplier = eval {
@@ -402,6 +614,7 @@ sub draft_supplier_invoices {
                 'from=' . $from,
                 'subject=' . ($inv->{subject} || ''),
                 'date=' . ($inv->{date} || ''),
+                'sitename_routing=applied',
             );
             my $row;
             eval {
@@ -424,12 +637,103 @@ sub draft_supplier_invoices {
                 push @skipped, { id => $mail_id, reason => "$@" };
                 next;
             }
+            my @line_items = $self->_parse_invoice_line_items($inv->{body_preview}, $inv->{subject}, $inv->{from});
+            for my $line_item (@line_items) {
+                eval {
+                    $self->_create_inventory_item_from_invoice_line($c, $line_item, $sitename, $row->id, $mail_id);
+                };
+                if ($@) {
+                    $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'draft_supplier_invoices',
+                        "Failed to create inventory item for line: $@");
+                }
+            }
             push @created, { invoice_id => $row->id, invoice_number => $inv_no, supplier_id => $supplier->id, amount => $amount };
         }
     }
     $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, 'draft_supplier_invoices',
         "sitename=$sitename created=" . scalar(@created) . " skipped=" . scalar(@skipped));
     return { ok => 1, created => \@created, skipped => \@skipped };
+}
+
+
+# Create inventory item from parsed invoice line
+sub _create_inventory_item_from_invoice_line {
+    my ($self, $c, $line_item, $sitename, $invoice_id, $mail_id) = @_;
+    
+    # Only proceed if we have valid line item data
+    return unless $line_item->{sku} || $line_item->{name};
+    
+    # Build item parameters using the same structure as Inventory::_create_item
+    my $params = {
+        sitename         => $sitename,
+        sku              => $line_item->{sku},
+        name             => $line_item->{name},
+        description      => "Item from invoice email (MAIL-" . substr($mail_id, 0, 16) . ") - Line item from supplier invoice",
+        category         => $self->_determine_item_category($line_item->{name}),
+        unit_cost        => $line_item->{price},
+        unit_price       => $line_item->{price},
+        unit_of_measure  => 'each',
+        is_assemblable   => 0,
+        status           => 'active',
+        notes            => "Extracted from invoice email - Line item: qty=" . $line_item->{quantity} . ", price=" . $line_item->{price} . ", source=" . $line_item->{source} . ", mail_id=" . $mail_id,
+        created_by       => $c->session->{username} || 'hermes-agent',
+        created_at       => Comserv::Util::AppTime->now_utc,
+        updated_at       => Comserv::Util::AppTime->now_utc,
+    };
+    
+    # Get the schema using the Inventory controller's method
+    my $schema = eval { $c->model('DBEncy')->schema }; 
+    unless ($schema) {
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, '_create_inventory_item_from_invoice_line',
+            "Cannot get schema for creating inventory item from line: $@");
+        return;
+    }
+    
+    # Apply duplicate SKU guard (same as Inventory::_create_item)
+    if ($params->{sku}) {
+        my $existing = $schema->resultset('Accounting::InventoryItem')->find(
+            { sitename => $sitename, sku => $params->{sku} }
+        );
+        if ($existing) {
+            $self->{logging}->log_with_details($c, 'warn', __FILE__, __LINE__, '_create_inventory_item_from_invoice_line',
+                "Duplicate SKU prevented: sitename=$sitename, sku=" . $params->{sku} . " -> returning existing item id=" . $existing->id);
+            return $existing->id;
+        }
+    }
+    
+    # Also check barcode uniqueness if provided
+    if ($params->{barcode}) {
+        my $existing = $schema->resultset('Accounting::InventoryItem')->find(
+            { sitename => $sitename, barcode => $params->{barcode} }
+        );
+        if ($existing) {
+            $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, '_create_inventory_item_from_invoice_line',
+                "Barcode already exists: id=" . $existing->id . " -> returning existing for reuse");
+            return $existing->id;
+        }
+    }
+    
+    # Create the inventory item
+    my $item;
+    eval {
+        $item = $schema->resultset('Accounting::InventoryItem')->create($params);
+    };
+    
+    if ($item) {
+        $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, '_create_inventory_item_from_invoice_line',
+            "✅ Created inventory item ID: " . $item->id . " for invoice ID: " . $invoice_id . ", SKU: " . ($line_item->{sku} || 'N/A') . ", Name: " . $line_item->{name} . ", Qty: " . $line_item->{quantity} . ", Price: " . $line_item->{price});
+        
+        # Log the financial value of this line item for the invoice
+        my $line_total = $line_item->{quantity} * $line_item->{price};
+        $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, '_create_inventory_item_from_invoice_line',
+            "📊 Invoice line item - Item ID: " . $item->id . ", Quantity: " . $line_item->{quantity} . ", Unit Price: " . $line_item->{price} . ", Total Value: " . $line_total . ", Category: " . $item->category);
+        
+        return $item->id;
+    } else {
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, '_create_inventory_item_from_invoice_line',
+            "Failed to create inventory item for SKU: " . ($line_item->{sku} || 'N/A') . ", Name: " . $line_item->{name} . ", Error: $@");
+        return undef;
+    }
 }
 
 1;
