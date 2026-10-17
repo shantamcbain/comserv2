@@ -1,0 +1,31 @@
+{
+  "fetched_at_pt": "2026-10-04T06:39:00-07:00",
+  "source": "openrouter_auth_key",
+  "http_status": "200",
+  "day_usd": 0.073311144,
+  "week_usd": 20.564711244,
+  "month_usd": 18.392746263,
+  "balance_usd": 18.6327,
+  "total_credits": 280,
+  "total_usage": 261.36731238,
+  "usage": 259.76849236,
+  "auth_key_usage_usd": 259.76849236,
+  "prev_report_auth_key_usage_usd": 255.093352969,
+  "derived_spend_since_prev_report_usd": 4.675139,
+  "caps": {
+    "day_usd": 1.65,
+    "week_usd": 11.5,
+    "month_usd": 50
+  },
+  "fallover_spend": {
+    "week": 20.4914,
+    "ok": 1,
+    "month": 19.3452,
+    "day": 0.5559
+  },
+  "overrun_tripped": 1,
+  "overrun_since_pt": "Sat Oct 03 08:13 PT",
+  "overrun_reasons": [
+    "OpenRouter week $20.56 over $11.50 cap"
+  ]
+}

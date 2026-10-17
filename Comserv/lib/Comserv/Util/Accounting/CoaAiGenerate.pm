@@ -389,7 +389,7 @@ sub generate {
         $resp = $router->dispatch_chat($c, $opt{model}, [
             { role => 'system', content => 'You output valid JSON only. No prose. One SiteName only.' },
             { role => 'user',   content => $prompt },
-        ]);
+        ], log_usage => 'coa_generate');
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,

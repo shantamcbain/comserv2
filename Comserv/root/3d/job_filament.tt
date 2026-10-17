@@ -5,6 +5,9 @@
     <h1>Change filament</h1>
     <p class="doc-muted">
         Works for any queued or printing job.
+        [% IF job.status == 'completed' %]<br><strong>This job is completed:</strong> saving returns the
+        grams issued from the old spool, issues them from the spool you pick, and re-calculates the filament
+        and total cost.[% END %]
         This row:
         [% IF job.item_name %][% job.item_name | html %][% ELSIF model %][% model.name | html %][% ELSE %]job #[% job.id %][% END %]
         (job #[% job.id %], [% job.status | html %][% IF job.source_type %], [% job.source_type | html %][% END %]).

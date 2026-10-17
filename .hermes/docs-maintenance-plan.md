@@ -1,7 +1,7 @@
 # Documentation Maintenance Plan — Comserv2
 
 Owned by: the Documentation expert (`.hermes.md` role).
-Status: active. Last refreshed: 2026-09-25 (aisystem Now: grok.com Firefox usage + Hermes SuperGrok daily guard).
+Status: active. Last refreshed: 2026-10-05 (aisystem: fixed /ai/usage TT parse errors).
 
 Purpose: keep every documentation surface accurate, consistent, and in sync with the
 code — and to give a repeatable process so the docs don't drift again.
@@ -107,6 +107,10 @@ reader" discipline.
   - Created .hermes/plans/ summary for new-session context + updated this plan.
   - No server ops performed. User-side: ulimit + sysctl + stale process cleanup.
   - See .hermes/plans/2026-09-11-dev-server-inotify-restart-fix.md and the .inc fragment.
+- 2026-10-05: Fixed /ai/usage 500 (TT parse errors in usage cards).
+  - Removed unresolved git merge conflict and fixed `| format` inside ternary in fallover + health cards.
+  - Changelog fragment `2026-10-05-fix-usage-monitor-templates.inc`.
+  - Verified `/ai/usage` now returns 200; followed comserv2-session-doc-sync.
 
 ---
 

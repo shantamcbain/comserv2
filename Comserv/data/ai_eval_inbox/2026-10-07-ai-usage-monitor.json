@@ -1,0 +1,129 @@
+{
+  "report_date": "2026-10-07",
+  "source": "AI usage monitor",
+  "created_by": "AI usage monitor",
+  "created_at": "2026-10-07T06:55:00-07:00",
+  "compares_to": "2026-10-05",
+  "summary": "MIXED: reliability slightly better (7d app ok_rate 73.7%->75.4%, 20/22 since Mon), cost worse Tue (in-place v4-pro switch pushed OpenRouter day to $2.18 > $1.65; billed $3.05 vs Hermes est $0.63). Week $3.54/$11.50, month $22.80/$50, balance $14.23. Super Grok ~43% est (reading 40%), add-on stale, reset Thu 10:31 PT. Bot est ~23-27%, projected 83-98% at Mon Oct 12 reset; early warning; needs reading. HelpDesk 25 open unchanged.",
+  "markdown": "# Daily AI Eval - 2026-10-07 (~6:55 AM PT)\n\n**Answer: MIXED.** Reliability is a little better (app ok_rate 7d excluding guard/snapshot rows 73.7% -> 75.4%; since Mon's report 20/22 app calls ok). Cost got worse on Tuesday: an in-place Hermes switch to deepseek-v4-pro (9:12-9:41 AM PT Tue, session \"Start ai editor code tuning\") pushed the OpenRouter day to $2.18 over the $1.65 cap before the guard tripped. Hermes thrash trips are frequent (13 since Mon's report) but now land on free Super Grok.\n\n## Budget\n- **OpenRouter** (auth_key, 6:45 AM PT): day $0.00/$1.65 (UTC day since Tue 5 PM PT), week $3.54/$11.50, month $22.80/$50, balance $14.23 (was $17.28). Billed since Mon's report $3.05 vs Hermes estimate ~$0.63 for 2 days -> under-logged ~5x, consistent with v4-pro routed to Relace (cached tokens billed at full input price). Tuesday's day cap was breached ($2.18 at 9:40 AM PT).\n- **Super Grok**: last reading Shanta's \"40\" (taken as 40% used, Tue Oct 6 7:01 AM PT). Add-on meter has not reported since the Mon Oct 5 Firefox restart (23.7h stale). App estimate from 61 Hermes xai calls: ~43% used, ~57% left, reset Thu Oct 8 10:31 AM PT (~28h). Hermes default is now xai-oauth/grok-build-0.1, so hard coding is on Super Grok; keep it there until the reset.\n- **Grok Bot** (estimate; last meter reading Tue Oct 6 7:01 AM PT = 12% used, reset ~Mon Oct 12 8:03 AM PT): observed burn 1% -> 12% in ~23h = ~11.5%/day; with the known ~3%/day undercount, ~14.5%/day. Unmetered since the reading: Tue 7:00-7:25 usage-monitor fixes task, this chat through ~1:49 PM Tue, likely CSC developer/HelpDesk wakes ~8:46 AM Tue, and this eval. Estimated now ~23-27% used, ~5.05 days left, soft room ~14.8%/day. Projected at reset ~83% (11.5%/day) to ~98% (14.5%/day). EARLY WARNING: the conservative pace lands near 100%, so one heavy day would push past it. Needs a fresh reading.\n- **CSC developer HelpDesk line**: no separately measurable Bot cost since Mon; folder activity ~8:46 AM PT Tue suggests at least one wake, counted inside the estimate above. Queue: 25 open, no changes (watcher 6:31 AM PT today).\n\n## Scorecard\n- App calls since Mon 6:50 AM PT (excluding 51 guard trip/restore and provider_snapshot rows): 22 real, 20 ok (90.9%); chat 15/17 on north-mini-code:free and 1 Super Grok; 2 errors = Ollama phi4:14b \"model not found\". Cost $0.019.\n- 7d app ok_rate 75.4% (52/69) vs 73.7% last report. Failover 14d 12.5%, answered after failover 4.\n- App thrash: none. Anomalies only old gemma/nemotron error spikes (already out of chains).\n- Hermes 2d: 10 sessions, models grok-build-0.1 (6), north-mini:free (2), grok-4.7 (1), deepseek-v4-pro (4, via in-place switch Tue), v4-flash (6). Est ~$0.63. Fallback chain is Super Grok > north-mini:free > nemotron-lightning:free > Ollama; no fallback-to-v4-pro from an invalid ID seen.\n- Overrun guard: 13 trips since Mon's report (12 thrash, 1 day-cap Tue 9:40 AM PT), all auto-restored; latest trip 6:25 AM PT today, restored 6:40. Guard targets are valid IDs (xai-oauth/grok-build-0.1 on thrash, openrouter/cohere/north-mini-code:free on caps). Live session now: \"Add picture item and barcode scanning to inventory\" (grok-build, 40 calls).\n- Tasks: aisystem commits Mon PM (bfa0bdd84 /ai/usage TT parse fix, c2fa5b529 gitignore runtime data, merge ab27b0bd7); Tue usage-monitor fixes applied uncommitted; Hermes finished ServerFallback util, AI editor tuning session and image-inventory plan.\n\n## Proposals (new)\n1. Super Grok guard handoff target is deepseek/deepseek-v4-pro (reason config_still_overrun_free); switch it to deepseek-v4-flash-0731 or a :free model while Relace bills cache at full price.\n2. Warn or block in-place /model switches to v4-pro when the OpenRouter day is near cap (Tue's switch cost ~$2).\n3. Don't trip on thrash when the session is already on Super Grok (12 of 13 trips swapped grok-build for itself).\n4. Remove phi4:14b from the Ollama chain or pull it (2 not-found errors).\n5. Reload the grok.com add-on so the Super Grok meter is fresh before Thu's reset.\n\n## Carried forward\n- Cap runaway single Hermes sessions (tool_loop_guardrails), unreviewed.\n",
+  "metrics": {
+    "app": {
+      "since_prev_real_calls": 22,
+      "since_prev_ok": 20,
+      "ok_rate_7d_excl_guard": 75.4,
+      "prev_ok_rate_7d_excl_guard": 73.7,
+      "excluded_guard_snapshot_rows": 51,
+      "errors": [
+        {
+          "model": "ollama/phi4:14b",
+          "count": 2,
+          "reason": "model not found"
+        }
+      ],
+      "thrash_windows": 0,
+      "cost_since_prev": 0.0192
+    },
+    "openrouter": {
+      "day_usd": 0.0,
+      "week_usd": 3.5389,
+      "month_usd": 22.7975,
+      "balance_usd": 14.2279,
+      "billed_since_prev_report_usd": 3.05,
+      "hermes_est_2d_usd": 0.63,
+      "tue_day_peak_usd": 2.18,
+      "caps": {
+        "day_usd": 1.65,
+        "week_usd": 11.5,
+        "month_usd": 50
+      },
+      "over_caps": [
+        "day (Tue Oct 6, $2.18)"
+      ],
+      "v4_pro_used": true,
+      "relace_suspected": true
+    },
+    "hermes": {
+      "sessions_2d": 10,
+      "default_model": "xai-oauth/grok-build-0.1",
+      "guard_trips_since_prev": 13,
+      "guard_thrash_trips": 12,
+      "guard_cap_trips": 1,
+      "guard_targets_valid": true,
+      "v4pro_in_place_switch": "Tue Oct 6 09:12-09:41 PT session 20261006_143018_fc801c",
+      "supergrok_guard_switch_model": "openrouter/deepseek/deepseek-v4-pro"
+    },
+    "supergrok": {
+      "last_reading_pct_used": 40,
+      "last_reading_at_pt": "Tue Oct 06 07:01 PT",
+      "estimate_pct_used": 43,
+      "addon_meter_stale_h": 23.7,
+      "reset_at": "2026-10-08T10:31:00-07:00",
+      "estimated": true
+    },
+    "bot": {
+      "last_reading": "12% used Tue 2026-10-06 07:01 PT",
+      "reset_estimate": "Mon 2026-10-12 08:03 PT",
+      "burn_observed_pct_day": 11.5,
+      "burn_conservative_pct_day": 14.5,
+      "estimated_now_pct": "23-27",
+      "days_left": 5.05,
+      "soft_room_pct_day": 14.8,
+      "projected_at_reset_pct": "83-98",
+      "early_warning": true,
+      "estimated": true,
+      "reading_requested": true
+    },
+    "helpdesk": {
+      "open": 25,
+      "changes": 0,
+      "checked_at_pt": "Wed Oct 07 06:31 PT",
+      "csc_developer_bot_cost": "not separately measurable; likely wake ~08:46 PT Tue, inside Bot estimate"
+    }
+  },
+  "proposals": [
+    {
+      "title": "Super Grok guard handoff: v4-pro -> flash-0731 or :free",
+      "change_type": "workstation",
+      "target": "~/.hermes supergrok guard switch_model",
+      "rationale": "switch_model is deepseek/deepseek-v4-pro; Relace bills cached tokens at full input price and Hermes under-logs (~5x this period).",
+      "payload": {
+        "switch_model": "openrouter/deepseek/deepseek-v4-flash-0731"
+      }
+    },
+    {
+      "title": "Warn/block in-place /model switch to v4-pro near OpenRouter day cap",
+      "change_type": "code",
+      "target": "Hermes overrun guard / switch_model hook",
+      "rationale": "Tue 9:12 PT in-place switch grok-build -> v4-pro pushed day to $2.18 > $1.65 before the 9:40 trip.",
+      "payload": {}
+    },
+    {
+      "title": "Skip thrash trips when already on Super Grok",
+      "change_type": "code",
+      "target": "HermesOverrunGuard thrash rule",
+      "rationale": "12 of 13 trips since Mon swapped grok-build-0.1 for xai-oauth/grok-build-0.1 (no cost effect, config churn).",
+      "payload": {}
+    },
+    {
+      "title": "Remove or pull ollama phi4:14b",
+      "change_type": "config",
+      "target": "app Ollama chain",
+      "rationale": "2 'model not found' errors Mon.",
+      "payload": {}
+    },
+    {
+      "title": "Reload grok.com usage add-on",
+      "change_type": "workstation",
+      "target": "Firefox add-on",
+      "rationale": "Super Grok meter stale since Mon Firefox restart.",
+      "payload": {}
+    },
+    {
+      "title": "Cap runaway single Hermes sessions",
+      "change_type": "workstation",
+      "target": "~/.hermes/config.yaml tool_loop_guardrails",
+      "rationale": "carried forward, unreviewed",
+      "payload": {}
+    }
+  ]
+}

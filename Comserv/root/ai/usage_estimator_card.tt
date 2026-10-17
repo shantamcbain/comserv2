@@ -1,0 +1,97 @@
+[%# Usage estimator (admin): one estimate per AI consumer, normalized against
+  # manual readings + grok.com add-on + OpenRouter API. Data: ai_health.estimator
+  # (UsageMonitor::usage_estimator). Form posts to /ai/usage_reading. No JS. %]
+[% est = ai_health.estimator %]
+<div class="card" id="usage-estimator" style="margin:12px 0;padding:12px;border:1px solid var(--border-color,#ccc);border-radius:6px;">
+  <h3>Usage estimator — every AI consumer</h3>
+  [% IF c.req.params.reading == 'saved' %]<div class="alert alert-success" role="status">Reading saved (stored as entered, nothing adjusted).</div>[% END %]
+  [% IF c.req.params.reading_error %]<div class="alert alert-danger" role="alert">Reading not saved: [% c.req.params.reading_error | html %]</div>[% END %]
+  [% IF est.consumers.size %]
+  <table class="table table-sm" style="width:100%;font-size:0.9em;">
+    <thead><tr><th>Consumer</th><th>Estimate now</th><th>App-only (cycle)</th><th>Latest reading</th><th>Drift (app − reading)</th><th>Reset</th><th>Burn</th><th>Projection at reset</th></tr></thead>
+    <tbody>
+    [% FOREACH e IN est.consumers %]
+      <tr id="est-[% e.consumer | html %]">
+        <td><strong>[% e.label | html %]</strong></td>
+        <td>[% e.estimate_fmt | html %]</td>
+        <td>[% e.app_only_fmt | html %]</td>
+        <td>[% IF e.latest %][% e.latest_fmt | html %]<br><span class="doc-muted">[% e.latest.at_pt | html %] · [% e.latest.source | html %]</span>[% ELSE %]<span class="doc-muted">none</span>[% END %]</td>
+        <td>[% e.drift_fmt | html %]</td>
+        <td>[% IF e.reset_pt %][% e.reset_pt | html %]<br><span class="doc-muted">in [% e.hours_to_reset | html %] h</span>[% ELSE %]—[% END %]</td>
+        <td>[% e.burn_fmt | html %]</td>
+        <td>[% e.projection_fmt | html %][% IF e.over_at_reset %] <strong style="color:var(--danger-color,#dc2626);">over limit</strong>[% END %]</td>
+      </tr>
+      [% IF e.conflicts.size || e.notes.size %]
+      <tr><td></td><td colspan="7" class="doc-muted" style="font-size:0.85em;">
+        [% FOREACH f IN e.conflicts %]<div style="color:var(--warning-color,#d97706);">⚠ [% f | html %]</div>[% END %]
+        [% FOREACH n IN e.notes %]<div>[% n | html %]</div>[% END %]
+      </td></tr>
+      [% END %]
+      [% IF e.bot_burn && e.bot_burn.lines.size %][% bb = e.bot_burn %]
+      <tr id="est-grok-bot-burn"><td></td><td colspan="7" style="font-size:0.85em;">
+        <strong>Grok Bot burn since the latest reading</strong>
+        <span class="doc-muted">([% bb.hours_since | html %] h ago · method: [% bb.method | html %][% IF bb.pct_per_event.defined && bb.method == 'per_event' %] · [% bb.pct_per_event | format('%.2f') %] %/event[% END %][% IF bb.pct_per_hour.defined %] · [% bb.pct_per_hour | format('%.2f') %] %/h between readings[% END %])</span>
+        <table class="table table-sm" style="width:auto;margin:4px 0;">
+          <thead><tr><th>Line</th><th>Events</th><th>Failed</th><th>%</th><th>Basis</th></tr></thead>
+          <tbody>
+          [% FOREACH l IN bb.lines %]
+            <tr id="bot-burn-[% l.kind | html %]"[% IF l.kind == 'csc_helpdesk' %] style="border-top:2px solid var(--border-color,#ccc);"[% END %]><td>[% l.label | html %]</td><td>[% l.events | html %]</td><td>[% l.failed | html %]</td><td>[% l.pct | format('%.2f') %]</td><td>counted</td></tr>
+          [% END %]
+            <tr><td>Uncounted activity (time-based)</td><td>—</td><td>—</td><td>[% bb.estimated_pct | format('%.2f') %]</td><td>estimated</td></tr>
+            <tr><td><strong>Estimate now</strong></td><td colspan="2">latest [% bb.latest_used | html %] %</td><td><strong>[% bb.estimate | format('%.1f') %]</strong></td><td>[% bb.counted_pct | format('%.2f') %] counted + [% bb.estimated_pct | format('%.2f') %] est.</td></tr>
+          </tbody>
+        </table>
+        [% IF bb.pairs.size %]<div class="doc-muted">Calibration intervals: [% FOREACH p IN bb.pairs %][% p.from_pt | html %] → [% p.to_pt | html %]: +[% p.delta | html %] % over [% p.hours | html %] h, [% p.events | html %] events[% UNLESS loop.last %]; [% END %][% END %]</div>[% END %]
+      </td></tr>
+      [% END %]
+    [% END %]
+    </tbody>
+  </table>
+  [% ELSE %]<p class="doc-muted">Estimator unavailable.</p>[% END %]
+  [% FOREACH e IN est.consumers %][% IF e.reconcile && (e.reconcile.day || e.reconcile.week) %]
+  <div id="unlogged-spend" style="margin:8px 0;padding:8px;border:1px solid [% IF e.reconcile.flag %]var(--danger-color,#dc2626)[% ELSE %]var(--border-color,#ccc)[% END %];border-radius:6px;">
+    <strong>OpenRouter reconciliation[% IF e.reconcile.flag %] — unlogged spend[% END %]</strong>
+    <table class="table table-sm" style="width:100%;font-size:0.9em;margin-top:4px;">
+      <thead><tr><th>Window</th><th>Billed (OpenRouter)</th><th>App Ledger</th><th>Hermes (own estimate)</th><th>Hermes if cache billed as input</th><th>Gap</th><th></th></tr></thead>
+      <tbody>
+      [% FOREACH w IN ['day', 'week'] %][% r = e.reconcile.$w %][% IF r %]
+        <tr><td>[% w == 'day' ? 'Today (UTC day)' : 'This week' %]</td>
+          <td>$[% r.billed | format('%.2f') %]</td><td>$[% r.app | format('%.2f') %]</td><td>$[% r.hermes_est | format('%.2f') %]</td>
+          <td>[% IF r.hermes_full.defined %]$[% r.hermes_full | format('%.2f') %][% ELSE %]—[% END %]</td>
+          <td>$[% r.gap | format('%.2f') %]</td>
+          <td>[% IF r.unlogged %]<strong style="color:var(--danger-color,#dc2626);">unlogged spend</strong><br><span class="doc-muted">[% r.likely | html %]</span>[% ELSE %]ok (≤ $[% r.limit | format('%.2f') %])[% END %]</td></tr>
+      [% END %][% END %]
+      </tbody>
+    </table>
+    <span class="doc-muted">Flag when billed − (Ledger + Hermes) exceeds $[% e.reconcile.threshold | format('%.2f') %] a day. Every aisystem OpenRouter call writes a Ledger audit row (request_type openrouter_call, billed cost, purpose/branch/site/user).</span>
+  </div>
+  [% END %][% END %]
+  [% IF est.errors.size %]<p class="doc-muted">Errors: [% est.errors.join('; ') | html %]</p>[% END %]
+
+  <details id="usage-reading-form" [% IF c.req.params.reading_error %]open[% END %]>
+    <summary style="cursor:pointer;">Enter a manual reading (admin)</summary>
+    [% IF est.csrf %]
+    <form method="post" action="/ai/usage_reading" style="margin-top:8px;">
+      <input type="hidden" name="csrf_token" value="[% est.csrf | html %]">
+      <label>Consumer
+        <select name="consumer" required>
+          <option value="grok_bot">Grok Bot</option><option value="supergrok">Super Grok</option>
+          <option value="openrouter">OpenRouter</option><option value="ollama">Ollama</option>
+        </select></label>
+      <label>Value <input type="text" name="value" size="8" required placeholder="22 or 3.50"></label>
+      <label>Used / left
+        <select name="kind"><option value="used">used</option><option value="left">left</option><option value="unconfirmed">unconfirmed</option></select></label>
+      <label>Timestamp (PT) <input type="text" name="at" size="17" placeholder="YYYY-MM-DD HH:MM" value="[% est.now_pt_input | html %]"></label>
+      <label>Reset in (hours, optional) <input type="text" name="reset_in_hours" size="5"></label>
+      <label>Source
+        <select name="source"><option value="manual">manual</option><option value="spoken">spoken</option><option value="screenshot">screenshot</option><option value="addon">addon</option><option value="api">api</option><option value="other">other</option></select></label>
+      <label>Note <input type="text" name="note" size="30"></label>
+      <button type="submit" class="btn btn-primary btn-sm">Save reading</button>
+    </form>
+    [% ELSE %]<p class="doc-muted">Log in as an admin to enter readings.</p>[% END %]
+    [% IF est.recent_readings.size %]
+    <p class="doc-muted" style="margin-top:8px;">Recent readings ([% est.readings_file | html %]):</p>
+    <ul style="font-size:0.85em;">[% FOREACH r IN est.recent_readings %]<li>[% r.consumer | html %]: [% r.value | html %][% r.unit | html %] [% r.kind | html %] at [% r.at_pt | html %] ([% r.source | html %][% IF r.reset_pt %], reset [% r.reset_pt | html %][% END %])[% IF r.note %] — [% r.note | html %][% END %]</li>[% END %]</ul>
+    [% END %]
+  </details>
+</div>

@@ -68,13 +68,14 @@ sub build_agent_prompt {
         helpdesk => "You are a helpful support agent for the Comserv system. Be concise and practical.",
         ency     => "You are an encyclopedia assistant. Provide clear, factual answers.",
         bmaster  => "You are a business master / project assistant. Be professional and concise.",
-        planning => "You are the Comserv Planning Assistant (also covers Project Manager and Task Assistant). Use LIVE TODO/PROJECT data when injected. The TODO ACTION contract is already in the system prompt — after a provider retry never say you have no todo tool. Confirm server-created todos; do not invent a form.",
+        planning => "You are the Comserv Planning Assistant (also covers Project Manager and Task Assistant). Use LIVE TODO/PROJECT data when injected. The TODO ACTION contract is already in the system prompt — after a provider retry never say you have no todo tool. Confirm server-created todos; do not invent a form. Local Ollama models (nimble for decision/todosort, tev1) may be available and are good for planning analysis.",
         todo     => "You are the Comserv Task Assistant (agent id=todo). The system prompt already contains the TODO ACTION contract and live project catalog. After a provider retry or fallback you MUST keep using that contract — never say you have no todo tool. When the user wants a todo created, the server may already have done it; confirm the result, do not invent a form.",
         code     => "You are a coding assistant for the Comserv2 Catalyst app. The server already loads source into [FILE:] blocks. NEVER say you lack filesystem access or ask the user to paste files. Load other sources with [READ_FILE: lib/...] (optional :START-END). Prefer concise examples and one fenced code block so Approve can apply it.",
-        programming => "You are the AI Editor programming agent for Comserv2. Use loaded [FILE:] buffers; never claim no filesystem access. Plan then code only when phase is implement. Never create todos, never emit [ACTION: create_todo], never file HelpDesk tickets or invoices.",
+        programming => "You are the AI Editor programming agent for Comserv2. Use loaded [FILE:] buffers (including any auto-attached related pipeline files such as the controller for an opened .tt template). Never claim no filesystem access. Understand the background pipeline: the controller action populates the stash (e.g. todos, dates, open_log_entry, audit data) which the template and its includes consume. Plan then code only when phase is implement. Never create todos, never emit [ACTION: create_todo], never file HelpDesk tickets or invoices.",
         documentation => "You are the AI Editor documentation agent. Prefer docs/changelog/planning guidance; avoid code file rewrites unless asked.",
-        analyze => "You are the AI Editor Analyze worker. Read loaded [FILE:] buffers and named paths only. Return root cause + short plan. Never rewrite files, never emit ## FIX / full-file patches, never ask the user to paste files already provided.",
+        analyze => "You are the AI Editor Analyze worker. Read loaded [FILE:] buffers and auto-attached pipeline files (the controller and related sources for the page/template). Return root cause + short plan. Use the controller source to understand exactly how data reaches the template. Never rewrite files, never emit ## FIX / full-file patches, never ask the user to paste files already provided.",
         nav      => "You are a navigation assistant. Help the user find the right page or feature in Comserv.",
+        investigator => "You are a cost-effective investigator using only cheap or free models. Your job is to search logs, code, git history, usage data, and reports to answer questions about what happened. Be efficient and produce a clear report with findings, relevant paths, commits if possible, and direct quotes. Use [READ_FILE: path] if you need more. For git describe what to look up (recent commits, diffs on current branch, etc.).",
     );
     return $agent{$aid} if exists $agent{$aid};
     return undef;
@@ -213,14 +214,23 @@ sub build_messages {
 }
 
 # Select provider+model via the v2 Router (role/context-aware, local-first).
+# Forward prompt/phase/agent so classify_prompt_for_routing can map the question
+# (using local Ollama eval model if available) to Supergrok/paid/free.
 sub select_provider_and_model {
     my ($self, $c, $requested_model, $can_select, %ctx) = @_;
     my $router = $c->model('AI2::Router');
-    return $router->select_model($c,
+    my ($prov, $model) = $router->select_model($c,
         requested_model => $requested_model,
         can_select      => $can_select,
+        prompt          => $ctx{prompt} || $ctx{user_prompt},
+        phase           => $ctx{phase},
+        agent_id        => $ctx{agent_id},
         %ctx,
     );
+    # Also run classify to surface quota warning for system message
+    my $cl = $router->classify_prompt_for_routing($c, $ctx{prompt} || $ctx{user_prompt},
+        agent_id => $ctx{agent_id}, phase => $ctx{phase}, %ctx);
+    return ($prov, $model, $cl);
 }
 
 # Main entry: run a chat turn. Returns { success, response, model, usage? }.
@@ -281,6 +291,12 @@ sub process {
     require Comserv::Model::AI2::ChatIntent;
     my $editor_todo_skip = Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id})
         || $args{skip_app_writes};
+
+    # Declare early so visible for both enrich skipping and the later editor
+    # process trace append (the latter was causing the "Global symbol" compile error).
+    my $surface   = $args{surface} || '';
+    my $is_editor = ($surface eq 'editor')
+        || Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id});
 
     # HelpDesk-ticket AGENT first — must beat TodoCreate when the prompt
     # mentions both "ticket" and "todo" (3180 / 6510 hijack).
@@ -418,7 +434,10 @@ sub process {
     my $code_read;
     my $code_skip;
     my $uname = $c->session->{username} || '';
-    my $code_ok = (lc($args{agent_id} // '') eq 'code')
+    # AI Editor sends agent_id=programming/analyze; they need [READ_FILE:] too
+    # (eval #30: they were left out, so models asked users to paste code or
+    # printed fake tool calls that nobody ran).
+    my $code_ok = (lc($args{agent_id} // '') =~ /^(code|programming|analyze)$/)
         && $uname && lc($uname) ne 'guest';
     if ($code_ok) {
         $code_read = eval {
@@ -433,13 +452,21 @@ sub process {
             $code_read = undef;
         }
         if ($code_read) {
-            my $prep = eval {
-                $code_read->prepare_turn($c,
-                    prompt       => $prompt,
-                    page_path    => $args{page_path} || '',
-                    page_content => $args{page_content} || '',
-                );
-            };
+            # Editor JS already pasted files as [FILE: path] blocks. Then do not
+            # run prepare_turn (it would re-add the open file and also load every
+            # path mentioned inside the pasted code). Only enable [READ_FILE:]
+            # follow-ups, skipping the files already in the message.
+            my %have;
+            while ($prompt =~ /\[FILE:\s*([^\]\s]+)/g) { $have{lc $1} = 1; }
+            my $prep = %have
+                ? { page_context => $code_read->editor_contract, files_read => [], skip => \%have }
+                : eval {
+                    $code_read->prepare_turn($c,
+                        prompt       => $prompt,
+                        page_path    => $args{page_path} || '',
+                        page_content => $args{page_content} || '',
+                    );
+                };
             if ($@) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
                     "CodeRead prepare_turn threw: $@");
@@ -448,6 +475,22 @@ sub process {
                 $args{page_context} = $prep->{page_context} if $prep->{page_context};
                 push @files_read, @{ $prep->{files_read} || [] };
                 $code_skip = $prep->{skip};
+                # 2026-10-15: add the code that shows how the open page works
+                # (rendering controller sub, Site.pm, chat route), 90K total cap.
+                my $rel = eval {
+                    $code_read->related_context($c,
+                        prompt => $prompt,
+                        open   => $args{page_path} || '',
+                        skip   => { %{ $prep->{skip} || {} }, %have },
+                        budget => 90000 - length($prompt),
+                    );
+                };
+                if ($rel && $rel->{blocks}) {
+                    $prompt .= "\n\n---\nRelated code the server loaded so you can see how this page works "
+                        . "(controller that renders it, settings, routes):\n\n" . $rel->{blocks};
+                    push @files_read, @{ $rel->{files_read} || [] };
+                    push @thinking, 'related code loaded: ' . join(', ', @{ $rel->{files_read} || [] });
+                }
                 if ($prep->{user_files} && length $prep->{user_files}) {
                     $prompt .= "\n\n---\nThe server already loaded these files from disk. "
                         . "They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n"
@@ -491,11 +534,38 @@ sub process {
         delete $args{use_search};   # no unlabelled provider-side search in a grounded turn
     }
 
-    # Select provider+model (v2 Router)
-    my ($provider_name, $use_model) = $self->select_provider_and_model($c,
-        $args{model}, $can_select,
-        agent_id => $args{agent_id},
+    # Select provider+model (v2 Router). The editor cheap-pin is not a user
+    # choice — leave it unset so ModelPick sees SuperGrok, OpenRouter, Ollama.
+    # Pass prompt + phase + agent so classification can choose Supergrok
+    # (allotment OK?), paid, or free, and return $cl for the quota warning.
+    my $requested_model = $args{model};
+    my $user_picked = $args{user_picked} ? 1 : 0;
+    if (!$user_picked && $requested_model) {
+        require Comserv::Model::AI2::ModelPick;
+        $requested_model = undef
+            if Comserv::Model::AI2::ModelPick->is_auto_pin($requested_model);
+    }
+    my ($provider_name, $use_model, $cl) = $self->select_provider_and_model($c,
+        $requested_model, $can_select,
+        agent_id    => $args{agent_id},
+        prompt      => $prompt,
+        phase       => $args{phase},
+        route       => $args{route},
+        user_picked => $user_picked,
+        surface     => $args{surface},
     );
+    $cl ||= {};
+    my $quota_msg = '';
+    if ($cl->{quota_warning}) {
+        my $next = $cl->{suggested_next_model} || 'a free/cheap model (e.g. openrouter/cohere/north-mini-code:free or local ollama)';
+        # Plain message for web users (eval #31). Config steps stay in the log only.
+        $quota_msg = "Today's allowance for the main AI model is used up, so this answer came from a free backup model. "
+            . "It may be less detailed. The main model comes back after the daily reset (5:00 AM PT).";
+        push @thinking, 'QUOTA: ' . $cl->{quota_warning} . " (using $next)";
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'process',
+            'Daily quota hit in classify: ' . $cl->{quota_warning} . ' suggested=' . $next . ' (or_over=' . ($cl->{openrouter_over_daily}||0) . ', sg_locked=' . ($cl->{supergrok_locked}||0) . ')'
+            . '. Admin: check Hermes default/editor/director/git aliases are not pinned to grok-build-0.1 / xai-oauth.');
+    }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
         "AI2 chat dispatch: user=$username provider=$provider_name model="
         . ($use_model // '(router-default)') . " can_select=$can_select");
@@ -525,6 +595,8 @@ sub process {
         # this point, so Grok's search_parameters (Grok.pm) never fired.
         $router->chat_with_fallback($c, $provider_name, $use_model, $messages,
             ($args{use_search} ? (use_search => 1) : ()),
+            (($args{phase} || '') eq 'implement' || ($args{route} || '') eq 'escalate')
+                ? (max_tokens => 8192) : (),
             purpose      => $purpose,
             request_type => 'chat',
             ledger_meta  => $self->_aimps_meta($c, \%args),
@@ -663,9 +735,16 @@ sub process {
         }
         my $site_audit = ($prompt =~ /\b(navigate|navigation|crawl|audit|failed\s+links?|each\s+page|readable|theme|look and content|site and report|broken\s+links?)\b/i) ? 1 : 0;
         my $lookup_intent = ($prompt =~ /\b(find|look\s*up|search\s+for|what\s+is|who\s+is|tell\s+me\s+about|tell\s+me\s+what|information\s+on|info\s+on|used\s+for)\b/i) ? 1 : 0;
+        # $surface / $is_editor declared at top of process() (wider scope for editor trace)
+        $surface = $args{surface} || '';
+        $is_editor = ($surface eq 'editor') || ($args{agent_id} && $args{agent_id} =~ /^(programming|coding|code|documentation|analyze)$/i);
         my $need = $can_enrich && $resp && $resp->{success}
             && ($quality eq 'poor' || $site_audit || $lookup_intent)
-            && !$args{use_search};
+            && !$args{use_search}
+            && !$is_editor;  # editor already has the raw buffer + CodeRead; avoid polluting with unexpanded TT links
+        # 2026-10-15: AI Editor agents never auto web-search; the re-answer
+        # overwrote code analysis with junk (helpdesk contact.tt session).
+        $need = 0 if Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id});
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
             "auto_enrich check: can=$can_enrich quality=$quality site_audit=$site_audit lookup_intent=$lookup_intent need=$need");
         push @thinking, "auto_enrich: quality=$quality site_audit=$site_audit lookup_intent=$lookup_intent need=$need";
@@ -696,6 +775,9 @@ sub process {
             $base =~ s{/$}{};
             for my $h (@hrefs) {
                 next if $seen{$h}++;
+                # Skip links that still hold unrendered template code, e.g.
+                # /todo/details?record_id=[% p.todo_id | uri %] (always 500s).
+                next if $h =~ /\[%|%\]|%5B%25|%25%5D|\{\{|\}\}/i;
                 my $url = $h;
                 $url = $base . $h if $h =~ m{^/};
                 next unless $url =~ m{^https?://}i;
@@ -718,6 +800,8 @@ sub process {
                     . "Do NOT claim all pages are identical just because chrome matches.\n";
                 my %finger;
                 for my $url (@fetch) {
+                    # Skip literal TT template fragments that came from raw .tt buffer in editor
+                    next if $url =~ /\[\s*\%|%]/ || $url =~ /selected_date|prev_date|next_date|current_date_str/;
                     my $req = HTTP::Request->new(GET => $url);
                     $req->header('Host' => $origin_host . ( ($c->req->uri->port && $c->req->uri->port !~ /^(80|443)$/) ? (':' . $c->req->uri->port) : '' ));
                     $req->header('Cookie' => $cookie) if length $cookie;
@@ -973,12 +1057,15 @@ sub process {
     eval {
         my $usage_info = $resp->{usage} || {};
         my $used = $resp->{model} || $use_model || 'unknown';
+        my $req_agent = $args{agent_id} // '';
+        my $req_phase = $args{phase} // '';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
             "AIMPS model_used provider=$provider_name model=$used "
             . "prompt_tokens=" . ($usage_info->{prompt_tokens} || 0)
             . " completion_tokens=" . ($usage_info->{completion_tokens} || 0)
             . " total_tokens=" . ($usage_info->{total_tokens} || 0)
-            . " user=$username duration_ms=" . (_aimps_elapsed_ms($t0) // '?'));
+            . " user=$username duration_ms=" . (_aimps_elapsed_ms($t0) // '?')
+            . " requested_agent=$req_agent requested_phase=$req_phase");
         $c->model('AI')->log_usage($c,
             provider          => $provider_name,
             model             => $used,
@@ -1017,9 +1104,30 @@ sub process {
             "Failed to record AI usage: $@");
     }
 
+    my $final_response = $resp->{response} // '';
+
+    # For AI Editor (programming/analyze/etc. agents or surface=editor): append a short
+    # transparent process trace so the user sees exactly what model/agent/enrich path
+    # produced the answer. This addresses "the visible reply does not contain the
+    # background process".
+    if ($is_editor || $surface eq 'editor') {
+        my $proc = "\n\n---\n[process] agent=" . ($args{agent_id} // 'general')
+                 . " phase=" . ($args{phase} // 'n/a')
+                 . " model=" . ($resp->{model} || $use_model || 'unknown')
+                 . " provider=" . ($resp->{provider} || $provider_name || 'unknown');
+        if (@thinking) {
+            my @key = grep { /enrich|fetch|search|files_read|CodeRead|model|Dispatch/i } @thinking;
+            $proc .= "\n" . join("\n", @key[0..4]) if @key;
+        }
+        if ($citations && @$citations) {
+            $proc .= "\n citations=" . scalar(@$citations);
+        }
+        $final_response .= $proc;
+    }
+
     return {
         success         => 1,
-        response        => $resp->{response} // '',
+        response        => $final_response,
         model           => $resp->{model} || $use_model,
         provider        => $resp->{provider} || $provider_name,
         usage           => $resp->{usage} || {},
@@ -1036,6 +1144,7 @@ sub process {
         original_model  => $resp->{original_model},
         original_error  => $resp->{original_error},
         all_exhausted   => $resp->{all_exhausted},
+        ($quota_msg ? (system_warning => $quota_msg, quota_switched => 1) : ()),
     };
 }
 

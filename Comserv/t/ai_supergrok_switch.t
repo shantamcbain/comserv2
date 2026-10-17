@@ -21,13 +21,13 @@ use_ok('Comserv::Util::AI::HealthChecks');
 my $router = Comserv::Model::AI2::Router->new(logging => T::Log->new);
 sub chains {
     my $d = Comserv::Util::AI::ModelChains->perl_default;
-    $d->{chain_coding} = [ 'openrouter|cohere/north-mini-code:free', 'ollama|qwen2.5-coder:14b' ];
+    $d->{chain_coding} = [ 'openrouter|google/gemma-4-31b-it:free', 'ollama|qwen2.5-coder:14b' ];
     $d->{chain_chat}   = [ 'openrouter|a/one:free' ];
     $d->{removed} = [];
     return { data => $d, source => 'file' };
 }
-my $SW = 'openrouter|deepseek/deepseek-v4-pro';
-is(Comserv::Util::AI::ModelChains->knob(chains(), 'supergrok_locked_coding_model'), $SW, 'knob default: deepseek-v4-pro via OpenRouter (not flash)');
+my $SW = 'openrouter|cohere/north-mini-code:free';  # was deepseek-v4-pro until 2026-10-15
+is(Comserv::Util::AI::ModelChains->knob(chains(), 'supergrok_locked_coding_model'), $SW, 'knob default: north-mini-code:free (never v4-pro)');
 
 my @c = $router->failover_candidates(undef, 'supergrok', 'grok-4.6', chains => chains(), purpose => 'coding', guard => { locked => 1 });
 my ($i_sw) = grep { $c[$_]{slug} eq $SW } 0 .. $#c;

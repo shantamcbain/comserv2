@@ -274,7 +274,7 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         $validated = $self->_validate_paths($c, \@paths);
         if (@{ $validated->{invalid} }) {
             $c->flash->{error_msg} =
-                "Rejected unsafe or unknown path(s): " . join(', ', @{ $validated->{invalid} });
+                "Rejected unsafe or unknown path(s): " . join(', ', @{ $validated->{invalid} }) . " (must exactly match git status --porcelain on the bound target. Refresh view or select only current dirty paths for this target. Runtime data should be gitignored.)";
             $c->response->redirect($c->uri_for('/admin/git'));
             return;
         }
@@ -594,6 +594,7 @@ PROMPT
             $requested_model,
             $messages,
             can_select => 1,
+            log_usage  => 'git_commit_message',
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
@@ -1496,13 +1497,15 @@ sub git_commit_management :Path('/admin/git_commit') :Args(0) {
         if ($action eq 'add_files') {
             my @files = $c->req->param('files');
             $result = $self->execute_git_add($c, \@files);
-        } elsif ($action eq 'commit') {
-            my $message = $c->req->param('commit_message');
-            $result = $self->execute_git_commit($c, $message);
-        } elsif ($action eq 'add_and_commit') {
-            my @files = $c->req->param('files');
-            my $message = $c->req->param('commit_message');
-            $result = $self->execute_git_add_and_commit($c, \@files, $message);
+        } elsif ($action eq 'commit' || $action eq 'add_and_commit') {
+            my @files = $action eq 'add_and_commit' ? $c->req->param('files') : ();
+            $result = $self->_review_for_commit($c, $c->req->param('commit_message'), \@files);
+        } elsif ($action eq 'confirm_commit') {
+            $result = $self->_confirm_reviewed_commit($c);
+        } elsif ($action eq 'ask_fixer') {
+            $result = $self->_ask_fixer($c);
+        } elsif ($action eq 'apply_fixer') {
+            $result = $self->_apply_fixer($c);
         }
         
         $c->stash(%$result) if $result;
@@ -1515,6 +1518,12 @@ sub git_commit_management :Path('/admin/git_commit') :Args(0) {
     # Get recent commits
     my $recent_commits = $self->get_recent_commits($c);
     $c->stash(recent_commits => $recent_commits);
+    my $gate = eval { $self->_user_gate($c) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'git_commit_management',
+            "commit gate read failed: $@");
+    }
+    $c->stash(commit_review => $gate) if $gate && ref $gate eq 'HASH' && !$c->stash->{commit_review};
     
     if ($c->session->{debug_mode}) {
         push @{$c->stash->{debug_msg}}, "Git controller git_commit view - Template: admin/git_commit.tt";
@@ -1546,6 +1555,275 @@ sub execute_git_add {
 Execute git commit operation
 
 =cut
+
+=head2 execute_git_commit
+
+Execute git commit operation. The commit form does not call this until a review is confirmed.
+
+=cut
+
+sub _app_root {
+    my ($self, $c) = @_;
+    my $r = '' . $c->path_to('');
+    $r =~ s{/$}{};
+    return $r;
+}
+
+sub _gate_user {
+    my ($self, $c) = @_;
+    return $c->session->{username} || ($c->user ? $c->user->username : '') || 'admin';
+}
+
+sub _gate_path {
+    my ($self, $c) = @_;
+    return $self->_app_root($c) . '/data/ai_commit_gate.json';
+}
+
+sub _read_gates {
+    my ($self, $c) = @_;
+    my $f = $self->_gate_path($c);
+    open my $fh, '<', $f or return {};
+    local $/;
+    my $d = eval { JSON->new->decode(scalar <$fh>) };
+    close $fh;
+    return ref $d eq 'HASH' ? $d : {};
+}
+
+sub _write_gates {
+    my ($self, $c, $all) = @_;
+    my $f = $self->_gate_path($c);
+    if (open my $fh, '>', "$f.tmp") {
+        print $fh JSON->new->canonical->pretty->encode($all);
+        close $fh;
+        rename "$f.tmp", $f or $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_write_gates', "rename failed: $!");
+    } else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_write_gates', "cannot write $f: $!");
+    }
+}
+
+sub _user_gate {
+    my ($self, $c) = @_;
+    return $self->_read_gates($c)->{ $self->_gate_user($c) };
+}
+
+sub _save_user_gate {
+    my ($self, $c, $gate) = @_;
+    my $all = $self->_read_gates($c);
+    if (defined $gate) { $all->{ $self->_gate_user($c) } = $gate }
+    else { delete $all->{ $self->_gate_user($c) } }
+    $self->_write_gates($c, $all);
+}
+
+sub _reviewer_for {
+    my ($self, $c) = @_;
+    require Comserv::Util::AI::CodeReviewer;
+    return Comserv::Util::AI::CodeReviewer->new(root => $self->_app_root($c));
+}
+
+sub _diff_for_commit {
+    my ($self, $c, $files) = @_;
+    if ($files && @$files) {
+        return $self->git_service->diff($c, paths => $files) // '';
+    }
+    return $self->git_service->diff($c, cached => 1) // '';
+}
+
+sub _review_for_commit {
+    my ($self, $c, $message, $files) = @_;
+    $files = [ grep { defined && !ref && length } @{ $files || [] } ];
+    my $result = { success => 0, output => '' };
+    unless (defined $message && length $message) {
+        $result->{error_msg} = 'Commit message required before review.';
+        return $result;
+    }
+    my $diff = eval { $self->_diff_for_commit($c, $files) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_review_for_commit', "diff failed: $@");
+        $result->{error_msg} = 'Could not read the diff. Nothing was committed.';
+        return $result;
+    }
+    $diff //= '';
+    require Digest::SHA;
+    my $sha = Digest::SHA::sha256_hex($diff);
+    my @paths = @$files ? @$files : ($diff =~ /^diff --git a\/(.+?) b\//mg);
+    my @am;
+    eval {
+        require Comserv::Model::AI2::TaskTracker;
+        my $author = Comserv::Model::AI2::TaskTracker->new(root => $self->_app_root($c))->author_for_paths(@paths);
+        @am = @{ $author->{models} || [] } if $author;
+        1;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, '_review_for_commit',
+            "author lookup failed: $@");
+    }
+    my $rv = $self->_reviewer_for($c);
+    my $res = eval {
+        $rv->review($c,
+            diff => $diff, author_models => \@am, files => \@paths, diff_sha => $sha,
+            task => $message, source => 'commit_gate');
+    };
+    if ($@ || !$res) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_review_for_commit',
+            'review failed: ' . ($@ || 'no result'));
+        $res = { ok => 0, skipped => 1, reason => 'review call failed; confirm is allowed', blocking => 0 };
+    }
+    $res->{blocking} = ($res->{skipped} || !$res->{ok}) ? 0 : ($rv->should_block($res) ? 1 : 0);
+    my $gate = {
+        at => time, diff => substr($diff, 0, 60000), diff_sha => $sha,
+        files => $files, paths => \@paths, message => $message,
+        author_models => \@am, review => $res, preview => undef,
+    };
+    $self->_save_user_gate($c, $gate);
+    $c->stash(commit_review => $gate);
+    if ($diff !~ /\S/) {
+        $result->{success_msg} = 'No diff to review. Confirm only if that is what you meant.';
+    } elsif ($res->{skipped} || !$res->{ok}) {
+        $result->{success_msg} = 'Not reviewed: ' . ($res->{reason} // 'skipped') . '. You may confirm the commit.';
+    } elsif ($res->{blocking}) {
+        $result->{error_msg} = 'Review blocked this commit. Read the findings, ask the fixer, or override with a reason.';
+    } else {
+        $result->{success_msg} = 'Review finished. Confirm to commit. Nothing has been committed yet.';
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_review_for_commit',
+        'sha=' . substr($sha, 0, 12) . ' blocking=' . $res->{blocking} . ' model=' . ($res->{model} // ''));
+    return $result;
+}
+
+sub _confirm_reviewed_commit {
+    my ($self, $c) = @_;
+    my $gate = $self->_user_gate($c);
+    my $result = { success => 0, output => '' };
+    unless ($gate && ref $gate eq 'HASH' && $gate->{diff_sha}) {
+        $result->{error_msg} = 'No review on file. Review the diff first.';
+        return $result;
+    }
+    my $files = $gate->{files} || [];
+    my $diff = eval { $self->_diff_for_commit($c, $files) } // '';
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_confirm_reviewed_commit', "diff failed: $@");
+        $result->{error_msg} = 'Could not re-read the diff.';
+        $c->stash(commit_review => $gate);
+        return $result;
+    }
+    require Digest::SHA;
+    my $sha = Digest::SHA::sha256_hex($diff);
+    if ($sha ne $gate->{diff_sha}) {
+        $result->{error_msg} = 'The diff changed after review. Review it again before committing.';
+        $c->stash(commit_review => $gate);
+        return $result;
+    }
+    my $reason = $c->req->param('override_reason') // '';
+    $reason =~ s/^\s+|\s+$//g;
+    if ($gate->{review}{blocking} && length($reason) < 8) {
+        $result->{error_msg} = 'This diff is blocked. Override needs a reason of at least 8 characters, or ask the fixer.';
+        $c->stash(commit_review => $gate);
+        return $result;
+    }
+    if ($gate->{review}{blocking}) {
+        eval {
+            $self->_reviewer_for($c)->append_score({
+                at => time,
+                author_models => $gate->{author_models} || [],
+                reviewer_model => $gate->{review}{model},
+                source => 'commit_override',
+                files => $gate->{paths} || [],
+                correctness => ($gate->{review}{review} || {})->{correctness},
+                security => ($gate->{review}{review} || {})->{security},
+                quality => ($gate->{review}{review} || {})->{quality},
+                verdict => 'override',
+                high_findings => 0,
+                diff_sha => $sha,
+                override => 1,
+                override_by => $self->_gate_user($c),
+                override_reason => $reason,
+            });
+            1;
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_confirm_reviewed_commit',
+                "override score failed: $@");
+        }
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, '_confirm_reviewed_commit',
+            'override by ' . $self->_gate_user($c) . ': ' . $reason);
+    }
+    if (@$files) {
+        my $add = $self->execute_git_add($c, $files);
+        unless ($add->{success}) {
+            $c->stash(commit_review => $gate);
+            return $add;
+        }
+    }
+    my $commit = $self->execute_git_commit($c, $gate->{message});
+    if ($commit->{success}) { $self->_save_user_gate($c, undef) }
+    else { $c->stash(commit_review => $gate) }
+    return $commit;
+}
+
+sub _ask_fixer {
+    my ($self, $c) = @_;
+    my $gate = $self->_user_gate($c);
+    my $result = { success => 0, output => '' };
+    unless ($gate && $gate->{diff}) {
+        $result->{error_msg} = 'No reviewed diff to fix.';
+        return $result;
+    }
+    my $findings = (($gate->{review} || {})->{review} || {})->{findings} || [];
+    my $fix = eval {
+        $self->_reviewer_for($c)->propose_fix($c,
+            diff => $gate->{diff},
+            findings => $findings,
+            author_models => $gate->{author_models} || [],
+            reviewer_model => $gate->{review}{model},
+        );
+    };
+    if ($@ || !$fix) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_ask_fixer', 'fixer failed: ' . ($@ || 'no result'));
+        $result->{error_msg} = 'Fixer did not run.';
+        $c->stash(commit_review => $gate);
+        return $result;
+    }
+    if (!$fix->{ok}) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, '_ask_fixer', $fix->{reason} // 'fixer skipped');
+        $result->{error_msg} = $fix->{reason} // 'Fixer did not return a patch.';
+        $c->stash(commit_review => $gate);
+        return $result;
+    }
+    $gate->{preview} = $fix->{patch};
+    $gate->{fixer_model} = $fix->{model};
+    $self->_save_user_gate($c, $gate);
+    $c->stash(commit_review => $gate);
+    $result->{success_msg} = 'Fixer preview from ' . $fix->{model} . '. Nothing is written until you click Apply.';
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_ask_fixer', 'preview from ' . $fix->{model});
+    return $result;
+}
+
+sub _apply_fixer {
+    my ($self, $c) = @_;
+    my $gate = $self->_user_gate($c);
+    my $result = { success => 0, output => '' };
+    unless ($gate && $gate->{preview}) {
+        $result->{error_msg} = 'No fixer preview to apply.';
+        return $result;
+    }
+    my $applied = eval { $self->git_service->apply_patch($c, $gate->{preview}) };
+    if ($@ || !$applied || !$applied->{success}) {
+        my $err = $@ || ($applied && ($applied->{error} || $applied->{output})) || 'apply failed';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_apply_fixer', $err);
+        $result->{error_msg} = "Patch was not applied: $err";
+        $c->stash(commit_review => $gate);
+        return $result;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_apply_fixer',
+        'applied preview from ' . ($gate->{fixer_model} // 'fixer'));
+    $gate->{preview} = undef;
+    $self->_save_user_gate($c, $gate);
+    my $again = $self->_review_for_commit($c, $gate->{message}, $gate->{files} || []);
+    $again->{success_msg} = 'Patch applied. ' . ($again->{success_msg} || $again->{error_msg} || 'Review it again before committing.');
+    delete $again->{error_msg} if $again->{success_msg};
+    return $again;
+}
 
 sub execute_git_commit {
     my ($self, $c, $message) = @_;

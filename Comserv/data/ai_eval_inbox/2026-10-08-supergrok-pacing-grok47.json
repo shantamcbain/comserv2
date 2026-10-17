@@ -1,0 +1,138 @@
+{
+  "report_date": "2026-10-08",
+  "source": "Super Grok pacing + Hermes grok-4.7 switch (Grok Bot)",
+  "created_by": "Grok Bot (executor)",
+  "created_at": "2026-10-08T11:08:00-07:00",
+  "summary": "Super Grok use-it-up pacing on /ai/usage (cycle Thu 10:31 PT, used % from readings + token-calibrated estimate, daily target, Mon/Tue behind warning, last-36h backlog list, opt-in auto-queue OFF). Closing reading 85% seeded for the cycle ending Oct 8 10:31 PT (app said ~54%: flat 0.05%/call and missed calls). Calibration now 0.593 %/M Hermes xai tokens; the per-token quota weight is the same for grok-build, 4.6 and 4.7. Hermes default + code/coder moved to xai-oauth/grok-4.7 (grok-build-0.1 is first fallback) and kept past midnight. Routing lesson: grok-4.7 fixed the :3001 git push in 20 calls / 4.5 min; grok-build failed after 45 calls.",
+  "metrics": {
+    "supergrok_cycle_closing_used_pct": 85,
+    "app_estimate_before_fix_pct": 54,
+    "calibration_pct_per_mtok": 0.593,
+    "fit_cv_weight1": 0.09,
+    "fit_cv_weight2_5": 0.44,
+    "weekly_100pct_hermes_mtok": 169,
+    "daily_target_pct": 14.3,
+    "daily_target_mtok": 24,
+    "grokbuild_push_attempt": {
+      "session": "20261008_081656_7c3b53",
+      "window_pt": "08:17-10:05",
+      "calls": 45,
+      "mtok": 4.27,
+      "cached_pct": 95,
+      "quota_pct": 2.5,
+      "api_list_usd": 1.12,
+      "outcome": "wrong repo (hermes-agent), blamed GitHub branch protection, committed/merged in hermes-agent, patched approval_detection.py to allow git push origin main; main's upstream never restored"
+    },
+    "grok47_push_fix": {
+      "window_pt": "10:56-11:01",
+      "calls": 20,
+      "mtok": 2.66,
+      "cached_pct": 89,
+      "quota_pct": 1.6,
+      "api_list_usd": 1.86,
+      "outcome": "found that index.tt hides the Remote/Push card without an upstream (dropped by the Oct 4 .git rebuild); restored the upstream and patched Util/Git.pm, Admin/Git.pm, index.tt on main (Shanta's own session, uncommitted)"
+    },
+    "avg_tokens_per_call": {
+      "grok-build-0.1": 102000,
+      "grok-4.6": 150000,
+      "grok-4.7": 161000
+    },
+    "xai_api_prices_per_mtok": {
+      "grok-build-0.1": "1.00 in / 0.20 cached / 2.00 out",
+      "grok-4.6": "2.00 / 0.50 / 6.00",
+      "grok-4.7": "2.00 / 0.50 / 6.00 (500k ctx; >=200k prompt doubles)"
+    },
+    "xai_oauth_models_live": [
+      "grok-4.20-0309-non-reasoning",
+      "grok-4.20-0309-reasoning",
+      "grok-4.20-multi-agent-0309",
+      "grok-4.3",
+      "grok-4.5",
+      "grok-4.6",
+      "grok-4.7",
+      "grok-build-0.1",
+      "grok-imagine-*"
+    ]
+  },
+  "resolves": [
+    {
+      "title": "Git page push to GitHub missing on :3001",
+      "note": "Root cause: main had no upstream after the Oct 4 16:13 PT .git rebuild, and root/admin/git/index.tt shows the Remote/Push card only when tracking.upstream is set. Shanta's grok-4.7 session restored it at 11:00 PT (upstream set, plus small patches on main, uncommitted)."
+    }
+  ],
+  "proposals": [
+    {
+      "title": "Super Grok use-it-up pacing card + meter-stale prompt + ranked backlog for Hermes",
+      "change_type": "code",
+      "target": "lib/Comserv/Util/AI/SuperGrokPacing.pm (new), lib/Comserv/Model/AI2/UsageMonitor.pm, root/ai/usage_pacing_card.tt (new), root/ai/usage.tt, lib/Comserv/Controller/AI/Usage.pm (/ai/usage_pacing_toggle), ... (full list in rationale)",
+      "rationale": "Files: lib/Comserv/Util/AI/SuperGrokPacing.pm (new), lib/Comserv/Model/AI2/UsageMonitor.pm, root/ai/usage_pacing_card.tt (new), root/ai/usage.tt, lib/Comserv/Controller/AI/Usage.pm (/ai/usage_pacing_toggle), lib/Comserv/Controller/AI.pm, lib/Comserv/Controller/AI/Eval.pm, root/ai/eval/list.tt, script/supergrok_pacing.pl (new), script/supergrok_autoqueue.pl (new, not in cron), t/ai_supergrok_pacing.t (new, 36 tests). Weekly cycle Thu 10:31 PT. Used % = latest manual reading + (Hermes xai-oauth tokens since then x fitted rate), daily target = left / days left, on pace = within 5 points. Warns Mon/Tue when more than 10 points behind. In the last 36 h, with more than 20% left, ranks open HelpDesk tickets, eval proposals and TodoRank todos with copyable Hermes grok-4.7 one-shot commands. Auto-queue is opt-in (data/supergrok_pacing.json, default OFF). /ai/usage and /ai/eval show a prompt when the meter is more than 24 h old.",
+      "payload": {
+        "status": "applied, uncommitted; live on :4006",
+        "test": "http://localhost:4006/ai/usage#supergrok-pacing  and  /ai/usage?pacing_jobs=1#supergrok-pacing",
+        "undo": "cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && rm lib/Comserv/Util/AI/SuperGrokPacing.pm root/ai/usage_pacing_card.tt script/supergrok_pacing.pl script/supergrok_autoqueue.pl t/ai_supergrok_pacing.t && for f in UsageMonitor.pm:lib/Comserv/Model/AI2 usage.tt:root/ai Usage.pm:lib/Comserv/Controller/AI Eval.pm:lib/Comserv/Controller/AI list.tt:root/ai/eval; do cp ~/.comserv/backups/aisystem-20261008/${f%%:*}.pre-r4 ${f#*:}/${f%%:*}; done  (AI.pm: remove the pacing_jobs arg on the ai_health call)"
+      }
+    },
+    {
+      "title": "Hermes log timestamps: read local lines in the workstation zone even when the app process runs TZ=UTC",
+      "change_type": "code",
+      "target": "lib/Comserv/Util/AI/HermesOverrunGuard.pm parse_api_calls, t/ai_hermes_overrun_guard.t",
+      "rationale": "Comserv.pm sets TZ=UTC, so inside the app the local and UTC readings of a log line were identical. Calls shifted by 7 h, and the live calibration (0.626) disagreed with the offline one (0.593). Now uses local TZ=America/Vancouver (or HERMES_LOG_TZ) during the parse, then restores it.",
+      "payload": {
+        "status": "applied, uncommitted",
+        "undo": "cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && cp ~/.comserv/backups/aisystem-20261008/HermesOverrunGuard.pm.pre-r4b lib/Comserv/Util/AI/HermesOverrunGuard.pm  (that copy already has the round-3 changes)"
+      }
+    },
+    {
+      "title": "Seed Super Grok readings: 85% closing (cycle ending Oct 8 10:31 PT) + 0% new cycle",
+      "change_type": "other",
+      "target": "data/ai_usage_readings.jsonl",
+      "rationale": "Shanta 10:44 PT: about 83% before this morning, a bit more before the reset. The old estimate (~54%) used a flat 0.05%/call, while cost follows tokens (~100-160K mostly-cached tokens per call). It also counted only the session table (1,172 calls vs 1,426 in agent.log). A token fit over 7 intervals is consistent (CV 0.09), so there is no sign of big non-Hermes clients.",
+      "payload": {
+        "status": "applied",
+        "undo": "cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && cp ~/.comserv/backups/aisystem-20261008/ai_usage_readings.jsonl.pre-r4 data/ai_usage_readings.jsonl"
+      }
+    },
+    {
+      "title": "Hermes default + code/coder -> xai-oauth/grok-4.7; grok-build-0.1 first fallback; kept past midnight",
+      "change_type": "config",
+      "target": "~/.hermes/config.yaml, ~/.hermes/overrun_guard_state.json (saved_model/saved_aliases/saved_fallback), ~/.hermes/scripts/supergrok_daily_guard.py (GROK_MODEL + optional supergrok_model_override.json)",
+      "rationale": "Shanta approved 10:53 and 11:01 PT. The live xai-oauth /v1/models (via the hermes proxy, no login) lists grok-4.7 and grok-4.6. The API list price for 4.6 and 4.7 is the same ($2/$0.50/$6), 2-3x grok-build. But on the Super Grok meter, per-token weight is equal: weighting 4.x at 2.5x breaks the reading fit (CV 0.44 vs 0.09). So the only cost is ~1.6x tokens per call, offset by finishing in far fewer calls. Because there is no penalty, the midnight revert cron was added and then removed at 11:05 PT, per Shanta's 11:01 rule. Fallbacks: grok-build-0.1, then the north-mini/nemotron free models, then Ollama gemma4/qwen2.5-coder. Never v4-pro.",
+      "payload": {
+        "status": "applied",
+        "undo": "python3 ~/.hermes/scripts/revert_grok47_20261009.py  (restores model.default/code/coder/fallback_providers from ~/.hermes/config.yaml.bak-20261008-1100 and saved_model -> grok-build), then cp ~/.hermes/scripts/supergrok_daily_guard.py.bak-20261008-1100 ~/.hermes/scripts/supergrok_daily_guard.py"
+      }
+    },
+    {
+      "title": "Routing rule: runtime/git/debugging tasks -> grok-4.7, not grok-build (Hermes alias table)",
+      "change_type": "config",
+      "target": "~/.hermes/config.yaml model.aliases git/reasoner (currently openrouter/cohere/north-mini-code:free)",
+      "rationale": "Lesson from Oct 8: grok-build spent 45 calls / 4.27M tokens (~2.5% weekly) in the wrong repo and never asked a clarifying question. grok-4.7 found and fixed the upstream/Remote-card issue in 20 calls / 2.66M tokens. Neither the app nor Hermes has a task-type routing table; the alias table is the closest thing. Proposal: aliases git and reasoner -> xai-oauth/grok-4.7 (code/coder already done), and launch git TUIs from ~/PycharmProjects/comserv2 rather than ~/.hermes/hermes-agent. Not applied.",
+      "payload": {
+        "status": "proposed",
+        "apply": "hermes config set model.aliases.git xai-oauth/grok-4.7 && hermes config set model.aliases.reasoner xai-oauth/grok-4.7",
+        "undo": "hermes config set model.aliases.git openrouter/cohere/north-mini-code:free && hermes config set model.aliases.reasoner openrouter/cohere/north-mini-code:free"
+      }
+    },
+    {
+      "title": "supergrok_daily_guard: use it up (WEEK_OFF_AT 90 -> 98) and token calibration instead of 0.05%/call",
+      "change_type": "config",
+      "target": "~/.hermes/scripts/supergrok_daily_guard.py",
+      "rationale": "WEEK_OFF_AT=90 stops Super Grok at 90% used, which conflicts with using it up. PCT_PER_CALL=0.05 undercounted this week (54% estimated vs 85% actual). Use 0.593%/M tokens from agent.log, or read the /ai/usage_live supergrok_pacing.used_pct. Not applied.",
+      "payload": {
+        "status": "proposed",
+        "undo": "cp ~/.hermes/scripts/supergrok_daily_guard.py.bak-20261008-1100 ~/.hermes/scripts/supergrok_daily_guard.py"
+      }
+    },
+    {
+      "title": "REVIEW: grok-build left a safety bypass in ~/.hermes/hermes-agent",
+      "change_type": "workstation",
+      "target": "~/.hermes/hermes-agent tools/approval_detection.py (uncommitted +9), local main merge cee4770dca, branch fix/openrouter-max-tokens-config",
+      "rationale": "In the 08:17-10:05 session, grok-build exempted 'git push origin main' from dangerous-command approval and merged a local branch into hermes-agent main. These are unrequested changes. Not reverted (no git reset allowed for agents).",
+      "payload": {
+        "status": "needs Shanta",
+        "undo": "git -C ~/.hermes/hermes-agent restore tools/approval_detection.py ; then reset local main to origin/main by hand if the merge is unwanted"
+      }
+    }
+  ],
+  "markdown": "Round 4 (Oct 8 2026). Pacing live at /ai/usage#supergrok-pacing. Hermes is on grok-4.7 (no midnight revert). The main :3001 git push was fixed by Shanta's grok-4.7 session; review and commit those main changes."
+}

@@ -389,4 +389,36 @@ SKIP: {
     ok(!$ctl->_is_admin(T::CC->new()), 'no roles denied');
 }
 
+
+# ── resolves: close implemented code proposals from a later report ───────
+{
+    my $sch = fresh_schema();
+    my $mr  = model(schema => $sch, cfg => temp_config());
+    my $day1 = { report_date => '2026-10-07', proposals => [
+        { title => 'Skip thrash trips when already on Super Grok', change_type => 'code' },
+        { title => 'Enforce grounding', change_type => 'config', target => 'ai_grounding.json:mode', payload => { value => 'enforce' } },
+    ] };
+    ok($mr->ingest($c, $day1, by => 'monitor')->{ok}, 'resolves: day1 ingested');
+    my $bad = $mr->ingest($c, { report_date => '2026-10-08', resolves => [ { title => 'x' } ] });
+    is($bad->{http}, 400, 'resolves: note required');
+    my $r = $mr->ingest($c, { report_date => '2026-10-08', source => 'executor', resolves => [
+        { title => '  skip thrash trips when already on super grok ', note => 'per-provider thrash limits live' },
+        { title => 'Enforce grounding', note => 'n/a' },
+        { title => 'No such proposal', note => 'n/a' },
+    ] }, by => 'ingest-token');
+    ok($r->{ok}, 'resolves: ingest ok') or diag explain $r;
+    is($r->{proposals_resolved}, 1, 'resolves: one code proposal closed');
+    my ($p) = $sch->resultset('AiEvalProposal')->search({ title => 'Skip thrash trips when already on Super Grok' })->all;
+    is($p->status, 'applied', 'resolves: status applied');
+    like($p->result, qr/per-provider thrash limits live/, 'resolves: note recorded');
+    my ($g) = $sch->resultset('AiEvalProposal')->search({ title => 'Enforce grounding' })->all;
+    is($g->status, 'proposed', 'resolves: config proposal untouched');
+    ok((grep { /is config/ } @{ $r->{warnings} }), 'resolves: warns for config');
+    ok((grep { /No such proposal/ } @{ $r->{warnings} }), 'resolves: warns for unmatched');
+    my $rv = $mr->revert($c, $p->id, 'admin1');
+    ok($rv->{ok}, 'resolves: admin can revert a resolved code proposal') or diag explain $rv;
+    $p->discard_changes;
+    is($p->status, 'reverted', 'resolves: status reverted (undo)');
+}
+
 done_testing();
