@@ -4,13 +4,13 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "planning,3d-printing"
-   page_version = "0.3"
-   last_updated = "Fri Sep 05 2026"
+   page_version = "0.4"
+   last_updated = "Fri Oct 17 2026"
    site_specific = "false"
    project_id = "206"
    project_code = "3DPRINT"
 %]
-[% PageVersion = 'Documentation/3dPrintingPlan.tt,v 0.3 2026/09/05 hermes-agent Exp - LAN control now' %]
+[% PageVersion = 'Documentation/3dPrintingPlan.tt,v 0.4 2026/10/17 hermes-agent Exp - two-week queue and filament update' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container">
@@ -29,6 +29,7 @@
             <p class="doc-muted">Jump to section:</p>
             <div class="doc-navrow">
                 <a href="#overview" class="doc-navlink">Overview</a>
+                <a href="#recent" class="doc-navlink">Last two weeks</a>
                 <a href="#what" class="doc-navlink">What it is</a>
                 <a href="#plans" class="doc-navlink">Child plans</a>
                 <a href="#order" class="doc-navlink">Work order</a>
@@ -59,14 +60,14 @@
                 App URLs such as <code>/3d</code> belong there, not on MASTER_PLAN.</p>
             </div>
             <div class="doc-success">
-                <p class="doc-body"><strong>Now (2026-09-05).</strong>
-                Kobra 3 LAN is linked at 192.168.2.53 (farm id=1). Control page reads live MQTT state
-                (busy / file / % / temps) and can pause/resume/stop.
-                Spec:
-                <a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a>
-                · todo
-                <a href="[% c.uri_for('/todo/details') %]?record_id=2334" class="doc-link">#2334</a>.
-                Next on that todo: use printer % / remaining time on queue Complete. No gcode send yet.</p>
+                <p class="doc-body"><strong>Now (2026-10-17).</strong>
+                The last two weeks shipped browse cards, public model visibility, live printer state,
+                and multi-material filament accounting. Completing a job opens a verify dialog
+                (copies, hours each, grams per colour) instead of a blank prompt.
+                The queue shows the job list first. Printers stay closed until opened, and each
+                printer is a card across that row.
+                Detail is in <a href="#recent" class="doc-link">Last two weeks</a>.
+                Newsletter promotion is a MailSystem todo, not 3D work.</p>
                 <p class="doc-body">Open the attached project and this plan standalone:</p>
                 <div class="doc-navrow">
                     <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-navlink" title="Project #206 3DPRINT — parent of INV, File Mgmt, Sales, DRYER-INT.">Project #206 3DPRINT</a>
@@ -74,6 +75,48 @@
                     <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-navlink" title="Site-wide coordinator. This 3D plan is one entry there.">MASTER_PLAN</a>
                     <a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-navlink">Kobra3LanMode</a>
                 </div>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="recent" class="doc-h2">1a. Last two weeks (2026-10-03 to 2026-10-17)</h2>
+            <p class="doc-body">What the 3D module actually gained. Operator steps are on
+            <a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing</a>.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Date</th>
+                    <th class="doc-th">What changed</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">2026-10-03</td>
+                    <td class="doc-td">Similar models, category filter, item relationships. External site cards use the site's own branding and search that site directly.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">2026-10-13</td>
+                    <td class="doc-td">Public model visibility. Queue reads the printer's real LAN state (busy, idle, offline), not only the database status.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">2026-10-14</td>
+                    <td class="doc-td">Completed jobs record filament grams and cost. Reorder uses source_item_id (a job has no item_id). Todo #2552.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">2026-10-16</td>
+                    <td class="doc-td">LanMap plus multi-material filament accounting. A sliced file can name more than one tool.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">2026-10-17</td>
+                    <td class="doc-td">Send-time rows in printing_3d_job_filaments. Complete shows those colours and grams and lets staff change copies, time each, and grams before stock is issued. Verified popup values win over the printer's own elapsed time. Job list is at the top of /3d/queue. Printers are a closed row of cards.</td>
+                </tr>
+            </table>
+            <div class="doc-info">
+                <p class="doc-body"><strong>Next.</strong>
+                Newsletter branch writes the member-facing highlight. Todo
+                <a href="[% c.uri_for('/todo/details') %]?record_id=2589" class="doc-link">#2589</a>
+                on MailSystem (#44), not on #206. LAN control (#2334) is still open: gcode send is not done.
+                A verified complete time is what staff confirm; it is not a replacement for live printer control.</p>
             </div>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>

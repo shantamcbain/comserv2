@@ -721,7 +721,30 @@ sub reopen_job {
     try {
         $schema->txn_do(sub {
             # ---- 1. Reverse the filament issue (grams consumed at completion) ----
-            if ($job->filament_item_id && $job->filament_quantity) {
+            my $saved = eval { $self->saved_filament_issues($c, $schema, $job) } || [];
+            if (@$saved) {
+                for my $rec (@$saved) {
+                    my $fil = $rec->{filament_item};
+                    my $sl  = $fil ? eval { ($fil->stock_levels->all)[0] } : undef;
+                    my $qty = $self->stock_qty_from_grams($fil, $rec->{grams_used});
+                    $ctl->_inventory_transaction($c,
+                        schema           => $schema,
+                        sitename         => $sitename,
+                        item_id          => $rec->{filament_item_id},
+                        location_id      => $sl ? $sl->location_id : undef,
+                        transaction_type => 'return',
+                        quantity         => $qty,
+                        unit_cost        => $rec->{unit_cost},
+                        reference_number => '3D-JOB-' . $job->id . '-FIL-' . $rec->{sequence},
+                        notes            => sprintf('Filament returned: %sg — job #%d reopened (slot %s)',
+                                                $rec->{grams_used}, $job->id, $rec->{sequence}),
+                        performed_by     => $who,
+                    );
+                    push @reversed, sprintf('returned %sg of %s',
+                        $rec->{grams_used}, $rec->{material_name} || 'filament');
+                }
+            }
+            elsif ($job->filament_item_id && $job->filament_quantity) {
                 my $fil = eval { $schema->resultset('Accounting::InventoryItem')
                                     ->find($job->filament_item_id) };
                 my $sl  = $fil ? eval { ($fil->stock_levels->all)[0] } : undef;
@@ -844,6 +867,128 @@ sub filament_slots_from_file {
     my $text = _slicer_text($path);
     return [] unless $text;
     return _slots_from_slicer_text($self, $text);
+}
+
+# Rows saved at send time (printing_3d_job_filaments). grams on the row is
+# one plate; the returned grams_used is that times job.quantity. Empty when
+# the table is not created yet or the job has no plan — caller keeps the
+# single-spool path. A slot with no filament_item_id is skipped, not guessed.
+sub saved_filament_issues {
+    my ($self, $c, $schema, $job) = @_;
+    return [] unless $schema && $job && eval { $job->id };
+    my @rows = eval {
+        $schema->resultset('Printing3dJobFilament')->search(
+            { job_id => $job->id },
+            { order_by => 'sequence' },
+        )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'saved_filament_issues', "plan unavailable job=" . $job->id . ": $@");
+        return [];
+    }
+    return [] unless @rows;
+    my $copies = $job->quantity || 1;
+    $copies = 1 if $copies < 1;
+    my @issue;
+    for my $row (@rows) {
+        my $g = $row->grams;
+        unless (defined $g && $g > 0 && $row->filament_item_id) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'saved_filament_issues',
+                'job ' . $job->id . ' sequence ' . ($row->sequence || '?')
+                . ' skipped: needs grams and filament_item_id');
+            next;
+        }
+        my $item = eval { $row->filament_item };
+        unless ($item) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'saved_filament_issues',
+                'job ' . $job->id . ' filament_item_id=' . $row->filament_item_id
+                . ' not found');
+            next;
+        }
+        push @issue, {
+            filament_item_id => $item->id,
+            filament_item    => $item,
+            grams_used       => sprintf('%.3f', $g * $copies),
+            material_name    => $item->name || $item->sku || $row->filament_color || 'Unknown',
+            sequence         => $row->sequence || 1,
+            type             => $row->filament_type || '',
+            color            => $row->color_hex || $row->filament_color || '',
+            source           => 'send_plan',
+            unit_cost        => $item->unit_cost,
+        };
+    }
+    return \@issue;
+}
+
+# Queue hashes, not Result objects. Attaches filament_plan / plan_grams /
+# plan_h / plan_m when printing_3d_job_filaments has rows. Missing table is
+# a no-op so the queue still renders.
+sub attach_filament_plans {
+    my ($self, $c, $schema, $jobs) = @_;
+    return unless $schema && $jobs && @$jobs;
+    my @ids = grep { $_ } map { $_->{id} } @$jobs;
+    return unless @ids;
+    my $rs = eval {
+        $schema->resultset('Printing3dJobFilament')->search(
+            { job_id => { -in => \@ids } },
+            { order_by => [ 'job_id', 'sequence' ] },
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'attach_filament_plans', "plan load failed: $@");
+        return;
+    }
+    my %by;
+    while (my $row = $rs->next) {
+        push @{ $by{ $row->job_id } }, {
+            sequence         => $row->sequence,
+            filament_type    => $row->filament_type || '',
+            filament_color   => $row->filament_color || '',
+            color_hex        => $row->color_hex || '',
+            grams            => $row->grams,
+            filament_item_id => $row->filament_item_id,
+        };
+    }
+    for my $job (@$jobs) {
+        my $slots = $by{ $job->{id} } or next;
+        my $copies = $job->{quantity} || 1;
+        $copies = 1 if $copies < 1;
+        my $total = 0;
+        for my $slot (@$slots) {
+            my $issue = ($slot->{grams} || 0) * $copies;
+            $slot->{issue_grams} = sprintf('%.2f', $issue);
+            $total += $issue;
+        }
+        $job->{filament_plan} = $slots;
+        $job->{plan_grams}    = sprintf('%.2f', $total);
+        my $hours_each = 24;
+        my $hours = $job->{print_hours};
+        if (defined $hours && $hours =~ /^\d+(?:\.\d+)?$/ && $hours > 0) {
+            my $mins = int($hours * 60 + 0.5);
+            $job->{plan_h} = int($mins / 60);
+            $job->{plan_m} = $mins % 60;
+            $hours_each = $hours / $copies;
+        }
+        $job->{hours_each} = sprintf('%.2f', $hours_each);
+        require JSON;
+        $job->{plan_json} = JSON->new->canonical->encode({
+            quantity   => 0 + $copies,
+            hours_each => 0 + $job->{hours_each},
+            slots      => [ map { {
+                sequence         => 0 + ($_->{sequence} || 1),
+                filament_item_id => 0 + ($_->{filament_item_id} || 0),
+                filament_type    => $_->{filament_type} || '',
+                filament_color   => $_->{filament_color} || '',
+                color_hex        => $_->{color_hex} || '',
+                plate_grams      => 0 + ($_->{grams} || 0),
+                issue_grams      => 0 + ($_->{issue_grams} || 0),
+            } } @$slots ],
+        });
+    }
 }
 
 # Records the complete action can issue. Does not read columns that are not
