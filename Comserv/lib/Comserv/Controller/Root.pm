@@ -874,6 +874,15 @@ sub auto :Private {
         }
         $c->stash->{can_plan} = $can_plan;
 
+        # Planning menu (CSC-20260909-2862): developers, editors and admins on
+        # every site; other users only when planning is in enabled_modules.
+        # session->{roles} is an arrayref (normalized above from a comma list).
+        my $pr = $c->stash->{user_roles} || [];
+        $pr = [ split /\s*,\s*/, $pr ] unless ref $pr eq 'ARRAY';
+        my $planning_staff = $c->stash->{is_admin}
+            || (grep { my $r = lc($_ // ''); $r =~ s/^\s+|\s+$//g; $r =~ /^(developer|editor|admin)$/ } @$pr);
+        $c->stash->{planning_staff} = $planning_staff ? 1 : 0;
+
         # Beekeeping nav — site addon (hosting/site_modules), BMaster site, or per-user grant.
         # Admin role alone does not enable the menu (unlike the old TopDropListBeekeeping bypass).
         my $can_beekeep = 0;
