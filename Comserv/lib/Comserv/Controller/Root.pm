@@ -1332,6 +1332,8 @@ sub auto :Private {
     # Error handling for auto() method
     if ($@) {
         my $error = $@;
+        # $c->detach inside auto() is normal control flow, not an error; rethrow it.
+        die $error if !ref($error) && $error =~ /^catalyst_detach/;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', 
             "Exception in auto() method: $error");
         
