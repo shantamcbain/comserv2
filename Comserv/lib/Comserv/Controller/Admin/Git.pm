@@ -2278,6 +2278,17 @@ sub merge :Path('/admin/git/merge') :Args(0) {
             }));
             return;
         }
+        # Secret guard: refuse if merging main would bring in a key/secret file.
+        my $guard = $self->git_service->secret_guard($c, $dest, '--merge', 'main');
+        unless ($guard->{ok}) {
+            $c->response->body(encode_json({
+                success => 0,
+                reason  => 'secret_guard',
+                error   => "Merge refused by secret guard: main would bring a key/secret file into '$target'.\n"
+                         . ($guard->{output} // q{}),
+            }));
+            return;
+        }
         my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $dest });
         # --autostash: the worktree routinely has uncommitted WIP; a plain merge
         # refuses ("Your local changes would be overwritten"). Autostash stashes

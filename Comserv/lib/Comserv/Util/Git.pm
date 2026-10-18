@@ -874,11 +874,12 @@ sub unstage {
     return $self->_run($c, 'restore', '--staged', '--', @$paths);
 }
 
-=head2 secret_guard($c, $repo)
+=head2 secret_guard($c, $repo, @mode_args)
 
 Run the shared secret guard (Comserv/script/git/secret_guard.sh, falling back to
 ~/.git-hooks/secret-guard.sh) against the staged index of $repo (default: the
-request's resolved local repo). Returns C<{ ok => 1 }> when clean or when the
+request's resolved local repo). Optional @mode_args are passed to the script,
+e.g. ('--merge', $branch) to scan what a merge would bring in. Returns C<{ ok => 1 }> when clean or when the
 target is remote (the remote host's own hooks apply), else
 C<{ ok => 0, output => $redacted_report }>. Never prints secret values — the
 script reports file names / rule ids only.
@@ -886,7 +887,7 @@ script reports file names / rule ids only.
 =cut
 
 sub secret_guard {
-    my ($self, $c, $repo) = @_;
+    my ($self, $c, $repo, @mode_args) = @_;
     unless ($repo) {
         my $req_target = ($c && $c->stash->{git_target})
                       // ($c && $c->req ? $c->req->param('target') : undef);
@@ -904,7 +905,7 @@ sub secret_guard {
         unless $script;
     require IPC::Run3;
     my $out = '';
-    IPC::Run3::run3([ 'bash', $script, $repo ], \undef, \$out, \$out);
+    IPC::Run3::run3([ 'bash', $script, @mode_args, $repo ], \undef, \$out, \$out);
     my $code = $? >> 8;
     return $code == 0 ? { ok => 1, output => $out } : { ok => 0, output => $out };
 }
@@ -1820,6 +1821,19 @@ sub merge_branch {
     }
     my %seen_d; @dirty = grep { !$seen_d{$_}++ } @dirty;
     $result->{uncommitted_files} = \@dirty if @dirty;
+
+    # Secret guard on the incoming merge diff (merge-base..branch). Refuse on a hit.
+    my $guard = $self->secret_guard($c, $repo, '--merge', $branch);
+    unless ($guard->{ok}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "merge_branch: secret guard refused merging '$branch' into $current");
+        $result->{error_msg} = "Merge refused by secret guard: '$branch' would bring in a key/secret file. "
+                             . "Remove it from the branch (keys belong in ~/.comserv/keys), then retry.\n"
+                             . ($guard->{output} // q{});
+        $result->{output}    = $guard->{output} // q{};
+        $result->{reason}    = 'secret_guard';
+        return $result;
+    }
 
     my $r = $self->_run($c, 'merge', '--no-ff', $branch, $run_opts);
     # CRITICAL: git prints almost all merge failures on stderr. _run keeps
