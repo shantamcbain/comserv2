@@ -11,6 +11,7 @@
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="app-container">
+    [% INCLUDE 'healthkitchen/_disclaimer.tt' %]
     <div class="page-header">
         <h1>Recipes</h1>
         <p>

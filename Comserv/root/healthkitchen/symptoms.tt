@@ -11,6 +11,7 @@
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="app-container">
+    [% INCLUDE 'healthkitchen/_disclaimer.tt' %]
     <div class="page-header">
         <h1>Active symptoms</h1>
         <p>
@@ -87,6 +88,14 @@
                 </ul>
             [% ELSE %]
                 <p class="doc-muted">No in-pantry herb matches for the active set.</p>
+            [% END %]
+            [% IF hk_match.not_in_pantry && hk_match.not_in_pantry.size %]
+                <h3>ENCY herbs linked to these symptoms (not in your pantry)</h3>
+                <ul>
+                    [% FOREACH h IN hk_match.not_in_pantry %]
+                        <li><a href="[% c.uri_for('/ENCY/Herb') %]/[% h.herb_id %]">[% h.name || h.herb_id | html %]</a>[% IF h.contra_indications %] <small class="doc-muted">— cautions: [% h.contra_indications | html %]</small>[% END %]</li>
+                    [% END %]
+                </ul>
             [% END %]
         </div>
     [% END %]
