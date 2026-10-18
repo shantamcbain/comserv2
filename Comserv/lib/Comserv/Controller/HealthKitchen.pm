@@ -352,5 +352,26 @@ sub nutrition :Local :Args(0) {
 }
 
 
+sub recipes_suggest :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'recipes_suggest',
+        'HealthKitchen AI recipe suggestion' );
+    unless ( $c->req->method eq 'POST' ) {
+        $c->response->redirect( $c->uri_for( $self->action_for('recipes') ) );
+        $c->detach;
+        return;
+    }
+    my $res = $self->hk->generate_ai_recipes( $c, { count => 3 } );
+    if ( $res->{ok} ) {
+        $c->flash->{success_msg} = scalar( @{ $res->{ids} } )
+            . ' AI recipe draft(s) added from your stock. Please review them before cooking.';
+    }
+    else {
+        $c->flash->{error_msg} = $res->{error};
+    }
+    $c->response->redirect( $c->uri_for( $self->action_for('recipes') ) );
+    $c->detach;
+}
+
 __PACKAGE__->meta->make_immutable;
 1;

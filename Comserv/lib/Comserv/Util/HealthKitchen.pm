@@ -499,10 +499,11 @@ sub list_recipes {
     try {
         my $rs = $c->model('DBEncy')->resultset('Recipe')->search(
             {
-                sitename           => $self->sitename($c),
-                username_of_poster => $c->session->{username},
-                recipe_kind        => 'food_recipe',
-                status             => { '!=' => 'archived' },
+                sitename    => $self->sitename($c),
+                -or         => [ { username_of_poster => $c->session->{username} },
+                                 { source => 'ai_generated' } ],
+                recipe_kind => 'food_recipe',
+                status      => { '!=' => 'archived' },
             },
             { order_by => 'name', prefetch => 'lines' }
         );
@@ -540,6 +541,9 @@ sub _recipe_hash {
         instructions => $r->instructions,
         yield_amount => $r->yield_amount,
         yield_unit   => $r->yield_unit,
+        status       => $r->status,
+        source       => $r->source,
+        notes        => $r->notes,
         lines        => \@lines,
     };
 }
@@ -1494,6 +1498,146 @@ sub intake_for_day {
         $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'intake_for_day', "failed: $_" );
     };
     return \@out;
+}
+
+
+# ── AI recipe suggestions from in-stock inventory (inventory-first) ─────────
+
+our $AI_RECIPE_NOTE = 'AI-generated suggestion from your in-stock food. Review before cooking: '
+    . 'check quantities, allergies and food safety. Informational only, not medical advice.';
+
+# In-stock foods that map to inventory items (only these may appear in AI recipes).
+sub ai_stock_foods {
+    my ( $self, $rows ) = @_;
+    my ( @out, %seen );
+    for my $r ( @{ $rows || [] } ) {
+        next unless $r->{inventory_item_id} && ( $r->{qty} || 0 ) > 0;
+        next if $seen{ $r->{inventory_item_id} }++;
+        push @out, { id => 0 + $r->{inventory_item_id}, name => $r->{name},
+                     qty => 0 + $r->{qty}, unit => $r->{unit} || 'each' };
+    }
+    return \@out;
+}
+
+sub ai_recipe_prompt {
+    my ( $self, $foods, $count ) = @_;
+    $count ||= 3;
+    my $list = join "\n", map { "- id=$_->{id}; name=$_->{name}; on_hand=$_->{qty} $_->{unit}" } @$foods;
+    return "Create $count simple, wholesome home recipes using ONLY the in-stock foods below.\n"
+         . "Every ingredient must be one of these items, referenced by its id. Do not invent ingredients "
+         . "(water is allowed and needs no id). Do not exceed on_hand quantities. Do not make health or medical claims.\n\n"
+         . "In stock:\n$list\n\n"
+         . "Reply with JSON only, no prose: "
+         . '[{"name":"...","servings":2,"cook_time_min":20,"instructions":"step 1... step 2...",'
+         . '"ingredients":[{"inventory_item_id":123,"quantity":200,"unit":"g"}]}]';
+}
+
+# Pure: parse model text into recipes whose ingredients all map to stock.
+sub parse_ai_recipes {
+    my ( $self, $text, $foods ) = @_;
+    return [] unless defined $text && length $text;
+    require JSON;
+    my ($json) = $text =~ /(\[.*\])/s;
+    return [] unless $json;
+    my $data = eval { JSON->new->relaxed->decode($json) };
+    return [] unless ref $data eq 'ARRAY';
+    my %by_id   = map { $_->{id} => $_ } @$foods;
+    my %by_name = map { lc( $_->{name} ) => $_ } @$foods;
+    my @out;
+    for my $r (@$data) {
+        next unless ref $r eq 'HASH' && defined $r->{name} && length $r->{name};
+        my ( @lines, @dropped );
+        for my $i ( @{ $r->{ingredients} || [] } ) {
+            next unless ref $i eq 'HASH';
+            my $iid  = $i->{inventory_item_id};
+            my $food = ( defined $iid && $iid =~ /^\d+$/ ) ? $by_id{$iid} : undef;
+            $food ||= $by_name{ lc( $i->{name} // '' ) } if defined $i->{name};
+            if ( !$food ) {
+                push @dropped, $i->{name} // $iid // '?' unless lc( $i->{name} // '' ) eq 'water';
+                next;
+            }
+            my $q = ( defined $i->{quantity} && $i->{quantity} =~ /^\d+(\.\d+)?$/ ) ? 0 + $i->{quantity} : undef;
+            push @lines, { inventory_item_id => $food->{id}, name => $food->{name},
+                           quantity => $q, unit => $i->{unit} || $food->{unit} };
+        }
+        next if @dropped || !@lines;    # inventory-first: reject recipes needing unstocked items
+        my $serv = ( defined $r->{servings} && $r->{servings} =~ /^\d+$/ && $r->{servings} > 0 ) ? 0 + $r->{servings} : 2;
+        push @out, {
+            name          => substr( $r->{name}, 0, 500 ),
+            servings      => $serv,
+            cook_time_min => ( defined $r->{cook_time_min} && $r->{cook_time_min} =~ /^\d+$/ ) ? 0 + $r->{cook_time_min} : undef,
+            instructions  => ref $r->{instructions} eq 'ARRAY' ? join( "\n", @{ $r->{instructions} } ) : ( $r->{instructions} // '' ),
+            lines         => \@lines,
+        };
+    }
+    return \@out;
+}
+
+# Calls the app's AI layer ($c->model('AI')->chat_message: provider/model selection,
+# usage + plan-quota logging). $opts->{ai_call} overrides the call (tests).
+sub generate_ai_recipes {
+    my ( $self, $c, $opts ) = @_;
+    $opts ||= {};
+    return { ok => 0, error => 'Recipe tables are not created yet. Run Schema Compare.' }
+        unless $self->recipe_ready($c);
+    my $foods = $self->ai_stock_foods( $self->list_pantry($c) );
+    return { ok => 0, error => 'No in-stock inventory foods found to build recipes from.' }
+        unless @$foods >= 2;
+    splice( @$foods, 60 ) if @$foods > 60;
+    my $prompt = $self->ai_recipe_prompt( $foods, $opts->{count} || 3 );
+    my $system = 'You are a careful home-cooking assistant for a wellness kitchen. '
+               . 'Use only provided stock items. Output strict JSON.';
+    my $res = $opts->{ai_call}
+        ? $opts->{ai_call}->( $prompt, $system )
+        : eval { $c->model('AI')->chat_message( $c, prompt => $prompt, system => $system,
+                                                 page_path => '/healthkitchen/recipes' ) };
+    unless ( $res && $res->{success} ) {
+        my $err = ( $res && $res->{error} ) || $@ || 'AI service unavailable';
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, 'generate_ai_recipes', "AI failed: $err" );
+        return { ok => 0, error => "AI recipe suggestion failed: $err" };
+    }
+    my $recipes = $self->parse_ai_recipes( $res->{response}, $foods );
+    return { ok => 0, error => 'The AI did not return any recipes that use only your stock. Try again.' }
+        unless @$recipes;
+    my $schema = $c->model('DBEncy');
+    my @saved;
+    try {
+        $schema->txn_do( sub {
+            my $n = 0;
+            for my $r (@$recipes) {
+                my $row = $schema->resultset('Ency::Recipe')->create( {
+                    recipe_code        => 'HK-AI-' . strftime( '%y%m%d%H%M%S', localtime ) . '-' . ++$n,
+                    name               => $r->{name},
+                    recipe_kind        => 'food_recipe',
+                    instructions       => $r->{instructions},
+                    servings           => $r->{servings},
+                    yield_amount       => $r->{servings},
+                    yield_unit         => 'servings',
+                    cook_time_min      => $r->{cook_time_min},
+                    notes              => $AI_RECIPE_NOTE,
+                    source             => 'ai_generated',
+                    sitename           => $self->sitename($c),
+                    status             => 'draft',
+                    username_of_poster => $c->session->{username},
+                } );
+                my $sort = 0;
+                for my $ln ( @{ $r->{lines} } ) {
+                    $schema->resultset('Ency::RecipeLine')->create( {
+                        recipe_id => $row->id, sort_order => ++$sort, ingredient_source => 'inventory',
+                        inventory_item_id => $ln->{inventory_item_id}, name_raw => $ln->{name},
+                        quantity => $ln->{quantity}, unit => $ln->{unit},
+                    } );
+                }
+                push @saved, $row->id;
+            }
+        } );
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'generate_ai_recipes', "save failed: $_" );
+        @saved = ();
+    };
+    return @saved ? { ok => 1, ids => \@saved, model => $res->{model} }
+                  : { ok => 0, error => 'Could not save AI recipes.' };
 }
 
 __PACKAGE__->meta->make_immutable;
