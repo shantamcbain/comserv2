@@ -1,0 +1,97 @@
+[% PageVersion = 'Inventory/email/setup.tt,v 0.04 2026/10/17 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% INCLUDE 'Accounting/_acct_inv_nav.tt' current_page='inventory' %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Invoice email addresses — [% sitename | html %]</h1>
+    <p>Watch the mailboxes that <strong>receive</strong> supplier invoices for this site (the To address). One address per line. Stock updates only when each invoice line matches an item already on this site.</p>
+    <p>If this computer has a mail directory, classification reads it. Production has no mail. Add a mail server for each address that receives invoices. CSC can have several. Saving another address does not replace the ones already listed. If four addresses are aliases of one inbox, one server login is enough and the watch list above still has all four To addresses.</p>
+  </div>
+
+  [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+  [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+  [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+
+  <form method="POST" action="[% c.uri_for('/Inventory/email-config') %]" class="content-section">
+    <p><label for="email_addresses"><strong>Email addresses to watch</strong></label></p>
+    <textarea id="email_addresses" name="email_addresses" rows="6" style="width:100%;max-width:40rem;font-family:monospace;">[% email_addresses | html %]</textarea>
+
+    <p style="margin-top:1rem;"><label for="monitored_suppliers"><strong>Supplier From addresses</strong> (optional; leave blank to match any supplier already on this site)</label></p>
+    <textarea id="monitored_suppliers" name="monitored_suppliers" rows="4" style="width:100%;max-width:40rem;font-family:monospace;">[% monitored_suppliers | html %]</textarea>
+
+    <p style="margin-top:1rem;"><label for="category_filter"><strong>Category filter</strong> (optional, one per line; empty means all categories)</label></p>
+    <textarea id="category_filter" name="category_filter" rows="3" style="width:100%;max-width:40rem;font-family:monospace;">[% category_filter | html %]</textarea>
+
+    <p style="margin-top:1rem;">
+      <button type="submit">Save email addresses</button>
+      <a href="[% c.uri_for('/mail/classify_invoices') %]" style="margin-left:1rem;">Run classification</a>
+      <a href="[% c.uri_for('/mail/invoice/api') %]" style="margin-left:1rem;">View classified invoices</a>
+      <a href="[% c.uri_for('/Inventory') %]" style="margin-left:1rem;">Back to inventory</a>
+    </p>
+    <p style="color:var(--text-muted-color,#666);font-size:0.85rem;">Saved to [% config_file | html %]</p>
+  </form>
+
+  <form method="POST" action="[% c.uri_for('/Inventory/email-config') %]" class="content-section">
+    <h2>Mail servers for this site</h2>
+    <p>Add one address at a time. Each can use a different host, or the same host with a different login. The password is encrypted and is not written to the watch-list file. Leave the password blank when updating an address that already has one saved.</p>
+    <input type="hidden" name="save_mailbox" value="1">
+    [% IF mailbox_note %]<p>[% mailbox_note | html %]</p>[% END %]
+    [% IF mailboxes.size %]
+    <p>[% mailboxes.size %] mail server[% IF mailboxes.size != 1 %]s[% END %] saved. Classification reads every one of them.</p>
+    <ul>
+      [% FOREACH box IN mailboxes %]
+      <li>
+        [% box.email_address | html %] — [% box.imap_host | html %]:[% box.imap_port | html %] ([% box.imap_security | html %])[% IF box.has_password %], password saved[% END %]
+      </li>
+      [% END %]
+    </ul>
+    [% ELSE %]
+    <p>No mail server saved yet.</p>
+    [% END %]
+    <p><label for="email_address">Mailbox address</label><br>
+      <input id="email_address" name="email_address" type="email" required style="width:100%;max-width:28rem;"></p>
+    <p><label for="imap_host">Mail server host</label><br>
+      <input id="imap_host" name="imap_host" required style="width:100%;max-width:28rem;"></p>
+    <p><label for="imap_port">Port</label><br>
+      <input id="imap_port" name="imap_port" value="993" style="width:6rem;"></p>
+    <p><label for="imap_security">Security</label><br>
+      <select id="imap_security" name="imap_security">
+        <option value="ssl" selected>SSL</option>
+        <option value="starttls">STARTTLS</option>
+        <option value="none">None</option>
+      </select></p>
+    <p><label for="login_username">Login name</label> (blank uses the mailbox address)<br>
+      <input id="login_username" name="login_username" style="width:100%;max-width:28rem;"></p>
+    <p><label for="mailbox_password">Password</label><br>
+      <input id="mailbox_password" name="password" type="password" autocomplete="new-password" style="width:100%;max-width:28rem;"></p>
+    <p><button type="submit">Add this mail server</button></p>
+  </form>
+  [% IF mailboxes.size %]
+  <div class="content-section">
+    <p>Remove one address. The others stay.</p>
+    [% FOREACH box IN mailboxes %]
+    <form method="POST" action="[% c.uri_for('/Inventory/email-config') %]" style="display:inline;margin-right:0.75rem;">
+      <input type="hidden" name="remove_mailbox" value="1">
+      <input type="hidden" name="email_address" value="[% box.email_address | html %]">
+      <button type="submit">Remove [% box.email_address | html %]</button>
+    </form>
+    [% END %]
+  </div>
+  [% END %]
+
+  <form method="POST" action="[% c.uri_for('/Inventory/invoice/apply_mail_stock') %]" class="content-section">
+    <p>Apply classified supplier invoices for <strong>[% sitename | html %]</strong> to on-hand stock. Unmatched lines stay as drafts. No general-ledger post.</p>
+    <p><button type="submit">Apply this site's invoices to stock</button></p>
+  </form>
+  [% IF sitename == 'CSC' OR c.session.username == 'Shanta' %]
+  <form method="POST" action="[% c.uri_for('/Inventory/invoice/apply_mail_stock') %]" class="content-section">
+    <p>CSC only: apply every site that has a watch list.</p>
+    <p>
+      <input type="hidden" name="all_sites" value="1">
+      <button type="submit">Apply every configured site</button>
+    </p>
+  </form>
+  [% END %]
+</div>
