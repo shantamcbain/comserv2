@@ -8,6 +8,7 @@ use Try::Tiny;
 use Comserv::Util::Logging;
 use Comserv::Util::SignGenerator;
 use Comserv::Util::Printing3d;
+use Comserv::Util::Manufacturing::Costing;
 use Comserv::Util::Logging;
 use Comserv::Util::CategoryManager;
 use Comserv::Util::AppTime;
@@ -1758,7 +1759,8 @@ sub queue :Path('/3d/queue') :Args(0) {
                                 $printer_cost = $print_hours * $eq->depreciation_per_hour;
                             }
                             if ($eq->wattage) {
-                                my $kwh_rate = 0.15;
+                                # CAD/kWh from <Manufacturing> kwh_rate (BC Hydro Tier 2 default)
+                                my $kwh_rate = Comserv::Util::Manufacturing::Costing->new->settings($c)->{kwh_rate};
                                 $elec_cost   = $print_hours * $eq->wattage * $kwh_rate / 1000;
                             }
                         }
@@ -1859,6 +1861,24 @@ sub queue :Path('/3d/queue') :Args(0) {
                             undef, $job->consignment_line_id)
                     };
                 }
+                # Cost rollup into the produced item (moving-average unit_cost,
+                # selling_price = cost x markup, rounded up to $0.05). Runs before
+                # the finished-goods receipt so on-hand qty is the pre-run stock.
+                eval {
+                    Comserv::Util::Manufacturing::Costing->new->rollup_job($c,
+                        job              => $job,
+                        item_id          => $printed_item_id,
+                        sitename         => $sitename,
+                        grams            => $grams_used,
+                        hours            => $print_hours,
+                        filament_cost    => $filament_cost,
+                        printer_cost     => $printer_cost,
+                        electricity_cost => $elec_cost,
+                    );
+                };
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+                    "Cost rollup failed for job $job_id: $@") if $@;
+
                 if ($printed_item_id) {
                     my $default_loc = eval {
                         $schema->storage->dbh->selectrow_array(

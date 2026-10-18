@@ -131,6 +131,16 @@ __PACKAGE__->add_columns(
         data_type   => 'datetime',
         is_nullable => 1,
     },
+    labour_cost => {
+        data_type   => "decimal",
+        size        => [10, 4],
+        is_nullable => 1,
+    },
+    cost_breakdown => {
+        data_type   => "text",
+        is_nullable => 1,
+        comment     => "JSON: per-step minutes, components, scrap, unit cost",
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
