@@ -114,6 +114,8 @@ __PACKAGE__->register_class('InventoryEncyMap',                'Comserv::Model::
 __PACKAGE__->register_class('UserPantryQty',                   'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserPantryQty');
 __PACKAGE__->register_class('UserHealthProfile',               'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserHealthProfile');
 __PACKAGE__->register_class('UserActiveSymptom',               'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserActiveSymptom');
+__PACKAGE__->register_class('HealthKitchen::MealPlan',      'Comserv::Model::Schema::Ency::Result::HealthKitchen::MealPlan');
+__PACKAGE__->register_class('HealthKitchen::MealPlanEntry', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::MealPlanEntry');
 
 # Register Inventory system classes
 __PACKAGE__->register_class('InventoryItem', 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItem');
