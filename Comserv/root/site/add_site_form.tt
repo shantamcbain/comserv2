@@ -3,6 +3,7 @@
 [% PageVersion %]
 [% END %]
 <h1>Add Site</h1>
+<p><a href="/site/clone_site">Clone my existing website (URL)</a> &mdash; after adding the site, import its existing public pages and images into the Page system.</p>
 
 <form method="POST" action="/site/add_site">
     <label for="name">Name:</label>

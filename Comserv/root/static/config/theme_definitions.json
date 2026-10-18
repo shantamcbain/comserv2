@@ -24,6 +24,7 @@
   "brew": "/static/images/favicons/brew.svg"
  },
  "themes": {
+    "icehorse": {"description": "Icehorse Ranch (cloned from icehorse.ca): black background, white 940px page, Verdana", "variables": {"background-color": "#000000", "text-color": "#333333", "link-color": "#5364a2", "body-font": "Verdana, Arial, Geneva, sans-serif", "header-font": "teen, serif", "nav-bg": "#000000", "nav-text": "#ffffff", "primary-color": "#201ccc", "accent-color": "#201ccc"}},
   "mcoop": {
    "name": "MCoop Theme",
    "variables": {
@@ -314,7 +315,7 @@
   "apis": "apis",
   "csc": "csc",
   "mcoop": "mcoop",
-  "icehorse": "default",
+  "icehorse": "icehorse",
   "bmaster": "apis",
   "usbm": "usbm",
   "default": "default",
