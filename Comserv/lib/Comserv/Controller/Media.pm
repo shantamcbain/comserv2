@@ -40,7 +40,7 @@ sub _serve_file_row {
     my $row = eval { $c->model('DBEncy')->resultset('File')->find($id) };
     return $self->_nf($c) unless $row && ($row->file_status // '') eq 'active';
     my $type = $row->file_format // '';
-    return $self->_nf($c) unless $type =~ m{^(image/(jpeg|png|gif|webp)|video/mp4)$};
+    return $self->_nf($c) unless $type =~ m{^(image/(jpeg|png|gif|webp)|video/mp4|text/css)$};
     require Comserv::Util::NfsPath;
     my $path = Comserv::Util::NfsPath->new->resolve_path($row->nfs_path // $row->file_path // '');
     return $self->_nf($c) unless length $path && -f $path;
