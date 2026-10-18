@@ -151,11 +151,22 @@ sub burn_alerts {
     my (%in) = @_;
     my $c = alert_config($in{cfg});
     my @a;
+    # 2026-10-18: after midnight the 05:00-05:00 work day still belongs to the
+    # previous calendar day; its alerts are no longer "today" - send nothing.
+    if (defined $in{day_from} && defined $in{now}) {
+        local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+        my ($d0, $d1) = (strftime('%Y-%m-%d', localtime $in{day_from}), strftime('%Y-%m-%d', localtime $in{now}));
+        POSIX::tzset();
+        return \@a if $d0 ne $d1;
+    }
     my $rise = $in{used} - $in{used_day_start};
+    my $basis = $in{used_basis} // 'estimate';
     if ($rise > $c->{day_rise_pts}) {
-        push @a, { kind => 'day_rise', level => 'critical', value => sprintf('%.1f', $rise),
-                   message => sprintf('Super Grok burned %.0f points today (since %s; limit %s): now %.0f%% used. Slow down or stop the big sessions.',
-                                      $rise, pt($in{day_from}), $c->{day_rise_pts}, $in{used}) };
+        my $day = defined $in{day_from} ? do { local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+            my $x = strftime('%a %b %d', localtime $in{day_from}); POSIX::tzset(); $x } : 'today';
+        push @a, { kind => 'day_rise', level => 'critical', value => sprintf('%.1f', $rise), basis => $basis,
+                   message => sprintf('Super Grok burned %.0f points in the %s work day (since %s; limit %s): now %.0f%% used (%s). Slow down or stop the big sessions.',
+                                      $rise, $day, pt($in{day_from}), $c->{day_rise_pts}, $in{used}, $basis) };
     }
     # Work-window check: hours since the work-day start >= check_hour - day_start_hour.
     my $dsh = $in{day_start_hour} // $DAY_START_HOUR;
@@ -300,7 +311,16 @@ sub pacing {
     $o{daily_budget} = daily_budget(used => $used, used_day_start => $used_day_start, day_from => $day_from,
                                     reset => $reset, now => $now, cfg => $in{daily_cfg});
     $o{day_start_hour} = $dsh;
-    $o{alerts} = burn_alerts(used => $used, used_day_start => $used_day_start, day_from => $day_from,
+    # 2026-10-18: a grok.com meter value under 2 h old beats the token estimate
+    # for the burn alerts (estimate said 44 %, meter 36 %).
+    my ($alert_used, $basis) = ($used, 'estimate');
+    if (my $m = $in{meter_now}) {
+        if (defined $m->{value} && $m->{value} =~ /^\d+(?:\.\d+)?$/ && $m->{at}
+            && $m->{at} >= $cs && $now - $m->{at} < 2 * 3600) {
+            ($alert_used, $basis) = (0 + $m->{value}, 'meter');
+        }
+    }
+    $o{alerts} = burn_alerts(used => $alert_used, used_basis => $basis, used_day_start => $used_day_start, day_from => $day_from,
                              expected => $expected, now => $now, cfg => $in{alert_cfg},
                              day_start_hour => $dsh, budget_pct => $o{daily_budget}{effective_budget_pct});
     $o{alert_config} = alert_config($in{alert_cfg});

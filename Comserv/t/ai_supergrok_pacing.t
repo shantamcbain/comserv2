@@ -112,7 +112,13 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
     is scalar(@$a), 2, 'Oct 8 case: day rise and work-window both fire';
     is $a->[0]{kind}, 'day_rise', '... day_rise first';
     is $a->[0]{level}, 'critical', '... critical';
-    like $a->[0]{message}, qr/burned 41 points today/, '... message';
+    like $a->[0]{message}, qr/burned 41 points in the Thu Oct 08 work day/, '... message names the work day (Oct 18)';
+    # Oct 18 2026: no previous-day alert after midnight (03:20 Sunday case).
+    my $three20 = Time::Local::timelocal(0, 20, 3, 9, 9, 2026);
+    is_deeply $P->can('burn_alerts')->(used => 44, used_day_start => 16, day_from => $five, now => $three20, budget_pct => 14),
+        [], 'after midnight: previous work day sends nothing';
+    like $P->can('burn_alerts')->(used => 44, used_day_start => 16, day_from => $five, now => $seven_pm, used_basis => 'meter')->[0]{message},
+        qr/\(meter\)/, 'message says which number was used';
     is $a->[1]{kind}, 'work_window', '... work_window (>60% of budget by 09:00)';
     my $nine = Time::Local::timelocal(0, 5, 9, 8, 9, 2026);
     my $eight = Time::Local::timelocal(0, 55, 8, 8, 9, 2026);
@@ -223,6 +229,23 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
     ok abs($p->{daily_budget}{used_day_start_pct} - $exp) < 0.11, "05:00 day start interpolated between readings ($exp)";
     ok exists $p->{daily_budget}{budget_pct}, 'pacing returns daily_budget';
     POSIX::tzset();
+}
+
+# Oct 18 2026: fresh grok.com meter (< 2 h) beats the token estimate for burn alerts.
+{
+    my $P = 'Comserv::Util::AI::SuperGrokPacing';
+    local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+    my $now  = Time::Local::timelocal(0, 0, 15, 17, 9, 2026);       # Sat Oct 17 15:00 PT
+    my $five = Time::Local::timelocal(0, 0, 5, 17, 9, 2026);
+    my @rd = ({ at => $five - 600, value => 15, kind => 'used', source => 'addon' });
+    my $units = sub { my ($f, $t) = @_; return ($t - $f) / 3600 * 1.0 };     # 1 M tok/h
+    my %base = (readings => \@rd, units => $units, rate => 3, now => $now, alert_cfg => {});
+    my $est = $P->can('pacing')->(%base);
+    ok( (grep { $_->{kind} eq 'day_rise' && $_->{basis} eq 'estimate' } @{ $est->{alerts} }), 'no meter: estimate drives day_rise');
+    my $m = $P->can('pacing')->(%base, meter_now => { value => 20, at => $now - 1800 });
+    ok !(grep { $_->{kind} eq 'day_rise' } @{ $m->{alerts} }), 'fresh meter 20% (rise ~5) -> no day_rise despite high estimate';
+    my $old = $P->can('pacing')->(%base, meter_now => { value => 20, at => $now - 3 * 3600 });
+    ok( (grep { $_->{kind} eq 'day_rise' && $_->{basis} eq 'estimate' } @{ $old->{alerts} }), 'meter 3 h old -> estimate again');
 }
 
 done_testing;

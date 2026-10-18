@@ -1958,7 +1958,14 @@ sub supergrok_pacing {
         return ($t + $ledger_tok->($from, $to)) / 1e6;
     };
     my $fit = $P->can('fit_rate')->(readings => \@rd, units => $units, now => $now, anchor => $anchor);
+    # Live meter: grok.com add-on rewrites this file on every post (history only on change).
+    my $gnow = eval {
+        require JSON::MaybeXS; open my $gfh, '<', "$root/root/static/ai/grokcom_usage.json" or die;
+        local $/; my $j = JSON::MaybeXS::decode_json(<$gfh>); close $gfh;
+        { value => $j->{build}, at => Comserv::Util::AI::HealthChecks::iso_epoch($j->{at}) };
+    };
     my $p = $P->can('pacing')->(readings => \@rd, units => $units, rate => $fit->{rate}, now => $now, anchor => $anchor,
+        ($gnow ? (meter_now => $gnow) : ()),
         alert_cfg => (eval { $self->pacing_config($c)->{alerts} } || {}),
         daily_cfg => (eval { $self->pacing_config($c)->{daily} } || {}));
     $p->{calibration} = $fit;
