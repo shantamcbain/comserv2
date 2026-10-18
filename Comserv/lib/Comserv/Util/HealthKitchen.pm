@@ -907,7 +907,8 @@ sub _id_set {
 }
 
 # Pure matcher (no Catalyst, no LLM). Inject a dataset for tests.
-# Required: pantry_herb_ids. Empty pantry → empty result (never invent stock).
+# pantry_herb_ids drives "herbs" (in stock). ENCY links outside the pantry go to
+# "not_in_pantry" as hints only; formulas still require every herb in stock.
 sub match_candidates {
     my ( $self, $data ) = @_;
     $data ||= {};
@@ -917,14 +918,28 @@ sub match_candidates {
     my $herbs  = $data->{herbs} || {};
 
     my @herb_out;
+    my @missing_out;
+    my %seen_missing;
     my %ok_herb;
     for my $link ( @{ $data->{herb_symptoms} || [] } ) {
         next unless ref $link eq 'HASH';
         my $hid = $link->{herb_id};
         my $sid = $link->{symptom_id};
-        next unless $hid && $sid && $pantry->{ 0 + $hid } && $syms->{ 0 + $sid };
+        next unless $hid && $sid && $syms->{ 0 + $sid };
         next if $self->_rel_skip( $link->{relationship_type} );
         my $h = $herbs->{$hid} || $herbs->{ 0 + $hid } || {};
+        unless ( $pantry->{ 0 + $hid } ) {
+            # ENCY-linked but not in stock: shown as a "not in pantry" hint only.
+            next if $seen_missing{ 0 + $hid }++;
+            push @missing_out, {
+                herb_id            => 0 + $hid,
+                name               => $h->{name} || $h->{common_names} || $h->{botanical_name} || '',
+                symptom_id         => 0 + $sid,
+                relationship_type  => $link->{relationship_type},
+                contra_indications => $h->{contra_indications} || '',
+            };
+            next;
+        }
         if ( my $term = $data->{user_contra_term} ) {
             my $ci = $h->{contra_indications} // '';
             next if length $ci && index( lc($ci), lc($term) ) >= 0;
@@ -970,8 +985,9 @@ sub match_candidates {
     }
 
     return {
-        herbs    => \@herb_out,
-        formulas => \@formula_out,
+        herbs         => \@herb_out,
+        formulas      => \@formula_out,
+        not_in_pantry => \@missing_out,
     };
 }
 
@@ -997,9 +1013,6 @@ sub match_for_symptoms {
         formulas          => [],
         drug_herb         => [],
     };
-    unless ( @{ $dataset->{pantry_herb_ids} } ) {
-        return { herbs => [], formulas => [] };
-    }
 
     my $schema = eval { $c->model('DBEncy') };
     return { herbs => [], formulas => [], error => 'no_schema' } unless $schema;
@@ -1015,6 +1028,35 @@ sub match_for_symptoms {
                     symptom_id        => $row->symptom_id,
                     relationship_type => $row->relationship_type,
                 };
+            }
+        }
+        # Fallback: herb_symptom is often unpopulated. Match symptom names against
+        # herb therapeutic_action / medical_uses text (flagged relationship 'text_match').
+        if ( !@{ $dataset->{herb_symptoms} }
+            && $self->source_ok( $schema, 'Ency::Symptom' )
+            && $self->source_ok( $schema, 'Ency::Herb' ) )
+        {
+            my @syms = $schema->resultset('Ency::Symptom')->search(
+                { record_id => { -in => $symptom_ids } } )->all;
+            for my $sym (@syms) {
+                my @terms = grep { defined $_ && length($_) >= 3 }
+                    ( $sym->name, $sym->common_name );
+                next unless @terms;
+                my @or;
+                for my $t (@terms) {
+                    ( my $like = $t ) =~ s/([%_\\])/\\$1/g;
+                    push @or, { therapeutic_action => { -like => "%$like%" } },
+                              { medical_uses       => { -like => "%$like%" } };
+                }
+                my $hrs = $schema->resultset('Ency::Herb')->search(
+                    { -or => \@or }, { columns => ['record_id'], rows => 50 } );
+                while ( my $h = $hrs->next ) {
+                    push @{ $dataset->{herb_symptoms} }, {
+                        herb_id           => $h->record_id,
+                        symptom_id        => $sym->record_id,
+                        relationship_type => 'text_match',
+                    };
+                }
             }
         }
         my @hids = map { $_->{herb_id} } @{ $dataset->{herb_symptoms} };
@@ -1085,7 +1127,6 @@ sub _pantry_herb_ids {
         my @item_ids;
         for my $row ( @{ $self->list_pantry($c) } ) {
             push @item_ids, $row->{inventory_item_id} if $row->{inventory_item_id};
-            push @item_ids, $row->{herb_id}           if $row->{herb_id};
             $ids{ 0 + $row->{herb_id} } = 1 if $row->{herb_id};
         }
         if ( @item_ids && $self->source_ok( $schema, 'HealthKitchen::InventoryEncyMap' ) ) {
