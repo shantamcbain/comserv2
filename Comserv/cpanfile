@@ -83,6 +83,7 @@ requires 'Digest::SHA';
 requires 'Email::Simple';
 requires 'Email::Simple::Creator';
 requires 'Email::MIME';
+requires 'Mail::IMAPClient';
 requires 'Email::Sender::Simple';
 requires 'Net::SMTP';
 requires 'MIME::Lite';

@@ -54,19 +54,105 @@ sub auto :Private {
 # Helpers
 # -------------------------------------------------------------------------
 
+
+
 sub _sitename {
     my ($self, $c) = @_;
-    return $c->session->{SiteName} || 'default';
+    return $c->session->{'SiteName'} || 'default';
 }
 
 sub _schema {
     my ($self, $c) = @_;
+    # Use the proper Comserv way to access database models
     return $c->model('DBEncy');
 }
 
 sub _now {
     require Comserv::Util::AppTime;
     return Comserv::Util::AppTime->now_utc;
+}
+
+# Set which mailbox addresses this SiteName watches for supplier invoices.
+sub email_config :Path('/Inventory/email-config') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
+    require Comserv::Util::MailInvoiceClassifier;
+    my $classifier = Comserv::Util::MailInvoiceClassifier->new();
+    my $all = $classifier->load_monitor_config;
+
+    if ($c->req->method eq 'POST' && $c->req->body_parameters->{save_mailbox}) {
+        my $p = $c->req->body_parameters;
+        my $err = $classifier->save_mailbox(
+            $c,
+            sitename       => $sitename,
+            email_address  => $p->{email_address},
+            imap_host      => $p->{imap_host},
+            imap_port      => $p->{imap_port},
+            imap_security  => $p->{imap_security},
+            login_username => $p->{login_username},
+            password       => $p->{password},
+        );
+        if ($err) {
+            $c->flash->{error_msg} = $err;
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'email_config',
+                "Saved a mail server for $sitename");
+            $c->flash->{success_msg} = 'Mail server added. Save each address separately; the others stay on the list.';
+        }
+        $c->res->redirect($c->uri_for('/Inventory/email-config'));
+        return;
+    }
+
+    if ($c->req->method eq 'POST' && $c->req->body_parameters->{remove_mailbox}) {
+        my $err = $classifier->delete_mailbox($c, $sitename, $c->req->body_parameters->{email_address});
+        if ($err) {
+            $c->flash->{error_msg} = $err;
+        } else {
+            $c->flash->{success_msg} = 'Removed that mail server. The other addresses are unchanged.';
+        }
+        $c->res->redirect($c->uri_for('/Inventory/email-config'));
+        return;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->body_parameters;
+        my @emails = grep { length $_ } map { s/^\s+|\s+$//gr } split /[\r\n,;]+/, ($p->{email_addresses} // '');
+        my @suppliers = grep { length $_ } map { s/^\s+|\s+$//gr } split /[\r\n,;]+/, ($p->{monitored_suppliers} // '');
+        my @cats = grep { length $_ } map { s/^\s+|\s+$//gr } split /[\r\n,;]+/, ($p->{category_filter} // '');
+        # Blank supplier list means "match InventorySupplier by From". Do not copy the mailbox watch list.
+        $all->{sites}{$sitename} = {
+            email_addresses    => \@emails,
+            monitored_suppliers => \@suppliers,
+            category_filter    => \@cats,
+        };
+        my $err = $classifier->save_monitor_config($all);
+        if ($err) {
+            $c->stash->{error_msg} = "Could not save email addresses: $err";
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'email_config',
+                "Saved invoice email watch list for $sitename (" . scalar(@emails) . " addresses)");
+            $c->flash->{success_msg} = 'Invoice email addresses saved for ' . $sitename;
+            $c->res->redirect($c->uri_for('/Inventory/email-config'));
+            return;
+        }
+    }
+
+    my $row = $classifier->config_for_site($all, $sitename);
+    my @show_emails = @{ $row->{email_addresses} || [] };
+    my @show_suppliers = @{ $row->{monitored_suppliers} || [] };
+    my $same_list = join(',', sort map { lc $_ } @show_emails) eq join(',', sort map { lc $_ } @show_suppliers);
+    @show_suppliers = () if $same_list;
+    my ($mailboxes, $mailbox_note) = $classifier->mailbox_summaries($c, $sitename);
+    $c->stash(
+        sitename            => $sitename,
+        email_addresses     => join("\n", @show_emails),
+        monitored_suppliers => join("\n", @show_suppliers),
+        category_filter     => join("\n", @{ $row->{category_filter} || [] }),
+        config_file         => $classifier->monitor_config_file,
+        mailboxes           => $mailboxes,
+        mailbox_note        => $mailbox_note,
+        template            => 'Inventory/email/setup.tt',
+    );
 }
 
 sub _today {
@@ -461,9 +547,6 @@ sub _create_item {
     $consumable = 1 if $cat && $cat =~ /^(food|herb|spice|produce)$/i;
 
     # HARD GUARD: never create a second item with the same (sitename, sku).
-    # Prevents duplicate-SKU data corruption that previously occurred when rows were
-    # written outside the app (e.g. AI/script direct inserts). Returns the existing row
-    # instead of silently creating a twin that breaks BOM explosion / traveler dedup.
     if ($p->{sku}) {
         my $existing = $schema->resultset('Accounting::InventoryItem')->find(
             { sitename => $sitename, sku => $p->{sku} }
@@ -475,7 +558,6 @@ sub _create_item {
         }
     }
 
-    # Also guard / allow switch on barcode (for camera/scan flow)
     if ($p->{barcode}) {
         my $existing = $schema->resultset('Accounting::InventoryItem')->find(
             { sitename => $sitename, barcode => $p->{barcode} }
@@ -3706,6 +3788,23 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
                 my $item_nm = $line->description || 'line #' . ($line->id || '?');
                 unless ($line->item_id) {
                     push @stock_log, "$item_nm: skipped (no item_id — link item in invoice edit)";
+                    $stock_skipped++;
+                    next;
+                }
+                my $line_ref = $ref . '-L' . ($line->id || 0);
+                my $already = eval {
+                    $schema->resultset('Accounting::InventoryTransaction')->search({
+                        item_id          => $line->item_id,
+                        transaction_type => 'receive',
+                        reference_number => { -in => [ $ref, $line_ref ] },
+                    })->count;
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'invoice_post',
+                        "receive lookup failed: $@");
+                }
+                if ($already) {
+                    push @stock_log, "$item_nm: skipped (already received)";
                     $stock_skipped++;
                     next;
                 }
