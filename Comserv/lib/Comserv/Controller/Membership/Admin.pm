@@ -1460,7 +1460,7 @@ sub hosting_account_edit :Local :Args(1) {
 
     if ($c->req->method eq 'POST') {
         my $p = $c->req->body_parameters;
-        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency ecommerce membership accounting printing_3d brew);
+        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency healthkitchen ecommerce membership accounting printing_3d brew);
         my $old_addons = $acct->requested_addons || '';
         my $addons_str = join(',', grep { $p->{"addon_$_"} } @addon_keys);
         eval {
