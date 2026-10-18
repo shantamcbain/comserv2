@@ -28,6 +28,21 @@ has 'logging' => (
 # duplicated). Keeps Catalyst MVC discipline: this is business logic only.
 # ===================================================================
 
+# pure (2026-10-18). Should this turn run the app's own web search / page fetch?
+# Members+ (can_enrich) with a successful answer, when the answer looks weak or
+# the prompt is a lookup/audit - OR when the user ticked "web search" but the
+# model that answered has no native search (only grok does). Before this, a
+# ticked box with a free/OpenRouter/Ollama answer got no web data at all, so
+# members stayed confined to the in-app answer.
+sub enrich_needed {
+    my (%a) = @_;
+    return 0 unless $a{can_enrich} && $a{success};
+    my $native = (($a{provider} // '') =~ /^(?:grok|xai)$/i) ? 1 : 0;
+    return 1 if $a{use_search} && !$native;
+    return 0 if $a{use_search};
+    return (($a{quality} // '') eq 'poor' || $a{site_audit} || $a{lookup_intent}) ? 1 : 0;
+}
+
 # Role-based system prompt. $roles is an arrayref; admin/dev get the
 # "you may use tools / internal data" flavor. Mirrors v1 _build_role_system_prompt.
 sub build_role_prompt {
@@ -717,9 +732,10 @@ sub process {
         }
         my $site_audit = ($prompt =~ /\b(navigate|navigation|crawl|audit|failed\s+links?|each\s+page|readable|theme|look and content|site and report|broken\s+links?)\b/i) ? 1 : 0;
         my $lookup_intent = ($prompt =~ /\b(find|look\s*up|search\s+for|what\s+is|who\s+is|tell\s+me\s+about|tell\s+me\s+what|information\s+on|info\s+on|used\s+for)\b/i) ? 1 : 0;
-        my $need = $can_enrich && $resp && $resp->{success}
-            && ($quality eq 'poor' || $site_audit || $lookup_intent)
-            && !$args{use_search};
+        my $need = enrich_needed(
+            can_enrich => $can_enrich, success => ($resp && $resp->{success}),
+            quality => $quality, site_audit => $site_audit, lookup_intent => $lookup_intent,
+            use_search => $args{use_search}, provider => ($resp ? $resp->{provider} : undef));
         # 2026-10-15: AI Editor agents never auto web-search; the re-answer
         # overwrote code analysis with junk (helpdesk contact.tt session).
         $need = 0 if Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id});
