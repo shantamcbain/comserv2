@@ -15,6 +15,7 @@ my %MIME = (jpg=>'image/jpeg', jpeg=>'image/jpeg', png=>'image/png',
 sub serve :Path('/media') :Args {
     my ($self, $c, $site, @parts) = @_;
     $site = lc($site // '');
+    return $self->_serve_file_row($c, @parts) if $site eq 'file';
     return $self->_nf($c) unless $ALLOWED_SITE{$site} && @parts;
     return $self->_nf($c) if grep { $_ eq '..' || $_ eq '' || /^\./ } @parts;
     my ($ext) = $parts[-1] =~ /\.([A-Za-z0-9]+)$/;
@@ -27,6 +28,25 @@ sub serve :Path('/media') :Args {
     open(my $fh, '<:raw', $file) or return $self->_nf($c);
     $c->res->content_type($type);
     $c->res->content_length(-s $file);
+    $c->res->header('Cache-Control' => 'public, max-age=86400');
+    $c->res->body($fh);
+}
+
+# /media/file/<id>/<name>: an image filed in the File Manager (File table).
+# Only active image/video rows are served; the name part is cosmetic.
+sub _serve_file_row {
+    my ($self, $c, $id) = @_;
+    return $self->_nf($c) unless defined $id && $id =~ /^\d+$/;
+    my $row = eval { $c->model('DBEncy')->resultset('File')->find($id) };
+    return $self->_nf($c) unless $row && ($row->file_status // '') eq 'active';
+    my $type = $row->file_format // '';
+    return $self->_nf($c) unless $type =~ m{^(image/(jpeg|png|gif|webp)|video/mp4)$};
+    require Comserv::Util::NfsPath;
+    my $path = Comserv::Util::NfsPath->new->resolve_path($row->nfs_path // $row->file_path // '');
+    return $self->_nf($c) unless length $path && -f $path;
+    open(my $fh, '<:raw', $path) or return $self->_nf($c);
+    $c->res->content_type($type);
+    $c->res->content_length(-s $path);
     $c->res->header('Cache-Control' => 'public, max-age=86400');
     $c->res->body($fh);
 }
