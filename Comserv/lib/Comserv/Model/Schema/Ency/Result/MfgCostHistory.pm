@@ -17,4 +17,15 @@ __PACKAGE__->add_columns(
     created_at => { data_type => 'datetime' },
 );
 __PACKAGE__->set_primary_key('id');
+
+__PACKAGE__->belongs_to(
+    item => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItem',
+    'item_id',
+    { is_foreign_key_constraint => 0 },
+);
+__PACKAGE__->belongs_to(
+    job => 'Comserv::Model::Schema::Ency::Result::Printing3dJob',
+    'job_id',
+    { join_type => 'left', is_foreign_key_constraint => 0 },
+);
 1;

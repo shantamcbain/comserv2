@@ -80,7 +80,7 @@ Branch `3d`, written 2026-10-17. Plan only; no code or DB changes yet.
 
 ---
 
-## Schema changes (minimal) — `sql/20261017_manufacturing_costing.sql`
+## Schema changes (minimal) — DBIx::Class Result files only (apply via Schema Compare)
 
 Phase 1 (4 columns + 1 table):
 - `inventory_items.markup_percent DECIMAL(6,2) NULL` (NULL = site default)
@@ -89,7 +89,7 @@ Phase 1 (4 columns + 1 table):
 - `printing_3d_jobs.cost_breakdown TEXT NULL` (JSON: step minutes, components, scrap, unit cost, actual logged steps)
 - New `mfg_cost_history` (item, job, event, old/new cost, old/new price, detail JSON, who, when). Result class: `MfgCostHistory`.
 - Settings stay in `comserv.conf` `<Manufacturing>` (no settings table).
-- The 4 columns are NOT added to the `InventoryItem` / `Printing3dJob` Result classes yet, because an unapplied column in a Result class breaks every query on that table. Add them to the Result classes after the SQL is applied.
+- Columns are defined in `Result/Accounting/InventoryItem.pm` and `Result/Printing3dJob.pm`; table in `Result/MfgCostHistory.pm`. No .sql files. Apply to the DB with Schema Compare before using pages that select these tables (DBIC selects every declared column).
 
 Phase 2: per-step labour stays in `cost_breakdown.actual` (no new table unless reporting needs it).
 

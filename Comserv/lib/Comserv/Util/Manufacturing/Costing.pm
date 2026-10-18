@@ -10,7 +10,7 @@ package Comserv::Util::Manufacturing::Costing;
 # Settings: comserv.conf <Manufacturing> (editable), defaults below.
 # New DB pieces are optional: if inventory_items.markup_percent/manual_price,
 # printing_3d_jobs.labour_cost/cost_breakdown or table mfg_cost_history are not
-# there yet, those writes are skipped with a warning (sql/20261017_manufacturing_costing.sql).
+# there yet, those writes are skipped with a warning (defined in the Result classes; apply via Schema Compare).
 use strict;
 use warnings;
 use POSIX qw(ceil);
@@ -208,7 +208,7 @@ sub rollup_job {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'costing', "job breakdown not saved: $@") if $@;
     } else {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'costing',
-            'printing_3d_jobs.cost_breakdown missing; breakdown not stored (run sql/20261017_manufacturing_costing.sql)');
+            'printing_3d_jobs.cost_breakdown missing; breakdown not stored (apply Printing3dJob Result via Schema Compare)');
     }
     my $res = { ok => 1, breakdown => $b };
     if ($a{item_id}) {
