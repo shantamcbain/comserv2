@@ -83,6 +83,11 @@ sub clone {
         $title =~ s/\s+/ /g; $title ||= $code;
         my ($desc_el) = $tree->look_down(_tag => 'meta', name => qr/^description$/i);
         my ($kw_el)   = $tree->look_down(_tag => 'meta', name => qr/^keywords$/i);
+        my @css_links;
+        for my $l ($tree->look_down(_tag => 'link', rel => qr/stylesheet/i, href => qr/./)) {
+            my $f = $self->_import_css(URI->new_abs($l->attr('href'), $base));
+            push @css_links, $f if $f;
+        }
         $_->delete for $tree->look_down(_tag => qr/^(script|noscript|iframe|link|style|meta)$/);
         $_->delete for $tree->look_down(id => 'fb-root');
         $_->delete for $tree->look_down(class => qr/\bfb-(like|share-button)\b/);
@@ -105,9 +110,24 @@ sub clone {
             $img->attr(src => $f) if $f;
         }
         my $body = $tree->look_down(_tag => 'body');
-        my $style = $body ? ($body->attr('style') // '') : '';
-        my $inner = $body ? join('', map { ref $_ ? $_->as_HTML('<>&', undef, {}) : _esc($_) } $body->content_list) : '';
-        $inner = qq{<div class="site-clone" data-source="$url" style="$style">$inner</div>};
+        $self->{body_style} //= $body ? ($body->attr('style') // '') : '';
+        $self->{css_files} ||= [ @css_links ];
+        # Site-wide header/footer become the theme's site_header/site_footer page rows (taken once,
+        # from the first page); they are removed from every page body so content is page-only.
+        my ($hdr) = $tree->look_down(sub { my $e = shift; ($e->tag eq 'header') || (($e->attr('id')//'') =~ /^(header|masthead|top)$/i) });
+        my ($ftr) = $tree->look_down(sub { my $e = shift; ($e->tag eq 'footer') || (($e->attr('id')//'') =~ /^(footer|navbottom)$/i) });
+        my $html_of = sub { my $e = shift; $e->as_HTML('<>&', undef, {}) };
+        if ($hdr) { $self->{site_header} //= $html_of->($hdr); $hdr->delete }
+        if ($ftr) {
+            # keep trailing copyright etc. that sits beside the footer nav
+            my $extra = '';
+            for my $sib ($ftr->right) { next unless ref $sib; $extra .= $html_of->($sib); $sib->delete; }
+            $self->{site_footer} //= $html_of->($ftr) . $extra; $ftr->delete;
+        }
+        my ($wrap) = $tree->look_down(id => qr/^(wrapper|container|page|main)$/i);
+        my $root = $wrap || $body;
+        my $inner = $root ? join('', map { ref $_ ? $html_of->($_) : _esc($_) } $root->content_list) : '';
+        $inner =~ s/^\s+|\s+$//g;
         $self->{pages}{$code} = { title => $title, body => $inner, url => $url,
             description => $desc_el ? $desc_el->attr('content') : undef,
             keywords => $kw_el ? $kw_el->attr('content') : undef };
@@ -116,7 +136,8 @@ sub clone {
         $tree->delete;
     }
     $self->_save_pages;
-    return { pages => [ @{$self->{order}} ], images => scalar(grep { defined } values %{$self->{images}}), errors => $self->{errors} };
+    $self->_save_theme;
+    return { theme_css => $self->{theme_css}, pages => [ @{$self->{order}} ], images => scalar(grep { defined } values %{$self->{images}}), errors => $self->{errors} };
 }
 
 sub _esc { my $t = shift; $t =~ s/&/&amp;/g; $t =~ s/</&lt;/g; $t =~ s/>/&gt;/g; $t }
@@ -130,28 +151,104 @@ sub _import_image {
     unless ($res->is_success) { push @{$self->{errors}}, "image $key: " . $res->status_line; return $self->{images}{$key} = undef; }
     my $ct = ($res->content_type // ''); unless ($ext && $MIME{$ext}) { ($ext) = $ct =~ m{image/(\w+)}; $ext = 'jpg' if ($ext//'') eq 'jpeg'; }
     unless ($ext && $MIME{$ext}) { push @{$self->{errors}}, "image $key: unsupported type $ct"; return $self->{images}{$key} = undef; }
-    my $name = URI::Escape::uri_unescape((split m{/}, $abs->path)[-1] // 'image');
-    $name =~ s/\.[^.]+$//; $name =~ s/[^A-Za-z0-9._-]+/_/g; $name =~ s/^_+|_+$//g; $name ||= 'image';
-    my $rel = URI->new($abs->path)->path; $rel =~ s{^/}{}; $rel =~ s{/[^/]*$}{};
+    my $name = $self->_local_name($abs, $ext);
+    my $f = $self->_store($key, $name, $ext, $MIME{$ext}, $res->content);
+    $self->{log}->("image $key -> $f") if $f;
+    return $self->{images}{$key} = $f;
+}
+
+# Import a stylesheet: its url() assets are filed first and rewritten to /media/file/<id>/<name>.
+sub _import_css {
+    my ($self, $abs) = @_;
+    my $key = $abs->canonical->as_string;
+    return $self->{css}{$key} if exists $self->{css}{$key};
+    my $res = $self->{ua}->get($key);
+    unless ($res->is_success) { push @{$self->{errors}}, "css $key: " . $res->status_line; return $self->{css}{$key} = undef; }
+    my $css = $res->decoded_content // $res->content;
+    $css =~ s{url\(\s*(['"]?)([^'")]+)\1\s*\)}{
+        my ($q, $u) = ($1, $2);
+        my $f = ($u =~ /^data:/i) ? undef : $self->_import_image(URI->new_abs($u, $key));
+        $f ? "url($f)" : ($u =~ /^data:/i ? "url($q$u$q)" : 'url(' . URI->new_abs($u, $key) . ')');
+    }ge;
+    my $name = $self->_local_name($abs, 'css');
+    my $f = $self->_store($key, $name, 'css', 'text/css', Encode::encode('UTF-8', $css));
+    $self->{log}->("css $key -> $f") if $f;
+    return $self->{css}{$key} = $f;
+}
+
+sub _local_name {
+    my ($self, $abs, $ext) = @_;
+    my $name = URI::Escape::uri_unescape((split m{/}, $abs->path)[-1] // 'file');
+    $name =~ s/\.[^.]+$//; $name =~ s/[^A-Za-z0-9._-]+/_/g; $name =~ s/^_+|_+$//g; $name ||= 'file';
+    my $rel = URI->new($abs->path)->path; $rel =~ s{^/}{}; $rel = ($rel =~ m{^(.*)/[^/]*$}) ? $1 : '';
     $rel =~ s/[^A-Za-z0-9]+/_/g; $name = "${rel}__$name" if length $rel && $rel ne 'images';
-    $name .= ".$ext";
+    return "$name.$ext";
+}
+
+# Write bytes to NFS site-import dir and create/update the File Manager row (matched by nfs_path).
+sub _store {
+    my ($self, $key, $name, $ext, $mime, $data) = @_;
     my $full = "$self->{dir}/$name";
-    my $data = $res->content;
-    open(my $fh, '>:raw', $full) or do { push @{$self->{errors}}, "write $full: $!"; return $self->{images}{$key} = undef };
+    open(my $fh, '>:raw', $full) or do { push @{$self->{errors}}, "write $full: $!"; return };
     print $fh $data; close $fh;
     my %rec = (
         file_name => $name, file_type => ".$ext", file_data => '', site_id => $self->{site_id},
         reference_id => 0, category_id => 0, share_id => 0, description => "Imported from $key",
         upload_date => strftime('%Y-%m-%d %H:%M:%S', localtime), file_size => length($data),
-        file_path => $full, file_url => '', file_status => 'active', file_format => $MIME{$ext},
+        file_path => $full, file_url => '', file_status => 'active', file_format => $mime,
         user_id => $self->{user_id}, nfs_path => $full, external_url => $key, access_level => 'public',
         source_type => 'web', sitename => $self->{sitename}, is_duplicate => 0, file_hash => sha256_hex($data),
     );
     my $rs = $self->{schema}->resultset('File');
     my $row = $rs->search({ nfs_path => $full, sitename => $self->{sitename} }, { rows => 1 })->single;
     if ($row) { delete $rec{upload_date}; $row->update(\%rec) } else { $row = $rs->create(\%rec) }
-    $self->{log}->("image $key -> file #" . $row->id);
-    return $self->{images}{$key} = '/media/file/' . $row->id . '/' . $name;
+    return '/media/file/' . $row->id . '/' . $name;
+}
+
+# Theme: site_header / site_footer page rows + a site-scoped copy of the original CSS
+# (every selector prefixed with body.theme-<site>) filed in the File Manager. The app theme
+# root/static/css/themes/<site>.css @imports that file (written here when the tree is writable).
+sub _save_theme {
+    my ($self) = @_;
+    my $site = lc $self->{sitename}; $site =~ s/[^a-z0-9]+//g;
+    my $rs = $self->{schema}->resultset('Page');
+    my $now = strftime('%Y-%m-%d %H:%M:%S', localtime);
+    for my $part ([site_header => $self->{site_header}], [site_footer => $self->{site_footer}]) {
+        my ($code, $html) = @$part; next unless defined $html;
+        my %rec = (sitename => $self->{sitename}, page_code => $code, title => "$self->{sitename} $code",
+            body => $html, menu => 'Theme', link_order => 0, status => 'active', roles => 'public',
+            page_type => $code, updated_at => $now);
+        my $row = $rs->search({ sitename => $self->{sitename}, page_code => $code }, { rows => 1 })->single;
+        if ($row) { $row->update(\%rec) } else { $rs->create({ %rec, created_by => $self->{created_by}, created_at => $now }) }
+    }
+    my $scoped = '';
+    for my $f (@{$self->{css_files} || []}) {
+        my ($id) = $f =~ m{/media/file/(\d+)/}; next unless $id;
+        my $row = $self->{schema}->resultset('File')->find($id) or next;
+        open(my $fh, '<:raw', $row->nfs_path) or next; local $/; my $css = <$fh>; close $fh;
+        $scoped .= scope_css($css, "body.theme-$site") . "\n";
+    }
+    $scoped .= "body.theme-$site { $self->{body_style} }\n" if $self->{body_style};
+    return unless length $scoped;
+    my $name = "theme-$site.css";
+    $self->{theme_css} = $self->_store("theme:$self->{sitename}", $name, 'css', 'text/css', $scoped);
+    $self->{log}->("theme css -> $self->{theme_css}");
+}
+
+sub scope_css {
+    my ($css, $scope) = @_;
+    $css =~ s{/\*.*?\*/}{}gs; $css =~ s/\@charset[^;]*;//g;
+    my $out = '';
+    while ($css =~ /\G\s*([^{}]+?)\s*\{([^{}]*)\}/gc) {
+        my ($sel, $decl) = ($1, $2);
+        next if $sel =~ /^\@/;    # simple @-rules dropped (media blocks handled by regex skip)
+        my @s = map {
+            my $x = $_; $x =~ s/^\s+|\s+$//g;
+            $x =~ /^(html|body)\b(.*)$/i ? "$scope$2" : "$scope $x"
+        } split /,/, $sel;
+        $out .= join(', ', @s) . " {$decl}\n";
+    }
+    return $out;
 }
 
 sub _save_pages {
