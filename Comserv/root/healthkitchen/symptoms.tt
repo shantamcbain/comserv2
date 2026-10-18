@@ -92,6 +92,19 @@
             <label>Diet flags <input type="text" name="diet_flags" value="[% hk_profile.diet_flags | html %]" /></label>
             <label>Allergies <textarea name="allergies">[% hk_profile.allergies | html %]</textarea></label>
             <label>Goals <textarea name="goals">[% hk_profile.goals | html %]</textarea></label>
+            [% IF hk_prefs_ready %]
+                <input type="hidden" name="prefs_submitted" value="1" />
+                <fieldset><legend>Food sourcing preferences</legend>
+                    <label><input type="checkbox" name="prefer_organic" value="1" [% IF hk_profile.prefer_organic %]checked[% END %] /> Prefer certified organic</label>
+                    <label><input type="checkbox" name="avoid_feedlot" value="1" [% IF hk_profile.avoid_feedlot %]checked[% END %] /> Avoid feedlot animal products</label>
+                    <label>Ethics weight
+                        <select name="ethics_weight">[% FOREACH w IN [0,1,2,3,4,5] %]<option value="[% w %]" [% IF (hk_profile.ethics_weight || 0) == w %]selected[% END %]>[% w %][% IF w == 0 %] (off)[% END %]</option>[% END %]</select>
+                    </label>
+                    <small class="doc-muted">Used to rank meal-plan suggestions and guide AI recipes.</small>
+                </fieldset>
+            [% ELSE %]
+                <p class="doc-muted">Sourcing preferences need new profile columns; run Schema Compare (HealthKitchen::UserHealthProfile).</p>
+            [% END %]
             <button type="submit" class="btn btn-primary">Save profile</button>
         </form>
     [% END %]

@@ -44,7 +44,7 @@
         <h2>Cook from what you have</h2>
         [% IF hk_suggestions.size %]
             <ul>[% FOREACH s IN hk_suggestions %]
-                <li><strong>[% s.name | html %]</strong> — [% s.in_stock %]/[% s.total %] ingredients in stock[% IF s.missing.size %]; missing: [% s.missing.join(', ') | html %][% END %]</li>
+                <li><strong>[% s.name | html %]</strong> — [% s.in_stock %]/[% s.total %] ingredients in stock[% IF s.sourcing_score %] · sourcing score [% s.sourcing_score %][% END %][% IF s.missing.size %]; missing: [% s.missing.join(', ') | html %][% END %]</li>
             [% END %]</ul>
         [% ELSE %]<p class="doc-muted">No food recipes to rank yet.</p>[% END %]
     </div>

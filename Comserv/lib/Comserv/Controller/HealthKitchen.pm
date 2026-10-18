@@ -81,6 +81,10 @@ sub _stash_mode {
     $c->stash->{hk_map_ready}      = $self->hk->map_ready($c) ? 1 : 0;
     $c->stash->{hk_symptom_ready}  = $self->hk->symptom_ready($c) ? 1 : 0;
     $c->stash->{hk_profile_ready}  = $self->hk->profile_ready($c) ? 1 : 0;
+    $c->stash->{hk_sourcing_ready} = $self->hk->sourcing_cols_ready($c) ? 1 : 0;
+    $c->stash->{hk_prefs_ready}    = $self->hk->prefs_cols_ready($c) ? 1 : 0;
+    $c->stash->{hk_factor_ready}   = $self->hk->factor_ready($c) ? 1 : 0;
+    $c->stash->{hk_sourcing_enums} = $self->hk->sourcing_enums;
 }
 
 sub index :Path('/healthkitchen') :Args(0) {
@@ -240,7 +244,7 @@ sub pantry_link :Local :Args(0) {
     }
     elsif ( $action eq 'product' ) {
         $res = $self->hk->save_item_product( $c,
-            { map { $_ => $p->{$_} } qw(item_kind item_id brand upc size) } );
+            { map { $_ => $p->{$_} } qw(item_kind item_id brand upc size sourcing_submitted food_category production animal_raising catch_method gmo local_km certifier cert_verified) } );
     }
     else {
         $res = $self->hk->add_ency_link( $c,
@@ -297,6 +301,9 @@ sub symptoms :Local :Args(0) {
                     diet_flags => $c->req->params->{diet_flags},
                     allergies  => $c->req->params->{allergies},
                     goals      => $c->req->params->{goals},
+                    ( $c->req->params->{prefs_submitted}
+                        ? ( prefs_submitted => 1, map { $_ => $c->req->params->{$_} } qw(prefer_organic avoid_feedlot ethics_weight) )
+                        : () ),
                 }
             );
         }

@@ -116,6 +116,9 @@
                             [% IF p.product.brand %][% p.product.brand | html %]<br />[% END %]
                             [% IF p.product.upc %]UPC [% p.product.upc | html %]<br />[% END %]
                             [% IF p.product.size_value %][% p.product.size_value | html %] [% p.product.size_unit | html %][% END %]
+                            [% IF p.product.badges.size %]<div class="hk-badges">[% FOREACH bd IN p.product.badges %]<span class="badge">[% bd | html %]</span> [% END %]</div>[% END %]
+                            [% IF p.product.summary.risks.size %]<small class="doc-muted">Risk: [% FOREACH rk IN p.product.summary.risks.keys.sort %][% rk | html %] [% p.product.summary.risks.$rk | html %][% UNLESS loop.last %], [% END %][% END %]</small><br />[% END %]
+                            [% IF p.product.summary.ethics.defined %]<small class="doc-muted">Ethics [% p.product.summary.ethics %]/5</small>[% END %]
                             [% IF hk_product_ready && p.item_key_id %]
                                 <details><summary>Edit</summary>
                                 <form method="post" action="[% c.uri_for('/healthkitchen/pantry_link') %]">
@@ -125,6 +128,21 @@
                                     <label>Brand <input type="text" name="brand" value="[% p.product.brand | html %]" /></label>
                                     <label>UPC <input type="text" name="upc" value="[% p.product.upc | html %]" placeholder="8 36676 00001 9" /></label>
                                     <label>Size <input type="text" name="size" value="[% IF p.product.size_value %][% p.product.size_value %] [% p.product.size_unit %][% END %]" placeholder="10 ml" /></label>
+                                    [% IF hk_sourcing_ready %]
+                                        <input type="hidden" name="sourcing_submitted" value="1" />
+                                        [% FOREACH fld IN ['food_category','production','animal_raising','catch_method','gmo'] %]
+                                            <label>[% fld.replace('_',' ') %]
+                                                <select name="[% fld %]"><option value="">—</option>
+                                                    [% FOREACH v IN hk_sourcing_enums.$fld %]<option value="[% v %]" [% IF p.product.$fld == v %]selected[% END %]>[% v.replace('_',' ') %]</option>[% END %]
+                                                </select>
+                                            </label>
+                                        [% END %]
+                                        <label>Distance km <input type="number" name="local_km" min="0" max="20000" step="1" value="[% p.product.local_km | html %]" /></label>
+                                        <label>Certifier <input type="text" name="certifier" maxlength="100" value="[% p.product.certifier | html %]" placeholder="e.g. Pro-Cert Organic" /></label>
+                                        <label><input type="checkbox" name="cert_verified" value="1" [% IF p.product.cert_verified %]checked[% END %] /> Certificate checked</label>
+                                    [% ELSE %]
+                                        <small class="doc-muted">Sourcing fields need new columns on HealthKitchen::ItemProduct; run Schema Compare.</small>
+                                    [% END %]
                                     <button type="submit" class="btn btn-sm btn-primary">Save</button>
                                 </form>
                                 </details>

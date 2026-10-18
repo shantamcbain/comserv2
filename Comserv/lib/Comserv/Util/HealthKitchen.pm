@@ -4,6 +4,25 @@ use namespace::autoclean;
 use Try::Tiny;
 use POSIX qw(strftime);
 use JSON qw(encode_json decode_json);
+
+# Sourcing enums (see "Production / sourcing attributes" section).
+our %SOURCING_ENUM = (
+    food_category  => [qw(beef pork lamb chicken eggs dairy salmon fish_other leafy_greens berries apples
+                          stone_fruit grapes potatoes tomatoes peppers corn soy grains legumes nuts other)],
+    production     => [qw(organic_certified conventional transitional unknown)],
+    animal_raising => [qw(grass_fed pasture feedlot free_range caged na)],
+    catch_method   => [qw(wild farmed na)],
+    gmo            => [qw(non_gmo_verified gmo unknown)],
+);
+our @SOURCING_COLS = ( keys(%SOURCING_ENUM), qw(local_km certifier cert_verified) );
+our @PREF_COLS     = qw(prefer_organic avoid_feedlot ethics_weight);
+our $LOCAL_KM      = 160;
+our %RISK_PTS      = ( low => 0, med => 1, high => 2 );
+our %BADGE = (
+    organic_certified => 'Organic', conventional => 'Conventional', transitional => 'Transitional',
+    grass_fed => 'Grass-fed', pasture => 'Pasture-raised', feedlot => 'Feedlot', free_range => 'Free-range',
+    caged => 'Caged', wild => 'Wild', farmed => 'Farmed', non_gmo_verified => 'Non-GMO', gmo => 'GMO',
+);
 use Comserv::Util::Logging;
 
 has 'logging' => (
@@ -407,18 +426,24 @@ sub save_profile {
     my ( $self, $c, $args ) = @_;
     return { ok => 0, error => 'Profile table is not created yet. Run schema-compare.' }
         unless $self->profile_ready($c);
+    my %data = (
+        diet_flags => $args->{diet_flags},
+        allergies  => $self->_enc( $args->{allergies} ),
+        goals      => $args->{goals},
+    );
+    my $prefs_ok = $self->prefs_cols_ready($c);
+    if ( $prefs_ok && grep { exists $args->{$_} } @PREF_COLS, 'prefs_submitted' ) {
+        my ( $p, $err ) = $self->validate_prefs($args);
+        return { ok => 0, error => $err } if $err;
+        %data = ( %data, %$p );
+    }
     my $row;
     try {
-        $row = $c->model('DBEncy')->resultset('HealthKitchen::UserHealthProfile')->update_or_create(
-            {
-                user_id    => $c->session->{user_id},
-                sitename   => $self->sitename($c),
-                diet_flags => $args->{diet_flags},
-                allergies  => $self->_enc( $args->{allergies} ),
-                goals      => $args->{goals},
-            },
-            { key => 'hk_profile_user_site' }
-        );
+        my $rs  = $c->model('DBEncy')->resultset('HealthKitchen::UserHealthProfile');
+        my %key = ( user_id => $c->session->{user_id}, sitename => $self->sitename($c) );
+        $row = $rs->search( \%key, ( $prefs_ok ? {} : { columns => $self->_base_cols( $c, 'HealthKitchen::UserHealthProfile', \@PREF_COLS ) } ) )->single;
+        if ($row) { $row->update( \%data ) }
+        else      { $row = $rs->create( { %key, %data } ) }
     }
     catch {
         $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'save_profile',
@@ -435,7 +460,8 @@ sub get_profile {
     my $h = {};
     try {
         my $row = $c->model('DBEncy')->resultset('HealthKitchen::UserHealthProfile')->search(
-            { user_id => $c->session->{user_id}, sitename => $self->sitename($c) }
+            { user_id => $c->session->{user_id}, sitename => $self->sitename($c) },
+            ( $self->prefs_cols_ready($c) ? {} : { columns => $self->_base_cols( $c, 'HealthKitchen::UserHealthProfile', \@PREF_COLS ) } )
         )->single;
         if ($row) {
             $h = {
@@ -443,6 +469,9 @@ sub get_profile {
                 allergies  => $self->_dec( $row->allergies ),
                 goals      => $row->goals,
             };
+            if ( $self->prefs_cols_ready($c) ) {
+                $h->{$_} = $row->get_column($_) for @PREF_COLS;
+            }
         }
     }
     catch {
@@ -1222,6 +1251,8 @@ sub plan_requirements {
                 $self->_ingredient_key( { name => $p->{name} } ) ) )
         {
             $stock{$key} ||= { qty => 0, unit => $p->{unit} // '' };
+            $stock{$key}{sourcing} ||= $p->{product}{badges} if $p->{product} && $p->{product}{badges} && @{ $p->{product}{badges} };
+            $stock{$key}{score} //= $p->{product}{score} if $p->{product};
             $stock{$key}{qty} += $p->{qty} || 0;
         }
     }
@@ -1231,6 +1262,8 @@ sub plan_requirements {
         my $st = $stock{$key} || ( $n->{name} ? $stock{ $self->_ingredient_key( { name => $n->{name} } ) // '' } : undef );
         my $on = $st ? $st->{qty} : 0;
         my $row = { %$n, need => 0 + sprintf( '%.2f', $n->{need} ), on_hand => 0 + $on };
+        $row->{sourcing} = $st->{sourcing} if $st && $st->{sourcing};
+        $row->{score}    = $st->{score}    if $st && defined $st->{score};
         if ( $st && length $n->{unit} && length $st->{unit} && lc $n->{unit} ne lc $st->{unit} ) {
             $row->{unit_mismatch} = $st->{unit};    # can't compare; list as have, flag for review
             push @have, $row;
@@ -1256,10 +1289,16 @@ sub rank_recipes_by_stock {
         my $req = $self->plan_requirements( [ { servings => $r->{yield_amount} || 1, recipe => $r } ], $pantry );
         my $total = @{ $req->{have} } + @{ $req->{buy} };
         next unless $total;
+        my @sc = map { $_->{score} } grep { defined $_->{score} } @{ $req->{have} }, @{ $req->{buy} };
+        my $score = @sc ? eval { my $t = 0; $t += $_ for @sc; $t / @sc } : 0;
         push @out, { id => $r->{id}, name => $r->{name}, in_stock => scalar @{ $req->{have} },
-                     total => $total, missing => [ map { $_->{name} } @{ $req->{buy} } ] };
+                     total => $total, missing => [ map { $_->{name} } @{ $req->{buy} } ],
+                     sourcing_score => 0 + sprintf( '%.2f', $score ),
+                     rank => ( scalar @{ $req->{have} } ) / $total + 0.1 * $score };
     }
-    return [ sort { ( $b->{in_stock} / $b->{total} ) <=> ( $a->{in_stock} / $a->{total} ) || $a->{name} cmp $b->{name} } @out ];
+    # Stock coverage first; sourcing score (prefs/ethics/contamination) nudges ties and near-ties.
+    # With no sourcing data and default prefs every score is 0, so order is unchanged.
+    return [ sort { $b->{rank} <=> $a->{rank} || $a->{name} cmp $b->{name} } @out ];
 }
 
 sub _plan_rs {
@@ -1380,17 +1419,24 @@ sub get_meal_plan {
         start_date => ( $plan->start_date ? $plan->start_date . '' : '' ),
         end_date   => ( $plan->end_date ? $plan->end_date . '' : '' ),
         entries    => \@entries,
-        requirements => $self->plan_requirements( \@entries, $self->list_pantry($c) ),
+        requirements => $self->plan_requirements( \@entries, $self->pantry_with_products($c) ),
         allergen_warnings => [ map { { name => $_->{name}, hits => $_->{allergen_hits} } }
             @{ ( $self->filter_recipes_by_allergens( [ map { $_->{recipe} } grep { $_->{recipe} } @entries ],
                     $self->user_matching_inputs($c)->{allergens} ) )[1] } ],
     };
 }
 
+sub pantry_with_products {
+    my ( $self, $c ) = @_;
+    my $rows = $self->list_pantry($c);
+    $self->attach_links_and_products( $c, $rows );
+    return $rows;
+}
+
 sub suggest_recipes_from_stock {
     my ( $self, $c ) = @_;
     my ($ok) = $self->filter_recipes_by_allergens( $self->list_recipes($c), $self->user_matching_inputs($c)->{allergens} );
-    return $self->rank_recipes_by_stock( $ok, $self->list_pantry($c) );
+    return $self->rank_recipes_by_stock( $ok, $self->pantry_with_products($c) );
 }
 
 # Recipes allowed for this user's meal plans (allergen-filtered) + the excluded ones.
@@ -1431,6 +1477,7 @@ sub daily_totals {
 sub list_foods {
     my ( $self, $c ) = @_;
     return [] unless $self->nutrition_ready($c);
+    my $prod = $self->_products_by_inventory($c);
     my @out;
     try {
         my $rs = $c->model('DBEncy')->resultset('HealthKitchen::FoodNutrient')->search(
@@ -1440,6 +1487,10 @@ sub list_foods {
             push @out, { id => $f->id, name => $f->name, brand => $f->brand, source => $f->source,
                          serving_size => 0 + $f->serving_size, serving_unit => $f->serving_unit,
                          map { $_ => $f->$_ } @NUTRIENTS };
+            if ( $f->inventory_item_id && ( my $p = $prod->{ $f->inventory_item_id } ) ) {
+                $out[-1]{sourcing} = { badges => $p->{badges}, summary => $p->{summary}, score => $p->{score} };
+                $out[-1]{adjusted} = $self->adjust_nutrients( $out[-1], $p->{factors} );
+            }
         }
     }
     catch {
@@ -1548,8 +1599,11 @@ sub ai_stock_foods {
     for my $r ( @{ $rows || [] } ) {
         next unless $r->{inventory_item_id} && ( $r->{qty} || 0 ) > 0;
         next if $seen{ $r->{inventory_item_id} }++;
+        my $pr = $r->{product} || {};
         push @out, { id => 0 + $r->{inventory_item_id}, name => $r->{name},
-                     qty => 0 + $r->{qty}, unit => $r->{unit} || 'each' };
+                     qty => 0 + $r->{qty}, unit => $r->{unit} || 'each',
+                     ( $pr->{badges} && @{ $pr->{badges} } ? ( sourcing => join( ', ', @{ $pr->{badges} } ) ) : () ),
+                     ( defined $pr->{score} ? ( score => $pr->{score} ) : () ) };
     }
     return \@out;
 }
@@ -1567,7 +1621,22 @@ sub ai_recipe_prompt {
     }
     my @avoid = grep { length } @{ $prefs->{avoid} || [] };
     $pref .= 'Exclude these ingredients entirely: ' . join( ', ', @avoid ) . ".\n" if @avoid;
-    my $list = join "\n", map { "- id=$_->{id}; name=$_->{name}; on_hand=$_->{qty} $_->{unit}" } @$foods;
+    my $use_src = grep { $prefs->{$_} } qw(prefer_organic avoid_feedlot ethics_weight);
+    if ($use_src) {
+        my @s;
+        push @s, 'certified organic items' if $prefs->{prefer_organic};
+        push @s, 'items with a higher sourcing score (better ethics, lower contamination risk)'
+            if $prefs->{ethics_weight};
+        $pref .= 'When choosing between in-stock items, prefer ' . join( ' and ', @s ) . ".\n" if @s;
+        $pref .= "Avoid items marked Feedlot unless nothing else fits.\n" if $prefs->{avoid_feedlot};
+    }
+    my $list = join "\n", map {
+        my $f = $_;
+        ( my $src = $f->{sourcing} // '' ) =~ s/[^\w ,:()\-]//g;
+        "- id=$f->{id}; name=$f->{name}; on_hand=$f->{qty} $f->{unit}"
+            . ( length $src ? "; sourcing=$src" : '' )
+            . ( $use_src && defined $f->{score} ? "; sourcing_score=$f->{score}" : '' )
+    } @$foods;
     return "Create $count simple, wholesome home recipes using ONLY the in-stock foods below.\n"
          . "Every ingredient must be one of these items, referenced by its id. Do not invent ingredients "
          . "(water is allowed and needs no id). Do not exceed on_hand quantities. Do not make health or medical claims.\n\n"
@@ -1630,12 +1699,14 @@ sub generate_ai_recipes {
     my $profile = $opts->{profile} || eval { $self->get_profile($c) } || {};
     my @avoid = @{ $inputs->{allergens} || [] };
     my $foods = [ grep { my $n = lc $_->{name}; !grep { index( $n, $_ ) >= 0 } @avoid }
-                  @{ $self->ai_stock_foods( $self->list_pantry($c) ) } ];
+                  @{ $self->ai_stock_foods( $self->pantry_with_products($c) ) } ];
     return { ok => 0, error => 'No in-stock inventory foods found to build recipes from.' }
         unless @$foods >= 2;
     splice( @$foods, 60 ) if @$foods > 60;
     my $prompt = $self->ai_recipe_prompt( $foods, $opts->{count} || 3,
-        { diet_flags => $profile->{diet_flags}, avoid => \@avoid } );
+        { diet_flags => $profile->{diet_flags}, avoid => \@avoid,
+          prefer_organic => $profile->{prefer_organic}, avoid_feedlot => $profile->{avoid_feedlot},
+          ethics_weight => $profile->{ethics_weight} } );
     my $system = 'You are a careful home-cooking assistant for a wellness kitchen. '
                . 'Use only provided stock items. Output strict JSON.';
     my $res = $opts->{ai_call}
@@ -2412,21 +2483,22 @@ sub save_item_product {
         if defined $args->{size} && $args->{size} =~ /\S/ && !defined $sv;
     my $brand = $args->{brand};
     $brand = undef if defined $brand && $brand !~ /\S/;
+    my $src_ok = $self->sourcing_cols_ready($c);
+    my $src;
+    if ( $src_ok && $args->{sourcing_submitted} ) {
+        ( $src, my $serr ) = $self->validate_sourcing($args);
+        return { ok => 0, error => $serr } if $serr;
+    }
     my ( $ok, $err ) = ( 0, 'Could not save product details.' );
     try {
         die "item not yours\n" unless $self->_item_owned( $c, $kind, $iid );
-        $c->model('DBEncy')->resultset('HealthKitchen::ItemProduct')->update_or_create(
-            {
-                sitename   => $self->sitename($c),
-                item_kind  => $kind,
-                item_id    => $iid,
-                brand      => $brand,
-                upc        => ( length $upc ? $upc : undef ),
-                size_value => $sv,
-                size_unit  => $su,
-            },
-            { key => 'hk_product_item' }
-        );
+        my $rs  = $c->model('DBEncy')->resultset('HealthKitchen::ItemProduct');
+        my %key = ( sitename => $self->sitename($c), item_kind => $kind, item_id => $iid );
+        my %data = ( brand => $brand, upc => ( length $upc ? $upc : undef ), size_value => $sv, size_unit => $su );
+        %data = ( %data, %$src ) if $src;
+        my $row = $rs->search( \%key, ( $src_ok ? {} : { columns => $self->_base_cols( $c, 'HealthKitchen::ItemProduct', \@SOURCING_COLS ) } ) )->single;
+        if ($row) { $row->update( \%data ) }
+        else      { $rs->create( { %key, %data } ) }
         $ok = 1;
     }
     catch {
@@ -2484,7 +2556,11 @@ sub attach_links_and_products {
     }
     if ( $self->product_ready($c) ) {
         try {
-            for my $p ( $schema->resultset('HealthKitchen::ItemProduct')->search( { sitename => $site } )->all ) {
+            my $src_ok  = $self->sourcing_cols_ready($c);
+            my $factors = $src_ok ? $self->list_sourcing_factors($c) : [];
+            my $prefs   = $src_ok ? $self->get_prefs($c) : {};
+            for my $p ( $schema->resultset('HealthKitchen::ItemProduct')->search( { sitename => $site },
+                    ( $src_ok ? {} : { columns => $self->_base_cols( $c, 'HealthKitchen::ItemProduct', \@SOURCING_COLS ) } ) )->all ) {
                 my $r = $by{ $p->item_kind . ':' . $p->item_id } or next;
                 $r->{product} = {
                     brand      => $p->brand,
@@ -2492,6 +2568,10 @@ sub attach_links_and_products {
                     size_value => $p->size_value,
                     size_unit  => $p->size_unit,
                 };
+                if ($src_ok) {
+                    $r->{product}{$_} = $p->get_column($_) for @SOURCING_COLS;
+                    $self->_enrich_product( $r->{product}, $factors, $prefs );
+                }
             }
         }
         catch {
@@ -2500,6 +2580,238 @@ sub attach_links_and_products {
         };
     }
     return;
+}
+
+# ---------------------------------------------------------------------------
+# Production / sourcing attributes (hk_item_product columns + hk_sourcing_factor)
+# ---------------------------------------------------------------------------
+
+sub sourcing_enums { return \%SOURCING_ENUM }
+
+# Do these columns exist in the live DB? Cached per request in the stash.
+sub _cols_ready {
+    my ( $self, $c, $source, $cols ) = @_;
+    my $key = "hk_cols_ready:$source";
+    return $c->stash->{$key} if defined $c->stash->{$key};
+    my $ok = 0;
+    if ( $self->table_ready( $c, $source ) ) {
+        try {
+            $c->model('DBEncy')->resultset($source)->search( {}, { columns => $cols, rows => 1 } )->first;
+            $ok = 1;
+        }
+        catch { $ok = 0 };
+    }
+    return $c->stash->{$key} = $ok;
+}
+
+sub sourcing_cols_ready {
+    my ( $self, $c ) = @_;
+    return $self->_cols_ready( $c, 'HealthKitchen::ItemProduct', [@SOURCING_COLS] );
+}
+
+sub prefs_cols_ready {
+    my ( $self, $c ) = @_;
+    return $self->_cols_ready( $c, 'HealthKitchen::UserHealthProfile', [@PREF_COLS] );
+}
+
+sub factor_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, 'HealthKitchen::SourcingFactor' );
+}
+
+# Columns of a source minus the given (not-yet-created) ones.
+sub _base_cols {
+    my ( $self, $c, $source, $exclude ) = @_;
+    my %x = map { $_ => 1 } @$exclude;
+    return [ grep { !$x{$_} } $c->model('DBEncy')->source($source)->columns ];
+}
+
+# Pure: validate sourcing input against allowed values. Returns ( \%clean, $error ).
+# Empty/absent -> undef (cleared).
+sub validate_sourcing {
+    my ( $self, $a ) = @_;
+    my %out;
+    for my $f ( keys %SOURCING_ENUM ) {
+        my $v = $a->{$f};
+        if ( !defined $v || $v eq '' ) { $out{$f} = undef; next }
+        $v = lc $v;
+        return ( undef, "Invalid value for $f." ) unless grep { $_ eq $v } @{ $SOURCING_ENUM{$f} };
+        $out{$f} = $v;
+    }
+    my $km = $a->{local_km};
+    if ( defined $km && $km ne '' ) {
+        return ( undef, 'Distance must be a whole number of km (0-20000).' )
+            unless $km =~ /^\s*\d{1,5}\s*$/ && $km <= 20000;
+        $out{local_km} = 0 + $km;
+    }
+    else { $out{local_km} = undef }
+    my $cert = $self->clean_text( $a->{certifier} );
+    return ( undef, 'Certifier must be 100 characters or fewer.' ) if length($cert) > 100;
+    return ( undef, q{Certifier may only contain letters, numbers, spaces and - ' & ( ) , . /} )
+        if length $cert && $cert !~ m{^[\p{L}\p{N}][\p{L}\p{N} \-'&(),./]*$};
+    $out{certifier}     = length $cert ? $cert : undef;
+    $out{cert_verified} = defined $a->{cert_verified} && $a->{cert_verified} =~ /^(1|on|yes)$/i ? 1
+                        : defined $a->{cert_verified} && $a->{cert_verified} =~ /^(0|no)$/i   ? 0 : undef;
+    return ( \%out, undef );
+}
+
+# Pure: validate user preferences.
+sub validate_prefs {
+    my ( $self, $a ) = @_;
+    my $w = $a->{ethics_weight};
+    $w = 0 if !defined $w || $w eq '';
+    return ( undef, 'Ethics weight must be 0-5.' ) unless $w =~ /^\d$/ && $w <= 5;
+    return ( {
+        prefer_organic => ( ( $a->{prefer_organic} // '' ) =~ /^(1|on|yes)$/i ? 1 : 0 ),
+        avoid_feedlot  => ( ( $a->{avoid_feedlot}  // '' ) =~ /^(1|on|yes)$/i ? 1 : 0 ),
+        ethics_weight  => 0 + $w,
+    }, undef );
+}
+
+# Pure: factor rows that apply to a product's attributes.
+sub match_factors {
+    my ( $self, $p, $factors ) = @_;
+    return [] unless $p;
+    my %have;
+    $have{$_} = $p->{$_} for grep { defined $p->{$_} } keys %SOURCING_ENUM;
+    $have{local} = 'local' if defined $p->{local_km} && $p->{local_km} <= $LOCAL_KM;
+    my $cat = $p->{food_category} // '';
+    return [ grep {
+        my $f = $_;
+        ( $f->{food_category} eq 'any' || ( length $cat && $f->{food_category} eq $cat ) )
+            && $f->{attribute} ne 'food_category'
+            && defined $have{ $f->{attribute} } && $have{ $f->{attribute} } eq $f->{attr_value}
+    } @{ $factors || [] } ];
+}
+
+# Pure: apply percent adjustments to a COPY of base nutrients. Base is never modified.
+sub adjust_nutrients {
+    my ( $self, $base, $factors ) = @_;
+    my %adj = map { $_ => $base->{$_} } @NUTRIENTS;
+    my ( %pct, @src );
+    for my $f ( @{ $factors || [] } ) {
+        my $j = $f->{nutrient_adj_json} or next;
+        my $h = ref $j ? $j : eval { decode_json($j) } or next;
+        my $used;
+        for my $k ( keys %$h ) {
+            next unless grep { $_ eq $k } @NUTRIENTS;
+            $pct{$k} += $h->{$k};
+            $used = 1;
+        }
+        push @src, $f->{citation} if $used;
+    }
+    return undef unless %pct;
+    for my $k ( keys %pct ) {
+        next unless defined $adj{$k};
+        $adj{$k} = 0 + sprintf( '%.2f', $adj{$k} * ( 1 + $pct{$k} / 100 ) );
+    }
+    return { %adj, estimate => 1, pct => \%pct, citations => \@src };
+}
+
+# Pure: contamination + ethics summary for matched factors.
+sub sourcing_summary {
+    my ( $self, $factors ) = @_;
+    my ( %risk, @eth );
+    for my $f ( @{ $factors || [] } ) {
+        for my $r (qw(pesticide antibiotic hormone heavy_metal)) {
+            my $lvl = $f->{"${r}_risk"} or next;
+            next unless exists $RISK_PTS{$lvl};
+            $risk{$r} = $lvl if !defined $risk{$r} || $RISK_PTS{$lvl} > $RISK_PTS{ $risk{$r} };
+        }
+        push @eth, $f->{ethics_score} if defined $f->{ethics_score};
+    }
+    my $pen = 0;
+    $pen += $RISK_PTS{$_} for values %risk;
+    my $eth = @eth ? 0 + sprintf( '%.1f', eval { my $s = 0; $s += $_ for @eth; $s / @eth } ) : undef;
+    return { risks => \%risk, contamination => $pen, ethics => $eth };
+}
+
+# Pure: preference-weighted sourcing score. 0 means neutral / no information.
+# ethics contributes only when the user sets ethics_weight > 0 (default 0).
+sub sourcing_score {
+    my ( $self, $p, $summary, $prefs ) = @_;
+    $p ||= {};
+    $summary ||= {};
+    $prefs ||= {};
+    my $s = 0;
+    my $w = $prefs->{ethics_weight} || 0;
+    $s += $w * ( ( $summary->{ethics} // 2.5 ) - 2.5 ) / 2.5 if $w && defined $summary->{ethics};
+    $s -= 0.5 * ( $summary->{contamination} || 0 );
+    if ( $prefs->{prefer_organic} ) {
+        my $pr = $p->{production} // '';
+        $s += 1 if $pr eq 'organic_certified';
+        $s -= 0.5 if $pr eq 'conventional';
+    }
+    $s -= 3 if $prefs->{avoid_feedlot} && ( $p->{animal_raising} // '' ) eq 'feedlot';
+    return 0 + sprintf( '%.2f', $s );
+}
+
+# Pure: short display labels.
+sub sourcing_badges {
+    my ( $self, $p ) = @_;
+    return [] unless $p;
+    my @b;
+    for my $f (qw(production animal_raising catch_method gmo)) {
+        my $v = $p->{$f} // next;
+        push @b, $BADGE{$v} if $BADGE{$v};
+    }
+    push @b, 'Local' if defined $p->{local_km} && $p->{local_km} <= $LOCAL_KM;
+    push @b, 'Cert: ' . $p->{certifier} . ( $p->{cert_verified} ? '' : ' (unverified)' ) if $p->{certifier};
+    return \@b;
+}
+
+sub list_sourcing_factors {
+    my ( $self, $c ) = @_;
+    return $c->stash->{hk_factors} if $c->stash->{hk_factors};
+    my @out;
+    if ( $self->factor_ready($c) ) {
+        try {
+            for my $f ( $c->model('DBEncy')->resultset('HealthKitchen::SourcingFactor')->search( {} )->all ) {
+                push @out, { $f->get_columns };
+            }
+        }
+        catch {
+            $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, 'list_sourcing_factors', "$_" );
+        };
+    }
+    return $c->stash->{hk_factors} = \@out;
+}
+
+sub get_prefs {
+    my ( $self, $c ) = @_;
+    my $p = $self->get_profile($c);
+    return { prefer_organic => $p->{prefer_organic} ? 1 : 0, avoid_feedlot => $p->{avoid_feedlot} ? 1 : 0,
+             ethics_weight => 0 + ( $p->{ethics_weight} || 0 ) };
+}
+
+# Enrich a product hash with badges, factor summary and score.
+sub _enrich_product {
+    my ( $self, $prod, $factors, $prefs ) = @_;
+    my $m = $self->match_factors( $prod, $factors );
+    $prod->{badges}   = $self->sourcing_badges($prod);
+    $prod->{summary}  = $self->sourcing_summary($m);
+    $prod->{score}    = $self->sourcing_score( $prod, $prod->{summary}, $prefs );
+    $prod->{factors}  = $m;
+    return $prod;
+}
+
+# inventory_item_id => enriched product (for nutrition foods linked to inventory).
+sub _products_by_inventory {
+    my ( $self, $c ) = @_;
+    return {} unless $self->product_ready($c) && $self->sourcing_cols_ready($c);
+    my ( %out, $factors, $prefs );
+    $factors = $self->list_sourcing_factors($c);
+    $prefs   = $self->get_prefs($c);
+    try {
+        for my $p ( $c->model('DBEncy')->resultset('HealthKitchen::ItemProduct')->search(
+                { sitename => $self->sitename($c), item_kind => 'inventory' } )->all ) {
+            $out{ $p->item_id } = $self->_enrich_product( { $p->get_columns }, $factors, $prefs );
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, '_products_by_inventory', "$_" );
+    };
+    return \%out;
 }
 
 __PACKAGE__->meta->make_immutable;

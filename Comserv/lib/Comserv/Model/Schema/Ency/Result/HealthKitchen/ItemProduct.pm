@@ -18,6 +18,15 @@ __PACKAGE__->add_columns(
     upc        => { data_type => 'varchar', size => 32,  is_nullable => 1 },
     size_value => { data_type => 'decimal', size => [12, 3], is_nullable => 1 },
     size_unit  => { data_type => 'varchar', size => 20,  is_nullable => 1 },
+    # Sourcing attributes (20261018_healthkitchen_sourcing.sql). Allowed values enforced in Util::HealthKitchen.
+    food_category  => { data_type => 'varchar', size => 30,  is_nullable => 1 },
+    production     => { data_type => 'varchar', size => 30,  is_nullable => 1 },
+    animal_raising => { data_type => 'varchar', size => 30,  is_nullable => 1 },
+    catch_method   => { data_type => 'varchar', size => 20,  is_nullable => 1 },
+    gmo            => { data_type => 'varchar', size => 30,  is_nullable => 1 },
+    local_km       => { data_type => 'integer', is_nullable => 1 },
+    certifier      => { data_type => 'varchar', size => 100, is_nullable => 1 },
+    cert_verified  => { data_type => 'tinyint', is_nullable => 1 },
     created_at => { data_type => 'datetime', is_nullable => 1, set_on_create => 1 },
     updated_at => { data_type => 'datetime', is_nullable => 1, set_on_create => 1, set_on_update => 1 },
 );
