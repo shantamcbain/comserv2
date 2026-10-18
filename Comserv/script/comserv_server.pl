@@ -4,6 +4,11 @@ BEGIN {
     require File::Spec; my $f = File::Spec->rel2abs(__FILE__); $f =~ s{[^/]*$}{raise_nofile.pl};
     eval { require $f; comserv_raise_nofile(8192); 1 } or print STDERR "[nofile] skipped: $@";
 }
+BEGIN {
+    # Same API keys on every branch/port; see script/load_shared_keys.pl (2026-10-18).
+    require File::Spec; my $f = File::Spec->rel2abs(__FILE__); $f =~ s{[^/]*$}{load_shared_keys.pl};
+    eval { require $f; comserv_load_shared_keys(); 1 } or print STDERR "[keys] skipped: $@";
+}
 use Catalyst qw( Static::Simple );
 BEGIN {
     $ENV{CATALYST_SCRIPT_GEN} = 40;
