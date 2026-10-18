@@ -1,0 +1,5 @@
+[%# Shared Health Kitchen medical disclaimer — include on every healthkitchen page %]
+<div class="alert alert-warning hk-disclaimer" role="note">
+    <strong>Informational only, not medical advice; consult a qualified professional.</strong>
+    Health Kitchen suggestions come from ENCY reference data and your pantry. They are not a diagnosis or treatment.
+</div>
