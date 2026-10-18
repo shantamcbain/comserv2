@@ -235,3 +235,7 @@ Comserv/root/static/app/*.apk
 # or a built APK dropped under the web static tree.
 /android/
 Comserv/root/static/android/
+
+# Encryption keys must never be committed (see Comserv::Util::Encryption)
+Comserv/config/.*_encryption_key
+.*_encryption_key
