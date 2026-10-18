@@ -9,6 +9,7 @@
         </label>
         <div style="display:flex;align-items:center;gap:8px;">
             <span id="nl-wysiwyg-badge" class="label label-success" style="font-size:0.85em;">Rich Text</span>
+            <button type="button" id="nl-insert-image" class="btn btn-secondary" style="font-size:0.85em;padding:4px 10px;" title="Insert an image from the File Manager, or upload one">Insert image</button>
             <button type="button" id="nl-toggle-editor-mode" class="btn btn-secondary" style="font-size:0.85em;padding:4px 10px;">
                 View HTML source
             </button>
@@ -83,6 +84,7 @@
         toolbar: ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo']
     }).then(function(editor) {
         editorInstance = editor;
+        window.nlEditor = editor;
         bodyTextarea.style.display = 'none';
 
         editor.model.document.on('change:data', function() {
@@ -158,5 +160,25 @@
         }
         updatePreview(merged);
     };
+})();
+</script>
+[% PROCESS 'pages/partials/image_picker.tt' %]
+<script>
+(function(){
+  var btn=document.getElementById('nl-insert-image'); if(!btn) return;
+  btn.addEventListener('click',function(){
+    window.ComservImagePicker.open(function(html){
+      var ed=window.nlEditor, ta=document.getElementById('body');
+      var ckVisible=ed && ed.ui && ed.ui.element && ed.ui.element.style.display!=='none';
+      if(ckVisible){
+        var vf=ed.data.processor.toView(html), mf=ed.data.toModel(vf);
+        ed.model.insertContent(mf); ed.editing.view.focus();
+      } else {
+        var at=ta.selectionStart||ta.value.length;
+        ta.value=ta.value.slice(0,at)+html+ta.value.slice(at);
+        ta.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+    });
+  });
 })();
 </script>
