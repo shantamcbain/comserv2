@@ -54,6 +54,7 @@
                 <a href='/admin/view_log'><i class="icon-view"></i>View Log</a>
                 [% IF c.session.roles.grep('admin').size %]
                 <a href="[% c.uri_for('/mail/invoice/api') %]"><i class="icon-invoice"></i>Invoice Classification</a>
+                <a href="[% c.uri_for('/Inventory/email-config') %]"><i class="icon-mail"></i>Set Invoice Email Addresses</a>
                 <a href="[% c.uri_for('/mail/invoice/sort') %]"><i class="icon-sort"></i>Sort Invoices by Site</a>
                 [% END %]
                 [% SET admin_sub_db = c.stash.admin_submenu_links || [] %]
@@ -81,6 +82,7 @@
                 <a href="[% c.uri_for('/ai/usage') %]"><i class="icon-stats"></i>Usage &amp; Billing Monitor</a>
                 [% IF c.session.roles.grep('admin').size %]
                 <a href="[% c.uri_for('/ai/eval') %]"><i class="icon-stats"></i>Daily AI Eval Reports</a>
+                <a href="[% c.uri_for('/ai/eval/latest') %]"><i class="icon-stats"></i>Latest AI Eval Report</a>
                 [% END %]
                 <a href="/ai/manage_api_keys"><i class="icon-key"></i>Manage API Keys</a>
                 <a href="/ai/check_status"><i class="icon-status"></i>Check AI Status</a>
@@ -88,7 +90,7 @@
                 <a href="/ai2"><i class="icon-ai"></i>AI2 (New Clean System)</a>
                 [% IF c.stash.is_admin || c.session.username == 'Shanta' %]
                 <a href="#" id="nav-aew-open" onclick="if(window.AEW){AEW.openPopup();return false;}window.open('/ai/editing_widget_popup','aew-code-editor','width=920,height=640,resizable=yes');return false;"><i class="icon-edit"></i>AI Code Editor</a>
-                <a href="#" onclick="window.open('/ai2/editing_widget_popup','AIEditor','width=1400,height=900,menubar=no,toolbar=no,resizable=yes');return false;"><i class="icon-ai"></i>AI2 Code Editor (New)</a>
+                <a href="#" onclick="if(window.AEW){AEW.openPopupAI2();return false;}window.open('/ai2/editing_widget_popup','AIEditor','width=1400,height=900,menubar=no,toolbar=no,resizable=yes');return false;"><i class="icon-ai"></i>AI2 Code Editor (New)</a>
                 <a href="/ai/template_editor"><i class="icon-ttml"></i>Template Editor</a>
                 [% END %]
                 [% IF c.session.roles.grep('admin').size %]
@@ -96,6 +98,8 @@
                         <span class="submenu-section-title">Admin</span>
                         <a href="[% c.uri_for('/ai/usage') %]"><i class="icon-stats"></i>Usage &amp; Activity Monitor</a>
                         <a href="[% c.uri_for('/ai/eval') %]"><i class="icon-stats"></i>Daily AI Eval Reports</a>
+                        <a href="[% c.uri_for('/ai/eval/latest') %]"><i class="icon-stats"></i>Latest AI Eval Report</a>
+                        <a href="[% c.uri_for('/ai/eval') %]#auto-changes"><i class="icon-stats"></i>AI Auto-changes (revert)</a>
                         <a href="[% c.uri_for('/ai/models') %]"><i class="icon-model"></i>Model Management</a>
                         <a href="[% c.uri_for('/ai/admin/agents') %]"><i class="icon-ai"></i>Agent Management</a>
                         <a href="[% c.uri_for('/ai/manage_api_keys') %]"><i class="icon-key"></i>API Keys</a>
@@ -243,6 +247,7 @@
                 <a href="/Inventory/locations"><i class="icon-location"></i>Locations</a>
                 <a href="/Inventory/bom/list"><i class="fas fa-sitemap"></i>Bill of Materials</a>
                 <a href="/Inventory/invoice"><i class="icon-invoice"></i>Supplier Invoices (AP)</a>
+                <a href="/Inventory/email-config"><i class="icon-mail"></i>Set Invoice Email Addresses</a>
                 <a href="/Inventory/sales"><i class="icon-invoice"></i>Sales Invoices (AR)</a>
                 <div class="submenu-section">
                     <span class="submenu-section-title">Shop / Orders</span>
@@ -256,6 +261,7 @@
                 <div class="submenu-section">
                     <span class="submenu-section-title">Accounting</span>
                     <a href="/Accounting"><i class="icon-accounting"></i>Accounting Dashboard</a>
+                    <a href="/Inventory/email-config"><i class="icon-mail"></i>Set Invoice Email Addresses</a>
                     <a href="/Accounting/coa"><i class="icon-coa"></i>Chart of Accounts</a>
                     <a href="/Accounting/gl"><i class="icon-gl"></i>General Ledger</a>
                 </div>

@@ -96,7 +96,7 @@
 
 			[% ELSE %]
 
-			<h3>  Hello!  Welcome to [% MailServer %]'s Mail Page!</h3>
+			<h3>  Hello!  Welcome to [% mail_site = site_display_name || SiteName || c.session.SiteName %][% IF mail_site %][% mail_site | html %]'s[% ELSE %]the[% END %] Mail Page!</h3>
 		<h2> We offer to our members one free email address. </h2>
 <p>When you join any of the hosted sites at [% MailServerName %] you will be given an email address based on your
     username, if available. You may access your mail by either your local mail reader for reading off-line, or you

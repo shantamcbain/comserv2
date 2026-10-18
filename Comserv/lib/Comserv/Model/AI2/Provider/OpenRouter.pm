@@ -114,7 +114,7 @@ sub _per_million {
 }
 
 # Chat completion against OpenRouter (OpenAI-compatible). Returns the v2 shape.
-sub chat {
+sub _chat_http {
     my ($self, $c, %args) = @_;
 
     my $api_key = $self->_resolve_api_key($c, $args{api_key});
@@ -128,6 +128,21 @@ sub chat {
     return { success => 0, error => 'No messages provided' }
         unless ref($messages) eq 'ARRAY' && @$messages;
 
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::scan_messages($messages);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'openrouter_chat',
+            "HarmRefusal failed closed: $@");
+        return { success => 0, refused => 1, error => 'Chat safety check failed. The question was not sent.' };
+    }
+    if ($harm) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'openrouter_chat',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, eval { $c->session->{user_id} }));
+        return Comserv::Util::AI::HarmRefusal::reply_hash($harm);
+    }
+
     my $model = $args{model};
     $model =~ s/^[^|]+\|// if $model;   # drop any "provider|" prefix
     unless ($model) {
@@ -140,6 +155,9 @@ sub chat {
         messages    => $messages,
         temperature => 0.7,
         max_tokens  => $args{max_tokens} // 4096,
+        # Ask OpenRouter for the billed cost of this call (usage.cost) so the
+        # Ledger audit row carries real dollars, not a token-rate guess.
+        usage       => { include => JSON::true },
     };
 
     my $ua = LWP::UserAgent->new(timeout => 180);
@@ -170,7 +188,7 @@ sub chat {
             'openrouter_chat',
             "OpenRouter HTTP failure: $status (model=$model, user="
             . ($c->session->{username} // 'Guest') . ") body=$body");
-        return { success => 0, error => "OpenRouter provider error: $status"
+        return { http_sent => 1, http_status => $status, success => 0, error => "OpenRouter provider error: $status"
                                       . ($detail ? " - $detail" : '') };
     }
 
@@ -179,7 +197,7 @@ sub chat {
         my $body = substr($res->decoded_content // '', 0, 600);
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
             'openrouter_chat', "Bad JSON from OpenRouter (model=$model) body=$body");
-        return { success => 0, error => 'Bad JSON from OpenRouter' };
+        return { http_sent => 1, success => 0, error => 'Bad JSON from OpenRouter' };
     }
 
     my $text = '';
@@ -206,19 +224,119 @@ sub chat {
             "OpenRouter empty content (model=$model, user="
             . ($c->session->{username} // 'Guest') . ") body=$body");
         return {
+            http_sent => 1, id => $data->{id}, upstream => $data->{provider},
             success => 0,
             error   => 'OpenRouter returned empty content',
             model   => $data->{model} || $model,
             usage   => $data->{usage} || {},
         };
     }
-    return { success => 1, response => $text, model => $data->{model} || $model, usage => $data->{usage} || {} };
+    return { http_sent => 1, id => $data->{id}, upstream => $data->{provider},
+             success => 1, response => $text, model => $data->{model} || $model, usage => $data->{usage} || {} };
 }
 
 # Admin-only sync: returns the live catalog (UI stores it in metadata if desired).
 sub sync_models {
     my ($self, $c, $api_key) = @_;
     return $self->list_models($c, $api_key);
+}
+
+# ===================================================================
+# chat() — every OpenRouter chat call goes through here and is written to
+# the Ledger (ai_usage_logs, request_type 'openrouter_call') with branch,
+# sitename, user and a purpose tag, whether or not the caller also logs its
+# own feature row. These audit rows are excluded from the usage totals
+# (UsageMonitor EXCLUDED_REQUEST_TYPES) and used for the unlogged-spend
+# reconciliation against OpenRouter's billed spend. Pass purpose => '...'
+# to tag a call explicitly; otherwise it is derived from the caller.
+# ===================================================================
+sub chat {
+    my ($self, $c, %args) = @_;
+    my $t0 = eval { require Time::HiRes; Time::HiRes::time() } || time;
+    my $r  = $self->_chat_http($c, %args);
+    if (ref $r eq 'HASH' && delete $r->{http_sent}) {
+        my $ms = int(((eval { Time::HiRes::time() } || time) - $t0) * 1000);
+        $self->_audit_ledger($c, %args, result => $r, duration_ms => $ms);
+    }
+    return $r;
+}
+
+our %PURPOSE_BY_SUB = (
+    'Comserv::Controller::AI::generate'      => 'ai_editor_generate',
+    'Comserv::Controller::AI::chat'          => 'ai_chat',
+    'Comserv::Controller::AI2::test_model'   => 'model_test',
+);
+
+sub purpose_from_chain {
+    my ($chain) = @_;
+    for my $sub (@{ $chain || [] }) {
+        return $PURPOSE_BY_SUB{$sub} if $PURPOSE_BY_SUB{$sub};
+        return 'focus_tune'  if $sub =~ /FocusTune|focustune/i;
+        return 'title'       if $sub =~ /title/i;
+        return 'eval'        if $sub =~ /Eval/;
+        return 'organizer'   if $sub =~ /Organizer|DecisionRank|TodaysFocus/i;
+    }
+    for my $sub (@{ $chain || [] }) {
+        next if $sub =~ /::Router::|::Chat::/;
+        (my $short = $sub) =~ s/^Comserv:://;
+        return lc join '_', grep { length } split /::/, $short;
+    }
+    return @{ $chain || [] } ? 'router' : 'unknown';
+}
+
+sub _audit_ledger {
+    my ($self, $c, %a) = @_;
+    return if $ENV{COMSERV_NO_OR_AUDIT};
+    my $ok = eval {
+        my $r = $a{result} || {};
+        my $u = ref $r->{usage} eq 'HASH' ? $r->{usage} : {};
+        my @chain;
+        for my $i (1 .. 12) {
+            my @f = caller($i) or last;
+            next if $f[3] =~ /Provider::OpenRouter::|^Try::Tiny|__ANON__|^\(eval\)/;
+            push @chain, $f[3];
+            last if @chain >= 4;
+        }
+        my $purpose = $a{purpose} // purpose_from_chain(\@chain);
+        my $cost = $u->{cost};
+        my $model = $r->{model} || $a{model} || 'unknown';
+        $model =~ s/^[^|]+\|//;
+        my $schema = $c->model('DBEncy')->schema or die "no schema\n";
+        require Comserv::Model::AI::Usage;
+        my $meta = {
+            audit => 1, purpose => $purpose, caller => join(' < ', @chain),
+            cost_source => (defined $cost ? 'openrouter_usage' : 'none'),
+            (defined $r->{id}       ? (generation_id => $r->{id})       : ()),
+            (defined $r->{upstream} ? (upstream      => $r->{upstream}) : ()),
+            (ref $u->{prompt_tokens_details} eq 'HASH' && defined $u->{prompt_tokens_details}{cached_tokens}
+                ? (cached_tokens => 0 + $u->{prompt_tokens_details}{cached_tokens}) : ()),
+            branch   => (eval { Comserv::Model::AI::Usage::_app_branch($c) } || undef),
+            sitename => (eval { $c->session->{SiteName} } || eval { $c->stash->{SiteName} } || undef),
+            username => (eval { $c->session->{username} } || undef),
+        };
+        delete $meta->{$_} for grep { !defined $meta->{$_} } keys %$meta;
+        my $pt = 0 + ($u->{prompt_tokens} // 0);
+        my $ct = 0 + ($u->{completion_tokens} // 0);
+        $schema->resultset('AiUsageLog')->create({
+            user_id            => (eval { $c->session->{user_id} } || undef),
+            site_id            => (eval { $c->session->{SiteID} } || undef),
+            provider           => 'openrouter',
+            model              => substr($model, 0, 100),
+            prompt_tokens      => $pt,
+            completion_tokens  => $ct,
+            total_tokens       => 0 + ($u->{total_tokens} // ($pt + $ct)),
+            estimated_cost_usd => (defined $cost ? 0 + $cost : 0),
+            duration_ms        => $a{duration_ms},
+            request_type       => 'openrouter_call',
+            status             => ($r->{success} ? 'success' : 'error'),
+            error_message      => ($r->{success} ? undef : substr($r->{error} // '', 0, 500)),
+            metadata           => encode_json($meta),
+        });
+        1;
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'openrouter_audit',
+        "Ledger audit row failed: $@") unless $ok;
+    return $ok ? 1 : 0;
 }
 
 __PACKAGE__->meta->make_immutable;

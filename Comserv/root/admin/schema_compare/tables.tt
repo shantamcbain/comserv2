@@ -203,33 +203,96 @@
                 </h3>
                 <div class="section-content">
                     [% IF result_only.size %]
-                    <div class="table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Result Name</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                [% FOREACH res IN result_only %]
-                                <tr>
-                                    <td>[% res.result_name | html %]
-                                        [% IF res.result_rel_path %]
-                                            <a href="#" onclick="openAI2EditorWindow('[% res.result_rel_path | html %]');return false" class="btn btn-sm btn-secondary" title="Edit result file in AI editor"><i class="fas fa-edit"></i> Edit</a>
+                    <div class="orphan-result-list">
+                        [% FOREACH res IN result_only %]
+                        <div class="orphan-result-card" style="margin-bottom: 1rem; padding: 0.75rem 1rem; border: 1px solid var(--border-color, #ddd); border-radius: 6px; background: var(--bg-secondary, #fafafa);">
+                            <div class="orphan-result-header" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <div>
+                                    <strong><i class="fas fa-file-code"></i> [% res.result_name | html %]</strong>
+                                    [% IF res.field_count %]
+                                        <span class="text-muted" style="margin-left: 0.5rem;">([% res.field_count %] fields)</span>
+                                    [% END %]
+                                    [% IF res.result_rel_path %]
+                                        <a href="#" onclick="openAI2EditorWindow('[% res.result_rel_path | html %]');return false" class="btn btn-sm btn-secondary" title="Edit result file in AI editor"><i class="fas fa-edit"></i> Edit</a>
+                                    [% END %]
+                                </div>
+                                <div class="action-cell">
+                                    <button class="btn btn-sm btn-primary"
+                                            data-action="create-table-from-result"
+                                            data-result-name="[% res.result_name | html %]"
+                                            data-db="[% db.name | html %]"
+                                            data-fetch-url="[% fetch_url %]"><i class="fas fa-plus"></i> Create Table</button>
+                                </div>
+                            </div>
+                            [% IF res.fields && res.fields.size %]
+                            <div class="table-container orphan-fields-wrap">
+                                <table class="data-table orphan-fields-table" style="margin: 0; font-size: 0.9em;">
+                                    <thead>
+                                        <tr>
+                                            <th>Field</th>
+                                            <th>Type</th>
+                                            <th>Size</th>
+                                            <th>Nullable</th>
+                                            <th>Default</th>
+                                            <th>Flags / Docs</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        [% FOREACH field IN res.fields %]
+                                        <tr>
+                                            <td><code>[% field.name | html %]</code></td>
+                                            <td>[% field.data_type | html %]</td>
+                                            <td>[% IF field.size.defined %][% field.size %][% ELSE %]—[% END %]</td>
+                                            <td>[% IF field.is_nullable %]<span class="prop nullable">NULL</span>[% ELSE %]<span class="prop not-null">NOT NULL</span>[% END %]</td>
+                                            <td><code>[% IF field.default_value.defined %][% field.default_value | html %][% ELSE %]—[% END %]</code></td>
+                                            <td>
+                                                [% IF field.is_primary_key %]<span class="prop primary">PK</span> [% END %]
+                                                [% IF field.is_auto_increment %]<span class="prop">AI</span> [% END %]
+                                                [% IF field.docs %]<span class="text-muted">[% field.docs | html %]</span>[% END %]
+                                            </td>
+                                        </tr>
                                         [% END %]
-                                    </td>
-                                    <td class="action-cell">
-                                        <button class="btn btn-sm btn-primary"
-                                                data-action="create-table-from-result"
-                                                data-result-name="[% res.result_name | html %]"
-                                                data-db="[% db.name | html %]"
-                                                data-fetch-url="[% fetch_url %]"><i class="fas fa-plus"></i> Create Table</button>
-                                    </td>
-                                </tr>
-                                [% END %]
-                            </tbody>
-                        </table>
+                                    </tbody>
+                                </table>
+                            </div>
+                            [% ELSIF res.columns %]
+                            <div class="table-container orphan-fields-wrap">
+                                <table class="data-table orphan-fields-table" style="margin: 0; font-size: 0.9em;">
+                                    <thead>
+                                        <tr>
+                                            <th>Field</th>
+                                            <th>Type</th>
+                                            <th>Size</th>
+                                            <th>Nullable</th>
+                                            <th>Default</th>
+                                            <th>Flags / Docs</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        [% FOREACH col_name IN res.columns.keys.sort %]
+                                        [% SET field = res.columns.$col_name %]
+                                        <tr>
+                                            <td><code>[% col_name | html %]</code></td>
+                                            <td>[% field.data_type | html %]</td>
+                                            <td>[% IF field.size.defined %][% field.size %][% ELSE %]—[% END %]</td>
+                                            <td>[% IF field.is_nullable %]<span class="prop nullable">NULL</span>[% ELSE %]<span class="prop not-null">NOT NULL</span>[% END %]</td>
+                                            <td><code>[% IF field.default_value.defined %][% field.default_value | html %][% ELSE %]—[% END %]</code></td>
+                                            <td>
+                                                [% IF field.is_primary_key %]<span class="prop primary">PK</span> [% END %]
+                                                [% IF field.is_auto_increment %]<span class="prop">AI</span> [% END %]
+                                                [% IF field.docs %]<span class="text-muted">[% field.docs | html %]</span>
+                                                [% ELSIF field.documentation %]<span class="text-muted">[% field.documentation | html %]</span>[% END %]
+                                            </td>
+                                        </tr>
+                                        [% END %]
+                                    </tbody>
+                                </table>
+                            </div>
+                            [% ELSE %]
+                            <p class="text-muted" style="margin: 0;">No column definitions parsed from this Result file.</p>
+                            [% END %]
+                        </div>
+                        [% END %]
                     </div>
                     [% ELSE %]
                     <p class="text-muted">No orphaned result files.</p>

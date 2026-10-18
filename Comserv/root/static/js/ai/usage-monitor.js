@@ -351,10 +351,29 @@
         };
     }
 
+    // How old is this reading, in minutes? null when the timestamp is missing
+    // or unparseable. Used to stop a cached value reading as live.
+    function guardAgeMinutes(at) {
+        if (!at) return null;
+        var t = Date.parse(at);
+        if (isNaN(t)) return null;
+        var mins = Math.round((Date.now() - t) / 60000);
+        return mins < 0 ? 0 : mins;
+    }
+
     function paintSuperGrok(g) {
         if (!g) return;
         lastGuard = g;
         var build = g.build;
+        var age = guardAgeMinutes(g.at);
+        var staleNote = '';
+        if (g.stale) {
+            staleNote = ' ⚠ cached reading'
+                + (age == null ? '' : ' from ' + age + ' min ago')
+                + ' — the live guard file could not be read, so this number may be out of date.';
+        } else if (age != null && age > 30) {
+            staleNote = ' ⚠ this reading is ' + age + ' min old — the add-on may have stopped reporting.';
+        }
         setText('usage-kpi-build', build == null ? '—' : (build + '%'));
         setText('usage-kpi-remaining', g.remaining == null ? '—' : (g.remaining + '%'));
         setText('usage-kpi-cap', g.daily_cap == null ? '—' : (g.daily_cap + '%'));
@@ -365,13 +384,17 @@
         if (g.off_today || g.mode === 'free') {
             st.textContent = 'SuperGrok off for today. New Hermes sessions → openrouter/cohere/north-mini-code:free. '
                 + (g.lock_reason || '')
-                + '. Restores grok-build-0.1 next PDT day only if week Build < ' + WEEK_OFF_AT + '%. This chat stays until a new session.';
+                + '. Restores grok-build-0.1 next PDT day only if week Build < ' + WEEK_OFF_AT + '%. This chat stays until a new session.'
+                + staleNote;
             st.style.color = 'var(--error-color, var(--primary-color))';
         } else {
             st.textContent = 'SuperGrok on for new sessions (grok-build-0.1). Yesterday +'
                 + (g.used_yesterday == null ? '?' : g.used_yesterday) + '% · reset '
-                + (g.reset_at || RESET_ISO) + '.';
-            st.style.color = 'var(--text-color)';
+                + (g.reset_at || RESET_ISO) + '.'
+                + staleNote;
+            st.style.color = staleNote
+                ? 'var(--error-color, var(--primary-color))'
+                : 'var(--text-color)';
         }
     }
 
@@ -487,12 +510,23 @@
                     .then(function (text) {
                         var o = loadGrokCom() || {};
                         if (typeof o.build !== 'number') return;
-                        paintSuperGrok(computeGuard(o.build, text));
+                        // Falling back to the browser-cached reading: flag it so
+                        // paintSuperGrok can say the number may be out of date
+                        // instead of presenting a stale value as live.
+                        var g = computeGuard(o.build, text);
+                        g.stale = true;
+                        if (o.at) g.at = o.at;
+                        paintSuperGrok(g);
                     });
             })
             .catch(function () {
                 var o = loadGrokCom() || {};
-                if (typeof o.build === 'number') paintSuperGrok(computeGuard(o.build, ''));
+                if (typeof o.build === 'number') {
+                    var g = computeGuard(o.build, '');
+                    g.stale = true;
+                    if (o.at) g.at = o.at;
+                    paintSuperGrok(g);
+                }
             });
     }
 

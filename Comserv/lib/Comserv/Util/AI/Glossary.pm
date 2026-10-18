@@ -66,10 +66,20 @@ our %TERMS = (
     'Allow-listed Config Change' =>
         'an approved config proposal whose target is in Comserv::Util::AI::EvalAllowList. Only these can be '
       . 'applied from /ai/eval, only when an admin presses Apply, and every apply records a before-value for Revert.',
+    'Failover Chain' =>
+        'the ordered list of provider|model slugs for one purpose (chat, docs, coding, title) in '
+      . 'data/ai_model_chains.json. The Router walks it on failure; admins can approve changes from /ai/eval.',
+    'Circuit Breaker' =>
+        'per-model health gate in data/ai_model_health.json. Opens after consecutive failures or an '
+      . 'error_spike/dead_model anomaly, cools down, then half-opens with a single probe.',
+    'All Exhausted' =>
+        'every candidate in the Failover Chain failed, was skipped (budget, guard, replace, circuit), or '
+      . 'was blocked. The user gets an honest message; the Ledger records status all_exhausted.',
 );
 
 # Admin-only terms (display order); not injected into model prompts.
-our @ADMIN_TERM_ORDER = ('Eval Report', 'Eval Proposal', 'Allow-listed Config Change');
+our @ADMIN_TERM_ORDER = ('Eval Report', 'Eval Proposal', 'Allow-listed Config Change',
+                          'Failover Chain', 'Circuit Breaker', 'All Exhausted');
 
 # Known Golden Data domains (ai_golden_data.domain is a varchar; other
 # values are accepted, these are the documented ones).
@@ -212,6 +222,21 @@ An approved config proposal whose target is in
 L<Comserv::Util::AI::EvalAllowList>. Only these can be applied from /ai/eval,
 only when an admin presses Apply, and every apply records a before-value for
 Revert.
+
+=item Failover Chain
+
+The ordered list of C<provider|model> slugs for one purpose in
+C<data/ai_model_chains.json>. The Router walks it on failure.
+
+=item Circuit Breaker
+
+Per-model health gate in C<data/ai_model_health.json>. Opens after consecutive
+failures or an anomaly, cools down, then half-opens with a single probe.
+
+=item All Exhausted
+
+Every candidate failed or was blocked. Honest user message; Ledger status
+C<all_exhausted>.
 
 =back
 

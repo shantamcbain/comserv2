@@ -23,8 +23,13 @@ __PACKAGE__->config(namespace => 'ai/eval');
 #   POST /ai/eval/import_inbox             ingest data/ai_eval_inbox/*.json
 #   POST /ai/eval/ingest                   JSON ingest (Bearer token or admin session)
 #
-# All state changes are POST + admin + per-session CSRF token. Nothing is
-# applied automatically; see Model::AI2::EvalReports.
+#   GET  /ai/eval/latest                   redirect to the newest report
+#   POST /ai/eval/auto_improve             run the safe auto-improver now
+#
+# All state changes are POST + admin + per-session CSRF token. Only the
+# auto-improver applies without a click, and only safe allow-listed changes
+# (chain re-orderings, cap decreases); each is listed under Auto-changes with
+# the normal Revert. See Model::AI2::EvalReports::auto_apply.
 # ===================================================================
 
 has 'logging' => (
@@ -131,7 +136,71 @@ sub index :Path :Args(0) {
         csrf_token  => $self->_csrf_token($c),
         is_admin    => 1,
         allow_list  => $m->allow_list($c)->describe,
+        auto_changes => $m->auto_changes($c, limit => 30),
+        latest_eval  => $m->latest_summary($c),
+        # Super Grok meter >24 h stale -> ask for a manual reading (Oct 8 2026).
+        supergrok_meter => (eval { require Comserv::Model::AI2::UsageMonitor; Comserv::Model::AI2::UsageMonitor->new->supergrok_meter($c) } || undef),
+        # Model scorecard (Oct 10 2026), cached 10 min; ?scorecard_refresh=1 forces.
+        scorecard => (eval { $self->_scorecard($c)->build(force => ($c->req->params->{scorecard_refresh} ? 1 : 0)) } || { error => "$@" }),
+        # Cost per Done task from rated Hermes tasks (/ai/tasks, eval #36).
+        task_cost => (eval { require Comserv::Model::AI2::TaskTracker;
+            my $r = ''.$c->path_to(''); $r =~ s{/$}{};
+            Comserv::Model::AI2::TaskTracker->new(root => $r)->build } || { error => "$@" }),
     );
+}
+
+sub _scorecard {
+    my ($self, $c) = @_;
+    require Comserv::Model::AI2::ModelScorecard;
+    return Comserv::Model::AI2::ModelScorecard->new(root => $c->config->{home} || $c->path_to('')->stringify);
+}
+
+=head2 scorecard_weights
+
+POST /ai/eval/scorecard_weights - edit the cost-per-result weights
+(data/ai_model_scorecard.json). Admin + CSRF.
+
+=cut
+
+sub scorecard_weights :Local :Args(0) {
+    my ($self, $c) = @_;
+    my $back = $c->uri_for('/ai/eval');
+    return unless $self->_post_guard($c, $back);
+    my $err = $self->_scorecard($c)->save_config($c->req->body_params, $self->_username($c));
+    $c->flash->{ $err ? 'ai_eval_err' : 'ai_eval_msg' } = $err ? "Scorecard weights not saved: $err" : 'Scorecard weights saved.';
+    $c->response->redirect($back . '#model-scorecard');
+}
+
+=head2 latest
+
+GET /ai/eval/latest - redirect to the newest report (admin menu / planning links).
+
+=cut
+
+sub latest :Local :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_admin($c);
+    my $s = $self->_model->latest_summary($c);
+    my $id = $s && $s->{latest} ? $s->{latest}{id} : undef;
+    $c->response->redirect($id ? $c->uri_for('/ai/eval/report', $id) : $c->uri_for('/ai/eval'));
+}
+
+=head2 auto_improve
+
+POST /ai/eval/auto_improve - run the safe auto-improver now (same code as
+script/ai_eval_auto_improve.pl). Only chain re-orderings and cap decreases.
+
+=cut
+
+sub auto_improve :Local :Args(0) {
+    my ($self, $c) = @_;
+    my $back = $c->uri_for('/ai/eval');
+    return unless $self->_post_guard($c, $back);
+    my $r = $self->_model->auto_apply($c, reason => 'run by ' . $self->_username($c));
+    my $msg = sprintf('Auto-improve: %d applied, %d skipped', scalar @{ $r->{applied} || [] }, scalar @{ $r->{skipped} || [] });
+    $msg .= ' - ' . join('; ', map { "$_->{target}: $_->{why}" } @{ $r->{skipped} }) if @{ $r->{skipped} || [] };
+    $c->flash->{ $r->{ok} ? 'ai_eval_msg' : 'ai_eval_err' } = $r->{ok} ? $msg : "Auto-improve failed: $r->{error}";
+    $c->response->redirect($back . '#auto-changes');
 }
 
 =head2 report

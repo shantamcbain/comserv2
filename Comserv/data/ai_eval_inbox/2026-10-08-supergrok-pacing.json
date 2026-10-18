@@ -1,0 +1,49 @@
+{
+   "created_by" : "script/supergrok_pacing.pl",
+   "markdown" : "# Super Grok pacing 2026-10-08\n\n- ALERT: Super Grok burned 42 points today (since Thu Oct 08 10:31 PT; limit 15): now 42% used. Slow down or stop the big sessions.\n- ALERT: Super Grok is 37 points ahead of pace (42% used vs 5% expected by now; limit 10).\n- Super Grok 41.7% used, 58.3% left; cycle Thu Oct 08 10:31 PT -> reset Thu Oct 15 10:31 PT (6.6 days left)\n- Today: +41.7 points since Thu Oct 08 10:31 PT\n- Pace: ahead (+36.6 points vs 5.1% expected). Daily target 8.8%/day (~16 M tokens, ~100 grok-4.7 calls)\n- Calibration 0.551 %/M Hermes xai tokens; base 41% at Thu Oct 08 19:04 PT\n",
+   "metrics" : {
+      "alerts" : [
+         {
+            "kind" : "day_rise",
+            "level" : "critical",
+            "message" : "Super Grok burned 42 points today (since Thu Oct 08 10:31 PT; limit 15): now 42% used. Slow down or stop the big sessions.",
+            "value" : 41.7
+         },
+         {
+            "kind" : "noon_ahead",
+            "level" : "warning",
+            "message" : "Super Grok is 37 points ahead of pace (42% used vs 5% expected by now; limit 10).",
+            "value" : 36.6
+         }
+      ],
+      "meter" : {
+         "age_h" : "0.1",
+         "last_at_pt" : "Thu Oct 08 19:04 PT",
+         "last_source" : "spoken",
+         "last_value" : "41",
+         "stale" : 0,
+         "stale_after_h" : 24
+      },
+      "supergrok_pacing" : {
+         "auto_queue" : 0,
+         "daily_target_calls" : "100",
+         "daily_target_mtok" : "16",
+         "daily_target_pct" : "8.8",
+         "day_rise_pct" : "41.7",
+         "days_left" : "6.6",
+         "endgame" : null,
+         "expected_pct" : "5.1",
+         "left_pct" : "58.3",
+         "midweek_warning" : null,
+         "pace" : "ahead",
+         "pace_delta" : "+36.6",
+         "rate_pct_per_mtok" : "0.551",
+         "reset_pt" : "Thu Oct 15 10:31 PT",
+         "used_day_start_pct" : "0.0",
+         "used_pct" : "41.7"
+      }
+   },
+   "report_date" : "2026-10-08",
+   "source" : "Super Grok pacing",
+   "summary" : "ALERT: Super Grok burned 42 points today (since Thu Oct 08 10:31 PT; limit 15): now 42% used. Slow down or stop the big sessions. ALERT: Super Grok is 37 points ahead of pace (42% used vs 5% expected by now; limit 10)."
+}

@@ -103,8 +103,8 @@ sub query {
     # SearXNG returns HTML for JSON POST bodies on our build; use form GET + format=json.
     my $res = try {
         require URI::Escape;
-        my $lang = $args{language} ? '&language=' . URI::Escape::uri_escape($args{language}) : '';
-        my $get = "$url/search?q=" . URI::Escape::uri_escape($q)
+        my $lang = $args{language} ? '&language=' . URI::Escape::uri_escape_utf8($args{language}) : '';
+        my $get = "$url/search?q=" . URI::Escape::uri_escape_utf8($q)
                 . '&format=json&categories=general' . $lang;
         my $req = HTTP::Request->new(GET => $get);
         $req->header('Accept' => 'application/json');

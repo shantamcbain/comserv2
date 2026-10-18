@@ -1,0 +1,459 @@
+{
+  "report_date": "2026-10-02",
+  "source": "AI usage monitor",
+  "created_by": "AI usage monitor",
+  "summary": "YES, improving on reliability: chain demotion + AISYSTEM guard/preflight (297276399) stopped new gemma 429s; app 1d ok_rate 26.3%\u2192100% (Chat quiet); 7d 37.2%\u219245.7%. Cost worse: OR week $15.12 > $11.50 soft cap (Hermes v4-pro Oct 1 ~$1.43/474 calls). Bot 43% @ Oct 1 9:23 AM \u2192 ~98% by Mon reset (early warning). Super Grok reset; Hermes back on grok-build-0.1; meter still stale 46h.",
+  "markdown": "# Daily AI Eval \u2014 2026-10-02 (Friday)\n\nRun: 2026-10-02 06:40 PT \u00b7 source: AI usage monitor \u00b7 system of record: aisystem :4006\nBranch: `aisystem` @ 4c54f696f (clean). Main: `main` @ 86df55bfb. :4006 up since Oct 1 9:46 AM PT (pid 497325, -r).\n\n**Core question: is the code making our AI usage better or worse?**\n**Answer: YES \u2014 reliability better; cost worse on the OpenRouter week soft cap.**\n297276399 demoted gemma-4-31b off chat/docs head and shipped UsageMonitor/StalePreflight/HealthChecks. No new Chat failures after land. Hermes DeepSeek v4-pro thrash on Oct 1 pushed OR week to $15.12 / $11.50.\n\n## Budget\n- **Grok Bot (spoken):** 43% used at 2026-10-01T09:23:00-07:00 (up from 27% at 2026-10-01T08:14:00-07:00). Burn ~14.06%/day since Mon Sep 28 8 AM PT reset. Soft daily max ~14.46% (57% left / 3.94 days). **Projection ~98% by Mon Oct 5 ~8 AM PT \u2014 early warning near 100%.** No newer spoken % found; not invented.\n- **OpenRouter (live key):** day **$0.63** / $1.65 (under); week **$15.12** / $11.5 (**OVER**); month **$12.95** / $50 (under). Balance **$4.08** (credits 260 \u2212 usage). Auth-key usage +$12.95 since Oct 1 report (~22h).\n- **Super Grok:** guard remaining **100%**, used_today 0, unlocked, mode grok. Reset \u2192 next **2026-10-08T10:31:00-07:00**. Hermes notice: switched back to grok-build-0.1 at Oct 2 00:00 PT. **Meter stale 46.4h** (last grokcom write Sep 30 8:07 AM PT).\n\n## Code changes since last report (2026-10-01 ~9:46 AM PT)\n- **297276399** (aisystem, Oct 1 9:41 AM PT): AISYSTEM guard/health/runtime \u2014 Router, UsageMonitor, EvalReports, HealthChecks, StalePreflight, chain reorder (gemma off chat/docs head). \u2192 **improved**\n- **48db9e958**: Hermes git-dashboard UI. \u2192 **no effect**\n- **f56e6a1e2**: gitignore ai_model_health.json. \u2192 **improved** (hygiene)\n- **86df55bfb / 4c54f696f**: merge aisystem\u2194main. \u2192 **no effect** (delivery; preflight OK)\n- **config:hermes-default-reset** (Oct 2 00:00 PT): default \u2192 xai-oauth/grok-build-0.1 after Super Grok reset. \u2192 **improved**\n- Uncommitted on aisystem: **0**. Skill said branch aisystem \u2014 confirmed (`git branch --show-current` = aisystem), not fix-ai-generate-pipe-model.\n\n## Scorecard trend\n- **App ledger 1d:** 6 calls, 6 ok, **100%**, $0 (all hermes rows). vs yesterday **26.3%** \u2014 rebound, but Chat has had **zero turns** since Sep 30 19:48 PT.\n- **App ledger 7d:** 46 calls, 21 ok, **45.7%**, $0.1015 (was 37.2% / 16 of 43).\n- **Org 1d:** 544 calls (6 app + 538 Hermes), $1.4309, 81.9M tokens.\n- **Org 7d:** 2475 calls (46 app + 2429 Hermes), $3.6802.\n- **Hermes 24h:** 9 sessions, 538 API, est **$1.43**, dominated by deepseek-v4-pro (474). 7d: 34 sessions, 2429 API, est $3.58.\n- **Kill switch:** none. **Grounding:** shadow.\n\n## Thrash / effectiveness\n- **App thrash:** none.\n- **Hermes thrash (24h):** 10 windows \u226520 assistant msgs/15min \u2014 deepseek-v4-pro peaks **46** (inventory categories 2:00 PM) and **42** (3D browse 11:00 AM); v4.1-flash 21 at 9:00 AM.\n- **Effectiveness (\u226510 calls):** no app model reached 10 calls in 1d/7d \u2192 too little data for replace/watch. gemma-31b remains 0/6 (watch / remove from coding). Hermes ok/flagged unavailable in state.db.\n\n## Failover health\n- **1d:** 0 turns / 0 failover / 0 all_exhausted (Chat idle).\n- **7d:** turns 4, answered_after_failover **2**, answered_first 2 (**50%**), all_exhausted 6 (Sep 30 Focus-Tune), failed http_429\u00d74 + http_404\u00d71.\n- Chains now lead chat with north-mini-code:free; gemma-31b last on chat/docs, still #2 on coding.\n- Real failover only when a failed call is retried on the next healthy model and succeeds \u2014 that path worked 2/4 in 7d; no new non-failed-over Chat failures after demotion.\n\n## Chat UX sample\n- Agent card: **quiet** \u2014 0 calls in 30 min; last Chat activity Sep 30 19:48 PT (all_exhausted / gemma 429 Focus-Tune era).\n- Oct 1\u20132 ledger rows are Hermes heartbeats (grok-build-0.1 / deepseek-v4-pro) marked success \u2014 not end-user Chat.\n\n## HelpDesk\n- No HelpDesk signal in usage_live (no section / request_type). Status: **no_signal**.\n\n## Ops / preflight\n- StalePreflight OK: :4006 aisystem, :3001 main, :4003 3d, :9119 Hermes UI.\n- Hermes also on :9103/:9106. CSC mailbox watch left paused; CSC developer not started. :3001 not touched.\n\n## Proposals\n1. **Config:** remove gemma-4-31b from chain_coding (allow-list `data/ai_model_chains.json:chain_coding`).\n2. **Config:** add gemma-4-31b to `removed[]` (allow-list).\n3. **Code:** Focus-Tune separate request_type + skip open circuits (carry-over).\n4. **Workstation:** Hermes OR week soft-cap guard (week already over).\n5. **Workstation:** refresh grok.com meter (stale 46h).",
+  "metrics": {
+    "bot": {
+      "spoken_used_pct": 43,
+      "spoken_percent_left": 57,
+      "observed_at": "2026-10-01T09:23:00-07:00",
+      "prior_spoken_used_pct": 27,
+      "prior_spoken_at": "2026-10-01T08:14:00-07:00",
+      "last_reset": "2026-09-28T08:00:00-07:00",
+      "next_reset": "2026-10-05T08:00:00-07:00",
+      "days_elapsed_at_spoken": 3.06,
+      "days_left_at_spoken": 3.94,
+      "days_left_now": 3.06,
+      "burn_pct_per_day": 14.06,
+      "projected_used_at_reset_pct": 98,
+      "soft_daily_max_pct": 14.46,
+      "early_warning": "projected ~98% by Mon Oct 5 ~8 AM PT \u2014 near/over 100% if pace holds",
+      "source": "user-spoken (memory); no newer spoken % found"
+    },
+    "openrouter": {
+      "balance_usd": 4.0798,
+      "day_usd": 0.634325679,
+      "week_usd": 15.117621128,
+      "month_usd": 12.945656147,
+      "total_credits": 260,
+      "total_usage": 255.920222264,
+      "auth_key_usage_usd": 254.321402244,
+      "prev_report_auth_key_usage_usd": 241.375746097,
+      "derived_spend_since_prev_report_usd": 12.9457,
+      "derived_window_hours": 22.0,
+      "live_status": "ok openrouter_auth_key + /api/v1/credits",
+      "free_model_daily_remaining": 1000,
+      "caps": {
+        "day_usd": 1.65,
+        "week_usd": 11.5,
+        "month_usd": 50
+      },
+      "vs_caps": {
+        "day": "under ($0.63 / $1.65)",
+        "week": "OVER ($15.12 / $11.50) \u2014 131% of soft week cap",
+        "month": "under ($12.95 / $50)"
+      }
+    },
+    "supergrok": {
+      "remaining_pct": 100,
+      "build_used_pct": 0,
+      "used_today": 0,
+      "used_yesterday": 0,
+      "daily_cap_pct": 14,
+      "locked_today": false,
+      "mode": "grok",
+      "reset_at": "2026-10-08T10:31:00-07:00",
+      "guard_checked": "2026-10-02T06:30:01-07:00",
+      "meter_stale": true,
+      "meter_age_h": 46.4,
+      "meter_at": "2026-09-30T08:07:40-07:00",
+      "hermes_notice": "2026-10-02 00:00 PT Super Grok reset \u2014 Hermes main switched back to xai-oauth/grok-build-0.1",
+      "switch_model": "deepseek/deepseek-v4-pro",
+      "usage_live_week_card": {
+        "week_start": "2026-09-28",
+        "api_calls": 205,
+        "tokens": 33753933,
+        "sessions": 2
+      },
+      "hermes_xai_24h_calls": {},
+      "note": "meter stale 46.4h; estimate calls_since_reset=0; remaining 100% is estimate/guard after reset, not live grok.com card"
+    },
+    "hermes": {
+      "window_24h": {
+        "sessions": 9,
+        "api_calls": 538,
+        "cost_usd_est": 1.4309,
+        "tokens": 81866598,
+        "by_model": [
+          {
+            "model": "deepseek/deepseek-v4-pro",
+            "provider": "openrouter",
+            "api_calls": 474,
+            "sessions": 8
+          },
+          {
+            "model": "qwen/qwen3.8-flash",
+            "provider": "openrouter",
+            "api_calls": 36,
+            "sessions": 1
+          },
+          {
+            "model": "deepseek/deepseek-v4.1-flash",
+            "provider": "openrouter",
+            "api_calls": 20,
+            "sessions": 1
+          },
+          {
+            "model": "deepseek/deepseek-v4-flash",
+            "provider": "openrouter",
+            "api_calls": 8,
+            "sessions": 8
+          }
+        ]
+      },
+      "window_7d": {
+        "sessions": 34,
+        "api_calls": 2429,
+        "cost_usd_est": 3.5787,
+        "tokens": 343190862,
+        "top_models": {
+          "grok-4.6": 519,
+          "deepseek/deepseek-v4-pro": 474,
+          "deepseek/deepseek-v4-flash": 312,
+          "grok-4.7": 261,
+          "deepseek/deepseek-v4.1-flash": 175,
+          "grok-build-0.1": 159,
+          "cohere/north-mini-code:free": 140,
+          "~deepseek/deepseek-flash-latest": 134,
+          "nvidia/nemotron-3.5-lightning:free": 123
+        }
+      },
+      "open_sessions": 4,
+      "live": 0,
+      "config": {
+        "default": "grok-build-0.1",
+        "provider": "xai-oauth",
+        "fallback": "openrouter/deepseek/deepseek-v4-pro",
+        "config_mtime": "2026-10-02T00:00:06-07:00",
+        "aliases_code": "openrouter/deepseek/deepseek-v4-pro"
+      }
+    },
+    "chat": {
+      "window_1d": {
+        "calls": 6,
+        "ok": 6,
+        "ok_rate": 100.0,
+        "cost_usd": 0.0,
+        "errors": 0,
+        "note": "all 6 ledger rows are request_type=hermes; zero Chat turns since Sep 30 19:48 PT"
+      },
+      "window_7d": {
+        "calls": 46,
+        "ok": 21,
+        "ok_rate": 45.7,
+        "cost_usd": 0.1015,
+        "errors": 25,
+        "chat_request_type_calls": 38
+      },
+      "vs_yesterday_1d": "26.3% (5/19) \u2192 100% (6/6 hermes-only; Chat quiet)",
+      "vs_7d_baseline": "37.2% (16/43) \u2192 45.7% (21/46)",
+      "agents_status": "quiet",
+      "last_chat_activity": "2026-09-30T19:48:15",
+      "grounding_mode": "shadow"
+    },
+    "helpdesk": {
+      "status": "no_signal",
+      "note": "usage_live has no helpdesk section; no helpdesk request_type in recent ledger"
+    },
+    "anomalies": [
+      {
+        "severity": "high",
+        "kind": "cost_spike",
+        "text": "OpenRouter week_usd $15.12 > soft cap $11.50 (131%); driven by Hermes deepseek-v4-pro Oct 1 (~$1.43 calendar day / 474 API calls)"
+      },
+      {
+        "severity": "high",
+        "kind": "error_spike",
+        "provider": "openrouter",
+        "model": "google/gemma-4-31b-it:free",
+        "text": "still 100% (6/6) in 7d window (all Sep 30); no new calls after chain demotion in 297276399"
+      },
+      {
+        "severity": "info",
+        "kind": "error_spike",
+        "provider": "openrouter",
+        "model": "google/gemma-4-26b-a4b-it:free",
+        "text": "historical 7/7 in 7d; already in removed[]"
+      },
+      {
+        "severity": "medium",
+        "kind": "meter_stale",
+        "text": "grokcom_usage.json meter stale 46.4h (last at 2026-09-30T08:07 PT); Super Grok remaining 100% is guard estimate after reset, not live card"
+      },
+      {
+        "severity": "medium",
+        "kind": "bot_burn",
+        "text": "Grok Bot 43% used @ Oct 1 9:23 AM PT; burn ~14.1%/day \u2192 ~98% by Mon Oct 5 reset \u2014 early warning"
+      }
+    ],
+    "effectiveness": [
+      {
+        "provider": "openrouter",
+        "model": "google/gemma-4-31b-it:free",
+        "calls": 6,
+        "ok_rate": 0.0,
+        "verdict": "too little data",
+        "note": "0/6 ever in window; demoted from chat/docs head; still #2 in chain_coding \u2014 remove or demote"
+      },
+      {
+        "provider": "openrouter",
+        "model": "cohere/north-mini-code:free",
+        "calls": 4,
+        "ok_rate": 100.0,
+        "verdict": "too little data",
+        "note": "7d; now chat chain head"
+      },
+      {
+        "provider": "openrouter",
+        "model": "deepseek/deepseek-v4-pro",
+        "calls": 3,
+        "ok_rate": 100.0,
+        "verdict": "too little data",
+        "note": "app ledger only; Hermes 474 API calls 24h (no per-call ok/flagged in state.db)"
+      },
+      {
+        "provider": "hermes",
+        "model": "*",
+        "verdict": "unavailable",
+        "note": "state.db has no per-call ok/flagged"
+      }
+    ],
+    "failover": {
+      "window_1d": {
+        "turns": 0,
+        "answered_after_failover": 0,
+        "answered_first": 0,
+        "all_exhausted": 0,
+        "failed_attempts": 0,
+        "fallover_rate_pct": 0.0,
+        "note": "no app Chat failover activity since Sep 30"
+      },
+      "window_7d": {
+        "turns": 4,
+        "answered_after_failover": 2,
+        "answered_first": 2,
+        "fallover_rate_pct": 50.0,
+        "all_exhausted": 6,
+        "failed_attempts": 5,
+        "failed_by_reason": {
+          "http_429": 4,
+          "http_404": 1
+        }
+      },
+      "chains_now": {
+        "chat": [
+          "north-mini-code:free",
+          "nemotron-3.5-lightning:free",
+          "gemma-4-31b-it:free",
+          "ollama|auto"
+        ],
+        "docs": [
+          "nemotron-3.5-lightning:free",
+          "north-mini-code:free",
+          "gemma-4-31b-it:free",
+          "ollama|auto"
+        ],
+        "coding": [
+          "north-mini-code:free",
+          "gemma-4-31b-it:free",
+          "nemotron-3.5-lightning:free",
+          "ollama|qwen2.5-coder:14b"
+        ],
+        "title": [
+          "nemotron-3.5-lightning:free",
+          "north-mini-code:free",
+          "ollama|auto"
+        ]
+      },
+      "real_failover_definition": "failed call retried on next healthy model and succeeded",
+      "health_one_liner": "1d idle (0 turns); 7d 50% real failover (2/4) with 6 stale all_exhausted from Sep 30 Focus-Tune; gemma demoted off chat/docs head"
+    },
+    "thrash": {
+      "app_ledger": [],
+      "hermes_24h": [
+        {
+          "session": "20261001_205306_7c2405",
+          "provider": "openrouter",
+          "model": "deepseek/deepseek-v4-pro",
+          "max_15min": 46,
+          "at": "2026-10-01T14:00:00-07:00",
+          "title": "Resume adding categories to inventory"
+        },
+        {
+          "session": "20261001_175450_980845",
+          "provider": "openrouter",
+          "model": "deepseek/deepseek-v4-pro",
+          "max_15min": 42,
+          "at": "2026-10-01T11:00:00-07:00",
+          "title": "Fix 3D browse page crashing"
+        },
+        {
+          "session": "20261001_091038_5def07",
+          "provider": "openrouter",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "max_15min": 21,
+          "at": "2026-10-01T09:00:00-07:00",
+          "title": "Diagnose git merge autostash"
+        }
+      ],
+      "note": "10 windows \u226520 assistant msgs/15min in 24h, all DeepSeek coding tool-loops; not app-ledger thrash"
+    },
+    "changes": [
+      {
+        "commit": "297276399",
+        "branch": "aisystem",
+        "when_pt": "2026-10-01T09:41:47-07:00",
+        "files": [
+          "Model/AI2/Router.pm",
+          "Model/AI2/UsageMonitor.pm",
+          "Model/AI2/EvalReports.pm",
+          "Util/AI/HealthChecks.pm",
+          "Util/AI/StalePreflight.pm",
+          "data/ai_model_chains.json",
+          "Controller/AI*.pm",
+          "root/ai/usage_*_card.tt"
+        ],
+        "verdict": "improved",
+        "evidence": "Moved gemma-4-31b off chat/docs head (yesterday's #1 proposal). No new gemma 429s or Chat errors after land; usage_live now exposes OR day/week/month+credits; StalePreflight shows :4006/:3001/:4003/:9119 OK. App 1d ok_rate 26.3%\u2192100% (Chat quiet). Cost side: Hermes v4-pro thrash is session pattern, not this commit regressing router."
+      },
+      {
+        "commit": "48db9e958",
+        "branch": "aisystem",
+        "when_pt": "2026-10-01T09:27:31-07:00",
+        "files": [
+          "root/admin/git/index.tt",
+          "root/static/js/git-dashboard.js"
+        ],
+        "verdict": "no effect",
+        "evidence": "Hermes dashboard button UI only; not on AI spend/ok_rate path"
+      },
+      {
+        "commit": "f56e6a1e2",
+        "branch": "aisystem",
+        "when_pt": "2026-10-01T09:34:18-07:00",
+        "files": [
+          ".gitignore",
+          "data/ai_model_health.json"
+        ],
+        "verdict": "improved",
+        "evidence": "Stops committing runtime health churn; hygiene only"
+      },
+      {
+        "commit": "86df55bfb / 4c54f696f",
+        "branch": "main / aisystem",
+        "when_pt": "2026-10-01T09:47:46-07:00",
+        "files": [
+          "merge aisystem \u2194 main"
+        ],
+        "verdict": "no effect",
+        "evidence": "Delivery merges; preflight OK on both :4006 and :3001"
+      },
+      {
+        "commit": "config:hermes-default-reset",
+        "branch": "workstation",
+        "when_pt": "2026-10-02T00:00:06-07:00",
+        "files": [
+          "~/.hermes/config.yaml"
+        ],
+        "verdict": "improved",
+        "evidence": "Guard switched default back to xai-oauth/grok-build-0.1 after Super Grok reset; fallback deepseek-v4-pro. Matches requested auto-switch-back behavior."
+      }
+    ],
+    "trend": {
+      "improving": true,
+      "core_answer": "YES \u2014 reliability improved after chain demotion + guard/preflight; cost worse on OR week over soft cap",
+      "app_ok_rate_1d": {
+        "prev": 26.3,
+        "now": 100.0
+      },
+      "app_ok_rate_7d": {
+        "prev": 37.2,
+        "now": 45.7
+      },
+      "or_week_vs_cap": {
+        "usd": 15.12,
+        "cap": 11.5,
+        "status": "over"
+      },
+      "bot_projection_pct": 98,
+      "chat_traffic": "quiet since Sep 30 \u2014 ok_rate rebound is partly no new Chat failures"
+    },
+    "ops": {
+      "aisystem_branch": "aisystem",
+      "aisystem_head": "4c54f696f",
+      "main_head": "86df55bfb",
+      "port_4006_pid": 497325,
+      "port_4006_started_pt": "2026-10-01T09:46:48-07:00",
+      "preflight": "OK :4006/:3001/:4003/:9119",
+      "uncommitted_aisystem": 0,
+      "run_pt": "2026-10-02T06:40:02.038687-07:00"
+    }
+  },
+  "proposals": [
+    {
+      "title": "Remove gemma-4-31b-it:free from chain_coding (still #2) / add to removed",
+      "change_type": "config",
+      "target": "data/ai_model_chains.json:chain_coding",
+      "rationale": "Chat/docs demotion landed in 297276399; coding still lists gemma #2 with 0/6 historical successes. Allow-listed. Prefer north-mini \u2192 nemotron \u2192 ollama coder.",
+      "payload": {
+        "value": [
+          "openrouter|cohere/north-mini-code:free",
+          "openrouter|nvidia/nemotron-3.5-lightning:free",
+          "ollama|qwen2.5-coder:14b"
+        ]
+      }
+    },
+    {
+      "title": "Apply: add gemma-4-31b-it:free to removed[]",
+      "change_type": "config",
+      "target": "data/ai_model_chains.json:removed",
+      "rationale": "0 successes ever in ledger; circuit had been open; keep out of all chains until OpenRouter health returns.",
+      "payload": {
+        "value": [
+          "openrouter|nvidia/nemotron-3-nano-30b-a3b:free",
+          "openrouter|nvidia/nemotron-nano-9b-v2:free",
+          "openrouter|stealth/ox-alpha",
+          "openrouter|google/gemma-3-27b-it:free",
+          "openrouter|google/gemma-4-26b-a4b-it:free",
+          "openrouter|google/gemma-4-31b-it:free"
+        ]
+      }
+    },
+    {
+      "title": "Separate Focus-Tune ledger rows from Chat ok_rate; skip open-circuit models",
+      "change_type": "code",
+      "target": "lib/Comserv/Model/AI2/FocusTune.pm, Model/AI/Usage.pm (DBIx::Class), extend AI.pm",
+      "rationale": "Still open from Oct 1 report. Sep 30 Focus-Tune (failover=0) inflated Chat errors; no Chat traffic since to re-test.",
+      "payload": {
+        "request_type": "focustune",
+        "skip_when_circuit_open": true,
+        "hop_count_exclude_tasks": [
+          "title_generation",
+          "compression"
+        ]
+      }
+    },
+    {
+      "title": "Hermes OpenRouter soft-cap guard (week already over $11.50)",
+      "change_type": "workstation",
+      "target": "~/.hermes/scripts/supergrok_daily_guard.py + config fallback to :free / pause paid coding",
+      "rationale": "Live OR week $15.12 > $11.50. Oct 1 Hermes deepseek-v4-pro ~$1.43 / 474 calls with thrash windows to 46/15min. Prefer free/north-mini or local for bulk loops; escalate to v4-pro only after plan.",
+      "payload": {
+        "week_cap_usd": 11.5,
+        "day_cap_usd": 1.65,
+        "on_breach": "switch default to free alias or pause paid coding sessions"
+      }
+    },
+    {
+      "title": "Refresh grok.com usage meter (stale 46.4h)",
+      "change_type": "workstation",
+      "target": "Firefox extension \u2192 root/static/ai/grokcom_usage.json",
+      "rationale": "Guard estimates remaining 100% after reset but meter_alert=true; cannot trust Super Grok lock/switch without a fresh card.",
+      "payload": {
+        "action": "open grok.com once signed-in; confirm extension write"
+      }
+    }
+  ]
+}

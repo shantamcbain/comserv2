@@ -1,9 +1,41 @@
 /* Persist current grok.com Usage % and record each change. No cookies. */
 var lastKey = null;
 var lastNativeAt = 0;
+// Oct 14 2026: post to the aisystem app first (:4006), then other local ports,
+// then the native host as last fallback. Never :3001.
+var APP_PORTS = [4006, 4003, 4001];
+
+function postOne(port, payload) {
+    return fetch('http://127.0.0.1:' + port + '/ai/usage_auto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Comserv-Grokcom': '1' },
+        body: JSON.stringify(payload)
+    }).then(function (r) {
+        if (!r.ok) throw new Error('http ' + r.status);
+        return r.json();
+    }).then(function (j) {
+        if (!j || (j.ok === false && j.error !== 'no_percent')) throw new Error('rejected');
+        return { port: port, reply: j };
+    });
+}
+
+function postToApp(payload) {
+    var i = 0;
+    function next() {
+        if (i >= APP_PORTS.length) {
+            return browser.runtime.sendNativeMessage('comserv_grokcom_usage', payload)
+                .then(function (j) { return { port: 'native', reply: j }; });
+        }
+        var port = APP_PORTS[i++];
+        return postOne(port, payload).catch(next);
+    }
+    return next().then(function (res) {
+        return browser.storage.local.set({ lastPost: { port: res.port, reply: res.reply, at: new Date().toISOString() } });
+    });
+}
 
 function payloadKey(p) {
-    return String(p && p.build) + ':' + String(p && p.chat);
+    return String(p && p.build) + ':' + String(p && p.chat) + ':' + String(p && p.bot);
 }
 
 function record(payload, reason) {
@@ -24,6 +56,7 @@ function record(payload, reason) {
             history.push({
                 build: payload.build,
                 chat: payload.chat,
+                bot: payload.bot,
                 at: payload.at,
                 href: payload.href
             });
@@ -31,7 +64,7 @@ function record(payload, reason) {
         }
         return browser.storage.local.set({ current: payload, history: history, lastKey: key });
     }).then(function () {
-        return browser.runtime.sendNativeMessage('comserv_grokcom_usage', payload);
+        return postToApp(payload);
     }).catch(function () {
         lastNativeAt = 0;
     });

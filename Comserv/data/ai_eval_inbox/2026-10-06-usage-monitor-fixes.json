@@ -1,0 +1,79 @@
+{
+  "report_date": "2026-10-06",
+  "source": "Usage monitor fixes (Grok Bot)",
+  "created_by": "Grok Bot (AI usage monitor task)",
+  "created_at": "2026-10-06T07:25:00-07:00",
+  "summary": "Overrun guard fixed (valid ids, Super Grok on thrash, safe fallback/aux, self-heal); live Hermes fallback now Super Grok > :free > Ollama; eval ingest port fallback; Grok Bot burn estimator; readings seeded (Bot 12%, Super Grok 40%); add-on AMO-ready. All uncommitted; undo per row.",
+  "markdown": "# Usage-monitor fixes - Tue Oct 6 2026 (~07:00-07:25 PT)\n\nAll aisystem changes uncommitted. Each proposal row carries its undo.\n\n- **Overrun guard: write valid model ids, Super Grok on thrash, safe fallback/aux, self-heal** (code, lib/Comserv/Util/AI/HermesOverrunGuard.pm + t/ai_hermes_overrun_guard.t): applied, uncommitted (live via */5 cron). Undo: `git restore Comserv/lib/Comserv/Util/AI/HermesOverrunGuard.pm Comserv/t/ai_hermes_overrun_guard.t (in the aisystem worktree); optional: rm ~/.hermes/cache/overrun_guard_openrouter_models.json`\n- **Live ~/.hermes/config.yaml: fallback_providers Super Grok > :free > Ollama; title_generation -> :free** (workstation, ~/.hermes/config.yaml): applied Tue Oct 6 07:06 PT. Undo: `cp -p ~/.hermes/config.yaml.bak-20261006-0706 ~/.hermes/config.yaml (note: guard trip at 07:15 PT made its own backup ~/.hermes/config.yaml.bak-overrun-20261006-071504 and auto-restores)`\n- **Eval ingest helper falls back across :4006 > :3001 > :5000 on 127.0.0.1 / workstation.local / 172.30.131.126 and records the source** (code, script/ai_eval_ingest.pl + lib/Comserv/Util/AI/ServerFallback.pm + t/ai_server_fallback.t): applied, uncommitted. Undo: `git restore Comserv/script/ai_eval_ingest.pl; rm Comserv/lib/Comserv/Util/AI/ServerFallback.pm Comserv/t/ai_server_fallback.t`\n- **Grok Bot burn estimate: count turns, routine runs (incl. failed), teammate wakes; separate CSC HelpDesk line; fit %/event from readings** (code, UsageEstimator::bot_burn + UsageMonitor::usage_estimator + root/ai/usage_estimator_card.tt + t/ai_usage_estimator.t): applied, uncommitted. Undo: `git restore Comserv/lib/Comserv/Util/AI/UsageEstimator.pm Comserv/lib/Comserv/Model/AI2/UsageMonitor.pm Comserv/root/ai/usage_estimator_card.tt Comserv/t/ai_usage_estimator.t`\n- **Seeded readings: Grok Bot 9% (Mon 10:04 PT), 12% (Tue 07:01 PT, reset ~Mon Oct 12 08:03); Super Grok 40% used (Tue 07:01 PT, reset Thu Oct 8 10:31)** (other, data/ai_usage_readings.jsonl; root/static/ai/grokcom_usage.json + grokcom_usage_history.jsonl): applied Tue Oct 6 07:14 PT. Undo: `cp data/ai_usage_readings.jsonl.bak-20261006-0714 data/ai_usage_readings.jsonl; cp root/static/ai/grokcom_usage.json.bak-20261006-0714 root/static/ai/grokcom_usage.json; cp root/static/ai/grokcom_usage_history.jsonl.bak-20261006-0714 root/static/ai/grokcom_usage_history.jsonl`\n- **grok.com usage add-on: AMO-ready 1.2.0 (data_collection_permissions none, min Firefox 142), lint clean, signing steps** (workstation, script/firefox-grokcom-usage/manifest.json + AMO_SIGNING.txt + web-ext-artifacts/): prepared, not signed/installed. Undo: `git restore Comserv/script/firefox-grokcom-usage/manifest.json; rm -r Comserv/script/firefox-grokcom-usage/web-ext-artifacts Comserv/script/firefox-grokcom-usage/AMO_SIGNING.txt; rm -r ~/.local/share/web-ext-tool`",
+  "metrics": {
+    "guard_tests": "105/105",
+    "estimator_tests": "49/49",
+    "server_fallback_tests": "38/38",
+    "hermes_supergrok_session": "20261006_070758_285649",
+    "hermes_calls": 26,
+    "hermes_cost_usd": 0
+  },
+  "proposals": [
+    {
+      "title": "Overrun guard: write valid model ids, Super Grok on thrash, safe fallback/aux, self-heal",
+      "change_type": "code",
+      "target": "lib/Comserv/Util/AI/HermesOverrunGuard.pm + t/ai_hermes_overrun_guard.t",
+      "rationale": "Mon Oct 5 11:30 PT trip wrote model.default openrouter/cohere/north-mini-code:free with provider openrouter -> OpenRouter 400 'not a valid model ID' -> new sessions fell to fallback_providers deepseek-v4-pro (Relace, cache billed full). Now: ids normalized (no provider prefix) and validated against the cached OpenRouter models list (~/.hermes/cache/overrun_guard_openrouter_models.json, 6 h TTL); thrash trips prefer Super Grok xai-oauth/grok-build-0.1, $ caps prefer :free; trip+restore rewrite fallback_providers to Super Grok > :free > Ollama and aux OpenRouter tasks to a valid :free; restore normalizes saved ids, never restores v4-pro, preserves hand-set defaults (bare-id compare); every run self-heals double-prefixed default / v4-pro or invalid fallback / paid aux. Tests 105/105.",
+      "payload": {
+        "status": "applied, uncommitted (live via */5 cron)",
+        "undo": "git restore Comserv/lib/Comserv/Util/AI/HermesOverrunGuard.pm Comserv/t/ai_hermes_overrun_guard.t (in the aisystem worktree); optional: rm ~/.hermes/cache/overrun_guard_openrouter_models.json"
+      }
+    },
+    {
+      "title": "Live ~/.hermes/config.yaml: fallback_providers Super Grok > :free > Ollama; title_generation -> :free",
+      "change_type": "workstation",
+      "target": "~/.hermes/config.yaml",
+      "rationale": "fallback_providers was [openrouter deepseek/deepseek-v4-pro] (paid; where the Oct 5 400s landed) and auxiliary.title_generation used paid deepseek-v4-flash; auxiliary 'auto' tasks follow fallback_providers. Now: xai-oauth/grok-build-0.1, openrouter/cohere/north-mini-code:free, openrouter/nvidia/nemotron-3.5-lightning:free, ollama-launch/gemma4-64k:latest, ollama-launch/qwen2.5-coder:14b; title_generation openrouter/nvidia/nemotron-3.5-lightning:free (both ids checked in the live OpenRouter list). Hermes has no auxiliary.free_only key, so explicit :free ids are used.",
+      "payload": {
+        "status": "applied Tue Oct 6 07:06 PT",
+        "backup": "~/.hermes/config.yaml.bak-20261006-0706",
+        "undo": "cp -p ~/.hermes/config.yaml.bak-20261006-0706 ~/.hermes/config.yaml (note: guard trip at 07:15 PT made its own backup ~/.hermes/config.yaml.bak-overrun-20261006-071504 and auto-restores)"
+      }
+    },
+    {
+      "title": "Eval ingest helper falls back across :4006 > :3001 > :5000 on 127.0.0.1 / workstation.local / 172.30.131.126 and records the source",
+      "change_type": "code",
+      "target": "script/ai_eval_ingest.pl + lib/Comserv/Util/AI/ServerFallback.pm + t/ai_server_fallback.t",
+      "rationale": "One down port blanked the daily report. Default (no --url) tries 9 bases port-major; moves on for connection errors / 404 / 502-504 / LWP internal 500, stops on real answers. --bases overrides; --collect PATH [--out FILE] GETs e.g. /ai/usage_live with {collected_from, data}. Each ingest appends {file, report_date, base, url, code, tried} to data/ai_eval_ingest_sources.jsonl. Bulk code by Hermes on Super Grok grok-build-0.1 (session 20261006_070758_285649, 26 calls, $0), reviewed + use-lib fix by Grok Bot. Tests 38/38.",
+      "payload": {
+        "status": "applied, uncommitted",
+        "undo": "git restore Comserv/script/ai_eval_ingest.pl; rm Comserv/lib/Comserv/Util/AI/ServerFallback.pm Comserv/t/ai_server_fallback.t"
+      }
+    },
+    {
+      "title": "Grok Bot burn estimate: count turns, routine runs (incl. failed), teammate wakes; separate CSC HelpDesk line; fit %/event from readings",
+      "change_type": "code",
+      "target": "UsageEstimator::bot_burn + UsageMonitor::usage_estimator + root/ai/usage_estimator_card.tt + t/ai_usage_estimator.t",
+      "rationale": "Bot went 9% (Mon Oct 5 10:04 PT) -> 12% (Tue Oct 6 07:01 PT); estimator showed the latest reading only (0 Ledger grok_bot rows) and missed ~3%. Now counts Ledger request_type grok_bot (metadata.event turn|routine_run|wake|csc_helpdesk, failed status included) + daily_eval rows + eval-report routine runs; fits %/event from same-cycle reading deltas; with no events between readings uses %/h from the deltas (marked ESTIMATED); time-based floor for unlogged activity. Today: 0 Bot events logged on the workstation, so the Bot line is estimated (0.44 %/h), not counted. Post events to /ai/usage_ingest source=grok_bot request_type=turn|routine_run|wake|csc_helpdesk.",
+      "payload": {
+        "status": "applied, uncommitted",
+        "undo": "git restore Comserv/lib/Comserv/Util/AI/UsageEstimator.pm Comserv/lib/Comserv/Model/AI2/UsageMonitor.pm Comserv/root/ai/usage_estimator_card.tt Comserv/t/ai_usage_estimator.t"
+      }
+    },
+    {
+      "title": "Seeded readings: Grok Bot 9% (Mon 10:04 PT), 12% (Tue 07:01 PT, reset ~Mon Oct 12 08:03); Super Grok 40% used (Tue 07:01 PT, reset Thu Oct 8 10:31)",
+      "change_type": "other",
+      "target": "data/ai_usage_readings.jsonl; root/static/ai/grokcom_usage.json + grokcom_usage_history.jsonl",
+      "rationale": "Readings store gets the three spoken readings. The Super Grok guard only reads the add-on meter file (stale since Oct 5 07:35 PT), so grokcom_usage.json now holds build 40 (source manual) and history got the Oct 5 07:35 22% heartbeat plus a derived Mon 23:59 PT 40% point (all 275 Super Grok calls between the readings ran Mon; 0 Tue) so used_today is 0 not 18 and the daily cap does not lock.",
+      "payload": {
+        "status": "applied Tue Oct 6 07:14 PT",
+        "undo": "cp data/ai_usage_readings.jsonl.bak-20261006-0714 data/ai_usage_readings.jsonl; cp root/static/ai/grokcom_usage.json.bak-20261006-0714 root/static/ai/grokcom_usage.json; cp root/static/ai/grokcom_usage_history.jsonl.bak-20261006-0714 root/static/ai/grokcom_usage_history.jsonl"
+      }
+    },
+    {
+      "title": "grok.com usage add-on: AMO-ready 1.2.0 (data_collection_permissions none, min Firefox 142), lint clean, signing steps",
+      "change_type": "workstation",
+      "target": "script/firefox-grokcom-usage/manifest.json + AMO_SIGNING.txt + web-ext-artifacts/",
+      "rationale": "Root cause: temporary add-on dropped when Firefox restarted after the Mon Oct 5 07:40 PT reboot (kernel update + snap refresh); last reading 07:35 PT. Not installed in profile 63c6yk5x.default; Release snap Firefox needs a signed xpi. web-ext 10.7.0 installed at ~/.local/share/web-ext-tool; lint 0/0/0; unsigned build web-ext-artifacts/comserv_grok.com_usage-1.2.0.zip. Shanta: sign unlisted on AMO (steps in AMO_SIGNING.txt) and install from file.",
+      "payload": {
+        "status": "prepared, not signed/installed",
+        "undo": "git restore Comserv/script/firefox-grokcom-usage/manifest.json; rm -r Comserv/script/firefox-grokcom-usage/web-ext-artifacts Comserv/script/firefox-grokcom-usage/AMO_SIGNING.txt; rm -r ~/.local/share/web-ext-tool"
+      }
+    }
+  ]
+}

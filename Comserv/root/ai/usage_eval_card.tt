@@ -9,7 +9,7 @@
         <code>AiEvalReport</code> and <code>AiEvalProposal</code> → Create Table).</p>
     [% ELSIF es.latest %]
       [% l = es.latest %]
-      <p class="doc-body">Latest: <a href="/ai/eval/report/[% l.id | uri %]"><strong>[% l.report_date | html %]</strong></a>
+      <p class="doc-body">Latest: <a href="[% c.uri_for('/ai/eval/report', l.id) %]"><strong>[% l.report_date | html %]</strong></a>
         ([% l.source | html %]) —
         Bot [% l.key.bot_pct_left.defined ? l.key.bot_pct_left _ '%' : '—' | html %] left ·
         OpenRouter balance [% l.key.openrouter_balance.defined ? '$' _ l.key.openrouter_balance : '—' | html %] ·

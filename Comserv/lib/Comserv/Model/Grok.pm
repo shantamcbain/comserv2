@@ -305,7 +305,23 @@ sub chat {
             "Messages must be a non-empty array");
         return undef;
     }
-    
+
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::scan_messages($messages);
+    };
+    if ($@) {
+        $self->last_error('Chat safety check failed. The question was not sent.');
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'chat',
+            "HarmRefusal failed closed: $@");
+        return undef;
+    }
+    if ($harm) {
+        $self->logging->log_with_details(undef, 'warning', __FILE__, __LINE__, 'chat',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, undef));
+        return Comserv::Util::AI::HarmRefusal::refusal_text($harm);
+    }
+
     my $use_search = $args{use_search} || 0;
     
     $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'chat',

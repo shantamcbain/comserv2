@@ -349,7 +349,10 @@ sub _get_default_site_name {
     }
     
     # 2. Try to find a site with name='CSC' (common default)
-    try {
+    # eval #32: "return" inside a Try::Tiny block only leaves the block, so a
+    # found site was thrown away and '' returned. Shanta (Oct 12): domains not
+    # in sitenames must always get the default site, never the session's site.
+    my $found = try {
         my $csc_site = $self->schema->resultset('Site')->find({ name => 'CSC' });
         if ($csc_site) {
             $self->logging->log_with_details(
@@ -358,14 +361,16 @@ sub _get_default_site_name {
             );
             return 'CSC';
         }
+        return;
     } catch {
-        # Ignore errors, fall through
+        return;   # Ignore errors, fall through
     };
-    
+    return $found if defined $found && length $found;
+
     # 3. Try to find the first site alphabetically
-    try {
+    $found = try {
         my $first_site = $self->schema->resultset('Site')->search(
-            {}, 
+            {},
             { order_by => 'name', rows => 1 }
         )->first;
         if ($first_site) {
@@ -375,10 +380,12 @@ sub _get_default_site_name {
             );
             return $first_site->name;
         }
+        return;
     } catch {
-        # Ignore errors
+        return;   # Ignore errors
     };
-    
+    return $found if defined $found && length $found;
+
     # 4. No site found
     $self->logging->log_with_details(
         $c, 'warn', __FILE__, __LINE__, '_get_default_site_name',

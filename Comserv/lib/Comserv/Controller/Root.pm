@@ -52,6 +52,15 @@ my $_DB_CONN_TTL            = 300;     # seconds between re-reads
 # blow past Cloudflare's origin timeout (HTTP 521). Keyed by SiteName; each
 # Starman worker keeps its own copy. Only the site-wide (non-user-specific)
 # portion is cached — per-user overrides/grants still run live below.
+# Canonical module key: lower-case, trimmed, spaces/dashes -> underscore.
+sub _module_key {
+    my ($k) = @_;
+    $k = '' unless defined $k;
+    $k = lc $k;
+    $k =~ s/^\s+|\s+$//g;
+    $k =~ s/[\s-]+/_/g;
+    return $k;
+}
 my %_site_modules_cache;              # sitename => { modules => {...}, at => epoch }
 my $_SITE_MODULES_TTL      = 120;     # seconds between re-checks
 my %_shop_flag_cache;                 # sitename => { val => 0|1, at => epoch }
@@ -734,7 +743,10 @@ sub auto :Private {
                     { columns  => [qw(module_name enabled)] }
                 )->all;
                 for my $row (@site_mods) {
-                    $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
+                    my $k = _module_key($row->module_name);
+                    next unless length $k;
+                    # Any enabled row for the key wins over a disabled duplicate.
+                    $enabled{$k} = ($enabled{$k} || ($row->enabled ? 1 : 0)) ? 1 : 0;
                 }
 
                 # Hosting requested_* column historically named "addons"; treat as site features.
@@ -749,7 +761,7 @@ sub auto :Private {
                 if ($hosting && $hosting->requested_addons) {
                     my @addons = split(/\s*,\s*/, $hosting->requested_addons);
                     for my $a (@addons) {
-                        my $lc_addon = lc($a);
+                        my $lc_addon = _module_key($a);
                         # Brew / Beekeeping: site_modules (or Brew/BMaster / brew.*)
                         # only — never from hosting requested_addons. Skip BEFORE
                         # the generic enable so a missing row cannot re-open them.
@@ -793,22 +805,30 @@ sub auto :Private {
                 $c->stash->{brew_feature_active} = 1;
             }
 
-            # Apply per-user overrides from user_module_access
+            # Per-user grants from user_module_access. enabled_modules is the UNION
+            # of site modules and the user's own modules (CSC-20260909-2862), so a
+            # granted row adds a module; a granted=0 row no longer removes a
+            # module the site itself has turned on.
             if ($c->session->{username}) {
                 my @overrides = $c->model('DBEncy')->resultset('UserModuleAccess')->search({
                     username => $c->session->{username},
-                    sitename => $mod_site,
+                    -or => [ { sitename => $mod_site }, \[ 'LOWER(TRIM(sitename)) = ?', lc($mod_site) ] ],
                 })->all;
                 for my $ov (@overrides) {
-                    $enabled{ $ov->module_name } = $ov->granted ? 1 : 0;
+                    my $k = _module_key($ov->module_name);
+                    next unless length $k && $ov->granted;
+                    $enabled{$k} = 1;
                 }
             }
 
             # Apply per-user service grants from membership_service_access
             # (e.g. beekeeping access granted by purchasing a BMaster membership plan)
             if ($c->session->{user_id}) {
+                # Case/whitespace-insensitive: session SiteName casing and sites.name
+                # (e.g. 'SB ') do not always match exactly.
                 my $svc_site = $c->model('DBEncy')->resultset('Site')->search(
-                    { name => $mod_site }, { rows => 1 }
+                    { -or => [ { name => $mod_site }, \[ 'LOWER(TRIM(name)) = ?', lc($mod_site) ] ] },
+                    { rows => 1 }
                 )->single;
                 if ($svc_site) {
                     my @svc_grants = $c->model('DBEncy')->resultset('MembershipServiceAccess')->search({
@@ -818,9 +838,15 @@ sub auto :Private {
                     })->all;
                     for my $sg (@svc_grants) {
                         next if $sg->is_expired;
-                        $enabled{ $sg->service_name } = 1;
+                        my $k = _module_key($sg->service_name);
+                        $enabled{$k} = 1 if length $k;
                     }
                 }
+            }
+            # Keep alias pairs in sync so templates can use either key.
+            for my $pair (['3d', 'printing_3d'], ['workshop', 'workshops'], ['beekeeping', 'apiary']) {
+                my ($x, $y) = @$pair;
+                if ($enabled{$x} || $enabled{$y}) { $enabled{$x} = $enabled{$y} = 1 }
             }
             $c->stash->{enabled_modules} = \%enabled;
         };
@@ -847,6 +873,15 @@ sub auto :Private {
             }
         }
         $c->stash->{can_plan} = $can_plan;
+
+        # Planning menu (CSC-20260909-2862): developers, editors and admins on
+        # every site; other users only when planning is in enabled_modules.
+        # session->{roles} is an arrayref (normalized above from a comma list).
+        my $pr = $c->stash->{user_roles} || [];
+        $pr = [ split /\s*,\s*/, $pr ] unless ref $pr eq 'ARRAY';
+        my $planning_staff = $c->stash->{is_admin}
+            || (grep { my $r = lc($_ // ''); $r =~ s/^\s+|\s+$//g; $r =~ /^(developer|editor|admin)$/ } @$pr);
+        $c->stash->{planning_staff} = $planning_staff ? 1 : 0;
 
         # Beekeeping nav — site addon (hosting/site_modules), BMaster site, or per-user grant.
         # Admin role alone does not enable the menu (unlike the old TopDropListBeekeeping bypass).
@@ -901,6 +936,62 @@ sub auto :Private {
 
         # Expose the friendly system identifier (workstation / production) to all templates
         $c->stash->{system_identifier} = Comserv::Util::Logging->get_system_identifier();
+
+        # AI model guard banner for admin/developer — shows on every page when the
+        # user should switch away from a paid model.  Two triggers:
+        #   1. SuperGrok daily cap reached (fast file read)
+        #   2. OpenRouter spend exceeds soft caps (cached 60 s, DB read on miss)
+        {
+            my $guard_roles = [ 'admin', 'developer' ];
+            my $user_roles  = $c->session->{roles} || [];
+            $user_roles = [ split /,/, $user_roles ] unless ref $user_roles eq 'ARRAY';
+            if (grep { my $r = $_; grep { /^$r$/i } @$guard_roles } @$user_roles) {
+                my $locked = 0;
+                my $notice = '';
+                # --- SuperGrok guard (fast file read) ---
+                my $guard_file = $c->config->{home}
+                    . '/root/static/ai/supergrok_guard.json';
+                if (-f $guard_file) {
+                    my $g = eval {
+                        open my $fh, '<:raw', $guard_file or die;
+                        local $/; my $raw = <$fh>; close $fh;
+                        JSON::decode_json($raw);
+                    };
+                    if ($g && $g->{off_today}) {
+                        $locked = 1;
+                        $notice = sprintf(
+                            'Super Grok capped — coding on %s/%s until %s',
+                            $g->{switch_provider} || 'openrouter',
+                            $g->{switch_model}  || 'unknown',
+                            $g->{reset_at}      || 'next reset');
+                    }
+                }
+                # --- OpenRouter spend caps (cached 60 s by Router) ---
+                if (!$locked) {
+                    my $sp = eval {
+                        require Comserv::Model::AI2::Router;
+                        Comserv::Model::AI2::Router->new->openrouter_spend($c);
+                    };
+                    if ($sp && $sp->{ok}) {
+                        my @caps;
+                        push @caps, sprintf('day $%.2f/%s',
+                            $sp->{day}, '$1.65')   if ($sp->{day}   || 0) >= 1.65;
+                        push @caps, sprintf('week $%.2f/%s',
+                            $sp->{week}, '$11.50')  if ($sp->{week}  || 0) >= 11.50;
+                        push @caps, sprintf('month $%.2f/%s',
+                            $sp->{month}, '$50')    if ($sp->{month} || 0) >= 50;
+                        if (@caps) {
+                            $locked = 1;
+                            $notice = 'OpenRouter spend cap reached — '
+                                . join(' · ', @caps)
+                                . ' — switch to free models';
+                        }
+                    }
+                }
+                $c->stash->{supergrok_guard_locked} = $locked;
+                $c->stash->{supergrok_guard_notice} = $notice if $notice;
+            }
+        }
 
         # Read build version baked into the image (or generated by deploy)
         my $version_file = $c->config->{home} . '/version.json';
@@ -1276,6 +1367,8 @@ sub auto :Private {
     # Error handling for auto() method
     if ($@) {
         my $error = $@;
+        # $c->detach inside auto() is normal control flow, not an error; rethrow it.
+        die $error if !ref($error) && $error =~ /^catalyst_detach/;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', 
             "Exception in auto() method: $error");
         
