@@ -81,7 +81,22 @@
     updatePreview(bodyTextarea.value);
 
     ClassicEditor.create(bodyTextarea, {
-        toolbar: ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo']
+        toolbar: ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo'],
+        link: {
+            decorators: {
+                // Site pages always open in a new tab so readers keep the newsletter open.
+                pageLinksNewTab: {
+                    mode: 'automatic',
+                    callback: function(url) { return !!url && /(^|\/\/[^\/]+)\/page\//.test(url); },
+                    attributes: { target: '_blank', rel: 'noopener' }
+                },
+                openInNewTab: {
+                    mode: 'manual',
+                    label: 'Open in a new tab',
+                    attributes: { target: '_blank', rel: 'noopener' }
+                }
+            }
+        }
     }).then(function(editor) {
         editorInstance = editor;
         window.nlEditor = editor;
