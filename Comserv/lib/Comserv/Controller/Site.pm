@@ -167,16 +167,51 @@ sub add_site :Local {
 }
 # Clone my existing website (URL): import a public website's pages and images
 # into the Page system for a site (Comserv::Util::SiteCloner). Idempotent.
-sub clone_site :Local {
-    my ($self, $c) = @_;
-    my $admin_auth = Comserv::Util::AdminAuth->new();
+sub _clone_auth {
+    my ($self, $c, $action) = @_;
     my $roles = $c->session->{roles} || [];
     my @r = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless ($admin_auth->check_admin_access($c, 'clone_site') || grep { $_ eq 'site_owner' || $_ eq 'owner' } @r) {
-        $c->flash->{error_msg} = 'You must be an administrator or site owner to clone a website.';
-        $c->response->redirect($c->uri_for('/user/login'));
-        return;
+    return 1 if Comserv::Util::AdminAuth->new->check_admin_access($c, $action) || grep { $_ eq 'site_owner' || $_ eq 'owner' } @r;
+    $c->flash->{error_msg} = 'You must be an administrator or site owner to do that.';
+    $c->response->redirect($c->uri_for('/user/login'));
+    return 0;
+}
+
+# Optional "Tidy up with AI" after a clone: proposals only (Comserv::Util::SiteTidy), reviewed here.
+sub clone_review :Local {
+    my ($self, $c) = @_;
+    return unless $self->_clone_auth($c, 'clone_review');
+    require Comserv::Util::SiteTidy;
+    my $tidy = Comserv::Util::SiteTidy->new;
+    my $site = $c->req->params->{site} // '';
+    $site =~ s/[^A-Za-z0-9._-]//g;
+    my ($msg, $err);
+    if ($site && $c->req->method eq 'POST') {
+        my $p = $c->req->body_parameters;
+        my $act = $p->{action} // '';
+        if ($act eq 'run') {
+            my $only = $p->{page_code} ? [ $p->{page_code} ] : undef;
+            my $r = eval { $tidy->run($c, $site, ($only ? (only => $only) : ())) };
+            if ($@) { $err = "AI tidy failed: $@" }
+            else {
+                $msg = "AI tidy made $r->{proposals} proposal(s) using " . (join(', ', keys %{$r->{models}}) || 'no model');
+                $err = join('; ', @{$r->{errors}}) if @{$r->{errors}};
+            }
+        } elsif ($act eq 'accept' || $act eq 'reject') {
+            my ($ok, $m) = $tidy->decide($c, $site, $p->{page_code} // '', $act,
+                with_title => $p->{with_title} ? 1 : 0, force => $p->{force} ? 1 : 0,
+                user => $c->session->{username} // '');
+            $ok ? ($msg = $m) : ($err = $m);
+        }
     }
+    my $data = $site ? $tidy->load($site) : { pages => {} };
+    $c->stash(template => 'site/clone_review.tt', review_site => $site, tidy => $data,
+              success_msg => $msg, error_msg => $err);
+}
+
+sub clone_site :Local {
+    my ($self, $c) = @_;
+    return unless $self->_clone_auth($c, 'clone_site');
     my $schema = $c->model('DBEncy');
     my @sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all;
     $c->stash(template => 'site/clone_site.tt', sites => \@sites);

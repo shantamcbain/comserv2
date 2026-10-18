@@ -14,5 +14,6 @@ The front page becomes page <code>home</code>. Running it again updates pages in
 <h2>Imported into [% clone_site_name | html %]</h2>
 <p>[% clone_result.pages.size %] pages, [% clone_result.images %] images.</p>
 <ul>[% FOREACH pc IN clone_result.pages %]<li><a href="/page/[% pc %]?SiteName=[% clone_site_name | uri %]" target="_blank">[% pc %]</a></li>[% END %]</ul>
+<p><a href="/site/clone_review?site=[% clone_site_name | uri %]">Optional: Tidy up with AI &rarr;</a> (review proposals before anything changes)</p>
 [% IF clone_result.errors.size %]<h3>Problems</h3><ul>[% FOREACH e IN clone_result.errors %]<li>[% e | html %]</li>[% END %]</ul>[% END %]
 [% END %]
