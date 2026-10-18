@@ -181,7 +181,7 @@ sub index :Path('/Inventory') :Args(0) {
         $location_count = $schema->resultset('Accounting::InventoryLocation')->search({ sitename => $sitename, status => 'active' })->count;
 
         my @items = $schema->resultset('Accounting::InventoryItem')->search(
-            { sitename => $sitename, status => 'active' },
+            { "me.sitename" => $sitename, "me.status" => 'active' },
             { prefetch => 'stock_levels' }
         );
         $low_stock = 0;
@@ -232,9 +232,9 @@ sub items :Path('/Inventory/items') :Args(0) {
     my $status   = $c->req->params->{status} || 'active';
     my $category = $c->req->params->{category};
 
-    my %search = (sitename => $sitename);
-    $search{status}   = $status   if $status   && $status ne 'all';
-    $search{category} = $category if $category;
+    my %search = ("me.sitename" => $sitename);
+    $search{"me.status"}   = $status   if $status   && $status ne 'all';
+    $search{"me.category"} = $category if $category;
 
     my @items;
     eval {
@@ -242,7 +242,7 @@ sub items :Path('/Inventory/items') :Args(0) {
             \%search,
             {
                 prefetch => 'stock_levels',
-                order_by => ['category', 'name'],
+                order_by => ['me.category', 'me.name'],
             }
         );
     };
@@ -2225,10 +2225,10 @@ sub inventory_count :Path('/Inventory/count') :Args(0) {
 
     my (@items, @categories, $draft);
     eval {
-        my %search = (sitename => $sitename, status => 'active');
-        $search{category} = $category if $category;
+        my %search = ("me.sitename" => $sitename, "me.status" => 'active');
+        $search{"me.category"} = $category if $category;
         @items = $schema->resultset('Accounting::InventoryItem')->search(
-            \%search, { prefetch => 'stock_levels', order_by => ['category','name'] }
+            \%search, { prefetch => 'stock_levels', order_by => ['me.category', 'me.name'] }
         )->all;
 
         @categories = $schema->resultset('Accounting::InventoryItem')->search(
@@ -4800,13 +4800,13 @@ sub print_stock_report :Path('/Inventory/print/stock') :Args(0) {
 
     my @items;
     eval {
-        my %search = (sitename => $sitename, status => 'active');
-        $search{category} = $category if $category;
+        my %search = ("me.sitename" => $sitename, "me.status" => 'active');
+        $search{"me.category"} = $category if $category;
         @items = $schema->resultset('Accounting::InventoryItem')->search(
             \%search,
             {
                 prefetch => 'stock_levels',
-                order_by => ['category', 'name'],
+                order_by => ['me.category', 'me.name'],
             }
         )->all;
     };
