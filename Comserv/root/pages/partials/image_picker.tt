@@ -1,0 +1,90 @@
+[%#
+  pages/partials/image_picker.tt: shared "Insert image" dialog for the page
+  and newsletter editors. Uploads go through the File Manager
+  (/file/upload_image_json -> upload_and_record), so every image has a File
+  row and can be found again here or in /file/list. Insert URLs use
+  /media/file/<id>/<name>, served straight from NFS, so no deploy is needed.
+  Usage: window.ComservImagePicker.open(function(html){ ...insert html... });
+%]
+[% UNLESS c.stash.image_picker_loaded %][% c.stash.image_picker_loaded = 1 %]
+<div id="cip-modal" class="cip-modal" hidden>
+  <div class="cip-box" role="dialog" aria-label="Insert image">
+    <div class="cip-head"><strong>Insert image</strong>
+      <button type="button" class="cip-close" aria-label="Close">&times;</button></div>
+    <div class="cip-upload">
+      <label>Upload a new image (it's saved in the File Manager)</label>
+      <input type="file" id="cip-file" accept="image/jpeg,image/png,image/gif,image/webp">
+      <input type="text" id="cip-desc" placeholder="Short description / caption (helps find it later)">
+      <button type="button" class="btn btn-primary btn-sm" id="cip-upload-btn">Upload and insert</button>
+      <span id="cip-status" class="cip-status"></span>
+    </div>
+    <div class="cip-pick">
+      <label>Or pick one already in the File Manager</label>
+      <input type="search" id="cip-search" placeholder="Search by file name or description">
+      <div id="cip-grid" class="cip-grid"></div>
+    </div>
+    <div class="cip-caption-row">
+      <label><input type="checkbox" id="cip-use-caption" checked> Add caption under the image</label>
+    </div>
+  </div>
+</div>
+<style>
+.cip-modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center}
+.cip-modal[hidden]{display:none}
+.cip-box{background:#fff;color:#333;width:min(860px,94vw);max-height:90vh;overflow:auto;border-radius:8px;padding:14px 16px}
+.cip-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.cip-close{border:0;background:none;font-size:1.6em;cursor:pointer}
+.cip-upload,.cip-pick{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.cip-upload label,.cip-pick label{font-weight:bold}
+.cip-status{font-size:.9em;color:#555}
+.cip-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.cip-thumb{border:1px solid #ccc;border-radius:6px;padding:4px;cursor:pointer;background:#fafafa;text-align:center;font-size:.75em;word-break:break-all}
+.cip-thumb:hover{border-color:#1565c0}
+.cip-thumb img{width:100%;height:95px;object-fit:cover;display:block;margin-bottom:3px}
+figure.teach-fig img{max-width:100%;height:auto}
+</style>
+<script>
+(function(){
+  var modal=document.getElementById('cip-modal'); if(!modal) return;
+  var grid=document.getElementById('cip-grid'), search=document.getElementById('cip-search');
+  var fileIn=document.getElementById('cip-file'), descIn=document.getElementById('cip-desc');
+  var status=document.getElementById('cip-status'), useCap=document.getElementById('cip-use-caption');
+  var onPick=null, timer=null;
+  function esc(s){return String(s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  function html(img){
+    var alt=esc(img.description||img.name);
+    var cap=(useCap.checked && img.description)?'<figcaption>'+esc(img.description)+'</figcaption>':'';
+    return '<figure class="teach-fig"><img src="'+esc(img.url)+'" alt="'+alt+'" loading="lazy">'+cap+'</figure>';
+  }
+  function choose(img){ var cb=onPick; close(); if(cb) cb(html(img)); }
+  function close(){ modal.hidden=true; onPick=null; }
+  function load(){
+    fetch('/file/images_json?q='+encodeURIComponent(search.value||''),{credentials:'same-origin'})
+      .then(function(r){return r.json();}).then(function(d){
+        grid.innerHTML='';
+        if(d.error){grid.textContent=d.error;return;}
+        if(!d.images.length){grid.textContent='No images found.';return;}
+        d.images.forEach(function(img){
+          var t=document.createElement('div'); t.className='cip-thumb'; t.title=img.description||img.name;
+          t.innerHTML='<img src="'+esc(img.url)+'" alt="" loading="lazy">'+esc(img.name);
+          t.addEventListener('click',function(){choose(img);}); grid.appendChild(t);
+        });
+      }).catch(function(e){grid.textContent='Could not load images: '+e;});
+  }
+  document.getElementById('cip-upload-btn').addEventListener('click',function(){
+    if(!fileIn.files.length){status.textContent='Choose a file first.';return;}
+    var fd=new FormData(); fd.append('file',fileIn.files[0]); fd.append('description',descIn.value||'');
+    status.textContent='Uploading…';
+    fetch('/file/upload_image_json',{method:'POST',body:fd,credentials:'same-origin'})
+      .then(function(r){return r.json();}).then(function(d){
+        if(d.error){status.textContent=d.error;return;}
+        status.textContent=''; fileIn.value=''; descIn.value=''; choose(d);
+      }).catch(function(e){status.textContent='Upload failed: '+e;});
+  });
+  search.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(load,250);});
+  modal.querySelector('.cip-close').addEventListener('click',close);
+  modal.addEventListener('click',function(e){if(e.target===modal)close();});
+  window.ComservImagePicker={open:function(cb){onPick=cb;status.textContent='';modal.hidden=false;load();}};
+})();
+</script>
+[% END %]

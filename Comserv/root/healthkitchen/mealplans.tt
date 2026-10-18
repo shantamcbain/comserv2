@@ -1,0 +1,51 @@
+[% META
+   title = "Health Kitchen meal plans"
+   description = "Inventory-first meal plans"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "HealthKitchen"
+   page_version = "0.01"
+   last_updated = "2026-10-18"
+%]
+[% PageVersion = 'healthkitchen/mealplans.tt,v 0.01 2026/10/18 grok-bot Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+    [% INCLUDE 'healthkitchen/_disclaimer.tt' %]
+    <div class="page-header">
+        <h1>Meal plans</h1>
+        <p><a href="[% c.uri_for('/healthkitchen') %]">Health Kitchen</a> · <a href="[% c.uri_for('/healthkitchen/pantry') %]">Pantry</a> · <a href="[% c.uri_for('/healthkitchen/recipes') %]">Recipes</a></p>
+        <p class="doc-muted">Plans use what is already in your [% IF hk_has_inventory %]inventory[% ELSE %]pantry[% END %] first. The shopping list only shows what is missing.</p>
+    </div>
+    [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+
+    [% IF !hk_meal_ready %]
+        <div class="alert alert-warning">Create tables <code>hk_meal_plan</code> / <code>hk_meal_plan_entry</code> via Schema Compare first.</div>
+    [% ELSE %]
+        <div class="content-section">
+            <h2>New plan</h2>
+            <form method="post" action="[% c.uri_for('/healthkitchen/mealplans') %]">
+                <label>Name <input type="text" name="name" required maxlength="255" /></label>
+                <label>From <input type="date" name="start_date" /></label>
+                <label>To <input type="date" name="end_date" /></label>
+                <button type="submit" class="btn btn-primary">Create</button>
+            </form>
+        </div>
+        <div class="content-section">
+            <h2>Your plans</h2>
+            [% IF hk_plans.size %]
+                <ul>[% FOREACH p IN hk_plans %]<li><a href="[% c.uri_for('/healthkitchen/mealplan') %]/[% p.id %]">[% p.name | html %]</a> [% p.start_date %][% IF p.end_date %] – [% p.end_date %][% END %] <small>([% p.status %])</small></li>[% END %]</ul>
+            [% ELSE %]<p class="doc-muted">No plans yet.</p>[% END %]
+        </div>
+    [% END %]
+
+    <div class="content-section">
+        <h2>Cook from what you have</h2>
+        [% IF hk_suggestions.size %]
+            <ul>[% FOREACH s IN hk_suggestions %]
+                <li><strong>[% s.name | html %]</strong> — [% s.in_stock %]/[% s.total %] ingredients in stock[% IF s.missing.size %]; missing: [% s.missing.join(', ') | html %][% END %]</li>
+            [% END %]</ul>
+        [% ELSE %]<p class="doc-muted">No food recipes to rank yet.</p>[% END %]
+    </div>
+</div>

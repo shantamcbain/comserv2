@@ -262,5 +262,195 @@ sub symptoms :Local :Args(0) {
     );
 }
 
+sub mealplans :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'mealplans',
+        'HealthKitchen meal plans' );
+    if ( $c->req->method eq 'POST' ) {
+        my $p   = $c->req->params;
+        my $res = $self->hk->create_meal_plan( $c,
+            { name => $p->{name}, start_date => $p->{start_date}, end_date => $p->{end_date} } );
+        if ( $res->{ok} ) {
+            $c->flash->{success_msg} = 'Meal plan created.';
+            $c->response->redirect( $c->uri_for( $self->action_for('mealplan'), $res->{id} ) );
+        }
+        else {
+            $c->flash->{error_msg} = $res->{error};
+            $c->response->redirect( $c->uri_for( $self->action_for('mealplans') ) );
+        }
+        $c->detach;
+        return;
+    }
+    $c->stash(
+        hk_meal_ready  => $self->hk->meal_plan_ready($c) ? 1 : 0,
+        hk_plans       => $self->hk->list_meal_plans($c),
+        hk_suggestions => $self->hk->suggest_recipes_from_stock($c),
+        template       => 'healthkitchen/mealplans.tt',
+    );
+}
+
+sub mealplan :Local :Args(1) {
+    my ( $self, $c, $plan_id ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'mealplan',
+        "HealthKitchen meal plan $plan_id" );
+    if ( $c->req->method eq 'POST' ) {
+        my $p = $c->req->params;
+        my $res = ( $p->{hk_action} // '' ) eq 'delete'
+            ? $self->hk->delete_meal_entry( $c, $plan_id, $p->{entry_id} )
+            : $self->hk->add_meal_entry( $c, $plan_id, {
+                  plan_date => $p->{plan_date}, meal_slot => $p->{meal_slot},
+                  recipe_id => $p->{recipe_id}, custom_name => $p->{custom_name},
+                  servings  => $p->{servings} } );
+        if   ( $res->{ok} ) { $c->flash->{success_msg} = 'Saved.' }
+        else                { $c->flash->{error_msg}   = $res->{error} || 'Could not save.' }
+        $c->response->redirect( $c->uri_for( $self->action_for('mealplan'), $plan_id ) );
+        $c->detach;
+        return;
+    }
+    my $plan = $self->hk->get_meal_plan( $c, $plan_id );
+    unless ($plan) {
+        $c->flash->{error_msg} = 'Meal plan not found.';
+        $c->response->redirect( $c->uri_for( $self->action_for('mealplans') ) );
+        $c->detach;
+        return;
+    }
+    $c->stash(
+        hk_plan    => $plan,
+        hk_recipes => $self->hk->meal_plan_recipes($c)->{allowed},
+        template   => 'healthkitchen/mealplan.tt',
+    );
+}
+
+sub nutrition :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'nutrition',
+        'HealthKitchen nutrition' );
+    my @lt = localtime;
+    my $today = sprintf( '%04d-%02d-%02d', $lt[5] + 1900, $lt[4] + 1, $lt[3] );
+    my $date = $self->hk->_clean_date( $c->req->params->{date} ) || $today;
+    if ( $c->req->method eq 'POST' ) {
+        my $p = $c->req->params;
+        my $act = $p->{hk_action} // 'log';
+        my $res = $act eq 'food'   ? $self->hk->add_food( $c, $p )
+                : $act eq 'delete' ? $self->hk->delete_intake( $c, $p->{id} )
+                :                    $self->hk->log_intake( $c, { %$p, log_date => $date } );
+        if   ( $res->{ok} ) { $c->flash->{success_msg} = 'Saved.' }
+        else                { $c->flash->{error_msg}   = $res->{error} || 'Could not save.' }
+        $c->response->redirect( $c->uri_for( $self->action_for('nutrition'), { date => $date } ) );
+        $c->detach;
+        return;
+    }
+    my $rows = $self->hk->intake_for_day( $c, $date );
+    $c->stash(
+        hk_nut_ready => $self->hk->nutrition_ready($c) ? 1 : 0,
+        hk_date      => $date,
+        hk_foods     => $self->hk->list_foods($c),
+        hk_intake    => $rows,
+        hk_totals    => $self->hk->daily_totals($rows),
+        template     => 'healthkitchen/nutrition.tt',
+    );
+}
+
+
+sub recipes_suggest :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'recipes_suggest',
+        'HealthKitchen AI recipe suggestion' );
+    unless ( $c->req->method eq 'POST' ) {
+        $c->response->redirect( $c->uri_for( $self->action_for('recipes') ) );
+        $c->detach;
+        return;
+    }
+    my $res = $self->hk->generate_ai_recipes( $c, { count => 3 } );
+    if ( $res->{ok} ) {
+        $c->flash->{success_msg} = scalar( @{ $res->{ids} } )
+            . ' AI recipe draft(s) added from your stock. Please review them before cooking.';
+    }
+    else {
+        $c->flash->{error_msg} = $res->{error};
+    }
+    $c->response->redirect( $c->uri_for( $self->action_for('recipes') ) );
+    $c->detach;
+}
+
+sub _is_admin {
+    my ( $self, $c ) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @r = ref $roles ? @$roles : split( /\s*,\s*/, $roles );
+    return ( grep { lc($_) eq 'admin' || lc($_) eq 'site_admin' } @r ) ? 1 : 0;
+}
+
+sub history :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'history',
+        'HealthKitchen health history' );
+    if ( $c->req->method eq 'POST' ) {
+        my $p   = $c->req->params;
+        my $act = $p->{hk_action} // '';
+        my $res = $act eq 'consent'    ? $self->hk->grant_consent($c)
+                : $act eq 'revoke'     ? $self->hk->revoke_consent($c)
+                : $act eq 'delete'     ? $self->hk->delete_history( $c, $p->{id} )
+                : $act eq 'delete_all' ? $self->hk->delete_all_history( $c, $p->{confirm} )
+                :                        $self->hk->save_history( $c, $p );
+        if ( $res->{ok} ) {
+            $c->flash->{success_msg} = $act eq 'delete_all' ? "Deleted all health history ($res->{deleted} entries) and consent."
+                                     : $act eq 'revoke'     ? 'Consent revoked. Your history is no longer used. You can delete it below.'
+                                     :                        'Saved.';
+        }
+        else {
+            $c->flash->{error_msg} = $res->{error} || 'Could not save.';
+        }
+        $c->response->redirect( $c->uri_for( $self->action_for('history') ) );
+        $c->detach;
+        return;
+    }
+    my $ready = $self->hk->history_ready($c) ? 1 : 0;
+    my $consent = $ready ? $self->hk->active_consent($c) : undef;
+    my $edit_id = $c->req->params->{edit};
+    my $hist = $consent ? $self->hk->list_history($c) : [];
+    my ($edit) = $edit_id ? grep { $_->{id} == $edit_id } @$hist : ();
+    $c->stash(
+        hk_hist_ready => $ready,
+        hk_consent    => $consent ? 1 : 0,
+        hk_history    => $hist,
+        hk_edit       => $edit,
+        hk_types      => [@Comserv::Util::HealthKitchen::HISTORY_TYPES],
+        hk_statuses   => [@Comserv::Util::HealthKitchen::HISTORY_STATUS],
+        template      => 'healthkitchen/history.tt',
+    );
+}
+
+sub history_export :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    my $fmt = ( $c->req->params->{format} // 'json' ) eq 'csv' ? 'csv' : 'json';
+    unless ( $self->hk->active_consent($c) ) {
+        $c->flash->{error_msg} = 'No active health history to export.';
+        $c->response->redirect( $c->uri_for( $self->action_for('history') ) );
+        $c->detach;
+        return;
+    }
+    $c->response->content_type( $fmt eq 'csv' ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8' );
+    $c->response->header( 'Content-Disposition' => "attachment; filename=health_history.$fmt" );
+    $c->response->header( 'Cache-Control' => 'no-store' );
+    $c->response->body( $self->hk->export_history( $c, $fmt ) );
+}
+
+sub history_admin :Local :Args(1) {
+    my ( $self, $c, $subject_id ) = @_;
+    unless ( $self->_is_admin($c) ) {
+        $c->response->status(403);
+        $c->response->body('Forbidden');
+        $c->detach;
+        return;
+    }
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'history_admin',
+        "Admin view of shared health history for user $subject_id" );
+    $c->stash(
+        hk_subject => $subject_id,
+        hk_history => $self->hk->admin_shared_history( $c, $subject_id ),
+        template   => 'healthkitchen/history_admin.tt',
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 1;

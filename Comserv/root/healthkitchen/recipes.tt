@@ -11,6 +11,7 @@
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="app-container">
+    [% INCLUDE 'healthkitchen/_disclaimer.tt' %]
     <div class="page-header">
         <h1>Recipes</h1>
         <p>
@@ -36,9 +37,16 @@
             <button type="submit" class="btn btn-secondary">Add morning turmeric coffee</button>
         </form>
 
+        <form method="post" action="[% c.uri_for('/healthkitchen/recipes_suggest') %]">
+            [% IF !hk_recipes.size %]<p><strong>No recipes yet.</strong> Let AI suggest recipes that use only food you already have in stock.</p>[% END %]
+            <button type="submit" class="btn btn-primary">Suggest recipes from my food</button>
+        </form>
+
         [% FOREACH r IN hk_recipes %]
             <div class="content-section">
-                <h2>[% r.name | html %]</h2>
+                <h2>[% r.name | html %][% IF r.source == 'ai_generated' %] <small class="badge">AI draft</small>[% END %]</h2>
+                [% IF r.source == 'ai_generated' && r.notes %]<p class="alert alert-warning">[% r.notes | html %]</p>[% END %]
+                [% IF r.instructions %]<p style="white-space:pre-line">[% r.instructions | html %]</p>[% END %]
                 [% IF r.preparation %]<p>[% r.preparation | html %]</p>[% END %]
                 [% IF r.lines && r.lines.size %]
                     <ul>

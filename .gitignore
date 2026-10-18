@@ -235,3 +235,7 @@ Comserv/root/static/app/*.apk
 # or a built APK dropped under the web static tree.
 /android/
 Comserv/root/static/android/
+
+# Encryption keys — keep in ~/.comserv/keys, never in git
+*_encryption_key
+.*_encryption_key

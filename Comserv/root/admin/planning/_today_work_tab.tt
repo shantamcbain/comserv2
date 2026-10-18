@@ -296,7 +296,7 @@
                     [% FOREACH ap IN xb_list %]
                     <div class="BlockerItem">
                         <span class="BlockerItemArrow">↳</span>
-                        <a href="/todo/details?record_id=[% ap.record_id %]" class="BlockerItemLink">[% ap.subject | html %]</a>
+                        <a href="/todo/details?record_id=[% ap.record_id %]" class="BlockerItemLink">#[% ap.record_id %] [% ap.subject | html %]</a>
                         <span class="BlockerItemProject">([% ap.project_name || ap.project_code || 'No project' %])</span>
                         [% IF ap.blocking_names %]<span class="BlockerItemBlocks">blocks: [% ap.blocking_names | html %]</span>[% END %]
                     </div>

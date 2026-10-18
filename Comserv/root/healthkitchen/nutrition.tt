@@ -1,0 +1,66 @@
+[% META
+   title = "Health Kitchen nutrition"
+   description = "Food nutrient facts, intake log and daily totals"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "HealthKitchen"
+   page_version = "0.01"
+   last_updated = "2026-10-18"
+%]
+[% PageVersion = 'healthkitchen/nutrition.tt,v 0.01 2026/10/18 grok-bot Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+    [% INCLUDE 'healthkitchen/_disclaimer.tt' %]
+    <div class="page-header">
+        <h1>Nutrition — [% hk_date %]</h1>
+        <p><a href="[% c.uri_for('/healthkitchen') %]">Health Kitchen</a> · <a href="[% c.uri_for('/healthkitchen/mealplans') %]">Meal plans</a></p>
+        <form method="get" action="[% c.uri_for('/healthkitchen/nutrition') %]"><label>Day <input type="date" name="date" value="[% hk_date %]" /></label> <button type="submit" class="btn btn-secondary">Show</button></form>
+    </div>
+    [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+
+    [% IF !hk_nut_ready %]
+        <div class="alert alert-warning">Create tables <code>hk_food_nutrient</code> / <code>hk_intake_log</code> via Schema Compare first.</div>
+    [% ELSE %]
+    [% labels = { calories => 'Calories', protein_g => 'Protein (g)', carbs_g => 'Carbs (g)', fat_g => 'Fat (g)', fiber_g => 'Fiber (g)', sugar_g => 'Sugar (g)', sodium_mg => 'Sodium (mg)' } %]
+    [% nkeys = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg'] %]
+    <div class="content-section">
+        <h2>Daily totals</h2>
+        <table class="table"><tr>[% FOREACH k IN nkeys %]<th>[% labels.$k %]</th>[% END %]</tr>
+            <tr>[% FOREACH k IN nkeys %]<td>[% hk_totals.$k %]</td>[% END %]</tr></table>
+    </div>
+
+    <div class="content-section">
+        <h2>Log food</h2>
+        [% IF hk_foods.size %]
+        <form method="post" action="[% c.uri_for('/healthkitchen/nutrition', { date => hk_date }) %]">
+            <input type="hidden" name="hk_action" value="log" />
+            <label>Food <select name="food_nutrient_id">[% FOREACH f IN hk_foods %]<option value="[% f.id %]">[% f.name | html %] ([% f.serving_size %] [% f.serving_unit | html %])</option>[% END %]</select></label>
+            <label>Servings <input type="number" name="servings" value="1" min="0.25" step="0.25" /></label>
+            <label>Meal <select name="meal_slot"><option value="">—</option>[% FOREACH s IN ['breakfast','lunch','dinner','snack'] %]<option value="[% s %]">[% s %]</option>[% END %]</select></label>
+            <button type="submit" class="btn btn-primary">Log</button>
+        </form>
+        [% ELSE %]<p class="doc-muted">Add a food below first.</p>[% END %]
+        [% IF hk_intake.size %]
+            <table class="table"><thead><tr><th>Meal</th><th>Food</th><th>Servings</th>[% FOREACH k IN nkeys %]<th>[% labels.$k %]</th>[% END %]<th></th></tr></thead><tbody>
+            [% FOREACH r IN hk_intake %]<tr><td>[% r.meal_slot %]</td><td>[% r.food_name | html %]</td><td>[% r.servings %]</td>[% FOREACH k IN nkeys %]<td>[% r.$k %]</td>[% END %]
+                <td><form method="post" action="[% c.uri_for('/healthkitchen/nutrition', { date => hk_date }) %]"><input type="hidden" name="hk_action" value="delete" /><input type="hidden" name="id" value="[% r.id %]" /><button type="submit" class="btn btn-secondary">Remove</button></form></td></tr>[% END %]
+            </tbody></table>
+        [% END %]
+    </div>
+
+    <div class="content-section">
+        <h2>Add food (manual nutrient facts per serving)</h2>
+        <form method="post" action="[% c.uri_for('/healthkitchen/nutrition', { date => hk_date }) %]">
+            <input type="hidden" name="hk_action" value="food" />
+            <label>Name <input type="text" name="name" required maxlength="255" /></label>
+            <label>Serving <input type="number" name="serving_size" value="100" min="0" step="any" /></label>
+            <label>Unit <input type="text" name="serving_unit" value="g" maxlength="32" size="5" /></label>
+            [% FOREACH k IN nkeys %]<label>[% labels.$k %] <input type="number" name="[% k %]" min="0" step="any" size="6" /></label> [% END %]
+            <button type="submit" class="btn btn-primary">Save food</button>
+        </form>
+        <p class="doc-muted">Importing from a public food database is planned; imported rows will be marked with their source.</p>
+    </div>
+    [% END %]
+</div>

@@ -67,6 +67,7 @@
         <button type="button" class="page-fmt-btn" data-cmd="insertUnorderedList" title="Bullet list">&#8226; List</button>
         <button type="button" class="page-fmt-btn" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
         <button type="button" class="page-fmt-btn" data-cmd="createLink" title="Insert hyperlink">Link</button>
+        <button type="button" class="page-fmt-btn" id="page-insert-image-btn" title="Insert an image from the File Manager, or upload one">Image</button>
         <span class="page-fmt-sep"></span>
         <div class="page-fmt-container-wrap" id="page-fmt-container-wrap">
             <button type="button" class="page-fmt-btn page-fmt-container-drag" id="page-fmt-container-drag" draggable="true"
@@ -420,5 +421,32 @@
     if (window.ComservPageContainers && window.ComservPageContainers.init) {
         window.ComservPageContainers.init(document.querySelector('.page-html-editor-wrap'));
     }
+})();
+</script>
+[% PROCESS 'pages/partials/image_picker.tt' %]
+<script>
+(function(){
+  var btn=document.getElementById('page-insert-image-btn'); if(!btn) return;
+  var saved=null;
+  function root(){return document.querySelector('#page-editor-surface .page-body');}
+  btn.addEventListener('mousedown',function(){
+    var sel=window.getSelection(), r=root();
+    saved=(sel.rangeCount && r && r.contains(sel.anchorNode))?sel.getRangeAt(0).cloneRange():null;
+  });
+  btn.addEventListener('click',function(e){
+    e.preventDefault();
+    window.ComservImagePicker.open(function(html){
+      var r=root(), visual=document.getElementById('page-editor-visual-pane');
+      if(r && visual && visual.style.display!=='none'){
+        var frag=document.createRange().createContextualFragment(html);
+        if(saved){saved.collapse(false);saved.insertNode(frag);} else {r.appendChild(frag);}
+        r.dispatchEvent(new Event('input',{bubbles:true}));
+      } else {
+        var ta=document.getElementById('body'), at=ta.selectionStart||ta.value.length;
+        ta.value=ta.value.slice(0,at)+html+ta.value.slice(at);
+        ta.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+    });
+  });
 })();
 </script>
