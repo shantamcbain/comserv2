@@ -7963,7 +7963,8 @@ sub branch_server_log :Path('/admin/branch_server_log') :Args(0) {
 
     if (-f $path) {
         my $raw = do { local $/; open my $fh, '<', $path or die $!; <$fh> };
-        $c->response->body($raw // '');
+        # Empty body would let RenderView look for a non-existent branch_server_log.tt.
+        $c->response->body(defined $raw && length $raw ? $raw : "(log is empty)");
     }
     else {
         $c->response->body('(server not started yet — no log)');

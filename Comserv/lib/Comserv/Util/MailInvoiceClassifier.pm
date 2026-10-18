@@ -22,6 +22,74 @@ sub new {
     return bless $self, $class;
 }
 
+sub monitor_config_file {
+    my ($self) = @_;
+    my $root = $self->{output_dir} || '';
+    $root =~ s{/data/invoices/?$}{};
+    return File::Spec->catfile($root, 'config', 'email_invoice_monitor.json');
+}
+
+sub _default_monitor_config {
+    return {
+        sites => {
+            CSC => {
+                email_addresses     => ['shanta@forager.com', 'paypal@forager.com', 'patrion@forager.com', 'aica@forager.com'],
+                monitored_suppliers => ['shanta@forager.com', 'paypal@forager.com', 'patrion@forager.com', 'aica@forager.com'],
+                category_filter     => ['csc_internet', 'hosting', 'domain'],
+            },
+            '3d' => {
+                email_addresses     => ['mater3d@forager.com'],
+                monitored_suppliers => ['mater3d@forager.com'],
+                category_filter     => ['3d_filament', 'hardware'],
+            },
+        },
+    };
+}
+
+sub load_monitor_config {
+    my ($self) = @_;
+    my $file = $self->monitor_config_file;
+    my $defaults = $self->_default_monitor_config;
+    return $defaults unless -f $file;
+    my $data;
+    eval {
+        open my $fh, '<', $file or die $!;
+        local $/;
+        $data = JSON->new->utf8->decode(<$fh>);
+        close $fh;
+    };
+    return $defaults if $@ || ref($data) ne 'HASH' || ref($data->{sites}) ne 'HASH';
+    return $data;
+}
+
+sub save_monitor_config {
+    my ($self, $data) = @_;
+    return 'config is not a hash' unless ref($data) eq 'HASH';
+    my $file = $self->monitor_config_file;
+    my $dir = File::Spec->catdir((File::Spec->splitpath($file))[1] ? (File::Spec->splitpath($file))[1] : ());
+    # splitpath returns volume, dir, file — dir may be empty-looking but includes trailing slash
+    my (undef, $dirname, undef) = File::Spec->splitpath($file);
+    eval { make_path($dirname) if $dirname && !-d $dirname };
+    eval {
+        open my $fh, '>', $file or die $!;
+        print $fh JSON->new->utf8->pretty->canonical->encode($data);
+        close $fh;
+    };
+    return $@ if $@;
+    return;
+}
+
+sub config_for_site {
+    my ($self, $all, $sitename) = @_;
+    $all ||= $self->load_monitor_config;
+    my $sites = $all->{sites} || {};
+    return $sites->{$sitename} if $sites->{$sitename};
+    for my $key (keys %$sites) {
+        return $sites->{$key} if lc($key) eq lc($sitename || '');
+    }
+    return { email_addresses => [], monitored_suppliers => [], category_filter => [] };
+}
+
 sub classify_all_mail {
     my ($self, %args) = @_;
     my $source = $args{source} || 'maildir';
@@ -40,11 +108,11 @@ sub classify_all_mail {
         make_path($self->{output_dir});
     }
 
-    my @messages;
+    my @messages = $self->_fetch_from_maildir();
     if ($source eq 'imap') {
-        @messages = $self->_fetch_from_imap($imap_server, $imap_port, $imap_ssl, $imap_user, $imap_pass);
-    } else {
-        @messages = $self->_fetch_from_maildir();
+        push @messages, $self->_fetch_from_imap($imap_server, $imap_port, $imap_ssl, $imap_user, $imap_pass);
+    } elsif ($source eq 'auto' || $source eq 'maildir') {
+        push @messages, $self->fetch_imap_accounts($args{accounts} || []);
     }
 
     my %classified;
@@ -60,6 +128,8 @@ sub classify_all_mail {
         total_messages_scanned => scalar(@messages),
         first_run => $first_run,
         message_counts_by_category => {},
+        local_maildir => join(', ', $self->system_maildirs()),
+        mailbox_logins => $self->{mailbox_log} || [],
     };
     foreach my $cat (keys %classified) {
         $result{metadata}{message_counts_by_category}{$cat} = scalar @{$classified{$cat}};
@@ -116,10 +186,29 @@ sub scan_for_invoices {
     return \@invoices;
 }
 
+sub system_maildirs {
+    my ($self) = @_;
+    my @dirs;
+    my $home = $ENV{HOME} || '';
+    if ($home) {
+        my $root = File::Spec->catdir($home, 'Maildir');
+        for my $sub (qw(new cur)) {
+            my $dir = File::Spec->catdir($root, $sub);
+            push @dirs, $dir if -d $dir;
+        }
+    }
+    return @dirs;
+}
+
 sub _fetch_from_maildir {
     my ($self) = @_;
     my @messages;
-    my @maildirs = ('/home/shanta/Maildir/new', '/home/shanta/Maildir/cur');
+    my @maildirs = $self->system_maildirs();
+    unless (@maildirs) {
+        $self->{logging}->log_with_details(undef, 'info', __FILE__, __LINE__, '_fetch_from_maildir',
+            'No system mail dir on this host. Use a configured mail server for addresses that are not delivered here.');
+        return @messages;
+    }
     foreach my $dir (@maildirs) {
         next unless -d $dir;
         opendir(my $dh, $dir);
@@ -145,6 +234,243 @@ sub _fetch_from_maildir {
     $self->{logging}->log_with_details(undef, 'info', __FILE__, __LINE__, '_fetch_from_maildir',
         "Fetched " . scalar(@messages) . " messages from Maildir");
     return @messages;
+}
+
+sub accounts_for_site {
+    my ($self, $c, $sitename) = @_;
+    my $note = '';
+    return ([], 'No request context') unless $c && $c->can('model');
+    my $rs = eval { $c->model('DBEncy')->resultset('UserMailbox') };
+    unless ($rs) {
+        return ([], 'Mailbox table is not loaded. Run Schema Compare, then save the mail server again.');
+    }
+    my $ready = eval { $rs->search({}, { rows => 1 })->count; 1 };
+    unless ($ready) {
+        $self->{logging}->log_with_details($c, 'warn', __FILE__, __LINE__, 'accounts_for_site',
+            'user_mailboxes is not available yet. Run Schema Compare before saving a mail server.');
+        return ([], 'Mailbox table is not created yet. Run Schema Compare, then save the mail server.');
+    }
+    my @rows = eval { $rs->search({ sitename => $sitename })->all };
+    if ($@) {
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'accounts_for_site', "Mailbox lookup failed: $@");
+        return ([], 'Could not read saved mail servers.');
+    }
+    my $enc = do { require Comserv::Util::Encryption; Comserv::Util::Encryption->new() };
+    my @accounts;
+    for my $row (@rows) {
+        my $cipher = $row->password_enc // '';
+        next unless $cipher && $row->imap_host;
+        my $password = eval { $enc->decrypt($cipher, 'mail') };
+        next unless defined $password && $password ne '';
+        push @accounts, {
+            email_address  => $row->email_address,
+            login_username => $row->login_username || $row->email_address,
+            password       => $password,
+            imap_host      => $row->imap_host,
+            imap_port      => $row->imap_port || 993,
+            imap_security  => $row->imap_security || 'ssl',
+        };
+    }
+    $note = @accounts
+        ? scalar(@accounts) . ' mail server(s) configured for this site'
+        : 'No mail server saved for this site. Local mail dir is used only if it exists on this computer.';
+    return (\@accounts, $note);
+}
+
+sub mailbox_summaries {
+    my ($self, $c, $sitename) = @_;
+    return ([], 'No request context') unless $c && $c->can('model');
+    my $rs = eval { $c->model('DBEncy')->resultset('UserMailbox') };
+    return ([], 'Mailbox table is not loaded. Run Schema Compare, then save the mail server again.') unless $rs;
+    my $ready = eval { $rs->search({}, { rows => 1 })->count; 1 };
+    return ([], 'Mailbox table is not created yet. Run Schema Compare, then save the mail server.') unless $ready;
+    my @rows = eval {
+        $rs->search({ sitename => $sitename }, { order_by => 'email_address' })->all;
+    };
+    return ([], 'Could not read saved mail servers.') if $@;
+    my @out;
+    for my $row (@rows) {
+        push @out, {
+            email_address => $row->email_address,
+            login_username => $row->login_username,
+            imap_host => $row->imap_host,
+            imap_port => $row->imap_port,
+            imap_security => $row->imap_security,
+            has_password => ($row->password_enc ? 1 : 0),
+        };
+    }
+    return (\@out, '');
+}
+
+sub save_mailbox {
+    my ($self, $c, %m) = @_;
+    my $sitename = $m{sitename} || '';
+    return 'No site in session.' unless $sitename;
+    my $email = lc($m{email_address} || '');
+    $email =~ s/^\s+|\s+$//g;
+    return 'Enter the mailbox address, like shanta@usbm.ca.' unless $email =~ /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+    my $host = lc($m{imap_host} || '');
+    $host =~ s/^\s+|\s+$//g;
+    return 'Enter the mail server host name.' unless $host =~ /^[a-z0-9.\-]{3,253}$/;
+    my $port = $m{imap_port} || 993;
+    return 'Mail server port must be a number.' unless $port =~ /^\d{1,5}$/ && $port > 0 && $port < 65536;
+    my $security = lc($m{imap_security} || 'ssl');
+    $security = 'ssl' unless $security =~ /^(ssl|starttls|none)$/;
+    my $login = $m{login_username};
+    $login = $email unless defined $login && $login =~ /\S/;
+    $login =~ s/^\s+|\s+$//g;
+
+    my $rs = eval { $c->model('DBEncy')->resultset('UserMailbox') };
+    return 'Mailbox table is not loaded. Run Schema Compare, then save again.' unless $rs;
+    my $ready = eval { $rs->search({}, { rows => 1 })->count; 1 };
+    return 'Mailbox table is not created yet. Run Schema Compare, then save again.' unless $ready;
+
+    my $existing = eval { $rs->search({ sitename => $sitename, email_address => $email })->first };
+    return "Could not read the mailbox row: $@" if $@;
+    my $password = $m{password} // '';
+    $password =~ s/^\s+|\s+$//g;
+    my $cipher;
+    if ($password ne '') {
+        my $enc = do { require Comserv::Util::Encryption; Comserv::Util::Encryption->new() };
+        $cipher = eval { $enc->encrypt($password, 'mail') };
+        return 'Could not encrypt the mailbox password.' unless $cipher;
+    } elsif ($existing && $existing->password_enc) {
+        $cipher = $existing->password_enc;
+    } else {
+        return 'Enter the mailbox password. It is stored encrypted and is not written to the watch-list file.';
+    }
+
+    require Comserv::Util::AppTime;
+    my $now = Comserv::Util::AppTime->now_utc;
+    my $row = eval {
+        $rs->update_or_create({
+            sitename       => $sitename,
+            email_address  => $email,
+            login_username => $login,
+            password_enc   => $cipher,
+            imap_host      => $host,
+            imap_port      => $port + 0,
+            imap_security  => $security,
+            user_id        => $c->session->{user_id},
+            updated_at     => $now,
+            ($existing ? () : (created_at => $now)),
+        }, { key => 'user_mailboxes_email_site' });
+    };
+    if ($@ || !$row) {
+        my $err = $@ || 'save failed';
+        $err =~ s/\s+/ /g;
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'save_mailbox',
+            "Could not save mailbox $email at $host: " . substr($err, 0, 180));
+        return 'Could not save the mail server.';
+    }
+    $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, 'save_mailbox',
+        "Saved mail server for $email at $host:$port ($security) on $sitename");
+
+    my $all = $self->load_monitor_config;
+    my $cfg = $self->config_for_site($all, $sitename);
+    my @emails = @{ $cfg->{email_addresses} || [] };
+    push @emails, $email unless grep { lc($_) eq $email } @emails;
+    $all->{sites}{$sitename} = {
+        %$cfg,
+        email_addresses => \@emails,
+    };
+    my $cfg_err = $self->save_monitor_config($all);
+    return "Mail server saved, but the watch list could not be updated: $cfg_err" if $cfg_err;
+    return undef;
+}
+
+sub delete_mailbox {
+    my ($self, $c, $sitename, $email) = @_;
+    $email = lc($email || '');
+    $email =~ s/^\s+|\s+$//g;
+    return 'No address to remove.' unless $email && $sitename;
+    my $rs = eval { $c->model('DBEncy')->resultset('UserMailbox') };
+    return 'Mailbox table is not loaded.' unless $rs;
+    my $row = eval { $rs->search({ sitename => $sitename, email_address => $email })->first };
+    return "Could not read the mailbox row: $@" if $@;
+    return 'That address is not on the mail-server list.' unless $row;
+    eval { $row->delete };
+    return 'Could not remove that mail server.' if $@;
+    $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_mailbox',
+        "Removed mail server $email for $sitename");
+    return undef;
+}
+
+sub fetch_imap_accounts {
+    my ($self, $accounts) = @_;
+    $accounts ||= [];
+    my @messages;
+    $self->{mailbox_log} = [];
+    for my $acct (@$accounts) {
+        my $label = ($acct->{email_address} || $acct->{login_username} || '') . ' @ ' . ($acct->{imap_host} || '');
+        unless ($acct->{imap_host} && $acct->{login_username} && $acct->{password}) {
+            push @{$self->{mailbox_log}}, {
+                email_address => $acct->{email_address} || '',
+                imap_host => $acct->{imap_host} || '',
+                imap_port => $acct->{imap_port} || '',
+                ok => 0,
+                fetched => 0,
+                error => 'Missing host, login, or password',
+            };
+            next;
+        }
+        my ($got, $err) = $self->_fetch_inbox($acct);
+        my $n = $got ? scalar(@$got) : 0;
+        push @{$self->{mailbox_log}}, {
+            email_address => $acct->{email_address} || $acct->{login_username},
+            imap_host => $acct->{imap_host},
+            imap_port => $acct->{imap_port} || 993,
+            ok => $err ? 0 : 1,
+            fetched => $n,
+            error => $err || '',
+        };
+        $self->{logging}->log_with_details(undef, $err ? 'error' : 'info', __FILE__, __LINE__, 'fetch_imap_accounts',
+            ($err ? "Login failed for $label: $err" : "Login ok for $label. Fetched $n messages"));
+        push @messages, @$got if $got && @$got;
+    }
+    return @messages;
+}
+
+sub _fetch_inbox {
+    my ($self, $acct) = @_;
+    my @messages;
+    try {
+        require Mail::IMAPClient;
+        my %opt = (
+            Server  => $acct->{imap_host},
+            Port    => $acct->{imap_port} || 993,
+            Timeout => 20,
+            Uid     => 1,
+            Peek    => 1,
+        );
+        my $security = lc($acct->{imap_security} || 'ssl');
+        $opt{Ssl} = 1 if $security eq 'ssl';
+        $opt{Starttls} = 1 if $security eq 'starttls';
+        my $imap = Mail::IMAPClient->new(%opt);
+        die "could not connect\n" unless $imap && $imap->IsConnected;
+        $imap->User($acct->{login_username});
+        $imap->Password($acct->{password});
+        die "login rejected\n" unless $imap->login;
+        $imap->select('INBOX') or die "could not open INBOX\n";
+        my @uids = $imap->messages or ();
+        @uids = splice(@uids, -200) if @uids > 200;
+        for my $uid (@uids) {
+            my $content = $imap->message_string($uid);
+            next unless $content;
+            my $msg = $self->_parse_message($content, $acct->{email_address} || $acct->{login_username});
+            push @messages, $msg if $msg;
+        }
+        $imap->logout;
+    } catch {
+        my $err = $_;
+        $err =~ s/\s+/ /g;
+        $err =~ s/\bpassword\b/[redacted]/ig;
+        $self->{logging}->log_with_details(undef, 'error', __FILE__, __LINE__, '_fetch_inbox',
+            'Mail server read failed for ' . ($acct->{email_address} || $acct->{login_username})
+            . ' at ' . $acct->{imap_host} . ': ' . substr($err, 0, 180));
+        return ([], substr($err, 0, 180));
+    };
+    return (\@messages, '');
 }
 
 sub _fetch_from_imap {
@@ -208,6 +534,8 @@ sub _parse_message {
     my $to = $msg->header('To') || '';
     my $subject = $msg->header('Subject') || '';
     my $date = $msg->header('Date') || '';
+    my $cc = $msg->header('Cc') || '';
+    my $delivered_to = $msg->header('Delivered-To') || $msg->header('X-Original-To') || '';
     my $body = '';
     try {
         if (ref $msg eq 'Email::MIME') {
@@ -240,11 +568,90 @@ sub _parse_message {
         source => $source,
         from => $from,
         to => $to,
+        cc => $cc,
+        delivered_to => $delivered_to,
         subject => $subject,
         date => $date,
-        body_preview => substr($body, 0, 500),
+        body_preview => substr($body, 0, 4000),
         is_invoice => $is_invoice,
     };
+}
+
+# Full body when the source file is still on disk. Classified JSON only keeps a preview.
+sub message_body {
+    my ($self, $inv) = @_;
+    $inv ||= {};
+    my $src = $inv->{source} || '';
+    if ($src && $src !~ /^IMAP:/ && -f $src && -s $src < 1_500_000) {
+        my $text;
+        eval {
+            open my $fh, '<:raw', $src or die $!;
+            local $/;
+            my $raw = <$fh>;
+            close $fh;
+            $text = $self->_body_from_raw($raw);
+        };
+        if ($@) {
+            $self->{logging}->log_with_details(undef, 'warn', __FILE__, __LINE__, 'message_body',
+                "Could not re-read $src: $@");
+        } elsif (defined $text && length $text) {
+            return substr($text, 0, 12000);
+        }
+    }
+    return $inv->{body_preview} || '';
+}
+
+sub _body_from_raw {
+    my ($self, $raw) = @_;
+    return '' unless defined $raw && length $raw;
+    my $body = '';
+    my $mime;
+    eval { $mime = Email::MIME->new($raw); };
+    if ($@) {
+        $self->{logging}->log_with_details(undef, 'warn', __FILE__, __LINE__, '_body_from_raw',
+            "MIME parse failed: $@");
+    }
+    if ($mime) {
+        eval { $body = $mime->body_str || ''; };
+        if ($@) {
+            $self->{logging}->log_with_details(undef, 'warn', __FILE__, __LINE__, '_body_from_raw',
+                "body_str failed: $@");
+            $body = '';
+        }
+        if (!$body) {
+            foreach my $part ($mime->parts) {
+                my $ct = $part->content_type || '';
+                next unless $ct =~ m{text/plain}i;
+                my $part_body = '';
+                eval { $part_body = $part->body_str || ''; };
+                if ($@) {
+                    $self->{logging}->log_with_details(undef, 'warn', __FILE__, __LINE__, '_body_from_raw',
+                        "part body failed: $@");
+                    next;
+                }
+                if (length $part_body) {
+                    $body = $part_body;
+                    last;
+                }
+            }
+        }
+        return $body if length $body;
+    }
+    my $simple;
+    eval { $simple = Email::Simple->new($raw); };
+    if ($@ || !$simple) {
+        $self->{logging}->log_with_details(undef, 'warn', __FILE__, __LINE__, '_body_from_raw',
+            "simple parse failed: " . ($@ || 'no message'));
+        return '';
+    }
+    my $simple_body = '';
+    eval { $simple_body = $simple->body || ''; };
+    if ($@) {
+        $self->{logging}->log_with_details(undef, 'warn', __FILE__, __LINE__, '_body_from_raw',
+            "simple body failed: $@");
+        return '';
+    }
+    return $simple_body;
 }
 
 sub _classify_message {
@@ -324,112 +731,103 @@ sub _category_keywords {
     return [];
 }
 
-# Create draft AP rows from classified mail. Never posts GL.
-# Matches InventorySupplier.email to From:. Skips unmatched + personal.
+# Line item parsing for invoice emails
+sub _parse_invoice_line_items {
+    my ($self, $body_preview, $subject, $from) = @_;
+    return () unless $body_preview;
+    
+    my @line_items;
+    my $text = $body_preview;
+    
+    # Clean up the text
+    $text =~ s/\s+/ /g;
+    $text =~ s/\n/ /g;
+    
+    # Try to extract line items using various patterns
+    # Pattern 1: "SKU: NAME - QUANTITY x PRICE"
+    while ($text =~ /([A-Z]+-\w+)\s*:\s*([^-]+?)\s*-\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/gi) {
+        my ($sku, $name, $qty, $price) = ($1, $2, $3, $4);
+        push @line_items, {
+            sku => $sku,
+            name => $name,
+            quantity => $qty,
+            price => $price,
+            source => 'email_parsing',
+        };
+    }
+    
+    # Pattern 2: "QUANTITY x NAME (SKU) - $PRICE"
+    while ($text =~ /(\d+(?:\.\d+)?)\s*x\s*([A-Za-z0-9\s]+?)\s*\((\w+-\w+)\)\s*-\s*\$(\d+(?:\.\d+)?)/gi) {
+        my ($qty, $name, $sku, $price) = ($1, $2, $3, $4);
+        push @line_items, {
+            sku => $sku,
+            name => $name,
+            quantity => $qty,
+            price => $price,
+            source => 'email_parsing',
+        };
+    }
+    
+    # Pattern 3: "NAME SKU QUANTITY $PRICE"
+    while ($text =~ /([A-Za-z0-9\s]+?)\s+(\w+-\w+)\s+(\d+(?:\.\d+)?)\s*\$(\d+(?:\.\d+)?)/gi) {
+        my ($name, $sku, $qty, $price) = ($1, $2, $3, $4);
+        push @line_items, {
+            sku => $sku,
+            name => $name,
+            quantity => $qty,
+            price => $price,
+            source => 'email_parsing',
+        };
+    }
+    
+    # Pattern 4: "ITEM: NAME - QTY: QUANTITY - PRICE: $PRICE"
+    while ($text =~ /ITEM:\s*([^\n]+?)\s*-\s*QTY:\s*(\d+(?:\.\d+)?)\s*-\s*PRICE:\s*\$(\d+(?:\.\d+)?)/gi) {
+        my ($name, $qty, $price) = ($1, $2, $3);
+        push @line_items, {
+            sku => '',
+            name => $name,
+            quantity => $qty,
+            price => $price,
+            source => 'email_parsing',
+        };
+    }
+    
+    return @line_items;
+}
+
+# Determine item category based on item name
+sub _determine_item_category {
+    my ($self, $name) = @_;
+    
+    $name = lc($name);
+    
+    if ($name =~ /filament|3d|printer|equipment|hardware|tool/) {
+        return 'Equipment';
+    }
+    
+    if ($name =~ /part|component|piece/) {
+        return 'Hardware';
+    }
+    
+    if ($name =~ /material|supply|consumable/) {
+        return 'Supply';
+    }
+    
+    if ($name =~ /data|information|document|file/) {
+        return 'Digital';
+    }
+    
+    return 'General';
+}
+
+# Enhanced draft_supplier_invoices with sitename-based email routing
+# This configuration allows each sitename to define which emails to monitor
+# and which supplier accounts are attached to those addresses.
 sub draft_supplier_invoices {
     my ($self, $c, %args) = @_;
-    my $sitename = $args{sitename} || ($c && $c->session->{SiteName}) || 'CSC';
-    my $file = $args{file} || File::Spec->catfile($self->{output_dir}, 'classified_invoices.json');
-    my $schema = $c->model('DBEncy');
-    my @created;
-    my @skipped;
-    unless (-f $file) {
-        $self->{logging}->log_with_details($c, 'warn', __FILE__, __LINE__, 'draft_supplier_invoices',
-            "no classified file $file");
-        return { ok => 0, error => "classified file missing: $file" };
-    }
-    my $data;
-    eval {
-        open my $fh, '<', $file or die $!;
-        local $/;
-        $data = JSON->new->utf8->decode(<$fh>);
-        close $fh;
-    };
-    if ($@ || ref($data) ne 'HASH') {
-        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'draft_supplier_invoices',
-            "parse: $@");
-        return { ok => 0, error => "parse failed: $@" };
-    }
-    my $now  = Comserv::Util::AppTime->now_utc;
-    my $today = Comserv::Util::AppTime->today_utc_ymd;
-    my $cats = $data->{categories} || {};
-    for my $cat (keys %$cats) {
-        next if $cat eq 'personal';
-        my $block = $cats->{$cat} || {};
-        my $sites = $block->{sites} || [];
-        if (@$sites && !grep { $_ eq 'all' || lc($_) eq lc($sitename) } @$sites) {
-            next;
-        }
-        for my $inv (@{ $block->{invoices} || [] }) {
-            next unless $inv && $inv->{is_invoice};
-            my $mail_id = $inv->{id} || '';
-            my $inv_no  = $mail_id ? ('MAIL-' . substr($mail_id, 0, 16)) : undef;
-            if ($inv_no) {
-                my $exists = eval {
-                    $schema->resultset('Accounting::InventorySupplierInvoice')->search({
-                        sitename => $sitename, invoice_number => $inv_no,
-                    })->first;
-                };
-                if ($exists) {
-                    push @skipped, { id => $mail_id, reason => 'exists' };
-                    next;
-                }
-            }
-            my $from = $inv->{from} || '';
-            my ($email) = $from =~ /<([^>]+)>/;
-            $email ||= $from;
-            $email =~ s/^\s+|\s+$//g;
-            my $supplier;
-            if ($email && $email =~ /@/) {
-                $supplier = eval {
-                    $schema->resultset('Accounting::InventorySupplier')->search({
-                        sitename => $sitename,
-                        email    => { -like => '%' . $email . '%' },
-                    }, { rows => 1 })->first;
-                };
-            }
-            unless ($supplier) {
-                push @skipped, { id => $mail_id, reason => 'no_supplier', from => $from };
-                next;
-            }
-            my $amount = 0;
-            if (($inv->{body_preview} || '') =~ /(?:total|amount|due)[^\d]{0,20}(\d+[\.,]\d{2})/i) {
-                ($amount = $1) =~ s/,/./;
-            }
-            my $notes = join("\n",
-                'Draft from mail classifier. No GL post.',
-                'mail_id=' . $mail_id,
-                'from=' . $from,
-                'subject=' . ($inv->{subject} || ''),
-                'date=' . ($inv->{date} || ''),
-            );
-            my $row;
-            eval {
-                $row = $schema->resultset('Accounting::InventorySupplierInvoice')->create({
-                    sitename       => $sitename,
-                    supplier_id    => $supplier->id,
-                    invoice_number => $inv_no,
-                    invoice_date   => $today,
-                    total_amount   => $amount,
-                    status         => 'draft',
-                    notes          => $notes,
-                    created_by     => ($c->session->{username} || 'hermes-agent'),
-                    created_at     => $now,
-                    updated_at     => $now,
-                });
-            };
-            if ($@ || !$row) {
-                $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'draft_supplier_invoices',
-                    "create failed: $@");
-                push @skipped, { id => $mail_id, reason => "$@" };
-                next;
-            }
-            push @created, { invoice_id => $row->id, invoice_number => $inv_no, supplier_id => $supplier->id, amount => $amount };
-        }
-    }
-    $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, 'draft_supplier_invoices',
-        "sitename=$sitename created=" . scalar(@created) . " skipped=" . scalar(@skipped));
-    return { ok => 1, created => \@created, skipped => \@skipped };
+    require Comserv::Util::Inventory::MailInvoiceStock;
+    return Comserv::Util::Inventory::MailInvoiceStock->new->apply($c, %args, classifier => $self);
 }
+
 
 1;
