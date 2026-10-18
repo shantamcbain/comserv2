@@ -280,9 +280,11 @@ sub symptoms :Local :Args(0) {
                 }
             );
             if ( $res->{ok} ) {
-                $c->flash->{success_msg} = $res->{created}
-                    ? q{Symptom added to ENCY (pending review) and set active.}
-                    : q{That symptom already exists in ENCY; set active.};
+                $c->flash->{success_msg} = $res->{existing}
+                    ? q{That symptom already exists in ENCY; set active.}
+                    : $res->{duplicate}
+                    ? q{You already submitted that symptom; it is awaiting review.}
+                    : q{Thanks. Your symptom was sent for staff review and shows as pending until approved.};
                 $c->response->redirect( $c->uri_for( $self->action_for(q{symptoms}) ) );
                 $c->detach;
                 return;
@@ -321,6 +323,7 @@ sub symptoms :Local :Args(0) {
     $c->stash(
         hk_profile  => $self->hk->get_profile($c),
         hk_active   => $active,
+        hk_pending_symptoms => $self->hk->list_pending_symptoms_for_user($c),
         hk_symptoms => $self->hk->list_ency_symptoms($c),
         hk_match    => $self->hk->match_for_symptoms(
             $c, { symptom_ids => [ map { $_->{symptom_id} } @$active ] }
@@ -438,6 +441,47 @@ sub recipes_suggest :Local :Args(0) {
     }
     $c->response->redirect( $c->uri_for( $self->action_for('recipes') ) );
     $c->detach;
+}
+
+sub _is_staff {
+    my ( $self, $c ) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @r = ref $roles ? @$roles : split( /\s*,\s*/, $roles );
+    return ( grep { lc($_) =~ /^(admin|site_admin|staff|editor|moderator)$/ } @r ) ? 1 : 0;
+}
+
+# Staff review queue for user-submitted ENCY additions.
+sub review :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'review',
+        'HealthKitchen review queue method=' . ( $c->req->method || '' ) );
+    unless ( $self->_is_staff($c) ) {
+        $c->flash->{error_msg} = 'Staff only.';
+        $c->response->redirect( $c->uri_for( $self->action_for('symptoms') ) );
+        $c->detach;
+        return;
+    }
+    if ( $c->req->method eq 'POST' ) {
+        my $p   = $c->req->params;
+        my $res = $self->hk->review_pending( $c, { id => $p->{id}, decision => $p->{decision}, notes => $p->{notes} } );
+        if ( $res->{ok} ) {
+            $c->flash->{success_msg} = $res->{decision} eq 'approved'
+                ? ( $res->{created} ? 'Approved; ENCY symptom created and activated for the user.'
+                                    : 'Approved; linked to existing ENCY symptom and activated for the user.' )
+                : 'Rejected.';
+        }
+        else { $c->flash->{error_msg} = $res->{error} || 'Review failed.' }
+        $c->response->redirect( $c->uri_for( $self->action_for('review') ) );
+        $c->detach;
+        return;
+    }
+    my $status = $c->req->params->{status} || 'pending';
+    $c->stash(
+        hk_pending_ready => $self->hk->pending_ready($c) ? 1 : 0,
+        hk_review_status => $status,
+        hk_review_rows   => $self->hk->list_pending_review( $c, $status ),
+        template         => 'healthkitchen/review.tt',
+    );
 }
 
 sub _is_admin {

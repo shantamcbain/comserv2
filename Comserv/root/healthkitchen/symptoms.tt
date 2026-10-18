@@ -46,12 +46,22 @@
 
         <form method="post" action="[% c.uri_for('/healthkitchen/symptoms') %]" class="content-section">
             <input type="hidden" name="hk_action" value="new" />
-            <p class="doc-muted">Not in the list? Add it to ENCY. It is tagged “user-added, pending review” and set active for you. If the name already exists (case-insensitive), the existing entry is used.</p>
-            <label>New symptom name <input type="text" name="new_name" maxlength="255" required /></label>
-            <label>Description (optional) <textarea name="new_description"></textarea></label>
+            <p class="doc-muted">Not in the list? Submit it for staff review. It shows below as “pending review” until approved, then becomes active. If the name already exists in ENCY (case-insensitive), it is set active right away.</p>
+            <label>New symptom name <input type="text" name="new_name" maxlength="120" required /></label>
+            <label>Description (optional) <textarea name="new_description" maxlength="2000"></textarea></label>
             <label>Severity <input type="text" name="severity" /></label>
-            <button type="submit" class="btn btn-secondary">Add to ENCY &amp; set active</button>
+            <button type="submit" class="btn btn-secondary">Submit for review</button>
         </form>
+
+        [% IF hk_pending_symptoms && hk_pending_symptoms.size %]
+            <h3>Pending review</h3>
+            <table class="table">
+                <tr><th>Symptom</th><th>Severity</th><th>Status</th></tr>
+                [% FOREACH ps IN hk_pending_symptoms %]
+                    <tr><td>[% ps.name | html %]</td><td>[% ps.severity | html %]</td><td><em>pending review</em></td></tr>
+                [% END %]
+            </table>
+        [% END %]
 
         [% IF hk_active && hk_active.size %]
             <table class="table">

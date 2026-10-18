@@ -3,6 +3,7 @@ use Moose;
 use namespace::autoclean;
 use Try::Tiny;
 use POSIX qw(strftime);
+use JSON qw(encode_json decode_json);
 use Comserv::Util::Logging;
 
 has 'logging' => (
@@ -1982,53 +1983,255 @@ sub find_symptom_dup {
     return undef;
 }
 
+sub pending_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, 'HealthKitchen::PendingEncyAddition' );
+}
+
+# Pure: strip HTML/control chars, normalise whitespace.
+sub clean_text {
+    my ( $self, $v ) = @_;
+    return '' unless defined $v;
+    $v =~ s/<!--.*?-->//gs;
+    $v =~ s/<[^>]*>//gs;
+    $v =~ s/[<>]//g;
+    $v =~ s/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]//g;
+    $v =~ s/[ \t]+/ /g;
+    $v =~ s/^\s+|\s+$//g;
+    return $v;
+}
+
+# Pure: returns ( \%clean, $error ).
+sub validate_symptom_submission {
+    my ( $self, $a ) = @_;
+    my $name = $self->normalize_symptom_name( $self->clean_text( $a->{name} ) );
+    return ( undef, 'Symptom name is required.' ) unless length $name;
+    return ( undef, 'Symptom name must be 2-120 characters.' ) if length($name) < 2 || length($name) > 120;
+    return ( undef, q{Symptom name may only contain letters, numbers, spaces and - ' ( ) , . /} )
+        unless $name =~ m{^[\p{L}\p{N}][\p{L}\p{N} \-'(),./]*$};
+    my $desc = $self->clean_text( $a->{description} );
+    return ( undef, 'Description must be 2000 characters or fewer.' ) if length($desc) > 2000;
+    my $sev = $self->clean_text( $a->{severity} );
+    return ( undef, 'Severity must be 40 characters or fewer.' ) if length($sev) > 40;
+    return ( { name => $name, description => ( length $desc ? $desc : undef ),
+               severity => ( length $sev ? $sev : undef ) }, undef );
+}
+
+sub _find_ency_symptom_id {
+    my ( $self, $c, $name ) = @_;
+    my $hit = $c->model('DBEncy')->resultset('Ency::Symptom')->search(
+        { -or => [ \[ 'LOWER(TRIM(name)) = ?', lc $name ], \[ 'LOWER(TRIM(common_name)) = ?', lc $name ] ] },
+        { rows => 1, columns => ['record_id'] }
+    )->single;
+    return $hit ? $hit->record_id : undef;
+}
+
+# Existing ENCY match -> activate now. Otherwise stage for review + notify staff via todo.
 sub add_user_symptom {
     my ( $self, $c, $args ) = @_;
-    return { ok => 0, error => 'Symptom table is not created yet. Run schema-compare.' }
-        unless $self->symptom_ready($c);
     return { ok => 0, error => 'Please log in.' } unless $c->session->{user_id};
-    my $name = $self->normalize_symptom_name( $args->{name} );
-    return { ok => 0, error => 'Symptom name is required.' } unless length $name;
-    return { ok => 0, error => 'Symptom name is too long.' } if length($name) > 255;
-    my $desc = $args->{description};
-    $desc = undef if defined $desc && $desc !~ /\S/;
-
-    my ( $sid, $created );
+    my ( $v, $err ) = $self->validate_symptom_submission($args);
+    return { ok => 0, error => $err } if $err;
+    my $sid = eval { $self->_find_ency_symptom_id( $c, $v->{name} ) };
+    if ($sid) {
+        my $r = $self->set_active_symptom( $c, { symptom_id => $sid, severity => $v->{severity} } );
+        $r->{existing} = 1;
+        return $r;
+    }
+    return { ok => 0, error => 'Review queue table is not created yet. Run schema-compare.' }
+        unless $self->pending_ready($c);
+    my ( $row, $dup );
     try {
-        my $rs = $c->model('DBEncy')->resultset('Ency::Symptom');
-        my $hit = $rs->search(
-            { -or => [ \[ 'LOWER(TRIM(name)) = ?', lc $name ], \[ 'LOWER(TRIM(common_name)) = ?', lc $name ] ] },
-            { rows => 1, columns => ['record_id'] }
-        )->single;
-        if ($hit) {
-            $sid = $hit->record_id;
+        my $rs = $c->model('DBEncy')->resultset('HealthKitchen::PendingEncyAddition');
+        for my $p ( $rs->search( { user_id => $c->session->{user_id}, sitename => $self->sitename($c),
+                                    entity_type => 'symptom', status => 'pending' } )->all ) {
+            my $d = eval { decode_json( $p->payload ) } || {};
+            if ( lc( $d->{name} // '' ) eq lc $v->{name} ) { $dup = $p; last }
         }
-        else {
-            my $row = $rs->create(
-                {
-                    name               => $name,
-                    description        => $desc,
-                    reference          => $USER_ADDED_REF,
-                    sitename           => $self->sitename($c),
-                    username_of_poster => $c->session->{username} || ( 'user#' . $c->session->{user_id} ),
-                    group_of_poster    => $USER_ADDED_GROUP,
-                    date_time_posted   => _now_str(),
-                    share              => 0,
-                }
-            );
-            $sid     = $row->record_id;
-            $created = 1;
-        }
+        $row = $dup || $rs->create( {
+            user_id     => $c->session->{user_id},
+            username    => $c->session->{username},
+            sitename    => $self->sitename($c),
+            entity_type => 'symptom',
+            payload     => encode_json($v),
+            status      => 'pending',
+        } );
     }
     catch {
         $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'add_user_symptom',
-            "add_user_symptom failed: $_" );
+            "stage failed: $_" );
     };
-    return { ok => 0, error => 'Could not add symptom to ENCY.' } unless $sid;
-    my $res = $self->set_active_symptom( $c, { symptom_id => $sid, severity => $args->{severity} } );
-    $res->{created}    = $created ? 1 : 0;
-    $res->{symptom_id} = $sid;
+    return { ok => 0, error => 'Could not submit symptom for review.' } unless $row;
+    $self->_notify_staff_pending( $c, $row, $v ) unless $dup || $row->todo_id;
+    return { ok => 1, pending => 1, pending_id => $row->id, duplicate => $dup ? 1 : 0 };
+}
+
+sub _notify_staff_pending {
+    my ( $self, $c, $row, $v ) = @_;
+    try {
+        my $today = strftime( '%Y-%m-%d', localtime );
+        my $due   = strftime( '%Y-%m-%d', localtime( time + 3 * 86400 ) );
+        my $todo  = $c->model('DBEncy')->resultset('Todo')->create( {
+            sitename            => $self->sitename($c),
+            start_date          => $today,
+            parent_todo         => '',
+            due_date            => $due,
+            subject             => 'Review ENCY symptom submission #' . $row->id,
+            description         => 'A user submitted a new ENCY symptom for review. '
+                . 'Open /healthkitchen/review to approve or reject. Name: ' . $v->{name},
+            estimated_man_hours => 0,
+            comments            => '',
+            reporter            => 'healthkitchen',
+            company_code        => 'default',
+            owner               => 'admin',
+            project_code        => '',
+            developer           => 'admin',
+            username_of_poster  => 'healthkitchen',
+            status              => 'NEW',
+            priority            => 3,
+            share               => 0,
+            last_mod_by         => 'healthkitchen',
+            last_mod_date       => $today,
+            user_id             => 0,
+            group_of_poster     => 'admin',
+            date_time_posted    => $today,
+        } );
+        $row->update( { todo_id => $todo->id } ) if $todo;
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, '_notify_staff_pending',
+            "todo create failed (submission still queued): $_" );
+    };
+}
+
+# Submitter's own pending symptom submissions, shown as 'pending review'.
+sub list_pending_symptoms_for_user {
+    my ( $self, $c ) = @_;
+    return [] unless $c->session->{user_id} && $self->pending_ready($c);
+    my @out;
+    try {
+        for my $p ( $c->model('DBEncy')->resultset('HealthKitchen::PendingEncyAddition')->search(
+                { user_id => $c->session->{user_id}, sitename => $self->sitename($c),
+                  entity_type => 'symptom', status => 'pending' }, { order_by => 'id' } )->all ) {
+            my $d = eval { decode_json( $p->payload ) } || {};
+            push @out, { pending_id => $p->id, name => $d->{name}, severity => $d->{severity},
+                         status => 'pending review' };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'list_pending_symptoms_for_user', "$_" );
+    };
+    return \@out;
+}
+
+sub list_pending_review {
+    my ( $self, $c, $status ) = @_;
+    return [] unless $self->pending_ready($c);
+    $status = 'pending' unless $status && $status =~ /^(pending|approved|rejected)$/;
+    my @out;
+    try {
+        for my $p ( $c->model('DBEncy')->resultset('HealthKitchen::PendingEncyAddition')->search(
+                { status => $status, sitename => $self->sitename($c) },
+                { order_by => { -desc => 'id' }, rows => 200 } )->all ) {
+            my $d = eval { decode_json( $p->payload ) } || {};
+            push @out, {
+                id => $p->id, entity_type => $p->entity_type, status => $p->status,
+                name => $d->{name}, description => $d->{description},
+                submitted_by => $p->username || ( 'user#' . $p->user_id ),
+                created_at => ( $p->get_column('created_at') // '' ),
+                reviewer => $p->reviewer_username, review_notes => $p->review_notes,
+                ency_record_id => $p->ency_record_id,
+                existing_match => eval { $self->_find_ency_symptom_id( $c, $d->{name} // '' ) },
+            };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'list_pending_review', "$_" );
+    };
+    return \@out;
+}
+
+# decision: approve|reject. Approve creates (or reuses) the ENCY symptom without
+# personal data, then activates it for the submitter.
+sub review_pending {
+    my ( $self, $c, $args ) = @_;
+    return { ok => 0, error => 'Review queue table is not created yet.' } unless $self->pending_ready($c);
+    my $id = $self->_opt_id( $args->{id} ) or return { ok => 0, error => 'Bad submission id.' };
+    my $decision = $args->{decision} // '';
+    return { ok => 0, error => 'Choose approve or reject.' } unless $decision =~ /^(approve|reject)$/;
+    my $notes = $self->clean_text( $args->{notes} );
+    $notes = substr( $notes, 0, 2000 );
+    my ( $res, $schema ) = ( undef, $c->model('DBEncy') );
+    try {
+        $schema->txn_do( sub {
+            my $p = $schema->resultset('HealthKitchen::PendingEncyAddition')->search(
+                { id => $id, sitename => $self->sitename($c), status => 'pending' },
+                { for => 'update' } )->single or die "not pending\n";
+            my %rev = (
+                reviewer_user_id  => $c->session->{user_id},
+                reviewer_username => $c->session->{username},
+                review_notes      => ( length $notes ? $notes : undef ),
+                reviewed_at       => strftime( '%Y-%m-%d %H:%M:%S', localtime ),
+            );
+            if ( $decision eq 'reject' ) {
+                $p->update( { %rev, status => 'rejected' } );
+                $res = { ok => 1, decision => 'rejected' };
+                return;
+            }
+            my $d = decode_json( $p->payload );
+            my ( $v, $err ) = $self->validate_symptom_submission($d);
+            die "invalid: $err\n" if $err;
+            my $sid = $self->_find_ency_symptom_id( $c, $v->{name} );
+            my $created = 0;
+            unless ($sid) {
+                my $s = $schema->resultset('Ency::Symptom')->create( {
+                    name               => $v->{name},
+                    description        => $v->{description},
+                    reference          => 'Submitted via HealthKitchen; approved by staff',
+                    sitename           => $p->sitename,
+                    username_of_poster => $c->session->{username} || 'hk-review',
+                    group_of_poster    => $USER_ADDED_GROUP,
+                    date_time_posted   => _now_str(),
+                    share              => 0,
+                } );
+                $sid = $s->record_id;
+                $created = 1;
+            }
+            $self->_activate_for( $c, $p->user_id, $p->sitename, $sid, $v->{severity} );
+            $p->update( { %rev, status => 'approved', ency_record_id => $sid } );
+            $res = { ok => 1, decision => 'approved', symptom_id => $sid, created => $created };
+        } );
+    }
+    catch {
+        my $e = "$_";
+        $res = { ok => 0, error => $e =~ /not pending/ ? 'Submission not found or already reviewed.'
+                                  : $e =~ /invalid: (.*)/ ? "Submission is invalid: $1" : 'Review failed.' };
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'review_pending', "review failed: $e" );
+    };
+    if ( $res && $res->{ok} ) {
+        try {
+            my $p = $schema->resultset('HealthKitchen::PendingEncyAddition')->find($id);
+            if ( $p && $p->todo_id ) {
+                my $t = $schema->resultset('Todo')->find( $p->todo_id );
+                $t->update( { status => 'COMPLETED', last_mod_by => $c->session->{username} || 'healthkitchen',
+                              last_mod_date => strftime( '%Y-%m-%d', localtime ) } ) if $t;
+            }
+        }
+        catch { };
+    }
     return $res;
+}
+
+sub _activate_for {
+    my ( $self, $c, $user_id, $site, $sid, $severity ) = @_;
+    return unless $self->symptom_ready($c);
+    my $rs  = $c->model('DBEncy')->resultset('HealthKitchen::UserActiveSymptom');
+    my $row = $rs->search( { user_id => $user_id, sitename => $site, symptom_id => $sid } )->single;
+    if ($row) { $row->update( { status => 'active', resolved_at => undef } ) }
+    else {
+        $rs->create( { user_id => $user_id, sitename => $site, symptom_id => $sid,
+                       severity => $severity, status => 'active' } );
+    }
 }
 
 sub _now_str {
