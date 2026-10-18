@@ -117,6 +117,12 @@
     <!-- Theme overrides to ensure proper application -->
     <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css?v=[% cv %]">
 
+    <!-- Per-site theme CSS from File Manager (theme-<site>.css), overrides static theme -->
+    [% site_css = c.controller('Media').site_theme_css(c, SiteName) %]
+    [% IF site_css %]
+    <link rel="stylesheet" type="text/css" href="/media/file/[% site_css.id %]/[% site_css.name | uri %]?v=[% site_css.v | uri %]">
+    [% END %]
+
     [% IF c.session.debug_mode == 1 %]
     <!-- Debug: Site name is [% SiteName %] -->
     [% END %]
