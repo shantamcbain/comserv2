@@ -1,0 +1,13 @@
+[%# Admin-only AI quick links (eval reports, latest report, usage). Included
+  # from the admin menu areas, /ai/usage and the AI planning pages. No JS. %]
+[% aiel_roles = c.session.roles.list.join(',') %]
+[% IF aiel_roles.match('(?i)(^|,)\\s*admin\\s*(,|$)') %]
+<div class="doc-note ai-admin-eval-links" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0 12px;padding:8px 10px;border:1px solid var(--border-color,#ccc);border-radius:6px;">
+  <strong>Admin · AI:</strong>
+  <a href="/ai/eval/latest" class="btn btn-primary" title="Newest Daily AI Eval Report">Latest eval report</a>
+  <a href="/ai/eval" class="btn btn-secondary">All eval reports</a>
+  <a href="/ai/eval#auto-changes" class="btn btn-secondary">Auto-changes</a>
+  <a href="/ai/usage" class="btn btn-secondary">AI Usage monitor</a>
+  <a href="/ai/usage#ai-health" class="btn btn-secondary">Health &amp; preflight</a>
+</div>
+[% END %]

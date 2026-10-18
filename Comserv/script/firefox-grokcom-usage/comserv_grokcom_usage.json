@@ -1,0 +1,7 @@
+{
+  "name": "comserv_grokcom_usage",
+  "description": "Write grok.com Build/Chat % numbers for Comserv /ai/usage",
+  "path": "/home/shanta/.comserv/worktrees/aisystem/Comserv/Comserv/script/firefox-grokcom-usage/native_host.py",
+  "type": "stdio",
+  "allowed_extensions": ["grokcom-usage@comserv.local"]
+}

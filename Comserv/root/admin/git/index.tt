@@ -149,6 +149,8 @@
                                 <span class="section-info"><i class="fas fa-check"></i> in sync with [% tracking.base | html %]</span>
                             [% END %]
                             <span class="section-info-muted">no GitHub upstream — local-merge workflow (merge into main, don't push per-branch)</span>
+                        [% ELSIF current_branch == 'main' OR current_branch == 'master' %]
+                            <span class="section-info"><i class="fas fa-upload"></i> origin/[% current_branch | html %] — Push publishes this checkout</span>
                         [% ELSE %]
                             <span class="section-info-warn">no upstream</span>
                         [% END %]
@@ -158,8 +160,8 @@
                     [% END %]
                 </div>
 
-                [%# ---- Remote actions: ONLY relevant for branches with a GitHub upstream ---- %]
-                [% IF tracking.upstream %]
+                [%# ---- Remote actions: GitHub upstream, or the primary main checkout (:3001) ---- %]
+                [% IF tracking.upstream OR current_branch == 'main' OR current_branch == 'master' %]
                 <div class="git-card git-card--fit">
                     <h4>Remote</h4>
                     <div class="git-inline">
@@ -304,6 +306,8 @@
             </div>
 
             [%# ==================== Develop Servers (zenflow worktree registry) ==================== %]
+            [%# Highlight uses current_worktree (from app_workflow = worktree dir key) to mark the active server row.
+               This matches b.name even when live git branch (current_branch) differs (e.g. feature branch in a named worktree slot). #]
             [%# Single source of truth = stash.worktree_list (Comserv::Util::Git->build_worktree_list,\n               which reads root/config/worktrees.json). Mirrors the planning tab's "Branch Servers"\n               panel. Open/Stop/Restart buttons POST to /admin/branch_server_action (handled in\n               git-dashboard.js). No inline <script>. #]
             [% IF worktree_list && worktree_list.size %]
             <details class="git-collapse git-dev-servers">
@@ -320,10 +324,10 @@
                         </thead>
                         <tbody>
                             [% FOREACH b IN worktree_list %]
-                            <tr[% IF b.name == current_branch %] class="git-dev-current"[% END %]>
+                            <tr[% IF b.name == current_worktree %] class="git-dev-current"[% END %]>
                                 <td>
                                     <code>[% b.label | html %]</code>
-                                    [% IF b.name == current_branch %]<span class="status-badge">current</span>[% END %]
+                                    [% IF b.name == current_worktree %]<span class="status-badge">current</span>[% END %]
                                 </td>
                                 <td><code>:[% b.port %]</code></td>
                                 <td>

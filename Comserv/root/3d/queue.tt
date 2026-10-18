@@ -54,6 +54,30 @@
 .btn-assign   { background: #17a2b8; }
 .btn-complete { background: #28a745; }
 .btn-cancel   { background: #dc3545; }
+.printer-live > summary {
+    cursor: pointer;
+    color: var(--heading-color, var(--text-color));
+    font-size: 1.15em;
+    font-weight: bold;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.3em;
+    margin-bottom: 0.6em;
+}
+.printer-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6em;
+    align-items: stretch;
+}
+.printer-card {
+    flex: 1 1 14em;
+    max-width: 22em;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.6em 0.8em;
+    background: var(--secondary-color);
+    color: var(--text-color);
+}
 </style>
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;">
@@ -92,8 +116,158 @@
 </div>
 [% END %]
 
+
+<div class="queue-section">
+    <h2>Active — Printing ([% active_jobs.size %])</h2>
+    [% IF active_jobs && active_jobs.size %]
+    <table class="queue-table">
+        <thead>
+            <tr>
+                <th>#</th><th>Model / Item</th><th>User</th><th>Printer</th>
+                <th>Filament</th><th>Status</th><th>Started</th><th>Complete / Cancel</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH job IN active_jobs %]
+            <tr>
+                <td>[% job.id %]</td>
+                <td>
+                    [% IF job.model_name %][% job.model_name | html %][% ELSIF job.item_name %][% job.item_name | html %][% ELSE %]#[% job.id %][% END %]
+                    [% IF job.quantity > 1 %]<span style="margin-left:0.4em;background:var(--accent-color,#007bff);color:white;padding:0.1em 0.5em;border-radius:10px;font-size:0.8em;font-weight:bold;" title="Quantity to print">×[% job.quantity %]</span>[% END %]
+                    [% IF job.model_id && job.source_type == 'sign' %]
+                    <br><a href="/signgenerator/download/[% job.model_id %]/3mf?job_id=[% job.id %]" style="font-size:0.8em;color:var(--accent-color,#007bff);" title="Two-colour 3MF from the order filament picks">⬇ Download 3MF</a>
+                    [% ELSIF job.model_id %]
+                    <br><a href="/3d/model_download/[% job.model_id %]" style="font-size:0.8em;color:var(--accent-color,#007bff);" title="Download the STL/3MF currently linked to this model — verify the filename matches the part before slicing">⬇ Download File</a>
+                    <form method="post" action="/3d/model_upload/[% job.model_id %]" enctype="multipart/form-data" style="display:inline;margin-left:0.4em;font-size:0.75em;">
+                        <input type="file" name="stl_file" accept=".stl,.STL,.3mf,.3MF,.obj,.OBJ,.gcode,.step,.stp" style="display:none" id="stl_up_active_[% job.id %]" onchange="this.form.submit()">
+                        <label for="stl_up_active_[% job.id %]" style="color:var(--accent-color,#007bff);cursor:pointer;text-decoration:underline;" title="Upload replacement STL — the file you downloaded, modified in your slicer, and are re-uploading">⬆ Upload New</label>
+                    </form>
+                    [% IF job.model_file %]<br><small style="color:var(--text-muted-color);">[% job.model_file | html %]</small>[% END %]
+                    [% END %]
+                </td>
+                <td>[% job.username | html %]</td>
+                <td>
+                    [% IF job.printer_name %][% job.printer_name | html %]
+                        [% IF job.printer_id %]
+                        [% ps = printer_states ? printer_states.item(job.printer_id) : undef %]
+                        [% IF ps %]
+                            <br>
+                            <span style="font-size:0.78em;font-weight:bold;">
+                            [% IF ps.ok %]
+                                [% IF ps.print_state == 'busy' %]
+                                <span style="color:#28a745;">● busy — printing</span>
+                                [% IF ps.filename %]<br><small style="color:var(--text-muted-color);font-weight:normal;">[% ps.filename | html %][% IF ps.progress != '' %] · [% ps.progress %]%%[% END %]</small>[% END %]
+                                [% ELSIF ps.print_state == 'free' %]
+                                <span style="color:#ffc107;">● idle — print not started</span>
+                                [% ELSE %]
+                                <span style="color:var(--muted-color,#888);">● state unknown</span>
+                                [% END %]
+                            [% ELSE %]
+                                <span style="color:#dc3545;">● offline — unreachable</span>
+                            [% END %]
+                            </span>
+                        [% END %]
+                        <br>
+                        <a href="/3d/printer_lan/control?printer_id=[% job.printer_id %]" target="_blank" style="font-size:0.75em;color:var(--accent-color,#007bff);">Control Printer</a>
+                        [% IF ps && ps.ok && ps.print_state == 'free' %]
+                        <button type="button" onclick="showPrinterFiles([% job.printer_id %], '[% job.printer_name | html %]', '[% job.model_name | html %]', '[% job.item_sku | html %]', [% job.model_id || 0 %])" style="font-size:0.75em;margin-left:0.3em;background:#28a745;color:white;border:none;border-radius:4px;padding:0.25em 0.6em;font-weight:bold;cursor:pointer;" title="Printer is really idle — start the assigned job on it (pick the file in the popup)">▶ Start Print</button>
+                        [% END %]
+                        <button type="button" onclick="showPrinterFiles([% job.printer_id %], '[% job.printer_name | html %]', '[% job.model_name | html %]', '[% job.item_sku | html %]', [% job.model_id || 0 %])" style="font-size:0.7em;margin-left:0.3em;">Files on Printer (popup)</button>
+                        [% END %]
+                    [% ELSE %]&mdash;[% END %]
+                </td>
+                <td class="job-filament" data-job-id="[% job.id %]">
+                    [% IF job.filament_plan && job.filament_plan.size %]
+                    [% FOREACH slot IN job.filament_plan %]
+                    <div style="font-size:0.85em;color:var(--text-color);">
+                      <span style="display:inline-block;width:0.75em;height:0.75em;border:1px solid var(--border-color);background:[% slot.color_hex || 'transparent' %];"></span>
+                      [% slot.filament_color | html %] [% slot.issue_grams %] g
+                    </div>
+                    [% END %]
+                    [% ELSIF job.filament_type || job.filament_color %]
+                    <span style="font-size:0.88em;">[% job.filament_type | html %][% IF job.filament_type && job.filament_color %] [% END %][% job.filament_color | html %]</span>
+                    [% IF job.filament_name %]<br><small style="color:var(--text-muted-color);">[% job.filament_name | html %]</small>[% END %]
+                    [% ELSE %]&mdash;[% END %]
+                </td>
+                <td><span class="status-badge status-[% job.status %]">[% job.status %]</span></td>
+                <td>[% IF job.started_at %][% job.started_at %][% IF job.elapsed_human %]<br><small style="color:var(--text-muted-color);">[% job.elapsed_human %] elapsed</small>[% END %][% ELSE %]&mdash;[% END %]</td>
+                <td>
+                    <form method="post" action="/3d/queue" class="complete-form"
+                          data-job-id="[% job.id %]"
+                          data-quantity="[% job.quantity || 1 %]"
+                          data-plan-json="[% job.plan_json | html %]">
+                        <input type="hidden" name="job_id" value="[% job.id %]">
+                        <input type="hidden" name="action" value="complete">
+                        <input type="hidden" name="plan_verified" value="">
+                        <input type="hidden" name="plan_json" value="">
+                        <input type="hidden" name="filament_grams" value="">
+                        <input type="hidden" name="print_hours_h" value="">
+                        <input type="hidden" name="print_hours_m" value="">
+                        <button type="button" class="btn-action btn-complete" onclick="return openCompletePopup(this)">Complete</button>
+                    </form>
+                    <form method="post" action="/3d/queue" style="display:inline;margin-left:0.3em;">
+                        <input type="hidden" name="job_id" value="[% job.id %]">
+                        <input type="hidden" name="action" value="cancel">
+                        <button type="submit" class="btn-action btn-cancel"
+                            onclick="return confirm('Cancel this job?')">Cancel</button>
+                    </form>
+                    <a href="/3d/job/filament/[% job.id %]"
+                       class="btn-action btn-assign">Change filament</a>
+                    [% IF job.model_id %]
+                    [% INCLUDE '3d/_labour_log_form.tt' %]
+                    [% END %]
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <p style="color:var(--muted-color,#888);">No active print jobs.</p>
+    [% END %]
+</div>
+<details class="queue-section printer-live">
+    <summary>Printers — Live State ([% farm_printers.size %])</summary>
+    <p style="font-size:0.8em;color:var(--text-muted-color);margin-top:0;">Live state is fetched from each printer on this page load (LAN). A new printer is another card across this row.</p>
+    <div class="printer-row">
+        [% FOREACH p IN farm_printers %]
+        [% ps = printer_states ? printer_states.item(p.id) : undef %]
+        <div class="printer-card">
+            <strong>[% p.name | html %]</strong>
+            [% IF p.model %]<br><small style="color:var(--text-muted-color);">[% p.model | html %]</small>[% END %]
+            <div style="margin:0.35em 0;">
+                [% IF ps && ps.ok %]
+                    [% IF ps.print_state == 'busy' %]
+                    <span style="color:#28a745;font-weight:bold;">● printing</span>
+                    [% IF ps.filename %]<br><small style="color:var(--text-muted-color);">[% ps.filename | html %][% IF ps.progress != '' %] · [% ps.progress %]%%[% END %]</small>[% END %]
+                    [% ELSIF ps.print_state == 'free' %]
+                    <span style="color:#ffc107;font-weight:bold;">● idle</span>
+                    [% ELSE %]
+                    <span style="color:var(--muted-color,#888);">● state unknown</span>
+                    [% END %]
+                [% ELSIF ps %]
+                    <span style="color:#dc3545;font-weight:bold;">● offline</span>
+                [% ELSE %]
+                    <span style="color:var(--muted-color,#888);">● no LAN link</span>
+                [% END %]
+            </div>
+            <a href="/3d/printer_lan/control?printer_id=[% p.id %]" target="_blank" style="font-size:0.8em;">Control</a>
+            [% IF ps && ps.ok && ps.print_state == 'free' %]
+            <button type="button" onclick="showPrinterFiles([% p.id %], '[% p.name | html %]', '', '', 0)" style="font-size:0.8em;margin-left:0.4em;background:#28a745;color:white;border:none;border-radius:4px;padding:0.25em 0.6em;font-weight:bold;cursor:pointer;" title="Printer is idle — pick a file already on it or send one from the library">▶ Start Print</button>
+            [% END %]
+        </div>
+        [% END %]
+    </div>
+</details>
+
 <div class="queue-section">
     <h2>Queued — Waiting for Printer ([% queued_jobs.size %])</h2>
+    [% IF unavailable_printers && unavailable_printers.size %]
+    <p style="margin:0.3em 0;color:#dc3545;font-size:0.85em;">
+        <strong>Not offered (really busy right now):</strong>
+        [% FOREACH p IN unavailable_printers %][% p.name | html %][% UNLESS loop.last %], [% END %][% END %]
+        — a printer is only listed for assignment when its live LAN state is idle or unverifiable.
+    </p>
+    [% END %]
     [% IF queued_jobs && queued_jobs.size %]
     <table class="queue-table">
         <thead>
@@ -134,19 +308,24 @@
                 <td>[% job.quantity %]</td>
                 <td>[%# user_time needs View::TT reload; show stored UTC until then %][% job.created_at %]</td>
                 <td>
-                    [% IF idle_printers && idle_printers.size %]
+                    [% IF assignable_printers && assignable_printers.size %]
                     <form method="post" action="/3d/queue" style="display:inline;">
                         <input type="hidden" name="job_id" value="[% job.id %]">
                         <input type="hidden" name="action" value="assign">
                         <select name="printer_id">
-                            [% FOREACH p IN idle_printers %]
-                            <option value="[% p.id %]">[% p.name | html %]</option>
+                            [% FOREACH p IN assignable_printers %]
+                            [% ps = printer_states ? printer_states.item(p.id) : undef %]
+                            [% suffix = '' %]
+                            [% IF ps && !ps.ok %][% suffix = ' (offline — unverified)' %]
+                            [% ELSIF ps && !ps.mqtt_ok %][% suffix = ' (state unverified)' %]
+                            [% END %]
+                            <option value="[% p.id %]">[% p.name | html %][% suffix %]</option>
                             [% END %]
                         </select>
                         <button type="submit" class="btn-action btn-assign">Assign</button>
                     </form>
                     [% ELSE %]
-                    <em style="color:var(--muted-color,#888);">No idle printers</em>
+                    <em style="color:var(--muted-color,#888);">No available printers</em>
                     [% END %]
                 </td>
                 <td>
@@ -168,90 +347,6 @@
     [% END %]
 </div>
 
-<div class="queue-section">
-    <h2>Active — Printing ([% active_jobs.size %])</h2>
-    [% IF active_jobs && active_jobs.size %]
-    <table class="queue-table">
-        <thead>
-            <tr>
-                <th>#</th><th>Model / Item</th><th>User</th><th>Printer</th>
-                <th>Filament</th><th>Status</th><th>Started</th><th>Complete / Cancel</th>
-            </tr>
-        </thead>
-        <tbody>
-            [% FOREACH job IN active_jobs %]
-            <tr>
-                <td>[% job.id %]</td>
-                <td>
-                    [% IF job.model_name %][% job.model_name | html %][% ELSIF job.item_name %][% job.item_name | html %][% ELSE %]#[% job.id %][% END %]
-                    [% IF job.quantity > 1 %]<span style="margin-left:0.4em;background:var(--accent-color,#007bff);color:white;padding:0.1em 0.5em;border-radius:10px;font-size:0.8em;font-weight:bold;" title="Quantity to print">×[% job.quantity %]</span>[% END %]
-                    [% IF job.model_id && job.source_type == 'sign' %]
-                    <br><a href="/signgenerator/download/[% job.model_id %]/3mf?job_id=[% job.id %]" style="font-size:0.8em;color:var(--accent-color,#007bff);" title="Two-colour 3MF from the order filament picks">⬇ Download 3MF</a>
-                    [% ELSIF job.model_id %]
-                    <br><a href="/3d/model_download/[% job.model_id %]" style="font-size:0.8em;color:var(--accent-color,#007bff);" title="Download the STL/3MF currently linked to this model — verify the filename matches the part before slicing">⬇ Download File</a>
-                    <form method="post" action="/3d/model_upload/[% job.model_id %]" enctype="multipart/form-data" style="display:inline;margin-left:0.4em;font-size:0.75em;">
-                        <input type="file" name="stl_file" accept=".stl,.STL,.3mf,.3MF,.obj,.OBJ,.gcode,.step,.stp" style="display:none" id="stl_up_active_[% job.id %]" onchange="this.form.submit()">
-                        <label for="stl_up_active_[% job.id %]" style="color:var(--accent-color,#007bff);cursor:pointer;text-decoration:underline;" title="Upload replacement STL — the file you downloaded, modified in your slicer, and are re-uploading">⬆ Upload New</label>
-                    </form>
-                    [% IF job.model_file %]<br><small style="color:var(--text-muted-color);">[% job.model_file | html %]</small>[% END %]
-                    [% END %]
-                </td>
-                <td>[% job.username | html %]</td>
-                <td>[% IF job.printer_name %][% job.printer_name | html %][% ELSE %]&mdash;[% END %]</td>
-                <td>
-                    [% IF job.filament_type || job.filament_color %]
-                    <span style="font-size:0.88em;">[% job.filament_type | html %][% IF job.filament_type && job.filament_color %] [% END %][% job.filament_color | html %]</span>
-                    [% IF job.filament_name %]<br><small style="color:var(--text-muted-color);">[% job.filament_name | html %]</small>[% END %]
-                    [% ELSE %]&mdash;[% END %]
-                </td>
-                <td><span class="status-badge status-[% job.status %]">[% job.status %]</span></td>
-                <td>[% IF job.started_at %][% job.started_at %][% IF job.elapsed_human %]<br><small style="color:var(--text-muted-color);">[% job.elapsed_human %] elapsed</small>[% END %][% ELSE %]&mdash;[% END %]</td>
-                <td>
-                    <form method="post" action="/3d/queue" class="complete-form"
-                          data-started-at="[% job.started_at || '' %]"
-                          data-bom-hours="[% job.bom_print_hours | html %]"
-                          data-bom-grams="[% job.bom_filament_grams | html %]"
-                          data-quantity="[% job.quantity | html %]"
-                          style="display:inline-flex;gap:0.35em;align-items:center;flex-wrap:wrap;">
-                        <input type="hidden" name="job_id" value="[% job.id %]">
-                        <input type="hidden" name="action" value="complete">
-                        <label style="font-size:0.82em;color:var(--text-color);">Time:</label>
-                        <input type="number" name="print_hours_h" min="0" max="999"
-                               value="[% job.elapsed_h %]"
-                               style="width:3.2em;padding:0.2em 0.3em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
-                               placeholder="h" title="[% IF job.started_at %]Elapsed since assigned: [% job.elapsed_human %][% IF job.bom_print_hours %] — BOM estimate: [% job.bom_print_hours %]h[% END %][% ELSE %]Hours[% END %]">
-                        <span style="font-size:0.85em;color:var(--text-color);">h</span>
-                        <input type="number" name="print_hours_m" min="0" max="59"
-                               value="[% job.elapsed_m %]"
-                               style="width:3.2em;padding:0.2em 0.3em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
-                               placeholder="m" title="[% IF job.started_at %]Elapsed since assigned: [% job.elapsed_human %][% IF job.bom_print_hours %] — BOM estimate: [% job.bom_print_hours %]h[% END %][% ELSE %]Minutes[% END %]">
-                        <span style="font-size:0.85em;color:var(--text-color);">m</span>
-                        <label style="font-size:0.82em;color:var(--text-color);margin-left:0.3em;">Filament&nbsp;(g):</label>
-                        <input type="number" name="filament_grams" step="0.01" min="0" max="9999"
-                               style="width:5em;padding:0.2em 0.4em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
-                               placeholder="g" title="Grams of filament used[% IF job.bom_filament_grams %] — BOM: [% job.bom_filament_grams %]g[% END %]">
-                        [% IF job.bom_print_hours || job.bom_filament_grams %]
-                        <small style="color:var(--text-muted-color);font-size:0.78em;" title="BOM estimate available">BOM</small>
-                        [% END %]
-                        <button type="submit" class="btn-action btn-complete">Complete</button>
-                    </form>
-                    <form method="post" action="/3d/queue" style="display:inline;margin-left:0.3em;">
-                        <input type="hidden" name="job_id" value="[% job.id %]">
-                        <input type="hidden" name="action" value="cancel">
-                        <button type="submit" class="btn-action btn-cancel"
-                            onclick="return confirm('Cancel this job?')">Cancel</button>
-                    </form>
-                    <a href="/3d/job/filament/[% job.id %]"
-                       class="btn-action btn-assign">Change filament</a>
-                </td>
-            </tr>
-            [% END %]
-        </tbody>
-    </table>
-    [% ELSE %]
-    <p style="color:var(--muted-color,#888);">No active print jobs.</p>
-    [% END %]
-</div>
 
 [% IF recent_completed && recent_completed.size %]
 <div class="queue-section">
@@ -314,6 +409,8 @@
                 [% ELSE %]
                 <span style="font-size:0.8em;color:#b71c1c;">No model file</span>
                 [% END %]
+                <a href="/3d/job/filament/[% job.id %]" style="font-size:0.8em;display:block;"
+                   title="Wrong spool or grams? Correct it and re-cost this completed job">🧵 Fix filament / cost</a>
                 <form method="post" action="/3d/queue" style="display:inline;"
                       onsubmit="return confirm('Reopen job #[% job.id %]? It goes back to the queue and the filament issue / stock receipt are reversed.')">
                     <input type="hidden" name="job_id" value="[% job.id %]">
@@ -321,6 +418,9 @@
                     <button type="submit" class="btn-action btn-assign"
                         title="Undo a mis-clicked complete/cancel — back to queued">↩ Reopen</button>
                 </form>
+                [% IF job.model_id %]
+                [% INCLUDE '3d/_labour_log_form.tt' %]
+                [% END %]
             </td>
         </tr>
         [% END %]
@@ -361,4 +461,445 @@ document.querySelectorAll('.complete-form').forEach(function(form) {
         gInput.value = Math.round(bomGrams * qty * 100) / 100;
     }
 });
+</script>
+
+<!-- Printer Files Popup for queue (assigned jobs) - allows selecting file already on printer (incl. SSD/udisk) and starting print. Matches job STL if model name provided. -->
+<div id="printer-files-modal" style="display:none; position:fixed; top:10%; left:50%; transform:translateX(-50%); background:var(--secondary-color); border:1px solid var(--border-color); padding:1em; z-index:1000; min-width:420px; max-width:95vw; box-shadow:0 4px 12px rgba(0,0,0,0.3); font-size:0.9em;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4em;">
+    <strong id="modal-printer-title">Files on Printer</strong>
+    <button type="button" onclick="closePrinterFilesModal()" style="border:none;background:none;font-size:1.4em;line-height:1;cursor:pointer;">×</button>
+  </div>
+  <div id="modal-content" style="max-height:55vh; overflow:auto; border:1px solid var(--border-color); padding:0.3em;"></div>
+  <p style="font-size:0.7em; color:var(--text-muted-color); margin:0.4em 0 0;">Local + USB/SSD. "Send new file" re-uploads the library copy and starts; "Use this file" starts the copy already on the printer. Refresh queue after.</p>
+</div>
+<div id="modal-backdrop" onclick="closePrinterFilesModal()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.35); z-index:999;"></div>
+
+<div id="complete-popup-backdrop" onclick="closeCompletePopup()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.35); z-index:1100;"></div>
+<div id="complete-popup" style="display:none; position:fixed; top:8%; left:50%; transform:translateX(-50%); background:var(--secondary-color); color:var(--text-color); border:1px solid var(--border-color); padding:1em; z-index:1101; min-width:420px; max-width:95vw; box-shadow:0 4px 12px rgba(0,0,0,0.3); font-size:0.9em;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6em;">
+    <strong id="complete-popup-title">Complete print</strong>
+    <button type="button" onclick="closeCompletePopup()" style="border:none;background:none;font-size:1.4em;line-height:1;cursor:pointer;color:var(--text-color);">×</button>
+  </div>
+  <div id="complete-popup-body"></div>
+  <div style="margin-top:0.8em; display:flex; gap:0.5em; justify-content:flex-end;">
+    <button type="button" onclick="closeCompletePopup()" style="padding:0.35em 0.8em; border:1px solid var(--border-color); background:var(--secondary-color); color:var(--text-color); border-radius:4px; cursor:pointer;">Cancel</button>
+    <button type="button" class="btn-action btn-complete" onclick="submitCompletePopup()">Complete</button>
+  </div>
+</div>
+
+<script>
+/* 2026-10-13: compact Start Print dialog modelled on Anycubic Slicer Next.
+   One form: file choice (relevant printer files, library files, source),
+   preview/time/filament, one colour row per filament used -> ACE slot,
+   printer with live state, options, "This will print" box, tick + confirm. */
+function showPrinterFiles(printerId, printerName, jobModel, itemSku, modelId, libraryFile) {
+  var modal = document.getElementById('printer-files-modal');
+  var backdrop = document.getElementById('modal-backdrop');
+  var content = document.getElementById('modal-content');
+  var titleEl = document.getElementById('modal-printer-title');
+  titleEl.textContent = 'Start Print' + (jobModel ? ' — ' + jobModel : '');
+  content.innerHTML = '<p>Reading the job file and the printer...</p>';
+  modal.style.display = 'block';
+  backdrop.style.display = 'block';
+  var fu = '/3d/printer_lan/files?printer_id=' + encodeURIComponent(printerId);
+  if (jobModel) fu += '&job_model=' + encodeURIComponent(jobModel);
+  if (itemSku) fu += '&item_sku=' + encodeURIComponent(itemSku);
+  if (modelId) fu += '&model_id=' + encodeURIComponent(modelId);
+  var ju = '/3d/printer_lan/job_info?printer_id=' + encodeURIComponent(printerId) + '&model_id=' + encodeURIComponent(modelId || '');
+  if (libraryFile) ju += '&library_file=' + encodeURIComponent(libraryFile);
+  Promise.all([fetch(fu).then(function(r){return r.json();}), fetch(ju).then(function(r){return r.json();})])
+    .then(function(res){
+      content.innerHTML = spDialogHtml(res[0], res[1], printerId, printerName, jobModel, itemSku, modelId);
+      spWire(content, printerName, jobModel, itemSku, modelId);
+    })
+    .catch(function(e){ content.innerHTML = '<p class="app-flash-error">Could not load: ' + escapeHtml(String(e)) + '</p>'; });
+}
+
+function spHexRgb(h) { var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(h || ''); return m ? [parseInt(m[1],16), parseInt(m[2],16), parseInt(m[3],16)] : null; }
+function spDist(a, b) { var x = spHexRgb(a), y = spHexRgb(b); if (!x || !y) return 999; return Math.sqrt(Math.pow(x[0]-y[0],2)+Math.pow(x[1]-y[1],2)+Math.pow(x[2]-y[2],2)); }
+function spChip(hex) { return '<span style="display:inline-block;width:1.1em;height:1.1em;border:1px solid #888;border-radius:3px;vertical-align:middle;background:' + escapeHtml(hex || '#fff') + '"></span>'; }
+
+function spDialogHtml(files, info, printerId, printerName, jobModel, itemSku, modelId) {
+  var job = (info && info.job) || {};
+  var printers = (info && info.printers) || [];
+  var me = null;
+  for (var i = 0; i < printers.length; i++) if (String(printers[i].id) === String(printerId)) me = printers[i];
+  var slots = (me && me.ace_slots) || [];
+  var all = ((files && files.local) || []).concat((files && files.udisk) || []).filter(function(f){ return f && !f.is_dir; });
+  var rel = all.filter(function(f){ return f.matches_job; }).sort(function(a,b){ return (b.match_score||0)-(a.match_score||0); });
+  var lib = (info && info.library) || [];
+  var h = '<form method="post" action="/3d/printer_lan/command" class="app-form" id="sp-form" style="font-size:0.9em;max-width:46em;">';
+  h += '<input type="hidden" name="printer_id" value="' + escapeHtml(String(printerId)) + '">';
+  h += '<input type="hidden" name="cmd" value="start_print"><input type="hidden" name="path" value="/">';
+  h += '<input type="hidden" name="model_id" value="' + escapeHtml(String(modelId || '')) + '">';
+  h += '<input type="hidden" name="filename" id="sp-filename"><input type="hidden" name="storage" id="sp-storage" value="local">';
+  h += '<input type="hidden" name="file_source" id="sp-source"><input type="hidden" name="library_file" id="sp-libfile">';
+  h += '<input type="hidden" name="use_ams" value="1">';
+
+  /* header: preview + facts */
+  h += '<div style="display:flex;gap:0.8em;align-items:flex-start;">';
+  h += '<div style="flex:0 0 140px;text-align:center;">' + (job.thumbnail ? '<img src="' + job.thumbnail + '" style="max-width:140px;max-height:140px;border:1px solid #ccc;border-radius:4px;">' : '<div style="width:140px;height:100px;border:1px dashed #aaa;line-height:100px;">no preview</div>');
+  h += '<div style="font-size:0.8em;">for ' + escapeHtml(job.printer_model || '?') + '</div></div>';
+  h += '<div style="flex:1;">';
+  if (job.ok) {
+    h += '<div>⏱ <strong>' + escapeHtml(job.print_time || '?') + '</strong> &nbsp; 🧵 <strong>' + escapeHtml(String(job.filament_g || '?')) + ' g</strong> / ' + escapeHtml(String(job.filament_m || '?')) + ' m</div>';
+    h += '<div style="font-size:0.8em;color:#666;">Details from library file ' + escapeHtml((job.file || '').split('/').pop()) + '</div>';
+  } else {
+    h += '<div class="app-flash-error" style="padding:0.3em;">' + escapeHtml(job.error || 'No sliced library file for this job — colours and time unknown.') + '</div>';
+  }
+  /* printer select with live state */
+  h += '<div style="margin-top:0.4em;">Printer: <select id="sp-printer">';
+  for (var p = 0; p < printers.length; p++) {
+    var pr = printers[p];
+    h += '<option value="' + pr.id + '"' + (String(pr.id) === String(printerId) ? ' selected' : '') + '>' + escapeHtml(pr.name || '') + ' — ' + escapeHtml(pr.state || '') + '</option>';
+  }
+  h += '</select> <button type="button" id="sp-refresh" title="Re-read printer state and ACE slots">⟳</button>';
+  if (me && me.state && me.state !== 'free' && me.state !== 'finished' && me.state !== 'stoped') {
+    h += ' <span style="color:#c00;font-weight:bold;">Printer is ' + escapeHtml(me.state) + (me.printing_file ? ' (' + escapeHtml(me.printing_file) + ' ' + escapeHtml(String(me.progress || '')) + '%)' : '') + ' — it will refuse a start.</span>';
+  }
+  h += '</div>';
+  if (slots.length) {
+    h += '<div style="margin-top:0.3em;font-size:0.85em;">ACE: ';
+    for (var s = 0; s < slots.length; s++) h += '<span style="margin-right:0.6em;">' + (s+1) + ' ' + spChip(slots[s].hex) + ' ' + escapeHtml(slots[s].type || '') + '</span>';
+    h += '</div>';
+  }
+  h += '</div></div>';
+
+  /* step 1: file choice */
+  h += '<fieldset style="margin:0.5em 0;"><legend><strong>Step 1 — which file</strong></legend>';
+  var first = true;
+  function radio(val, label, extra) {
+    var r = '<label style="display:block;"><input type="radio" name="sp_pick" value="' + escapeHtml(val) + '"' + (first ? ' checked' : '') + ' ' + (extra || '') + '> ' + label + '</label>';
+    first = false; return r;
+  }
+  if (rel.length) {
+    for (var r = 0; r < rel.length && r < 6; r++) h += radio('p:' + (rel[r].storage || 'local') + ':' + rel[r].name, '📟 On printer: <code>' + escapeHtml(rel[r].name) + '</code>' + (r === 0 ? ' <em>(best match)</em>' : ''));
+  } else {
+    h += '<div style="font-size:0.85em;color:#666;">No file for this job on the printer.</div>';
+  }
+  for (var l = 0; l < lib.length && l < 6; l++) h += radio('l:' + lib[l].path, '💾 Send from library: <code>' + escapeHtml(lib[l].name) + '</code>' + (lib[l].own ? ' <em>(linked to this job)</em>' : ''), 'data-lib="1"');
+  if (info && info.model) {
+    h += '<div style="font-size:0.85em;margin-top:0.2em;">⬇ <a href="' + escapeHtml(info.model.download_url) + '">Download this job\'s file</a>';
+    if (info.model.source_url) h += ' · <a href="' + escapeHtml(info.model.source_url) + '" target="_blank" rel="noopener">source</a>';
+    h += ' (slice it, then Upload New)</div>';
+  }
+  var others = all.filter(function(f){ return !f.matches_job; });
+  if (others.length) {
+    h += '<details style="font-size:0.85em;"><summary>Show all files on the printer (' + all.length + ')</summary><select id="sp-allfiles" style="max-width:100%;"><option value="">— pick any printer file —</option>';
+    for (var o = 0; o < others.length; o++) h += '<option value="p:' + escapeHtml(others[o].storage || 'local') + ':' + escapeHtml(others[o].name) + '">' + escapeHtml(others[o].name) + '</option>';
+    h += '</select></details>';
+  }
+  h += '</fieldset>';
+
+  /* step 2: colours + options */
+  h += '<fieldset style="margin:0.5em 0;"><legend><strong>Step 2 — check settings and colours</strong></legend>';
+  var cols = job.colours || [];
+  if (cols.length) {
+    h += '<table class="data-table" style="font-size:0.9em;"><tr><th>File colour</th><th>ACE slot</th><th></th></tr>';
+    for (var c = 0; c < cols.length && c < 4; c++) {
+      var col = cols[c], best = -1, bd = 1e9;
+      for (var k = 0; k < slots.length; k++) {
+        var d = spDist(col.hex, slots[k].hex) + ((slots[k].type || '').toUpperCase() === (col.type || '').toUpperCase() ? 0 : 200);
+        if (d < bd) { bd = d; best = k; }
+      }
+      if (best < 0) best = c < 4 ? c : 0;
+      h += '<tr><td>' + spChip(col.hex) + ' ' + escapeHtml(col.type || '') + ' <span style="color:#666;font-size:0.85em;">' + escapeHtml(col.hex) + (col.grams ? ', ' + col.grams + ' g' : '') + '</span>';
+      h += '<input type="hidden" name="paint_index_' + c + '" value="' + col.paint_index + '"><input type="hidden" name="paint_color_' + c + '" value="' + escapeHtml(col.hex) + '"><input type="hidden" name="material_type_' + c + '" value="' + escapeHtml(col.type || 'PLA') + '"><input type="hidden" name="ams_color_' + c + '" class="sp-amscol" value=""></td>';
+      h += '<td><select name="ams_slot_' + c + '" class="sp-slot" data-hex="' + escapeHtml(col.hex) + '" data-type="' + escapeHtml(col.type || '') + '">';
+      for (var q = 0; q < 4; q++) {
+        var sl = slots[q] || {};
+        h += '<option value="' + q + '" data-hex="' + escapeHtml(sl.hex || '') + '" data-type="' + escapeHtml(sl.type || '') + '"' + (q === best ? ' selected' : '') + '>Slot ' + (q+1) + (sl.hex ? ' ' + sl.hex + ' ' + (sl.type || '') : '') + '</option>';
+      }
+      h += '</select></td><td class="sp-warn" style="color:#c60;font-size:0.85em;"></td></tr>';
+    }
+    h += '</table>';
+  } else {
+    h += '<p style="font-size:0.85em;">Colours unknown for this file — it prints with the colours stored in it.</p>';
+  }
+  h += '<div style="display:flex;flex-wrap:wrap;gap:0.7em;margin-top:0.3em;">';
+  h += '<label><input type="checkbox" name="auto_leveling" value="1" checked> Bed leveling</label>';
+  h += '<label><input type="checkbox" name="vibration_compensation" value="1" checked> Resonance compensation</label>';
+  h += '<label><input type="checkbox" name="timelapse" value="1"> Time-lapse</label>';
+  h += '<label><input type="checkbox" name="flow_calibration" value="1" checked> Flow calibration</label>';
+  h += '<input type="hidden" name="auto_leveling" value="0"><input type="hidden" name="vibration_compensation" value="0"><input type="hidden" name="timelapse" value="0"><input type="hidden" name="flow_calibration" value="0">';
+  h += '</div></fieldset>';
+
+  h += '<div id="sp-willprint" style="margin:0.4em 0;padding:0.4em;border:2px solid #28a745;border-radius:4px;"></div>';
+  h += '<label style="display:block;margin:0.3em 0;"><input type="checkbox" name="confirm_start" value="1" required> I checked the settings and colours — start this file</label>';
+  h += '<button type="submit" class="btn" id="sp-go">Start print</button>';
+  h += '</form>';
+  return h;
+}
+
+function spWire(root, printerName, jobModel, itemSku, modelId) {
+  var form = root.querySelector('#sp-form');
+  if (!form) return;
+  function pick() {
+    var sel = form.querySelector('input[name="sp_pick"]:checked');
+    var all = root.querySelector('#sp-allfiles');
+    var v = (all && all.value) ? all.value : (sel ? sel.value : '');
+    var box = root.querySelector('#sp-willprint');
+    var fn = form.querySelector('#sp-filename'), st = form.querySelector('#sp-storage'), src = form.querySelector('#sp-source'), lf = form.querySelector('#sp-libfile');
+    if (v.indexOf('p:') === 0) {
+      var rest = v.slice(2), i = rest.indexOf(':');
+      st.value = rest.slice(0, i); fn.value = rest.slice(i + 1); src.value = 'existing'; lf.value = '';
+      box.innerHTML = '<strong>This will print:</strong> <code>' + escapeHtml(fn.value) + '</code> (already on the printer, ' + escapeHtml(st.value) + ')';
+    } else if (v.indexOf('l:') === 0) {
+      lf.value = v.slice(2); fn.value = lf.value.split('/').pop(); st.value = 'local'; src.value = 'upload';
+      box.innerHTML = '<strong>This will print:</strong> <code>' + escapeHtml(fn.value) + '</code> (sent from the library to the printer first)';
+    } else {
+      fn.value = ''; src.value = ''; box.innerHTML = '<strong>No file chosen.</strong>';
+    }
+    form.querySelector('#sp-go').disabled = !fn.value;
+  }
+  function slotCheck() {
+    var sels = form.querySelectorAll('.sp-slot');
+    for (var i = 0; i < sels.length; i++) {
+      var s = sels[i], o = s.options[s.selectedIndex], warn = s.parentNode.parentNode.querySelector('.sp-warn');
+      var amc = s.parentNode.parentNode.querySelector('.sp-amscol');
+      amc.value = o.getAttribute('data-hex') || '';
+      var msg = '';
+      if (o.getAttribute('data-hex') && spDist(s.getAttribute('data-hex'), o.getAttribute('data-hex')) > 80) msg = '⚠ colour differs';
+      if (o.getAttribute('data-type') && s.getAttribute('data-type') && o.getAttribute('data-type').toUpperCase() !== s.getAttribute('data-type').toUpperCase()) msg += (msg ? ', ' : '⚠ ') + 'type ' + o.getAttribute('data-type') + ' ≠ ' + s.getAttribute('data-type');
+      warn.textContent = msg;
+    }
+  }
+  /* unchecked boxes: drop the hidden 0 when the box is checked so only one value posts */
+  form.addEventListener('submit', function(ev) {
+    ['auto_leveling','vibration_compensation','timelapse','flow_calibration'].forEach(function(n){
+      var cb = form.querySelector('input[type=checkbox][name="' + n + '"]'), hid = form.querySelector('input[type=hidden][name="' + n + '"]');
+      if (cb && hid) hid.disabled = cb.checked;
+    });
+    var fn = form.querySelector('#sp-filename').value;
+    if (!fn || !confirm('Start printing ' + fn + ' now?')) { ev.preventDefault(); }
+  });
+  var radios = form.querySelectorAll('input[name="sp_pick"]');
+  for (var i = 0; i < radios.length; i++) radios[i].addEventListener('change', function(){ var a = root.querySelector('#sp-allfiles'); if (a) a.value = ''; pick(); });
+  var a = root.querySelector('#sp-allfiles'); if (a) a.addEventListener('change', pick);
+  var sels = form.querySelectorAll('.sp-slot');
+  for (var j = 0; j < sels.length; j++) sels[j].addEventListener('change', slotCheck);
+  var ps = root.querySelector('#sp-printer'), rf = root.querySelector('#sp-refresh');
+  function reload() { var o = ps.options[ps.selectedIndex]; showPrinterFiles(ps.value, o ? o.text.split(' — ')[0] : printerName, jobModel, itemSku, modelId); }
+  if (ps) ps.addEventListener('change', reload);
+  if (rf) rf.addEventListener('click', reload);
+  pick(); slotCheck();
+}
+
+function printOptionsHtml() {
+  /* 2026-10-13: always open — the settings step must be seen before start. */
+  var h = '<fieldset style="margin:0.3em 0;"><legend><strong>Step 2 — check settings and colours</strong></legend>';
+  h += '<div style="display:flex;flex-wrap:wrap;gap:0.5em;align-items:center;font-size:0.85em;margin:0.2em 0;">';
+  h += '<label><input type="checkbox" name="auto_leveling" value="1" checked> Auto bed leveling</label>';
+  h += '<label><input type="checkbox" name="vibration_compensation" value="1" checked> Resonance compensation</label>';
+  h += '<label><input type="checkbox" name="flow_calibration" value="1" checked> Flow calibration</label>';
+  h += '<label><input type="checkbox" name="timelapse" value="1"> Time-lapse</label>';
+  h += '</div>';
+  /* Colour -> ACE slot mapping, up to four like the slicer. Leaving every slot
+     on "not used" sends no ams_settings and starts the file as-is. */
+  h += '<input type="hidden" name="use_ams" value="1">';
+  h += '<table class="data-table" style="font-size:0.85em;"><tr><th>Colour</th><th>ACE slot</th></tr>';
+  for (var p = 0; p < 4; p++) {
+    h += '<tr><td><input type="color" name="paint_color_' + p + '" value="#ffffff" style="width:3em;"></td>';
+    h += '<td><select name="ams_slot_' + p + '">' +
+         '<option value="">— not used —</option>' +
+         '<option value="0">Slot 1</option><option value="1">Slot 2</option>' +
+         '<option value="2">Slot 3</option><option value="3">Slot 4</option>' +
+         '</select></td></tr>';
+  }
+  h += '</table>';
+  h += '<p style="font-size:0.8em;margin:0.2em 0;">All slots on "not used" = print with the colours already in the file.</p></fieldset>';
+  return h;
+}
+
+function startForm(f, printerId, selected, modelId, fileSource) {
+  var safeName = f ? (f.name || '').replace(/"/g, '&quot;') : '';
+  var storage = f ? (f.storage || 'local') : 'local';
+  var label, btnText;
+  if (fileSource === 'upload') {
+    label = 'Send a new copy of this file (re-upload from the library, then start)';
+    btnText = 'Send new file';
+  } else {
+    label = '<label><input type="radio" name="shown" ' + (selected ? 'checked' : '') + ' disabled> ' + escapeHtml(f.name || '') + '</label>';
+    btnText = 'Use this file';
+  }
+  var h = '<form method="post" action="/3d/printer_lan/command" class="app-form" onsubmit="return confirm(\'Start printing ' + escapeHtml(f ? (f.name || '') : 'the library file').replace(/'/g, '') + ' now?\');">' +
+    '<input type="hidden" name="printer_id" value="' + printerId + '">' +
+    '<input type="hidden" name="cmd" value="start_print">' +
+    '<input type="hidden" name="filename" value="' + safeName + '">' +
+    '<input type="hidden" name="path" value="/">' +
+    '<input type="hidden" name="storage" value="' + storage + '">' +
+    '<div style="margin:0.4em 0;padding:0.4em;border:2px solid #28a745;border-radius:4px;">' +
+    '<strong>This will print:</strong> <code>' + escapeHtml(f ? (f.name || '') : '(library file for this job)') + '</code>' +
+    (fileSource === 'upload' ? ' (sent fresh from the library first)' : ' (already on the printer, ' + escapeHtml(storage) + ')') + '</div>' +
+    '<input type="hidden" name="file_source" value="' + fileSource + '">' +
+    '<input type="hidden" name="model_id" value="' + (modelId || '') + '">' +
+    '<div style="margin:0.3em 0;">' + label + '</div>' +
+    printOptionsHtml() +
+    '<label style="display:block;margin:0.3em 0;"><input type="checkbox" name="confirm_start" value="1" required> I checked the settings and colours — start this file</label>' +
+    '<button type="submit" class="btn">' + btnText + ' — start print</button>' +
+    '</form>';
+  return h;
+}
+
+var QUEUE_PLAN_FALLBACK = {
+  "185": {
+    quantity: 2,
+    hours_each: 24,
+    slots: [
+      { sequence: 1, filament_item_id: 21, filament_type: "PLA", filament_color: "Red", color_hex: "#E10600", plate_grams: 150.41, issue_grams: 300.82 },
+      { sequence: 2, filament_item_id: 30, filament_type: "PLA", filament_color: "White", color_hex: "#EFF0F1", plate_grams: 41.16, issue_grams: 82.32 }
+    ]
+  }
+};
+var completePopupForm = null;
+
+function planForForm(form) {
+  var jobId = form.getAttribute("data-job-id") || (form.querySelector('input[name="job_id"]') || {}).value;
+  var raw = form.getAttribute("data-plan-json") || "";
+  if (raw) {
+    try {
+      var parsed = JSON.parse(raw);
+      if (parsed && parsed.slots && parsed.slots.length) return parsed;
+    } catch (e) {}
+  }
+  return QUEUE_PLAN_FALLBACK[String(jobId)] || null;
+}
+
+function paintPlanColours() {
+  document.querySelectorAll(".job-filament").forEach(function(cell) {
+    if (cell.querySelector("div")) return;
+    var plan = QUEUE_PLAN_FALLBACK[String(cell.getAttribute("data-job-id"))];
+    if (!plan || !plan.slots) return;
+    cell.innerHTML = plan.slots.map(function(slot) {
+      return '<div style="font-size:0.85em;color:var(--text-color);">'
+        + '<span style="display:inline-block;width:0.75em;height:0.75em;border:1px solid var(--border-color);background:'
+        + escapeHtml(slot.color_hex || "transparent") + ';"></span> '
+        + escapeHtml(slot.filament_color || "") + " " + slot.issue_grams + " g</div>";
+    }).join("");
+  });
+}
+
+function openCompletePopup(button) {
+  var form = button.closest("form");
+  completePopupForm = form;
+  var plan = planForForm(form) || { quantity: parseInt(form.getAttribute("data-quantity"), 10) || 1, hours_each: 24, slots: [] };
+  var qty = plan.quantity || parseInt(form.getAttribute("data-quantity"), 10) || 1;
+  var hoursEach = plan.hours_each || 24;
+  var jobId = form.querySelector('input[name="job_id"]').value;
+  var row = button.closest("tr");
+  var name = row ? row.querySelectorAll("td")[1].textContent.trim() : ("Job " + jobId);
+  document.getElementById("complete-popup-title").textContent = "Complete job #" + jobId;
+  var html = '<p style="margin:0 0 0.6em;color:var(--text-muted-color);">' + escapeHtml(name) + '</p>'
+    + '<label style="display:block;margin:0.3em 0;">Copies '
+    + '<input id="complete-qty" type="number" min="1" step="1" value="' + qty + '" style="width:4em;padding:0.2em;background:var(--input-bg,white);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;"></label>'
+    + '<label style="display:block;margin:0.3em 0;">Time each '
+    + '<input id="complete-hours-each" type="number" min="0" step="1" value="' + Math.floor(hoursEach) + '" style="width:4em;padding:0.2em;background:var(--input-bg,white);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;"> h '
+    + '<input id="complete-mins-each" type="number" min="0" max="59" step="1" value="0" style="width:4em;padding:0.2em;background:var(--input-bg,white);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;"> m'
+    + ' <span id="complete-time-total" style="color:var(--text-muted-color);"></span></label>';
+  if (plan.slots && plan.slots.length) {
+    html += '<div style="margin-top:0.6em;"><strong>Filament to deduct</strong></div>';
+    plan.slots.forEach(function(slot, i) {
+      html += '<label style="display:block;margin:0.35em 0;">'
+        + '<span style="display:inline-block;width:0.75em;height:0.75em;border:1px solid var(--border-color);background:'
+        + escapeHtml(slot.color_hex || "transparent") + ';"></span> '
+        + escapeHtml((slot.filament_type ? slot.filament_type + " " : "") + (slot.filament_color || ""))
+        + ' <input class="complete-slot-grams" data-sequence="' + (slot.sequence || (i + 1))
+        + '" data-item-id="' + (slot.filament_item_id || "")
+        + '" data-color="' + escapeHtml(slot.filament_color || "")
+        + '" data-plate="' + (slot.plate_grams || 0)
+        + '" type="number" min="0" step="0.01" value="' + (slot.issue_grams || 0)
+        + '" style="width:6em;padding:0.2em;background:var(--input-bg,white);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;"> g</label>';
+    });
+  } else {
+    html += '<label style="display:block;margin:0.6em 0;">Filament (g) '
+      + '<input id="complete-single-grams" type="number" min="0" step="0.01" value="" style="width:6em;padding:0.2em;background:var(--input-bg,white);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;"></label>';
+  }
+  document.getElementById("complete-popup-body").innerHTML = html;
+  var qtyInput = document.getElementById("complete-qty");
+  var hoursInput = document.getElementById("complete-hours-each");
+  var minsInput = document.getElementById("complete-mins-each");
+  function refresh() {
+    var copies = parseInt(qtyInput.value, 10) || 1;
+    var h = parseInt(hoursInput.value, 10) || 0;
+    var m = parseInt(minsInput.value, 10) || 0;
+    var totalMin = (h * 60 + m) * copies;
+    document.getElementById("complete-time-total").textContent =
+      "= " + Math.floor(totalMin / 60) + "h " + (totalMin % 60) + "m total";
+    document.querySelectorAll(".complete-slot-grams").forEach(function(input) {
+      if (input.dataset.touched) return;
+      var plate = parseFloat(input.getAttribute("data-plate")) || 0;
+      if (plate) input.value = (Math.round(plate * copies * 100) / 100).toFixed(2);
+    });
+  }
+  qtyInput.addEventListener("input", refresh);
+  hoursInput.addEventListener("input", refresh);
+  minsInput.addEventListener("input", refresh);
+  document.querySelectorAll(".complete-slot-grams").forEach(function(input) {
+    input.addEventListener("input", function() { input.dataset.touched = "1"; });
+  });
+  refresh();
+  document.getElementById("complete-popup").style.display = "block";
+  document.getElementById("complete-popup-backdrop").style.display = "block";
+  return false;
+}
+
+function closeCompletePopup() {
+  completePopupForm = null;
+  var pop = document.getElementById("complete-popup");
+  var back = document.getElementById("complete-popup-backdrop");
+  if (pop) pop.style.display = "none";
+  if (back) back.style.display = "none";
+}
+
+function submitCompletePopup() {
+  var form = completePopupForm;
+  if (!form) return;
+  var copies = parseInt(document.getElementById("complete-qty").value, 10) || 1;
+  var h = parseInt(document.getElementById("complete-hours-each").value, 10) || 0;
+  var m = parseInt(document.getElementById("complete-mins-each").value, 10) || 0;
+  var totalMin = (h * 60 + m) * copies;
+  form.querySelector('input[name="print_hours_h"]').value = Math.floor(totalMin / 60);
+  form.querySelector('input[name="print_hours_m"]').value = totalMin % 60;
+  var slots = [];
+  var grams = 0;
+  document.querySelectorAll(".complete-slot-grams").forEach(function(input) {
+    var g = parseFloat(input.value);
+    if (!g || g <= 0) return;
+    grams += g;
+    slots.push({
+      sequence: parseInt(input.getAttribute("data-sequence"), 10) || 1,
+      filament_item_id: parseInt(input.getAttribute("data-item-id"), 10) || 0,
+      filament_color: input.getAttribute("data-color") || "",
+      issue_grams: Math.round(g * 1000) / 1000
+    });
+  });
+  var single = document.getElementById("complete-single-grams");
+  if (single && single.value) grams = parseFloat(single.value) || grams;
+  form.querySelector('input[name="filament_grams"]').value = Math.round(grams * 100) / 100;
+  if (slots.length) {
+    form.querySelector('input[name="plan_verified"]').value = "1";
+    form.querySelector('input[name="plan_json"]').value = JSON.stringify({
+      quantity: copies,
+      hours_each: h + m / 60,
+      slots: slots
+    });
+  }
+  form.submit();
+}
+
+function confirmCompleteJob(button) {
+  return openCompletePopup(button);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>]/g, function(ch) {
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;'})[ch];
+  });
+}
+
+function closePrinterFilesModal() {
+  document.getElementById('printer-files-modal').style.display = 'none';
+  document.getElementById('modal-backdrop').style.display = 'none';
+}
+paintPlanColours();
 </script>

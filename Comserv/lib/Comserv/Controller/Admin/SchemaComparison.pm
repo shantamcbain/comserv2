@@ -17,6 +17,7 @@ use File::Path qw(make_path);
 use File::Spec;
 use File::Find;
 use Comserv::Util::Schema::ResultParser;
+use DBI;
 
 sub begin :Private {
     my ($self, $c) = @_;
@@ -296,8 +297,11 @@ sub _dbh_list_columns {
     return %db_columns;
 }
 
-# Get a fresh DB connection via RemoteDB — avoids stale cached model handles
 # Get a fresh DB connection via RemoteDB — uses highest-priority connection for the selected database
+# Audit #2378: never DBI-connect as username '' (DatabaseCredentials is often
+# missing; the old die interpolated "admin user ''"). Prefer a named *_admin
+# JSON slot / env admin user via a direct DBI connect so RemoteDB::_load_config
+# cannot discard an in-memory username override.
 sub _get_fresh_dbh {
     my ($self, $c, $database) = @_;
     require Comserv::Model::RemoteDB;
@@ -305,13 +309,11 @@ sub _get_fresh_dbh {
     $remote_db->config({});
     my $all_conns = $remote_db->get_all_connections();
 
-    # Filter to only connections matching this database name exactly
     my @group_conns = grep {
         my $cfg = $all_conns->{$_}{config};
         (lc($cfg->{database} // '') eq lc($database))
     } keys %$all_conns;
 
-    # Sort by priority (lower = higher priority)
     @group_conns = sort {
         ($all_conns->{$a}{priority} // 999) <=> ($all_conns->{$b}{priority} // 999)
         || $a cmp $b
@@ -321,31 +323,36 @@ sub _get_fresh_dbh {
         die "No connection found for database '$database'";
     }
 
-    # DDL (CREATE/DROP/ALTER) must run as the admin DB user (comserv_admin), so it
-    # can CREATE/DROP tables. Prefer the env-provided admin credentials; fall back
-    # to the highest-priority connection's own credentials (which includes any
-    # dedicated *_admin connection already present in the RemoteDB secret set) if
-    # the admin class is unavailable. Comserv::Util::DatabaseCredentials may not
-    # exist in every worktree/environment, so guard the call and treat an empty
-    # result as "no admin override" rather than dying on a misleading message.
-    my $admin_user = eval { Comserv::Util::DatabaseCredentials->admin_user };
-    my $admin_pass = eval { Comserv::Util::DatabaseCredentials->admin_password };
-    $admin_user = '' unless defined $admin_user;
-    $admin_pass = '' unless defined $admin_pass;
-    my $want_admin = ($admin_user ne '' && $admin_pass ne '');
+    my ($admin_user, $admin_pass, $admin_src) =
+        $self->_resolve_admin_creds($all_conns, $database);
 
-    # NOTE: we intentionally do NOT swap credentials on the RemoteDB config here.
-    # RemoteDB::get_connection() calls _load_config() internally, which reloads
-    # the connection config from disk and discards any override we set, so the
-    # old credential-swap never took effect — it only produced confusing errors.
-    #
-    # Several callers (e.g. get_ency_table_schema, used by "Add to Result") only
-    # need to READ schema metadata (DESCRIBE / information_schema / SHOW INDEX),
-    # not to run DDL. Requiring a working admin DDL connection for those made the
-    # action fail outright whenever the admin connection is unreachable, even
-    # though a perfectly good ordinary connection was available. So: prefer a
-    # real admin connection when one exists, otherwise use any connection that
-    # actually connects instead of dying.
+    if ($admin_user && $admin_pass) {
+        for my $conn_name (@group_conns) {
+            my $cfg = $all_conns->{$conn_name}{config} || {};
+            my $dbh = $self->_dbi_connect_as($cfg, $admin_user, $admin_pass);
+            if ($dbh) {
+                $c->stash->{schema_compare_ddl_user}   = $admin_user;
+                $c->stash->{schema_compare_ddl_source} = $admin_src;
+                $self->logging->log_with_details(
+                    $c, 'info', __FILE__, __LINE__, '_get_fresh_dbh',
+                    "DDL connect to '$database' as '$admin_user' via $admin_src ($conn_name)"
+                );
+                return $dbh;
+            }
+        }
+        $self->logging->log_with_details(
+            $c, 'warn', __FILE__, __LINE__, '_get_fresh_dbh',
+            "Admin login '$admin_user' ($admin_src) failed for '$database'; falling back to ordinary connections"
+        );
+    }
+    else {
+        $self->logging->log_with_details(
+            $c, 'warn', __FILE__, __LINE__, '_get_fresh_dbh',
+            "No admin DB user configured for '$database' (DatabaseCredentials/env/JSON *_admin empty); using ordinary connection"
+        );
+    }
+
+    # Read paths (DESCRIBE / information_schema) and last-resort DDL: any live slot.
     my ($dbh, $used_conn) = $self->_pick_live_connection(
         $remote_db, $all_conns, \@group_conns, $database
     );
@@ -354,17 +361,87 @@ sub _get_fresh_dbh {
         my $tried = join(', ', map {
             sprintf('%s(%s)', $_, ($all_conns->{$_}{config}{username} // '?'))
         } @group_conns);
-        die "Failed to connect to database '$database' for DDL. "
-          . "Admin override "
-          . ($want_admin ? "requested as '$admin_user'" : 'NOT configured (Comserv::Util::DatabaseCredentials unavailable/empty)')
-          . ". Tried connections (in priority order): $tried. "
+        my $admin_note = ($admin_user && $admin_pass)
+            ? "admin '$admin_user' via $admin_src also failed"
+            : 'no non-empty admin user (do not connect as \'\')';
+        die "Failed to connect to database '$database' for schema-compare. "
+          . "$admin_note. Tried connections (priority order): $tried. "
           . "Last DBI error: " . ($remote_db->last_connection_error // 'none recorded');
     }
 
     $c->stash->{schema_compare_ddl_user} =
         $all_conns->{$used_conn}{config}{username} // '';
+    $c->stash->{schema_compare_ddl_source} = "remotedb:$used_conn";
 
     return $dbh;
+}
+
+# Returns ($user, $pass, $source). Never returns a defined user with empty name.
+sub _resolve_admin_creds {
+    my ($self, $all_conns, $database) = @_;
+
+    my $u = eval { Comserv::Util::DatabaseCredentials->admin_user };
+    my $p = eval { Comserv::Util::DatabaseCredentials->admin_password };
+    $u = defined $u ? $u : '';
+    $p = defined $p ? $p : '';
+    $u =~ s/^\s+|\s+$//g;
+    if ($u ne '' && $p ne '') {
+        return ($u, $p, 'DatabaseCredentials');
+    }
+
+    $u = $ENV{COMSERV_DB_ADMIN_USER} // '';
+    $p = $ENV{COMSERV_DB_ADMIN_PASS} // $ENV{COMSERV_DB_ADMIN_PASSWORD} // '';
+    $u =~ s/^\s+|\s+$//g;
+    if ($u ne '' && $p ne '') {
+        return ($u, $p, 'env');
+    }
+
+    my @admin_slots = grep {
+        my $cfg = $all_conns->{$_}{config} || {};
+        (lc($cfg->{database} // '') eq lc($database // ''))
+        && (
+            ($_ =~ /_admin$/i)
+            || lc($cfg->{username} // '') eq 'comserv_admin'
+        )
+        && length($cfg->{username} // '')
+        && length($cfg->{password} // '')
+    } keys %$all_conns;
+
+    @admin_slots = sort {
+        ($all_conns->{$a}{priority} // 999) <=> ($all_conns->{$b}{priority} // 999)
+        || $a cmp $b
+    } @admin_slots;
+
+    if (@admin_slots) {
+        my $cfg = $all_conns->{ $admin_slots[0] }{config};
+        return ($cfg->{username}, $cfg->{password}, "json:$admin_slots[0]");
+    }
+
+    return ('', '', 'none');
+}
+
+sub _dbi_connect_as {
+    my ($self, $cfg, $user, $pass) = @_;
+    return unless $cfg && $user && length $user;
+    $pass = '' unless defined $pass;
+
+    my $host = $cfg->{host} || '127.0.0.1';
+    my $port = $cfg->{port} || ($self->_is_postgresql($cfg) ? 5432 : 3306);
+    my $db   = $cfg->{database} || '';
+    return unless $db;
+
+    my $dsn;
+    my %attr = (RaiseError => 0, PrintError => 0, AutoCommit => 1);
+    if ($self->_is_postgresql($cfg)) {
+        $dsn = "dbi:Pg:dbname=$db;host=$host;port=$port";
+        $attr{pg_connect_timeout} = 5;
+    }
+    else {
+        $dsn = "dbi:mysql:database=$db;host=$host;port=$port";
+        $attr{mysql_connect_timeout} = 5;
+    }
+
+    return DBI->connect($dsn, $user, $pass, \%attr);
 }
 
 sub _write_result_file_safe {
@@ -1029,6 +1106,136 @@ sub create_result_from_table :Path('/schema-comparison/create_result_from_table'
     $c->forward('View::JSON');
 }
 
+# Live schema objects freeze at process start. Nested Result classes
+# (HealthKitchen::*, Accounting::*) can be require'd but still missing from
+# $schema->source() until restart. Attach them on this instance so Create
+# Table works without bouncing :4006.
+sub _ensure_result_source {
+    my ($self, $c, $schema, $result_path, $class_name) = @_;
+    my @try = ($result_path);
+    (my $short = $result_path) =~ s/.*:://;
+    push @try, $short if length $short && $short ne $result_path;
+
+    for my $name (@try) {
+        my $src = eval { $schema->source($name) };
+        return $src if $src;
+    }
+
+    die "$class_name has no result_source_instance"
+        unless $class_name->can('result_source_instance');
+    my $rsi = $class_name->result_source_instance;
+    $schema->register_source($result_path, $rsi);
+    if (length $short && $short ne $result_path) {
+        eval { $schema->register_source($short, $rsi) };
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_ensure_result_source',
+        "Registered missing source '$result_path' from $class_name on live schema");
+    return eval { $schema->source($result_path) };
+}
+
+# A live schema freezes at process start. Create Table used to call
+# $schema->deployment_statements, which walks every source, then fell through
+# to $schema->deploy(), which deploys the whole schema. One unregistered
+# relationship (Can't find source for AiModelPolicyHistory) aborted the
+# request. Generate SQL for this source only. If source() names a missing
+# class, register it on this instance and retry. Never deploy the schema.
+sub _create_sql_for_source {
+    my ($self, $c, $schema, $namespace, $result_path, $class_name, $table_name) = @_;
+
+    my $source = $self->_ensure_result_source($c, $schema, $result_path, $class_name);
+    die "Could not register source '$result_path' from $class_name" unless $source;
+    $self->_ensure_related_sources($c, $schema, $namespace, $source);
+
+    require SQL::Translator;
+    my %tried;
+    my $last_err = '';
+    for my $attempt (1 .. 8) {
+        my $moniker = eval { $source->source_name } || $result_path;
+        my $tr = SQL::Translator->new(
+            parser => 'SQL::Translator::Parser::DBIx::Class',
+            parser_args => {
+                dbic_schema => $schema,
+                sources     => [$moniker],
+            },
+            producer => 'MySQL',
+            producer_args => { no_comments => 1 },
+        );
+        my $sql = eval { $tr->translate };
+        my $err = $@ || '';
+        $err ||= $tr->error if !$sql;
+        if ($sql && $sql =~ /CREATE TABLE\s+`?\Q$table_name\E`?/i) {
+            return $sql;
+        }
+        $last_err = $err || "SQL::Translator produced no CREATE TABLE for '$table_name'";
+        my ($missing) = $last_err =~ /Can't find source for (\S+)/;
+        last unless $missing;
+        $missing =~ s/['"]//g;
+        $missing =~ s/\s+at\b.*//s;
+        die "Could not register missing source '$missing': $last_err" if $tried{$missing}++;
+        my $ok = $self->_register_result_class($c, $schema, $namespace, $missing);
+        die "Could not register missing source '$missing': $last_err" unless $ok;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_sql_for_source',
+            "Registered missing source '$missing' and retrying CREATE for '$table_name'");
+        $source = eval { $schema->source($moniker) } || $source;
+    }
+    die $last_err;
+}
+
+# Load and attach a Result class the live schema does not know yet.
+# $source_name may be a moniker (AiModelPolicy) or a full class name.
+# Returns 1 on success. Does not die — the caller decides.
+sub _register_result_class {
+    my ($self, $c, $schema, $namespace, $source_name) = @_;
+    return 1 if eval { $schema->source($source_name) };
+    return 0 unless defined $source_name && $source_name =~ /\A[A-Za-z0-9:]+\z/;
+
+    my $class = $source_name;
+    unless ($class =~ /^Comserv::/) {
+        $class = "Comserv::Model::Schema::${namespace}::Result::${class}";
+    }
+    my $load_err = do { local $@; eval "require $class"; $@ };
+    if ($load_err) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_register_result_class',
+            "Could not load Result class for source '$source_name': $load_err");
+        return 0;
+    }
+    (my $path = $class) =~ s/^Comserv::Model::Schema::\Q$namespace\E::Result:://;
+    my $src = eval { $self->_ensure_result_source($c, $schema, $path, $class) };
+    if ($@ || !$src) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_register_result_class',
+            "Could not register source '$source_name': " . ($@ || 'no source'));
+        return 0;
+    }
+    # _ensure_result_source already attaches the moniker. DBIC also indexes the
+    # class name. A second register_source replaces that and warns.
+    return 1 if eval { $schema->source($source_name) };
+    eval { $schema->register_source($source_name, $src) };
+    return eval { $schema->source($source_name) } ? 1 : 0;
+}
+
+# Register belongs_to / has_many targets so a frozen schema can resolve them.
+# A missing cousin class is a warning, not a failed CREATE — FKs are stripped.
+sub _ensure_related_sources {
+    my ($self, $c, $schema, $namespace, $source, $seen) = @_;
+    $seen ||= {};
+    return unless $source;
+    my $name = eval { $source->source_name } || return;
+    return if $seen->{$name}++;
+    for my $rel (eval { $source->relationships }) {
+        my $info = eval { $source->relationship_info($rel) } || next;
+        my $rel_class = $info->{class} || next;
+        next if $seen->{$rel_class};
+        my $rel_src = eval { $source->related_source($rel) };
+        if (!$rel_src) {
+            $self->_register_result_class($c, $schema, $namespace, $rel_class);
+            $rel_src = eval { $schema->source($rel_class) };
+            (my $short = $rel_class) =~ s/.*:://;
+            $rel_src ||= eval { $schema->source($short) };
+        }
+        $self->_ensure_related_sources($c, $schema, $namespace, $rel_src, $seen) if $rel_src;
+    }
+}
+
 sub create_table_from_result :Path('/schema-comparison/create_table_from_result') :Args(0) {
     my ($self, $c) = @_;
     
@@ -1152,34 +1359,18 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         }
 
         if (!$table_exists) {
-            # Create the table using deployment_statements
+            # SQL for this table only. Do not call deployment_statements or deploy.
             try {
-                my $source = $schema->source($result_path);
-                unless ($source) {
-                    die "Could not find source '$result_path' in schema";
-                }
-
-                my @statements = $schema->deployment_statements('MySQL');
-                my @table_statements = grep { /CREATE TABLE\s+`?\Q$table_name\E`?/i } @statements;
-
-                if (@table_statements) {
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=0');
-                    foreach my $statement (@table_statements) {
-                        ($statement) = ($statement =~ /(CREATE\s+TABLE\b.*)/si);
-                        next unless $statement;
-                        my $safe_statement = _strip_fk_constraints($statement);
-                        $dbh->do($safe_statement);
-                    }
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=1');
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                        "Successfully created table '$table_name' from Result class '$class_name'");
-                } else {
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=0');
-                    $schema->deploy();
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=1');
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                        "Deployed table '$table_name' via schema->deploy()");
-                }
+                my $sql = $self->_create_sql_for_source(
+                    $c, $schema, $namespace, $result_path, $class_name, $table_name);
+                my ($statement) = ($sql =~ /(CREATE\s+TABLE\s+`?\Q$table_name\E`?\b.*?);/si);
+                die "Could not isolate CREATE TABLE for '$table_name'" unless $statement;
+                $dbh->do('SET FOREIGN_KEY_CHECKS=0');
+                my $safe_statement = _strip_fk_constraints($statement);
+                $dbh->do($safe_statement);
+                $dbh->do('SET FOREIGN_KEY_CHECKS=1');
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
+                    "Successfully created table '$table_name' from Result class '$class_name'");
             } catch {
                 my $deploy_error = $_;
                 eval { $dbh->do('SET FOREIGN_KEY_CHECKS=1') };
@@ -3056,15 +3247,51 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
         }
     }
 
-    # Explicitly find result files whose table name is NOT in the live DB
+    # Explicitly find result files whose table name is NOT in the live DB.
+    # Attach parsed columns so tables.tt can preview fields before Create Table.
     my @orphaned_result_files = ();
+    my $orphan_parser = Comserv::Util::Schema::ResultParser->new();
     foreach my $tname (sort keys %$result_mapping) {
         if (!exists $db_tables{lc($tname)}) {
+            my $rpath = $result_mapping->{$tname}{result_path};
+            my $rname = $result_mapping->{$tname}{result_name};
+            my $rel   = $rpath =~ s{^\Q$app_root\E/?}{}r;
+
+            my $columns = {};
+            my @fields  = ();
+            my @pks     = ();
+            my $schema  = eval { $orphan_parser->get_result_file_schema($rpath) };
+            if ($schema && ref($schema->{columns}) eq 'HASH') {
+                $columns = $schema->{columns};
+                @pks = @{ $schema->{primary_keys} || [] };
+                my %pk_lookup = map { $_ => 1 } @pks;
+                foreach my $cname (sort keys %$columns) {
+                    my $cinfo = $columns->{$cname} || {};
+                    $cinfo->{is_primary_key} = 1 if $pk_lookup{$cname};
+                    # Flatten for Template Toolkit: ordered list with name + attrs
+                    push @fields, {
+                        name            => $cname,
+                        data_type       => $cinfo->{data_type} // '',
+                        size            => $cinfo->{size},
+                        is_nullable     => defined $cinfo->{is_nullable} ? $cinfo->{is_nullable} : 1,
+                        is_auto_increment => $cinfo->{is_auto_increment} ? 1 : 0,
+                        is_primary_key  => $cinfo->{is_primary_key} ? 1 : 0,
+                        default_value   => defined $cinfo->{default_value} ? $cinfo->{default_value} : undef,
+                        docs            => $cinfo->{docs} // $cinfo->{documentation} // $cinfo->{comment} // '',
+                    };
+                    $columns->{$cname} = $cinfo;
+                }
+            }
+
             push @orphaned_result_files, {
-                result_name => $result_mapping->{$tname}{result_name},
-                result_path => $result_mapping->{$tname}{result_path},
-                result_rel_path => $result_mapping->{$tname}{result_path} =~ s{^\Q$app_root\E/?}{}r,
+                result_name => $rname,
+                result_path => $rpath,
+                result_rel_path => $rel,
                 extracted_table_name => $tname,
+                columns     => $columns,
+                fields      => [ @fields ],
+                primary_keys => [ @pks ],
+                field_count => scalar(@fields),
             };
             push @result_only, {
                 name        => $tname,
@@ -3074,9 +3301,13 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
                 status      => 'result-only',
                 in_table    => 0,
                 has_result  => 1,
-                result_name => $result_mapping->{$tname}{result_name},
-                result_path => $result_mapping->{$tname}{result_path},
-                result_rel_path => $result_mapping->{$tname}{result_path} =~ s{^\Q$app_root\E/?}{}r,
+                result_name => $rname,
+                result_path => $rpath,
+                result_rel_path => $rel,
+                columns     => $columns,
+                fields      => [ @fields ],
+                primary_keys => [ @pks ],
+                field_count => scalar(@fields),
             };
         }
     }

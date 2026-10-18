@@ -1,0 +1,402 @@
+{
+   "1" : {
+      "payload_json" : "{\"max_tokens\":1536}",
+      "title" : "Hermes max_tokens 1536 (idle)"
+   },
+   "10" : {
+      "payload_json" : "{\"do_not\":\"hand-deploy tables\",\"symptom\":\"Can't find source for AiModelPolicyHistory at SchemaComparison.pm line 1157\"}",
+      "title" : "Fix schema-compare create-table, do not bypass it"
+   },
+   "100" : {
+      "payload_json" : "{\"apply\":\"cp ~/.hermes/config.yaml ~/.hermes/config.yaml.bak-$(date +%Y%m%d-%H%M) && hermes config set compression.model_thresholds.grok-4 0.38\",\"status\":\"proposed\",\"undo\":\"restore the config.yaml backup (or hermes config set compression.model_thresholds {})\"}",
+      "title" : "Hermes: compress grok-4.x context below 200K (compression.model_thresholds grok-4: 0.38)"
+   },
+   "101" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted; live on :4006\",\"test\":\"http://localhost:4006/ai/usage#supergrok-pacing and http://127.0.0.1:4006/ai/usage_pacing_json\",\"undo\":\"cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && for f in SuperGrokPacing.pm:lib/Comserv/Util/AI UsageMonitor.pm:lib/Comserv/Model/AI2 Usage.pm:lib/Comserv/Controller/AI usage_pacing_card.tt:root/ai ai_supergrok_pacing.t:t; do cp ~/.comserv/backups/aisystem-20261009/${f%%:*}.pre-r6 ${f#*:}/${f%%:*}; done\"}",
+      "title" : "Super Grok daily budget in pacing + /ai/usage_pacing_json + banner"
+   },
+   "102" : {
+      "payload_json" : "{\"status\":\"applied (cron */5 unchanged)\",\"undo\":\"cp ~/.hermes/scripts/supergrok_daily_guard.py.bak-20261009-0814 ~/.hermes/scripts/supergrok_daily_guard.py && cp ~/.hermes/scripts/test_supergrok_daily_guard.py.bak-20261009-0814 ~/.hermes/scripts/test_supergrok_daily_guard.py (if a switch happened: cp ~/.hermes/config.yaml.bak-20261009-0814 ~/.hermes/config.yaml)\"}",
+      "title" : "supergrok_daily_guard.py: daily switch to openrouter/z-ai/glm-5.3-flash from app numbers; midnight restore to grok-4.7"
+   },
+   "103" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted\",\"undo\":\"cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && cp ~/.comserv/backups/aisystem-20261009/HermesOverrunGuard.pm.pre-r6 lib/Comserv/Util/AI/HermesOverrunGuard.pm && cp ~/.comserv/backups/aisystem-20261009/ai_hermes_overrun_guard.t.pre-r6 t/ai_hermes_overrun_guard.t\"}",
+      "title" : "Overrun guard restore respects the daily Super Grok lock"
+   },
+   "104" : {
+      "payload_json" : "{\"status\":\"applied\",\"undo\":\"cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && cp ~/.comserv/backups/aisystem-20261009/ai_usage_readings.jsonl.pre-r6 data/ai_usage_readings.jsonl\"}",
+      "title" : "Seed Super Grok reading 54% at Fri Oct 9 08:12 PT"
+   },
+   "105" : {
+      "payload_json" : "{\"apply\":\"@reboot sleep 60 && cd /home/shanta/.comserv/worktrees/aisystem/Comserv/Comserv && PATH=/home/shanta/perl5/perlbrew/perls/perl-5.40.0/bin:$PATH PERL5LIB=/home/shanta/perl5/lib/perl5 CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4006 -r >> /home/shanta/.comserv/logs/aisystem-4006.log 2>&1\",\"status\":\"proposed\",\"undo\":\"remove the @reboot line\"}",
+      "title" : "Autostart the :4006 aisystem server after reboot (the daily switch depends on it)"
+   },
+   "107" : {
+      "payload_json" : "{}",
+      "title" : "Fix AI Editor generate provider/model routing"
+   },
+   "108" : {
+      "payload_json" : "{\"compress_at_tokens\":190000}",
+      "title" : "Compress grok-4.7 sessions earlier (~190K tokens)"
+   },
+   "109" : {
+      "payload_json" : "{}",
+      "title" : "Remove or pull ollama phi4:14b from app chain"
+   },
+   "11" : {
+      "payload_json" : "{\"value\":[\"openrouter|nvidia/nemotron-3-nano-30b-a3b:free\",\"openrouter|nvidia/nemotron-nano-9b-v2:free\",\"openrouter|stealth/ox-alpha\",\"openrouter|google/gemma-3-27b-it:free\"]}",
+      "title" : "Keep dead free slugs out of every chain"
+   },
+   "110" : {
+      "payload_json" : "{}",
+      "title" : "Reload or permanently sign grok.com usage add-on"
+   },
+   "12" : {
+      "payload_json" : "{\"value\":[\"openrouter|cohere/north-mini-code:free\",\"openrouter|nvidia/nemotron-3.5-lightning:free\",\"openrouter|google/gemma-4-31b-it:free\",\"openrouter|google/gemma-4-26b-a4b-it:free\",\"ollama|auto\"]}",
+      "title" : "Chat chain: reliable model first, 429-ing gemma last"
+   },
+   "13" : {
+      "payload_json" : "{\"value\":[\"openrouter|cohere/north-mini-code:free\",\"openrouter|nvidia/nemotron-3.5-lightning:free\",\"openrouter|google/gemma-4-31b-it:free\",\"openrouter|google/gemma-4-26b-a4b-it:free\",\"ollama|auto\"]}",
+      "title" : "Docs chain: same order as chat"
+   },
+   "14" : {
+      "payload_json" : "{\"apply_steps\":[\"cp ~/.hermes/config.yaml.proposed-2026-09-28 ~/.hermes/config.yaml (after review)\",\"start a new Hermes session (fallback is read per session)\"],\"backup\":\"~/.hermes/config.yaml.bak-2026-09-28-20260928-093707\",\"changes\":{\"fallback.min_switch_reset_seconds\":{\"from\":null,\"to\":60},\"fallback_providers\":{\"from\":[{\"model\":\"deepseek/deepseek-v4-flash\",\"provider\":\"openrouter\"}],\"to\":[{\"model\":\"grok-build-0.1\",\"provider\":\"xai-oauth\"},{\"model\":\"deepseek/deepseek-v4-pro\",\"provider\":\"openrouter\"}]},\"model.aliases.*\":\"all other aliases converted to dict form with explicit provider (same targets)\",\"model.aliases.build\":{\"from\":null,\"to\":{\"model\":\"grok-build-0.1\",\"provider\":\"xai-oauth\"}},\"model.aliases.code\":{\"from\":\"openrouter/deepseek/deepseek-v4-pro\",\"to\":{\"model\":\"grok-4.6\",\"provider\":\"xai-oauth\"}},\"model.aliases.code-paid\":{\"from\":null,\"to\":{\"model\":\"deepseek/deepseek-v4-pro\",\"provider\":\"openrouter\"}},\"model.aliases.coder\":{\"from\":\"openrouter/deepseek/deepseek-v4-pro\",\"to\":{\"model\":\"grok-4.6\",\"provider\":\"xai-oauth\"}},\"model.default\":{\"from\":\"grok-4.7\",\"to\":\"grok-4.6\"}},\"diff\":\"/tmp/hermes-failover-config.diff\",\"proposed_file\":\"~/.hermes/config.yaml.proposed-2026-09-28\"}",
+      "title" : "Hermes: fix coder alias and use native fallback_providers"
+   },
+   "15" : {
+      "payload_json" : "{\"caps\":{\"day_usd\":1.65,\"month_usd\":50,\"week_usd\":11.5},\"status\":\"proposal only; no script written\"}",
+      "title" : "Hermes: OpenRouter USD soft-cap guard (not native)"
+   },
+   "16" : {
+      "payload_json" : "{\"target\":\"data/ai_model_chains.json:removed\",\"value\":[\"openrouter|nvidia/nemotron-3-nano-30b-a3b:free\",\"openrouter|nvidia/nemotron-nano-9b-v2:free\",\"openrouter|stealth/ox-alpha\",\"openrouter|google/gemma-3-27b-it:free\",\"openrouter|google/gemma-4-26b-a4b-it:free\"]}",
+      "title" : "Remove gemma-4-26b-a4b-it:free from failover chains (100% errors)"
+   },
+   "17" : {
+      "payload_json" : "{\"target\":\"data/ai_model_chains.json:chain_chat\",\"value\":[\"openrouter|google/gemma-4-31b-it:free\",\"openrouter|nvidia/nemotron-3.5-lightning:free\",\"openrouter|cohere/north-mini-code:free\",\"ollama|auto\"]}",
+      "title" : "Drop gemma-4-26b from chat chain after removal"
+   },
+   "18" : {
+      "payload_json" : "{\"target\":\"data/ai_model_chains.json:chain_docs\",\"value\":[\"openrouter|google/gemma-4-31b-it:free\",\"openrouter|nvidia/nemotron-3.5-lightning:free\",\"openrouter|cohere/north-mini-code:free\",\"ollama|auto\"]}",
+      "title" : "Drop gemma-4-26b from docs chain"
+   },
+   "19" : {
+      "payload_json" : "{\"target\":\"data/ai_model_chains.json:chain_title\",\"value\":[\"openrouter|nvidia/nemotron-3.5-lightning:free\",\"openrouter|cohere/north-mini-code:free\",\"ollama|auto\"]}",
+      "title" : "Drop gemma-4-26b from title chain"
+   },
+   "2" : {
+      "payload_json" : "{\"authority\":\"spoken_percent\",\"ignore_rises\":true}",
+      "title" : "Track Grok Bot % drops only; ignore meter rises"
+   },
+   "20" : {
+      "payload_json" : "{\"files\":[\"lib/Comserv/Util/ModelCatalog.pm\",\"lib/Comserv/Model/AI2/Router.pm\"],\"note\":\"Shanta commits/merges on aisystem; bots do not commit\"}",
+      "title" : "Commit dead free-slug last-resort catalog fix"
+   },
+   "21" : {
+      "payload_json" : "{\"live\":0,\"open_sessions\":20,\"stalled_gt_6h\":15}",
+      "title" : "Archive stale Hermes open sessions"
+   },
+   "22" : {
+      "payload_json" : "{\"endpoint\":\"http://127.0.0.1:4006/ai/eval/ingest\",\"min_chars\":16}",
+      "title" : "Configure AI eval ingest token"
+   },
+   "23" : {
+      "payload_json" : "{\"open_sessions_usage_live\":20,\"open_unarchived_db\":41,\"stalled_gt_6h\":41}",
+      "title" : "Archive stale Hermes open sessions"
+   },
+   "24" : {
+      "payload_json" : "{\"current_default\":\"grok-build-0.1\",\"current_provider\":\"xai-oauth\",\"suggested_default\":\"deepseek/deepseek-v4-flash\",\"suggested_provider\":\"openrouter\",\"supergrok_remaining_pct\":13}",
+      "title" : "Hermes default back to deepseek flash for cheap idle"
+   },
+   "25" : {
+      "payload_json" : "{\"files\":[\"lib/Comserv/Util/ModelCatalog.pm\"],\"note\":\"Shanta commits/merges on aisystem; bots do not commit\",\"remove\":\"openrouter|google/gemma-4-26b-a4b-it:free\"}",
+      "title" : "Drop gemma-4-26b from ModelCatalog @FREE_PREFERENCE"
+   },
+   "26" : {
+      "payload_json" : "{\"allow_list_note\":\"EvalAllowList only covers ai_grounding.json, ai_usage.json and data/ai_model_chains.json keys (chains per purpose chat|docs|coding|title, removed, caps, circuits); no task_class routing / preflight / escalation key exists, so change_type=workstation -> approve creates an AISYSTEM todo.\",\"allow_models\":{\"first\":[\"supergrok grok-4.6\",\"supergrok grok-4.7\"],\"paid_fallback_only\":[\"deepseek-v4-pro\"]},\"applicable_from_page\":false,\"apply_mode\":\"manual: Hermes/router config\",\"deny_models\":[\"deepseek-v4-flash\",\"deepseek-flash-latest\",\"*-flash free models\",\"nemotron-*-free\"],\"escalate_after\":{\"action\":\"hand off to a stronger model in a fresh session with a written summary\",\"iteration_cap_hits\":1,\"tool_calls\":40,\"unverified_fixed_claims\":2},\"evidence\":{\"api_calls\":122,\"cost_usd\":0.541,\"counterexample\":\"grok-4.6 diagnosed the identical failure on :4001 on 2026-09-24\",\"date\":\"2026-09-29\",\"misdirected_edits\":\"flash edits went into the main checkout, not the 3d worktree\",\"model\":\"deepseek-v4-flash\",\"outcome\":\"never fixed the 3d Hermes dashboard button\",\"root_cause\":\":4003 server stale since 2026-09-24 12:45 PT; restart-on-change (-r) had not reloaded; branch_server_action returned 'Unknown action'\",\"session\":\"20260929_153046_f3cacd\"},\"forbid\":[\"manually starting the service the button should start, as a 'fix'\"],\"match_symptoms\":[\"running port or process\",\"button -> server -> spawn chain\",\"works on X not Y across branches or worktrees\",\"works on X not Y across dashboards, proxies or tabs\",\"earlier failed attempts\"],\"required_preflight_before_edit\":[\"find the PID serving the page with ss, its cwd and start time; compare with the files' mtimes and the last merge\",\"reproduce the failing request with curl and capture the response or alert\",\"confirm the edit target is the checkout that process serves\"],\"review_first\":true,\"status\":\"pending\",\"task_class\":\"runtime_cross_service_debug\"}",
+      "title" : "No flash/free models for runtime cross-service debugging"
+   },
+   "27" : {
+      "payload_json" : "{\"chat\":[\"openrouter|cohere/north-mini-code:free\",\"openrouter|nvidia/nemotron-3.5-lightning:free\",\"openrouter|google/gemma-4-31b-it:free\",\"ollama|auto\"],\"docs\":[\"openrouter|nvidia/nemotron-3.5-lightning:free\",\"openrouter|cohere/north-mini-code:free\",\"openrouter|google/gemma-4-31b-it:free\",\"ollama|auto\"],\"evidence\":{\"gemma31b_calls\":6,\"gemma31b_errors\":6,\"reason\":\"http_429\"}}",
+      "title" : "Demote gemma-4-31b-it:free from chat/docs chain head"
+   },
+   "28" : {
+      "payload_json" : "{\"hop_count_exclude_tasks\":[\"title_generation\",\"compression\"],\"request_type\":\"focustune\",\"skip_when_circuit_open\":true}",
+      "title" : "Separate Focus-Tune ledger rows from Chat ok_rate; skip open-circuit models"
+   },
+   "29" : {
+      "payload_json" : "{\"coding_runtime_debug\":\"xai-oauth/grok-4.6 (fallback openrouter/deepseek/deepseek-v4-pro)\",\"escalate_after_calls\":20,\"idle_title\":\"openrouter/deepseek/deepseek-v4-flash\"}",
+      "title" : "Hermes task routing: flash only for idle/title; escalate runtime debugging"
+   },
+   "3" : {
+      "payload_json" : "{\"coding\":\"grok-4.6\",\"idle\":\"flash\"}",
+      "title" : "After Super Grok reset: flash for idle, Super Grok for programming"
+   },
+   "30" : {
+      "payload_json" : "{\"check\":\"pid lstart < max(mtime lib/, root/, HEAD commit time)\",\"ports\":[4003,4006]}",
+      "title" : "Stale dev-server preflight before AI debugging"
+   },
+   "31" : {
+      "payload_json" : "{\"caps\":{\"day\":1.65,\"month\":50,\"week\":11.5},\"fields\":[\"usage_daily\",\"usage_weekly\",\"usage_monthly\",\"credits_balance\"]}",
+      "title" : "Expose OpenRouter day/week/month + credits in usage_live; Hermes dollar cap"
+   },
+   "32" : {
+      "payload_json" : "{\"meter_stale_hours\":24,\"stale_threshold_hours\":6}",
+      "title" : "Super Grok guard stale-meter alert + state.db fallback"
+   },
+   "33" : {
+      "payload_json" : "{\"models\":[\"inclusionai/ling-3.0-flash-sante:free\",\"cohere/north-mini-code:free\",\"nvidia/nemotron-3.5-lightning:free\"]}",
+      "title" : "Fix cost attribution on :free slugs"
+   },
+   "34" : {
+      "payload_json" : "{\"gitignore\":[\"Comserv/data/ai_model_health.json\",\"Comserv/root/static/ai/grokcom_usage.json\",\"Comserv/root/static/ai/supergrok_guard.json\"],\"stale_sessions\":41}",
+      "title" : "Hygiene: gitignore runtime JSON, archive stale Hermes sessions, drop gemma-26b leftovers, Ollama probe"
+   },
+   "39" : {
+      "payload_json" : "{\"hop_count_exclude_tasks\":[\"title_generation\",\"compression\"],\"request_type\":\"focustune\",\"skip_when_circuit_open\":true}",
+      "title" : "Separate Focus-Tune ledger rows from Chat ok_rate; skip open-circuit models"
+   },
+   "4" : {
+      "payload_json" : "{\"from\":\"grok-4.6\",\"scope\":\"idle/default model only\",\"to\":\"flash\"}",
+      "title" : "Switch Hermes idle model to flash"
+   },
+   "40" : {
+      "payload_json" : "{\"day_cap_usd\":1.65,\"on_breach\":\"switch default to free alias or pause paid coding sessions\",\"week_cap_usd\":11.5}",
+      "title" : "Hermes OpenRouter soft-cap guard (week already over $11.50)"
+   },
+   "41" : {
+      "payload_json" : "{\"action\":\"open grok.com once signed-in; confirm extension write\"}",
+      "title" : "Refresh grok.com usage meter (stale 46.4h)"
+   },
+   "42" : {
+      "payload_json" : "{\"value\":[\"openrouter|cohere/north-mini-code:free\",\"openrouter|nvidia/nemotron-3.5-lightning:free\",\"ollama|auto\"]}",
+      "title" : "Clean gemma-4-31b out of chain_chat/chain_docs file lines (already in removed[])"
+   },
+   "43" : {
+      "payload_json" : "{\"value\":[\"openrouter|nvidia/nemotron-3-nano-30b-a3b:free\",\"openrouter|nvidia/nemotron-nano-9b-v2:free\",\"openrouter|stealth/ox-alpha\",\"openrouter|google/gemma-3-27b-it:free\",\"openrouter|google/gemma-4-26b-a4b-it:free\",\"openrouter|google/gemma-4-31b-it:free\"]}",
+      "title" : "Confirm removed[] includes gemma-4-31b-it:free (already uncommitted)"
+   },
+   "44" : {
+      "payload_json" : "{\"keep_when_under\":\"openrouter/deepseek/deepseek-v4-pro\",\"when_week_over_cap\":\"openrouter/cohere/north-mini-code:free\"}",
+      "title" : "Hermes code/coder alias: respect OR week soft cap (force free when week≥$11.50)"
+   },
+   "45" : {
+      "payload_json" : "{\"action\":\"refresh_meter\"}",
+      "title" : "Refresh grok.com usage meter (stale 70.5h)"
+   },
+   "46" : {
+      "payload_json" : "{\"request_type\":\"focustune\",\"skip_when_circuit_open\":true}",
+      "title" : "Separate Focus-Tune ledger rows from Chat ok_rate; skip open-circuit models"
+   },
+   "47" : {
+      "payload_json" : "{\"fallback_hint\":\"openrouter|cohere/north-mini-code:free\",\"prefer\":\"empty model for router auto\"}",
+      "title" : "Drop dead gemma constant from ai2editor/chat.js CLARIFY/ANALYZE hints"
+   },
+   "48" : {
+      "payload_json" : "{\"also_apply\":{\"data/ai_model_chains.json:chain_docs\":[\"openrouter|nvidia/nemotron-3.5-lightning:free\",\"openrouter|cohere/north-mini-code:free\",\"ollama|auto\"]},\"chain_chat\":[\"openrouter|cohere/north-mini-code:free\",\"openrouter|nvidia/nemotron-3.5-lightning:free\",\"ollama|auto\"]}",
+      "title" : "Strip gemma-4-31b from chain_chat and chain_docs file lines"
+   },
+   "49" : {
+      "payload_json" : "{\"behavior\":\"when week_usd>=11.50 (or day/month caps), rewrite/block code+coder+fallback to free north-mini/lightning even for explicit -m deepseek-v4-pro; log bypass attempts\"}",
+      "title" : "Hermes overrun guard must cover TUI -m and code/coder aliases"
+   },
+   "5" : {
+      "payload_json" : "{\"action\":\"remove_from_fallback\",\"remove\":[\"openrouter|nvidia/nemotron-3-nano-30b-a3b:free\"],\"replacement\":\"first live OpenRouter :free instruction model (verify on /api/v1/models)\",\"verify_also\":[\"openrouter|nvidia/nemotron-nano-9b-v2:free\",\"openrouter|nvidia/nemotron-3.5-lightning:free\"]}",
+      "title" : "Drop or replace the free nemotron slug in Chat routing"
+   },
+   "50" : {
+      "payload_json" : "{\"avoid\":[\"deepseek-v4-pro\"],\"prefer\":[\"openrouter/cohere/north-mini-code:free\",\"openrouter/nvidia/nemotron-3.5-lightning:free\",\"ollama\"]}",
+      "title" : "Until OR week under $11.50: no Hermes -m deepseek-v4-pro"
+   },
+   "51" : {
+      "payload_json" : "{\"show\":\"billed_minus_hermes_est\"}",
+      "title" : "Surface Relace cache-bill gap on /ai/usage"
+   },
+   "52" : {
+      "payload_json" : "{\"filter\":\"status in (trip, restore) -> events, not calls\"}",
+      "title" : "Exclude overrun-guard trip/restore rows from ok_rate and error counts"
+   },
+   "53" : {
+      "payload_json" : "{\"rule\":\"if config default != trip 'to' model at restore time, keep it or ask\"}",
+      "title" : "Guard restore must not overwrite a manual default change made during a trip"
+   },
+   "54" : {
+      "payload_json" : "{\"aliases\":{\"code\":\"xai-oauth/grok-build-0.1\",\"editor\":\"xai-oauth/grok-4.6\",\"xai\":\"xai-oauth/grok-build-0.1\"},\"keep_default\":\"openrouter/cohere/north-mini-code:free\"}",
+      "title" : "Route hard coding to idle Super Grok until Thu Oct 8 10:31 PT reset"
+   },
+   "55" : {
+      "payload_json" : "{\"guard\":\"post notice into live sessions on thrash trip\",\"tool_loop_guardrails.hard_stop_enabled\":true}",
+      "title" : "Cap runaway single Hermes sessions"
+   },
+   "56" : {
+      "payload_json" : "{}",
+      "title" : "Archive 10 stale open Hermes sessions"
+   },
+   "57" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted (live via */5 cron)\",\"undo\":\"git restore Comserv/lib/Comserv/Util/AI/HermesOverrunGuard.pm Comserv/t/ai_hermes_overrun_guard.t (in the aisystem worktree); optional: rm ~/.hermes/cache/overrun_guard_openrouter_models.json\"}",
+      "title" : "Overrun guard: write valid model ids, Super Grok on thrash, safe fallback/aux, self-heal"
+   },
+   "58" : {
+      "payload_json" : "{\"backup\":\"~/.hermes/config.yaml.bak-20261006-0706\",\"status\":\"applied Tue Oct 6 07:06 PT\",\"undo\":\"cp -p ~/.hermes/config.yaml.bak-20261006-0706 ~/.hermes/config.yaml (note: guard trip at 07:15 PT made its own backup ~/.hermes/config.yaml.bak-overrun-20261006-071504 and auto-restores)\"}",
+      "title" : "Live ~/.hermes/config.yaml: fallback_providers Super Grok > :free > Ollama; title_generation -> :free"
+   },
+   "59" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted\",\"undo\":\"git restore Comserv/script/ai_eval_ingest.pl; rm Comserv/lib/Comserv/Util/AI/ServerFallback.pm Comserv/t/ai_server_fallback.t\"}",
+      "title" : "Eval ingest helper falls back across :4006 > :3001 > :5000 on 127.0.0.1 / workstation.local / 172.30.131.126 and records the source"
+   },
+   "6" : {
+      "payload_json" : "{\"else_status\":\"empty_response\",\"fallback\":\"treat like a provider failure\",\"rule\":\"success requires completion_tokens > 0 or non-empty content\"}",
+      "title" : "Stop counting zero-token Ollama calls as success"
+   },
+   "60" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted\",\"undo\":\"git restore Comserv/lib/Comserv/Util/AI/UsageEstimator.pm Comserv/lib/Comserv/Model/AI2/UsageMonitor.pm Comserv/root/ai/usage_estimator_card.tt Comserv/t/ai_usage_estimator.t\"}",
+      "title" : "Grok Bot burn estimate: count turns, routine runs (incl. failed), teammate wakes; separate CSC HelpDesk line; fit %/event from readings"
+   },
+   "61" : {
+      "payload_json" : "{\"status\":\"applied Tue Oct 6 07:14 PT\",\"undo\":\"cp data/ai_usage_readings.jsonl.bak-20261006-0714 data/ai_usage_readings.jsonl; cp root/static/ai/grokcom_usage.json.bak-20261006-0714 root/static/ai/grokcom_usage.json; cp root/static/ai/grokcom_usage_history.jsonl.bak-20261006-0714 root/static/ai/grokcom_usage_history.jsonl\"}",
+      "title" : "Seeded readings: Grok Bot 9% (Mon 10:04 PT), 12% (Tue 07:01 PT, reset ~Mon Oct 12 08:03); Super Grok 40% used (Tue 07:01 PT, reset Thu Oct 8 10:31)"
+   },
+   "62" : {
+      "payload_json" : "{\"status\":\"prepared, not signed/installed\",\"undo\":\"git restore Comserv/script/firefox-grokcom-usage/manifest.json; rm -r Comserv/script/firefox-grokcom-usage/web-ext-artifacts Comserv/script/firefox-grokcom-usage/AMO_SIGNING.txt; rm -r ~/.local/share/web-ext-tool\"}",
+      "title" : "grok.com usage add-on: AMO-ready 1.2.0 (data_collection_permissions none, min Firefox 142), lint clean, signing steps"
+   },
+   "63" : {
+      "payload_json" : "{\"switch_model\":\"openrouter/deepseek/deepseek-v4-flash-0731\"}",
+      "title" : "Super Grok guard handoff: v4-pro -> flash-0731 or :free"
+   },
+   "64" : {
+      "payload_json" : "{}",
+      "title" : "Warn/block in-place /model switch to v4-pro near OpenRouter day cap"
+   },
+   "66" : {
+      "payload_json" : "{}",
+      "title" : "Remove or pull ollama phi4:14b"
+   },
+   "67" : {
+      "payload_json" : "{}",
+      "title" : "Reload grok.com usage add-on"
+   },
+   "68" : {
+      "payload_json" : "{}",
+      "title" : "Cap runaway single Hermes sessions"
+   },
+   "7" : {
+      "payload_json" : "{\"coding\":\"grok-4.6\",\"idle\":\"flash\"}",
+      "title" : "Hermes idle default: flash, not Super Grok"
+   },
+   "71" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted/live\",\"undo\":\"cp ~/.hermes/scripts/supergrok_daily_guard.py.bak-20261007-0713 ~/.hermes/scripts/supergrok_daily_guard.py\"}",
+      "title" : "Super Grok daily guard: switch target v4-pro -> deepseek/deepseek-v4-flash-0731 (eval proposal 1)"
+   },
+   "72" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted/live\",\"undo\":\"cp ~/.hermes/config.yaml.bak-20261007-0713 ~/.hermes/config.yaml (or delete the provider_routing block at the end)\"}",
+      "title" : "Hermes provider_routing: sort price, ignore relace"
+   },
+   "73" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted/live\",\"undo\":\"rm -rf /tmp/r2/bench\"}",
+      "title" : "Benchmark: grok-build-0.1 vs flash-0731 vs glm-5.3-flash vs gemma4-64k (scratch /tmp/r2/bench, not applied)"
+   },
+   "74" : {
+      "payload_json" : "{\"metrics\":{\"model\":\"nimble:latest\",\"n\":\"20\",\"tau_coded_vs_manual\":0.378947368421053,\"tau_final_vs_manual\":0.189473684210526,\"tau_model_vs_coded\":0.505263157894737,\"tau_model_vs_manual\":0.473684210526316,\"top5_coded_manual\":0,\"top5_model_manual\":0.4,\"ts\":\"1791294806\",\"worked_in_coded_top5\":0,\"worked_in_model_top5\":0,\"worked_n\":\"8\"},\"status\":\"computed\",\"undo\":\"delete this inbox file and data/ai_decision_rank_quality.jsonl\"}",
+      "title" : "Decision rank quality: nimble:latest"
+   },
+   "75" : {
+      "payload_json" : "{\"status\":\"no ranking calls logged\",\"undo\":\"delete this inbox file and data/ai_decision_rank_quality.jsonl\"}",
+      "title" : "Decision rank quality: tev1:0.8b"
+   },
+   "76" : {
+      "payload_json" : "{\"status\":\"no ranking calls logged\",\"undo\":\"delete this inbox file and data/ai_decision_rank_quality.jsonl\"}",
+      "title" : "Decision rank quality: tev1:latest"
+   },
+   "77" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted; live cache written\",\"undo\":\"cd ~/.comserv/worktrees/aisystem/Comserv && git restore Comserv/lib/Comserv/Util/AI/DecisionRank.pm Comserv/script/compute_decision_rank.pl Comserv/root/admin/planning/_today_work_tab.tt Comserv/lib/Comserv/Controller/Planning.pm && rm Comserv/t/ai_decision_rank_content.t && cp /tmp/r2/ai_rank_order.json.before Comserv/data/ai_rank_order.json\"}",
+      "title" : "DecisionRank v2: content-first todo ordering (0.7 content / 0.3 fields), per-todo reason, no confidence gate"
+   },
+   "78" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted\",\"undo\":\"cp /tmp/r2/RankQuality.pm.r2 Comserv/lib/Comserv/Util/AI/RankQuality.pm\"}",
+      "title" : "RankQuality: divergence from field order + worked_in_final_top5"
+   },
+   "8" : {
+      "payload_json" : "{\"already_applied\":true,\"from\":\"~deepseek/deepseek-flash-latest\",\"to\":\"grok-4.6\"}",
+      "title" : "Do not use deepseek-flash-latest as the coding/eval lead"
+   },
+   "80" : {
+      "payload_json" : "{\"restore_model_when_supergrok_ok\":\"xai-oauth/grok-build-0.1\"}",
+      "title" : "Guard restore to Super Grok when it has quota"
+   },
+   "81" : {
+      "payload_json" : "{}",
+      "title" : "Warn/block in-place /model switch to v4-pro near OpenRouter day cap"
+   },
+   "82" : {
+      "payload_json" : "{}",
+      "title" : "Reload grok.com usage add-on"
+   },
+   "83" : {
+      "payload_json" : "{}",
+      "title" : "Remove or pull ollama phi4:14b"
+   },
+   "84" : {
+      "payload_json" : "{}",
+      "title" : "Cap runaway single Hermes sessions"
+   },
+   "86" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted; live on :4006 (auto-reload)\",\"undo\":\"cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && git restore lib/Comserv/Model/Ollama/Chat.pm lib/Comserv/Model/AI2/Provider/Ollama.pm && rm lib/Comserv/Util/OllamaModelResolver.pm t/ai_ollama_model_resolver.t  (AI.pm also has the logging change below; restore it with: cp ~/.comserv/backups/aisystem-20261008/AI.pm.pre-logging lib/Comserv/Controller/AI.pm then git restore to drop both)\"}",
+      "title" : "Ollama: only call installed models, fall back to an installed chat model (app-wide) + fix provider/model swap"
+   },
+   "87" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted; LIVE (cron)\",\"undo\":\"cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && cp ~/.comserv/backups/aisystem-20261008/HermesOverrunGuard.pm.pre-r3 lib/Comserv/Util/AI/HermesOverrunGuard.pm && cp ~/.comserv/backups/aisystem-20261008/ai_hermes_overrun_guard.t.pre-r3 t/ai_hermes_overrun_guard.t\"}",
+      "title" : "Overrun guard: per-provider thrash limits (configurable) + mixed-timezone agent.log parsing"
+   },
+   "88" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted\",\"undo\":\"cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && cp ~/.comserv/backups/aisystem-20261008/EvalReports.pm.pre-r3 lib/Comserv/Model/AI2/EvalReports.pm && cp ~/.comserv/backups/aisystem-20261008/ai_eval_reports.t.pre-r3 t/ai_eval_reports.t ; status undo per proposal: Revert on /ai/eval\"}",
+      "title" : "Eval ingest: 'resolves' closes implemented code proposals; Revert reopens them"
+   },
+   "89" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted; live on :4006\",\"undo\":\"cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && for f in Model/AI2/Router.pm Controller/Admin/Git.pm Model/AI2/TodoRank.pm Util/Accounting/CoaAiGenerate.pm Util/ErrorAudit.pm; do git restore lib/Comserv/$f; done && cp ~/.comserv/backups/aisystem-20261008/GitFix.pm.pre-logging lib/Comserv/Model/AI2/GitFix.pm && cp ~/.comserv/backups/aisystem-20261008/AI.pm.pre-logging lib/Comserv/Controller/AI.pm && rm t/ai_router_dispatch_usage.t\"}",
+      "title" : "Usage ledger: every AI entry point logs to /ai/usage with branch/sitename/username"
+   },
+   "9" : {
+      "payload_json" : "{\"action\":\"avoid\",\"model\":\"nvidia/nemotron-3-super-120b-a12b:free\"}",
+      "title" : "Do not use nvidia/nemotron-3-super-120b-a12b:free for code"
+   },
+   "90" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted; live on :4006\",\"test\":\"http://localhost:4006/ai/usage#supergrok-pacing  and  /ai/usage?pacing_jobs=1#supergrok-pacing\",\"undo\":\"cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && rm lib/Comserv/Util/AI/SuperGrokPacing.pm root/ai/usage_pacing_card.tt script/supergrok_pacing.pl script/supergrok_autoqueue.pl t/ai_supergrok_pacing.t && for f in UsageMonitor.pm:lib/Comserv/Model/AI2 usage.tt:root/ai Usage.pm:lib/Comserv/Controller/AI Eval.pm:lib/Comserv/Controller/AI list.tt:root/ai/eval; do cp ~/.comserv/backups/aisystem-20261008/${f%%:*}.pre-r4 ${f#*:}/${f%%:*}; done  (AI.pm: remove the pacing_jobs arg on the ai_health call)\"}",
+      "title" : "Super Grok use-it-up pacing card + meter-stale prompt + ranked backlog for Hermes"
+   },
+   "91" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted\",\"undo\":\"cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && cp ~/.comserv/backups/aisystem-20261008/HermesOverrunGuard.pm.pre-r4b lib/Comserv/Util/AI/HermesOverrunGuard.pm  (that copy already has the round-3 changes)\"}",
+      "title" : "Hermes log timestamps: read local lines in the workstation zone even when the app process runs TZ=UTC"
+   },
+   "92" : {
+      "payload_json" : "{\"status\":\"applied\",\"undo\":\"cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && cp ~/.comserv/backups/aisystem-20261008/ai_usage_readings.jsonl.pre-r4 data/ai_usage_readings.jsonl\"}",
+      "title" : "Seed Super Grok readings: 85% closing (cycle ending Oct 8 10:31 PT) + 0% new cycle"
+   },
+   "93" : {
+      "payload_json" : "{\"status\":\"applied\",\"undo\":\"python3 ~/.hermes/scripts/revert_grok47_20261009.py  (restores model.default/code/coder/fallback_providers from ~/.hermes/config.yaml.bak-20261008-1100 and saved_model -> grok-build), then cp ~/.hermes/scripts/supergrok_daily_guard.py.bak-20261008-1100 ~/.hermes/scripts/supergrok_daily_guard.py\"}",
+      "title" : "Hermes default + code/coder -> xai-oauth/grok-4.7; grok-build-0.1 first fallback; kept past midnight"
+   },
+   "94" : {
+      "payload_json" : "{\"apply\":\"hermes config set model.aliases.git xai-oauth/grok-4.7 && hermes config set model.aliases.reasoner xai-oauth/grok-4.7\",\"status\":\"proposed\",\"undo\":\"hermes config set model.aliases.git openrouter/cohere/north-mini-code:free && hermes config set model.aliases.reasoner openrouter/cohere/north-mini-code:free\"}",
+      "title" : "Routing rule: runtime/git/debugging tasks -> grok-4.7, not grok-build (Hermes alias table)"
+   },
+   "95" : {
+      "payload_json" : "{\"status\":\"proposed\",\"undo\":\"cp ~/.hermes/scripts/supergrok_daily_guard.py.bak-20261008-1100 ~/.hermes/scripts/supergrok_daily_guard.py\"}",
+      "title" : "supergrok_daily_guard: use it up (WEEK_OFF_AT 90 -> 98) and token calibration instead of 0.05%/call"
+   },
+   "96" : {
+      "payload_json" : "{\"status\":\"needs Shanta\",\"undo\":\"git -C ~/.hermes/hermes-agent restore tools/approval_detection.py ; then reset local main to origin/main by hand if the merge is unwanted\"}",
+      "title" : "REVIEW: grok-build left a safety bypass in ~/.hermes/hermes-agent"
+   },
+   "97" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted; cron installed\",\"test\":\"http://localhost:4006/ai/usage#supergrok-pacing (red 'Super Grok burn warning' banner)\",\"undo\":\"cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && for f in SuperGrokPacing.pm:lib/Comserv/Util/AI UsageMonitor.pm:lib/Comserv/Model/AI2 usage_pacing_card.tt:root/ai supergrok_pacing.pl:script ai_supergrok_pacing.t:t; do cp ~/.comserv/backups/aisystem-20261008/${f%%:*}.pre-r5 ${f#*:}/${f%%:*}; done; crontab -l | grep -v 'supergrok_pacing.pl --alert' | grep -v 'Super Grok burn alerts' | crontab -\"}",
+      "title" : "Super Grok burn alerts: >15 points per PT day or >10 points ahead after noon -> notify-send + /ai/usage banner + eval inbox line"
+   },
+   "98" : {
+      "payload_json" : "{\"status\":\"applied, uncommitted\",\"undo\":\"set $LONG_CTX_WEIGHT = 1.0 in lib/Comserv/Util/AI/SuperGrokPacing.pm (or restore SuperGrokPacing.pm.pre-r5)\"}",
+      "title" : "Estimator: weight prompts >= 200K tokens at 1.3x (Super Grok long-context)"
+   },
+   "99" : {
+      "payload_json" : "{\"status\":\"applied\",\"undo\":\"cd ~/.comserv/worktrees/aisystem/Comserv/Comserv && cp ~/.comserv/backups/aisystem-20261008/ai_usage_readings.jsonl.pre-r5 data/ai_usage_readings.jsonl\"}",
+      "title" : "Seed Super Grok reading 41% at Thu Oct 8 19:04 PT"
+   }
+}

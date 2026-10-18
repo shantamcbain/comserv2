@@ -1,0 +1,30 @@
+[%# All AI usage in one table (admin) — included from ai/usage.tt.
+  # Data: Model::AI2::UsageMonitor->unified_usage (app ledger + Hermes
+  # state.db + Ollama decision organizer). No JS. %]
+[% u = ai_health.unified %]
+<section id="all-ai-usage" class="card" style="margin:16px 0;">
+  <div class="card-header">All AI usage — app, AI editor, Focus-Tune, Ollama, Hermes, organizer (last [% u.window_days %] days)</div>
+  <div class="card-body">
+    <p class="doc-muted">One table for every AI caller, tagged with branch, sitename and user. App rows come from the ledger
+      (<code>ai_usage_log</code>; new rows carry <code>metadata.branch / sitename / username</code>), Hermes rows from
+      <code>~/.hermes/state.db</code> (git_branch, user), and the Today's Focus decision organizer from <code>data/ai_rank_order.json</code>.</p>
+    <table class="data-table">
+      <thead><tr><th>Source</th><th>Branch</th><th>Site</th><th>User</th><th>Calls</th><th>OK</th><th>Tokens</th><th>$</th></tr></thead>
+      <tbody>
+      [% FOREACH r IN u.rows %]
+        <tr><td>[% r.source | html %]</td><td>[% r.branch | html %]</td><td>[% r.sitename | html %]</td><td>[% r.user | html %]</td>
+          <td>[% r.calls %]</td><td>[% r.ok %]</td><td>[% r.tokens %]</td><td>[% r.cost %]</td></tr>
+      [% END %]
+      [% UNLESS u.rows.size %]<tr><td colspan="8" class="doc-muted">No usage in this window.</td></tr>[% END %]
+      </tbody>
+    </table>
+    [% og = u.organizer %]
+    [% IF og %]
+    <p class="doc-body" style="margin-top:8px;"><strong>Ollama todo organizer (Today's Focus)</strong> — carries work between sessions:
+      [% FOREACH b IN og.branches %]branch <code>[% b.branch | html %]</code>: [% b.ranked %] todos ranked by [% b.model | html %] at [% b.computed_pt | html %][% UNLESS loop.last %]; [% END %][% END %].
+      [% IF og.last_call %]Last decision call [% og.last_call.at_pt | html %] ([% og.last_call.model | html %], [% og.last_call.gate_passed %] passed the gate, [% og.last_call.changed %] moved).[% END %]
+      Open it on the Planning page <em>Today's work</em> tab (<a href="/todo">/todo</a>); recompute with <code>perl -Ilib script/compute_decision_rank.pl --branch aisystem</code>.</p>
+    [% END %]
+    [% IF u.errors.size %]<p class="doc-muted">[% u.errors.join('; ') | html %]</p>[% END %]
+  </div>
+</section>

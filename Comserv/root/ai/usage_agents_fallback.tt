@@ -1,0 +1,38 @@
+[%# Fallback when :4006 still runs old UsageMonitor (no org.agents).
+    Figures copied from ~/.hermes/state.db — not a substitute for /ai/usage_live. %]
+<div class="doc-warning" role="alert" style="margin:12px 0;">
+  <strong>If KPIs stay at 0, hard-refresh.</strong>
+  Live JSON is <code>/ai2/usage_live</code> (thin AI2 bridge). Do not start a second
+  <code>:4006</code> — the port is already in use. New <code>Controller::AI::Usage</code>
+  is not in this process; that is expected.
+  Until then these numbers are a read of Hermes <code>state.db</code>
+  (UTC 2026-09-25 16:31) — they include cache/reasoning tokens xAI OAuth does not bill as cash.
+</div>
+<table class="data-table">
+  <thead><tr><th>Agent</th><th>Status</th><th>Now</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Hermes</td>
+      <td>active</td>
+      <td>This TUI session <code>20260925_140037_b6b58e</code> · grok-4.6 / xai-oauth ·
+        91 API calls · 13.8M tokens (last activity &lt; 1 min).
+        Last 24h: 12 sessions · ~700–1110 API calls · ~103–166M tokens (mostly grok-4.6 cache).
+        43 sessions still marked open in state.db (many stale).</td>
+    </tr>
+    <tr>
+      <td>AI Chat</td>
+      <td>quiet</td>
+      <td>App ledger (<code>ai_usage_logs</code>) not readable until UsageMonitor reloads.</td>
+    </tr>
+    <tr>
+      <td>Grok Bot</td>
+      <td>active</td>
+      <td>Local process pid 12939 (no API probe).</td>
+    </tr>
+    <tr>
+      <td>AI Editor</td>
+      <td>quiet</td>
+      <td>No <code>generate</code> rows until the app ledger path reloads.</td>
+    </tr>
+  </tbody>
+</table>

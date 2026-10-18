@@ -27,6 +27,7 @@ use DateTime;
 use LWP::UserAgent;
 use Comserv::Util::Logging;
 use Comserv::Util::ModelCatalog;
+use Comserv::Util::OllamaModelResolver;
 use Comserv::Model::Ollama;
 use Comserv::Model::Grok;
 use Comserv::Util::SystemInfo;
@@ -305,14 +306,165 @@ sub index :Path :Args(0) {
         task_todo => $task_todo,
         ai_quota_warning => $c->stash->{ai_quota_warning},
     );
+    # Admin banner on /ai: SuperGrok guard switch + stale AI meters (no network).
+    {
+        my $r = $c->session->{roles} || [];
+        $r = [ split /,/, $r ] unless ref $r eq 'ARRAY';
+        if (grep { /^admin$/i } @$r) {
+            my $b = eval { require Comserv::Model::AI2::UsageMonitor; Comserv::Model::AI2::UsageMonitor->new->ai_banner($c) };
+            $c->stash(ai_admin_banner => $b) if $b;
+        }
+    }
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-        'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
+    # Vision analysis endpoints
+    sub vision :Path('/ai/vision') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'vision', "AI vision query endpoint accessed");
+    
+    # Check if request is from .zero address (allow access without authentication)
+    my $client_address = $c->req->address // '';
+    my $is_zero_address = ($client_address eq '127.0.0.1' || $client_address eq '::1' 
+                         || $client_address =~ /^192\.168\.1\./ || $client_address =~ /127\.0\.0\./
+                         || $client_address =~ /^localhost$/i);
+    
+    if (!$is_zero_address) {
+        # Standard authentication for non-.zero addresses
+        my $username = $c->session->{username};
+        my $guest_session_id = $c->session->{guest_session_id};
+        
+        unless ($username) {
+            unless ($guest_session_id) {
+                use Data::UUID;
+                my $ug = Data::UUID->new;
+                $guest_session_id = $ug->create_str();
+                $c->session->{guest_session_id} = $guest_session_id;
+            }
+            $username = "Guest-" . substr($guest_session_id, 0, 8);
+        }
+    } else {
+        # .zero address access: use system identifier
+        $c->stash->{username} = 'system-zero';
+        $c->stash->{guest_session_id} = 'zero-system';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'vision', "AI vision accessed from .zero address: $client_address");
+    }
+    
+    # Get vision query parameters
+    my $prompt = $c->request->param('prompt');
+    my $image_data = $c->request->param('image_data');
+    
+    # Validate parameters
+    unless ($prompt && $image_data) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'vision', "Missing required parameters: prompt or image_data");
+        $c->response->status(400);
+        $c->response->header('Content-Type' => 'application/json');
+        $c->response->body(JSON::encode_json({
+            success => 0,
+            error   => 'Both prompt and image_data parameters are required',
+        }));
+        return;
+    }
+    
+    # Process vision query
+    my $args = {
+        prompt       => $prompt,
+        image_data   => $image_data,
+        vision_model => $c->request->param('vision_model') || 'llava',
+        temperature  => $c->request->param('temperature') || 0.7,
+        max_tokens   => $c->request->param('max_tokens') || 512,
+    };
+    
+    my $result = $self->_vision_query($c, $args);
+    
+    if ($result->{success}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'vision', "Vision analysis completed successfully for location_id=" . ($result->{location_id} // 'unknown'));
+        
+        $c->response->status(200);
+        $c->response->header('Content-Type' => 'application/json');
+        $c->response->body(JSON::encode_json($result));
+    } else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'vision', "Vision analysis failed: " . ($result->{error} // 'Unknown error'));
+        
+        $c->response->status(500);
+        $c->response->header('Content-Type' => 'application/json');
+        $c->response->body(JSON::encode_json($result));
+    }
 }
 
-=head2 template_editor
+# Legacy vision endpoint for backward compatibility
+sub legacy_vision :Path('/ai/analyze-image') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'legacy_vision', "Legacy vision analysis endpoint accessed");
+    
+    # Same implementation as vision but with different path
+    my $client_address = $c->req->address // '';
+    my $is_zero_address = ($client_address eq '127.0.0.1' || $client_address eq '::1' 
+                         || $client_address =~ /^192\.168\.1\./ || $client_address =~ /127\.0\.0\./
+                         || $client_address =~ /^localhost$/i);
+    
+    if (!$is_zero_address) {
+        # Standard authentication for non-.zero addresses
+        my $username = $c->session->{username};
+        my $guest_session_id = $c->session->{guest_session_id};
+        
+        unless ($username) {
+            unless ($guest_session_id) {
+                use Data::UUID;
+                my $ug = Data::UUID->new;
+                $guest_session_id = $ug->create_str();
+                $c->session->{guest_session_id} = $guest_session_id;
+            }
+            $username = "Guest-" . substr($guest_session_id, 0, 8);
+        }
+    } else {
+        # .zero address access: use system identifier
+        $c->stash->{username} = 'system-zero';
+        $c->stash->{guest_session_id} = 'zero-system';
+    }
+    
+    # Same implementation as vision for backward compatibility
+    my $prompt = $c->request->param('prompt');
+    my $image_data = $c->request->param('image_data');
+    
+    unless ($prompt && $image_data) {
+        $c->response->status(400);
+        $c->response->header('Content-Type' => 'application/json');
+        $c->response->body(JSON::encode_json({
+            success => 0,
+            error   => 'Both prompt and image_data parameters are required',
+        }));
+        return;
+    }
+    
+    my $args = {
+        prompt       => $prompt,
+        image_data   => $image_data,
+        vision_model => $c->request->param('vision_model') || 'llava',
+        temperature  => $c->request->param('temperature') || 0.7,
+        max_tokens   => $c->request->param('max_tokens') || 512,
+    };
+    
+    my $result = $self->_vision_query($c, $args);
+    
+    if ($result->{success}) {
+        $c->response->status(200);
+        $c->response->header('Content-Type' => 'application/json');
+        $c->response->body(JSON::encode_json($result));
+    } else {
+        $c->response->status(500);
+        $c->response->header('Content-Type' => 'application/json');
+        $c->response->body(JSON::encode_json($result));
+    }
+}
 
-Admin-only page for reviewing and applying AI-proposed TT2 template edits.
+# Admin-only page for reviewing and applying AI-proposed TT2 template edits.
 
 =cut
 
@@ -608,6 +760,34 @@ sub grok_cli :Local :Args(0) {
         return;
     }
 
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::classify($prompt);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'grok_cli',
+            "HarmRefusal failed closed: $@");
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            refused => JSON::true,
+            error   => 'Chat safety check failed. The question was not sent.',
+        }));
+        return;
+    }
+    if ($harm) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'grok_cli',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, $c->session->{user_id}));
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            refused  => JSON::true,
+            response => Comserv::Util::AI::HarmRefusal::refusal_text($harm),
+            provider => 'local-refusal',
+            model    => 'harm-refusal',
+        }));
+        return;
+    }
+
     my $grok = $self->_find_grok_binary();
     unless ($grok && -x $grok) {
         $c->response->status(503);
@@ -687,6 +867,9 @@ sub grok_cli :Local :Args(0) {
             . ' stderr_len=' . length($stderr || '') . ' api_key=' . ($self->_grok_cli_api_key($c) ? 'yes' : 'no'));
 
     $stdout =~ s/\A\s+|\s+\z//g if defined $stdout;
+    $self->_log_ai_usage($c, provider => 'grok_cli', model => 'grok-cli', request_type => 'grok_cli',
+        status => (($stdout // '') =~ /\S/ ? 'success' : 'error'), response_text => ($stdout // ''),
+        metadata => { surface => 'ai_editor_grok_cli', backend => 'grok_cli', exit => $exit });
     if (!$stdout || $stdout !~ /\S/) {
         my $err = $self->_grok_cli_stderr_message($stderr)
                || "grok exited with code " . (defined $exit ? $exit : 'unknown')
@@ -796,14 +979,20 @@ sub _grok_cli_via_api {
         { role => 'user',   content => $prompt },
     ]);
 
+    my $u = (ref $resp eq 'HASH' && ref $resp->{usage} eq 'HASH') ? $resp->{usage} : {};
+    my %usage_row = (provider => 'grok', model => ((ref $resp eq 'HASH' && $resp->{model}) || $model),
+        prompt_tokens => $u->{prompt_tokens} // 0, completion_tokens => $u->{completion_tokens} // 0,
+        request_type => 'grok_cli', metadata => { surface => 'ai_editor_grok_cli', backend => 'grok_api' });
     unless ($resp && ref $resp eq 'HASH' && $resp->{success}) {
         my $err = $grok->last_error || 'Grok API request failed';
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
             'grok_cli', "xAI API fallback error: $err");
+        $self->_log_ai_usage($c, %usage_row, status => 'error', error_message => substr($err, 0, 500));
         return { error => $err };
     }
 
     my $text = $resp->{response} || '';
+    $self->_log_ai_usage($c, %usage_row, status => 'success', response_text => $text);
     unless ($text =~ /\S/) {
         return { error => 'Grok API returned an empty response' };
     }
@@ -1165,6 +1354,17 @@ sub generate :Local :Args(0) {
             'generate', "Pipe-delimited model detected: provider=$pipe_provider, model=$pipe_model");
     }
 
+    # Normalize swapped provider/model (the root cause of Bug #83) and bare provider
+    # tokens. Uses pure helper so the same logic is available to chat() and tests.
+    # Must come AFTER pipe normalization.
+    my ($norm_provider, $norm_model) = Comserv::Util::OllamaModelResolver::normalize_provider_model($provider, $model);
+    if ($norm_provider ne ($provider // '') || $norm_model ne ($model // '')) {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+            'generate', "Normalized provider/model: '$provider'/'$model' -> '$norm_provider'/'$norm_model'");
+        $provider = $norm_provider;
+        $model    = $norm_model;
+    }
+
     # Fall back to session-stored conversation_id if not provided in request
     unless ($conversation_id) {
         $conversation_id = $c->session->{current_conversation_id};
@@ -1173,7 +1373,7 @@ sub generate :Local :Args(0) {
                 'generate', "Using session-stored conversation_id: $conversation_id");
         }
     }
-    
+
     # DEBUG: Log conversation_id status
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
         'generate', "BEFORE_VALIDATION: conversation_id is " . (defined($conversation_id) ? "'$conversation_id'" : "undef"));
@@ -1204,6 +1404,35 @@ sub generate :Local :Args(0) {
     if (!$is_guest && $prompt =~ /^\s*(good\s+night|end\s+day|finish\s+day|end\s+of\s+day)\s*[!.]?\s*$/i) {
         my $kw_resp = $c->controller("Planning")->_daily_log_action($c, 'end', $username, $user_id);
         $c->response->body(encode_json($kw_resp));
+        return;
+    }
+
+    # Refuse before the prompt preview is logged and before any provider call.
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::classify_turn($prompt, $history_items);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'generate',
+            "HarmRefusal failed closed: $@");
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            refused => JSON::true,
+            error   => 'Chat safety check failed. The question was not sent.',
+        }));
+        return;
+    }
+    if ($harm) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'generate',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, $user_id));
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            refused  => JSON::true,
+            response => Comserv::Util::AI::HarmRefusal::refusal_text($harm),
+            provider => 'local-refusal',
+            model    => 'harm-refusal',
+        }));
         return;
     }
 
@@ -1686,13 +1915,29 @@ sub generate :Local :Args(0) {
             }
             my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
             $active_ollama_host = $current_host;
-            
+
             # ── 3-Tier model selection: start small, escalate if needed ─────────
             # Tier 1 = tier_small (fastest / lightest installed model)
             # Tier 2 = tier_large (escalated only if Tier-1 quality is poor)
             my ($tier_small, $tier_large) = $self->_pick_ollama_tier(
                 $installed_models, $current_model, $agent_id, $page_context);
             my $manual_model = ($model && $can_select_model_gen) ? $model : '';
+
+            # Resolve manual model (e.g. from UI picker that sent uninstalled or swapped token)
+            # against the installed list returned by _get_current... . If not present,
+            # fall back instead of letting Ollama 404 "model not found".
+            if ($manual_model) {
+                # $installed_models may be array of hashrefs {name=>} or strings
+                my @inst_names = map { ref($_) ? ($_->{name} // '') : $_ } @$installed_models;
+                my ($resolved, $note) = Comserv::Util::OllamaModelResolver::resolve($manual_model, \@inst_names);
+                if (defined $resolved && $resolved ne $manual_model) {
+                    push @trace, "🔄 Model fallback: $note";
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'generate', "manual_model '$manual_model' resolved via OllamaModelResolver: $note");
+                    $manual_model = $resolved;
+                }
+            }
+
             # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
             my $force_large = (!$is_guest && !$manual_model &&
                 $normalized_agent_type =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
@@ -1955,7 +2200,7 @@ sub generate :Local :Args(0) {
                     # Pass 3: hard-cap system prompt to SYS_MAX_CHARS (snap to newline to avoid mid-URL cuts)
                     if (length($sys) > $SYS_MAX_CHARS) {
                         my $cut = substr($sys, 0, $SYS_MAX_CHARS);
-                        my $nl  = rindex($cut, "\n");
+                        my $nl  = index($cut, "\n");
                         $cut    = substr($cut, 0, $nl > 0 ? $nl : $SYS_MAX_CHARS);
                         $ollama_msgs[0]{content} = $cut . "\n[system prompt truncated to fit context budget]";
                         push @trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS);
@@ -2569,6 +2814,10 @@ sub result :Local :Args(0) {
         
         $ai_response = $response->{response} || '';
         my $response_time = int((time() - $start_time) * 1000); # milliseconds
+        $self->_log_ai_usage($c, provider => 'ollama', model => ($response->{model} || $ollama->model),
+            prompt_tokens => $response->{prompt_eval_count} // 0, completion_tokens => $response->{eval_count} // 0,
+            duration_ms => $response_time, request_type => 'query_form', response_text => $ai_response,
+            metadata => { surface => 'ai_query_form' });
         
         $response_metadata = {
             model => $response->{model} || $ollama->model,
@@ -2862,6 +3111,17 @@ sub chat :Local :Args(0) {
         $model = '';
     }
 
+    # Call the shared pure normalizer after the chat endpoint's existing (partial)
+    # pipe/slash/bare handling. Keeps prior behaviour while making consistent with
+    # generate() and covering the swapped case.
+    my ($norm_provider, $norm_model) = Comserv::Util::OllamaModelResolver::normalize_provider_model($provider, $model);
+    if ($norm_provider ne ($provider // '') || $norm_model ne ($model // '')) {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+            'chat', "Normalized provider/model: '$provider'/'$model' -> '$norm_provider'/'$norm_model'");
+        $provider = $norm_provider;
+        $model    = $norm_model;
+    }
+
     # Record structured page_links if the client sent them (from extractPageLinks JS helper).
     # Complements the content-based extraction. (safe)
     eval {
@@ -2889,6 +3149,34 @@ sub chat :Local :Args(0) {
         });
         $c->response->body($error_response);
         $c->response->status(400);
+        return;
+    }
+
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::classify_turn($prompt, $history);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'chat',
+            "HarmRefusal failed closed: $@");
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            refused => JSON::true,
+            error   => 'Chat safety check failed. The question was not sent.',
+        }));
+        return;
+    }
+    if ($harm) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, $user_id));
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            refused  => JSON::true,
+            response => Comserv::Util::AI::HarmRefusal::refusal_text($harm),
+            provider => 'local-refusal',
+            model    => 'harm-refusal',
+        }));
         return;
     }
 
@@ -3309,6 +3597,15 @@ sub chat :Local :Args(0) {
             }
 
             $ai_response = $or_response->{response} // '';
+            # 3D-20260907-6510: free OpenRouter models (e.g. nemotron :free) sometimes
+            # return success with EMPTY content; the widget then showed nothing. Retry once.
+            unless ($ai_response =~ /\S/) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'chat', "OpenRouter model $model returned empty content; retrying once");
+                push @chat_trace, "⚠️ OpenRouter $model returned an empty reply — retrying once";
+                my $retry = eval { $or->chat($c, model => $model, messages => \@or_messages, api_key => $or_api_key) };
+                $ai_response = $retry->{response} // '' if $retry && $retry->{success};
+            }
             $model_used  = $or_response->{model} || $model;
             $response = { response => $ai_response, model => $model_used, usage => $or_response->{usage} };
             $response_eval_count = ($or_response->{usage} && $or_response->{usage}{total_tokens})
@@ -3455,7 +3752,7 @@ sub chat :Local :Args(0) {
                     # Pass 3: hard-cap system prompt
                     if (length($sys) > $SYS_MAX_CHARS_CHAT) {
                         my $cut = substr($sys, 0, $SYS_MAX_CHARS_CHAT);
-                        my $nl  = rindex($cut, "\n");
+                        my $nl  = index($cut, "\n");
                         $cut    = substr($cut, 0, $nl > 0 ? $nl : $SYS_MAX_CHARS_CHAT);
                         $ollama_messages[0]{content} = $cut . "\n[system prompt truncated to fit context budget]";
                         push @chat_trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS_CHAT);
@@ -3588,6 +3885,15 @@ sub chat :Local :Args(0) {
             $response_eval_count = $response->{eval_count} || 0;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'chat', "Chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars");
+        }
+
+        # 3D-20260907-6510: never save/show a blank assistant turn.
+        unless (defined $ai_response && $ai_response =~ /\S/) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'chat', "Empty AI response from model " . ($model_used // '?') . " — substituting notice");
+            $ai_response = "Sorry — the AI model (" . ($model_used || 'unknown') . ") returned an empty reply. "
+                . "Please send your question again, or pick a different model. If it keeps happening, "
+                . "report it via the HelpDesk.";
         }
 
         # Save conversation to database
@@ -5476,7 +5782,7 @@ sub _assess_response_quality {
     );
     my $lc_resp = lc($response);
     for my $phrase (@uncertain_phrases) {
-        return 'poor' if CORE::index($lc_resp, $phrase) >= 0;
+        return 'poor' if index($lc_resp, $phrase) >= 0;
     }
 
     return 'good';
@@ -5680,8 +5986,9 @@ sub _do_web_search {
         if ($provider eq 'ddg') {
             eval {
                 require URI::Escape;
+                my $q = eval { URI::Escape::uri_escape_utf8($query) } || URI::Escape::uri_escape($query);
                 my $url  = 'https://api.duckduckgo.com/?q='
-                         . URI::Escape::uri_escape($query)
+                         . $q
                          . '&format=json&no_html=1&skip_disambig=1';
                 my $req  = HTTP::Request->new(GET => $url);
                 my $resp = $ua->request($req);
@@ -5763,7 +6070,7 @@ sub _pick_ollama_tier {
             # 2. Known family prefix
             unless ($score) {
                 for my $family (sort { length($b) <=> length($a) } keys %known_family) {
-                    if (CORE::index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
+                    if (index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
                 }
             }
             # 3. Generic hints
@@ -5972,9 +6279,9 @@ New pages like the AI usage monitor will appear automatically without editing th
 =cut
 
 {
-    my $cached_tt_links;
-    my $cache_time = 0;
-    my $CACHE_TTL = 300;  # 5 minutes
+    our $cached_tt_links;
+    our $cache_time = 0;
+    our $CACHE_TTL = 300;  # 5 minutes
 
     sub _get_auto_discovered_tt_pages {
         my ($self, $base_url) = @_;
@@ -6101,6 +6408,17 @@ sub _build_navigation_command_guide {
             [ 'Merge COA seed',             '/Accounting/coa/seed_merge'],
             [ 'General ledger',             '/Accounting/gl'            ],
         ]],
+        [ '3D printing & Manufacturing (Traveler)', 'admin', [
+            [ 'Manufacturing travelers (open orders) — "open traveler"', '/Accounting/manufacturing' ],
+            [ 'View one traveler (order id)',  '/Accounting/manufacturing/traveler_view/ORDER_ID' ],
+            [ 'Print one traveler (order id)', '/Accounting/manufacturing/traveler_print/ORDER_ID' ],
+            [ '3D print queue',             '/3d/queue'                 ],
+            [ '3D admin dashboard',         '/3d/admin'                 ],
+            [ '3D printers (LAN control)',  '/3d/printers'              ],
+            [ '3D models library',          '/3d/models'                ],
+            [ '3D store / browse',          '/3d/browse'                ],
+            [ 'My 3D orders',               '/3d/my_orders'             ],
+        ]],
         [ 'Site management (admin)', 'admin', [
             [ 'Site list / setup',          '/site'                     ],
             [ 'Add a new site',             '/site/add_site'            ],
@@ -6112,6 +6430,7 @@ sub _build_navigation_command_guide {
             [ 'Manage AI models',           '/ai/models'                ],
             [ 'AI server status',           '/ai/check_status'          ],
             [ 'AI Usage & Billing Monitor', '/ai/usage'                 ],
+            [ 'Daily AI Eval Reports',      '/ai/eval'                  ],
             [ 'Support chat admin',         '/chat/admin'               ],
         ]],
         # ── Common sections ───────────────────────────────────────────────────
@@ -8996,6 +9315,7 @@ sub action :Local :Args(0) {
                 priority      => $priority,
                 status        => 'open',
                 created_at    => $now_str,
+                metadata      => eval { JSON->new->canonical->encode({ entry_path => "chat_ai", client_ip => (scalar($c->req->header("CF-Connecting-IP")) || $c->req->address), remote_addr => $c->req->address, user_agent => scalar($c->req->user_agent), sitename => $site_name }) },
             });
         };
         if ($@ || !$new_ticket) {
@@ -10931,7 +11251,7 @@ sub _project_root_path {
         || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
 }
 
-my @_EDITOR_ROOTS = qw(lib root sql script t);
+our @_EDITOR_ROOTS = qw(lib root sql script t);
 
 sub _list_dir_param {
     my ($self, $c) = @_;
@@ -11615,9 +11935,9 @@ sub search_files :Local :Args(0) {
             my $low = lc($path);
             if ($low eq $query) {
                 push @exact, $path;
-            } elsif (CORE::index($low, $query) == 0) {
+            } elsif (index($low, $query) == 0) {
                 push @prefix, $path;
-            } elsif (CORE::index($low, $query) != -1) {
+            } elsif (index($low, $query) != -1) {
                 push @substring, $path;
             }
         }
@@ -11628,9 +11948,9 @@ sub search_files :Local :Args(0) {
             my $name = (split m{/}, $low)[-1];
             if ($name eq $query || $low eq $query) {
                 push @exact, $path;
-            } elsif (CORE::index($name, $query) == 0 || CORE::index($low, $query) == 0) {
+            } elsif (index($name, $query) == 0 || index($low, $query) == 0) {
                 push @prefix, $path;
-            } elsif (CORE::index($name, $query) != -1 || CORE::index($low, $query) != -1) {
+            } elsif (index($name, $query) != -1 || index($low, $query) != -1) {
                 push @substring, $path;
             }
         }
@@ -11801,7 +12121,7 @@ sub resolve_route :Local :Args(0) {
         my @guesses;
         my $lc_route = lc($route);
         for my $known (keys %$map) {
-            if (CORE::index($known, $lc_route) != -1 || CORE::index($lc_route, $known) != -1) {
+            if (index($known, $lc_route) != -1 || index($lc_route, $known) != -1) {
                 push @guesses, $map->{$known}{template};
             }
         }
@@ -12765,6 +13085,55 @@ sub usage :Local :Args(0) {
     my $usage_m = eval { $c->model('AI')->usage };
     my $provider_status = $usage_m ? ($usage_m->snapshot_provider_status($c) || {}) : {};
 
+    # Ledger / Golden Data monitor (admin only) — Model::AI2::UsageMonitor.
+    my $ledger_monitor;
+    if ($is_admin) {
+        $ledger_monitor = eval {
+            require Comserv::Model::AI2::UsageMonitor;
+            # Honor the requested window ($days read above); this was pinned to
+            # 14 days, which is why no view could show less than two weeks.
+            Comserv::Model::AI2::UsageMonitor->new->ledger_summary($c, days => $days);
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
+            "Ledger monitor failed: $@") if $@;
+    }
+
+    # Daily AI Eval Reports summary card (admin only) — full pages on /ai/eval
+    # (Controller::AI::Eval, Model::AI2::EvalReports).
+    my $eval_summary;
+    if ($is_admin) {
+        $eval_summary = eval {
+            require Comserv::Model::AI2::EvalReports;
+            Comserv::Model::AI2::EvalReports->new->latest_summary($c);
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
+            "Eval summary failed: $@") if $@;
+    }
+
+    # Model failover section #fallover (admin only) — AISYSTEM plan §5e.
+    my $fallover;
+    if ($is_admin) {
+        $fallover = eval {
+            require Comserv::Model::AI2::UsageMonitor;
+            Comserv::Model::AI2::UsageMonitor->new->fallover_summary($c, days => $days);
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
+            "Fallover summary failed: $@") if $@;
+    }
+
+    # Health & preflight card #ai-health + admin banners (guard switch,
+    # stale meters) - Model::AI2::UsageMonitor::ai_health.
+    my $ai_health;
+    if ($is_admin) {
+        $ai_health = eval {
+            require Comserv::Model::AI2::UsageMonitor;
+            Comserv::Model::AI2::UsageMonitor->new->ai_health($c, days => $days, pacing_jobs => ($c->req->param("pacing_jobs") ? 1 : 0));
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'usage',
+            "ai_health failed: $@") if $@;
+    }
+
+    # For filter dropdowns: recent distinct providers/sites (lightweight)
     my @providers = qw(ollama grok supergrok openrouter openai hermes xai-oauth opencode-free);
     my @sites;
     my $schema = eval { $c->model('DBEncy')->schema };
@@ -12786,96 +13155,11 @@ sub usage :Local :Args(0) {
         is_admin         => $is_admin ? 1 : 0,
         current_site     => $site_id,
         username         => $username,
+        ledger_monitor   => $ledger_monitor,
+        eval_summary     => $eval_summary,
+        fallover         => $fallover,
+        ai_health        => $ai_health,
     );
-}
-
-sub usage_live :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json; charset=utf-8');
-    unless ($self->_usage_is_operator($c) || $c->session->{user_id}) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'login required' }));
-        return;
-    }
-    my $org = eval { $self->_usage_org($c) };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'usage_live', "$@");
-        $c->response->body(encode_json({ success => JSON::false, error => 'summary failed' }));
-        return;
-    }
-    $c->response->body(encode_json({ success => JSON::true, org => $org }));
-}
-
-sub usage_kill :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json; charset=utf-8');
-    unless ($self->_usage_is_operator($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'operator only' }));
-        return;
-    }
-    require Comserv::Model::AI2::KillSwitch;
-    my $ks = Comserv::Model::AI2::KillSwitch->new;
-    my $action   = $c->req->param('action') || 'kill';
-    my $provider = $c->req->param('provider') || '';
-    my $model    = $c->req->param('model') || '';
-    my $result;
-    if ($action eq 'unkill') {
-        $result = $ks->unkill($c, provider => $provider, model => $model);
-    } else {
-        $result = $ks->kill($c,
-            provider => $provider,
-            model    => $model,
-            reason   => $c->req->param('reason') || 'other',
-            notes    => $c->req->param('notes') || '',
-            by       => $c->session->{username} || 'operator',
-        );
-        eval {
-            $c->model('AI')->log_usage($c,
-                provider      => $provider,
-                model         => $model,
-                request_type  => 'kill_switch',
-                status        => 'killed',
-                error_message => ($c->req->param('reason') || 'other') . ': ' . ($c->req->param('notes') || ''),
-                metadata      => { action => 'kill' },
-            );
-        };
-    }
-    $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'usage_kill',
-        "action=$action $provider/$model ok=" . ($result->{ok} ? 1 : 0));
-    $c->response->body(encode_json({
-        success => $result->{ok} ? JSON::true : JSON::false,
-        error   => $result->{error},
-        killed  => $result->{killed} || [],
-    }));
-}
-
-sub usage_ingest :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json; charset=utf-8');
-    unless ($self->_usage_is_operator($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'operator / LAN only' }));
-        return;
-    }
-    my $body = {};
-    if (($c->req->content_type || '') =~ /json/i) {
-        $body = eval { decode_json($c->req->body_data ? encode_json($c->req->body_data) : ($c->req->body || '{}')) } || {};
-        if (ref $c->req->body_data eq 'HASH') { $body = $c->req->body_data; }
-    }
-    $body = {} unless ref $body eq 'HASH';
-    my %args;
-    for my $k (qw(source request_type provider model prompt_tokens completion_tokens
-                  total_tokens estimated_cost_usd status error_message user_id site_id evaluation)) {
-        $args{$k} = $body->{$k} // $c->req->param($k);
-    }
-    if (ref $body->{metadata} eq 'HASH') { $args{metadata} = $body->{metadata}; }
-    require Comserv::Model::AI2::UsageMonitor;
-    my $r = Comserv::Model::AI2::UsageMonitor->new->ingest($c, %args);
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'usage_ingest',
-        "source=" . ($args{source}||'?') . " model=" . ($args{model}||'?') . " ok=" . ($r->{ok} ? 1 : 0));
-    $c->response->body(encode_json({
-        success => $r->{ok} ? JSON::true : JSON::false,
-        error   => $r->{error},
-        source  => $r->{source},
-    }));
 }
 
 =head2 grok_balance
@@ -13175,104 +13459,21 @@ Safe: never throws; logs errors to system log only.
 
 sub _log_ai_usage {
     my ($self, $c, %args) = @_;
-
-    eval {
-        my $schema = $c->model('DBEncy')->schema;
-        return unless $schema;
-
-        my $user_id     = $args{user_id}     // $c->session->{user_id};
-        my $site_id     = $args{site_id}     // $c->session->{SiteID};
-        my $guest_id    = $args{guest_session_id} // $c->session->{guest_session_id};
-        my $provider    = $args{provider}    // 'ollama';
-        my $model       = $args{model}       // 'unknown';
-        my $pt          = $args{prompt_tokens}     // 0;
-        my $ct          = $args{completion_tokens} // 0;
-        my $tot         = $args{total_tokens}      // ($pt + $ct);
-        my $dur_ms      = $args{duration_ms};
-        my $req_type    = $args{request_type} // 'chat';
-        my $conv_id     = $args{conversation_id};
-        my $status      = $args{status} // 'success';
-        my $err_msg     = $args{error_message};
-        my $ollama_host = $args{ollama_host};
-        my $ip          = $c->request ? $c->request->address : undef;
-        my $meta        = $args{metadata} || {};
-
-        # Ensure numeric
-        $pt  += 0; $ct += 0; $tot += 0;
-
-        my $cost = $args{estimated_cost_usd};
-        unless (defined $cost) {
-            $cost = $self->_estimate_ai_cost_usd($provider, $model, $pt, $ct);
-        }
-
-        # === Wire in plan quota for "free calls" harmony ===
-        my $plan_id = undef;
-        my $plan_quota = 0;
-        my $within_free = 1;
-        my $bill_status = 'free';
-
-        eval {
-            my $memb_model = $c->model('Membership');
-            if ($memb_model && $site_id) {
-                $plan_quota = $memb_model->get_ai_daily_quota_for_site($c, $site_id, $user_id) || 0;
-
-                # Get active membership to snapshot plan_id (prefer membership id or plan? we store plan_id but using membership id is common in this codebase)
-                my $active_mem = $memb_model->get_active_plan($c, $user_id, $site_id);
-                $plan_id = $active_mem ? $active_mem->id : undef;
-
-                my ($is_within, $used_today) = $memb_model->is_ai_call_within_free_quota($c, $site_id, $provider, $user_id);
-                $within_free = $is_within ? 1 : 0;
-
-                my $is_paid_provider = $provider && lc($provider) ne 'ollama';
-                if ($is_paid_provider) {
-                    $bill_status = 'paid_provider';  # always cost-tracked
-                } elsif ($plan_quota > 0 && !$within_free) {
-                    $bill_status = 'overage';
-                } else {
-                    $bill_status = 'free';
-                }
-
-                # Update meta for visibility
-                $meta->{plan_quota} = $plan_quota;
-                $meta->{used_today_before_this} = $used_today;
-                $meta->{within_free_quota} = $within_free;
-            }
-        };
-
-        $schema->resultset('AiUsageLog')->create({
-            user_id                 => $user_id,
-            site_id                 => $site_id,
-            guest_session_id        => $guest_id,
-            provider                => $provider,
-            model                   => $model,
-            prompt_tokens           => $pt,
-            completion_tokens       => $ct,
-            total_tokens            => $tot,
-            estimated_cost_usd      => $cost,
-            duration_ms             => $dur_ms,
-            request_type            => $req_type,
-            conversation_id         => $conv_id,
-            status                  => $status,
-            error_message           => $err_msg,
-            ip_address              => $ip,
-            ollama_host             => $ollama_host,
-            plan_id                 => $plan_id,
-            plan_ai_requests_per_day=> $plan_quota,
-            within_free_quota       => $within_free,
-            billing_status          => $bill_status,
-            metadata                => (ref($meta) ? encode_json($meta) : $meta),
-        });
-
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_log_ai_usage',
-            sprintf("Logged AI usage: provider=%s model=%s tokens=%s/%s cost=%.6f site=%s user=%s status=%s",
-                $provider, $model, $pt, $ct, $cost, $site_id//'-', $user_id//'-', $status));
+    # One ledger: delegate to Model::AI::Usage::log (branch/sitename/username
+    # tags, :free cost zeroing, grounding/fallover metadata). This used to be
+    # a stale copy that wrote rows without those tags (Oct 8 2026 audit).
+    my $ok = eval {
+        my $ai = eval { $c->model('AI') };
+        if ($ai && $ai->can('log_usage')) { $ai->log_usage($c, %args) }
+        else { require Comserv::Model::AI::Usage; Comserv::Model::AI::Usage->new->log($c, %args) }
+        1;
     };
-    if ($@) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_log_ai_usage',
-            "Failed to write ai_usage_logs: $@");
-    }
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_log_ai_usage',
+        "Failed to write ai_usage_logs: $@") unless $ok;
+    return;
 }
 
 __PACKAGE__->meta->make_immutable;
+}
 
-1;
+__PACKAGE__->meta->make_immutable;

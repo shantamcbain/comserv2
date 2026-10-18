@@ -1,0 +1,65 @@
+{
+ "report_date": "2026-10-07",
+ "source": "Overrun lag fixes + model benchmark (Grok Bot)",
+ "created_by": "Grok Bot (AI usage monitor task)",
+ "created_at": "2026-10-07T08:00:00-07:00",
+ "summary": "Live per-call OpenRouter estimate (1-min cron) fixes cap lag; Super Grok excluded from thrash; Super Grok guard no longer switches to v4-pro; Relace ignored. Benchmark: grok/flash-0731/glm pass, gemma4 local fails; spend ~$0.009.",
+ "metrics": {
+  "tue_live_estimate_usd": 3.047,
+  "tue_billed_usd": 3.05,
+  "bench_openrouter_usd": 0.009
+ },
+ "proposals": [
+  {
+   "title": "Overrun guard: Super Grok calls excluded from thrash (eval proposal 3)",
+   "change_type": "code",
+   "target": "lib/Comserv/Util/AI/HermesOverrunGuard.pm thrash_count",
+   "rationale": "Wed 06:25-07:00 PT thrash trips were Shanta's own flat-rate Super Grok session (40 calls). thrash_count now joins sessions and skips billing_provider xai-oauth/xai/supergrok and grok-* models.",
+   "payload": {
+    "status": "applied, uncommitted/live",
+    "undo": "cp /tmp/HermesOverrunGuard.pm.pre-r2 back, or git restore the file (also drops round-1 changes)"
+   }
+  },
+  {
+   "title": "Overrun guard: live per-call OpenRouter estimate + 1-min watcher + v4-pro near-cap trip",
+   "change_type": "code",
+   "target": "HermesOverrunGuard.pm (parse_api_calls, price_call, openrouter_endpoints, live_spend, merge_live, decide v4pro_recent, lite run) + t/ai_hermes_overrun_guard.t (138 pass) + crontab */5 -> * * * * *",
+   "rationale": "Tue OpenRouter billed $3.05 while Hermes logged $0.63: v4-pro list price is StreamLake $0.21/M but calls routed to DigitalOcean $1.044/M (14 calls, ~210K ctx each) and Relace. Live estimate prices each agent.log call at its actual upstream endpoint price (Relace cache at full input, unknown upstream = priciest endpoint). Replay of Tue gives $3.047 (billed $3.05) and would trip at 09:30 PT ($1.06, v4-pro near-cap rule at 60% of cap) instead of 09:40 at $2.18.",
+   "payload": {
+    "status": "applied, uncommitted/live",
+    "undo": "crontab ~/.hermes/crontab.bak-20261007-0721; restore file as above; rm ~/.hermes/cache/overrun_guard_or_endpoints.json"
+   }
+  },
+  {
+   "title": "Super Grok daily guard: switch target v4-pro -> deepseek/deepseek-v4-flash-0731 (eval proposal 1)",
+   "change_type": "config",
+   "target": "~/.hermes/scripts/supergrok_daily_guard.py SWITCH_MODEL + notice text",
+   "rationale": "Tue 09:10 PT daily-cap lock switched default to v4-pro; live TUI session adopted it in-place at 09:12 (model_switch._sync_agent_model_with_config). Notices said 'new sessions only' - wrong, fixed.",
+   "payload": {
+    "status": "applied, uncommitted/live",
+    "undo": "cp ~/.hermes/scripts/supergrok_daily_guard.py.bak-20261007-0713 ~/.hermes/scripts/supergrok_daily_guard.py"
+   }
+  },
+  {
+   "title": "Hermes provider_routing: sort price, ignore relace",
+   "change_type": "config",
+   "target": "~/.hermes/config.yaml",
+   "rationale": "Relace bills cache reads at full input; cheapest flash-0731 endpoint was Relace. Benchmark confirmed flash routed to Sail Research, glm to OpenInference.",
+   "payload": {
+    "status": "applied, uncommitted/live",
+    "undo": "cp ~/.hermes/config.yaml.bak-20261007-0713 ~/.hermes/config.yaml (or delete the provider_routing block at the end)"
+   }
+  },
+  {
+   "title": "Benchmark: grok-build-0.1 vs flash-0731 vs glm-5.3-flash vs gemma4-64k (scratch /tmp/r2/bench, not applied)",
+   "change_type": "other",
+   "target": "/tmp/r2/bench",
+   "rationale": "Task: Perl RankQuality.pm + tests, hidden 14-test check. grok PASS 108s 10 calls 107K in/7.2K out flat-rate; flash-0731 PASS 226s 9 calls 103K/4.8K ~$0.006-0.008; glm-5.3-flash PASS 132s 5 calls 44K/2.5K ~$0.003; gemma4-64k local FAIL (900s timeout, 5 calls, 50-400s/call). Total OpenRouter ~$0.009 of $0.50 cap. Recommend glm-5.3-flash as cheap paid fallback/switch target candidate; flash-0731 ok; local Ollama not viable for agent coding.",
+   "payload": {
+    "status": "applied, uncommitted/live",
+    "undo": "rm -rf /tmp/r2/bench"
+   }
+  }
+ ],
+ "markdown": "# Overrun lag fixes + model benchmark (Grok Bot)\n\n- **Overrun guard: Super Grok calls excluded from thrash (eval proposal 3)**: Wed 06:25-07:00 PT thrash trips were Shanta's own flat-rate Super Grok session (40 calls). thrash_count now joins sessions and skips billing_provider xai-oauth/xai/supergrok and grok-* models. Undo: `cp /tmp/HermesOverrunGuard.pm.pre-r2 back, or git restore the file (also drops round-1 changes)`\n- **Overrun guard: live per-call OpenRouter estimate + 1-min watcher + v4-pro near-cap trip**: Tue OpenRouter billed $3.05 while Hermes logged $0.63: v4-pro list price is StreamLake $0.21/M but calls routed to DigitalOcean $1.044/M (14 calls, ~210K ctx each) and Relace. Live estimate prices each agent.log call at its actual upstream endpoint price (Relace cache at full input, unknown upstream = priciest endpoint). Replay of Tue gives $3.047 (billed $3.05) and would trip at 09:30 PT ($1.06, v4-pro near-cap rule at 60% of cap) instead of 09:40 at $2.18. Undo: `crontab ~/.hermes/crontab.bak-20261007-0721; restore file as above; rm ~/.hermes/cache/overrun_guard_or_endpoints.json`\n- **Super Grok daily guard: switch target v4-pro -> deepseek/deepseek-v4-flash-0731 (eval proposal 1)**: Tue 09:10 PT daily-cap lock switched default to v4-pro; live TUI session adopted it in-place at 09:12 (model_switch._sync_agent_model_with_config). Notices said 'new sessions only' - wrong, fixed. Undo: `cp ~/.hermes/scripts/supergrok_daily_guard.py.bak-20261007-0713 ~/.hermes/scripts/supergrok_daily_guard.py`\n- **Hermes provider_routing: sort price, ignore relace**: Relace bills cache reads at full input; cheapest flash-0731 endpoint was Relace. Benchmark confirmed flash routed to Sail Research, glm to OpenInference. Undo: `cp ~/.hermes/config.yaml.bak-20261007-0713 ~/.hermes/config.yaml (or delete the provider_routing block at the end)`\n- **Benchmark: grok-build-0.1 vs flash-0731 vs glm-5.3-flash vs gemma4-64k (scratch /tmp/r2/bench, not applied)**: Task: Perl RankQuality.pm + tests, hidden 14-test check. grok PASS 108s 10 calls 107K in/7.2K out flat-rate; flash-0731 PASS 226s 9 calls 103K/4.8K ~$0.006-0.008; glm-5.3-flash PASS 132s 5 calls 44K/2.5K ~$0.003; gemma4-64k local FAIL (900s timeout, 5 calls, 50-400s/call). Total OpenRouter ~$0.009 of $0.50 cap. Recommend glm-5.3-flash as cheap paid fallback/switch target candidate; flash-0731 ok; local Ollama not viable for agent coding. Undo: `rm -rf /tmp/r2/bench`"
+}

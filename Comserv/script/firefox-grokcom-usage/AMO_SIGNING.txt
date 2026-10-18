@@ -1,0 +1,47 @@
+Make the grok.com usage add-on survive reboots (Oct 6 2026)
+=============================================================
+Why it stopped: the add-on was loaded as a TEMPORARY add-on (about:debugging).
+Firefox drops temporary add-ons on every restart. The workstation rebooted
+Mon Oct 5 07:40 PT (kernel 7.0.0-38 update + snap auto-refresh 07:39); Firefox
+restarted 07:41 PT. The last reading (Build 22%) was written at 07:35 PT, 5 min
+before. The profile (63c6yk5x.default) has no grokcom-usage xpi installed and
+Release Firefox (snap 157) will not load an unsigned one permanently.
+
+Fix = sign it once on addons.mozilla.org (AMO) as UNLISTED (private, not public;
+free; automatic signing usually takes minutes). Needs Shanta's AMO account.
+
+1. Log in at https://addons.mozilla.org/developers/ (free Firefox account).
+2. Open https://addons.mozilla.org/developers/addon/api/key/ and
+   "Generate new credentials": copy JWT issuer (user:...) and JWT secret.
+3. In a terminal (keys only in env for this shell, never in a file in git):
+     cd /home/shanta/.comserv/worktrees/aisystem/Comserv/Comserv/script/firefox-grokcom-usage
+     export WEB_EXT_API_KEY='user:XXXXXXX:XXX'
+     export WEB_EXT_API_SECRET='paste-secret'
+     ~/.local/share/web-ext-tool/node_modules/.bin/web-ext sign --channel=unlisted \
+        --source-dir . --artifacts-dir web-ext-artifacts \
+        --ignore-files native_host.py comserv_grokcom_usage.json '*.xpi' README.txt AMO_SIGNING.txt 'web-ext-artifacts/**'
+     unset WEB_EXT_API_KEY WEB_EXT_API_SECRET
+   Result: web-ext-artifacts/<name>-1.2.0.xpi (signed). (Already lint-clean:
+   0 errors / 0 warnings; unsigned build: web-ext-artifacts/comserv_grok.com_usage-1.2.0.zip)
+4. Install permanently: Firefox -> about:addons -> gear -> "Install Add-on From File..."
+   -> pick the signed .xpi. Remove the temporary one in about:debugging if listed.
+5. Native messaging host is already installed:
+     ~/snap/firefox/common/.mozilla/native-messaging-hosts/comserv_grokcom_usage.json
+   (points at native_host.py in this folder). Nothing to change.
+6. Open grok.com -> Settings -> Usage and leave the tab open. Within ~15 s
+   root/static/ai/grokcom_usage.json gets "source": "firefox-extension" and a
+   fresh "at"; /ai/usage (Usage estimator, Super Grok row) shows the add-on reading.
+
+Future versions: bump "version" in manifest.json and re-run step 3.
+
+Alternatives (no AMO account):
+ - Firefox Developer Edition or Nightly (or unbranded builds) honour
+   about:config xpinstall.signatures.required = false, so the unsigned zip/xpi
+   installs permanently there. Release/ESR/snap Firefox ignore that pref.
+ - Enterprise policies (/etc/firefox/policies/policies.json, honoured by snap
+   Firefox) can force-install an add-on via ExtensionSettings
+   {"grokcom-usage@comserv.local": {"installation_mode": "force_installed",
+   "install_url": "file:///home/shanta/.../grokcom-usage-signed.xpi"}} - but Release
+   Firefox still requires the xpi to be signed, so policies only automate step 4.
+ - Keep using the temporary add-on and reload it after each reboot
+   (about:debugging -> This Firefox -> Load Temporary Add-on -> manifest.json).

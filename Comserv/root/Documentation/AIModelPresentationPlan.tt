@@ -16,6 +16,8 @@
 [% END %]
 
 <div class="container">
+
+    [% INCLUDE 'ai/_admin_eval_links.tt' %]
   <div class="row">
     <div class="col">
 

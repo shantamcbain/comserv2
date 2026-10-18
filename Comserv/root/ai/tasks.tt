@@ -1,0 +1,76 @@
+[%# AI tasks (Hermes sessions grouped into tasks) + commit-time code reviewer.
+  # Controller::AI::Tasks. Ratings: data/ai_task_ratings.json. No JS, no CDNs. %]
+[% d = tasks %]
+<div class="ai-tasks-page" style="max-width:1300px;margin:0 auto;padding:1rem;">
+  <h1>AI tasks</h1>
+  [% INCLUDE 'ai/eval/_messages.tt' %]
+  <p class="doc-muted">Hermes sessions from the last [% days %] days grouped into tasks (built [% d.generated_pt | html %];
+    <a href="?refresh=1&amp;days=[% days %]">refresh</a>). Rate each task Done / Partial / Failed; your rating always beats the guess.
+    Cost per Done task shows on <a href="[% c.uri_for('/ai/eval') %]#task-cost">/ai/eval</a>.
+    Show: <a href="?days=[% days %]">all</a> | <a href="?show=unrated&amp;days=[% days %]">unrated</a> | <a href="?show=flagged&amp;days=[% days %]">flagged (corrections or rewrites)</a>.
+    [% d.rated %] of [% d.tasks.size %] rated.</p>
+  [% IF d.error %]<p class="alert alert-warning">Tasks unavailable: [% d.error | html %]</p>[% END %]
+  [% FOREACH n IN d.notes %]<p class="alert alert-warning">[% n | html %]</p>[% END %]
+
+  <section id="reviewer" class="card" style="margin:1em 0;padding:0.8em;">
+    <h2>Code reviewer <small>(warn only; runs at commit time)</small></h2>
+    [% r = reviewer %]
+    <p>Primary <b>[% r.cfg.primary | html %]</b>, alternate <b>[% r.cfg.alternate | html %]</b>.
+      Never reviews its own vendor's code. Today (PT): <b>$[% r.spent_today | format('%.4f') %]</b> of $[% r.cfg.cap_usd_per_day | format('%.2f') %] cap,
+      [% r.calls_today %] call(s). [% UNLESS r.cfg.enabled %]<b>Disabled</b> (data/ai_reviewer.json).[% END %]
+      Config: data/ai_reviewer.json.</p>
+    <form method="post" action="[% c.uri_for('/ai/tasks/review_test') %]" style="display:inline">
+      <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+      <button type="submit" class="btn btn-sm">Run one test review (a few cents)</button>
+    </form>
+    <span class="doc-muted">Commit hook: POST /ai/tasks/review_staged (reviews <code>git diff --cached</code>; not yet on the commit form, see eval #35).</span>
+    [% IF r.last.size %]
+    <h3>Recent reviews</h3>
+    <table class="table table-sm" style="font-size:0.85em">
+      <tr><th>When</th><th>Source</th><th>Model</th><th>$</th><th>Correct / Secure / Quality</th><th>Verdict</th><th>Summary / reason</th></tr>
+      [% FOREACH x IN r.last %]
+      <tr><td>[% x.at_pt | html %]</td><td>[% x.source | html %]</td><td>[% x.model | html %]</td>
+        <td>[% x.usd.defined ? x.usd : '-' %]</td>
+        <td>[% IF x.review %][% x.review.correctness %] / [% x.review.security %] / [% x.review.quality %][% ELSE %]-[% END %]</td>
+        <td>[% x.review.verdict || (x.skipped ? 'skipped' : '-') | html %]</td>
+        <td>[% IF x.review %][% x.review.summary | html %]
+              [% IF x.review.findings.size %]<ul style="margin:0">[% FOREACH f IN x.review.findings %]<li>[% f.severity | html %]: [% f.file | html %]:[% f.line | html %] [% f.reason | html %]</li>[% END %]</ul>[% END %]
+            [% ELSE %][% x.reason | html %][% END %]</td></tr>
+      [% END %]
+    </table>
+    [% END %]
+  </section>
+
+  <div style="overflow-x:auto">
+  <table class="table table-sm table-striped" style="font-size:0.85em">
+    <tr><th>Started</th><th>Task (first prompts)</th><th>Model</th><th>Active min</th><th>$</th><th>Tok M</th><th>Edits / files</th><th>Rewritten 3+</th><th>Corrections</th><th>Guess</th><th>Rating</th></tr>
+    [% FOREACH t IN task_list %]
+    [% aid = t.id.replace('[^\w]', '-') %]
+    <tr id="t-[% aid %]">
+      <td style="white-space:nowrap">[% t.start_pt | html %]</td>
+      <td style="max-width:420px"><b>[% t.title | html %]</b>[% FOREACH p IN t.prompts %][% IF loop.index < 3 %]<div>&bull; [% p | html %]</div>[% END %][% END %]
+        [% IF t.prompts.size > 3 %]<small>+[% t.prompts.size - 3 %] more prompts</small>[% END %]</td>
+      <td>[% t.last_model | html %][% IF t.models.size > 1 %]<br><small>[% t.models.join(', ') | html %]</small>[% END %]</td>
+      <td>[% t.active_min %]</td><td>[% t.usd %]</td><td>[% t.tokens / 1000000 | format('%.2f') %]</td>
+      <td>[% t.edits %] / [% t.files_edited %]</td>
+      <td>[% FOREACH w IN t.rewritten %]<div><small>[% w.path | html %] &times;[% w.edits %]</small></div>[% END %]</td>
+      <td>[% t.corrections %]</td><td>[% t.guess | html %]</td>
+      <td style="white-space:nowrap">
+        [% IF t.rating %]<b>[% t.rating | html %]</b>[% IF t.rating_note %]<br><small>[% t.rating_note | html %]</small>[% END %]<br>[% END %]
+        <form method="post" action="[% c.uri_for('/ai/tasks/rate') %]" style="margin:0">
+          <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+          <input type="hidden" name="task_id" value="[% t.id | html %]">
+          <input type="hidden" name="anchor" value="[% aid | html %]">
+          <input type="hidden" name="show" value="[% show | html %]">
+          <input type="text" name="note" placeholder="note (optional)" size="12" maxlength="500">
+          <button name="rating" value="done" class="btn btn-sm">Done</button>
+          <button name="rating" value="partial" class="btn btn-sm">Partial</button>
+          <button name="rating" value="failed" class="btn btn-sm">Failed</button>
+          [% IF t.rating %]<button name="rating" value="clear" class="btn btn-sm">clear</button>[% END %]
+        </form>
+      </td>
+    </tr>
+    [% END %]
+  </table>
+  </div>
+</div>

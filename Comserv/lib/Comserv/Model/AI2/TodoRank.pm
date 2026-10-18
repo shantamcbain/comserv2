@@ -221,7 +221,7 @@ sub run_batch {
             ref($target) ? $target->{name} : $target,
             [ { role => 'system', content => $system },
               { role => 'user',   content => $user_prompt } ],
-            can_select => 1);
+            can_select => 1, log_usage => 'todo_rank');
         1;
     } or do {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'todorank_run',

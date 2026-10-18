@@ -245,9 +245,10 @@ sub _list_bom {
 }
 
 sub _explode_to_leaves {
-    my ($self, $c, $parent_id, $parent_sku, $mult, $seen_parents) = @_;
+    my ($self, $c, $parent_id, $parent_sku, $mult, $seen_parents, $seen_leaves) = @_;
     $mult         = 1 unless defined $mult;
     $seen_parents ||= {};
+    $seen_leaves  ||= {};
     return () if $parent_id && $seen_parents->{$parent_id}++;
 
     my $res   = $self->_list_bom($c, $parent_id, $parent_sku);
@@ -263,6 +264,10 @@ sub _explode_to_leaves {
         if (@$child_lines) {
             push @nested, { line => $ln, child_id => $cid, child_sku => $ln->{sku} };
         } else {
+            # Leaf at this path. A component reachable via two paths (e.g. a direct
+            # child of the parent AND a descendant of a sub-assembly) must only be
+            # counted once, otherwise the traveler double-adds it.
+            next if $seen_leaves->{$cid}++;
             push @flat, $ln;
         }
     }
@@ -272,11 +277,10 @@ sub _explode_to_leaves {
         for my $n (@nested) {
             my $q = 0 + ($n->{line}{quantity} // 1);
             push @leaves, $self->_explode_to_leaves(
-                $c, $n->{child_id}, $n->{child_sku}, $mult * $q, $seen_parents
+                $c, $n->{child_id}, $n->{child_sku}, $mult * $q, $seen_parents, $seen_leaves
             );
         }
         for my $ln (@flat) {
-            my $sku = $ln->{sku} // '';
             push @leaves, $self->_leaf_from_line($ln, $mult);
         }
     } else {
@@ -929,6 +933,10 @@ sub record_clean_labour {
         '[%s] %s labour %s (%.0fs) by %s — +$%s cost @ %s pts/hr',
         $now, $category, $human, $secs, $username, $labour_cost, $rate
     );
+    my $extra = $args->{notes} // '';
+    $extra =~ s/[\r\n]+/ /g;
+    $extra =~ s/^\s+|\s+$//g;
+    $note_line .= " — $extra" if length $extra;
     my $notes = $item->notes // '';
     $notes = length($notes) ? ($notes . "\n" . $note_line) : $note_line;
     # Keep notes from growing without bound
@@ -1184,9 +1192,10 @@ sub get_customers_with_open_orders {
     # Ensure In-House appears when there is an INT-HDRY-001 build to pick/print,
     # even if no inventory_customer_orders row exists yet.
     # Only add synthetic if there are *no* In-House records at all (open or cancelled).
+    # MariaDB has no ILIKE (Postgres). Customer name is stored as 'In-House'.
     my $has_inhouse = $c->model('DBEncy')->resultset('Accounting::InventoryCustomerOrder')->search({
-        sitename => $self->_sitename($c),
-        customer_name => { -ilike => 'in-house' },
+        sitename      => $self->_sitename($c),
+        customer_name => 'In-House',
     })->count > 0;
     unless ($has_inhouse) {
         my $hdry = eval {
@@ -1263,8 +1272,8 @@ sub get_customers_with_open_orders {
         { id => HDRY_ADDON_ID, sku => HDRY_ADDON_SKU, name => 'HDRY Add-on module (stacks, no bottom/top)' }
     ) {
         my $has_real_open_for_item = $c->model('DBEncy')->resultset('Accounting::InventoryCustomerOrder')->search({
-            sitename => $self->_sitename($c),
-            customer_name => { -ilike => 'in-house' },
+            sitename      => $self->_sitename($c),
+            customer_name => 'In-House',
             status => { -in => [qw(pending open processing in_progress confirmed accepted picking manufacturing partial)] },
         }, { join => 'lines' })->search({
             'lines.item_id' => $sub->{id},

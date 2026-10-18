@@ -1300,7 +1300,7 @@ sub _search_documentation_files {
 
                     if ($content =~ /\Q$query\E/i) {
                         # Create excerpt
-                        my $match_pos = CORE::index(lc($content), lc($query));
+                        my $match_pos = index(lc($content), lc($query));
                         my $excerpt = '';
                         if ($match_pos >= 0) {
                             my $start = $match_pos > 50 ? $match_pos - 50 : 0;

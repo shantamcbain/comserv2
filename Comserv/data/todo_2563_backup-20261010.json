@@ -1,0 +1,4 @@
+{
+   "subject" : "[AI eval] Auto-start aisystem :4006 (and :5000) after reboot/power loss",
+   "description" : "Sat 06:35 daily eval failed while workstation was offline/ports down; :4006 was hand-started; :5000 still down. Pacing JSON and ingest need :4006.\n\nChange type: workstation  Target: systemd user unit or Comserv startup for :4006/:5000\n\nPayload: {}\n\nFrom Daily AI Eval Report 2026-10-10 (AI usage monitor) proposal #106 - review on /ai/eval/report/26. Approved by Shanta."
+}

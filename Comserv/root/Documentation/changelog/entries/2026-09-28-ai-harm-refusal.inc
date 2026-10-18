@@ -1,0 +1,6 @@
+<div id="2026-09-28-ai-harm-refusal" class="cl-entry">
+<h3>2026-09-28 — Local refusal before any AI provider call</h3>
+<p class="doc-body"><strong>What.</strong> A prompt that asks for help harming a person, building a weapon to hurt people, sexual content involving a child, or a method of suicide is refused locally. The text is not sent to Grok, OpenRouter, Ollama, or the Grok CLI, and it is not written to the log. Herbal, plant-safety, and pest-control questions are not refused. A refusal does not call the police and does not block the member from deleting a chat.</p>
+<p class="doc-body"><strong>Why.</strong> The app must not aid harm to other people, and must not rely on the provider to be the only gate. The check sits in front of the v2 router and the older generate, chat, and CLI sends so a fallback hop cannot forward the same prompt.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/lib/Comserv/Util/AI/HarmRefusal.pm</code>, <code>Model/AI2/Chat.pm</code>, <code>Model/AI2/Router.pm</code>, <code>Model/AI2/Provider/Grok.pm</code>, <code>Ollama.pm</code>, <code>OpenRouter.pm</code>, <code>Model/Grok.pm</code>, <code>Model/Ollama/Chat.pm</code>, <code>Model/AI/Provider.pm</code>, <code>Controller/AI.pm</code>, <code>root/Documentation/AIChatSystemUserGuide.tt</code></p>
+</div>
