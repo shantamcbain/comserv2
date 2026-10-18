@@ -801,12 +801,20 @@ is_production_host() {
 # NEVER include comserv2-web-prod, redis, or config-db here.
 WORKSTATION_WEB_SIBLINGS="comserv2-web comserv-web-dev comserv-web-staging"
 
-# Keep at most 3 dated backup containers (bk-*) and 3 numbered backup images.
-# Older ones eat the 30G prod disk (~2.8G each).
-KEEP_BACKUPS=3
+# Keep only the newest N dated backup containers (bk-comserv2-web-prod-*).
+# Default 1; override with KEEP_BACKUPS=N. Pruning runs ONLY after the new
+# container passes the health gate. Never touches non-bk containers or volumes.
+# PRUNE_BACKUP_IMAGES=0 keeps superseded bk-comserv2-web-prod:* images too.
+KEEP_BACKUPS="${KEEP_BACKUPS:-1}"
+PRUNE_BACKUP_IMAGES="${PRUNE_BACKUP_IMAGES:-1}"
+# Minimum free GB on the target's Docker filesystem before a deploy starts
+# (new image ~3G + temp container layers).
+DEPLOY_MIN_FREE_GB="${DEPLOY_MIN_FREE_GB:-5}"
 prune_old_backups() {
-    local keep="${1:-$KEEP_BACKUPS}"
-    echo "Pruning backups (keep $keep)..."
+    local keep="${1:-${KEEP_BACKUPS:-1}}"
+    case "$keep" in ''|*[!0-9]*) keep=1 ;; esac
+    [ "$keep" -lt 1 ] && keep=1
+    echo "Pruning old bk-* backup containers (keep newest $keep; volumes untouched)..."
     local n i=0
     # Oldest first (name contains sortable YYYYMMDD-HHMMSS).
     while IFS= read -r n; do
@@ -818,7 +826,9 @@ prune_old_backups() {
         fi
     done < <(docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E '^bk-comserv2?-web-prod-' | sort -r)
 
-    # Numbered Hub-style tags: only backup-1..backup-3 may remain.
+    [ "${PRUNE_BACKUP_IMAGES:-1}" = "1" ] || return 0
+    # Only this service's superseded backup images; never a broad image prune.
+    # docker rmi (no -f) refuses images still used by a container.
     docker rmi shantamcsbain/comserv-web-prod:backup-5 2>/dev/null || true
     docker rmi shantamcsbain/comserv-web-prod:backup-4 2>/dev/null || true
     i=0
@@ -874,9 +884,17 @@ ensure_nfs_volume() {
         echo "❌ $volume_name is not the required NFS volume: ${opts:-no options}"
         return 1
     fi
-    if ! docker run --rm --entrypoint sh -v "$volume_name:/data/nfs:ro" "$img" \
-        -c 'find /data/nfs -type f -iname "*.stl" -print -quit | grep -q .' ; then
-        echo "❌ $volume_name mounted but no STL file is visible"
+    local nfs_out nfs_rc
+    nfs_out=$(docker run --rm --entrypoint sh -v "$volume_name:/data/nfs:ro" "$img" \
+        -c 'if find /data/nfs -type f -iname "*.stl" -print -quit | grep -q .; then exit 0; else echo "no STL file found under /data/nfs"; exit 3; fi' 2>&1)
+    nfs_rc=$?
+    if [ "$nfs_rc" -ne 0 ]; then
+        if [ "$nfs_rc" -eq 3 ]; then
+            echo "❌ $volume_name mounted but no STL file is visible"
+        else
+            echo "❌ Could not start the NFS check container (docker rc=$nfs_rc) — this is a Docker/host problem, not NFS:"
+        fi
+        echo "$nfs_out" | sed 's/^/   docker: /'
         return 1
     fi
     echo "    NFS volume verified: $volume_name -> 192.168.1.175:/mnt/data"
@@ -1135,6 +1153,18 @@ canonical_deploy() {
             echo "❌ Cannot resolve registry config digest for $IMAGE — production untouched."
             return 1
         fi
+        local FREE_GB
+        FREE_GB=$($REMOTE_SSH "df -BG --output=avail /var/lib/docker 2>/dev/null | tail -1 | tr -dc 0-9" 2>/dev/null || true)
+        if [ -z "$FREE_GB" ]; then
+            echo "❌ Could not read free disk on $TARGET_HOST — production NOT updated."
+            return 1
+        fi
+        echo "    Free disk on $TARGET_HOST /var/lib/docker: ${FREE_GB}G (need ${DEPLOY_MIN_FREE_GB}G)"
+        if [ "$FREE_GB" -lt "$DEPLOY_MIN_FREE_GB" ]; then
+            echo "❌ NOT ENOUGH DISK on $TARGET_HOST: ${FREE_GB}G free < ${DEPLOY_MIN_FREE_GB}G — production NOT updated, current container untouched."
+            echo "   Free space (old bk-* containers/images, logs) or grow the disk, then retry."
+            return 1
+        fi
         if ! $REMOTE_SSH bash -s <<EOF
 $(declare -f ensure_nfs_volume)
 IMAGE=${IMAGE}
@@ -1150,12 +1180,6 @@ EOF
         $REMOTE_SSH "date +%s > /tmp/comserv-deploy.lock"
         echo "--- [3/6] RENAME running $CONTAINER → $BK (keep serving during pull) ---"
         $REMOTE_SSH "if docker inspect ${CONTAINER} >/dev/null 2>&1; then docker rename ${CONTAINER} ${BK}; echo renamed; else echo no-live-container; fi"
-        $REMOTE_SSH bash -s <<EOF
-$(declare -f prune_old_backups)
-KEEP_BACKUPS=3
-prune_old_backups
-EOF
-
         echo "--- [4/6] PULL $IMAGE (no build, no host source) ---"
         if ! $REMOTE_SSH "docker pull ${IMAGE}"; then
             echo "❌ Remote pull failed. Restarting backup if we renamed."
@@ -1209,6 +1233,14 @@ EOF
                 "Host: ${TARGET_HOST}\nBackup: ${BK}\nNew ${CONTAINER} failed /health. Freshly renamed backup container is now running. Investigate the failed deploy." || true
             return 1
         fi
+
+        echo "--- PRUNE old backups (only after healthy deploy) ---"
+        $REMOTE_SSH bash -s <<EOF || echo "⚠ backup prune failed (deploy itself succeeded)"
+$(declare -f prune_old_backups)
+KEEP_BACKUPS=${KEEP_BACKUPS}
+PRUNE_BACKUP_IMAGES=${PRUNE_BACKUP_IMAGES}
+prune_old_backups
+EOF
 
         echo "--- POST-DEPLOY ---"
         local POST_CMD="perl -pi -e 's/USE_DB_MENU.*/USE_DB_MENU=1/' /opt/comserv/comserv.conf 2>/dev/null; rm -rf /tmp/comserv/cache/* /cache/* 2>/dev/null; echo done"
@@ -1302,19 +1334,23 @@ canonical_deploy_to_nodes() {
     canonical_deploy "local" || { echo "❌ build+push failed"; return 1; }
     # Now pull+run the SAME digest on every node (never rebuild).
     # workstation/local is NOT a remote SSH target — recreate in place.
-    local H NH did_remote=0 did_local=0
+    local H NH did_remote=0 did_local=0 failed_hosts=""
     for H in "${HOSTS[@]}"; do
         NH="$(_normalize_deploy_node "$H")"
         if [ "$NH" = "local" ]; then
             echo "=== Recreating local workstation web-prod from the image just built ==="
-            recreate_local_web_prod || echo "⚠ local recreate failed"
+            recreate_local_web_prod || { echo "⚠ local recreate failed"; failed_hosts="$failed_hosts local"; }
             did_local=1
         else
             echo "=== Deploying identical image to $NH (production pull+run) ==="
-            canonical_deploy "$NH" || echo "⚠ deploy to $NH failed (continuing)"
+            canonical_deploy "$NH" || { echo "⚠ deploy to $NH failed (continuing)"; failed_hosts="$failed_hosts $NH"; }
             did_remote=1
         fi
     done
+    if [ -n "$failed_hosts" ]; then
+        echo "❌ DEPLOY FAILED on:$failed_hosts — production NOT updated there (old container still running)."
+        return 1
+    fi
     if [ "$did_remote" = "1" ] && [ "$did_local" = "1" ]; then
         echo "✅ Done: local workstation recreated AND remote node(s) pull-deployed."
     elif [ "$did_remote" = "1" ]; then
