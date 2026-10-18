@@ -43,6 +43,9 @@
         [% ELSE %]<p class="doc-muted">No meals yet.</p>[% END %]
     </div>
 
+    [% IF hk_plan.allergen_warnings.size %]
+        <div class="alert alert-danger">Allergen warning: [% FOREACH w IN hk_plan.allergen_warnings %][% w.name | html %] ([% w.hits.join(', ') | html %])[% UNLESS loop.last %]; [% END %][% END %]</div>
+    [% END %]
     <div class="content-section">
         <h2>Shopping list (missing only)</h2>
         [% IF hk_plan.requirements.buy.size %]

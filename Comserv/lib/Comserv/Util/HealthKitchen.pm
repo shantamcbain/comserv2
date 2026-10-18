@@ -412,7 +412,7 @@ sub save_profile {
                 user_id    => $c->session->{user_id},
                 sitename   => $self->sitename($c),
                 diet_flags => $args->{diet_flags},
-                allergies  => $args->{allergies},
+                allergies  => $self->_enc( $args->{allergies} ),
                 goals      => $args->{goals},
             },
             { key => 'hk_profile_user_site' }
@@ -438,7 +438,7 @@ sub get_profile {
         if ($row) {
             $h = {
                 diet_flags => $row->diet_flags,
-                allergies  => $row->allergies,
+                allergies  => $self->_dec( $row->allergies ),
                 goals      => $row->goals,
             };
         }
@@ -499,10 +499,11 @@ sub list_recipes {
     try {
         my $rs = $c->model('DBEncy')->resultset('Recipe')->search(
             {
-                sitename           => $self->sitename($c),
-                username_of_poster => $c->session->{username},
-                recipe_kind        => 'food_recipe',
-                status             => { '!=' => 'archived' },
+                sitename    => $self->sitename($c),
+                -or         => [ { username_of_poster => $c->session->{username} },
+                                 { source => 'ai_generated' } ],
+                recipe_kind => 'food_recipe',
+                status      => { '!=' => 'archived' },
             },
             { order_by => 'name', prefetch => 'lines' }
         );
@@ -540,6 +541,9 @@ sub _recipe_hash {
         instructions => $r->instructions,
         yield_amount => $r->yield_amount,
         yield_unit   => $r->yield_unit,
+        status       => $r->status,
+        source       => $r->source,
+        notes        => $r->notes,
         lines        => \@lines,
     };
 }
@@ -917,15 +921,23 @@ sub match_candidates {
     my $drugs  = $self->_id_set( $data->{user_drug_ids} );
     my $herbs  = $data->{herbs} || {};
 
+    # History conditions (ENCY DiseaseHerb) become extra candidate links, gated like symptom links.
+    my @links = @{ $data->{herb_symptoms} || [] };
+    my $dis = $self->_id_set( $data->{disease_ids} );
+    for my $dh ( @{ $data->{disease_herbs} || [] } ) {
+        next unless ref $dh eq 'HASH' && $dh->{herb_id} && $dh->{disease_id} && $dis->{ 0 + $dh->{disease_id} };
+        push @links, { herb_id => $dh->{herb_id}, symptom_id => 0, disease_id => $dh->{disease_id},
+                       relationship_type => $dh->{relationship_type} // 'history_condition' };
+    }
     my @herb_out;
     my @missing_out;
     my %seen_missing;
     my %ok_herb;
-    for my $link ( @{ $data->{herb_symptoms} || [] } ) {
+    for my $link (@links) {
         next unless ref $link eq 'HASH';
         my $hid = $link->{herb_id};
         my $sid = $link->{symptom_id};
-        next unless $hid && $sid && $syms->{ 0 + $sid };
+        next unless $hid && ( $link->{disease_id} || ( $sid && $syms->{ 0 + $sid } ) );
         next if $self->_rel_skip( $link->{relationship_type} );
         my $h = $herbs->{$hid} || $herbs->{ 0 + $hid } || {};
         unless ( $pantry->{ 0 + $hid } ) {
@@ -934,15 +946,17 @@ sub match_candidates {
             push @missing_out, {
                 herb_id            => 0 + $hid,
                 name               => $h->{name} || $h->{common_names} || $h->{botanical_name} || '',
-                symptom_id         => 0 + $sid,
+                symptom_id         => 0 + ( $sid || 0 ),
+                disease_id         => $link->{disease_id},
                 relationship_type  => $link->{relationship_type},
                 contra_indications => $h->{contra_indications} || '',
             };
             next;
         }
-        if ( my $term = $data->{user_contra_term} ) {
-            my $ci = $h->{contra_indications} // '';
-            next if length $ci && index( lc($ci), lc($term) ) >= 0;
+        my @terms = grep { defined && length } ( $data->{user_contra_term}, @{ $data->{user_contra_terms} || [] } );
+        if (@terms) {
+            my $ci = lc( $h->{contra_indications} // '' );
+            next if length $ci && grep { index( $ci, lc $_ ) >= 0 } @terms;
         }
         my $blocked;
         for my $dh ( @{ $data->{drug_herb} || [] } ) {
@@ -958,7 +972,8 @@ sub match_candidates {
         push @herb_out, {
             herb_id            => 0 + $hid,
             name               => $h->{name} || $h->{common_names} || $h->{botanical_name} || '',
-            symptom_id         => 0 + $sid,
+            symptom_id         => 0 + ( $sid || 0 ),
+            disease_id         => $link->{disease_id},
             relationship_type  => $link->{relationship_type},
             contra_indications => $h->{contra_indications} || '',
         };
@@ -999,15 +1014,19 @@ sub match_for_symptoms {
 
     my $symptom_ids = $opts->{symptom_ids} || [];
     $symptom_ids = [$symptom_ids] unless ref $symptom_ids eq 'ARRAY';
-    unless (@$symptom_ids) {
+    my $hist = $opts->{history_inputs} || eval { $self->user_matching_inputs($c) } || {};
+    unless ( @$symptom_ids || @{ $hist->{disease_ids} || [] } ) {
         return { herbs => [], formulas => [], error => 'no_symptoms' };
     }
 
     my $dataset = {
         symptom_ids       => $symptom_ids,
         pantry_herb_ids   => $self->_pantry_herb_ids($c),
-        user_drug_ids     => $opts->{user_drug_ids} || [],
+        user_drug_ids     => [ @{ $opts->{user_drug_ids} || [] }, @{ $hist->{drug_ids} || [] } ],
         user_contra_term  => $opts->{user_contra_term},
+        user_contra_terms => $hist->{contra_terms} || [],
+        disease_ids       => $hist->{disease_ids} || [],
+        disease_herbs     => [],
         herb_symptoms     => [],
         herbs             => {},
         formulas          => [],
@@ -1059,7 +1078,14 @@ sub match_for_symptoms {
                 }
             }
         }
-        my @hids = map { $_->{herb_id} } @{ $dataset->{herb_symptoms} };
+        if ( @{ $dataset->{disease_ids} } && $self->source_ok( $schema, 'Ency::DiseaseHerb' ) ) {
+            my $drs = $schema->resultset('Ency::DiseaseHerb')->search( { disease_id => { -in => $dataset->{disease_ids} } } );
+            while ( my $d = $drs->next ) {
+                push @{ $dataset->{disease_herbs} }, { herb_id => $d->herb_id, disease_id => $d->disease_id,
+                                                       relationship_type => $d->relationship_type };
+            }
+        }
+        my @hids = ( map( { $_->{herb_id} } @{ $dataset->{herb_symptoms} } ), map( { $_->{herb_id} } @{ $dataset->{disease_herbs} } ) );
         if ( @hids && $self->source_ok( $schema, 'Ency::Herb' ) ) {
             my $hrs = $schema->resultset('Ency::Herb')->search(
                 { record_id => { -in => \@hids } }
@@ -1096,7 +1122,7 @@ sub match_for_symptoms {
                 }
             }
         }
-        if ( @{ $dataset->{user_drug_ids} }
+        if ( @{ $dataset->{user_drug_ids} || [] }
             && $self->source_ok( $schema, 'Ency::DrugHerbInteraction' ) )
         {
             my $drs = $schema->resultset('Ency::DrugHerbInteraction')->search(
@@ -1353,12 +1379,23 @@ sub get_meal_plan {
         end_date   => ( $plan->end_date ? $plan->end_date . '' : '' ),
         entries    => \@entries,
         requirements => $self->plan_requirements( \@entries, $self->list_pantry($c) ),
+        allergen_warnings => [ map { { name => $_->{name}, hits => $_->{allergen_hits} } }
+            @{ ( $self->filter_recipes_by_allergens( [ map { $_->{recipe} } grep { $_->{recipe} } @entries ],
+                    $self->user_matching_inputs($c)->{allergens} ) )[1] } ],
     };
 }
 
 sub suggest_recipes_from_stock {
     my ( $self, $c ) = @_;
-    return $self->rank_recipes_by_stock( $self->list_recipes($c), $self->list_pantry($c) );
+    my ($ok) = $self->filter_recipes_by_allergens( $self->list_recipes($c), $self->user_matching_inputs($c)->{allergens} );
+    return $self->rank_recipes_by_stock( $ok, $self->list_pantry($c) );
+}
+
+# Recipes allowed for this user's meal plans (allergen-filtered) + the excluded ones.
+sub meal_plan_recipes {
+    my ( $self, $c ) = @_;
+    my ( $ok, $bad ) = $self->filter_recipes_by_allergens( $self->list_recipes($c), $self->user_matching_inputs($c)->{allergens} );
+    return { allowed => $ok, excluded => $bad };
 }
 
 
@@ -1494,6 +1531,426 @@ sub intake_for_day {
         $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'intake_for_day', "failed: $_" );
     };
     return \@out;
+}
+
+
+# ── AI recipe suggestions from in-stock inventory (inventory-first) ─────────
+
+our $AI_RECIPE_NOTE = 'AI-generated suggestion from your in-stock food. Review before cooking: '
+    . 'check quantities, allergies and food safety. Informational only, not medical advice.';
+
+# In-stock foods that map to inventory items (only these may appear in AI recipes).
+sub ai_stock_foods {
+    my ( $self, $rows ) = @_;
+    my ( @out, %seen );
+    for my $r ( @{ $rows || [] } ) {
+        next unless $r->{inventory_item_id} && ( $r->{qty} || 0 ) > 0;
+        next if $seen{ $r->{inventory_item_id} }++;
+        push @out, { id => 0 + $r->{inventory_item_id}, name => $r->{name},
+                     qty => 0 + $r->{qty}, unit => $r->{unit} || 'each' };
+    }
+    return \@out;
+}
+
+# $prefs carries ONLY non-identifying preferences: diet_flags and ingredients to avoid.
+# Never diagnoses, conditions, medications or notes.
+sub ai_recipe_prompt {
+    my ( $self, $foods, $count, $prefs ) = @_;
+    $count ||= 3;
+    $prefs ||= {};
+    my $pref = '';
+    if ( my $df = $prefs->{diet_flags} ) {
+        $df =~ s/[^\w ,\-]//g;
+        $pref .= 'Dietary style: ' . substr( $df, 0, 200 ) . ".\n" if length $df;
+    }
+    my @avoid = grep { length } @{ $prefs->{avoid} || [] };
+    $pref .= 'Exclude these ingredients entirely: ' . join( ', ', @avoid ) . ".\n" if @avoid;
+    my $list = join "\n", map { "- id=$_->{id}; name=$_->{name}; on_hand=$_->{qty} $_->{unit}" } @$foods;
+    return "Create $count simple, wholesome home recipes using ONLY the in-stock foods below.\n"
+         . "Every ingredient must be one of these items, referenced by its id. Do not invent ingredients "
+         . "(water is allowed and needs no id). Do not exceed on_hand quantities. Do not make health or medical claims.\n\n"
+         . $pref
+         . "In stock:\n$list\n\n"
+         . "Reply with JSON only, no prose: "
+         . '[{"name":"...","servings":2,"cook_time_min":20,"instructions":"step 1... step 2...",'
+         . '"ingredients":[{"inventory_item_id":123,"quantity":200,"unit":"g"}]}]';
+}
+
+# Pure: parse model text into recipes whose ingredients all map to stock.
+sub parse_ai_recipes {
+    my ( $self, $text, $foods ) = @_;
+    return [] unless defined $text && length $text;
+    require JSON;
+    my ($json) = $text =~ /(\[.*\])/s;
+    return [] unless $json;
+    my $data = eval { JSON->new->relaxed->decode($json) };
+    return [] unless ref $data eq 'ARRAY';
+    my %by_id   = map { $_->{id} => $_ } @$foods;
+    my %by_name = map { lc( $_->{name} ) => $_ } @$foods;
+    my @out;
+    for my $r (@$data) {
+        next unless ref $r eq 'HASH' && defined $r->{name} && length $r->{name};
+        my ( @lines, @dropped );
+        for my $i ( @{ $r->{ingredients} || [] } ) {
+            next unless ref $i eq 'HASH';
+            my $iid  = $i->{inventory_item_id};
+            my $food = ( defined $iid && $iid =~ /^\d+$/ ) ? $by_id{$iid} : undef;
+            $food ||= $by_name{ lc( $i->{name} // '' ) } if defined $i->{name};
+            if ( !$food ) {
+                push @dropped, $i->{name} // $iid // '?' unless lc( $i->{name} // '' ) eq 'water';
+                next;
+            }
+            my $q = ( defined $i->{quantity} && $i->{quantity} =~ /^\d+(\.\d+)?$/ ) ? 0 + $i->{quantity} : undef;
+            push @lines, { inventory_item_id => $food->{id}, name => $food->{name},
+                           quantity => $q, unit => $i->{unit} || $food->{unit} };
+        }
+        next if @dropped || !@lines;    # inventory-first: reject recipes needing unstocked items
+        my $serv = ( defined $r->{servings} && $r->{servings} =~ /^\d+$/ && $r->{servings} > 0 ) ? 0 + $r->{servings} : 2;
+        push @out, {
+            name          => substr( $r->{name}, 0, 500 ),
+            servings      => $serv,
+            cook_time_min => ( defined $r->{cook_time_min} && $r->{cook_time_min} =~ /^\d+$/ ) ? 0 + $r->{cook_time_min} : undef,
+            instructions  => ref $r->{instructions} eq 'ARRAY' ? join( "\n", @{ $r->{instructions} } ) : ( $r->{instructions} // '' ),
+            lines         => \@lines,
+        };
+    }
+    return \@out;
+}
+
+# Calls the app's AI layer ($c->model('AI')->chat_message: provider/model selection,
+# usage + plan-quota logging). $opts->{ai_call} overrides the call (tests).
+sub generate_ai_recipes {
+    my ( $self, $c, $opts ) = @_;
+    $opts ||= {};
+    return { ok => 0, error => 'Recipe tables are not created yet. Run Schema Compare.' }
+        unless $self->recipe_ready($c);
+    my $inputs = $opts->{matching_inputs} || eval { $self->user_matching_inputs($c) } || {};
+    my $profile = $opts->{profile} || eval { $self->get_profile($c) } || {};
+    my @avoid = @{ $inputs->{allergens} || [] };
+    my $foods = [ grep { my $n = lc $_->{name}; !grep { index( $n, $_ ) >= 0 } @avoid }
+                  @{ $self->ai_stock_foods( $self->list_pantry($c) ) } ];
+    return { ok => 0, error => 'No in-stock inventory foods found to build recipes from.' }
+        unless @$foods >= 2;
+    splice( @$foods, 60 ) if @$foods > 60;
+    my $prompt = $self->ai_recipe_prompt( $foods, $opts->{count} || 3,
+        { diet_flags => $profile->{diet_flags}, avoid => \@avoid } );
+    my $system = 'You are a careful home-cooking assistant for a wellness kitchen. '
+               . 'Use only provided stock items. Output strict JSON.';
+    my $res = $opts->{ai_call}
+        ? $opts->{ai_call}->( $prompt, $system )
+        : eval { $c->model('AI')->chat_message( $c, prompt => $prompt, system => $system,
+                                                 page_path => '/healthkitchen/recipes' ) };
+    unless ( $res && $res->{success} ) {
+        my $err = ( $res && $res->{error} ) || $@ || 'AI service unavailable';
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, 'generate_ai_recipes', "AI failed: $err" );
+        return { ok => 0, error => "AI recipe suggestion failed: $err" };
+    }
+    my $recipes = $self->parse_ai_recipes( $res->{response}, $foods );
+    return { ok => 0, error => 'The AI did not return any recipes that use only your stock. Try again.' }
+        unless @$recipes;
+    my $schema = $c->model('DBEncy');
+    my @saved;
+    try {
+        $schema->txn_do( sub {
+            my $n = 0;
+            for my $r (@$recipes) {
+                my $row = $schema->resultset('Ency::Recipe')->create( {
+                    recipe_code        => 'HK-AI-' . strftime( '%y%m%d%H%M%S', localtime ) . '-' . ++$n,
+                    name               => $r->{name},
+                    recipe_kind        => 'food_recipe',
+                    instructions       => $r->{instructions},
+                    servings           => $r->{servings},
+                    yield_amount       => $r->{servings},
+                    yield_unit         => 'servings',
+                    cook_time_min      => $r->{cook_time_min},
+                    notes              => $AI_RECIPE_NOTE,
+                    source             => 'ai_generated',
+                    sitename           => $self->sitename($c),
+                    status             => 'draft',
+                    username_of_poster => $c->session->{username},
+                } );
+                my $sort = 0;
+                for my $ln ( @{ $r->{lines} } ) {
+                    $schema->resultset('Ency::RecipeLine')->create( {
+                        recipe_id => $row->id, sort_order => ++$sort, ingredient_source => 'inventory',
+                        inventory_item_id => $ln->{inventory_item_id}, name_raw => $ln->{name},
+                        quantity => $ln->{quantity}, unit => $ln->{unit},
+                    } );
+                }
+                push @saved, $row->id;
+            }
+        } );
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'generate_ai_recipes', "save failed: $_" );
+        @saved = ();
+    };
+    return @saved ? { ok => 1, ids => \@saved, model => $res->{model} }
+                  : { ok => 0, error => 'Could not save AI recipes.' };
+}
+
+
+# ── Encryption helpers (Comserv::Util::Encryption, namespace 'healthkitchen') ──
+# crypto is injectable for tests; decrypt falls back to plaintext for legacy rows.
+
+has 'crypto' => ( is => 'rw', lazy => 1, default => sub { require Comserv::Util::Encryption; 'Comserv::Util::Encryption' } );
+
+sub _enc {
+    my ( $self, $v ) = @_;
+    return undef unless defined $v && length $v;
+    return $v if $v =~ /^ENC:/;
+    my $out = eval { $self->crypto->encrypt( $v, 'healthkitchen' ) };
+    die "Health Kitchen encryption unavailable: " . ( $@ || 'no output' ) . "\n" unless $out;    # never store plaintext silently
+    return $out;
+}
+
+sub _dec {
+    my ( $self, $v ) = @_;
+    return '' unless defined $v && length $v;
+    return $v unless $v =~ /^ENC:/;
+    my $out = eval { $self->crypto->decrypt( $v, 'healthkitchen' ) };
+    return defined $out ? $out : '';
+}
+
+# ── Health & disease history (opt-in) ──────────────────────────────────────
+
+our @HISTORY_TYPES  = qw(condition symptom medication allergy procedure);
+our @HISTORY_STATUS = qw(active resolved managed);
+
+sub history_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, 'HealthKitchen::HealthConsent' )
+        && $self->table_ready( $c, 'HealthKitchen::HealthHistory' )
+        && $self->table_ready( $c, 'HealthKitchen::HealthAudit' );
+}
+
+sub _now { strftime( '%Y-%m-%d %H:%M:%S', localtime ) }
+
+sub active_consent {
+    my ( $self, $c, $user_id ) = @_;
+    $user_id //= $c->session->{user_id};
+    return undef unless $user_id && $self->history_ready($c);
+    return eval {
+        $c->model('DBEncy')->resultset('HealthKitchen::HealthConsent')->search(
+            { user_id => $user_id, sitename => $self->sitename($c), revoked_at => undef },
+            { order_by => { -desc => 'id' }, rows => 1 } )->first;
+    };
+}
+
+sub _audit {
+    my ( $self, $c, $subject, $action, $count ) = @_;
+    eval {
+        $c->model('DBEncy')->resultset('HealthKitchen::HealthAudit')->create( {
+            actor_user_id => $c->session->{user_id}, subject_user_id => $subject,
+            sitename => $self->sitename($c), action => $action, entry_count => $count } );
+    };
+}
+
+sub grant_consent {
+    my ( $self, $c ) = @_;
+    return { ok => 0, error => 'Health history tables are not created yet. Run Schema Compare.' }
+        unless $self->history_ready($c);
+    return { ok => 1 } if $self->active_consent($c);
+    my $ok = eval {
+        my $req = $c->req;
+        $c->model('DBEncy')->resultset('HealthKitchen::HealthConsent')->create( {
+            user_id => $c->session->{user_id}, sitename => $self->sitename($c),
+            consent_version => '1', granted_at => $self->_now,
+            ip_address => $self->_enc( $req ? $req->address : undef ),
+            user_agent => $self->_enc( $req ? substr( $req->user_agent // '', 0, 500 ) : undef ),
+        } );
+        $self->_audit( $c, $c->session->{user_id}, 'consent', undef );
+        1;
+    };
+    $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'grant_consent', "failed: $@" ) unless $ok;
+    return $ok ? { ok => 1 } : { ok => 0, error => 'Could not record consent.' };
+}
+
+sub revoke_consent {
+    my ( $self, $c ) = @_;
+    my $con = $self->active_consent($c) or return { ok => 1 };
+    my $ok = eval { $con->update( { revoked_at => $self->_now } ); $self->_audit( $c, $c->session->{user_id}, 'revoke', undef ); 1 };
+    return $ok ? { ok => 1 } : { ok => 0, error => 'Could not revoke consent.' };
+}
+
+sub _history_rs {
+    my ( $self, $c, $user_id ) = @_;
+    return $c->model('DBEncy')->resultset('HealthKitchen::HealthHistory')->search(
+        { user_id => $user_id // $c->session->{user_id}, sitename => $self->sitename($c) } );
+}
+
+sub _history_hash {
+    my ( $self, $r ) = @_;
+    return {
+        id => $r->id, entry_type => $r->entry_type, label => $self->_dec( $r->label ),
+        notes => $self->_dec( $r->notes ), status => $r->status,
+        ency_disease_id => $r->ency_disease_id, ency_symptom_id => $r->ency_symptom_id,
+        ency_drug_id => $r->ency_drug_id,
+        onset_date => ( $r->onset_date ? $r->onset_date . '' : '' ),
+        resolved_date => ( $r->resolved_date ? $r->resolved_date . '' : '' ),
+        severity => $r->severity, use_for_matching => $r->use_for_matching ? 1 : 0,
+        visibility => $r->visibility,
+    };
+}
+
+# Own entries; requires active consent (no consent = no reads, no use).
+sub list_history {
+    my ( $self, $c ) = @_;
+    return [] unless $self->active_consent($c);
+    my @out;
+    try {
+        push @out, $self->_history_hash($_)
+            for $self->_history_rs($c)->search( {}, { order_by => [ { -desc => 'onset_date' }, { -desc => 'id' } ] } )->all;
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'list_history', "failed: $_" );
+    };
+    return \@out;
+}
+
+sub _clean_history_args {
+    my ( $self, $a ) = @_;
+    my %h;
+    my $type = lc( $a->{entry_type} // 'condition' );
+    $h{entry_type} = ( grep { $_ eq $type } @HISTORY_TYPES ) ? $type : 'condition';
+    my $st = lc( $a->{status} // 'active' );
+    $h{status} = ( grep { $_ eq $st } @HISTORY_STATUS ) ? $st : 'active';
+    for my $k (qw(ency_disease_id ency_symptom_id ency_drug_id)) {
+        $h{$k} = ( defined $a->{$k} && $a->{$k} =~ /^\d+$/ ) ? 0 + $a->{$k} : undef;
+    }
+    $h{onset_date}    = $self->_clean_date( $a->{onset_date} );
+    $h{resolved_date} = $self->_clean_date( $a->{resolved_date} );
+    my $sev = lc( $a->{severity} // '' );
+    $h{severity} = $sev =~ /^(mild|moderate|severe)$/ ? $sev : undef;
+    $h{use_for_matching} = ( defined $a->{use_for_matching} && !$a->{use_for_matching} ) ? 0 : 1;
+    $h{visibility} = ( ( $a->{visibility} // '' ) eq 'site_admin' ) ? 'site_admin' : 'private';
+    my $label = $a->{label} // '';
+    $label =~ s/^\s+|\s+$//g;
+    $h{label} = substr( $label, 0, 255 );
+    $h{notes} = defined $a->{notes} ? substr( $a->{notes}, 0, 5000 ) : undef;
+    return \%h;
+}
+
+sub save_history {
+    my ( $self, $c, $a ) = @_;
+    return { ok => 0, error => 'Please give consent before adding health history.' } unless $self->active_consent($c);
+    my $h = $self->_clean_history_args($a);
+    return { ok => 0, error => 'Enter a name or pick an ENCY entry.' }
+        unless length $h->{label} || $h->{ency_disease_id} || $h->{ency_symptom_id} || $h->{ency_drug_id};
+    $h->{label} = $self->_enc( $h->{label} );
+    $h->{notes} = $self->_enc( $h->{notes} );
+    my $ok = eval {
+        if ( $a->{id} && $a->{id} =~ /^\d+$/ ) {
+            my $row = $self->_history_rs($c)->search( { id => $a->{id} } )->first or die "not found\n";
+            $row->update($h);
+        }
+        else {
+            $self->_history_rs($c)->create($h);
+        }
+        1;
+    };
+    $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'save_history', "failed: $@" ) unless $ok;
+    return $ok ? { ok => 1 } : { ok => 0, error => 'Could not save entry.' };
+}
+
+sub delete_history {
+    my ( $self, $c, $id ) = @_;
+    return { ok => 0, error => 'Invalid entry.' } unless $id && $id =~ /^\d+$/;
+    my $n = eval { $self->_history_rs($c)->search( { id => $id } )->delete } || 0;
+    return $n > 0 ? { ok => 1 } : { ok => 0, error => 'Entry not found.' };
+}
+
+# Hard delete of all history + consent rows for this user/site (audit keeps only counts).
+sub delete_all_history {
+    my ( $self, $c, $confirm ) = @_;
+    return { ok => 0, error => 'Type DELETE to confirm.' } unless defined $confirm && $confirm eq 'DELETE';
+    return { ok => 0, error => 'Health history tables are not created yet.' } unless $self->history_ready($c);
+    my $n = 0;
+    my $ok = eval {
+        $n = $self->_history_rs($c)->count;
+        $self->_history_rs($c)->delete;
+        $c->model('DBEncy')->resultset('HealthKitchen::HealthConsent')->search(
+            { user_id => $c->session->{user_id}, sitename => $self->sitename($c) } )->delete;
+        $self->_audit( $c, $c->session->{user_id}, 'delete_all', $n );
+        1;
+    };
+    return $ok ? { ok => 1, deleted => $n } : { ok => 0, error => 'Could not delete health history.' };
+}
+
+our @EXPORT_COLS = qw(id entry_type label status onset_date resolved_date severity ency_disease_id ency_symptom_id ency_drug_id use_for_matching visibility notes);
+
+sub export_history {
+    my ( $self, $c, $format ) = @_;
+    my $rows = $self->list_history($c);
+    $self->_audit( $c, $c->session->{user_id}, 'export', scalar @$rows ) if $self->history_ready($c);
+    return $self->history_to_csv($rows) if ( $format // '' ) eq 'csv';
+    require JSON;
+    return JSON->new->canonical->pretty->encode( { exported_at => $self->_now, sitename => $self->sitename($c), entries => $rows } );
+}
+
+sub history_to_csv {
+    my ( $self, $rows ) = @_;
+    my $q = sub { my $v = $_[0] // ''; $v =~ s/"/""/g; $v = "'$v" if $v =~ /^[=+\-@]/; qq{"$v"} };
+    return join( "\n", join( ',', @EXPORT_COLS ),
+        map { my $r = $_; join( ',', map { $q->( $r->{$_} ) } @EXPORT_COLS ) } @$rows ) . "\n";
+}
+
+# Admin view of ONE user's entries that user shared (visibility=site_admin). Audited.
+sub admin_shared_history {
+    my ( $self, $c, $subject_id ) = @_;
+    return [] unless $subject_id && $subject_id =~ /^\d+$/ && $self->active_consent( $c, $subject_id );
+    my @rows = map { $self->_history_hash($_) }
+        eval { $self->_history_rs( $c, $subject_id )->search( { visibility => 'site_admin' } )->all };
+    $self->_audit( $c, $subject_id, 'admin_view', scalar @rows );
+    return \@rows;
+}
+
+# Pure: turn decrypted history + profile into matching inputs.
+sub history_matching_inputs {
+    my ( $self, $history, $profile ) = @_;
+    my ( %terms, %drugs, %diseases, %allergens );
+    for my $h ( @{ $history || [] } ) {
+        next unless $h->{use_for_matching};
+        next if ( $h->{status} // '' ) eq 'resolved';
+        my $label = lc( $h->{label} // '' );
+        $label =~ s/^\s+|\s+$//g;
+        if ( $h->{entry_type} eq 'allergy' ) {
+            $allergens{$label} = 1 if length $label;
+            next;
+        }
+        $terms{$label} = 1 if length $label >= 3 && $h->{entry_type} =~ /^(condition|medication|procedure)$/;
+        $drugs{ $h->{ency_drug_id} }       = 1 if $h->{ency_drug_id};
+        $diseases{ $h->{ency_disease_id} } = 1 if $h->{ency_disease_id} && $h->{entry_type} eq 'condition';
+    }
+    for my $a ( split /\s*[,;\n]\s*/, lc( ( $profile || {} )->{allergies} // '' ) ) {
+        $a =~ s/^\s+|\s+$//g;
+        $allergens{$a} = 1 if length $a;
+    }
+    return { contra_terms => [ sort keys %terms ], drug_ids => [ sort { $a <=> $b } keys %drugs ],
+             disease_ids => [ sort { $a <=> $b } keys %diseases ], allergens => [ sort keys %allergens ] };
+}
+
+sub user_matching_inputs {
+    my ( $self, $c ) = @_;
+    return $self->history_matching_inputs( $self->list_history($c), $self->get_profile($c) );
+}
+
+# Pure: split recipes into allowed / excluded by allergen terms found in ingredient names.
+sub filter_recipes_by_allergens {
+    my ( $self, $recipes, $allergens ) = @_;
+    my @terms = grep { length } @{ $allergens || [] };
+    return ( $recipes || [], [] ) unless @terms;
+    my ( @ok, @bad );
+    for my $r ( @{ $recipes || [] } ) {
+        my @hit;
+        for my $ln ( @{ $r->{lines} || [] } ) {
+            my $n = lc( $ln->{name} // '' );
+            push @hit, grep { index( $n, $_ ) >= 0 } @terms;
+        }
+        if (@hit) { my %u = map { $_ => 1 } @hit; push @bad, { %$r, allergen_hits => [ sort keys %u ] } }
+        else      { push @ok, $r }
+    }
+    return ( \@ok, \@bad );
 }
 
 __PACKAGE__->meta->make_immutable;
