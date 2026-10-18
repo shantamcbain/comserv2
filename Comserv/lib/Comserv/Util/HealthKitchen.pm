@@ -2763,6 +2763,7 @@ sub sourcing_badges {
 sub list_sourcing_factors {
     my ( $self, $c ) = @_;
     return $c->stash->{hk_factors} if $c->stash->{hk_factors};
+    $self->ensure_sourcing_seed($c);
     my @out;
     if ( $self->factor_ready($c) ) {
         try {
@@ -2812,6 +2813,51 @@ sub _products_by_inventory {
         $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, '_products_by_inventory', "$_" );
     };
     return \%out;
+}
+
+# ── hk_sourcing_factor auto-seed (no manual SQL) ────────────────────────────
+our $SOURCING_SEEDED = 0;    # per-process; reset on restart
+
+sub _factor_key { join '|', map { lc( $_[0]{$_} // '' ) } qw(food_category attribute attr_value) }
+
+# Pure: seed rows whose unique key is not in $existing (arrayref of rows/hashes).
+sub missing_seed_rows {
+    my ( $self, $existing, $seed ) = @_;
+    my %have = map { _factor_key($_) => 1 } @{ $existing || [] };
+    return [ grep { !$have{ _factor_key($_) } } @{ $seed || [] } ];
+}
+
+# Insert-if-missing by unique key once the table exists. Never updates existing rows.
+# Called on HealthKitchen requests; cheap after the first successful pass.
+sub ensure_sourcing_seed {
+    my ( $self, $c ) = @_;
+    return { ok => 1, inserted => 0, skipped => 'already seeded' } if $SOURCING_SEEDED;
+    return { ok => 0, inserted => 0, skipped => 'table missing' } unless $self->factor_ready($c);
+    require Comserv::Util::HealthKitchen::SourcingSeed;
+    my $seed = Comserv::Util::HealthKitchen::SourcingSeed::rows();
+    my $n    = 0;
+    my $ok   = 0;
+    try {
+        my $rs = $c->model('DBEncy')->resultset('HealthKitchen::SourcingFactor');
+        my @existing = map { { $_->get_columns } }
+            $rs->search( {}, { columns => [qw(food_category attribute attr_value)] } )->all;
+        for my $row ( @{ $self->missing_seed_rows( \@existing, $seed ) } ) {
+            $rs->find_or_create( $row, { key => 'hk_factor_key' } );
+            $n++;
+        }
+        $ok = 1;
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, 'ensure_sourcing_seed',
+            "sourcing seed failed (will retry next request): $_" );
+    };
+    if ($ok) {
+        $SOURCING_SEEDED = 1;
+        delete $c->stash->{hk_factors};
+        $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'ensure_sourcing_seed',
+            "hk_sourcing_factor seed: inserted $n missing row(s)" ) if $n;
+    }
+    return { ok => $ok, inserted => $n };
 }
 
 __PACKAGE__->meta->make_immutable;
