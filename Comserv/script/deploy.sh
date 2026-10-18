@@ -1179,7 +1179,9 @@ EOF
         BK="bk-${CONTAINER}-${REMOTE_TS}"
         $REMOTE_SSH "date +%s > /tmp/comserv-deploy.lock"
         echo "--- [3/6] RENAME running $CONTAINER → $BK (keep serving during pull) ---"
-        $REMOTE_SSH "if docker inspect ${CONTAINER} >/dev/null 2>&1; then docker rename ${CONTAINER} ${BK}; echo renamed; else echo no-live-container; fi"
+        # The live container may be running under a bk-* name (left by an older
+        # rollback that did not rename back). Treat the running bk-* as live.
+        $REMOTE_SSH "if docker inspect ${CONTAINER} >/dev/null 2>&1; then docker rename ${CONTAINER} ${BK}; echo renamed; else LIVE=\$(docker ps --format '{{.Names}}' | grep -E '^bk-comserv2?-web-prod-' | head -1); if [ -n \"\$LIVE\" ]; then docker rename \"\$LIVE\" ${BK}; echo \"renamed running \$LIVE -> ${BK}\"; else echo no-live-container; fi; fi"
         echo "--- [4/6] PULL $IMAGE (no build, no host source) ---"
         if ! $REMOTE_SSH "docker pull ${IMAGE}"; then
             echo "❌ Remote pull failed. Restarting backup if we renamed."
@@ -1207,7 +1209,7 @@ start_prod_container_from_image ${IMAGE} ${CONTAINER}
 EOF
         then
             echo "❌ Remote start failed — restarting backup $BK"
-            $REMOTE_SSH "docker start ${BK} 2>/dev/null || true" || true
+            $REMOTE_SSH "docker rm -f ${CONTAINER} 2>/dev/null; docker start ${BK} 2>/dev/null && docker rename ${BK} ${CONTAINER} 2>/dev/null || true" || true
             $REMOTE_SSH "rm -f /tmp/comserv-deploy.lock" || true
             notify_admin_deploy \
                 "Production deploy start failed — backup ${BK} running" \
@@ -1216,20 +1218,25 @@ EOF
         fi
 
         echo "--- [6/6] HEALTH GATE ---"
-        local HEALTHY=0 i OK
-        for i in $(seq 1 45); do
-            OK=0
+        # Time-based: production startup can take minutes (Starman preload).
+        local HEALTHY=0 i=0 OK H_START H_EL
+        local H_TIMEOUT="${HEALTH_TIMEOUT_S:-600}" H_INT="${HEALTH_INTERVAL_S:-5}"
+        H_START=$(date +%s)
+        while :; do
+            i=$((i + 1)); OK=0
             $REMOTE_SSH "curl -fs --max-time 8 http://127.0.0.1:5000/health" >/dev/null 2>&1 && OK=1
-            if [ "$OK" = "1" ]; then HEALTHY=1; echo "✅ healthy (attempt $i)"; break; fi
-            echo "  health attempt $i failed, waiting 2s..."
-            sleep 2
+            H_EL=$(( $(date +%s) - H_START ))
+            if [ "$OK" = "1" ]; then HEALTHY=1; echo "✅ healthy (attempt $i, ${H_EL}s)"; break; fi
+            if [ "$H_EL" -ge "$H_TIMEOUT" ]; then break; fi
+            echo "  health attempt $i failed (${H_EL}s/${H_TIMEOUT}s), waiting ${H_INT}s..."
+            sleep "$H_INT"
         done
         if [ "$HEALTHY" != "1" ]; then
             echo "❌ HEALTH FAILED. Stopping new container and restarting backup $BK"
-            $REMOTE_SSH "docker stop ${CONTAINER} 2>/dev/null || true; docker rename ${CONTAINER} failed-${CONTAINER}-${REMOTE_TS} 2>/dev/null || docker rm -f ${CONTAINER} 2>/dev/null || true; docker start ${BK} 2>/dev/null || true"
+            $REMOTE_SSH "docker stop ${CONTAINER} 2>/dev/null || true; docker rename ${CONTAINER} failed-${CONTAINER}-${REMOTE_TS} 2>/dev/null || docker rm -f ${CONTAINER} 2>/dev/null || true; docker start ${BK} 2>/dev/null && docker rename ${BK} ${CONTAINER} 2>/dev/null || true"
             $REMOTE_SSH "rm -f /tmp/comserv-deploy.lock" || true
             notify_admin_deploy \
-                "Production deploy unhealthy — backup ${BK} running" \
+                "Production deploy unhealthy — previous container restored as ${CONTAINER}" \
                 "Host: ${TARGET_HOST}\nBackup: ${BK}\nNew ${CONTAINER} failed /health. Freshly renamed backup container is now running. Investigate the failed deploy." || true
             return 1
         fi
