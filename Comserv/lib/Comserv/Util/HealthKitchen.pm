@@ -1361,5 +1361,140 @@ sub suggest_recipes_from_stock {
     return $self->rank_recipes_by_stock( $self->list_recipes($c), $self->list_pantry($c) );
 }
 
+
+# ── Nutrition tracking (manual entry; import-ready via source/source_ref) ────
+
+our @NUTRIENTS = qw(calories protein_g carbs_g fat_g fiber_g sugar_g sodium_mg);
+
+sub nutrition_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, 'HealthKitchen::FoodNutrient' )
+        && $self->table_ready( $c, 'HealthKitchen::IntakeLog' );
+}
+
+sub _num {
+    my ( $self, $v ) = @_;
+    return undef unless defined $v && $v =~ /^\s*(\d+(?:\.\d+)?)\s*$/;
+    return 0 + $1;
+}
+
+# Pure: sum snapshotted intake rows into daily totals.
+sub daily_totals {
+    my ( $self, $rows ) = @_;
+    my %t = map { $_ => 0 } @NUTRIENTS;
+    for my $r ( @{ $rows || [] } ) {
+        $t{$_} += ( $r->{$_} || 0 ) for @NUTRIENTS;
+    }
+    $t{$_} = 0 + sprintf( '%.2f', $t{$_} ) for @NUTRIENTS;
+    return \%t;
+}
+
+sub list_foods {
+    my ( $self, $c ) = @_;
+    return [] unless $self->nutrition_ready($c);
+    my @out;
+    try {
+        my $rs = $c->model('DBEncy')->resultset('HealthKitchen::FoodNutrient')->search(
+            { -or => [ { sitename => $self->sitename($c) }, { sitename => undef } ] },
+            { order_by => 'name', rows => 500 } );
+        while ( my $f = $rs->next ) {
+            push @out, { id => $f->id, name => $f->name, brand => $f->brand, source => $f->source,
+                         serving_size => 0 + $f->serving_size, serving_unit => $f->serving_unit,
+                         map { $_ => $f->$_ } @NUTRIENTS };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'list_foods', "failed: $_" );
+    };
+    return \@out;
+}
+
+sub add_food {
+    my ( $self, $c, $a ) = @_;
+    return { ok => 0, error => 'Nutrition tables are not created yet. Run Schema Compare.' }
+        unless $self->nutrition_ready($c);
+    my $name = $a->{name} // '';
+    $name =~ s/^\s+|\s+$//g;
+    return { ok => 0, error => 'Food name is required.' } unless length $name;
+    my $unit = $a->{serving_unit} // 'g';
+    $unit =~ s/^\s+|\s+$//g;
+    my $ok;
+    try {
+        $c->model('DBEncy')->resultset('HealthKitchen::FoodNutrient')->create( {
+            sitename     => $self->sitename($c),
+            name         => substr( $name, 0, 255 ),
+            source       => 'manual',
+            serving_size => $self->_num( $a->{serving_size} ) || 100,
+            serving_unit => substr( length $unit ? $unit : 'g', 0, 32 ),
+            created_by   => $c->session->{user_id},
+            map { $_ => $self->_num( $a->{$_} ) } @NUTRIENTS,
+        } );
+        $ok = 1;
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'add_food', "failed: $_" );
+    };
+    return $ok ? { ok => 1 } : { ok => 0, error => 'Could not save food.' };
+}
+
+sub log_intake {
+    my ( $self, $c, $a ) = @_;
+    return { ok => 0, error => 'Nutrition tables are not created yet. Run Schema Compare.' }
+        unless $self->nutrition_ready($c);
+    my $date = $self->_clean_date( $a->{log_date} ) or return { ok => 0, error => 'Valid date required.' };
+    my $serv = $self->_num( $a->{servings} ) || 1;
+    my $fid  = ( $a->{food_nutrient_id} && $a->{food_nutrient_id} =~ /^\d+$/ ) ? $a->{food_nutrient_id} : undef;
+    my $food = $fid ? eval {
+        $c->model('DBEncy')->resultset('HealthKitchen::FoodNutrient')->search( {
+            id => $fid, -or => [ { sitename => $self->sitename($c) }, { sitename => undef } ] } )->first
+    } : undef;
+    return { ok => 0, error => 'Pick a food from your list.' } unless $food;
+    my $slot = lc( $a->{meal_slot} // '' );
+    $slot = undef unless $slot =~ /^(breakfast|lunch|dinner|snack)$/;
+    my $ok;
+    try {
+        $c->model('DBEncy')->resultset('HealthKitchen::IntakeLog')->create( {
+            user_id => $c->session->{user_id}, sitename => $self->sitename($c),
+            log_date => $date, meal_slot => $slot, food_nutrient_id => $food->id,
+            food_name => $food->name, servings => $serv,
+            map { my $v = $food->$_; $_ => ( defined $v ? sprintf( '%.2f', $v * $serv ) : undef ) } @NUTRIENTS,
+        } );
+        $ok = 1;
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'log_intake', "failed: $_" );
+    };
+    return $ok ? { ok => 1 } : { ok => 0, error => 'Could not log food.' };
+}
+
+sub delete_intake {
+    my ( $self, $c, $id ) = @_;
+    return { ok => 0, error => 'Invalid entry.' } unless $id && $id =~ /^\d+$/;
+    my $n = eval {
+        $c->model('DBEncy')->resultset('HealthKitchen::IntakeLog')->search( {
+            id => $id, user_id => $c->session->{user_id}, sitename => $self->sitename($c) } )->delete
+    } || 0;
+    return $n ? { ok => 1 } : { ok => 0, error => 'Entry not found.' };
+}
+
+sub intake_for_day {
+    my ( $self, $c, $date ) = @_;
+    return [] unless $self->nutrition_ready($c) && $self->_clean_date($date);
+    my @out;
+    try {
+        my $rs = $c->model('DBEncy')->resultset('HealthKitchen::IntakeLog')->search(
+            { user_id => $c->session->{user_id}, sitename => $self->sitename($c), log_date => $date },
+            { order_by => [ 'meal_slot', 'id' ] } );
+        while ( my $r = $rs->next ) {
+            push @out, { id => $r->id, meal_slot => $r->meal_slot, food_name => $r->food_name,
+                         servings => 0 + $r->servings, map { $_ => $r->$_ } @NUTRIENTS };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'intake_for_day', "failed: $_" );
+    };
+    return \@out;
+}
+
 __PACKAGE__->meta->make_immutable;
 1;

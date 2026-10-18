@@ -321,5 +321,36 @@ sub mealplan :Local :Args(1) {
     );
 }
 
+sub nutrition :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'nutrition',
+        'HealthKitchen nutrition' );
+    my @lt = localtime;
+    my $today = sprintf( '%04d-%02d-%02d', $lt[5] + 1900, $lt[4] + 1, $lt[3] );
+    my $date = $self->hk->_clean_date( $c->req->params->{date} ) || $today;
+    if ( $c->req->method eq 'POST' ) {
+        my $p = $c->req->params;
+        my $act = $p->{hk_action} // 'log';
+        my $res = $act eq 'food'   ? $self->hk->add_food( $c, $p )
+                : $act eq 'delete' ? $self->hk->delete_intake( $c, $p->{id} )
+                :                    $self->hk->log_intake( $c, { %$p, log_date => $date } );
+        if   ( $res->{ok} ) { $c->flash->{success_msg} = 'Saved.' }
+        else                { $c->flash->{error_msg}   = $res->{error} || 'Could not save.' }
+        $c->response->redirect( $c->uri_for( $self->action_for('nutrition'), { date => $date } ) );
+        $c->detach;
+        return;
+    }
+    my $rows = $self->hk->intake_for_day( $c, $date );
+    $c->stash(
+        hk_nut_ready => $self->hk->nutrition_ready($c) ? 1 : 0,
+        hk_date      => $date,
+        hk_foods     => $self->hk->list_foods($c),
+        hk_intake    => $rows,
+        hk_totals    => $self->hk->daily_totals($rows),
+        template     => 'healthkitchen/nutrition.tt',
+    );
+}
+
+
 __PACKAGE__->meta->make_immutable;
 1;
