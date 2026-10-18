@@ -262,5 +262,95 @@ sub symptoms :Local :Args(0) {
     );
 }
 
+sub mealplans :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'mealplans',
+        'HealthKitchen meal plans' );
+    if ( $c->req->method eq 'POST' ) {
+        my $p   = $c->req->params;
+        my $res = $self->hk->create_meal_plan( $c,
+            { name => $p->{name}, start_date => $p->{start_date}, end_date => $p->{end_date} } );
+        if ( $res->{ok} ) {
+            $c->flash->{success_msg} = 'Meal plan created.';
+            $c->response->redirect( $c->uri_for( $self->action_for('mealplan'), $res->{id} ) );
+        }
+        else {
+            $c->flash->{error_msg} = $res->{error};
+            $c->response->redirect( $c->uri_for( $self->action_for('mealplans') ) );
+        }
+        $c->detach;
+        return;
+    }
+    $c->stash(
+        hk_meal_ready  => $self->hk->meal_plan_ready($c) ? 1 : 0,
+        hk_plans       => $self->hk->list_meal_plans($c),
+        hk_suggestions => $self->hk->suggest_recipes_from_stock($c),
+        template       => 'healthkitchen/mealplans.tt',
+    );
+}
+
+sub mealplan :Local :Args(1) {
+    my ( $self, $c, $plan_id ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'mealplan',
+        "HealthKitchen meal plan $plan_id" );
+    if ( $c->req->method eq 'POST' ) {
+        my $p = $c->req->params;
+        my $res = ( $p->{hk_action} // '' ) eq 'delete'
+            ? $self->hk->delete_meal_entry( $c, $plan_id, $p->{entry_id} )
+            : $self->hk->add_meal_entry( $c, $plan_id, {
+                  plan_date => $p->{plan_date}, meal_slot => $p->{meal_slot},
+                  recipe_id => $p->{recipe_id}, custom_name => $p->{custom_name},
+                  servings  => $p->{servings} } );
+        if   ( $res->{ok} ) { $c->flash->{success_msg} = 'Saved.' }
+        else                { $c->flash->{error_msg}   = $res->{error} || 'Could not save.' }
+        $c->response->redirect( $c->uri_for( $self->action_for('mealplan'), $plan_id ) );
+        $c->detach;
+        return;
+    }
+    my $plan = $self->hk->get_meal_plan( $c, $plan_id );
+    unless ($plan) {
+        $c->flash->{error_msg} = 'Meal plan not found.';
+        $c->response->redirect( $c->uri_for( $self->action_for('mealplans') ) );
+        $c->detach;
+        return;
+    }
+    $c->stash(
+        hk_plan    => $plan,
+        hk_recipes => $self->hk->list_recipes($c),
+        template   => 'healthkitchen/mealplan.tt',
+    );
+}
+
+sub nutrition :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'nutrition',
+        'HealthKitchen nutrition' );
+    my @lt = localtime;
+    my $today = sprintf( '%04d-%02d-%02d', $lt[5] + 1900, $lt[4] + 1, $lt[3] );
+    my $date = $self->hk->_clean_date( $c->req->params->{date} ) || $today;
+    if ( $c->req->method eq 'POST' ) {
+        my $p = $c->req->params;
+        my $act = $p->{hk_action} // 'log';
+        my $res = $act eq 'food'   ? $self->hk->add_food( $c, $p )
+                : $act eq 'delete' ? $self->hk->delete_intake( $c, $p->{id} )
+                :                    $self->hk->log_intake( $c, { %$p, log_date => $date } );
+        if   ( $res->{ok} ) { $c->flash->{success_msg} = 'Saved.' }
+        else                { $c->flash->{error_msg}   = $res->{error} || 'Could not save.' }
+        $c->response->redirect( $c->uri_for( $self->action_for('nutrition'), { date => $date } ) );
+        $c->detach;
+        return;
+    }
+    my $rows = $self->hk->intake_for_day( $c, $date );
+    $c->stash(
+        hk_nut_ready => $self->hk->nutrition_ready($c) ? 1 : 0,
+        hk_date      => $date,
+        hk_foods     => $self->hk->list_foods($c),
+        hk_intake    => $rows,
+        hk_totals    => $self->hk->daily_totals($rows),
+        template     => 'healthkitchen/nutrition.tt',
+    );
+}
+
+
 __PACKAGE__->meta->make_immutable;
 1;

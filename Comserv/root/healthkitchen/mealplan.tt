@@ -1,0 +1,56 @@
+[% META
+   title = "Health Kitchen meal plan"
+   description = "Meal plan with stock check and shopping list"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "HealthKitchen"
+   page_version = "0.01"
+   last_updated = "2026-10-18"
+%]
+[% PageVersion = 'healthkitchen/mealplan.tt,v 0.01 2026/10/18 grok-bot Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+    [% INCLUDE 'healthkitchen/_disclaimer.tt' %]
+    <div class="page-header">
+        <h1>[% hk_plan.name | html %]</h1>
+        <p><a href="[% c.uri_for('/healthkitchen/mealplans') %]">All meal plans</a> · <a href="[% c.uri_for('/healthkitchen/pantry') %]">Pantry</a>
+           [% IF hk_plan.start_date %]· [% hk_plan.start_date %][% IF hk_plan.end_date %] – [% hk_plan.end_date %][% END %][% END %]</p>
+    </div>
+    [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+
+    <div class="content-section">
+        <h2>Add a meal</h2>
+        <form method="post" action="[% c.uri_for('/healthkitchen/mealplan') %]/[% hk_plan.id %]">
+            <label>Date <input type="date" name="plan_date" value="[% hk_plan.start_date %]" /></label>
+            <label>Meal <select name="meal_slot">[% FOREACH s IN ['breakfast','lunch','dinner','snack'] %]<option value="[% s %]">[% s %]</option>[% END %]</select></label>
+            <label>Recipe <select name="recipe_id"><option value="">— none —</option>[% FOREACH r IN hk_recipes %]<option value="[% r.id %]">[% r.name | html %]</option>[% END %]</select></label>
+            <label>or meal name <input type="text" name="custom_name" maxlength="255" /></label>
+            <label>Servings <input type="number" name="servings" value="1" min="0.25" step="0.25" /></label>
+            <button type="submit" class="btn btn-primary">Add</button>
+        </form>
+    </div>
+
+    <div class="content-section">
+        <h2>Meals</h2>
+        [% IF hk_plan.entries.size %]
+            <table class="table"><thead><tr><th>Date</th><th>Meal</th><th>Dish</th><th>Servings</th><th></th></tr></thead><tbody>
+            [% FOREACH e IN hk_plan.entries %]
+                <tr><td>[% e.plan_date %]</td><td>[% e.meal_slot %]</td><td>[% e.name | html %]</td><td>[% e.servings %]</td>
+                    <td><form method="post" action="[% c.uri_for('/healthkitchen/mealplan') %]/[% hk_plan.id %]"><input type="hidden" name="hk_action" value="delete" /><input type="hidden" name="entry_id" value="[% e.id %]" /><button type="submit" class="btn btn-secondary">Remove</button></form></td></tr>
+            [% END %]</tbody></table>
+        [% ELSE %]<p class="doc-muted">No meals yet.</p>[% END %]
+    </div>
+
+    <div class="content-section">
+        <h2>Shopping list (missing only)</h2>
+        [% IF hk_plan.requirements.buy.size %]
+            <ul>[% FOREACH b IN hk_plan.requirements.buy %]<li>[% b.name | html %] — buy [% b.buy %] [% b.unit | html %] <small class="doc-muted">(need [% b.need %], have [% b.on_hand %])</small></li>[% END %]</ul>
+        [% ELSE %]<p>Everything for this plan is already in stock.</p>[% END %]
+        [% IF hk_plan.requirements.have.size %]
+            <h3>Using existing stock</h3>
+            <ul>[% FOREACH h IN hk_plan.requirements.have %]<li>[% h.name | html %] — [% h.need %] [% h.unit | html %] of [% h.on_hand %] on hand[% IF h.unit_mismatch %] <small class="doc-muted">(stock is in [% h.unit_mismatch | html %]; check manually)</small>[% END %]</li>[% END %]</ul>
+        [% END %]
+    </div>
+</div>

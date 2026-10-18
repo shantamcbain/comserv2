@@ -11,6 +11,7 @@
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="app-container">
+    [% INCLUDE 'healthkitchen/_disclaimer.tt' %]
     <div class="page-header">
         <h1>Health Kitchen</h1>
         <p class="doc-muted">Personal wellness planner — not diagnosis or treatment. Menus use your pantry and ENCY knowledge only.</p>
@@ -22,6 +23,8 @@
     <p>
         <a href="[% c.uri_for('/healthkitchen/pantry') %]" class="btn btn-primary">Pantry</a>
         <a href="[% c.uri_for('/healthkitchen/recipes') %]" class="btn btn-primary">Recipes</a>
+        <a href="[% c.uri_for('/healthkitchen/mealplans') %]" class="btn btn-primary">Meal plans</a>
+        <a href="[% c.uri_for('/healthkitchen/nutrition') %]" class="btn btn-primary">Nutrition</a>
         <a href="[% c.uri_for('/healthkitchen/symptoms') %]" class="btn btn-primary">Symptoms</a>
         <a href="[% c.uri_for('/ENCY') %]" class="btn btn-secondary">ENCY</a>
     </p>

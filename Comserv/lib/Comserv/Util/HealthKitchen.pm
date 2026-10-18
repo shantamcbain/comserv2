@@ -907,7 +907,8 @@ sub _id_set {
 }
 
 # Pure matcher (no Catalyst, no LLM). Inject a dataset for tests.
-# Required: pantry_herb_ids. Empty pantry → empty result (never invent stock).
+# pantry_herb_ids drives "herbs" (in stock). ENCY links outside the pantry go to
+# "not_in_pantry" as hints only; formulas still require every herb in stock.
 sub match_candidates {
     my ( $self, $data ) = @_;
     $data ||= {};
@@ -917,14 +918,28 @@ sub match_candidates {
     my $herbs  = $data->{herbs} || {};
 
     my @herb_out;
+    my @missing_out;
+    my %seen_missing;
     my %ok_herb;
     for my $link ( @{ $data->{herb_symptoms} || [] } ) {
         next unless ref $link eq 'HASH';
         my $hid = $link->{herb_id};
         my $sid = $link->{symptom_id};
-        next unless $hid && $sid && $pantry->{ 0 + $hid } && $syms->{ 0 + $sid };
+        next unless $hid && $sid && $syms->{ 0 + $sid };
         next if $self->_rel_skip( $link->{relationship_type} );
         my $h = $herbs->{$hid} || $herbs->{ 0 + $hid } || {};
+        unless ( $pantry->{ 0 + $hid } ) {
+            # ENCY-linked but not in stock: shown as a "not in pantry" hint only.
+            next if $seen_missing{ 0 + $hid }++;
+            push @missing_out, {
+                herb_id            => 0 + $hid,
+                name               => $h->{name} || $h->{common_names} || $h->{botanical_name} || '',
+                symptom_id         => 0 + $sid,
+                relationship_type  => $link->{relationship_type},
+                contra_indications => $h->{contra_indications} || '',
+            };
+            next;
+        }
         if ( my $term = $data->{user_contra_term} ) {
             my $ci = $h->{contra_indications} // '';
             next if length $ci && index( lc($ci), lc($term) ) >= 0;
@@ -970,8 +985,9 @@ sub match_candidates {
     }
 
     return {
-        herbs    => \@herb_out,
-        formulas => \@formula_out,
+        herbs         => \@herb_out,
+        formulas      => \@formula_out,
+        not_in_pantry => \@missing_out,
     };
 }
 
@@ -997,9 +1013,6 @@ sub match_for_symptoms {
         formulas          => [],
         drug_herb         => [],
     };
-    unless ( @{ $dataset->{pantry_herb_ids} } ) {
-        return { herbs => [], formulas => [] };
-    }
 
     my $schema = eval { $c->model('DBEncy') };
     return { herbs => [], formulas => [], error => 'no_schema' } unless $schema;
@@ -1015,6 +1028,35 @@ sub match_for_symptoms {
                     symptom_id        => $row->symptom_id,
                     relationship_type => $row->relationship_type,
                 };
+            }
+        }
+        # Fallback: herb_symptom is often unpopulated. Match symptom names against
+        # herb therapeutic_action / medical_uses text (flagged relationship 'text_match').
+        if ( !@{ $dataset->{herb_symptoms} }
+            && $self->source_ok( $schema, 'Ency::Symptom' )
+            && $self->source_ok( $schema, 'Ency::Herb' ) )
+        {
+            my @syms = $schema->resultset('Ency::Symptom')->search(
+                { record_id => { -in => $symptom_ids } } )->all;
+            for my $sym (@syms) {
+                my @terms = grep { defined $_ && length($_) >= 3 }
+                    ( $sym->name, $sym->common_name );
+                next unless @terms;
+                my @or;
+                for my $t (@terms) {
+                    ( my $like = $t ) =~ s/([%_\\])/\\$1/g;
+                    push @or, { therapeutic_action => { -like => "%$like%" } },
+                              { medical_uses       => { -like => "%$like%" } };
+                }
+                my $hrs = $schema->resultset('Ency::Herb')->search(
+                    { -or => \@or }, { columns => ['record_id'], rows => 50 } );
+                while ( my $h = $hrs->next ) {
+                    push @{ $dataset->{herb_symptoms} }, {
+                        herb_id           => $h->record_id,
+                        symptom_id        => $sym->record_id,
+                        relationship_type => 'text_match',
+                    };
+                }
             }
         }
         my @hids = map { $_->{herb_id} } @{ $dataset->{herb_symptoms} };
@@ -1085,7 +1127,6 @@ sub _pantry_herb_ids {
         my @item_ids;
         for my $row ( @{ $self->list_pantry($c) } ) {
             push @item_ids, $row->{inventory_item_id} if $row->{inventory_item_id};
-            push @item_ids, $row->{herb_id}           if $row->{herb_id};
             $ids{ 0 + $row->{herb_id} } = 1 if $row->{herb_id};
         }
         if ( @item_ids && $self->source_ok( $schema, 'HealthKitchen::InventoryEncyMap' ) ) {
@@ -1105,6 +1146,354 @@ sub _pantry_herb_ids {
             "pantry herb map failed: $_" );
     };
     return [ sort { $a <=> $b } keys %ids ];
+}
+
+
+# ── Meal plans (inventory-first) ───────────────────────────────────────────
+
+sub meal_plan_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, 'HealthKitchen::MealPlan' )
+        && $self->table_ready( $c, 'HealthKitchen::MealPlanEntry' );
+}
+
+sub _ingredient_key {
+    my ( $self, $line ) = @_;
+    return 'inv:' . $line->{inventory_item_id} if $line->{inventory_item_id};
+    my $n = lc( $line->{name} // '' );
+    $n =~ s/^\s+|\s+$//g;
+    $n =~ s/\s+/ /g;
+    return length $n ? "name:$n" : undef;
+}
+
+# Pure: sum recipe line needs for planned entries and compare with stock.
+# $entries: [ { servings, recipe => { yield_amount, lines => [ {name,quantity,unit,inventory_item_id} ] } } ]
+# $pantry:  list_pantry rows ({name, qty, unit, inventory_item_id})
+# Returns { have => [...], buy => [...] } — buy is ONLY the shortfall after stock.
+sub plan_requirements {
+    my ( $self, $entries, $pantry ) = @_;
+    my ( %need, @order );
+    for my $e ( @{ $entries || [] } ) {
+        my $r = $e->{recipe} or next;
+        my $yield = ( $r->{yield_amount} && $r->{yield_amount} > 0 ) ? $r->{yield_amount} : 1;
+        my $factor = ( $e->{servings} || 1 ) / $yield;
+        for my $ln ( @{ $r->{lines} || [] } ) {
+            my $key = $self->_ingredient_key($ln) or next;
+            unless ( $need{$key} ) {
+                push @order, $key;
+                $need{$key} = { name => $ln->{name}, unit => $ln->{unit} // '',
+                                inventory_item_id => $ln->{inventory_item_id}, need => 0 };
+            }
+            $need{$key}{need} += ( $ln->{quantity} || 0 ) * $factor;
+        }
+    }
+    my %stock;
+    for my $p ( @{ $pantry || [] } ) {
+        for my $key ( grep { defined } (
+                $p->{inventory_item_id} ? 'inv:' . $p->{inventory_item_id} : undef,
+                $self->_ingredient_key( { name => $p->{name} } ) ) )
+        {
+            $stock{$key} ||= { qty => 0, unit => $p->{unit} // '' };
+            $stock{$key}{qty} += $p->{qty} || 0;
+        }
+    }
+    my ( @have, @buy );
+    for my $key (@order) {
+        my $n  = $need{$key};
+        my $st = $stock{$key} || ( $n->{name} ? $stock{ $self->_ingredient_key( { name => $n->{name} } ) // '' } : undef );
+        my $on = $st ? $st->{qty} : 0;
+        my $row = { %$n, need => 0 + sprintf( '%.2f', $n->{need} ), on_hand => 0 + $on };
+        if ( $st && length $n->{unit} && length $st->{unit} && lc $n->{unit} ne lc $st->{unit} ) {
+            $row->{unit_mismatch} = $st->{unit};    # can't compare; list as have, flag for review
+            push @have, $row;
+            next;
+        }
+        my $short = $n->{need} - $on;
+        if ( $short > 0.0001 ) {
+            $row->{buy} = 0 + sprintf( '%.2f', $short );
+            push @buy, $row;
+        }
+        else {
+            push @have, $row;
+        }
+    }
+    return { have => \@have, buy => \@buy };
+}
+
+# Pure: rank recipes by share of ingredient lines already in stock (inventory-first).
+sub rank_recipes_by_stock {
+    my ( $self, $recipes, $pantry ) = @_;
+    my @out;
+    for my $r ( @{ $recipes || [] } ) {
+        my $req = $self->plan_requirements( [ { servings => $r->{yield_amount} || 1, recipe => $r } ], $pantry );
+        my $total = @{ $req->{have} } + @{ $req->{buy} };
+        next unless $total;
+        push @out, { id => $r->{id}, name => $r->{name}, in_stock => scalar @{ $req->{have} },
+                     total => $total, missing => [ map { $_->{name} } @{ $req->{buy} } ] };
+    }
+    return [ sort { ( $b->{in_stock} / $b->{total} ) <=> ( $a->{in_stock} / $a->{total} ) || $a->{name} cmp $b->{name} } @out ];
+}
+
+sub _plan_rs {
+    my ( $self, $c ) = @_;
+    return $c->model('DBEncy')->resultset('HealthKitchen::MealPlan')->search(
+        { user_id => $c->session->{user_id}, sitename => $self->sitename($c) } );
+}
+
+sub list_meal_plans {
+    my ( $self, $c ) = @_;
+    return [] unless $self->meal_plan_ready($c);
+    my @out;
+    try {
+        my $rs = $self->_plan_rs($c)->search( { status => { '!=' => 'archived' } },
+            { order_by => { -desc => 'id' } } );
+        while ( my $p = $rs->next ) {
+            push @out, { id => $p->id, name => $p->name, status => $p->status,
+                         start_date => ( $p->start_date ? $p->start_date . '' : '' ),
+                         end_date   => ( $p->end_date ? $p->end_date . '' : '' ) };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'list_meal_plans', "failed: $_" );
+    };
+    return \@out;
+}
+
+sub _clean_date {
+    my ( $self, $d ) = @_;
+    return ( defined $d && $d =~ /^(\d{4}-\d{2}-\d{2})$/ ) ? $1 : undef;
+}
+
+sub create_meal_plan {
+    my ( $self, $c, $args ) = @_;
+    return { ok => 0, error => 'Meal plan tables are not created yet. Run Schema Compare.' }
+        unless $self->meal_plan_ready($c);
+    my $name = $args->{name} // '';
+    $name =~ s/^\s+|\s+$//g;
+    return { ok => 0, error => 'Plan name is required.' } unless length $name;
+    my $row;
+    try {
+        $row = $c->model('DBEncy')->resultset('HealthKitchen::MealPlan')->create( {
+            user_id    => $c->session->{user_id},
+            sitename   => $self->sitename($c),
+            name       => substr( $name, 0, 255 ),
+            start_date => $self->_clean_date( $args->{start_date} ),
+            end_date   => $self->_clean_date( $args->{end_date} ),
+            status     => 'draft',
+        } );
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'create_meal_plan', "failed: $_" );
+    };
+    return $row ? { ok => 1, id => $row->id } : { ok => 0, error => 'Could not create plan.' };
+}
+
+sub _own_plan {
+    my ( $self, $c, $plan_id ) = @_;
+    return undef unless $plan_id && $plan_id =~ /^\d+$/;
+    return eval { $self->_plan_rs($c)->search( { id => $plan_id } )->first };
+}
+
+sub add_meal_entry {
+    my ( $self, $c, $plan_id, $args ) = @_;
+    my $plan = $self->_own_plan( $c, $plan_id ) or return { ok => 0, error => 'Plan not found.' };
+    my $rid = ( $args->{recipe_id} && $args->{recipe_id} =~ /^\d+$/ ) ? $args->{recipe_id} : undef;
+    my $custom = $args->{custom_name} // '';
+    $custom =~ s/^\s+|\s+$//g;
+    return { ok => 0, error => 'Pick a recipe or type a meal name.' } unless $rid || length $custom;
+    my $slot = lc( $args->{meal_slot} // 'dinner' );
+    $slot = 'dinner' unless $slot =~ /^(breakfast|lunch|dinner|snack)$/;
+    my $serv = ( $args->{servings} && $args->{servings} =~ /^\d+(\.\d+)?$/ && $args->{servings} > 0 ) ? $args->{servings} : 1;
+    my $ok;
+    try {
+        $plan->create_related( entries => {
+            plan_date   => $self->_clean_date( $args->{plan_date} ),
+            meal_slot   => $slot,
+            recipe_id   => $rid,
+            custom_name => length $custom ? substr( $custom, 0, 255 ) : undef,
+            servings    => $serv,
+        } );
+        $ok = 1;
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'add_meal_entry', "failed: $_" );
+    };
+    return $ok ? { ok => 1 } : { ok => 0, error => 'Could not add meal.' };
+}
+
+sub delete_meal_entry {
+    my ( $self, $c, $plan_id, $entry_id ) = @_;
+    my $plan = $self->_own_plan( $c, $plan_id ) or return { ok => 0, error => 'Plan not found.' };
+    return { ok => 0, error => 'Invalid entry.' } unless $entry_id && $entry_id =~ /^\d+$/;
+    my $n = eval { $plan->entries->search( { id => $entry_id } )->delete } || 0;
+    return $n ? { ok => 1 } : { ok => 0, error => 'Entry not found.' };
+}
+
+# Plan + entries + inventory-first requirements (have vs buy).
+sub get_meal_plan {
+    my ( $self, $c, $plan_id ) = @_;
+    my $plan = $self->_own_plan( $c, $plan_id ) or return undef;
+    my @entries;
+    my $recipe_rs = eval { $c->model('DBEncy')->resultset('Ency::Recipe') };
+    for my $e ( $plan->entries->search( {}, { order_by => [ 'plan_date', 'meal_slot', 'id' ] } )->all ) {
+        my $r;
+        if ( $e->recipe_id && $recipe_rs ) {
+            my $row = $recipe_rs->search( { id => $e->recipe_id }, { prefetch => 'lines' } )->first;
+            $r = $self->_recipe_hash($row) if $row;
+        }
+        push @entries, {
+            id => $e->id, plan_date => ( $e->plan_date ? $e->plan_date . '' : '' ),
+            meal_slot => $e->meal_slot, servings => 0 + $e->servings,
+            name => ( $r ? $r->{name} : $e->custom_name ), recipe => $r,
+        };
+    }
+    return {
+        id => $plan->id, name => $plan->name, status => $plan->status,
+        start_date => ( $plan->start_date ? $plan->start_date . '' : '' ),
+        end_date   => ( $plan->end_date ? $plan->end_date . '' : '' ),
+        entries    => \@entries,
+        requirements => $self->plan_requirements( \@entries, $self->list_pantry($c) ),
+    };
+}
+
+sub suggest_recipes_from_stock {
+    my ( $self, $c ) = @_;
+    return $self->rank_recipes_by_stock( $self->list_recipes($c), $self->list_pantry($c) );
+}
+
+
+# ── Nutrition tracking (manual entry; import-ready via source/source_ref) ────
+
+our @NUTRIENTS = qw(calories protein_g carbs_g fat_g fiber_g sugar_g sodium_mg);
+
+sub nutrition_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, 'HealthKitchen::FoodNutrient' )
+        && $self->table_ready( $c, 'HealthKitchen::IntakeLog' );
+}
+
+sub _num {
+    my ( $self, $v ) = @_;
+    return undef unless defined $v && $v =~ /^\s*(\d+(?:\.\d+)?)\s*$/;
+    return 0 + $1;
+}
+
+# Pure: sum snapshotted intake rows into daily totals.
+sub daily_totals {
+    my ( $self, $rows ) = @_;
+    my %t = map { $_ => 0 } @NUTRIENTS;
+    for my $r ( @{ $rows || [] } ) {
+        $t{$_} += ( $r->{$_} || 0 ) for @NUTRIENTS;
+    }
+    $t{$_} = 0 + sprintf( '%.2f', $t{$_} ) for @NUTRIENTS;
+    return \%t;
+}
+
+sub list_foods {
+    my ( $self, $c ) = @_;
+    return [] unless $self->nutrition_ready($c);
+    my @out;
+    try {
+        my $rs = $c->model('DBEncy')->resultset('HealthKitchen::FoodNutrient')->search(
+            { -or => [ { sitename => $self->sitename($c) }, { sitename => undef } ] },
+            { order_by => 'name', rows => 500 } );
+        while ( my $f = $rs->next ) {
+            push @out, { id => $f->id, name => $f->name, brand => $f->brand, source => $f->source,
+                         serving_size => 0 + $f->serving_size, serving_unit => $f->serving_unit,
+                         map { $_ => $f->$_ } @NUTRIENTS };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'list_foods', "failed: $_" );
+    };
+    return \@out;
+}
+
+sub add_food {
+    my ( $self, $c, $a ) = @_;
+    return { ok => 0, error => 'Nutrition tables are not created yet. Run Schema Compare.' }
+        unless $self->nutrition_ready($c);
+    my $name = $a->{name} // '';
+    $name =~ s/^\s+|\s+$//g;
+    return { ok => 0, error => 'Food name is required.' } unless length $name;
+    my $unit = $a->{serving_unit} // 'g';
+    $unit =~ s/^\s+|\s+$//g;
+    my $ok;
+    try {
+        $c->model('DBEncy')->resultset('HealthKitchen::FoodNutrient')->create( {
+            sitename     => $self->sitename($c),
+            name         => substr( $name, 0, 255 ),
+            source       => 'manual',
+            serving_size => $self->_num( $a->{serving_size} ) || 100,
+            serving_unit => substr( length $unit ? $unit : 'g', 0, 32 ),
+            created_by   => $c->session->{user_id},
+            map { $_ => $self->_num( $a->{$_} ) } @NUTRIENTS,
+        } );
+        $ok = 1;
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'add_food', "failed: $_" );
+    };
+    return $ok ? { ok => 1 } : { ok => 0, error => 'Could not save food.' };
+}
+
+sub log_intake {
+    my ( $self, $c, $a ) = @_;
+    return { ok => 0, error => 'Nutrition tables are not created yet. Run Schema Compare.' }
+        unless $self->nutrition_ready($c);
+    my $date = $self->_clean_date( $a->{log_date} ) or return { ok => 0, error => 'Valid date required.' };
+    my $serv = $self->_num( $a->{servings} ) || 1;
+    my $fid  = ( $a->{food_nutrient_id} && $a->{food_nutrient_id} =~ /^\d+$/ ) ? $a->{food_nutrient_id} : undef;
+    my $food = $fid ? eval {
+        $c->model('DBEncy')->resultset('HealthKitchen::FoodNutrient')->search( {
+            id => $fid, -or => [ { sitename => $self->sitename($c) }, { sitename => undef } ] } )->first
+    } : undef;
+    return { ok => 0, error => 'Pick a food from your list.' } unless $food;
+    my $slot = lc( $a->{meal_slot} // '' );
+    $slot = undef unless $slot =~ /^(breakfast|lunch|dinner|snack)$/;
+    my $ok;
+    try {
+        $c->model('DBEncy')->resultset('HealthKitchen::IntakeLog')->create( {
+            user_id => $c->session->{user_id}, sitename => $self->sitename($c),
+            log_date => $date, meal_slot => $slot, food_nutrient_id => $food->id,
+            food_name => $food->name, servings => $serv,
+            map { my $v = $food->$_; $_ => ( defined $v ? sprintf( '%.2f', $v * $serv ) : undef ) } @NUTRIENTS,
+        } );
+        $ok = 1;
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'log_intake', "failed: $_" );
+    };
+    return $ok ? { ok => 1 } : { ok => 0, error => 'Could not log food.' };
+}
+
+sub delete_intake {
+    my ( $self, $c, $id ) = @_;
+    return { ok => 0, error => 'Invalid entry.' } unless $id && $id =~ /^\d+$/;
+    my $n = eval {
+        $c->model('DBEncy')->resultset('HealthKitchen::IntakeLog')->search( {
+            id => $id, user_id => $c->session->{user_id}, sitename => $self->sitename($c) } )->delete
+    } || 0;
+    return $n ? { ok => 1 } : { ok => 0, error => 'Entry not found.' };
+}
+
+sub intake_for_day {
+    my ( $self, $c, $date ) = @_;
+    return [] unless $self->nutrition_ready($c) && $self->_clean_date($date);
+    my @out;
+    try {
+        my $rs = $c->model('DBEncy')->resultset('HealthKitchen::IntakeLog')->search(
+            { user_id => $c->session->{user_id}, sitename => $self->sitename($c), log_date => $date },
+            { order_by => [ 'meal_slot', 'id' ] } );
+        while ( my $r = $rs->next ) {
+            push @out, { id => $r->id, meal_slot => $r->meal_slot, food_name => $r->food_name,
+                         servings => 0 + $r->servings, map { $_ => $r->$_ } @NUTRIENTS };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'intake_for_day', "failed: $_" );
+    };
+    return \@out;
 }
 
 __PACKAGE__->meta->make_immutable;
