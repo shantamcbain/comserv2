@@ -949,8 +949,10 @@ sub record_clean_labour {
     my $ledger_id;
     eval {
         $schema->txn_do(sub {
+            # unit_cost is NOT bumped here any more (it grew by the whole
+            # labour amount on every log). Costing->apply_logged_labour below
+            # spreads it per unit / replaces the job's default minutes.
             $item->update({
-                unit_cost  => $new_cost,
                 notes      => $notes,
                 updated_at => $now,
                 updated_by => $username,
@@ -1001,6 +1003,20 @@ sub record_clean_labour {
             'record_clean_labour', "item=$item_id failed: $err");
         return { ok => 0, error => "$err" };
     }
+
+    my $costing = eval {
+        require Comserv::Util::Manufacturing::Costing;
+        Comserv::Util::Manufacturing::Costing->new->apply_logged_labour($c,
+            item_id  => $item_id,
+            job_id   => $args->{job_id},
+            minutes  => $secs / 60,
+            step     => ($category eq 'clean' ? 'collect_clean' : $category),
+            sitename => $sitename,
+        );
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'record_clean_labour',
+        "cost update skipped: $@") if $@;
+    $new_cost = ($costing && defined $costing->{new_cost}) ? $costing->{new_cost} : $old_cost;
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
         'record_clean_labour',

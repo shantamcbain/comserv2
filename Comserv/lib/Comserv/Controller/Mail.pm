@@ -2831,13 +2831,17 @@ sub classify_invoices :Local :Args(0) {
     try {
         require Comserv::Util::MailInvoiceClassifier;
         my $classifier = Comserv::Util::MailInvoiceClassifier->new();
+        my ($accounts, $mail_note) = $classifier->accounts_for_site($c, $c->session->{SiteName} || '');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'classify_invoices', $mail_note);
         my $result = $classifier->classify_all_mail(
-            source => 'maildir',
+            source => 'auto',
             first_run => 1,
+            accounts => $accounts,
         );
         
         $c->stash(
             classification_result => $result,
+            mail_source_note => $mail_note,
             template => 'mail/mail.classify_results.tt',
         );
         $c->forward($c->view('TT'));
@@ -2950,9 +2954,12 @@ sub classify_invoices_cron :Private {
     try {
         require Comserv::Util::MailInvoiceClassifier;
         my $classifier = Comserv::Util::MailInvoiceClassifier->new();
+        my ($accounts, $mail_note) = $classifier->accounts_for_site($c, $c->session->{SiteName} || '');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'classify_invoices_cron', $mail_note);
         my $result = $classifier->classify_all_mail(
-            source => 'maildir',
+            source => 'auto',
             first_run => 0,
+            accounts => $accounts,
         );
         return $result;
     } catch {
