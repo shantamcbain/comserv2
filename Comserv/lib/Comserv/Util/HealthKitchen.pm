@@ -2860,5 +2860,93 @@ sub ensure_sourcing_seed {
     return { ok => $ok, inserted => $n };
 }
 
+# ── Sourcing classifier (pure; used by script/hk_classify_sourcing.pl) ──────
+# Proposes sourcing attributes from item name/category/brand. Explicit label words
+# give 'explicit' confidence; species-based guesses are 'inferred'; anything unclear
+# stays undef. Never guesses production from brand alone.
+our @PROCESSED_RX = qw(bar chips? cookies? puffs snack soda pie mix nog sandwich churro samosa pakora fudge
+                       ice\s+cream crackers? cereal granola);
+our @CATEGORY_RULES = (
+    [ beef         => qr/\b(beef|hamburger|steak|ground\s+chuck)\b/i ],
+    [ pork         => qr/\b(pork|bacon|ham|prosciutto)\b/i ],
+    [ lamb         => qr/\b(lamb|mutton)\b/i ],
+    [ chicken      => qr/\bchicken\b/i ],
+    [ eggs         => qr/\beggs?\b/i, qr/\b(contains|with|noodles?|nog|bread|replacer)\b/i ],
+    [ salmon       => qr/\bsalmon\b/i ],
+    [ fish_other   => qr/\b(herring|sardines?|tuna|mackerel|cod|halibut|anchov(y|ies)|trout)\b/i ],
+    [ dairy        => qr/\b(cheese|yogh?urt|milk|butter|kefir|cream)\b/i, qr/\b(coconut|oat|almond|soy|peanut|cocoa)\b/i ],
+    [ leafy_greens => qr/\b(spinach|kale|lettuce|greens|chard|arugula|collards?)\b/i ],
+    [ berries      => qr/\b(\w*berr(y|ies)|raspberr\w*)\b/i ],
+    [ apples       => qr/\bapples?\b/i ],
+    [ potatoes     => qr/\bpotato(es)?\b/i, qr/\bsweet\b/i ],
+    [ tomatoes     => qr/\btomato(es)?\b/i ],
+    [ peppers      => qr/\bpeppers?\b/i ],
+    [ soy          => qr/\b(soy|tofu|edamame|tempeh)\b/i ],
+    [ corn         => qr/\b(corn|maize|polenta)\b/i ],
+    [ legumes      => qr/\b(lentils?|chickpeas?|beans?|peas)\b/i, qr/\b(vanilla|coffee|cocoa|cacao|jelly)\s+beans?\b/i ],
+    [ nuts         => qr/\b(cashews?|walnuts?|almonds?|pecans?|hazelnuts?|pistachios?|peanuts?)\b/i ],
+    [ grains       => qr/\b(oats?|rye|wheat|spelt|rice|quinoa|barley|millet|buckwheat)\b/i, qr/\b(alternative|nog|beverage|drink|creamer|milk)\b/i ],
+);
+our %WILD_SPECIES = map { $_ => 1 } qw(fish_other);
+
+sub classify_sourcing {
+    my ( $self, $item ) = @_;
+    my $name = $item->{name} // '';
+    my $text = join ' ', grep { defined } $name, $item->{brand}, $item->{category};
+    my ( %p, %why );
+    my $processed = grep { $name =~ /\b$_\b/i } @PROCESSED_RX;
+
+    unless ($processed) {
+        for my $r (@CATEGORY_RULES) {
+            my ( $cat, $rx, $not ) = @$r;
+            next unless $name =~ $rx;
+            next if $not && $name =~ $not;
+            $p{food_category} = $cat;
+            $why{food_category} = 'inferred';
+            last;
+        }
+    }
+    # Production: explicit label words only. "organic feed" describes feed, not certification.
+    if ( $text =~ /\borganic\s+feed\b/i ) {
+        $why{production_note} = 'organic feed (not product certification)';
+    }
+    elsif ( $text =~ /\b(org|organic|certified\s+organic)\b/i ) {
+        $p{production} = 'organic_certified';
+        $why{production} = 'explicit';
+    }
+    if    ( $text =~ /\bgrass[\s-]*(fed|finished)\b/i ) { @p{'animal_raising'} = ('grass_fed');  $why{animal_raising} = 'explicit' }
+    elsif ( $text =~ /\bpasture[sd]?([\s-]raised)?\b/i ) { $p{animal_raising} = 'pasture';    $why{animal_raising} = 'explicit' }
+    elsif ( $text =~ /\bfree[\s-]*range\b/i )           { $p{animal_raising} = 'free_range'; $why{animal_raising} = 'explicit' }
+    elsif ( $text =~ /\b(caged|battery)\b/i && $text !~ /\bcage[\s-]*free\b/i ) { $p{animal_raising} = 'caged'; $why{animal_raising} = 'explicit' }
+    elsif ( $text =~ /\bfeedlot|grain[\s-]*finished\b/i ) { $p{animal_raising} = 'feedlot'; $why{animal_raising} = 'explicit' }
+
+    if    ( $text =~ /\bwild([\s-]caught)?\b/i ) { $p{catch_method} = 'wild';   $why{catch_method} = 'explicit' }
+    elsif ( $text =~ /\bfarm(ed|[\s-]raised)\b/i && ( $p{food_category} // '' ) =~ /salmon|fish/ ) {
+        $p{catch_method} = 'farmed'; $why{catch_method} = 'explicit';
+    }
+    elsif ( $p{food_category} && $WILD_SPECIES{ $p{food_category} } && $name =~ /\b(herring|sardines?|mackerel|anchov)/i ) {
+        $p{catch_method} = 'wild'; $why{catch_method} = 'inferred';    # these species are not commercially farmed
+    }
+
+    if ( $text =~ /\bnon[\s-]*gmo\b/i ) {
+        $p{gmo} = 'non_gmo_verified';
+        $why{gmo} = $text =~ /\bnon[\s-]*gmo\s+feed\b/i ? 'inferred' : 'explicit';
+        $why{gmo_note} = 'non-GMO feed' if $why{gmo} eq 'inferred';
+    }
+    elsif ( ( $p{production} // '' ) eq 'organic_certified' ) {
+        $p{gmo} = 'non_gmo_verified';    # certified organic prohibits GMOs
+        $why{gmo} = 'inferred';
+    }
+    my $level = ( grep { $_ eq 'explicit' } values %why ) ? 'explicit'
+              : ( grep { $_ eq 'inferred' } values %why ) ? 'inferred' : 'unknown';
+    return { %p, confidence => $level, why => \%why, processed => $processed ? 1 : 0 };
+}
+
+# Pure: brand code from Co-op style names ("BLK Oats ..." -> "BLK").
+sub brand_code {
+    my ( $self, $name ) = @_;
+    return ( defined $name && $name =~ /^([A-Z]{2,5})\s+\S/ ) ? $1 : undef;
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
