@@ -2034,7 +2034,7 @@ sub auto_resolve_text_fields {
 
         my @terms = grep { length($_) > 2 && !$stop{lc($_)} }
                     map  { s/^\s+|\s+$//gr }
-                    split /[,;\n\r|]+/, $text;
+                    $self->_split_terms($text);
 
         for my $term (@terms) {
             next if $term =~ /^\d+(\.\d+)?$/;
@@ -2174,8 +2174,37 @@ my $_LEADING_VERB_RE = qr{
     )\b
 }xi;
 
+# Split a free-text list on , ; | and newlines, but NOT inside parentheses, so
+# "Constipation (codeine, morphine)" stays one term instead of "Constipation (codeine".
+sub _split_terms {
+    my ($self, $text) = @_;
+    return () unless defined $text;
+    my @out;
+    my $buf   = '';
+    my $depth = 0;
+    for my $ch (split //, $text) {
+        if    ($ch eq '(' || $ch eq '[') { $depth++ }
+        elsif (($ch eq ')' || $ch eq ']') && $depth > 0) { $depth-- }
+        if ($depth == 0 && $ch =~ /[,;\n\r|]/) { push @out, $buf; $buf = ''; next }
+        $buf .= $ch;
+    }
+    push @out, $buf;
+    return grep { /\S/ } @out;
+}
+
 sub _draft_clean_term {
     my ($self, $rs, $term) = @_;
+    return '' unless defined $term;
+    $term =~ s/^\s+|\s+$//g;
+    # JS objects stringified into form fields
+    return '' if $term =~ /object\s+object/i;
+    # Label prefixes ("common:", "serious:", "Herbal:") on every entity type, not just Glossary
+    $term =~ s/^[A-Za-z][\w ]{0,20}:\s*(?=\S)//;
+    # List markers ("a.", "b)", "1.") and leading conjunctions/articles left by splitting prose
+    $term =~ s/^(?:(?:and|or|&)\s+)?(?:[a-z0-9][.)]\s+)?//i;
+    $term =~ s/^(?:and|or|&|the|an|a)\s+//i;
+    # Drop a parenthetical qualifier entirely: "Constipation (codeine, morphine)" -> "Constipation"
+    $term =~ s/\s*\([^)]*\)?\s*$//;
     $term =~ s/^\s+|\s+$//g;
     $term =~ s/^['"*\[\(]+|['"*\]\)]+$//g;
     $term =~ s/[.,;]+$//g;
