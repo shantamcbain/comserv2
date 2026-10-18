@@ -347,6 +347,13 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
                 goto COMMIT_DONE;
             }
 
+            # Secret guard (same script as the global pre-commit hook). Never --no-verify.
+            my $guard = $self->git_service->secret_guard($c);
+            unless ($guard->{ok}) {
+                $msg = "Commit refused by secret guard \x{2014} a staged file looks like a key or secret. "
+                     . "Unstage it (keys belong in ~/.comserv/keys) and retry.\n" . ($guard->{output} // q{});
+                goto COMMIT_DONE;
+            }
             my ($out, $code) = $self->_git_list($c, 'commit', '-m', $message);
             $ok = ($code == 0);
             $msg = $ok ? "Committed staged changes." : "Commit failed: $out";

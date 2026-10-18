@@ -132,10 +132,10 @@ sub list_inventory_foods {
     try {
         my $rs = $c->model('DBEncy')->resultset('InventoryItem')->search(
             {
-                sitename => $self->sitename($c),
-                status   => 'active',
+                "me.sitename" => $self->sitename($c),
+                "me.status"   => 'active',
             },
-            { prefetch => 'stock_levels', order_by => 'name' }
+            { prefetch => 'stock_levels', order_by => 'me.name' }
         );
         while ( my $item = $rs->next ) {
             my $on = 0;
@@ -151,6 +151,7 @@ sub list_inventory_foods {
                 notes             => $item->notes,
                 via               => 'inventory',
                 category          => $item->category,
+                barcode           => $item->barcode,
             };
             push @all, $row;
             push @food, $row if $self->_looks_like_food($item);
@@ -298,11 +299,11 @@ sub list_active_symptoms {
     try {
         my $rs = $c->model('DBEncy')->resultset('HealthKitchen::UserActiveSymptom')->search(
             {
-                user_id  => $c->session->{user_id},
-                sitename => $self->sitename($c),
-                status   => 'active',
+                "me.user_id"  => $c->session->{user_id},
+                "me.sitename" => $self->sitename($c),
+                "me.status"   => 'active',
             },
-            { order_by => 'id', prefetch => 'symptom' }
+            { order_by => 'me.id', prefetch => 'symptom' }
         );
         while ( my $row = $rs->next ) {
             my $sym = eval { $row->symptom };
@@ -499,13 +500,13 @@ sub list_recipes {
     try {
         my $rs = $c->model('DBEncy')->resultset('Recipe')->search(
             {
-                sitename    => $self->sitename($c),
-                -or         => [ { username_of_poster => $c->session->{username} },
-                                 { source => 'ai_generated' } ],
-                recipe_kind => 'food_recipe',
-                status      => { '!=' => 'archived' },
+                "me.sitename" => $self->sitename($c),
+                -or         => [ { "me.username_of_poster" => $c->session->{username} },
+                                 { "me.source" => 'ai_generated' } ],
+                "me.recipe_kind" => 'food_recipe',
+                "me.status" => { '!=' => 'archived' },
             },
-            { order_by => 'name', prefetch => 'lines' }
+            { order_by => 'me.name', prefetch => 'lines' }
         );
         while ( my $r = $rs->next ) {
             push @out, $self->_recipe_hash($r);
@@ -559,9 +560,9 @@ sub consume_recipe {
     my $recipe = eval {
         $c->model('DBEncy')->resultset('Recipe')->search(
             {
-                id                 => $recipe_id,
-                sitename           => $self->sitename($c),
-                username_of_poster => $c->session->{username},
+                "me.id" => $recipe_id,
+                "me.sitename" => $self->sitename($c),
+                "me.username_of_poster" => $c->session->{username},
             },
             { prefetch => 'lines' }
         )->single;
@@ -1364,7 +1365,7 @@ sub get_meal_plan {
     for my $e ( $plan->entries->search( {}, { order_by => [ 'plan_date', 'meal_slot', 'id' ] } )->all ) {
         my $r;
         if ( $e->recipe_id && $recipe_rs ) {
-            my $row = $recipe_rs->search( { id => $e->recipe_id }, { prefetch => 'lines' } )->first;
+            my $row = $recipe_rs->search( { "me.id" => $e->recipe_id }, { prefetch => 'lines' } )->first;
             $r = $self->_recipe_hash($row) if $row;
         }
         push @entries, {
@@ -1951,6 +1952,351 @@ sub filter_recipes_by_allergens {
         else      { push @ok, $r }
     }
     return ( \@ok, \@bad );
+}
+
+# ---------------------------------------------------------------------------
+# User-added ENCY symptoms (dedupe case-insensitive exact, tagged for review)
+# ---------------------------------------------------------------------------
+our $USER_ADDED_GROUP = 'hk_user_added';
+our $USER_ADDED_REF   = 'User-added via HealthKitchen; pending ENCY review';
+
+sub normalize_symptom_name {
+    my ( $self, $name ) = @_;
+    return '' unless defined $name;
+    $name =~ s/^\s+|\s+$//g;
+    $name =~ s/\s+/ /g;
+    return $name;
+}
+
+# Pure: find an existing symptom whose name or common_name equals $name (case-insensitive).
+sub find_symptom_dup {
+    my ( $self, $name, $list ) = @_;
+    my $want = lc $self->normalize_symptom_name($name);
+    return undef unless length $want;
+    for my $s ( @{ $list || [] } ) {
+        for my $f (qw(name common_name)) {
+            my $v = lc $self->normalize_symptom_name( $s->{$f} );
+            return $s if length $v && $v eq $want;
+        }
+    }
+    return undef;
+}
+
+sub add_user_symptom {
+    my ( $self, $c, $args ) = @_;
+    return { ok => 0, error => 'Symptom table is not created yet. Run schema-compare.' }
+        unless $self->symptom_ready($c);
+    return { ok => 0, error => 'Please log in.' } unless $c->session->{user_id};
+    my $name = $self->normalize_symptom_name( $args->{name} );
+    return { ok => 0, error => 'Symptom name is required.' } unless length $name;
+    return { ok => 0, error => 'Symptom name is too long.' } if length($name) > 255;
+    my $desc = $args->{description};
+    $desc = undef if defined $desc && $desc !~ /\S/;
+
+    my ( $sid, $created );
+    try {
+        my $rs = $c->model('DBEncy')->resultset('Ency::Symptom');
+        my $hit = $rs->search(
+            { -or => [ \[ 'LOWER(TRIM(name)) = ?', lc $name ], \[ 'LOWER(TRIM(common_name)) = ?', lc $name ] ] },
+            { rows => 1, columns => ['record_id'] }
+        )->single;
+        if ($hit) {
+            $sid = $hit->record_id;
+        }
+        else {
+            my $row = $rs->create(
+                {
+                    name               => $name,
+                    description        => $desc,
+                    reference          => $USER_ADDED_REF,
+                    sitename           => $self->sitename($c),
+                    username_of_poster => $c->session->{username} || ( 'user#' . $c->session->{user_id} ),
+                    group_of_poster    => $USER_ADDED_GROUP,
+                    date_time_posted   => _now_str(),
+                    share              => 0,
+                }
+            );
+            $sid     = $row->record_id;
+            $created = 1;
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'add_user_symptom',
+            "add_user_symptom failed: $_" );
+    };
+    return { ok => 0, error => 'Could not add symptom to ENCY.' } unless $sid;
+    my $res = $self->set_active_symptom( $c, { symptom_id => $sid, severity => $args->{severity} } );
+    $res->{created}    = $created ? 1 : 0;
+    $res->{symptom_id} = $sid;
+    return $res;
+}
+
+sub _now_str {
+    my @t = localtime;
+    return sprintf( '%04d-%02d-%02d %02d:%02d:%02d', $t[5] + 1900, $t[4] + 1, @t[ 3, 2, 1, 0 ] );
+}
+
+# ---------------------------------------------------------------------------
+# Inventory/pantry item -> many ENCY entities (herb, animal, constituent)
+# ---------------------------------------------------------------------------
+our %LINK_ENTITY = (
+    herb        => { source => 'Ency::Herb',        label => [qw(key_name botanical_name common_names)], path => '/ENCY/Herb' },
+    animal      => { source => 'Ency::Animal',      label => [qw(common_name scientific_name)], path => '/ENCY/Animal' },
+    constituent => { source => 'Ency::Constituent', label => [qw(name common_name)],            path => '/ENCY/Constituent' },
+);
+our %ITEM_KIND = ( inventory => 1, pantry => 1 );
+
+sub link_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, 'HealthKitchen::InventoryEncyLink' );
+}
+
+sub product_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, 'HealthKitchen::ItemProduct' );
+}
+
+# Pure validation; returns ( \%clean, $error ).
+sub validate_link_args {
+    my ( $self, $a ) = @_;
+    my $kind = lc( $a->{item_kind} // '' );
+    my $type = lc( $a->{entity_type} // '' );
+    return ( undef, 'Unknown item kind.' )   unless $ITEM_KIND{$kind};
+    return ( undef, 'Unknown ENCY type.' )   unless $LINK_ENTITY{$type};
+    my $iid = $self->_opt_id( $a->{item_id} );
+    my $eid = $self->_opt_id( $a->{entity_id} );
+    return ( undef, 'Item id is required.' )       unless $iid;
+    return ( undef, 'Pick an ENCY entry to link.' ) unless $eid;
+    return ( { item_kind => $kind, item_id => $iid, entity_type => $type, entity_id => $eid }, undef );
+}
+
+# Pure: digits only; accepts "8 36676 00001 9". Valid lengths 8/12/13/14. Returns '' when invalid.
+sub normalize_upc {
+    my ( $self, $v ) = @_;
+    return '' unless defined $v;
+    ( my $d = $v ) =~ s/[\s\-]//g;
+    return '' unless $d =~ /^\d+$/;
+    return '' unless grep { length($d) == $_ } ( 8, 12, 13, 14 );
+    return $d;
+}
+
+# Pure: GS1 check digit validation (UPC-A/EAN-8/EAN-13/GTIN-14).
+sub upc_check_ok {
+    my ( $self, $d ) = @_;
+    return 0 unless defined $d && $d =~ /^\d{8,14}$/;
+    my @n   = reverse split //, $d;
+    my $chk = shift @n;
+    my $sum = 0;
+    for my $i ( 0 .. $#n ) { $sum += $n[$i] * ( $i % 2 == 0 ? 3 : 1 ) }
+    return ( ( 10 - $sum % 10 ) % 10 ) == $chk ? 1 : 0;
+}
+
+# Pure: "10 ml" / "10ml" / "1.5 L" -> ( 10, 'ml' ).
+sub parse_size {
+    my ( $self, $v ) = @_;
+    return () unless defined $v && $v =~ /^\s*(\d+(?:\.\d+)?)\s*([A-Za-z][A-Za-z .]{0,19}?)?\s*$/;
+    my ( $n, $u ) = ( 0 + $1, defined $2 ? lc $2 : undef );
+    return ( $n, $u );
+}
+
+sub _item_owned {
+    my ( $self, $c, $kind, $iid ) = @_;
+    my $schema = $c->model('DBEncy');
+    if ( $kind eq 'inventory' ) {
+        return $schema->resultset('InventoryItem')->search(
+            { id => $iid, sitename => $self->sitename($c) } )->count ? 1 : 0;
+    }
+    return 0 unless $self->pantry_ready($c);
+    return $schema->resultset('HealthKitchen::UserPantryQty')->search(
+        { id => $iid, sitename => $self->sitename($c), user_id => $c->session->{user_id} } )->count ? 1 : 0;
+}
+
+sub _entity_label {
+    my ( $self, $row, $type ) = @_;
+    for my $f ( @{ $LINK_ENTITY{$type}{label} } ) {
+        my $v = eval { $row->get_column($f) };
+        return $v if defined $v && length $v;
+    }
+    return "#" . $row->record_id;
+}
+
+sub add_ency_link {
+    my ( $self, $c, $args ) = @_;
+    return { ok => 0, error => 'ENCY link table is not created yet. Run schema-compare.' }
+        unless $self->link_ready($c);
+    my ( $a, $err ) = $self->validate_link_args($args);
+    return { ok => 0, error => $err } if $err;
+    my $ok = 0;
+    try {
+        my $schema = $c->model('DBEncy');
+        die "item not yours\n" unless $self->_item_owned( $c, $a->{item_kind}, $a->{item_id} );
+        die "entity missing\n"
+            unless $schema->resultset( $LINK_ENTITY{ $a->{entity_type} }{source} )->find( $a->{entity_id} );
+        $schema->resultset('HealthKitchen::InventoryEncyLink')->find_or_create(
+            { %$a, sitename => $self->sitename($c), added_by_user_id => $c->session->{user_id} },
+            { key => 'hk_link_unique' }
+        );
+        $ok = 1;
+    }
+    catch {
+        $err = /item not yours/ ? 'That item is not on your site/pantry.'
+             : /entity missing/ ? 'ENCY entry not found.'
+             : 'Could not save ENCY link.';
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'add_ency_link',
+            "add_ency_link failed: $_" );
+    };
+    return $ok ? { ok => 1 } : { ok => 0, error => $err };
+}
+
+sub remove_ency_link {
+    my ( $self, $c, $link_id ) = @_;
+    return { ok => 0, error => 'ENCY link table is not created yet.' } unless $self->link_ready($c);
+    my $id = $self->_opt_id($link_id) or return { ok => 0, error => 'Bad link id.' };
+    my $n = 0;
+    try {
+        my $row = $c->model('DBEncy')->resultset('HealthKitchen::InventoryEncyLink')->search(
+            { id => $id, sitename => $self->sitename($c) } )->single;
+        if ( $row && $self->_item_owned( $c, $row->item_kind, $row->item_id ) ) {
+            $row->delete;
+            $n = 1;
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'remove_ency_link',
+            "remove_ency_link failed: $_" );
+    };
+    return $n ? { ok => 1 } : { ok => 0, error => 'Link not found.' };
+}
+
+# Search ENCY entities by name for the link picker.
+sub search_ency_entities {
+    my ( $self, $c, $type, $q ) = @_;
+    my $def = $LINK_ENTITY{ lc( $type // '' ) } or return [];
+    $q = $self->normalize_symptom_name($q);
+    return [] unless length($q) >= 2;
+    ( my $like = $q ) =~ s/([%_\\])/\\$1/g;
+    my @out;
+    try {
+        my $rs = $c->model('DBEncy')->resultset( $def->{source} )->search(
+            { -or => [ map { { $_ => { -like => "%$like%" } } } @{ $def->{label} } ] },
+            { rows => 25, columns => [ 'record_id', @{ $def->{label} } ], order_by => $def->{label}[0] }
+        );
+        while ( my $r = $rs->next ) {
+            push @out, { id => $r->record_id, label => $self->_entity_label( $r, lc $type ), type => lc $type };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, 'search_ency_entities',
+            "search_ency_entities failed: $_" );
+    };
+    return \@out;
+}
+
+sub save_item_product {
+    my ( $self, $c, $args ) = @_;
+    return { ok => 0, error => 'Product table is not created yet. Run schema-compare.' }
+        unless $self->product_ready($c);
+    my $kind = lc( $args->{item_kind} // '' );
+    my $iid  = $self->_opt_id( $args->{item_id} );
+    return { ok => 0, error => 'Unknown item.' } unless $ITEM_KIND{$kind} && $iid;
+    my $upc = '';
+    if ( defined $args->{upc} && $args->{upc} =~ /\S/ ) {
+        $upc = $self->normalize_upc( $args->{upc} );
+        return { ok => 0, error => 'UPC/barcode must be 8, 12, 13 or 14 digits.' } unless $upc;
+    }
+    my ( $sv, $su ) = $self->parse_size( $args->{size} );
+    return { ok => 0, error => 'Size should look like "10 ml".' }
+        if defined $args->{size} && $args->{size} =~ /\S/ && !defined $sv;
+    my $brand = $args->{brand};
+    $brand = undef if defined $brand && $brand !~ /\S/;
+    my ( $ok, $err ) = ( 0, 'Could not save product details.' );
+    try {
+        die "item not yours\n" unless $self->_item_owned( $c, $kind, $iid );
+        $c->model('DBEncy')->resultset('HealthKitchen::ItemProduct')->update_or_create(
+            {
+                sitename   => $self->sitename($c),
+                item_kind  => $kind,
+                item_id    => $iid,
+                brand      => $brand,
+                upc        => ( length $upc ? $upc : undef ),
+                size_value => $sv,
+                size_unit  => $su,
+            },
+            { key => 'hk_product_item' }
+        );
+        $ok = 1;
+    }
+    catch {
+        $err = 'That item is not on your site/pantry.' if /item not yours/;
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'save_item_product',
+            "save_item_product failed: $_" );
+    };
+    return $ok ? { ok => 1, upc_check => ( length $upc ? $self->upc_check_ok($upc) : undef ) }
+               : { ok => 0, error => $err };
+}
+
+# Attach ency_links => [ {id,type,entity_id,label,path} ] and product => {...} to pantry rows.
+sub attach_links_and_products {
+    my ( $self, $c, $rows ) = @_;
+    return unless $rows && @$rows;
+    my $site = $self->sitename($c);
+    for my $r (@$rows) {
+        $r->{item_kind} = $r->{via} && $r->{via} eq 'pantry' ? 'pantry' : 'inventory';
+        $r->{item_key_id} = $r->{item_kind} eq 'pantry' ? $r->{id} : ( $r->{inventory_item_id} || $r->{id} );
+        $r->{ency_links} = [];
+        $r->{product} = { upc => $r->{barcode} };
+    }
+    my %by = map { ( "$_->{item_kind}:" . ( $_->{item_key_id} // '' ) ) => $_ } @$rows;
+    my $schema = $c->model('DBEncy');
+    if ( $self->link_ready($c) ) {
+        try {
+            my @links = $schema->resultset('HealthKitchen::InventoryEncyLink')->search(
+                { sitename => $site }, { order_by => [qw(entity_type id)] } )->all;
+            my %ids;
+            push @{ $ids{ $_->entity_type } }, $_->entity_id for @links;
+            my %label;
+            for my $t ( keys %ids ) {
+                my $def = $LINK_ENTITY{$t} or next;
+                for my $e ( $schema->resultset( $def->{source} )->search(
+                        { record_id => { -in => $ids{$t} } },
+                        { columns => [ 'record_id', @{ $def->{label} } ] } )->all ) {
+                    $label{"$t:" . $e->record_id} = $self->_entity_label( $e, $t );
+                }
+            }
+            for my $l (@links) {
+                my $r = $by{ $l->item_kind . ':' . $l->item_id } or next;
+                push @{ $r->{ency_links} }, {
+                    id        => $l->id,
+                    type      => $l->entity_type,
+                    entity_id => $l->entity_id,
+                    label     => $label{ $l->entity_type . ':' . $l->entity_id } // ( '#' . $l->entity_id ),
+                    path      => ( $LINK_ENTITY{ $l->entity_type } || {} )->{path},
+                };
+            }
+        }
+        catch {
+            $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'attach_links_and_products',
+                "links failed: $_" );
+        };
+    }
+    if ( $self->product_ready($c) ) {
+        try {
+            for my $p ( $schema->resultset('HealthKitchen::ItemProduct')->search( { sitename => $site } )->all ) {
+                my $r = $by{ $p->item_kind . ':' . $p->item_id } or next;
+                $r->{product} = {
+                    brand      => $p->brand,
+                    upc        => $p->upc // $r->{barcode},
+                    size_value => $p->size_value,
+                    size_unit  => $p->size_unit,
+                };
+            }
+        }
+        catch {
+            $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'attach_links_and_products',
+                "products failed: $_" );
+        };
+    }
+    return;
 }
 
 __PACKAGE__->meta->make_immutable;

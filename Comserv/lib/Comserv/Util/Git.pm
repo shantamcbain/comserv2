@@ -874,6 +874,41 @@ sub unstage {
     return $self->_run($c, 'restore', '--staged', '--', @$paths);
 }
 
+=head2 secret_guard($c, $repo)
+
+Run the shared secret guard (Comserv/script/git/secret_guard.sh, falling back to
+~/.git-hooks/secret-guard.sh) against the staged index of $repo (default: the
+request's resolved local repo). Returns C<{ ok => 1 }> when clean or when the
+target is remote (the remote host's own hooks apply), else
+C<{ ok => 0, output => $redacted_report }>. Never prints secret values — the
+script reports file names / rule ids only.
+
+=cut
+
+sub secret_guard {
+    my ($self, $c, $repo) = @_;
+    unless ($repo) {
+        my $req_target = ($c && $c->stash->{git_target})
+                      // ($c && $c->req ? $c->req->param('target') : undef);
+        my $t = $self->resolve_target($c, $req_target);
+        return { ok => 1, skipped => 'remote' } if ($t->{mode} // '') ne 'local';
+        $repo = $t->{repo};
+    }
+    return { ok => 0, output => 'secret guard: no repository resolved' }
+        unless defined $repo && length $repo;
+    my @cand = ("$repo/Comserv/script/git/secret_guard.sh",
+                ($ENV{HOME} ? "$ENV{HOME}/.git-hooks/secret-guard.sh" : ()));
+    my ($script) = grep { -x $_ } @cand;
+    return { ok => 0, output => 'secret guard script not found; refusing to commit '
+                              . '(expected Comserv/script/git/secret_guard.sh)' }
+        unless $script;
+    require IPC::Run3;
+    my $out = '';
+    IPC::Run3::run3([ 'bash', $script, $repo ], \undef, \$out, \$out);
+    my $code = $? >> 8;
+    return $code == 0 ? { ok => 1, output => $out } : { ok => 0, output => $out };
+}
+
 =head2 commit($c, $message)
 
 Commit staged changes with $message. Returns the uniform hash.
@@ -884,6 +919,12 @@ sub commit {
     my ($self, $c, $message) = @_;
     return { success => 0, error => 'Commit message required' }
         unless defined $message && length $message;
+    # Secret guard: refuse key files / raw keys / gitleaks hits. Never --no-verify.
+    my $guard = $self->secret_guard($c);
+    return { success => 0, exit_code => 1, output => $guard->{output} // q{},
+             error => "Commit refused by secret guard (possible key/secret staged). "
+                    . "Unstage the flagged file(s) and retry." }
+        unless $guard->{ok};
     return $self->_run($c, 'commit', '-m', $message);
 }
 

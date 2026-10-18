@@ -119,8 +119,18 @@ sub pantry :Local :Args(0) {
         $c->detach;
         return;
     }
+    my $pantry = $self->hk->list_pantry($c);
+    $self->hk->attach_links_and_products( $c, $pantry );
+    my $etype = $c->req->params->{ency_type} || q{herb};
+    my $q     = $c->req->params->{ency_q};
     $c->stash(
-        hk_pantry => $self->hk->list_pantry($c),
+        hk_pantry => $pantry,
+        hk_link_ready    => $self->hk->link_ready($c) ? 1 : 0,
+        hk_product_ready => $self->hk->product_ready($c) ? 1 : 0,
+        hk_ency_type     => $etype,
+        hk_ency_q        => $q,
+        hk_ency_results  => ( defined $q ? $self->hk->search_ency_entities( $c, $etype, $q ) : [] ),
+        hk_link_item     => $c->req->params->{link_item},
         template  => 'healthkitchen/pantry.tt',
     );
 }
@@ -211,6 +221,45 @@ sub pantry_map :Local :Args(0) {
     $c->detach;
 }
 
+# POST: hk_action = link | unlink | product. Links pantry/inventory items to ENCY
+# herbs, animals and constituents; stores brand / UPC / size.
+sub pantry_link :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'pantry_link',
+        'HealthKitchen pantry_link method=' . ( $c->req->method || '' ) );
+    unless ( $c->req->method eq 'POST' ) {
+        $c->response->redirect( $c->uri_for( $self->action_for('pantry') ) );
+        $c->detach;
+        return;
+    }
+    my $p      = $c->req->params;
+    my $action = $p->{hk_action} || 'link';
+    my $res;
+    if ( $action eq 'unlink' ) {
+        $res = $self->hk->remove_ency_link( $c, $p->{link_id} );
+    }
+    elsif ( $action eq 'product' ) {
+        $res = $self->hk->save_item_product( $c,
+            { map { $_ => $p->{$_} } qw(item_kind item_id brand upc size) } );
+    }
+    else {
+        $res = $self->hk->add_ency_link( $c,
+            { map { $_ => $p->{$_} } qw(item_kind item_id entity_type entity_id) } );
+    }
+    if ( $res->{ok} ) {
+        my $msg = { unlink => 'ENCY link removed.', product => 'Product details saved.' }->{$action}
+            || 'ENCY link saved.';
+        $msg .= ' (UPC check digit does not validate; please double-check.)'
+            if $action eq 'product' && defined $res->{upc_check} && !$res->{upc_check};
+        $c->flash->{success_msg} = $msg;
+    }
+    else {
+        $c->flash->{error_msg} = $res->{error} || 'Could not save.';
+    }
+    $c->response->redirect( $c->uri_for( $self->action_for('pantry') ) );
+    $c->detach;
+}
+
 sub symptoms :Local :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'symptoms',
@@ -220,6 +269,24 @@ sub symptoms :Local :Args(0) {
         my $res;
         if ( $action eq 'resolve' ) {
             $res = $self->hk->resolve_symptom( $c, $c->req->params->{id} );
+        }
+        elsif ( $action eq q{new} ) {
+            $res = $self->hk->add_user_symptom(
+                $c,
+                {
+                    name        => $c->req->params->{new_name},
+                    description => $c->req->params->{new_description},
+                    severity    => $c->req->params->{severity},
+                }
+            );
+            if ( $res->{ok} ) {
+                $c->flash->{success_msg} = $res->{created}
+                    ? q{Symptom added to ENCY (pending review) and set active.}
+                    : q{That symptom already exists in ENCY; set active.};
+                $c->response->redirect( $c->uri_for( $self->action_for(q{symptoms}) ) );
+                $c->detach;
+                return;
+            }
         }
         elsif ( $action eq 'profile' ) {
             $res = $self->hk->save_profile(
