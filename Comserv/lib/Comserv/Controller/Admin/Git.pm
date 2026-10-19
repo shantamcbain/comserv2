@@ -347,6 +347,13 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
                 goto COMMIT_DONE;
             }
 
+            # Secret guard (same script as the global pre-commit hook). Never --no-verify.
+            my $guard = $self->git_service->secret_guard($c);
+            unless ($guard->{ok}) {
+                $msg = "Commit refused by secret guard \x{2014} a staged file looks like a key or secret. "
+                     . "Unstage it (keys belong in ~/.comserv/keys) and retry.\n" . ($guard->{output} // q{});
+                goto COMMIT_DONE;
+            }
             my ($out, $code) = $self->_git_list($c, 'commit', '-m', $message);
             $ok = ($code == 0);
             $msg = $ok ? "Committed staged changes." : "Commit failed: $out";
@@ -2268,6 +2275,17 @@ sub merge :Path('/admin/git/merge') :Args(0) {
             $c->response->body(encode_json({
                 success => 0,
                 error   => "Branch '$target' is not checked out in any worktree; cannot merge main into it from the dashboard.",
+            }));
+            return;
+        }
+        # Secret guard: refuse if merging main would bring in a key/secret file.
+        my $guard = $self->git_service->secret_guard($c, $dest, '--merge', 'main');
+        unless ($guard->{ok}) {
+            $c->response->body(encode_json({
+                success => 0,
+                reason  => 'secret_guard',
+                error   => "Merge refused by secret guard: main would bring a key/secret file into '$target'.\n"
+                         . ($guard->{output} // q{}),
             }));
             return;
         }

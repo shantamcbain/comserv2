@@ -44,3 +44,31 @@ regexes = [
     # JWT-ish example in docs
     '''eyJ[A-Za-z0-9_-]{0,10}\.\.\.''',
 ]
+
+# ---------------------------------------------------------------------------
+# Path rules: flag key/secret FILES by name regardless of content
+# (random raw keys have no recognisable pattern). Mirrors secret_guard.sh.
+[[rules]]
+id = "secret-file-encryption-key"
+description = "Encryption key file committed (*_encryption_key)"
+path = '''(^|/)\.?[^/]*_encryption_key$'''
+
+[[rules]]
+id = "secret-file-key-material"
+description = "Private key / keystore file committed"
+path = '''(?i)(^|/)[^/]+\.(key|pem|p12|pfx|jks|kdbx)$'''
+
+[[rules]]
+id = "secret-file-ssh-key"
+description = "SSH private key file committed"
+path = '''(^|/)id_(rsa|ed25519|ecdsa|dsa)[^/]*$'''
+
+[[rules]]
+id = "secret-file-dotenv"
+description = ".env file committed"
+path = '''(^|/)\.env(\.[^/]*)?$'''
+
+[[rules]]
+id = "secret-file-credentials-json"
+description = "Credentials JSON committed"
+path = '''(^|/)(db_config|credentials|auth)\.json$'''
