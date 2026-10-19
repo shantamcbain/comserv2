@@ -57,11 +57,20 @@ sub resolve {
     my $s      = $map->{scripts}{$script};
     $s = $map->{scripts}{ $s->{alias} } if $s && $s->{alias};
     return ($map->{default} // '410', "unmapped-script:$script") unless $s;
+    my $site = lc($q->{site} // '');
+    my $pick = sub {                     # per-site targets: { "bmaster": "/x", "*": "/y" }
+        my $t = shift;
+        return $t unless ref $t eq 'HASH';
+        return exists $t->{$site} ? $t->{$site} : $t->{'*'};
+    };
     for my $r (@{ $s->{rules} || [] }) {
         my $p = lc $r->{param};
         next unless exists $q->{$p};
         my $v = lc $q->{$p};
-        if ($r->{values} && exists $r->{values}{$v}) { return ($r->{values}{$v}, "$script|$p=$v") }
+        if ($r->{values} && exists $r->{values}{$v}) {
+            my $t = $pick->($r->{values}{$v});
+            return ($t, "$script|$p=$v") if defined $t;
+        }
         for my $rx (@{ $r->{_re} }) { return ($rx->[1], "$script|$p~$v") if $v =~ $rx->[0] }
         if ($r->{_match}) {
             if ($q->{$p} =~ $r->{_match}) { (my $t = $r->{to}) =~ s/\{value\}/$q->{$p}/; return ($t, "$script|$p=N") }

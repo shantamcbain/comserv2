@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "updated": "2026-10-19",
-  "comment": "Old /cgi-bin URL map. Script keys are lowercase, relative to /cgi-bin/. Rules run in order; first hit wins. Targets are same-host paths, or \"410\". Values are matched lowercase. session_id is always ignored.",
+  "updated": "2026-10-19T10:20-07:00",
+  "comment": "Old /cgi-bin URL map. Script keys are lowercase, relative to /cgi-bin/. Rules run in order; first hit wins. Targets are same-host paths, or \"410\". Values are matched lowercase. session_id is always ignored. A target may be an object keyed by lowercase site= value, with \"*\" as fallback.",
   "default": "410",
   "scripts": {
     "index.cgi": {
@@ -12,20 +12,42 @@
         },
         {
           "param": "procedure",
-          "to": "410"
+          "values": {
+            "winterizingyard": "/page/wintering-yard-fall-2026",
+            "contactview": "/HelpDesk/contact",
+            "wintervisits": {
+              "bmaster": "/page/core_autumn_stores_interior_bc",
+              "*": "/page/wintering-yard-fall-2026"
+            },
+            "yardmanagementsystem": "/BMaster"
+          },
+          "else": "410"
         },
         {
           "param": "page",
           "values": {
             "homeview": "/",
             "firstvisit": "/",
-            "swarmcontrol": "/BMaster/education",
-            "hiveevaluation": "/BMaster/education",
-            "hiveevaluationlost": "/BMaster/education",
-            "disease": "/BMaster/education",
+            "swarmcontrol": {
+              "bmaster": "/page/core_swarm_control",
+              "*": "/BMaster/education"
+            },
+            "hiveevaluation": {
+              "bmaster": "/page/core_struggling_small_hive",
+              "*": "/BMaster/education"
+            },
+            "hiveevaluationlost": {
+              "bmaster": "/page/core_disease_screen_signs",
+              "*": "/BMaster/education"
+            },
+            "disease": {
+              "bmaster": "/page/core_disease_screen_signs",
+              "*": "/BMaster/education"
+            },
             "beeproducts": "/BMaster/products",
             "beeproductsstock": "/BMaster/products",
-            "nucmakingworkshop": "/workshop"
+            "nucmakingworkshop": "/workshop",
+            "earthheartcolective": "/workshop"
           },
           "regex": [
             [
@@ -47,12 +69,37 @@
             "contactview": "/HelpDesk/contact",
             "membersview": "/membership",
             "mailview": "/newsletters",
-            "newsletterview": "/newsletters",
-            "bmasterbreederview": "/BMaster/products",
+            "newsletterview": {
+              "bmaster": "/page/nl-pub-beemaster-class-newsletters",
+              "*": "/newsletters"
+            },
+            "bmasterbreederview": {
+              "bmaster": "/page/breeder_program",
+              "*": "/BMaster/products"
+            },
             "helpdeskhomeview": "/HelpDesk",
             "botanicalnameview": "/ENCY/BotanicalNameView",
             "forumulaview": "/ENCY/Formula",
-            "formulaview": "/ENCY/Formula"
+            "formulaview": "/ENCY/Formula",
+            "mentorview": {
+              "bmaster": "/page/mentoring_program",
+              "*": "410"
+            },
+            "mentoringhomeview": {
+              "bmaster": "/page/mentoring_program",
+              "*": "410"
+            },
+            "opensourceview": "/page/open_source_vs_closed",
+            "apisqueensview": {
+              "bmaster": "/page/sustainable_queens",
+              "apis": "/page/sustainable_queens",
+              "*": "410"
+            },
+            "resourcesview": {
+              "ency": "/page/environmental_resources",
+              "usbm": "/page/environmental_resources",
+              "*": "410"
+            }
           },
           "else": "410"
         }
@@ -117,6 +164,12 @@
         {
           "param": "submit_logon",
           "to": "410"
+        },
+        {
+          "param": "view",
+          "values": {
+            "opensourceview": "/page/open_source_vs_closed"
+          }
         }
       ],
       "default": "/CSC"
