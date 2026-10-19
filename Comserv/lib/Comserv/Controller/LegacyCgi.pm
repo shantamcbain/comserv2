@@ -35,12 +35,22 @@ sub legacy :Path('/cgi-bin') :Args {
         ? $MAP->resolve('/' . ($c->req->path // ''), $query)
         : ('410', 'map-load-failed');
 
+    # Map targets are "410", a same-host path, or https:// to one of Shanta's own
+    # domains (LegacyCgiMap::target_ok, also enforced at map load). An absolute
+    # target on the request's own host is sent as a relative path.
+    if (defined $target && $target ne '410' && Comserv::Util::LegacyCgiMap::target_ok($target)) {
+        (my $req_host = lc($c->req->header('Host') // '')) =~ s/:\d+$//;
+        if ($target =~ m{^https://([^/:?#\@]+)(/.*)?$} && lc($1) eq $req_host) { $target = $2 // '/' }
+    } else {
+        $target = undef;
+    }
+
     my $res = $c->res;
     $res->header('Cache-Control' => 'public, max-age=86400');
     $res->content_type('text/plain; charset=utf-8');
-    if (defined $target && $target =~ m{^/}) {
+    if (defined $target) {
         $res->status(301);
-        $res->header(Location => $target);   # relative path only (Catalyst-built URLs leak http://127.0.0.1:5000)
+        $res->header(Location => $target);   # map value as-is (never uri_for: Catalyst-built URLs leak http://127.0.0.1:5000)
         $res->body("Moved Permanently: $target\n");
     } else {
         $res->status(410);
@@ -64,7 +74,7 @@ sub _log_line {
     my $line = join("\t",
         POSIX::strftime('%Y-%m-%dT%H:%M:%SZ', gmtime),
         $status,
-        (defined $target && $target =~ m{^/} ? $target : '-'),
+        $target // '-',
         $clean->($why, 120),
         $clean->(scalar $c->req->header('Host'), 80),
         $clean->(scalar($c->req->header('CF-Connecting-IP')) || $c->req->address, 64),
