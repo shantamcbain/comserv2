@@ -208,8 +208,10 @@ sub auto :Private {
     # Cheap assets and probe URLs must not run site/DB auto (~1s+). One HTML
     # page pulls many /static/js files; on a single worker that serializes into
     # minutes when mixed with WAN scanners.
+    # cgi-bin/: old Perl CGI URLs hit by crawlers (Oct 19 2026 522 outage);
+    # answered by Controller::LegacyCgi with no site/session/DB/theme work.
     my $path = $c->req->path // '';
-    if ($path =~ m{^(?:static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
+    if ($path =~ m{^(?:cgi-bin(?:/|$)|static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
         return 1;
     }
 
@@ -2624,7 +2626,7 @@ sub begin :Private {
     if ($c->req->path =~ m{^/?health(?:/|$)}) {
         return;
     }
-    if (($c->req->path // '') =~ m{^(?:static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
+    if (($c->req->path // '') =~ m{^(?:cgi-bin(?:/|$)|static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
         return;
     }
 
