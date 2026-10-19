@@ -20,7 +20,10 @@ and receives stock for lines that match existing items. Does not post GL.
 Does not create inventory items from email text.
 
 Watch-list addresses are the mailboxes that receive the invoice (To / Cc /
-Delivered-To), not the supplier's From address.
+Delivered-To), not the supplier's From address. A mailbox can be watched by
+more than one SiteName. The invoice still belongs to one site: the site that
+owns the supplier row matched by the From address. A shared address never
+copies a CSC supplier invoice onto Shanta, or the reverse.
 
 =cut
 
@@ -62,6 +65,7 @@ sub apply {
     }
 
     my (@created, @received, @skipped, @site_rows);
+    my %seen_skip;
     my $invoice_msgs = 0;
     for my $sitename (@targets) {
         my $config = $classifier->config_for_site($all, $sitename);
@@ -73,16 +77,19 @@ sub apply {
             for my $msg (@{ $cats->{$cat}{invoices} || [] }) {
                 next unless $msg && $msg->{is_invoice};
                 $invoice_msgs++ if $args{sitename}; # counted per requested site below
-                my @owners = $self->matching_sites($sites, $msg);
-                if ($args{sitename}) {
-                    next unless grep { lc($_) eq lc($sitename) } @owners;
-                } else {
-                    next unless @owners == 1 && lc($owners[0]) eq lc($sitename);
-                    if (@owners > 1) {
-                        push @skipped, { id => $msg->{id}, reason => 'ambiguous_site', sites => \@owners };
-                        $site_skipped++;
-                        next;
+                my ($owner, $why) = $self->owner_site($schema, $sites, $msg, $cat);
+                if (!$owner || lc($owner) ne lc($sitename)) {
+                    my $key = ($msg->{id} || '') . '|' . ($why || 'skip') . '|' . ($owner || '');
+                    unless ($seen_skip{$key}++) {
+                        push @skipped, {
+                            id      => $msg->{id} || '',
+                            reason  => $owner ? 'other_site' : ($why || 'unknown_supplier'),
+                            owner   => $owner,
+                            subject => $msg->{subject} || '',
+                        };
                     }
+                    $site_skipped++;
+                    next;
                 }
                 my $one = $self->_apply_one($c, $schema, $classifier, $sitename, $config, $msg);
                 if ($one->{received}) {
@@ -152,6 +159,57 @@ sub matching_sites {
         push @hit, $name if $self->site_receives($sites->{$name}, $msg);
     }
     return @hit;
+}
+
+# The mailbox is not the site. shanta@forager.com receives bank and purchase
+# mail for more than one SiteName. The supplier row owns the invoice.
+sub owner_site {
+    my ($self, $schema, $sites, $msg, $cat) = @_;
+    my @watched = $self->matching_sites($sites, $msg);
+    return (undef, 'not_watched') unless @watched;
+    my ($from) = $self->emails_in($msg->{from});
+    my @by_supplier = $self->sites_owning_supplier($schema, $from);
+    my %watch = map { lc($_) => 1 } @watched;
+    my @hit = grep { $watch{ lc($_) } } @by_supplier;
+    return ($hit[0], 'supplier') if @hit == 1;
+    return (undef, 'ambiguous_supplier') if @hit > 1;
+    # Supplier exists, but on a site that does not watch this copy of the mail.
+    # Still do not file it under a site that only shares the bank address.
+    return (undef, 'supplier_other_site') if @by_supplier;
+    my @by_cat;
+    for my $name (@watched) {
+        push @by_cat, $name if $self->category_owns($sites->{$name}, $cat);
+    }
+    return ($by_cat[0], 'category') if @by_cat == 1;
+    return (undef, 'ambiguous_category') if @by_cat > 1;
+    return (undef, 'unknown_supplier');
+}
+
+sub sites_owning_supplier {
+    my ($self, $schema, $from_email) = @_;
+    return () unless $from_email && $schema;
+    my @rows = eval {
+        $schema->resultset('Accounting::InventorySupplier')->search({
+            status => 'active',
+        })->all;
+    };
+    return () if $@;
+    my %sites;
+    for my $row (@rows) {
+        my ($em) = $self->emails_in($row->email);
+        next unless $em && $em eq lc($from_email);
+        my $site = $row->sitename or next;
+        $sites{$site} = 1;
+    }
+    return sort keys %sites;
+}
+
+sub category_owns {
+    my ($self, $config, $cat) = @_;
+    return 0 unless $cat && $config;
+    my $filter = $config->{category_filter} || [];
+    return 0 unless ref($filter) eq 'ARRAY' && @$filter;
+    return grep { lc($_) eq lc($cat) } @$filter;
 }
 
 sub site_receives {

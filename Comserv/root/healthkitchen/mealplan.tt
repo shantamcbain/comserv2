@@ -49,11 +49,11 @@
     <div class="content-section">
         <h2>Shopping list (missing only)</h2>
         [% IF hk_plan.requirements.buy.size %]
-            <ul>[% FOREACH b IN hk_plan.requirements.buy %]<li>[% b.name | html %] — buy [% b.buy %] [% b.unit | html %] <small class="doc-muted">(need [% b.need %], have [% b.on_hand %])</small></li>[% END %]</ul>
+            <ul>[% FOREACH b IN hk_plan.requirements.buy %]<li>[% b.name | html %] — buy [% b.buy %] [% b.unit | html %][% IF b.sourcing %] <small class="hk-badges">[[% b.sourcing.join(', ') | html %]]</small>[% END %] <small class="doc-muted">(need [% b.need %], have [% b.on_hand %])</small></li>[% END %]</ul>
         [% ELSE %]<p>Everything for this plan is already in stock.</p>[% END %]
         [% IF hk_plan.requirements.have.size %]
             <h3>Using existing stock</h3>
-            <ul>[% FOREACH h IN hk_plan.requirements.have %]<li>[% h.name | html %] — [% h.need %] [% h.unit | html %] of [% h.on_hand %] on hand[% IF h.unit_mismatch %] <small class="doc-muted">(stock is in [% h.unit_mismatch | html %]; check manually)</small>[% END %]</li>[% END %]</ul>
+            <ul>[% FOREACH h IN hk_plan.requirements.have %]<li>[% h.name | html %] — [% h.need %] [% h.unit | html %] of [% h.on_hand %] on hand[% IF h.sourcing %] <small class="hk-badges">[[% h.sourcing.join(', ') | html %]]</small>[% END %][% IF h.unit_mismatch %] <small class="doc-muted">(stock is in [% h.unit_mismatch | html %]; check manually)</small>[% END %]</li>[% END %]</ul>
         [% END %]
     </div>
 </div>
