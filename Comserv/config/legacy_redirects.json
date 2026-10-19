@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "updated": "2026-10-19",
+  "comment": "Old /cgi-bin URL map. Script keys are lowercase, relative to /cgi-bin/. Rules run in order; first hit wins. Targets are same-host paths, or \"410\". Values are matched lowercase. session_id is always ignored.",
+  "default": "410",
+  "scripts": {
+    "index.cgi": {
+      "rules": [
+        {
+          "param": "submit_logon",
+          "to": "410"
+        },
+        {
+          "param": "procedure",
+          "to": "410"
+        },
+        {
+          "param": "page",
+          "values": {
+            "homeview": "/",
+            "firstvisit": "/",
+            "swarmcontrol": "/BMaster/education",
+            "hiveevaluation": "/BMaster/education",
+            "hiveevaluationlost": "/BMaster/education",
+            "disease": "/BMaster/education",
+            "beeproducts": "/BMaster/products",
+            "beeproductsstock": "/BMaster/products",
+            "nucmakingworkshop": "/workshop"
+          },
+          "regex": [
+            [
+              "workshop$",
+              "/workshop"
+            ]
+          ],
+          "else": "410"
+        },
+        {
+          "param": "view",
+          "values": {
+            "homeview": "/",
+            "hostingview": "/CSC/web_hosting",
+            "buysellhomeview": "/marketplace",
+            "workshopsview": "/workshop",
+            "productview": "/shop",
+            "jobview": "/jobs",
+            "contactview": "/HelpDesk/contact",
+            "membersview": "/membership",
+            "mailview": "/newsletters",
+            "newsletterview": "/newsletters",
+            "bmasterbreederview": "/BMaster/products",
+            "helpdeskhomeview": "/HelpDesk",
+            "botanicalnameview": "/ENCY/BotanicalNameView",
+            "forumulaview": "/ENCY/Formula",
+            "formulaview": "/ENCY/Formula"
+          },
+          "else": "410"
+        }
+      ],
+      "default": "/"
+    },
+    "page.cgi": {
+      "alias": "index.cgi"
+    },
+    "forager/index.cgi": {
+      "alias": "index.cgi"
+    },
+    "buyandsell/buy.cgi": {
+      "rules": [
+        {
+          "param": "submit_logon",
+          "to": "410"
+        },
+        {
+          "param": "record_id",
+          "to": "410"
+        },
+        {
+          "param": "display_details_view.x",
+          "to": "410"
+        }
+      ],
+      "default": "/marketplace"
+    },
+    "faq/faq.cgi": {
+      "rules": [
+        {
+          "param": "submit_logon",
+          "to": "410"
+        }
+      ],
+      "default": "/faq"
+    },
+    "ency/herbs.cgi": {
+      "rules": [
+        {
+          "param": "submit_logon",
+          "to": "410"
+        },
+        {
+          "param": "record_id",
+          "match": "^[0-9]{1,6}$",
+          "to": "/ENCY/herb_detail/{value}",
+          "else": "/ENCY/BotanicalNameView"
+        }
+      ],
+      "default": "/ENCY/BotanicalNameView"
+    },
+    "usbm/herbs.cgi": {
+      "alias": "ency/herbs.cgi"
+    },
+    "ency/formulas.cgi": {
+      "default": "/ENCY/Formula"
+    },
+    "csc/csc.cgi": {
+      "rules": [
+        {
+          "param": "submit_logon",
+          "to": "410"
+        }
+      ],
+      "default": "/CSC"
+    },
+    "csc/helpdesk.cgi": {
+      "default": "/HelpDesk"
+    },
+    "apis/yards.cgi": {
+      "default": "410"
+    },
+    "apis/pallet.cgi": {
+      "default": "410"
+    },
+    "apis/queens.cgi": {
+      "default": "410"
+    },
+    "apis/apis.cgi": {
+      "default": "410"
+    },
+    "apis/indicator.cgi": {
+      "default": "410"
+    }
+  }
+}

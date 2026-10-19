@@ -1,0 +1,37 @@
+use strict; use warnings;
+use Test::More;
+use FindBin; use lib "$FindBin::Bin/../lib";
+use Comserv::Util::LegacyCgiMap;
+my $m = Comserv::Util::LegacyCgiMap->load("$FindBin::Bin/../config/legacy_redirects.json");
+my @cases = (
+  ['/cgi-bin/index.cgi', 'site=BMaster&view=JobView&session_id=ABC', '/jobs'],
+  ['/cgi-bin/index.cgi', 'site=BMaster&view=HostingView&session_id=YVQV', '/CSC/web_hosting'],
+  ['/cgi-bin/index.cgi/cgi-bin/index.cgi', 'site=Forager&view=ProductView', '/shop'],
+  ['/cgi-bin/beetalk.beemaster.ca/cgi-bin/index.cgi', 'site=BMaster', '/'],
+  ['/cgi-bin/index.cgi', 'site=BMaster&page=SwarmControl', '/BMaster/education'],
+  ['/cgi-bin/index.cgi', 'site=BMaster&page=BeeProductsStock', '/BMaster/products'],
+  ['/cgi-bin/index.cgi', 'site=BMaster&page=QueenRearingWorkshop', '/workshop'],
+  ['/cgi-bin/index.cgi', 'site=BMaster&page=EarthHeartColective', '410'],
+  ['/cgi-bin/index.cgi', 'site=BMaster&procedure=WinterizingYard', '410'],
+  ['/cgi-bin/index.cgi', 'site=BMaster&view=ProceduresView', '410'],
+  ['/cgi-bin/index.cgi', 'site=BMaster&submit_logon=1&view=JobView', '410'],
+  ['/cgi-bin/index.cgi', 'session_id=X&site=Forager', '/'],
+  ['/cgi-bin/', 'session_id=X&view=MembersView', '/membership'],
+  ['/cgi-bin/index.cgi', '&?site=BMaster&view=MailView', '/newsletters'],
+  ['/cgi-bin/BuyAndSell/buy.cgi', 'site=BMaster&session_id=R&&display_details_view.x&record_id=3&Small+Perl+Programing+Jobs', '410'],
+  ['/cgi-bin/BuyAndSell/buy.cgi', 'site=BMaster&display_add_form=on', '/marketplace'],
+  ['/cgi-bin/ENCY/herbs.cgi', 'site=BMaster&view=HerbDetailView&record_id=31', '/ENCY/herb_detail/31'],
+  ['/cgi-bin/ENCY/herbs.cgi', 'record_id=31x', '/ENCY/BotanicalNameView'],
+  ['/cgi-bin/ENCY/herbs.cgi', 'site=BMaster&view=BotanicalNameView', '/ENCY/BotanicalNameView'],
+  ['/cgi-bin/FAQ/faq.cgi', 'site=MonasheeSupport&sort_field1=category', '/faq'],
+  ['/cgi-bin/Apis/yards.cgi', 'site=BMaster&view=YardsView', '410'],
+  ['/cgi-bin/CSC/csc.cgi', 'site=CSC&view=OpensourceView', '/CSC'],
+  ['/cgi-bin/computersystemconsulting.ca/cgi-bin/CSC/csc.cgi', '', '/CSC'],
+  ['/cgi-bin/ENCY/formulas.cgi', '', '/ENCY/Formula'],
+  ['/cgi-bin/Hal.archives+louver+yes.fr', 'site=x', '410'],
+  ['/cgi-bin/BuyAndSell/default', 'v', '410'],
+  ['/cgi-bin/index.php', '', '410'],
+  ['/cgi-bin/index.cgi', 'view=http://evil.example/', '410'],
+);
+for my $t (@cases) { my ($got) = $m->resolve(@$t[0,1]); is($got, $t->[2], "$t->[0]?$t->[1]") }
+done_testing;
