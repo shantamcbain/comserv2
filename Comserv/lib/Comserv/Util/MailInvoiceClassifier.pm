@@ -250,7 +250,9 @@ sub accounts_for_site {
             'user_mailboxes is not available yet. Run Schema Compare before saving a mail server.');
         return ([], 'Mailbox table is not created yet. Run Schema Compare, then save the mail server.');
     }
-    my @rows = eval { $rs->search({ sitename => $sitename })->all };
+    my $has_folders = $self->_mailbox_has_folders($rs);
+    my @rows = eval { $rs->search({ sitename => $sitename },
+        ($has_folders ? () : { columns => [ grep { $_ ne 'imap_folders' } $rs->result_source->columns ] }))->all };
     if ($@) {
         $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'accounts_for_site', "Mailbox lookup failed: $@");
         return ([], 'Could not read saved mail servers.');
@@ -269,6 +271,7 @@ sub accounts_for_site {
             imap_host      => $row->imap_host,
             imap_port      => $row->imap_port || 993,
             imap_security  => $row->imap_security || 'ssl',
+            imap_folders   => ($has_folders ? $row->get_column('imap_folders') : undef),
         };
     }
     $note = @accounts
@@ -285,7 +288,7 @@ sub mailbox_summaries {
     my $ready = eval { $rs->search({}, { rows => 1 })->count; 1 };
     return ([], 'Mailbox table is not created yet. Run Schema Compare, then save the mail server.') unless $ready;
     my @rows = eval {
-        $rs->search({ sitename => $sitename }, { order_by => 'email_address' })->all;
+        $rs->search({ sitename => $sitename }, { order_by => 'email_address', %{ $self->_mb_attrs($rs) } })->all;
     };
     return ([], 'Could not read saved mail servers.') if $@;
     my @out;
@@ -325,7 +328,7 @@ sub save_mailbox {
     my $ready = eval { $rs->search({}, { rows => 1 })->count; 1 };
     return 'Mailbox table is not created yet. Run Schema Compare, then save again.' unless $ready;
 
-    my $existing = eval { $rs->search({ sitename => $sitename, email_address => $email })->first };
+    my $existing = eval { $rs->search({ sitename => $sitename, email_address => $email }, $self->_mb_attrs($rs))->first };
     return "Could not read the mailbox row: $@" if $@;
     my $password = $m{password} // '';
     $password =~ s/^\s+|\s+$//g;
@@ -351,6 +354,7 @@ sub save_mailbox {
             imap_host      => $host,
             imap_port      => $port + 0,
             imap_security  => $security,
+            ( $self->_mailbox_has_folders($rs) ? ( imap_folders => $self->clean_folders($m{imap_folders}) ) : () ),
             user_id        => $c->session->{user_id},
             updated_at     => $now,
             ($existing ? () : (created_at => $now)),
@@ -386,7 +390,7 @@ sub delete_mailbox {
     return 'No address to remove.' unless $email && $sitename;
     my $rs = eval { $c->model('DBEncy')->resultset('UserMailbox') };
     return 'Mailbox table is not loaded.' unless $rs;
-    my $row = eval { $rs->search({ sitename => $sitename, email_address => $email })->first };
+    my $row = eval { $rs->search({ sitename => $sitename, email_address => $email }, $self->_mb_attrs($rs))->first };
     return "Could not read the mailbox row: $@" if $@;
     return 'That address is not on the mail-server list.' unless $row;
     eval { $row->delete };
@@ -451,15 +455,30 @@ sub _fetch_inbox {
         $imap->User($acct->{login_username});
         $imap->Password($acct->{password});
         die "login rejected\n" unless $imap->login;
-        $imap->select('INBOX') or die "could not open INBOX\n";
-        my @uids = $imap->messages or ();
-        @uids = splice(@uids, -200) if @uids > 200;
-        for my $uid (@uids) {
-            my $content = $imap->message_string($uid);
-            next unless $content;
-            my $msg = $self->_parse_message($content, $acct->{email_address} || $acct->{login_username});
-            push @messages, $msg if $msg;
+        my $sep = eval { $imap->separator } || '/';
+        my $opened = 0;
+        for my $folder (@{ $self->folder_list($acct->{imap_folders}) }) {
+            my @try = ($folder);
+            (my $alt = $folder) =~ s{[/.]}{$sep}g;
+            push @try, $alt if $alt ne $folder;
+            my ($ok) = grep { $imap->select($_) } @try;
+            unless ($ok) {
+                $self->{logging}->log_with_details(undef, 'warn', __FILE__, __LINE__, '_fetch_inbox',
+                    "Folder not found: $folder");
+                next;
+            }
+            $opened++;
+            my @uids = $imap->messages or ();
+            @uids = splice(@uids, -200) if @uids > 200 && $ok =~ /^INBOX$/i;   # subfolders: read all
+            for my $uid (@uids) {
+                my $content = $imap->message_string($uid);
+                next unless $content;
+                my $msg = $self->_parse_message($content,
+                    ($acct->{email_address} || $acct->{login_username}) . ($ok =~ /^INBOX$/i ? '' : ":$ok"));
+                push @messages, $msg if $msg;
+            }
         }
+        die "could not open any folder\n" unless $opened;
         $imap->logout;
     } catch {
         my $err = $_;
@@ -471,6 +490,106 @@ sub _fetch_inbox {
         return ([], substr($err, 0, 180));
     };
     return (\@messages, '');
+}
+
+# Pure: "INBOX, INBOX/coop" -> ['INBOX','INBOX/coop']; blank -> ['INBOX'].
+sub folder_list {
+    my ($self, $spec) = @_;
+    my @f = grep { length } map { s/^\s+|\s+$//gr } split /,/, ($spec // '');
+    return @f ? \@f : ['INBOX'];
+}
+
+# Pure: sanitize the folder setting (letters, digits, space, . / _ - and commas only).
+sub clean_folders {
+    my ($self, $spec) = @_;
+    my @f = grep { /^[\w .\/\-&]{1,100}$/ } map { s/^\s+|\s+$//gr } split /,/, ($spec // '');
+    return @f ? join(', ', @f) : undef;
+}
+
+# Select attrs that skip imap_folders until Schema Compare adds it.
+sub _mb_attrs {
+    my ($self, $rs) = @_;
+    return $self->_mailbox_has_folders($rs) ? {} : { columns => [ grep { $_ ne 'imap_folders' } $rs->result_source->columns ] };
+}
+
+sub _mailbox_has_folders {
+    my ($self, $rs) = @_;
+    return $self->{_has_folders} //= (eval { $rs->search({}, { columns => ['imap_folders'], rows => 1 })->first; 1 } ? 1 : 0);
+}
+
+# ---- Square receipt (HTML) parser -------------------------------------------
+# Square's text/plain part only says "You paid $X"; the items are in the HTML.
+sub html_lines {
+    my ($self, $h) = @_;
+    return [] unless defined $h && length $h;
+    require HTML::Entities;
+    $h =~ s{<(style|script)\b.*?</\1>}{}gis;
+    $h =~ s{<br\s*/?>|</(?:p|div|tr|td|th|li|h\d)>}{\n}gi;
+    $h =~ s/<[^>]+>//g;
+    $h = HTML::Entities::decode_entities($h);
+    return [ grep { length } map { s/^\s+|\s+$//gr } split /\n/, $h ];
+}
+
+my $MONEY = qr/^-?\$(\d+(?:,\d{3})*\.\d{2})$/;
+sub _money { my $v = shift; $v =~ s/,//g; return 0 + $v }
+
+# Returns { code, items => [{name,qty,uom,unit_price,line_total,reg_price,discount}], subtotal, gst, total, line_sum }
+# or undef when the HTML is not a Square itemized receipt.
+sub parse_square_receipt {
+    my ($self, $html) = @_;
+    my $L = ref $html ? $html : $self->html_lines($html);
+    my ($code) = map { substr($_, 1) } grep { /^#\w{4}$/ } @$L;
+    return undef unless $code;
+    my $i = 0;
+    $i++ while $i < @$L && $L->[$i] !~ $MONEY;
+    return undef if $i >= @$L;
+    $i++;
+    $i += 2 if $i < @$L && $L->[$i] =~ /^#\w{4}$/;    # newer layout repeats #code + date
+    my @items;
+    while ($i < @$L) {
+        my $l = $L->[$i];
+        last if $l =~ /^(?:(?:purchase )?subtotal|total)$/i;
+        my $cur = @items ? $items[-1] : undef;
+        if ($l =~ $MONEY) {
+            $cur->{line_total} = _money($1) if $cur && !defined $cur->{line_total};
+        } elsif ($l =~ /^reg price/i) {
+            (my $v = $l) =~ s/[^\d.]//g;
+            if (!length $v && $i + 1 < @$L && $L->[$i + 1] =~ $MONEY) { $i++; $v = $1 }
+            $cur->{reg_price} = _money($v) if $cur && length $v;
+        } elsif ($l =~ /^Discount:\s*(.*)/) {
+            $cur->{discount} = $1 if $cur;
+        } elsif ($l =~ /^\(-?\$[\d.,]+\)$/) {
+        } elsif ($l =~ /^([\d.]+)\s*(lb|kg|g)\s*@\s*\$([\d.]+)/) {
+            @{$cur}{qw(qty uom unit_price)} = (0 + $1, $2, 0 + $3) if $cur;
+        } elsif ($l =~ /^\(\$([\d.]+) ea\.\)$/) {
+            $cur->{unit_price} = 0 + $1 if $cur;
+        } elsif ($l =~ /^\(/) {
+            push @{ $cur->{notes} }, $l if $cur;
+        } else {
+            my ($n, $q) = $l =~ /^(.*?)\s*[\x{00d7}x]\s*(\d+)$/ ? ($1, $2) : ($l, 1);
+            $n =~ s/\s{2,}/ /g;
+            push @items, { name => $n, qty => 0 + $q, uom => 'each' };
+        }
+        $i++;
+    }
+    @items = grep { defined $_->{line_total} } @items;
+    return undef unless @items;
+    my $after = sub {
+        my $re = shift;
+        for my $j ($i - 1 .. $#$L - 1) {
+            return _money($1) if $L->[$j] =~ $re && $L->[$j + 1] =~ $MONEY;
+        }
+        return undef;
+    };
+    my %r = (code => $code, items => \@items,
+        subtotal => $after->(qr/^(?:purchase )?subtotal$/i), gst => $after->(qr/^GST/), total => $after->(qr/^total$/i));
+    for my $it (@items) {
+        $it->{unit_price} //= $it->{qty} ? sprintf('%.4f', $it->{line_total} / $it->{qty}) + 0 : undef;
+    }
+    my $sum = 0; $sum += $_->{line_total} for @items;
+    $r{line_sum} = sprintf('%.2f', $sum) + 0;
+    $r{sum_ok} = !defined $r{subtotal} || abs($sum - $r{subtotal}) < 0.02 ? 1 : 0;
+    return \%r;
 }
 
 sub _fetch_from_imap {
@@ -553,6 +672,18 @@ sub _parse_message {
             }
         }
     }
+    my $square;
+    my $mime = $from =~ /squareup\.com/i ? eval { require Email::MIME; Email::MIME->new($content) } : undef;
+    if ($mime) {
+        my $html = '';
+        for my $part ($mime->subparts ? $mime->subparts : ($mime)) {
+            for my $p ($part->subparts ? $part->subparts : ($part)) {
+                if (($p->content_type || '') =~ m{text/html}i) { $html = eval { $p->body_str } // ''; last }
+            }
+            last if length $html;
+        }
+        $square = $self->parse_square_receipt($html) if length $html;
+    }
     my $body_lower = lc($body . ' ' . $subject);
     my $is_invoice = 0;
     foreach my $pattern (@{$self->_invoice_patterns}) {
@@ -573,7 +704,8 @@ sub _parse_message {
         subject => $subject,
         date => $date,
         body_preview => substr($body, 0, 4000),
-        is_invoice => $is_invoice,
+        is_invoice => ($square ? 1 : $is_invoice),
+        ($square ? (square_receipt => $square, line_items => $square->{items}) : ()),
     };
 }
 
@@ -659,6 +791,7 @@ sub _classify_message {
     my $text = lc($msg->{subject} . ' ' . $msg->{body_preview} . ' ' . $msg->{from});
     return 'other' unless $msg->{is_invoice};
 
+    return 'grocery' if $msg->{square_receipt};
     my @cats = ('personal', 'csc_internet', 'hosting', 'domain', '3d_filament', 'hardware');
     foreach my $cat (@cats) {
         my $kw = $self->_category_keywords($cat);
@@ -677,6 +810,7 @@ sub _classify_message {
 sub _category_label {
     my ($self, $cat) = @_;
     my %labels = (
+        grocery => 'Groceries (Square receipts)',
         personal => 'Personal (Shanta)',
         csc_internet => 'CSC Internet',
         hosting => 'Hosting',
@@ -691,6 +825,7 @@ sub _category_label {
 sub _category_sites {
     my ($self, $cat) = @_;
     my %sites = (
+        grocery => ['Shanta'],
         personal => ['personal'],
         csc_internet => ['CSC'],
         hosting => ['CSC'],

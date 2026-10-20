@@ -347,6 +347,7 @@ sub save_invoice_mailbox :Path('/Inventory/invoice/save_mailbox') :Args(0) {
         imap_host      => $p->{imap_host},
         imap_port      => $p->{imap_port},
         imap_security  => $p->{imap_security},
+        imap_folders   => $p->{imap_folders},
         login_username => $p->{login_username},
         password       => $p->{password},
     );
