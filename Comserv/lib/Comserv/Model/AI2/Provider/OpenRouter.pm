@@ -47,11 +47,12 @@ sub _resolve_api_key {
     # systemd) miss OPENROUTER_API_KEY from ~/.bashrc. Fall back to the
     # workstation secret file (one line, chmod 600) before the DB lookup.
     if (my $home = $ENV{HOME}) {
-        for my $f ("$home/.comserv/secrets/openrouter_api_key") {
+        # 2026-10-20 (#2580): also read the key Hermes and the shell already use.
+        for my $f ("$home/.comserv/secrets/openrouter_api_key", "$home/.hermes/.env", "$home/.bashrc") {
             next unless -r $f && open(my $fh, '<', $f);
             my $k;
             while (my $l = <$fh>) {
-                if ($f =~ /\.env$/) { ($k) = $l =~ /^\s*(?:export\s+)?OPENROUTER_API_KEY\s*=\s*['"]?([^'"\s]+)/ and last; }
+                if ($f =~ /(?:\.env|\.bashrc)$/) { ($k) = $l =~ /^\s*(?:export\s+)?OPENROUTER_API_KEY\s*=\s*['"]?([^'"\s]+)/ and last; }
                 else { chomp $l; $k = $l if length $l; last; }
             }
             close $fh;
