@@ -643,17 +643,9 @@ sync_host_app_lib() {
 if [ -n "${DEPLOY_MODE:-}" ]; then
     case "$DEPLOY_MODE" in
         "prod")
-            echo "=== PRODUCTION DEPLOY MODE ==="
-            echo "Full production deploy: clean build + push + pull + deploy"
-            # Route through the SINGLE canonical pipeline so every entry point
-            # produces the identical result (build -> push -> pull -> run --no-build).
-            # "prod" mode means production — default the target to prod1
-            # (192.168.1.126). This must BUILD+PUSH on the workstation first,
-            # then pull+run on prod (never build on prod itself). Route through
-            # canonical_deploy_to_nodes so the build happens locally and the
-            # remote node only pulls the pushed digest.
-            canonical_deploy_to_nodes "${PROD_TARGET_HOST:-192.168.1.126}"
-            exit $?
+            # canonical_deploy_to_nodes is defined further down. Calling it
+            # here is "command not found" (exit 127) and the deploy never
+            # starts. Late dispatch after the function definition runs it.
             ;;
 
         "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild"|"push-only")
@@ -1232,7 +1224,9 @@ EOF
             sleep "$H_INT"
         done
         if [ "$HEALTHY" != "1" ]; then
-            echo "❌ HEALTH FAILED. Stopping new container and restarting backup $BK"
+            echo "❌ HEALTH FAILED after ${H_EL}s. Dumping new container before rollback."
+            $REMOTE_SSH "echo '--- curl ---'; curl -sv --max-time 8 http://127.0.0.1:5000/health; echo; echo '--- inspect ---'; docker inspect ${CONTAINER} --format 'status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}} oom={{.State.OOMKilled}} started={{.State.StartedAt}}' 2>&1; echo '--- logs ---'; docker logs --tail 80 ${CONTAINER} 2>&1" || true
+            echo "❌ Stopping new container and restarting backup $BK"
             $REMOTE_SSH "docker stop ${CONTAINER} 2>/dev/null || true; docker rename ${CONTAINER} failed-${CONTAINER}-${REMOTE_TS} 2>/dev/null || docker rm -f ${CONTAINER} 2>/dev/null || true; docker start ${BK} 2>/dev/null && docker rename ${BK} ${CONTAINER} 2>/dev/null || true"
             $REMOTE_SSH "rm -f /tmp/comserv-deploy.lock" || true
             notify_admin_deploy \
@@ -1368,7 +1362,8 @@ canonical_deploy_to_nodes() {
     return 0
 }
 
-# Late dispatch — canonical_deploy* exist now. Pull & Deploy must NEVER build.
+# Late dispatch — canonical_deploy* AND _normalize_deploy_node exist now.
+# --prod must be after _normalize_deploy_node: canonical_deploy_to_nodes calls it.
 _normalize_deploy_node() {
     case "${1:-}" in
         production1|prod1) echo "192.168.1.126" ;;
@@ -1377,6 +1372,14 @@ _normalize_deploy_node() {
         *) echo "$1" ;;
     esac
 }
+
+if [ "${DEPLOY_MODE:-}" = "prod" ]; then
+    echo "=== PRODUCTION DEPLOY MODE ==="
+    echo "Full production deploy: clean build + push + pull + deploy"
+    # Build+push on this workstation, then pull+run on prod. Never build on prod.
+    canonical_deploy_to_nodes "${PROD_TARGET_HOST:-192.168.1.126}"
+    exit $?
+fi
 
 if [ "${DEPLOY_MODE:-}" = "pull-deploy" ]; then
     _pd_node="$(_normalize_deploy_node "${CLI_ARG2:-192.168.1.126}")"

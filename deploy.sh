@@ -643,17 +643,9 @@ sync_host_app_lib() {
 if [ -n "${DEPLOY_MODE:-}" ]; then
     case "$DEPLOY_MODE" in
         "prod")
-            echo "=== PRODUCTION DEPLOY MODE ==="
-            echo "Full production deploy: clean build + push + pull + deploy"
-            # Route through the SINGLE canonical pipeline so every entry point
-            # produces the identical result (build -> push -> pull -> run --no-build).
-            # "prod" mode means production — default the target to prod1
-            # (192.168.1.126). This must BUILD+PUSH on the workstation first,
-            # then pull+run on prod (never build on prod itself). Route through
-            # canonical_deploy_to_nodes so the build happens locally and the
-            # remote node only pulls the pushed digest.
-            canonical_deploy_to_nodes "${PROD_TARGET_HOST:-192.168.1.126}"
-            exit $?
+            # canonical_deploy_to_nodes is defined further down. Calling it
+            # here is "command not found" (exit 127) and the deploy never
+            # starts. Late dispatch after the function definition runs it.
             ;;
 
         "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild"|"push-only")
@@ -1179,7 +1171,9 @@ EOF
         BK="bk-${CONTAINER}-${REMOTE_TS}"
         $REMOTE_SSH "date +%s > /tmp/comserv-deploy.lock"
         echo "--- [3/6] RENAME running $CONTAINER → $BK (keep serving during pull) ---"
-        $REMOTE_SSH "if docker inspect ${CONTAINER} >/dev/null 2>&1; then docker rename ${CONTAINER} ${BK}; echo renamed; else echo no-live-container; fi"
+        # The live container may be running under a bk-* name (left by an older
+        # rollback that did not rename back). Treat the running bk-* as live.
+        $REMOTE_SSH "if docker inspect ${CONTAINER} >/dev/null 2>&1; then docker rename ${CONTAINER} ${BK}; echo renamed; else LIVE=\$(docker ps --format '{{.Names}}' | grep -E '^bk-comserv2?-web-prod-' | head -1); if [ -n \"\$LIVE\" ]; then docker rename \"\$LIVE\" ${BK}; echo \"renamed running \$LIVE -> ${BK}\"; else echo no-live-container; fi; fi"
         echo "--- [4/6] PULL $IMAGE (no build, no host source) ---"
         if ! $REMOTE_SSH "docker pull ${IMAGE}"; then
             echo "❌ Remote pull failed. Restarting backup if we renamed."
@@ -1207,7 +1201,7 @@ start_prod_container_from_image ${IMAGE} ${CONTAINER}
 EOF
         then
             echo "❌ Remote start failed — restarting backup $BK"
-            $REMOTE_SSH "docker start ${BK} 2>/dev/null || true" || true
+            $REMOTE_SSH "docker rm -f ${CONTAINER} 2>/dev/null; docker start ${BK} 2>/dev/null && docker rename ${BK} ${CONTAINER} 2>/dev/null || true" || true
             $REMOTE_SSH "rm -f /tmp/comserv-deploy.lock" || true
             notify_admin_deploy \
                 "Production deploy start failed — backup ${BK} running" \
@@ -1216,20 +1210,27 @@ EOF
         fi
 
         echo "--- [6/6] HEALTH GATE ---"
-        local HEALTHY=0 i OK
-        for i in $(seq 1 45); do
-            OK=0
+        # Time-based: production startup can take minutes (Starman preload).
+        local HEALTHY=0 i=0 OK H_START H_EL
+        local H_TIMEOUT="${HEALTH_TIMEOUT_S:-600}" H_INT="${HEALTH_INTERVAL_S:-5}"
+        H_START=$(date +%s)
+        while :; do
+            i=$((i + 1)); OK=0
             $REMOTE_SSH "curl -fs --max-time 8 http://127.0.0.1:5000/health" >/dev/null 2>&1 && OK=1
-            if [ "$OK" = "1" ]; then HEALTHY=1; echo "✅ healthy (attempt $i)"; break; fi
-            echo "  health attempt $i failed, waiting 2s..."
-            sleep 2
+            H_EL=$(( $(date +%s) - H_START ))
+            if [ "$OK" = "1" ]; then HEALTHY=1; echo "✅ healthy (attempt $i, ${H_EL}s)"; break; fi
+            if [ "$H_EL" -ge "$H_TIMEOUT" ]; then break; fi
+            echo "  health attempt $i failed (${H_EL}s/${H_TIMEOUT}s), waiting ${H_INT}s..."
+            sleep "$H_INT"
         done
         if [ "$HEALTHY" != "1" ]; then
-            echo "❌ HEALTH FAILED. Stopping new container and restarting backup $BK"
-            $REMOTE_SSH "docker stop ${CONTAINER} 2>/dev/null || true; docker rename ${CONTAINER} failed-${CONTAINER}-${REMOTE_TS} 2>/dev/null || docker rm -f ${CONTAINER} 2>/dev/null || true; docker start ${BK} 2>/dev/null || true"
+            echo "❌ HEALTH FAILED after ${H_EL}s. Dumping new container before rollback."
+            $REMOTE_SSH "echo '--- curl ---'; curl -sv --max-time 8 http://127.0.0.1:5000/health; echo; echo '--- inspect ---'; docker inspect ${CONTAINER} --format 'status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}} oom={{.State.OOMKilled}} started={{.State.StartedAt}}' 2>&1; echo '--- logs ---'; docker logs --tail 80 ${CONTAINER} 2>&1" || true
+            echo "❌ Stopping new container and restarting backup $BK"
+            $REMOTE_SSH "docker stop ${CONTAINER} 2>/dev/null || true; docker rename ${CONTAINER} failed-${CONTAINER}-${REMOTE_TS} 2>/dev/null || docker rm -f ${CONTAINER} 2>/dev/null || true; docker start ${BK} 2>/dev/null && docker rename ${BK} ${CONTAINER} 2>/dev/null || true"
             $REMOTE_SSH "rm -f /tmp/comserv-deploy.lock" || true
             notify_admin_deploy \
-                "Production deploy unhealthy — backup ${BK} running" \
+                "Production deploy unhealthy — previous container restored as ${CONTAINER}" \
                 "Host: ${TARGET_HOST}\nBackup: ${BK}\nNew ${CONTAINER} failed /health. Freshly renamed backup container is now running. Investigate the failed deploy." || true
             return 1
         fi
@@ -1361,7 +1362,8 @@ canonical_deploy_to_nodes() {
     return 0
 }
 
-# Late dispatch — canonical_deploy* exist now. Pull & Deploy must NEVER build.
+# Late dispatch — canonical_deploy* AND _normalize_deploy_node exist now.
+# --prod must be after _normalize_deploy_node: canonical_deploy_to_nodes calls it.
 _normalize_deploy_node() {
     case "${1:-}" in
         production1|prod1) echo "192.168.1.126" ;;
@@ -1370,6 +1372,14 @@ _normalize_deploy_node() {
         *) echo "$1" ;;
     esac
 }
+
+if [ "${DEPLOY_MODE:-}" = "prod" ]; then
+    echo "=== PRODUCTION DEPLOY MODE ==="
+    echo "Full production deploy: clean build + push + pull + deploy"
+    # Build+push on this workstation, then pull+run on prod. Never build on prod.
+    canonical_deploy_to_nodes "${PROD_TARGET_HOST:-192.168.1.126}"
+    exit $?
+fi
 
 if [ "${DEPLOY_MODE:-}" = "pull-deploy" ]; then
     _pd_node="$(_normalize_deploy_node "${CLI_ARG2:-192.168.1.126}")"
