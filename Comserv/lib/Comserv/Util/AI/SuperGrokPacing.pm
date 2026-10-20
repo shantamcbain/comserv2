@@ -343,6 +343,13 @@ sub meter_status {
     my %ok = map { ($_ => 1) } @METER_SOURCES;
     my @m = grep { $ok{ $_->{source} // '' } } @{ clean_readings($in{readings}) };
     my $last = $m[-1];
+    # Oct 20 2026: history only gets a row when the value changes; the add-on still
+    # posts unchanged values (grokcom_usage.json 'at' = last seen). Fresher wins.
+    my $ls = $in{last_seen};
+    if ($ls && defined $ls->{at} && defined $ls->{value} && $ls->{value} =~ /^-?\d+(?:\.\d+)?$/
+        && (!$last || $ls->{at} > $last->{at})) {
+        $last = { at => $ls->{at}, value => $ls->{value}, kind => 'used', source => 'addon' };
+    }
     my $age_h = $last ? ($now - $last->{at}) / 3600 : undef;
     my $stale = !defined $age_h || $age_h > $METER_STALE_H ? 1 : 0;
     return {

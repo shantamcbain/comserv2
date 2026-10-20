@@ -248,4 +248,16 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
     ok( (grep { $_->{kind} eq 'day_rise' && $_->{basis} eq 'estimate' } @{ $old->{alerts} }), 'meter 3 h old -> estimate again');
 }
 
+# Oct 20 2026: unchanged add-on posts keep the meter fresh (history row is 36 h old).
+{
+    my $P = 'Comserv::Util::AI::SuperGrokPacing';
+    my $now = 1_800_000_000;
+    my @rd = ({ at => $now - 36 * 3600, value => 48, kind => 'used', source => 'addon' });
+    ok $P->can('meter_status')->(readings => \@rd, now => $now)->{stale}, 'history only: 36 h -> stale';
+    my $ms = $P->can('meter_status')->(readings => \@rd, now => $now, last_seen => { at => $now - 240, value => 48 });
+    ok !$ms->{stale}, 'last_seen 4 min ago -> fresh';
+    is $ms->{age_h}, '0.1', '... age from last_seen';
+    ok $P->can('meter_status')->(readings => \@rd, now => $now, last_seen => { at => $now - 240, value => undef })->{stale}, 'last_seen without value ignored';
+}
+
 done_testing;

@@ -1922,7 +1922,17 @@ sub supergrok_meter {
     require Comserv::Util::AI::SuperGrokPacing;
     my $root = eval { $c->path_to('') . '' } // '.';
     $root =~ s{/$}{};
-    return Comserv::Util::AI::SuperGrokPacing::meter_status(readings => $self->_supergrok_readings($root), now => $a{now} // time);
+    return Comserv::Util::AI::SuperGrokPacing::meter_status(readings => $self->_supergrok_readings($root), now => $a{now} // time, last_seen => _grokcom_now($root));
+}
+
+# Live grok.com meter (add-on rewrites the file on every post; 'at' = last seen).
+sub _grokcom_now {
+    my ($root) = @_;
+    return eval {
+        require JSON::MaybeXS; open my $gfh, '<', "$root/root/static/ai/grokcom_usage.json" or die;
+        local $/; my $j = JSON::MaybeXS::decode_json(<$gfh>); close $gfh;
+        { value => $j->{build}, at => Comserv::Util::AI::HealthChecks::iso_epoch($j->{at}) };
+    };
 }
 
 sub supergrok_pacing {
@@ -1959,17 +1969,13 @@ sub supergrok_pacing {
     };
     my $fit = $P->can('fit_rate')->(readings => \@rd, units => $units, now => $now, anchor => $anchor);
     # Live meter: grok.com add-on rewrites this file on every post (history only on change).
-    my $gnow = eval {
-        require JSON::MaybeXS; open my $gfh, '<', "$root/root/static/ai/grokcom_usage.json" or die;
-        local $/; my $j = JSON::MaybeXS::decode_json(<$gfh>); close $gfh;
-        { value => $j->{build}, at => Comserv::Util::AI::HealthChecks::iso_epoch($j->{at}) };
-    };
+    my $gnow = _grokcom_now($root);
     my $p = $P->can('pacing')->(readings => \@rd, units => $units, rate => $fit->{rate}, now => $now, anchor => $anchor,
         ($gnow ? (meter_now => $gnow) : ()),
         alert_cfg => (eval { $self->pacing_config($c)->{alerts} } || {}),
         daily_cfg => (eval { $self->pacing_config($c)->{daily} } || {}));
     $p->{calibration} = $fit;
-    $p->{meter} = $P->can('meter_status')->(readings => \@rd, now => $now);
+    $p->{meter} = $P->can('meter_status')->(readings => \@rd, now => $now, last_seen => $gnow);
     # Daily switch state written by ~/.hermes/scripts/supergrok_daily_guard.py (owner).
     if (open my $gfh, '<', "$root/root/static/ai/supergrok_guard.json") {
         local $/; my $g = eval { JSON::PP->new->decode(<$gfh>) } || {}; close $gfh;
