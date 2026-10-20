@@ -15,6 +15,9 @@ our %SOURCING_ENUM = (
     gmo            => [qw(non_gmo_verified gmo unknown)],
 );
 our @SOURCING_COLS = ( keys(%SOURCING_ENUM), qw(local_km certifier cert_verified) );
+# Columns stored in Accounting::InventoryItemAttributes (food_category is derived from food_category_id).
+our @ATTR_COLS     = qw(food_category_id production animal_raising catch_method gmo local_km certifier cert_verified);
+our $ATTR_SOURCE   = 'Accounting::InventoryItemAttributes';
 our @PREF_COLS     = qw(prefer_organic avoid_feedlot ethics_weight);
 our $LOCAL_KM      = 160;
 our %RISK_PTS      = ( low => 0, med => 1, high => 2 );
@@ -2485,20 +2488,39 @@ sub save_item_product {
     $brand = undef if defined $brand && $brand !~ /\S/;
     my $src_ok = $self->sourcing_cols_ready($c);
     my $src;
-    if ( $src_ok && $args->{sourcing_submitted} ) {
+    if ( $src_ok && $args->{sourcing_submitted} && $kind eq 'inventory' ) {
         ( $src, my $serr ) = $self->validate_sourcing($args);
         return { ok => 0, error => $serr } if $serr;
     }
     my ( $ok, $err ) = ( 0, 'Could not save product details.' );
     try {
         die "item not yours\n" unless $self->_item_owned( $c, $kind, $iid );
-        my $rs  = $c->model('DBEncy')->resultset('HealthKitchen::ItemProduct');
-        my %key = ( sitename => $self->sitename($c), item_kind => $kind, item_id => $iid );
-        my %data = ( brand => $brand, upc => ( length $upc ? $upc : undef ), size_value => $sv, size_unit => $su );
-        %data = ( %data, %$src ) if $src;
-        my $row = $rs->search( \%key, ( $src_ok ? {} : { columns => $self->_base_cols( $c, 'HealthKitchen::ItemProduct', \@SOURCING_COLS ) } ) )->single;
-        if ($row) { $row->update( \%data ) }
-        else      { $rs->create( { %key, %data } ) }
+        my $schema = $c->model('DBEncy');
+        my $site   = $self->sitename($c);
+        $schema->txn_do( sub {
+            my $rs  = $schema->resultset('HealthKitchen::ItemProduct');
+            my %key = ( sitename => $site, item_kind => $kind, item_id => $iid );
+            # Site items: barcode lives on inventory_items; hk_item_product.upc is pantry-only.
+            my %data = ( brand => $brand, size_value => $sv, size_unit => $su,
+                         upc => ( $kind eq 'pantry' && length $upc ? $upc : undef ) );
+            if ( $kind eq 'inventory' && length $upc ) {
+                my $item = $schema->resultset('Accounting::InventoryItem')->find($iid);
+                $item->update( { barcode => $upc, barcode_type => $self->barcode_type_for($upc) } ) if $item;
+            }
+            my $row = $rs->search( \%key )->single;
+            if ($row) { $row->update( \%data ) }
+            else      { $rs->create( { %key, %data } ) }
+            if ($src) {
+                my %attr = map { $_ => $src->{$_} } grep { $_ ne 'food_category' } @ATTR_COLS;
+                if ( !defined $attr{food_category_id} && defined $src->{food_category} ) {
+                    $attr{food_category_id} = $self->_category_id_for_key( $c, $src->{food_category} );
+                }
+                my $ars = $schema->resultset($ATTR_SOURCE);
+                my $arow = $ars->search( { item_id => $iid } )->single;
+                if ($arow) { $arow->update( \%attr ) }
+                else       { $ars->create( { item_id => $iid, sitename => $site, %attr } ) }
+            }
+        } );
         $ok = 1;
     }
     catch {
@@ -2556,28 +2578,31 @@ sub attach_links_and_products {
     }
     if ( $self->product_ready($c) ) {
         try {
-            my $src_ok  = $self->sourcing_cols_ready($c);
-            my $factors = $src_ok ? $self->list_sourcing_factors($c) : [];
-            my $prefs   = $src_ok ? $self->get_prefs($c) : {};
-            for my $p ( $schema->resultset('HealthKitchen::ItemProduct')->search( { sitename => $site },
-                    ( $src_ok ? {} : { columns => $self->_base_cols( $c, 'HealthKitchen::ItemProduct', \@SOURCING_COLS ) } ) )->all ) {
+            for my $p ( $schema->resultset('HealthKitchen::ItemProduct')->search( { sitename => $site } )->all ) {
                 my $r = $by{ $p->item_kind . ':' . $p->item_id } or next;
                 $r->{product} = {
                     brand      => $p->brand,
-                    upc        => $p->upc // $r->{barcode},
+                    upc        => ( $p->item_kind eq 'pantry' ? $p->upc : undef ) // $r->{barcode},
                     size_value => $p->size_value,
                     size_unit  => $p->size_unit,
                 };
-                if ($src_ok) {
-                    $r->{product}{$_} = $p->get_column($_) for @SOURCING_COLS;
-                    $self->_enrich_product( $r->{product}, $factors, $prefs );
-                }
             }
         }
         catch {
             $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'attach_links_and_products',
                 "products failed: $_" );
         };
+    }
+    if ( $self->sourcing_cols_ready($c) ) {
+        my @inv = grep { $_->{item_kind} eq 'inventory' && $_->{item_key_id} } @$rows;
+        my $attrs   = $self->_attrs_by_item( $c, [ map { $_->{item_key_id} } @inv ] );
+        my $factors = %$attrs ? $self->list_sourcing_factors($c) : [];
+        my $prefs   = %$attrs ? $self->get_prefs($c) : {};
+        for my $r (@inv) {
+            my $a = $attrs->{ $r->{item_key_id} } or next;
+            $r->{product}{$_} = $a->{$_} for keys %$a;
+            $self->_enrich_product( $r->{product}, $factors, $prefs );
+        }
     }
     return;
 }
@@ -2606,7 +2631,7 @@ sub _cols_ready {
 
 sub sourcing_cols_ready {
     my ( $self, $c ) = @_;
-    return $self->_cols_ready( $c, 'HealthKitchen::ItemProduct', [@SOURCING_COLS] );
+    return $self->table_ready( $c, $ATTR_SOURCE );
 }
 
 sub prefs_cols_ready {
@@ -2626,6 +2651,53 @@ sub _base_cols {
     return [ grep { !$x{$_} } $c->model('DBEncy')->source($source)->columns ];
 }
 
+# Pure: inventory barcode_type from a normalized barcode's length.
+sub barcode_type_for {
+    my ( $self, $code ) = @_;
+    my $n = length( $code // '' );
+    return $n == 12 || $n == 8 ? 'upc' : $n == 13 ? 'ean' : $n ? 'other' : undef;
+}
+
+# item_id => { attribute cols, food_category (factor key), food_category_path } for this site.
+# $ids undef = all items on the site.
+sub _attrs_by_item {
+    my ( $self, $c, $ids ) = @_;
+    return {} if $ids && !@$ids;
+    my %out;
+    try {
+        require Comserv::Util::CategoryManager;
+        my $cm     = Comserv::Util::CategoryManager->new;
+        my $schema = $c->model('DBEncy');
+        my %path   = map { $_->{id} => $_->{path} }
+            @{ $cm->path_options( [ map { +{ $_->get_columns } }
+                $schema->resultset('Accounting::InventoryCategory')->search( { sitename => $self->sitename($c) } )->all ], { map { $_ => 1 } qw(brew 3d) } ) };
+        my %q = ( sitename => $self->sitename($c) );
+        $q{item_id} = { -in => $ids } if $ids;
+        for my $a ( $schema->resultset($ATTR_SOURCE)->search( \%q )->all ) {
+            my %h = map { $_ => $a->get_column($_) } @ATTR_COLS;
+            my $pth = defined $h{food_category_id} ? $path{ $h{food_category_id} } : undef;
+            $h{food_category_path} = $pth;
+            $h{food_category}      = $cm->food_key_for_path($pth);
+            $out{ $a->item_id } = \%h;
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, '_attrs_by_item', "$_" );
+    };
+    return \%out;
+}
+
+# Factor key (e.g. 'beef') -> inventory_categories.id on this site via the starter tree path.
+sub _category_id_for_key {
+    my ( $self, $c, $key ) = @_;
+    require Comserv::Util::CategoryManager;
+    my $cm   = Comserv::Util::CategoryManager->new;
+    my $want = $cm->path_for_food_key($key) or return undef;
+    my ($o) = grep { $_->{path} eq $want }
+        @{ $cm->options_for_site( $c->model('DBEncy'), $self->sitename($c), $c->stash->{enabled_modules} || {} ) };
+    return $o ? $o->{id} : undef;
+}
+
 # Pure: validate sourcing input against allowed values. Returns ( \%clean, $error ).
 # Empty/absent -> undef (cleared).
 sub validate_sourcing {
@@ -2638,6 +2710,12 @@ sub validate_sourcing {
         return ( undef, "Invalid value for $f." ) unless grep { $_ eq $v } @{ $SOURCING_ENUM{$f} };
         $out{$f} = $v;
     }
+    my $fcid = $a->{food_category_id};
+    if ( defined $fcid && $fcid ne '' ) {
+        return ( undef, 'Invalid food category.' ) unless $fcid =~ /^\d{1,10}$/;
+        $out{food_category_id} = 0 + $fcid;
+    }
+    else { $out{food_category_id} = undef }
     my $km = $a->{local_km};
     if ( defined $km && $km ne '' ) {
         return ( undef, 'Distance must be a whole number of km (0-20000).' )
@@ -2799,19 +2877,12 @@ sub _enrich_product {
 # inventory_item_id => enriched product (for nutrition foods linked to inventory).
 sub _products_by_inventory {
     my ( $self, $c ) = @_;
-    return {} unless $self->product_ready($c) && $self->sourcing_cols_ready($c);
-    my ( %out, $factors, $prefs );
-    $factors = $self->list_sourcing_factors($c);
-    $prefs   = $self->get_prefs($c);
-    try {
-        for my $p ( $c->model('DBEncy')->resultset('HealthKitchen::ItemProduct')->search(
-                { sitename => $self->sitename($c), item_kind => 'inventory' } )->all ) {
-            $out{ $p->item_id } = $self->_enrich_product( { $p->get_columns }, $factors, $prefs );
-        }
-    }
-    catch {
-        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, '_products_by_inventory', "$_" );
-    };
+    return {} unless $self->sourcing_cols_ready($c);
+    my $attrs = $self->_attrs_by_item( $c, undef );
+    return {} unless %$attrs;
+    my $factors = $self->list_sourcing_factors($c);
+    my $prefs   = $self->get_prefs($c);
+    my %out = map { $_ => $self->_enrich_product( { %{ $attrs->{$_} } }, $factors, $prefs ) } keys %$attrs;
     return \%out;
 }
 

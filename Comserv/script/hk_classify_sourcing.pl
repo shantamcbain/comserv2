@@ -3,9 +3,9 @@
 #   perl script/hk_classify_sourcing.pl --sitename Shanta            # DRY RUN (default, read-only)
 #   perl script/hk_classify_sourcing.pl --sitename Shanta --csv      # dry run as CSV
 #   perl script/hk_classify_sourcing.pl --sitename Shanta --apply    # writes (needs approval)
-# --apply only fills hk_item_product sourcing columns that are currently NULL (never
+# --apply only fills inventory_item_attributes columns that are currently NULL (never
 # overwrites user edits), skips 'unknown' items, and requires the sourcing columns to exist
-# (Admin > Schema Compare). One transaction. Run from Comserv/ (needs logs/).
+# (Schema Compare: Accounting::InventoryItemAttributes). One transaction. Run from Comserv/ (needs logs/).
 use strict;
 use warnings;
 use FindBin;
@@ -62,26 +62,34 @@ printf STDERR "\nexplicit=%d inferred-only=%d unknown=%d\n", map { $count{$_} ||
 exit 0 unless $apply;
 
 # ---- APPLY ----
-my $ok = eval { $s->resultset('HealthKitchen::ItemProduct')->search( {}, { columns => [ @F, 'local_km' ], rows => 1 } )->first; 1 };
-die "Sourcing columns not present on hk_item_product; run Admin > Schema Compare first. Nothing written.\n" unless $ok;
-my $rs = $s->resultset('HealthKitchen::ItemProduct');
+# Writes Accounting::InventoryItemAttributes (inventory_item_attributes); food
+# category is stored as an inventory_categories id from the shared tree.
+my $ok = eval { $s->resultset('Accounting::InventoryItemAttributes')->search( {}, { rows => 1 } )->first; 1 };
+die "inventory_item_attributes table not present; run Admin > Schema Compare (Accounting::InventoryItemAttributes) first. Nothing written.\n" unless $ok;
+require Comserv::Util::CategoryManager;
+my $cm = Comserv::Util::CategoryManager->new;
+my $rs = $s->resultset('Accounting::InventoryItemAttributes');
 my ( $ins, $upd ) = ( 0, 0 );
 $s->txn_do( sub {
+    my %cat_id = map { $_->{path} => $_->{id} } @{ $cm->options_for_site( $s, $site, { brew => 1, '3d' => 1 } ) };
     for my $r (@plan) {
         next if $r->{confidence} eq 'unknown';
         next if !$include_inferred && $r->{confidence} ne 'explicit';
-        my %set = map { $_ => $r->{$_} } grep { defined $r->{$_} } @F;
+        my %set = map { $_ => $r->{$_} } grep { $_ ne 'food_category' && defined $r->{$_} } @F;
+        if ( defined $r->{food_category} ) {
+            my $path = $cm->path_for_food_key( $r->{food_category} );
+            $set{food_category_id} = $cat_id{$path} if $path && $cat_id{$path};
+        }
         next unless %set;
-        my $row = $rs->search( { sitename => $site, item_kind => 'inventory', item_id => $r->{id} } )->single;
+        my $row = $rs->search( { item_id => $r->{id} } )->single;
         if ($row) {
             my %fill = map { $_ => $set{$_} } grep { !defined $row->get_column($_) } keys %set;
             if (%fill) { $row->update( \%fill ); $upd++ }
         }
         else {
-            $rs->create( { sitename => $site, item_kind => 'inventory', item_id => $r->{id},
-                           upc => ( $r->{barcode} || undef ), %set } );
+            $rs->create( { sitename => $site, item_id => $r->{id}, %set } );
             $ins++;
         }
     }
 } );
-print STDERR "APPLIED: created $ins, filled $upd hk_item_product row(s)\n";
+print STDERR "APPLIED: created $ins, filled $upd inventory_item_attributes row(s)\n";

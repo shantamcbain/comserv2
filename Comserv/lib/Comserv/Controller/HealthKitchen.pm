@@ -88,6 +88,15 @@ sub _stash_mode {
     $c->stash->{hk_sourcing_enums} = $self->hk->sourcing_enums;
 }
 
+# Food branch of the shared inventory category tree (for the pantry sourcing editor).
+sub _food_category_options {
+    my ( $self, $c ) = @_;
+    require Comserv::Util::CategoryManager;
+    my $o = eval { Comserv::Util::CategoryManager->new->options_for_site(
+        $c->model('DBEncy'), $self->hk->sitename($c), $c->stash->{enabled_modules} || {} ) } || [];
+    return [ grep { ( $_->{top} // '' ) eq 'Food' } @$o ];
+}
+
 sub index :Path('/healthkitchen') :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'index',
@@ -101,6 +110,7 @@ sub index :Path('/healthkitchen') :Args(0) {
 
 sub pantry :Local :Args(0) {
     my ( $self, $c ) = @_;
+    $c->stash->{hk_food_categories} = $self->_food_category_options($c) if $c->stash->{hk_sourcing_ready};
     $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'pantry',
         'HealthKitchen pantry' );
     if ( $c->req->method eq 'POST' ) {
@@ -245,7 +255,7 @@ sub pantry_link :Local :Args(0) {
     }
     elsif ( $action eq 'product' ) {
         $res = $self->hk->save_item_product( $c,
-            { map { $_ => $p->{$_} } qw(item_kind item_id brand upc size sourcing_submitted food_category production animal_raising catch_method gmo local_km certifier cert_verified) } );
+            { map { $_ => $p->{$_} } qw(item_kind item_id brand upc size sourcing_submitted food_category_id production animal_raising catch_method gmo local_km certifier cert_verified) } );
     }
     else {
         $res = $self->hk->add_ency_link( $c,
