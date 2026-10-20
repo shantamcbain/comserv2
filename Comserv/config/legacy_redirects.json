@@ -16,7 +16,7 @@
             "winterizingyard": "/page/wintering-yard-fall-2026",
             "contactview": "/HelpDesk/contact",
             "wintervisits": {
-              "bmaster": "/page/core_autumn_stores_interior_bc",
+              "bmaster": "https://beemaster.ca/page/core_autumn_stores_interior_bc",
               "*": "/page/wintering-yard-fall-2026"
             },
             "yardmanagementsystem": "/BMaster"
@@ -29,19 +29,19 @@
             "homeview": "/",
             "firstvisit": "/",
             "swarmcontrol": {
-              "bmaster": "/page/core_swarm_control",
+              "bmaster": "https://beemaster.ca/page/core_swarm_control",
               "*": "/BMaster/education"
             },
             "hiveevaluation": {
-              "bmaster": "/page/core_struggling_small_hive",
+              "bmaster": "https://beemaster.ca/page/core_struggling_small_hive",
               "*": "/BMaster/education"
             },
             "hiveevaluationlost": {
-              "bmaster": "/page/core_disease_screen_signs",
+              "bmaster": "https://beemaster.ca/page/core_disease_screen_signs",
               "*": "/BMaster/education"
             },
             "disease": {
-              "bmaster": "/page/core_disease_screen_signs",
+              "bmaster": "https://beemaster.ca/page/core_disease_screen_signs",
               "*": "/BMaster/education"
             },
             "beeproducts": "/BMaster/products",
@@ -70,11 +70,11 @@
             "membersview": "/membership",
             "mailview": "/newsletters",
             "newsletterview": {
-              "bmaster": "/page/nl-pub-beemaster-class-newsletters",
+              "bmaster": "https://beemaster.ca/page/nl-pub-beemaster-class-newsletters",
               "*": "/newsletters"
             },
             "bmasterbreederview": {
-              "bmaster": "/page/breeder_program",
+              "bmaster": "https://beemaster.ca/page/breeder_program",
               "*": "/BMaster/products"
             },
             "helpdeskhomeview": "/HelpDesk",
@@ -82,22 +82,22 @@
             "forumulaview": "/ENCY/Formula",
             "formulaview": "/ENCY/Formula",
             "mentorview": {
-              "bmaster": "/page/mentoring_program",
+              "bmaster": "https://beemaster.ca/page/mentoring_program",
               "*": "410"
             },
             "mentoringhomeview": {
-              "bmaster": "/page/mentoring_program",
+              "bmaster": "https://beemaster.ca/page/mentoring_program",
               "*": "410"
             },
-            "opensourceview": "/page/open_source_vs_closed",
+            "opensourceview": "https://computersystemconsulting.ca/page/open_source_vs_closed",
             "apisqueensview": {
-              "bmaster": "/page/sustainable_queens",
-              "apis": "/page/sustainable_queens",
+              "bmaster": "https://beemaster.ca/page/sustainable_queens",
+              "apis": "https://beemaster.ca/page/sustainable_queens",
               "*": "410"
             },
             "resourcesview": {
-              "ency": "/page/environmental_resources",
-              "usbm": "/page/environmental_resources",
+              "ency": "https://ency.usbm.ca/page/environmental_resources",
+              "usbm": "https://ency.usbm.ca/page/environmental_resources",
               "*": "410"
             }
           },
@@ -168,7 +168,7 @@
         {
           "param": "view",
           "values": {
-            "opensourceview": "/page/open_source_vs_closed"
+            "opensourceview": "https://computersystemconsulting.ca/page/open_source_vs_closed"
           }
         }
       ],

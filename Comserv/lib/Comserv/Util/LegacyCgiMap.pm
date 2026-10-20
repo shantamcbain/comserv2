@@ -16,7 +16,37 @@ sub load {
             $r->{_match} = qr/$r->{match}/ if defined $r->{match};
         }
     }
+    _check_targets($map->{scripts}, 'scripts');
     return bless { map => $map }, $class;
+}
+
+# Targets are map-authored only (never built from Host or query, except a {value} that
+# passed its rule's match). Allowed: "410", a site-relative path, or https:// to one of
+# Shanta's own domains. Anything else (http://, //host, other hosts) fails the load.
+our $OWN_HOSTS = qr/^(?:www\.)?(?:beemaster\.ca|computersystemconsulting\.ca|ency\.usbm\.ca|usbm\.ca|forager\.com|shamanbotanicals\.ca)$/i;
+sub target_ok {
+    my ($t) = @_;
+    return 1 if $t eq '410';
+    return 1 if $t =~ m{^/(?![/\\])};
+    return 1 if $t =~ m{^https://([^/:?#\@]+)(?:/|$)} && $1 =~ $OWN_HOSTS;
+    return 0;
+}
+sub _check_targets {
+    my ($n, $where) = @_;
+    if (ref $n eq 'HASH') {
+        for my $k (keys %$n) {
+            next if $k =~ /^_/;
+            my $v = $n->{$k};
+            if (!ref $v) { die "legacy map: bad target '$v' at $where.$k\n" if $k =~ /^(?:to|else|default)$/ && !target_ok($v) }
+            elsif ($k eq 'values') { for my $vk (keys %$v) { my $t = $v->{$vk};
+                for my $x (ref $t eq 'HASH' ? values %$t : ($t)) { die "legacy map: bad target '$x' at $where.values.$vk\n" unless target_ok($x) } } }
+            else { _check_targets($v, "$where.$k") }
+        }
+    } elsif (ref $n eq 'ARRAY') {
+        for my $i (0..$#$n) { my $e = $n->[$i];
+            if (ref $e eq 'ARRAY' && @$e == 2 && !ref $e->[1]) { die "legacy map: bad target '$e->[1]' at $where\[$i]\n" unless target_ok($e->[1]) }
+            else { _check_targets($e, "$where\[$i]") } }
+    }
 }
 
 # '/cgi-bin/index.cgi/cgi-bin/index.cgi' -> 'index.cgi'; '/cgi-bin/' -> 'index.cgi'
