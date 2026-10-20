@@ -18,6 +18,14 @@
     <tr>
       <th><label for="category">Category</label></th>
       <td>
+        [% IF category_options.size %]
+        <select id="category_id" name="category_id" onchange="if(this.value){document.getElementById('category').value=this.options[this.selectedIndex].dataset.path}">
+          <option value="">— choose from category list —</option>
+          [% FOREACH o IN category_options %]
+          <option value="[% o.id %]" data-path="[% o.path | html %]"[% IF current_category_ids.grep('^' _ o.id _ '$').size || (item.category && item.category == o.path) %] selected[% END %]>[% '&nbsp;&nbsp;' FILTER repeat(o.depth) %][% o.name | html %]</option>
+          [% END %]
+        </select><br>
+        [% END %]
         <input type="text" id="category" name="category" maxlength="100"
                list="category-suggestions"
                placeholder="Apiary, Garden, Hardware, 3D Print, Craft…">

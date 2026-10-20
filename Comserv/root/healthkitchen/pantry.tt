@@ -128,9 +128,14 @@
                                     <label>Brand <input type="text" name="brand" value="[% p.product.brand | html %]" /></label>
                                     <label>UPC <input type="text" name="upc" value="[% p.product.upc | html %]" placeholder="8 36676 00001 9" /></label>
                                     <label>Size <input type="text" name="size" value="[% IF p.product.size_value %][% p.product.size_value %] [% p.product.size_unit %][% END %]" placeholder="10 ml" /></label>
-                                    [% IF hk_sourcing_ready %]
+                                    [% IF hk_sourcing_ready && p.item_kind == 'inventory' %]
                                         <input type="hidden" name="sourcing_submitted" value="1" />
-                                        [% FOREACH fld IN ['food_category','production','animal_raising','catch_method','gmo'] %]
+                                        <label>Food category
+                                            <select name="food_category_id"><option value="">—</option>
+                                                [% FOREACH o IN hk_food_categories %]<option value="[% o.id %]" [% IF p.product.food_category_id == o.id %]selected[% END %]>[% o.path | html %]</option>[% END %]
+                                            </select>
+                                        </label>
+                                        [% FOREACH fld IN ['production','animal_raising','catch_method','gmo'] %]
                                             <label>[% fld.replace('_',' ') %]
                                                 <select name="[% fld %]"><option value="">—</option>
                                                     [% FOREACH v IN hk_sourcing_enums.$fld %]<option value="[% v %]" [% IF p.product.$fld == v %]selected[% END %]>[% v.replace('_',' ') %]</option>[% END %]
@@ -140,8 +145,8 @@
                                         <label>Distance km <input type="number" name="local_km" min="0" max="20000" step="1" value="[% p.product.local_km | html %]" /></label>
                                         <label>Certifier <input type="text" name="certifier" maxlength="100" value="[% p.product.certifier | html %]" placeholder="e.g. Pro-Cert Organic" /></label>
                                         <label><input type="checkbox" name="cert_verified" value="1" [% IF p.product.cert_verified %]checked[% END %] /> Certificate checked</label>
-                                    [% ELSE %]
-                                        <small class="doc-muted">Sourcing fields need new columns on HealthKitchen::ItemProduct; run Schema Compare.</small>
+                                    [% ELSIF p.item_kind == 'inventory' %]
+                                        <small class="doc-muted">Sourcing fields need the inventory_item_attributes table (Accounting::InventoryItemAttributes); run Schema Compare.</small>
                                     [% END %]
                                     <button type="submit" class="btn btn-sm btn-primary">Save</button>
                                 </form>
