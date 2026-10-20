@@ -83,3 +83,18 @@ ciphertext (git history, backups) still decrypt to the CURRENT passwords. So:
   (the `gh` CLI isn't installed on the workstation, so this couldn't be checked or enabled from here). Make
   `secret-scan / scan` a required status check on `main`.
 - Optionally purge history (git filter-repo + force push) after rotation; rotation is what matters.
+
+## Addendum 2026-10-20: .env, NPM and other untracked items (prod first)
+Copies of the untracked files are in ~/.comserv/secrets/repo-untracked/ (600). For each item:
+change it at the source, update the copy / future app_secrets row, restart, verify, then delete the old.
+1. Production MySQL app user + root (DB_PASSWORD, DB_ROOT_PASSWORD, COMSERV_DB_ENCY_PRODUCTION_PASSWORD
+   in .env.production / .env.staging): ALTER USER on the prod DB, update ~/.comserv/secrets/dbi/*.json,
+   restart comserv2-web-prod, check login + a page that reads ENCY.
+2. Production Redis (REDIS_PASSWORD): requirepass in redis config, update env, restart redis then app.
+3. SMTP (SMTP_PASS in Comserv/.env.staging): change at mail host; send a test mail.
+4. NPM JWT api_key (npm-*.conf): in Nginx Proxy Manager, revoke/re-issue the API token (or change the
+   NPM user password, which invalidates tokens); update the conf copies.
+5. Staging API key (API_KEY_COMSERV_STAGING): re-issue.
+6. Proxmox token + mail/proxmox encryption keys: as above.
+7. Dev/staging DB passwords (.env, .env.development) and the values that were in .env.example.
+8. Verify old values fail; record date of each rotation (not the value).

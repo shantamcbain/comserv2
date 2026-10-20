@@ -67,6 +67,8 @@ path = '''(^|/)id_(rsa|ed25519|ecdsa|dsa)[^/]*$'''
 id = "secret-file-dotenv"
 description = ".env file committed"
 path = '''(^|/)\.env(\.[^/]*)?$'''
+[rules.allowlist]
+paths = ['''(^|/)\.env\.example$''']
 
 [[rules]]
 id = "secret-file-credentials-json"
