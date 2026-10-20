@@ -95,20 +95,32 @@ while IFS= read -r -d '' status && IFS= read -r -d '' path; do
 done < <("${LIST[@]}")
 
 # gitleaks — findings on allow-listed paths do not block
+if ! command -v gitleaks >/dev/null 2>&1 && [ "${SECRET_GUARD_REQUIRE_GITLEAKS:-0}" = 1 ]; then
+    echo "secret-guard: gitleaks not installed but SECRET_GUARD_REQUIRE_GITLEAKS=1"; exit 1
+fi
 if command -v gitleaks >/dev/null 2>&1; then
     CFG=(); [ -f "$ROOT/.gitleaks.toml" ] && CFG=(--config "$ROOT/.gitleaks.toml")
     REP=$(mktemp); trap 'rm -f "$REP"' EXIT
     if [ "$MODE" = staged ]; then
         gitleaks protect --staged --no-banner --redact "${CFG[@]+"${CFG[@]}"}" \
-            --report-format json --report-path "$REP" >/dev/null 2>&1
+            --report-format json --report-path "$REP" >/dev/null 2>&1; GL_RC=$?
     elif [ "$BASE" = "$EMPTY_TREE" ]; then
         gitleaks detect --no-banner --redact "${CFG[@]+"${CFG[@]}"}" --log-opts="$TIP" \
-            --report-format json --report-path "$REP" >/dev/null 2>&1
+            --report-format json --report-path "$REP" >/dev/null 2>&1; GL_RC=$?
     else
         gitleaks detect --no-banner --redact "${CFG[@]+"${CFG[@]}"}" --log-opts="$BASE..$TIP" \
-            --report-format json --report-path "$REP" >/dev/null 2>&1
+            --report-format json --report-path "$REP" >/dev/null 2>&1; GL_RC=$?
+    fi
+    # 0 = clean, 1 = leaks found; anything else is a gitleaks error -> fail closed
+    if [ "${GL_RC:-0}" -gt 1 ]; then
+        echo "secret-guard: gitleaks failed (exit $GL_RC) - refusing rather than skipping"; exit 1
+    fi
+    if [ "${GL_RC:-0}" -eq 1 ] && [ ! -s "$REP" ]; then
+        echo "secret-guard: gitleaks reported leaks but wrote no report - refusing"; exit 1
     fi
     if [ -s "$REP" ]; then
+        perl -MJSON::PP -0777 -e 'decode_json(<STDIN> || "[]")' < "$REP" 2>/dev/null \
+            || { echo "secret-guard: cannot parse gitleaks report - refusing"; exit 1; }
         while IFS=$'\t' read -r f rule; do
             [ -n "$f" ] || continue
             hit "$f" "gitleaks rule $rule"
