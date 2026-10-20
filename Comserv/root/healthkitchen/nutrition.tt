@@ -50,6 +50,22 @@
         [% END %]
     </div>
 
+    [% adj_foods = [] %][% FOREACH f IN hk_foods %][% IF f.adjusted || f.sourcing %][% adj_foods.push(f) %][% END %][% END %]
+    [% IF adj_foods.size %]
+    <div class="content-section">
+        <h2>Sourcing-adjusted estimates</h2>
+        <p class="doc-muted">Base values are unchanged. Estimates apply cited percentage adjustments for how the linked inventory item was produced (e.g. grass-fed, wild). Treat as approximate.</p>
+        <table class="table"><thead><tr><th>Food</th><th>Sourcing</th>[% FOREACH k IN nkeys %]<th>[% labels.$k %]</th>[% END %]<th>Contamination</th><th>Ethics</th></tr></thead><tbody>
+        [% FOREACH f IN adj_foods %]
+            <tr><td>[% f.name | html %]<br /><small>base</small></td><td>[% f.sourcing.badges.join(', ') | html %]</td>[% FOREACH k IN nkeys %]<td>[% f.$k %]</td>[% END %]
+                <td rowspan="[% f.adjusted ? 2 : 1 %]">[% FOREACH rk IN f.sourcing.summary.risks.keys.sort %][% rk | html %]: [% f.sourcing.summary.risks.$rk | html %]<br />[% END %]</td>
+                <td rowspan="[% f.adjusted ? 2 : 1 %]">[% f.sourcing.summary.ethics.defined ? f.sourcing.summary.ethics _ '/5' : '—' %]</td></tr>
+            [% IF f.adjusted %]<tr><td><small><em>adjusted (estimate)</em></small></td><td></td>[% FOREACH k IN nkeys %]<td>[% f.adjusted.$k %]</td>[% END %]</tr>[% END %]
+        [% END %]
+        </tbody></table>
+    </div>
+    [% END %]
+
     <div class="content-section">
         <h2>Add food (manual nutrient facts per serving)</h2>
         <form method="post" action="[% c.uri_for('/healthkitchen/nutrition', { date => hk_date }) %]">

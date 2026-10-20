@@ -4,8 +4,8 @@
    roles = "user,admin"
    TemplateType = "Application"
    category = "HealthKitchen"
-   page_version = "0.01"
-   last_updated = "2026-09-23"
+   page_version = "0.02"
+   last_updated = "2026-10-18"
 %]
 [% PageVersion = 'healthkitchen/pantry.tt,v 0.01 2026/09/23 hermes-agent Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
@@ -48,9 +48,33 @@
             </p>
         </form>
 
+        [% IF hk_link_ready %]
+        <form method="get" action="[% c.uri_for('/healthkitchen/pantry') %]" class="content-section">
+            <h2>Find ENCY entry to link</h2>
+            <label>Type
+                <select name="ency_type">
+                    [% FOREACH t IN ['herb','animal','constituent'] %]
+                        <option value="[% t %]" [% IF hk_ency_type == t %]selected[% END %]>[% t %]</option>
+                    [% END %]
+                </select>
+            </label>
+            <label>Name <input type="text" name="ency_q" value="[% hk_ency_q | html %]" placeholder="e.g. Oregano, carvacrol, Beef" /></label>
+            <button type="submit" class="btn btn-secondary">Search</button>
+            [% IF hk_ency_q.defined %]
+                [% IF hk_ency_results.size %]
+                    <p>[% hk_ency_results.size %] match(es); choose one in an item’s “Link” box below.</p>
+                [% ELSE %]
+                    <p class="doc-muted">No [% hk_ency_type | html %] matches “[% hk_ency_q | html %]”.</p>
+                [% END %]
+            [% END %]
+        </form>
+        [% ELSE %]
+            <div class="alert alert-warning">Create tables <code>HealthKitchen::InventoryEncyLink</code> and <code>HealthKitchen::ItemProduct</code> via Schema Compare to link herbs/animals/constituents and store brand/UPC/size.</div>
+        [% END %]
+
         [% IF hk_pantry && hk_pantry.size %]
             <table class="table">
-                <tr><th>Name</th><th>Qty</th><th>Unit</th><th>Reorder</th><th>Source</th><th>SKU</th><th>ENCY</th></tr>
+                <tr><th>Name</th><th>Qty</th><th>Unit</th><th>Reorder</th><th>Source</th><th>SKU</th><th>ENCY</th><th>Product</th></tr>
                 [% FOREACH p IN hk_pantry %]
                     <tr>
                         <td>[% p.name | html %]</td>
@@ -60,24 +84,73 @@
                         <td>[% p.via | html %]</td>
                         <td>[% p.sku || p.inventory_item_id || '—' | html %]</td>
                         <td>
-                            [% IF p.herb_id %]<a href="[% c.uri_for('/ENCY/Herb') %]/[% p.herb_id %]">herb #[% p.herb_id %]</a>[% END %]
-                            [% IF p.organism_id %] organism #[% p.organism_id %][% END %]
-                            [% IF p.animal_id %] <a href="[% c.uri_for('/ENCY/Animal') %]">animal #[% p.animal_id %]</a>[% END %]
-                            [% IF p.insect_id %] insect #[% p.insect_id %][% END %]
-                            [% IF p.formula_id %] <a href="[% c.uri_for('/ENCY/Formula') %]">formula #[% p.formula_id %]</a>[% END %]
-                            [% IF p.inventory_item_id && hk_map_ready %]
-                                <form method="post" action="[% c.uri_for('/healthkitchen/pantry_map') %]">
-                                    <input type="hidden" name="inventory_item_id" value="[% p.inventory_item_id %]" />
-                                    <label>herb <input type="number" name="herb_id" value="[% p.herb_id %]" /></label>
-                                    <label>organism <input type="number" name="organism_id" value="[% p.organism_id %]" /></label>
-                                    <label>animal <input type="number" name="animal_id" value="[% p.animal_id %]" /></label>
-                                    <label>insect <input type="number" name="insect_id" value="[% p.insect_id %]" /></label>
-                                    <label>formula <input type="number" name="formula_id" value="[% p.formula_id %]" /></label>
-                                    <button type="submit" class="btn btn-sm btn-primary">Link</button>
-                                    <button type="submit" name="unlink" value="1" class="btn btn-sm btn-secondary">Unlink</button>
+                            [% IF !hk_link_ready %][% IF p.herb_id %]<a href="[% c.uri_for('/ENCY/Herb') %]/[% p.herb_id %]">herb #[% p.herb_id %]</a>[% END %][% IF p.animal_id %] animal #[% p.animal_id %][% END %][% END %]
+                            [% FOREACH l IN p.ency_links %]
+                                <div>
+                                    [% l.type | html %]: <a href="[% c.uri_for(l.path) %]">[% l.label | html %]</a>
+                                    <form method="post" action="[% c.uri_for('/healthkitchen/pantry_link') %]" style="display:inline">
+                                        <input type="hidden" name="hk_action" value="unlink" />
+                                        <input type="hidden" name="link_id" value="[% l.id %]" />
+                                        <button type="submit" class="btn btn-sm btn-secondary" title="Remove link">×</button>
+                                    </form>
+                                </div>
+                            [% END %]
+                            [% IF hk_link_ready && p.item_key_id %]
+                                <form method="post" action="[% c.uri_for('/healthkitchen/pantry_link') %]">
+                                    <input type="hidden" name="hk_action" value="link" />
+                                    <input type="hidden" name="item_kind" value="[% p.item_kind %]" />
+                                    <input type="hidden" name="item_id" value="[% p.item_key_id %]" />
+                                    <input type="hidden" name="entity_type" value="[% hk_ency_type | html %]" />
+                                    [% IF hk_ency_results.size %]
+                                        <select name="entity_id">
+                                            [% FOREACH e IN hk_ency_results %]<option value="[% e.id %]">[% e.label | html %]</option>[% END %]
+                                        </select>
+                                        <button type="submit" class="btn btn-sm btn-primary">Link [% hk_ency_type | html %]</button>
+                                    [% ELSE %]
+                                        <span class="doc-muted">Search above to link.</span>
+                                    [% END %]
                                 </form>
-                            [% ELSIF !p.inventory_item_id %]
-                                <span class="doc-muted">Add an inventory SKU id to link ENCY.</span>
+                            [% END %]
+                        </td>
+                        <td>
+                            [% IF p.product.brand %][% p.product.brand | html %]<br />[% END %]
+                            [% IF p.product.upc %]UPC [% p.product.upc | html %]<br />[% END %]
+                            [% IF p.product.size_value %][% p.product.size_value | html %] [% p.product.size_unit | html %][% END %]
+                            [% IF p.product.badges.size %]<div class="hk-badges">[% FOREACH bd IN p.product.badges %]<span class="badge">[% bd | html %]</span> [% END %]</div>[% END %]
+                            [% IF p.product.summary.risks.size %]<small class="doc-muted">Risk: [% FOREACH rk IN p.product.summary.risks.keys.sort %][% rk | html %] [% p.product.summary.risks.$rk | html %][% UNLESS loop.last %], [% END %][% END %]</small><br />[% END %]
+                            [% IF p.product.summary.ethics.defined %]<small class="doc-muted">Ethics [% p.product.summary.ethics %]/5</small>[% END %]
+                            [% IF hk_product_ready && p.item_key_id %]
+                                <details><summary>Edit</summary>
+                                <form method="post" action="[% c.uri_for('/healthkitchen/pantry_link') %]">
+                                    <input type="hidden" name="hk_action" value="product" />
+                                    <input type="hidden" name="item_kind" value="[% p.item_kind %]" />
+                                    <input type="hidden" name="item_id" value="[% p.item_key_id %]" />
+                                    <label>Brand <input type="text" name="brand" value="[% p.product.brand | html %]" /></label>
+                                    <label>UPC <input type="text" name="upc" value="[% p.product.upc | html %]" placeholder="8 36676 00001 9" /></label>
+                                    <label>Size <input type="text" name="size" value="[% IF p.product.size_value %][% p.product.size_value %] [% p.product.size_unit %][% END %]" placeholder="10 ml" /></label>
+                                    [% IF hk_sourcing_ready && p.item_kind == 'inventory' %]
+                                        <input type="hidden" name="sourcing_submitted" value="1" />
+                                        <label>Food category
+                                            <select name="food_category_id"><option value="">—</option>
+                                                [% FOREACH o IN hk_food_categories %]<option value="[% o.id %]" [% IF p.product.food_category_id == o.id %]selected[% END %]>[% o.path | html %]</option>[% END %]
+                                            </select>
+                                        </label>
+                                        [% FOREACH fld IN ['production','animal_raising','catch_method','gmo'] %]
+                                            <label>[% fld.replace('_',' ') %]
+                                                <select name="[% fld %]"><option value="">—</option>
+                                                    [% FOREACH v IN hk_sourcing_enums.$fld %]<option value="[% v %]" [% IF p.product.$fld == v %]selected[% END %]>[% v.replace('_',' ') %]</option>[% END %]
+                                                </select>
+                                            </label>
+                                        [% END %]
+                                        <label>Distance km <input type="number" name="local_km" min="0" max="20000" step="1" value="[% p.product.local_km | html %]" /></label>
+                                        <label>Certifier <input type="text" name="certifier" maxlength="100" value="[% p.product.certifier | html %]" placeholder="e.g. Pro-Cert Organic" /></label>
+                                        <label><input type="checkbox" name="cert_verified" value="1" [% IF p.product.cert_verified %]checked[% END %] /> Certificate checked</label>
+                                    [% ELSIF p.item_kind == 'inventory' %]
+                                        <small class="doc-muted">Sourcing fields need the inventory_item_attributes table (Accounting::InventoryItemAttributes); run Schema Compare.</small>
+                                    [% END %]
+                                    <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                                </form>
+                                </details>
                             [% END %]
                         </td>
                     </tr>

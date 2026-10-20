@@ -213,8 +213,20 @@ sub _get_key_file_path {
     my ($class, $namespace) = @_;
     $namespace ||= 'default';
     
+    my $name = '.' . $namespace . '_encryption_key';
+    # Shared key dir (outside the repo) so every checkout/server uses the same key:
+    #   1. $ENV{COMSERV_KEY_DIR} if set (used for both lookup and generation)
+    #   2. ~/.comserv/keys/<name> if that file already exists
+    #   3. legacy per-checkout config/<name> (unchanged behaviour)
+    if (my $dir = $ENV{COMSERV_KEY_DIR}) {
+        return File::Spec->catfile($dir, $name);
+    }
+    if ($ENV{HOME}) {
+        my $shared = File::Spec->catfile($ENV{HOME}, '.comserv', 'keys', $name);
+        return $shared if -f $shared;
+    }
     my $config_dir = $class->_get_config_dir();
-    return File::Spec->catfile($config_dir, '.' . $namespace . '_encryption_key');
+    return File::Spec->catfile($config_dir, $name);
 }
 
 =head2 _get_config_dir()
@@ -240,6 +252,13 @@ Ensure the config directory exists, create if necessary.
 
 sub _ensure_config_dir {
     my ($class) = @_;
+    if (my $dir = $ENV{COMSERV_KEY_DIR}) {
+        return if -d $dir;
+        require File::Path;
+        File::Path::make_path($dir, { mode => 0700 });
+        die "Failed to create key dir $dir\n" unless -d $dir;
+        return;
+    }
     my $config_dir = $class->_get_config_dir();
     
     return if -d $config_dir;

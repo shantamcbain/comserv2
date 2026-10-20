@@ -81,6 +81,20 @@ sub _stash_mode {
     $c->stash->{hk_map_ready}      = $self->hk->map_ready($c) ? 1 : 0;
     $c->stash->{hk_symptom_ready}  = $self->hk->symptom_ready($c) ? 1 : 0;
     $c->stash->{hk_profile_ready}  = $self->hk->profile_ready($c) ? 1 : 0;
+    $c->stash->{hk_sourcing_ready} = $self->hk->sourcing_cols_ready($c) ? 1 : 0;
+    $c->stash->{hk_prefs_ready}    = $self->hk->prefs_cols_ready($c) ? 1 : 0;
+    $c->stash->{hk_factor_ready}   = $self->hk->factor_ready($c) ? 1 : 0;
+    $self->hk->ensure_sourcing_seed($c) if $c->stash->{hk_factor_ready};
+    $c->stash->{hk_sourcing_enums} = $self->hk->sourcing_enums;
+}
+
+# Food branch of the shared inventory category tree (for the pantry sourcing editor).
+sub _food_category_options {
+    my ( $self, $c ) = @_;
+    require Comserv::Util::CategoryManager;
+    my $o = eval { Comserv::Util::CategoryManager->new->options_for_site(
+        $c->model('DBEncy'), $self->hk->sitename($c), $c->stash->{enabled_modules} || {} ) } || [];
+    return [ grep { ( $_->{top} // '' ) eq 'Food' } @$o ];
 }
 
 sub index :Path('/healthkitchen') :Args(0) {
@@ -96,6 +110,7 @@ sub index :Path('/healthkitchen') :Args(0) {
 
 sub pantry :Local :Args(0) {
     my ( $self, $c ) = @_;
+    $c->stash->{hk_food_categories} = $self->_food_category_options($c) if $c->stash->{hk_sourcing_ready};
     $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'pantry',
         'HealthKitchen pantry' );
     if ( $c->req->method eq 'POST' ) {
@@ -119,8 +134,18 @@ sub pantry :Local :Args(0) {
         $c->detach;
         return;
     }
+    my $pantry = $self->hk->list_pantry($c);
+    $self->hk->attach_links_and_products( $c, $pantry );
+    my $etype = $c->req->params->{ency_type} || q{herb};
+    my $q     = $c->req->params->{ency_q};
     $c->stash(
-        hk_pantry => $self->hk->list_pantry($c),
+        hk_pantry => $pantry,
+        hk_link_ready    => $self->hk->link_ready($c) ? 1 : 0,
+        hk_product_ready => $self->hk->product_ready($c) ? 1 : 0,
+        hk_ency_type     => $etype,
+        hk_ency_q        => $q,
+        hk_ency_results  => ( defined $q ? $self->hk->search_ency_entities( $c, $etype, $q ) : [] ),
+        hk_link_item     => $c->req->params->{link_item},
         template  => 'healthkitchen/pantry.tt',
     );
 }
@@ -211,6 +236,45 @@ sub pantry_map :Local :Args(0) {
     $c->detach;
 }
 
+# POST: hk_action = link | unlink | product. Links pantry/inventory items to ENCY
+# herbs, animals and constituents; stores brand / UPC / size.
+sub pantry_link :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'pantry_link',
+        'HealthKitchen pantry_link method=' . ( $c->req->method || '' ) );
+    unless ( $c->req->method eq 'POST' ) {
+        $c->response->redirect( $c->uri_for( $self->action_for('pantry') ) );
+        $c->detach;
+        return;
+    }
+    my $p      = $c->req->params;
+    my $action = $p->{hk_action} || 'link';
+    my $res;
+    if ( $action eq 'unlink' ) {
+        $res = $self->hk->remove_ency_link( $c, $p->{link_id} );
+    }
+    elsif ( $action eq 'product' ) {
+        $res = $self->hk->save_item_product( $c,
+            { map { $_ => $p->{$_} } qw(item_kind item_id brand upc size sourcing_submitted food_category_id production animal_raising catch_method gmo local_km certifier cert_verified) } );
+    }
+    else {
+        $res = $self->hk->add_ency_link( $c,
+            { map { $_ => $p->{$_} } qw(item_kind item_id entity_type entity_id) } );
+    }
+    if ( $res->{ok} ) {
+        my $msg = { unlink => 'ENCY link removed.', product => 'Product details saved.' }->{$action}
+            || 'ENCY link saved.';
+        $msg .= ' (UPC check digit does not validate; please double-check.)'
+            if $action eq 'product' && defined $res->{upc_check} && !$res->{upc_check};
+        $c->flash->{success_msg} = $msg;
+    }
+    else {
+        $c->flash->{error_msg} = $res->{error} || 'Could not save.';
+    }
+    $c->response->redirect( $c->uri_for( $self->action_for('pantry') ) );
+    $c->detach;
+}
+
 sub symptoms :Local :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'symptoms',
@@ -221,6 +285,26 @@ sub symptoms :Local :Args(0) {
         if ( $action eq 'resolve' ) {
             $res = $self->hk->resolve_symptom( $c, $c->req->params->{id} );
         }
+        elsif ( $action eq q{new} ) {
+            $res = $self->hk->add_user_symptom(
+                $c,
+                {
+                    name        => $c->req->params->{new_name},
+                    description => $c->req->params->{new_description},
+                    severity    => $c->req->params->{severity},
+                }
+            );
+            if ( $res->{ok} ) {
+                $c->flash->{success_msg} = $res->{existing}
+                    ? q{That symptom already exists in ENCY; set active.}
+                    : $res->{duplicate}
+                    ? q{You already submitted that symptom; it is awaiting review.}
+                    : q{Thanks. Your symptom was sent for staff review and shows as pending until approved.};
+                $c->response->redirect( $c->uri_for( $self->action_for(q{symptoms}) ) );
+                $c->detach;
+                return;
+            }
+        }
         elsif ( $action eq 'profile' ) {
             $res = $self->hk->save_profile(
                 $c,
@@ -228,6 +312,9 @@ sub symptoms :Local :Args(0) {
                     diet_flags => $c->req->params->{diet_flags},
                     allergies  => $c->req->params->{allergies},
                     goals      => $c->req->params->{goals},
+                    ( $c->req->params->{prefs_submitted}
+                        ? ( prefs_submitted => 1, map { $_ => $c->req->params->{$_} } qw(prefer_organic avoid_feedlot ethics_weight) )
+                        : () ),
                 }
             );
         }
@@ -254,6 +341,7 @@ sub symptoms :Local :Args(0) {
     $c->stash(
         hk_profile  => $self->hk->get_profile($c),
         hk_active   => $active,
+        hk_pending_symptoms => $self->hk->list_pending_symptoms_for_user($c),
         hk_symptoms => $self->hk->list_ency_symptoms($c),
         hk_match    => $self->hk->match_for_symptoms(
             $c, { symptom_ids => [ map { $_->{symptom_id} } @$active ] }
@@ -371,6 +459,47 @@ sub recipes_suggest :Local :Args(0) {
     }
     $c->response->redirect( $c->uri_for( $self->action_for('recipes') ) );
     $c->detach;
+}
+
+sub _is_staff {
+    my ( $self, $c ) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @r = ref $roles ? @$roles : split( /\s*,\s*/, $roles );
+    return ( grep { lc($_) =~ /^(admin|site_admin|staff|editor|moderator)$/ } @r ) ? 1 : 0;
+}
+
+# Staff review queue for user-submitted ENCY additions.
+sub review :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'review',
+        'HealthKitchen review queue method=' . ( $c->req->method || '' ) );
+    unless ( $self->_is_staff($c) ) {
+        $c->flash->{error_msg} = 'Staff only.';
+        $c->response->redirect( $c->uri_for( $self->action_for('symptoms') ) );
+        $c->detach;
+        return;
+    }
+    if ( $c->req->method eq 'POST' ) {
+        my $p   = $c->req->params;
+        my $res = $self->hk->review_pending( $c, { id => $p->{id}, decision => $p->{decision}, notes => $p->{notes} } );
+        if ( $res->{ok} ) {
+            $c->flash->{success_msg} = $res->{decision} eq 'approved'
+                ? ( $res->{created} ? 'Approved; ENCY symptom created and activated for the user.'
+                                    : 'Approved; linked to existing ENCY symptom and activated for the user.' )
+                : 'Rejected.';
+        }
+        else { $c->flash->{error_msg} = $res->{error} || 'Review failed.' }
+        $c->response->redirect( $c->uri_for( $self->action_for('review') ) );
+        $c->detach;
+        return;
+    }
+    my $status = $c->req->params->{status} || 'pending';
+    $c->stash(
+        hk_pending_ready => $self->hk->pending_ready($c) ? 1 : 0,
+        hk_review_status => $status,
+        hk_review_rows   => $self->hk->list_pending_review( $c, $status ),
+        template         => 'healthkitchen/review.tt',
+    );
 }
 
 sub _is_admin {
