@@ -11,6 +11,8 @@
   <span style="color:#475569;">|</span>
   <a href="/Inventory/email-config" style="color:#fcd34d;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;" title="Set which email addresses become supplier invoices">Invoice emails</a>
   <span style="color:#475569;">|</span>
+  <a href="/mail/invoice/sort" style="color:#fcd34d;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;" title="Sort invoice lines to a SiteName">Invoice queue</a>
+  <span style="color:#475569;">|</span>
   <a href="/Inventory/sales"   style="color:#93c5fd;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;">AR / Sales</a>
   <span style="color:#475569;">|</span>
   <a href="/Inventory"         style="color:#a5b4fc;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;">Inventory</a>
