@@ -350,8 +350,18 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
             # Secret guard (same script as the global pre-commit hook). Never --no-verify.
             my $guard = $self->git_service->secret_guard($c);
             unless ($guard->{ok}) {
-                $msg = "Commit refused by secret guard \x{2014} a staged file looks like a key or secret. "
-                     . "Unstage it (keys belong in ~/.comserv/keys) and retry.\n" . ($guard->{output} // q{});
+                my $where = join(', ', map {
+                    $_->{file} . ($_->{line} ? ":$_->{line}" : '')
+                } @{ $guard->{hits} || [] });
+                $msg = "Commit refused by secret guard. "
+                     . ($where ? "Location: $where. " : '')
+                     . "Only the primary DB key belongs in the env; other keys belong in the database. "
+                     . "Use the fix route below. Do not use --no-verify.";
+                if ($guard->{hits} && @{ $guard->{hits} }) {
+                    $c->flash->{guard_hits_json} = encode_json($guard->{hits});
+                } else {
+                    $msg .= "\n" . ($guard->{output} // q{});
+                }
                 goto COMMIT_DONE;
             }
             my ($out, $code) = $self->_git_list($c, 'commit', '-m', $message);
@@ -718,6 +728,16 @@ sub index :Path('/admin/git') :Args(0) {
     my $target_key = $c->stash->{git_target} // '';
 
     my $status = $self->get_git_status($c);
+
+    if (my $raw = $c->flash->{guard_hits_json}) {
+        my $hits = eval { decode_json($raw) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+                "guard_hits_json decode failed: $@");
+        } elsif (ref $hits eq 'ARRAY') {
+            $c->stash(guard_hits => $hits);
+        }
+    }
 
     $c->stash(
         repo_path       => $self->repo_path($c),
@@ -2281,8 +2301,9 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         # Do not pre-scan `main` with secret_guard --merge. That scan diffs the
         # whole main range and gitleaks hangs, and it refuses files already on
         # main (which blocks every worktree update). The pre-merge-commit hook
-        # still blocks a blob this branch newly adds or changes. If that hook
-        # leaves MERGE_HEAD, the failure path below aborts it.
+        # still blocks a blob this branch newly adds or changes, and that refusal
+        # includes the file:line fix route. If the hook leaves MERGE_HEAD, the
+        # failure path below aborts it.
         my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $dest });
         # --autostash: the worktree routinely has uncommitted WIP; a plain merge
         # refuses ("Your local changes would be overwritten"). Autostash stashes

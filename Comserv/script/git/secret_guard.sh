@@ -67,11 +67,13 @@ already_on_parent() {
     done
     return 1
 }
-hit() { # path reason
-    if allowed "$1"; then echo "  ALLOWED (allow-listed, see .secret-guard-allow): $1 — $2"
+hit() { # path reason [line]
+    local loc="$1"
+    if [ -n "${3:-}" ] && [ "$3" != 0 ]; then loc="$1:$3"; fi
+    if allowed "$1"; then echo "  ALLOWED (allow-listed, see .secret-guard-allow): $loc — $2"
     elif [ "$MODE" = staged ] && already_on_parent "$1"; then
-        echo "  ALLOWED (unchanged blob already on a parent): $1 — $2"
-    else echo "  BLOCKED: $1 — $2"; FAIL=1; fi
+        echo "  ALLOWED (unchanged blob already on a parent): $loc — $2"
+    else echo "  BLOCKED: $loc — $2"; FAIL=1; fi
 }
 
 if [ "$MODE" = staged ]; then
@@ -144,17 +146,23 @@ if command -v gitleaks >/dev/null 2>&1; then
     if [ -s "$REP" ]; then
         perl -MJSON::PP -0777 -e 'decode_json(<STDIN> || "[]")' < "$REP" 2>/dev/null \
             || { echo "secret-guard: cannot parse gitleaks report - refusing"; exit 1; }
-        while IFS=$'\t' read -r f rule; do
+        while IFS=$'\t' read -r f rule line; do
             [ -n "$f" ] || continue
-            hit "$f" "gitleaks rule $rule"
+            hit "$f" "gitleaks rule $rule" "$line"
         done < <(perl -MJSON::PP -0777 -ne 'my %s; for (@{ decode_json($_ || "[]") }) {
-                    my $k = "$_->{File}\t$_->{RuleID}"; print "$k\n" unless $s{$k}++ }' "$REP" 2>/dev/null)
+                    my $line = $_->{StartLine} || 0;
+                    my $k = "$_->{File}\t$_->{RuleID}\t$line";
+                    print "$k\n" unless $s{$k}++ }' "$REP" 2>/dev/null)
     fi
 fi
 
 if [ "$FAIL" -ne 0 ]; then
-    echo "secret-guard: refused. Remove the flagged file(s) from the commit/merge/push,"
-    echo "  keep keys in ~/.comserv/keys, or add a reviewed glob to .secret-guard-allow."
+    echo "secret-guard: refused."
+    echo "  Location is each BLOCKED path above (file:line when the scanner knows a line)."
+    echo "  Only one encryption key belongs in the env: the primary key for the initial DB password."
+    echo "  Every other key belongs in the database, not in git."
+    echo "  Do not print the secret. Do not use --no-verify."
+    echo "  The git dashboard refusal includes an AI-editor link and a copyable fix prompt."
     exit 1
 fi
 exit 0
