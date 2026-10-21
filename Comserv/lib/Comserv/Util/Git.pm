@@ -491,16 +491,24 @@ sub _run {
         && (grep { defined $_ && $_ eq '--show-current' } @argv)
         && $code == 128
         && (($result->{output} // '') =~ /^\s*$/);
+    # pre-merge-commit / secret_guard.sh refusal. Expected policy block, not a
+    # git failure. Logging it as ERROR spawned audit todos whose only text was
+    # "Created autostash" because the BLOCKED lines are on stderr.
+    my $secret_guard_block = $combined =~ /secret-guard:|pre-merge-commit:|^\s*BLOCKED:/m;
     my $benign   = !$result->{success}
                 && ( $asks_upstream
                   || $checkout_collision
                   || $show_current_empty
+                  || $secret_guard_block
                   || $combined =~ /no upstream configured|does not have an upstream|no such branch/i );
-    my $level    = $result->{success} ? 'info'
-                 : $benign            ? 'info'
-                 :                      'error';
+    my $level    = $result->{success}       ? 'info'
+                 : $secret_guard_block      ? 'warn'
+                 : $benign                  ? 'info'
+                 :                            'error';
+    my $shown = ($result->{output} // '');
+    $shown .= "\n" . $result->{error} if length($result->{error} // '');
     $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_run',
-        "git " . join(' ', @argv) . " -> exit=$code out=" . substr($result->{output}, 0, 500));
+        "git " . join(' ', @argv) . " -> exit=$code out=" . substr($shown, 0, 500));
 
     return $result;
 }
@@ -907,7 +915,22 @@ sub secret_guard {
     my $out = '';
     IPC::Run3::run3([ 'bash', $script, @mode_args, $repo ], \undef, \$out, \$out);
     my $code = $? >> 8;
-    return $code == 0 ? { ok => 1, output => $out } : { ok => 0, output => $out };
+    my $res = $code == 0 ? { ok => 1, output => $out } : { ok => 0, output => $out };
+    if (!$res->{ok}) {
+        my $report_ok = eval {
+            require Comserv::Util::GitGuardReport;
+            $res->{hits} = Comserv::Util::GitGuardReport->enrich($out);
+            $res->{remediation} = Comserv::Util::GitGuardReport->text_for($res->{hits});
+            1;
+        };
+        if (!$report_ok) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'secret_guard',
+                "guard report failed: $@");
+            $res->{hits} = [];
+            $res->{remediation} = '';
+        }
+    }
+    return $res;
 }
 
 =head2 commit($c, $message)
@@ -923,8 +946,11 @@ sub commit {
     # Secret guard: refuse key files / raw keys / gitleaks hits. Never --no-verify.
     my $guard = $self->secret_guard($c);
     return { success => 0, exit_code => 1, output => $guard->{output} // q{},
+             hits => $guard->{hits} || [],
              error => "Commit refused by secret guard (possible key/secret staged). "
-                    . "Unstage the flagged file(s) and retry." }
+                    . "Unstage the flagged file(s) and retry. "
+                    . "Only the primary DB key belongs in the env; other keys belong in the database.\n"
+                    . ($guard->{remediation} || $guard->{output} // q{}) }
         unless $guard->{ok};
     return $self->_run($c, 'commit', '-m', $message);
 }
@@ -1828,9 +1854,10 @@ sub merge_branch {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
             "merge_branch: secret guard refused merging '$branch' into $current");
         $result->{error_msg} = "Merge refused by secret guard: '$branch' would bring in a key/secret file. "
-                             . "Remove it from the branch (keys belong in ~/.comserv/keys), then retry.\n"
-                             . ($guard->{output} // q{});
+                             . "Only the primary DB key belongs in the env; other keys belong in the database.\n"
+                             . ($guard->{remediation} || $guard->{output} // q{});
         $result->{output}    = $guard->{output} // q{};
+        $result->{hits}      = $guard->{hits} || [];
         $result->{reason}    = 'secret_guard';
         return $result;
     }

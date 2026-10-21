@@ -54,9 +54,26 @@ allowed() {
 }
 
 FAIL=0
-hit() { # path reason
-    if allowed "$1"; then echo "  ALLOWED (allow-listed, see .secret-guard-allow): $1 — $2"
-    else echo "  BLOCKED: $1 — $2"; FAIL=1; fi
+# A merge may carry a blob that is already on HEAD or MERGE_HEAD. That is not a
+# new secret. Blocking it froze every worktree merge of main. A commit that
+# adds or changes the blob still fails this test and is blocked.
+already_on_parent() {
+    local path="$1" rev blob parent
+    blob=$(git rev-parse -q --verify ":$path" 2>/dev/null) || return 1
+    for rev in HEAD MERGE_HEAD; do
+        git rev-parse -q --verify "$rev" >/dev/null 2>&1 || continue
+        parent=$(git rev-parse -q --verify "$rev:$path" 2>/dev/null) || continue
+        [ "$blob" = "$parent" ] && return 0
+    done
+    return 1
+}
+hit() { # path reason [line]
+    local loc="$1"
+    if [ -n "${3:-}" ] && [ "$3" != 0 ]; then loc="$1:$3"; fi
+    if allowed "$1"; then echo "  ALLOWED (allow-listed, see .secret-guard-allow): $loc — $2"
+    elif [ "$MODE" = staged ] && already_on_parent "$1"; then
+        echo "  ALLOWED (unchanged blob already on a parent): $loc — $2"
+    else echo "  BLOCKED: $loc — $2"; FAIL=1; fi
 }
 
 if [ "$MODE" = staged ]; then
@@ -75,6 +92,14 @@ while IFS= read -r -d '' status && IFS= read -r -d '' path; do
         id_rsa|id_rsa.*|id_rsa_*|id_ed25519|id_ed25519.*|id_ed25519_*|id_ecdsa*|id_dsa*|\
         .env|.env.*|db_config.json|credentials.json|auth.json)
             hit "$path" "file name matches a secret/key pattern"; continue ;;
+    esac
+    # Binary/entropy heuristic is for extensionless blobs and unknown types.
+    # Images, archives, and source/JSON are not keystores; treating every
+    # <4KB png/json as a key blocked merging main (site icons, rank-job JSON).
+    case "$base" in
+        *.png|*.jpg|*.jpeg|*.gif|*.ico|*.webp|*.svg|*.zip|*.xpi|*.xpi.*|*.json|\
+        *.html|*.css|*.js|*.pm|*.tt|*.md|*.yml|*.yaml|*.xml|*.csv|*.txt|*.woff|*.woff2)
+            continue ;;
     esac
     [ "${status:0:1}" = "A" ] || continue
     ref=$(blob "$path")
@@ -121,17 +146,23 @@ if command -v gitleaks >/dev/null 2>&1; then
     if [ -s "$REP" ]; then
         perl -MJSON::PP -0777 -e 'decode_json(<STDIN> || "[]")' < "$REP" 2>/dev/null \
             || { echo "secret-guard: cannot parse gitleaks report - refusing"; exit 1; }
-        while IFS=$'\t' read -r f rule; do
+        while IFS=$'\t' read -r f rule line; do
             [ -n "$f" ] || continue
-            hit "$f" "gitleaks rule $rule"
+            hit "$f" "gitleaks rule $rule" "$line"
         done < <(perl -MJSON::PP -0777 -ne 'my %s; for (@{ decode_json($_ || "[]") }) {
-                    my $k = "$_->{File}\t$_->{RuleID}"; print "$k\n" unless $s{$k}++ }' "$REP" 2>/dev/null)
+                    my $line = $_->{StartLine} || 0;
+                    my $k = "$_->{File}\t$_->{RuleID}\t$line";
+                    print "$k\n" unless $s{$k}++ }' "$REP" 2>/dev/null)
     fi
 fi
 
 if [ "$FAIL" -ne 0 ]; then
-    echo "secret-guard: refused. Remove the flagged file(s) from the commit/merge/push,"
-    echo "  keep keys in ~/.comserv/keys, or add a reviewed glob to .secret-guard-allow."
+    echo "secret-guard: refused."
+    echo "  Location is each BLOCKED path above (file:line when the scanner knows a line)."
+    echo "  Only one encryption key belongs in the env: the primary key for the initial DB password."
+    echo "  Every other key belongs in the database, not in git."
+    echo "  Do not print the secret. Do not use --no-verify."
+    echo "  The git dashboard refusal includes an AI-editor link and a copyable fix prompt."
     exit 1
 fi
 exit 0

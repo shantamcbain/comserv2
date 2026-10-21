@@ -5,6 +5,7 @@ use warnings;
 use namespace::autoclean;
 use File::Copy qw(copy);
 use File::Temp qw(tempfile);
+use Encode qw(decode FB_CROAK);
 
 =head1 NAME
 
@@ -109,9 +110,12 @@ sub read_file {
         return { error => 'Not found' };
     }
 
+    # Read raw bytes, then explicitly decode as UTF-8.
+    # Binary files (e.g. .db-shm, .db-wal) fail here with a clear message
+    # instead of later crashing encode_json with "malformed unicode character".
     my $content;
     eval {
-        open my $fh, '<:utf8', $full or die "open: $!";
+        open my $fh, '<:raw', $full or die "open: $!";
         local $/;
         $content = <$fh>;
         close $fh;
@@ -119,6 +123,13 @@ sub read_file {
     } or do {
         my $err = $@ || 'Unknown error';
         return { error => "Read failed: $err" };
+    };
+
+    # Validate that the file is valid UTF-8 text
+    eval { $content = decode('UTF-8', $content, FB_CROAK) };
+    if (my $err = $@) {
+        chomp $err;
+        return { error => "Binary file (not editable): $err" };
     };
 
     my $mtime = (stat($full))[9];
