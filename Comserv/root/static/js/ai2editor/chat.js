@@ -1710,6 +1710,30 @@ function ensureThinkingStyles(doc) {
         }
 
         console.log('[AI2EditorChat] chat + suggestion wiring ready');
+        seedGuardPrompt();
+    }
+
+    function seedGuardPrompt() {
+        var params;
+        try { params = new URLSearchParams(window.location.search); } catch (e) { return; }
+        var prompt = params.get('prompt');
+        var line = parseInt(params.get('line') || '0', 10);
+        var input = document.getElementById('ai-chat-input');
+        if (prompt && input && !input.value) {
+            input.value = prompt;
+        }
+        if (!(line > 0)) { return; }
+        var tries = 0;
+        var timer = setInterval(function () {
+            tries += 1;
+            var ed = getEditor();
+            if (ed && ed.session && ed.getValue()) {
+                ed.gotoLine(line, 0, true);
+                clearInterval(timer);
+            } else if (tries > 20) {
+                clearInterval(timer);
+            }
+        }, 300);
     }
 
     if (document.readyState === 'loading') {
