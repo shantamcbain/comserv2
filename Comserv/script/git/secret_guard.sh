@@ -76,6 +76,20 @@ hit() { # path reason [line]
     else echo "  BLOCKED: $loc — $2"; FAIL=1; fi
 }
 
+# Credential literals in docs. gitleaks is the thorough scan, but it is skipped
+# entirely when the binary is absent, and its default rules miss the forms a
+# copied DB password actually takes. This runs on the blob either way and never
+# prints the value — only the file, line, and which pattern matched.
+content_scan() { # path
+    local path="$1" ref scan
+    ref=$(blob "$path")
+    scan="$ROOT/Comserv/script/git/scan_credential_literals.pl"
+    [ -f "$scan" ] || return 0
+    git cat-file blob "$ref" 2>/dev/null | perl "$scan" | while IFS=$'\t' read -r rule line; do
+        [ -n "$rule" ] && hit "$path" "credential literal ($rule)" "$line"
+    done
+}
+
 if [ "$MODE" = staged ]; then
     LIST=(git diff --cached --name-status -z --diff-filter=ACMR)
     blob() { echo ":$1"; }
@@ -99,6 +113,14 @@ while IFS= read -r -d '' status && IFS= read -r -d '' path; do
     case "$base" in
         *.png|*.jpg|*.jpeg|*.gif|*.ico|*.webp|*.svg|*.zip|*.xpi|*.xpi.*|*.json|\
         *.html|*.css|*.js|*.pm|*.tt|*.md|*.yml|*.yaml|*.xml|*.csv|*.txt|*.woff|*.woff2)
+            # Known source types are not keystores, so the binary/entropy test
+            # below does not apply. But .md/.tt/.txt are exactly where a copied
+            # DB password landed (mysql -p'…', DBI->connect positional args),
+            # and the entropy test never sees them. Scan those for credential
+            # literals before skipping.
+            case "$base" in
+                *.md|*.tt|*.txt) content_scan "$path" ;;
+            esac
             continue ;;
     esac
     [ "${status:0:1}" = "A" ] || continue
