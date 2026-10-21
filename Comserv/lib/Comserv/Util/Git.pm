@@ -491,16 +491,24 @@ sub _run {
         && (grep { defined $_ && $_ eq '--show-current' } @argv)
         && $code == 128
         && (($result->{output} // '') =~ /^\s*$/);
+    # pre-merge-commit / secret_guard.sh refusal. Expected policy block, not a
+    # git failure. Logging it as ERROR spawned audit todos whose only text was
+    # "Created autostash" because the BLOCKED lines are on stderr.
+    my $secret_guard_block = $combined =~ /secret-guard:|pre-merge-commit:|^\s*BLOCKED:/m;
     my $benign   = !$result->{success}
                 && ( $asks_upstream
                   || $checkout_collision
                   || $show_current_empty
+                  || $secret_guard_block
                   || $combined =~ /no upstream configured|does not have an upstream|no such branch/i );
-    my $level    = $result->{success} ? 'info'
-                 : $benign            ? 'info'
-                 :                      'error';
+    my $level    = $result->{success}       ? 'info'
+                 : $secret_guard_block      ? 'warn'
+                 : $benign                  ? 'info'
+                 :                            'error';
+    my $shown = ($result->{output} // '');
+    $shown .= "\n" . $result->{error} if length($result->{error} // '');
     $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_run',
-        "git " . join(' ', @argv) . " -> exit=$code out=" . substr($result->{output}, 0, 500));
+        "git " . join(' ', @argv) . " -> exit=$code out=" . substr($shown, 0, 500));
 
     return $result;
 }

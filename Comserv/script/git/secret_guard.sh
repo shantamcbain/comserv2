@@ -54,10 +54,25 @@ allowed() {
 }
 
 FAIL=0
+# A merge may carry a blob that is already on HEAD or MERGE_HEAD. That is not a
+# new secret. Blocking it froze every worktree merge of main. A commit that
+# adds or changes the blob still fails this test and is blocked.
+already_on_parent() {
+    local path="$1" rev blob parent
+    blob=$(git rev-parse -q --verify ":$path" 2>/dev/null) || return 1
+    for rev in HEAD MERGE_HEAD; do
+        git rev-parse -q --verify "$rev" >/dev/null 2>&1 || continue
+        parent=$(git rev-parse -q --verify "$rev:$path" 2>/dev/null) || continue
+        [ "$blob" = "$parent" ] && return 0
+    done
+    return 1
+}
 hit() { # path reason [line]
     local loc="$1"
     if [ -n "${3:-}" ] && [ "$3" != 0 ]; then loc="$1:$3"; fi
     if allowed "$1"; then echo "  ALLOWED (allow-listed, see .secret-guard-allow): $loc — $2"
+    elif [ "$MODE" = staged ] && already_on_parent "$1"; then
+        echo "  ALLOWED (unchanged blob already on a parent): $loc — $2"
     else echo "  BLOCKED: $loc — $2"; FAIL=1; fi
 }
 
