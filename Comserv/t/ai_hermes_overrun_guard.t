@@ -605,4 +605,8 @@ sub cb_for {
     is $pick->(or_ids => {}, supergrok => $hi, kind => 'caps', ollama_models => []), undef, 'caps, no SG budget, no free -> pause, not Super Grok build';
 }
 
+# Oct 21 2026: 98 % stop paid coder is honored and watched.
+is Comserv::Util::AI::HermesOverrunGuard::supergrok_daily_target({ switch_model => 'qwen/qwen3-coder' })->{default}, 'qwen/qwen3-coder', '98% stop paid coder kept';
+ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID_WATCH_RE, 'qwen3-coder on paid watch';
+
 done_testing();

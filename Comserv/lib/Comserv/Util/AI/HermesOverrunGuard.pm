@@ -60,7 +60,7 @@ our %SUPERGROK_CAPS = ( %SUPERGROK, name => 'xai-oauth/grok-4.7', default => 'gr
 our $BANNED_RE      = qr/deepseek-v4-pro/i;   # never written anywhere by the guard
 # Paid models whose recent use (last 10 min) trips the guard early once the day is
 # at $NEAR_CAP_FRAC of the cap (proposal #34b adds tencent/hy4-preview).
-our @PAID_WATCH     = ('deepseek-v4-pro', 'tencent/hy4-preview', 'x-ai/grok');
+our @PAID_WATCH     = ('deepseek-v4-pro', 'tencent/hy4-preview', 'x-ai/grok', 'qwen/qwen3-coder');   # Oct 21: 98 % stop paid coder
 # Oct 15 2026 (Shanta): grok only through xai-oauth (Super Grok). Any OpenRouter grok id is
 # BLOCKED, not just watched: set_model/set_aliases/write_fallback_providers rewrite it, and
 # every run sweeps config default, aliases, fallback, auxiliary and delegation (or_grok_block_plan).
