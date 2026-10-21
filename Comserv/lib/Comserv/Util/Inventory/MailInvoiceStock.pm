@@ -185,6 +185,303 @@ sub owner_site {
     return (undef, 'unknown_supplier');
 }
 
+sub queue_rows {
+    my ($self, $c) = @_;
+    my @rows;
+    my $classifier = Comserv::Util::MailInvoiceClassifier->new;
+    my $all = $classifier->load_monitor_config;
+    my $sites = $all->{sites} || {};
+    my $schema = eval { $c->model('DBEncy') };
+    my $file = $self->_classified_file($c, $classifier);
+    my $data = ($file && -f $file) ? $self->_read_json($c, $file) : {};
+    my $cats = ref($data) eq 'HASH' ? ($data->{categories} || {}) : {};
+    my $mail_invoices = 0;
+    for my $cat (sort keys %$cats) {
+        next if $cat eq 'other' || $cat eq 'personal';
+        for my $msg (@{ $cats->{$cat}{invoices} || [] }) {
+            next unless $msg && $msg->{is_invoice};
+            $mail_invoices++;
+            my ($owner, $why) = $schema
+                ? $self->owner_site($schema, $sites, $msg, $cat)
+                : (undef, 'no_schema');
+            my ($from) = $self->emails_in($msg->{from});
+            my $supplier = $self->_supplier_label($schema, $from);
+            my @parsed = eval {
+                $classifier->_parse_invoice_line_items(
+                    $classifier->message_body($msg), $msg->{subject}, $msg->{from},
+                );
+            };
+            @parsed = ({ name => $msg->{subject} || '(no lines parsed)' }) unless @parsed;
+            my $mailbox = join(', ', $self->emails_in($msg->{to}, $msg->{cc}, $msg->{delivered_to}));
+            for my $line (@parsed) {
+                push @rows, {
+                    source => 'mail',
+                    date => $msg->{date} || '',
+                    invoice => $msg->{subject} || '',
+                    item => $line->{name} || $line->{sku} || '',
+                    qty => $line->{quantity} // '',
+                    cost => $line->{price} // '',
+                    mailbox => $mailbox,
+                    from => $from || '',
+                    sitename => $owner || 'unassigned',
+                    site_reason => $why || '',
+                    supplier => $supplier || 'no supplier match',
+                    item_site => '',
+                };
+                last if @rows >= 300;
+            }
+            last if @rows >= 300;
+        }
+        last if @rows >= 300;
+    }
+    if ($schema && @rows < 300) {
+        my @inv = eval {
+            $schema->resultset('Accounting::InventorySupplierInvoice')->search(
+                { sitename => { -in => [qw(3d CSC Shanta)] } },
+                { order_by => { -desc => 'id' } },
+            )->all;
+        };
+        for my $inv (@inv) {
+            my $sup = eval { $inv->supplier };
+            my $sup_name = ($sup && $sup->name) ? $sup->name : 'no supplier match';
+            my $sup_site = ($sup && $sup->sitename) ? $sup->sitename : '';
+            $sup_name .= " (supplier site $sup_site)" if $sup_site && $sup_site ne ($inv->sitename || '');
+            my @lines = eval { $inv->lines->all };
+            @lines = () if $@ || !@lines;
+            for my $line (@lines) {
+                next unless ref $line;
+                my $item = eval { $line->item };
+                push @rows, {
+                    source => 'filed',
+                    date => ($inv->invoice_date || '') . '',
+                    invoice => $inv->invoice_number || '',
+                    item => $line->description || ($item && $item->name) || '',
+                    qty => $line->quantity,
+                    cost => $line->unit_cost,
+                    mailbox => '',
+                    from => ($sup && $sup->email) ? $sup->email : '',
+                    sitename => $inv->sitename || 'unassigned',
+                    site_reason => 'already filed',
+                    supplier => $sup_name,
+                    item_site => ($item && $item->sitename) ? $item->sitename : '',
+                };
+                last if @rows >= 300;
+            }
+            last if @rows >= 300;
+        }
+    }
+    my $note = $mail_invoices
+        ? "$mail_invoices invoice message(s) from the last classification, plus lines already filed for 3d, CSC, and Shanta."
+        : 'The last classification had no invoice messages. The rows below are supplier-invoice lines already filed for 3d, CSC, and Shanta.';
+    return { rows => \@rows, note => $note, mail_invoices => $mail_invoices };
+}
+
+sub queue_invoices {
+    my ($self, $c) = @_;
+    my $schema = eval { $c->model('DBEncy') };
+    my (@invoices, @suppliers, @sites);
+    if ($schema) {
+        my @inv = eval {
+            $schema->resultset('Accounting::InventorySupplierInvoice')->search(
+                { sitename => { -in => [qw(3d CSC Shanta)] } },
+                { order_by => { -desc => 'id' } },
+            )->all;
+        };
+        @inv = () if $@;
+        for my $inv (@inv) {
+            next unless ref $inv;
+            my $sup = eval { $inv->supplier };
+            my @lines = eval { $inv->lines->all };
+            @lines = () if $@;
+            my @out;
+            for my $line (@lines) {
+                next unless ref $line;
+                my $item = eval { $line->item };
+                push @out, {
+                    line_id    => $line->id,
+                    item_id    => $line->item_id,
+                    item       => $line->description || ($item && $item->name) || '',
+                    sku        => ($item && $item->sku) || '',
+                    qty        => $line->quantity,
+                    cost       => $line->unit_cost,
+                    item_site  => ($item && $item->sitename) || '',
+                    barcode    => ($item && $item->barcode) || '',
+                };
+            }
+            push @invoices, {
+                id             => $inv->id,
+                invoice        => $inv->invoice_number || '',
+                date           => ($inv->invoice_date || '') . '',
+                status         => $inv->status || '',
+                sitename       => $inv->sitename || '',
+                supplier_id    => $inv->supplier_id,
+                supplier       => ($sup && $sup->name) ? $sup->name : 'no supplier match',
+                supplier_site  => ($sup && $sup->sitename) || '',
+                lines          => \@out,
+            };
+        }
+        my @sup = eval {
+            $schema->resultset('Accounting::InventorySupplier')->search(
+                { status => 'active' },
+                { order_by => [ 'name', 'sitename' ] },
+            )->all;
+        };
+        @sup = () if $@;
+        for my $s (@sup) {
+            next unless ref $s;
+            push @suppliers, {
+                id       => $s->id,
+                name     => $s->name || '',
+                sitename => $s->sitename || '',
+            };
+        }
+        my @site_rows = eval {
+            $schema->resultset('Site')->search({}, { order_by => 'name' })->all;
+        };
+        @site_rows = () if $@;
+        for my $s (@site_rows) {
+            next unless ref $s && defined $s->name && $s->name ne '';
+            push @sites, $s->name;
+        }
+    }
+    return {
+        invoices  => \@invoices,
+        suppliers => \@suppliers,
+        sites     => \@sites,
+        note      => 'One block per invoice. SiteName on the invoice or on an item is the move. Stock rows are not rewritten. Chemicals, GMO, and filament-barcode data are not stored yet.',
+    };
+}
+
+sub update_invoice_assignment {
+    my ($self, $c, %args) = @_;
+    my $schema = eval { $c->model('DBEncy') };
+    return { ok => 0, error => 'no database' } unless $schema;
+    my $id = $args{invoice_id};
+    my $sitename = $args{sitename};
+    my $supplier_id = $args{supplier_id};
+    return { ok => 0, error => 'Choose a SiteName and a supplier.' }
+        unless $id && defined $sitename && $sitename ne '' && $supplier_id;
+
+    my $inv = eval { $schema->resultset('Accounting::InventorySupplierInvoice')->find($id) };
+    return { ok => 0, error => 'Invoice not found.' } unless $inv && !$@;
+
+    my $site_ok = eval { $schema->resultset('Site')->search({ name => $sitename })->count };
+    return { ok => 0, error => 'Unknown SiteName.' } unless $site_ok && !$@;
+
+    my $supplier = eval { $schema->resultset('Accounting::InventorySupplier')->find($supplier_id) };
+    return { ok => 0, error => 'Supplier not found.' } unless $supplier && !$@;
+    return { ok => 0, error => 'Supplier is not active.' }
+        unless ($supplier->status || '') eq 'active';
+
+    my $number = $inv->invoice_number;
+    if (defined $number && $number ne '') {
+        my $clash = eval {
+            $schema->resultset('Accounting::InventorySupplierInvoice')->search({
+                sitename       => $sitename,
+                invoice_number => $number,
+                id             => { '!=' => $inv->id },
+            })->first;
+        };
+        if ($@) {
+            $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'update_invoice_assignment', "$@");
+            return { ok => 0, error => 'Could not check for a duplicate invoice number.' };
+        }
+        if ($clash) {
+            return { ok => 0, error => "Invoice $number is already on $sitename." };
+        }
+    }
+
+    my $old_site = $inv->sitename || '';
+    my $old_sup  = $inv->supplier_id || '';
+    eval { $inv->update({ sitename => $sitename, supplier_id => $supplier->id }) };
+    if ($@) {
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'update_invoice_assignment', "$@");
+        return { ok => 0, error => 'Could not save the invoice.' };
+    }
+    $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, 'update_invoice_assignment',
+        "invoice $id sitename $old_site -> $sitename supplier $old_sup -> " . $supplier->id);
+    return { ok => 1 };
+}
+
+sub update_item_site {
+    my ($self, $c, %args) = @_;
+    my $schema = eval { $c->model('DBEncy') };
+    return { ok => 0, error => 'no database' } unless $schema;
+    my $id = $args{item_id};
+    my $sitename = $args{sitename};
+    return { ok => 0, error => 'Choose a SiteName.' }
+        unless $id && defined $sitename && $sitename ne '';
+
+    my $item = eval { $schema->resultset('Accounting::InventoryItem')->find($id) };
+    return { ok => 0, error => 'Item not found.' } unless $item && !$@;
+
+    my $site_ok = eval { $schema->resultset('Site')->search({ name => $sitename })->count };
+    return { ok => 0, error => 'Unknown SiteName.' } unless $site_ok && !$@;
+
+    my $sku = $item->sku;
+    if (defined $sku && $sku ne '') {
+        my $clash = eval {
+            $schema->resultset('Accounting::InventoryItem')->search({
+                sitename => $sitename,
+                sku      => $sku,
+                id       => { '!=' => $item->id },
+            })->first;
+        };
+        if ($@) {
+            $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'update_item_site', "$@");
+            return { ok => 0, error => 'Could not check for a duplicate SKU.' };
+        }
+        if ($clash) {
+            return { ok => 0, error => "SKU $sku is already on $sitename." };
+        }
+    }
+
+    my %set = ( sitename => $sitename );
+    if (exists $args{barcode}) {
+        my $barcode = $args{barcode};
+        $barcode = '' unless defined $barcode;
+        $barcode =~ s/^\s+|\s+$//g;
+        $set{barcode} = (length $barcode ? $barcode : undef);
+        $set{barcode_type} = $self->_barcode_type($barcode);
+    }
+    my $old_site = $item->sitename || '';
+    eval { $item->update(\%set) };
+    if ($@) {
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'update_item_site', "$@");
+        return { ok => 0, error => 'Could not save the item.' };
+    }
+    $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, 'update_item_site',
+        "item $id sitename $old_site -> $sitename");
+    return { ok => 1 };
+}
+
+sub _barcode_type {
+    my ($self, $barcode) = @_;
+    return undef unless defined $barcode && $barcode =~ /^\d+$/;
+    my $n = length $barcode;
+    return 'upc' if $n == 8 || $n == 12;
+    return 'ean' if $n == 13 || $n == 14;
+    return 'other';
+}
+
+sub _supplier_label {
+    my ($self, $schema, $from) = @_;
+    return '' unless $schema && $from;
+    my @rows = eval {
+        $schema->resultset('Accounting::InventorySupplier')->search({ status => 'active' })->all;
+    };
+    return '' if $@;
+    my @hit;
+    for my $row (@rows) {
+        my ($em) = $self->emails_in($row->email);
+        next unless $em && $em eq lc($from);
+        my $label = $row->name || $em;
+        $label .= ' on ' . $row->sitename if $row->sitename;
+        push @hit, $label;
+    }
+    return join('; ', @hit);
+}
+
 sub sites_owning_supplier {
     my ($self, $schema, $from_email) = @_;
     return () unless $from_email && $schema;
