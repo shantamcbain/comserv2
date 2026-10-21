@@ -54,8 +54,23 @@ allowed() {
 }
 
 FAIL=0
+# A merge may carry a blob that is already on HEAD or MERGE_HEAD. That is not a
+# new secret. Blocking it froze every worktree merge of main. A commit that
+# adds or changes the blob still fails this test and is blocked.
+already_on_parent() {
+    local path="$1" rev blob parent
+    blob=$(git rev-parse -q --verify ":$path" 2>/dev/null) || return 1
+    for rev in HEAD MERGE_HEAD; do
+        git rev-parse -q --verify "$rev" >/dev/null 2>&1 || continue
+        parent=$(git rev-parse -q --verify "$rev:$path" 2>/dev/null) || continue
+        [ "$blob" = "$parent" ] && return 0
+    done
+    return 1
+}
 hit() { # path reason
     if allowed "$1"; then echo "  ALLOWED (allow-listed, see .secret-guard-allow): $1 — $2"
+    elif [ "$MODE" = staged ] && already_on_parent "$1"; then
+        echo "  ALLOWED (unchanged blob already on a parent): $1 — $2"
     else echo "  BLOCKED: $1 — $2"; FAIL=1; fi
 }
 
@@ -75,6 +90,14 @@ while IFS= read -r -d '' status && IFS= read -r -d '' path; do
         id_rsa|id_rsa.*|id_rsa_*|id_ed25519|id_ed25519.*|id_ed25519_*|id_ecdsa*|id_dsa*|\
         .env|.env.*|db_config.json|credentials.json|auth.json)
             hit "$path" "file name matches a secret/key pattern"; continue ;;
+    esac
+    # Binary/entropy heuristic is for extensionless blobs and unknown types.
+    # Images, archives, and source/JSON are not keystores; treating every
+    # <4KB png/json as a key blocked merging main (site icons, rank-job JSON).
+    case "$base" in
+        *.png|*.jpg|*.jpeg|*.gif|*.ico|*.webp|*.svg|*.zip|*.xpi|*.xpi.*|*.json|\
+        *.html|*.css|*.js|*.pm|*.tt|*.md|*.yml|*.yaml|*.xml|*.csv|*.txt|*.woff|*.woff2)
+            continue ;;
     esac
     [ "${status:0:1}" = "A" ] || continue
     ref=$(blob "$path")
