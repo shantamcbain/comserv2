@@ -139,6 +139,21 @@
                         — Active first, then this branch's todos
                         <a href="/planning/daily?filter_project=all" class="BacklogLink">Show all</a>
                     </span>
+                    [%# Which ordering is actually in force. The decision-model order is
+                        read from a cache (data/ai_rank_order.json) written by
+                        script/compute_decision_rank.pl — never computed during a render. %]
+                    [% IF decision_order %]
+                    <span class="FocusStats" id="decision-order-note"
+                          title="Order = content assessment (model reads title+description) weighted [% decision_order.weights.content || 0.7 %] + field order (priority/due/status) weighted [% decision_order.weights.fields || 0.3 %]. Computed [% decision_order.computed_at %].">
+                        🤖 <code>[% decision_order.model | html %]</code>
+                        [% decision_order.used %]/[% decision_order.scored %] by content ([% decision_order.weights.content || 0.7 %]/[% decision_order.weights.fields || 0.3 %])
+                    </span>
+                    [% ELSE %]
+                    <span class="FocusStats" id="decision-order-note"
+                          title="No cached decision-model order for this branch. Run: perl -Ilib script/compute_decision_rank.pl --branch <branch>">
+                        code score order
+                    </span>
+                    [% END %]
                     [% END %]
                     [% IF active_priorities_backlog %]
                     <a href="/todo" class="BacklogLink">+ [% active_priorities_backlog %] more in backlog →</a>
@@ -257,6 +272,15 @@
                         class="SortBtn">Project</button>
                     <button data-action="sort-due" id="sort-due"
                         class="SortBtn">Due</button>
+                    [%# Decision-model resort (local Ollama systemone via DecisionRank,
+                        never a chat model). decision-resort.js auto-runs it once on
+                        load (data-autorank) and on click; status shows in the span. %]
+                    [% IF branch_focus_filter %]
+                    <button data-action="decision-resort" id="decision-resort-btn"
+                        class="SortBtn" data-autorank="1" data-model="nimble:latest"
+                        title="Re-sort the Focus Queue with the local decision model (nimble). Runs in the background; the page stays usable.">🤖 Resort</button>
+                    <span id="decision-rank-status" class="AITuneStatus" role="status" aria-live="polite"></span>
+                    [% END %]
                     <a href="/planning/daily" data-action="clear-filters"
                         class="ClearFiltersLink">✕ Clear</a>
                 </div>
@@ -272,7 +296,7 @@
                     [% FOREACH ap IN xb_list %]
                     <div class="BlockerItem">
                         <span class="BlockerItemArrow">↳</span>
-                        <a href="/todo/details?record_id=[% ap.record_id %]" class="BlockerItemLink">[% ap.subject | html %]</a>
+                        <a href="/todo/details?record_id=[% ap.record_id %]" class="BlockerItemLink">#[% ap.record_id %] [% ap.subject | html %]</a>
                         <span class="BlockerItemProject">([% ap.project_name || ap.project_code || 'No project' %])</span>
                         [% IF ap.blocking_names %]<span class="BlockerItemBlocks">blocks: [% ap.blocking_names | html %]</span>[% END %]
                     </div>
@@ -307,6 +331,10 @@
                     tc_show_done         = 1
                     tc_done_fn           = 'quickClose'
                 %]
+                [% IF ap.decision_reason %]
+                <div class="DecisionReason" style="font-size:0.8em;color:#666;margin:-4px 0 6px 2.2em"
+                     title="AI content assessment [% ap.decision_content | format('%.2f') %], blended score [% ap.decision_score | format('%.2f') %]">🤖 [% ap.decision_reason | html %]</div>
+                [% END %]
                 [% END %]
                 </div>[%# end #priorities-list %]
 

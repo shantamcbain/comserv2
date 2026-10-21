@@ -1,0 +1,6 @@
+{
+  "versionCode": 2,
+  "versionName": "1.1",
+  "apkUrl": "/static/app/ComservInventory.apk",
+  "releaseNotes": "Initial inventory + barcode + photo app. LAN and ZeroTier support."
+}

@@ -1,0 +1,44 @@
+Use of uninitialized value in printf at /home/shanta/.hermes/cache/scratch/attrib_probe.pl line 153.
+A) importance + is_broken + is_routine (with P labels)
+   [nimble:latest asked=60] ok elapsed=385s
+C) same importance question, P labels STRIPPED from the state
+   [nimble:latest asked=20] ok elapsed=138s
+B) category per item
+   [nimble:latest asked=20] ok elapsed=202s
+
+id    P   ap      import   broken   routine     category
+------------------------------------------------------------------------------------------------
+2528  2   2.00    1.708    0.08     0.04        feature
+2197  2   -3.00   1.270    0.57     0.15        error_fix
+2218  2   -3.00   1.356    0.15     0.04        feature
+2195  3   -2.00   1.379    0.16     0.04        feature
+2237  4   -0.50   0.984    0.08     0.11        feature
+2238  4   -0.50   1.007    0.03     0.03        feature
+2261  1   0.00    1.739    0.47     0.13        feature
+2277  1   0.00    1.262    0.14     0.32        research
+2234  1   0.50    1.673    0.54     0.08        feature
+2235  1   0.50    1.551    0.11     0.03        feature
+2236  1   0.50    1.672    0.06     0.03        feature
+2239  5   0.50    0.817    0.09     0.38        routine
+778   2   2.50    0.272    0.18     0.03        admin
+2513  3   3.50    1.593    0.18     0.02        error_fix
+2514  3   3.50    1.233    0.07     0.02        feature
+2516  3   3.50    0.940    0.06     0.03        admin
+2527  3   3.50    1.638    0.17     0.03        feature
+2199  5   5.50    0.805    0.30     0.38        feature
+2200  5   5.50    0.691    0.09     0.06        feature
+2201  9   9.50    0.294    0.11     0.48        routine
+
+mean importance overall: 1.194 (n=20)
+  category admin     n=2   mean importance 0.606
+  category error_fix n=2   mean importance 1.431
+  category feature   n=13  mean importance 1.341
+  category research  n=1   mean importance 1.262
+  category routine   n=2   mean importance 0.555
+  is_broken>=0.5: n=2 mean 1.471   |  is_broken<0.5: n=18 mean 1.163
+  is_routine>=0.5: n=0 mean 0.000  |  is_routine<0.5: n=20 mean 1.194
+
+P-label ablation: 17 of 20 positions changed when the P label was removed
+  with P : #2261,#2528,#2234,#2236,#2527,#2513,#2235
+  without: #2195,#2528,#2197,#2261,#2236,#2234,#2527
+PROBE_DONE exit=0

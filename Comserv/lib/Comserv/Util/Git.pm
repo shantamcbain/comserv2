@@ -48,7 +48,7 @@ Logging uses the standard helper; all public methods therefore take C<$c>.
 # Allowed git subcommands. Anything else is refused by _run.
 my %ALLOWED_SUBCMD = map { $_ => 1 } qw(
     status log rev-parse rev-list branch diff fetch pull push ls-files
-    add commit stash checkout show restore rm merge worktree
+    add commit stash checkout show restore rm merge worktree apply
 );
 
 # Per-subcommand allow-list of flags (leading '-'). User values are NEVER flags.
@@ -79,6 +79,7 @@ my %ALLOWED_FLAGS = (
     # Worktree is used by the isolation primitive (create_worktree / remove_worktree):
     # allow add, remove (with --force to clear a dirty checkout), list, prune.
     worktree => { map { $_ => 1 } qw(add remove list prune --porcelain --force) },
+    apply    => { map { $_ => 1 } qw(--check) },
 );
 
 sub new {
@@ -737,30 +738,33 @@ Worktrees are *linked* to the main (PyCharm) repo's .git, so a branch in a
 worktree IS the same ref as that branch in the PyCharm repo — the AI commits
 in the worktree, the user verifies and commits, then merges into `main`.
 
-We therefore compute the relationship in two layers:
+We therefore compute the relationship in three layers:
 
   1. GitHub upstream (@{u}) if it exists — the classic ahead/behind.
-  2. FALLBACK when there is no @{u} (the normal local-merge case): compare the
-     current branch against `main` using a local-only `rev-list --count` (no
-     fetch, no network — `main` is a local branch in the shared repo). This is
-     the signal the dashboard needs: "is my branch behind main?" so the branch
-     can be updated before new work starts.
+  2. PRIMARY checkout (`main`/`master`) with no @{u}: compare against
+     `origin/<branch>` anyway. Port 3001 is that checkout; admin push to
+     origin must not disappear just because `branch.main.merge` was unset
+     (filter-repo drops it). Worktrees do not get this path.
+  3. FALLBACK for every other branch with no @{u} (the local-merge case):
+     compare against `main` using a local-only `rev-list --count` (no fetch).
+     "is my branch behind main?" so the branch can be updated before new work.
 
-Returns { upstream, ahead, behind, base, base_ahead, base_behind } where the
-`base*` fields describe the relationship to `main` (or whatever integration
-base we pick) regardless of whether a GitHub upstream is configured.
+Returns { upstream, upstream_configured, ahead, behind, base, base_ahead,
+base_behind }. `upstream_configured` is true only for a real @{u}. The
+`base*` fields describe the relationship to `main` regardless of GitHub.
 
 =cut
 
 sub get_tracking_info {
     my ($self, $c) = @_;
     my $info = {
-        upstream     => undef,
-        ahead        => 0,
-        behind       => 0,
-        base         => undef,   # integration base we fell back to (e.g. 'main')
-        base_ahead   => 0,       # commits in branch not in base
-        base_behind  => 0,       # commits in base not in branch (branch is stale)
+        upstream             => undef,
+        upstream_configured  => 0,  # 1 only when @{u} is actually set
+        ahead                => 0,
+        behind               => 0,
+        base                 => undef,   # integration base we fell back to (e.g. 'main')
+        base_ahead           => 0,       # commits in branch not in base
+        base_behind          => 0,       # commits in base not in branch (branch is stale)
     };
 
     # --- Layer 1: GitHub-style upstream if configured -------------------
@@ -769,6 +773,7 @@ sub get_tracking_info {
     chomp $upstream if defined $upstream;
     if ($r->{success} && $upstream && $upstream !~ /fatal|no upstream/i) {
         $info->{upstream} = $upstream;
+        $info->{upstream_configured} = 1;
         my $cr = $self->_run($c, 'rev-list', '--left-right', '--count', '@{u}...HEAD');
         my $counts = $cr->{output};
         chomp $counts if defined $counts;
@@ -779,10 +784,29 @@ sub get_tracking_info {
         return $info;
     }
 
-    # --- Layer 2: local-merge fallback vs integration base -----------------
+    # --- Layer 2: primary checkout publishes to origin even with no @{u} --
+    # :3001 is main. Hiding Push because branch.main.merge is unset made the
+    # git page look like there was nothing to send, while origin/main was behind.
+    my $current = $self->get_current_branch($c);
+    if (defined $current && ($current eq 'main' || $current eq 'master')) {
+        my $origin_ref = "origin/$current";
+        my $has = $self->_run($c, 'rev-parse', '--verify', '--quiet', "refs/remotes/$origin_ref");
+        $info->{upstream} = $origin_ref;
+        if ($has->{success} && length($has->{output} // '')) {
+            my $cr = $self->_run($c, 'rev-list', '--left-right', '--count', "$origin_ref...HEAD");
+            my $counts = $cr->{output};
+            chomp $counts if defined $counts;
+            if ($counts && $counts =~ /^(\d+)\s+(\d+)$/) {
+                $info->{behind} = $1;
+                $info->{ahead}  = $2;
+            }
+        }
+        return $info;
+    }
+
+    # --- Layer 3: local-merge fallback vs integration base -----------------
     # Pick a base branch: `main` if it exists, else `master`, else the repo's
     # first existing local branch that is not the current branch.
-    my $current = $self->get_current_branch($c);
     my $base;
     for my $cand (qw(main master)) {
         my $br = $self->_run($c, 'rev-parse', '--verify', '--quiet', $cand);
@@ -792,7 +816,7 @@ sub get_tracking_info {
         }
     }
     return $info unless defined $base;          # no base to compare against
-    return $info if defined $current && $current eq $base;  # already on base
+    return $info if defined $current && $current eq $base;  # already on base (layer 2 returned)
 
     $info->{base} = $base;
     my $cr = $self->_run($c, 'rev-list', '--left-right', '--count', "$base...HEAD");
@@ -850,6 +874,42 @@ sub unstage {
     return $self->_run($c, 'restore', '--staged', '--', @$paths);
 }
 
+=head2 secret_guard($c, $repo, @mode_args)
+
+Run the shared secret guard (Comserv/script/git/secret_guard.sh, falling back to
+~/.git-hooks/secret-guard.sh) against the staged index of $repo (default: the
+request's resolved local repo). Optional @mode_args are passed to the script,
+e.g. ('--merge', $branch) to scan what a merge would bring in. Returns C<{ ok => 1 }> when clean or when the
+target is remote (the remote host's own hooks apply), else
+C<{ ok => 0, output => $redacted_report }>. Never prints secret values — the
+script reports file names / rule ids only.
+
+=cut
+
+sub secret_guard {
+    my ($self, $c, $repo, @mode_args) = @_;
+    unless ($repo) {
+        my $req_target = ($c && $c->stash->{git_target})
+                      // ($c && $c->req ? $c->req->param('target') : undef);
+        my $t = $self->resolve_target($c, $req_target);
+        return { ok => 1, skipped => 'remote' } if ($t->{mode} // '') ne 'local';
+        $repo = $t->{repo};
+    }
+    return { ok => 0, output => 'secret guard: no repository resolved' }
+        unless defined $repo && length $repo;
+    my @cand = ("$repo/Comserv/script/git/secret_guard.sh",
+                ($ENV{HOME} ? "$ENV{HOME}/.git-hooks/secret-guard.sh" : ()));
+    my ($script) = grep { -x $_ } @cand;
+    return { ok => 0, output => 'secret guard script not found; refusing to commit '
+                              . '(expected Comserv/script/git/secret_guard.sh)' }
+        unless $script;
+    require IPC::Run3;
+    my $out = '';
+    IPC::Run3::run3([ 'bash', $script, @mode_args, $repo ], \undef, \$out, \$out);
+    my $code = $? >> 8;
+    return $code == 0 ? { ok => 1, output => $out } : { ok => 0, output => $out };
+}
+
 =head2 commit($c, $message)
 
 Commit staged changes with $message. Returns the uniform hash.
@@ -860,7 +920,49 @@ sub commit {
     my ($self, $c, $message) = @_;
     return { success => 0, error => 'Commit message required' }
         unless defined $message && length $message;
+    # Secret guard: refuse key files / raw keys / gitleaks hits. Never --no-verify.
+    my $guard = $self->secret_guard($c);
+    return { success => 0, exit_code => 1, output => $guard->{output} // q{},
+             error => "Commit refused by secret guard (possible key/secret staged). "
+                    . "Unstage the flagged file(s) and retry." }
+        unless $guard->{ok};
     return $self->_run($c, 'commit', '-m', $message);
+}
+
+=head2 apply_patch($c, $patch_text)
+
+Check then apply a unified diff. Refuses path traversal. Does not commit.
+
+=cut
+
+sub apply_patch {
+    my ($self, $c, $patch_text) = @_;
+    return { success => 0, error => 'empty patch' } unless defined $patch_text && $patch_text =~ /\S/;
+    return { success => 0, error => 'unsafe patch path' }
+        if $patch_text =~ m{(?:^|\n)(?:diff --git|---|\+\+\+) [ab]/(\.\./|/)}
+        || $patch_text =~ m{(?:^|\n)(?:diff --git|---|\+\+\+) [ab]/[^\n]*\.git};
+    my $repo = $self->repo_path($c);
+    return { success => 0, error => 'Repository path could not be resolved' } unless $repo;
+    # Worktrees have .git as a file, so do not write the patch under .git/.
+    my $dir = $ENV{TMPDIR} || '/tmp';
+    my $file = "$dir/comserv-fixer-$$.patch";
+    open my $fh, '>', $file or return { success => 0, error => "cannot write patch: $!" };
+    print $fh $patch_text;
+    close $fh;
+    my $check = $self->_run($c, 'apply', '--check', '--', $file);
+    unless ($check->{success}) {
+        unlink $file;
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'apply_patch',
+            'patch check failed: ' . ($check->{error} || $check->{output} || 'unknown'));
+        return { success => 0, error => 'Patch does not apply: ' . ($check->{error} || $check->{output}) };
+    }
+    my $applied = $self->_run($c, 'apply', '--', $file);
+    unlink $file;
+    unless ($applied->{success}) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'apply_patch',
+            'patch apply failed: ' . ($applied->{error} || $applied->{output} || 'unknown'));
+    }
+    return $applied;
 }
 
 =head2 push_to_origin($c, %opts)
@@ -1399,13 +1501,19 @@ sub build_worktree_list {
         # Do NOT pass -w: Comserv worktrees ARE the isolation. `hermes chat -w`
         # creates a nested hermes/hermes-* branch (often from origin/main) and
         # the agent then edits the wrong tree.
-        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && hermes chat',
+        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2 && hermes dashboard --isolated --host 0.0.0.0 --port 9119 --no-open --skip-build',
+        hermes_port => 9119,
+        hermes_cwd => '/home/shanta/PycharmProjects/comserv2',
     };
 
     my $cfg = eval { _worktree_config() } // { branches => {} };
     my $branches = $cfg->{branches} // {};
     for my $name (sort keys %$branches) {
         my $b = $branches->{$name} // {};
+        my $hp = eval {
+            require Comserv::Util::BranchServerControl;
+            Comserv::Util::BranchServerControl->new->hermes_port_for($name, $b->{port} // 0);
+        } || (9100 + int(($b->{port} // 0) % 100));
         push @list, {
             name  => $name,
             port  => $b->{port} // 0,
@@ -1413,9 +1521,11 @@ sub build_worktree_list {
             url   => $b->{url}   // '/planning/daily',
             cmd   => "cd $base/$name/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p "
                    . ($b->{port} // 0) . ' -r',
-            # Branch Hermes: cwd = the worktree git root so its .hermes.md loads.
-            # No -w — see main hermes_cmd comment above.
-            hermes_cmd => "cd $base/$name/Comserv && hermes chat",
+            # Branch Hermes: isolated dashboard in the worktree git root so
+            # .hermes.md loads and 9119 (main) is not reused. No hermes -w.
+            hermes_port => $hp,
+            hermes_cmd => "cd $base/$name/Comserv && hermes dashboard --isolated --host 0.0.0.0 --port $hp --no-open --skip-build",
+            hermes_cwd => "$base/$name/Comserv",
             project_id => $b->{project_id} // undef,
             host       => $b->{host} // undef,
             sitename   => $b->{sitename} // undef,
@@ -1711,6 +1821,19 @@ sub merge_branch {
     }
     my %seen_d; @dirty = grep { !$seen_d{$_}++ } @dirty;
     $result->{uncommitted_files} = \@dirty if @dirty;
+
+    # Secret guard on the incoming merge diff (merge-base..branch). Refuse on a hit.
+    my $guard = $self->secret_guard($c, $repo, '--merge', $branch);
+    unless ($guard->{ok}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "merge_branch: secret guard refused merging '$branch' into $current");
+        $result->{error_msg} = "Merge refused by secret guard: '$branch' would bring in a key/secret file. "
+                             . "Remove it from the branch (keys belong in ~/.comserv/keys), then retry.\n"
+                             . ($guard->{output} // q{});
+        $result->{output}    = $guard->{output} // q{};
+        $result->{reason}    = 'secret_guard';
+        return $result;
+    }
 
     my $r = $self->_run($c, 'merge', '--no-ff', $branch, $run_opts);
     # CRITICAL: git prints almost all merge failures on stderr. _run keeps

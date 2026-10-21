@@ -554,6 +554,7 @@ sub perform {
                 priority      => $priority,
                 status        => 'open',
                 created_at    => $now_str,
+                metadata      => eval { JSON->new->canonical->encode({ entry_path => "ai2_action", client_ip => (scalar($c->req->header("CF-Connecting-IP")) || $c->req->address), remote_addr => $c->req->address, user_agent => scalar($c->req->user_agent), sitename => $site_name }) },
             });
         };
         if ($@ || !$new_ticket) {

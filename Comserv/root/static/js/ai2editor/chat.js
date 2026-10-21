@@ -47,9 +47,38 @@
         return '';
     }
 
+    // Returns context distinguishing the *open editable file* from the *current page / endpoint*.
+    // Important: the file clicked to open AI Editor is often the page itself, but not always
+    // (e.g. error on page X, open editor from page Y to fix X; error message usually provided).
+    function getEditorContext() {
+        const openFile = currentFilePath();
+        let currentPage = '';
+        try {
+            currentPage = window.location.pathname || '';
+            // If opened from a different surface, try referer as hint
+            if (!currentPage || currentPage.includes('/ai2/')) {
+                const ref = document.referrer ? new URL(document.referrer).pathname : '';
+                if (ref && !ref.includes('/ai2/')) currentPage = ref;
+            }
+        } catch (e) {}
+        return { openFile, currentPage, pageVsFileDiffer: !!(openFile && currentPage && openFile.toLowerCase() !== currentPage.toLowerCase()) };
+    }
+
     function setActiveFile(path) {
         _activeFile = path || '';
         if (path) window.AI2_FILE_TO_LOAD = path;
+    }
+
+    // Stub for early preload called from core openFile.
+    // Beefs up auto-pipeline: pre-fetches related controller(s) so they are ready when chat starts.
+    // Uses the strengthened infer that handles open-file vs page and errors.
+    async function preloadRelatedPipeline(path, extraHint = '') {
+        try {
+            const paths = await inferRelatedPipelineFiles(path, extraHint);
+            // Fire the loads so cache / network is warm; chat will re-use via filesP later
+            await Promise.all(paths.map(p => fetchLoadFile(p).catch(() => null)));
+            console.log('[AI2Chat] preloaded pipeline for', path, paths);
+        } catch (e) { /* non-fatal */ }
     }
 
     function escapeHtml(s) {
@@ -252,6 +281,31 @@ function ensureThinkingStyles(doc) {
     function recordMessage(who, html) {
         chatLog.push({ who: who, html: html });
         refreshChatViews();
+    }
+
+    // Build conversation history for the model — strips HTML to plain text
+    // and returns [{role:'user'|'assistant', content}] for the last N exchanges.
+    // This lets the AI editor maintain context across turns (like Hermes).
+    // Skipped thinking entries (client-only), keeps only user+assistant.
+    var _lastConversationId = '';
+    function buildConversationHistory(maxExchanges) {
+        maxExchanges = maxExchanges || 8;
+        var history = [];
+        var count = 0;
+        for (var i = chatLog.length - 1; i >= 0 && count < maxExchanges; i--) {
+            var entry = chatLog[i];
+            if (!entry || entry.who === 'Think') continue;
+            var role = (entry.who === 'You') ? 'user' : 'assistant';
+            // Strip HTML tags for clean history
+            var content = String(entry.html || '');
+            content = content.replace(/<[^>]+>/g, ' ');
+            content = content.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+            content = content.replace(/\s+/g, ' ').trim();
+            if (!content) continue;
+            history.unshift({ role: role, content: content });
+            count++;
+        }
+        return history;
     }
 
     // Live thinking trail in chat (visible + kept for daily agent analysis).
@@ -582,6 +636,92 @@ function ensureThinkingStyles(doc) {
         'lib/Comserv/Model/AI2/Router.pm'
     ];
 
+    // Infer related controller / pipeline files from an opened template or page path.
+    // Beefed up: uses getEditorContext() to handle cases where the *open file* (the one being edited)
+    // differs from the *analyzed page/endpoint* (e.g. fix a failing page by opening editor elsewhere;
+    // error message usually provided in prompt).
+    // Also extracts file paths from error messages/stack traces.
+    // Prefers AI2 paths during legacy->AI2 refactor. Tries legacy resolve_route for accuracy if available.
+    // Enables earlier auto-knowledge of the "background pipeline" (controller action, stash population,
+    // models, includes, date logic, action bars, etc.).
+    async function inferRelatedPipelineFiles(openPath, promptHint = '') {
+        const related = [];
+        const ctx = getEditorContext();
+        const primary = openPath || ctx.openFile || '';
+        if (!primary && !ctx.currentPage) return related;
+
+        const candidates = new Set();
+        if (primary) candidates.add(primary);
+        if (ctx.currentPage) candidates.add(ctx.currentPage);
+        if (ctx.pageVsFileDiffer) {
+            // When they differ, still try to resolve the "real" page
+            candidates.add(ctx.currentPage);
+        }
+
+        // Error message / stack trace extraction (common when fixing load failures)
+        if (promptHint) {
+            const errPaths = promptHint.match(/(?:lib|root|script|Comserv)\/[\w\/.-]+\.(?:pm|tt|js|pl)/gi) || [];
+            errPaths.forEach(p => candidates.add(p.replace(/^Comserv\//, '')));
+            // Also look for common error indicators pointing at Planning etc.
+            if (/planning|daily|DailyPlan/i.test(promptHint)) {
+                candidates.add('lib/Comserv/Controller/Planning.pm');
+            }
+        }
+
+        for (let cand of candidates) {
+            if (!cand) continue;
+            const p = cand.toLowerCase();
+
+            // Try to get better mapping via legacy resolve_route (still useful during AI2 refactor;
+            // returns controller + template). Non-blocking.
+            try {
+                const url = '/ai/resolve_route?path=' + encodeURIComponent(cand);
+                const r = await fetch(url, { credentials: 'include' }).then(res => res.ok ? res.json() : null).catch(() => null);
+                if (r && r.controller) {
+                    const ctrlPath = r.controller.replace(/\./g, '/').replace('Comserv::Controller::', 'lib/Comserv/Controller/') + '.pm';
+                    if (ctrlPath && !related.includes(ctrlPath)) related.push(ctrlPath);
+                }
+                if (r && r.template) {
+                    if (!related.includes(r.template)) related.push(r.template);
+                }
+            } catch (e) { /* ignore, fall back to heuristics */ }
+
+            // Template -> controller heuristics (Catalyst / TT conventions)
+            if (p.endsWith('.tt') || p.includes('/root/')) {
+                if (p.includes('dailyplan') || p.includes('planning/daily')) {
+                    related.push('lib/Comserv/Controller/Planning.pm');
+                }
+                const match = p.match(/root\/(?:admin\/)?([^\/]+)\/.*\.tt$/);
+                if (match) {
+                    let ctrl = 'lib/Comserv/Controller/' + match[1].charAt(0).toUpperCase() + match[1].slice(1) + '.pm';
+                    if (!related.includes(ctrl)) related.push(ctrl);
+                }
+                if (p.includes('/admin/')) {
+                    const adminMatch = p.match(/root\/admin\/([^\/]+)\//);
+                    if (adminMatch) {
+                        const ctrl = 'lib/Comserv/Controller/Admin/' + adminMatch[1].charAt(0).toUpperCase() + adminMatch[1].slice(1) + '.pm';
+                        if (!related.includes(ctrl)) related.push(ctrl);
+                    }
+                }
+            } else if (p.endsWith('.pm')) {
+                // If a controller is primary, pull its likely template too for context
+                if (!related.includes(cand)) related.push(cand);
+                // crude reverse
+                const ctrlName = cand.split('/').pop().replace('.pm', '');
+                const possibleTpl = 'root/' + ctrlName.toLowerCase() + '/' + ctrlName.toLowerCase() + '.tt'; // rough
+                // better: we already have the open file
+            }
+
+            // Always consider core AI/editor files (prefer AI2 during refactor)
+            DEFAULT_APP_PATHS.forEach(f => {
+                if (!related.includes(f)) related.push(f);
+            });
+        }
+
+        // Dedup
+        return [...new Set(related)];
+    }
+
     function isEvaluatePrompt(text) {
         const p = String(text || '').toLowerCase();
         if (/\bevaluat/.test(p)) return true;
@@ -600,23 +740,57 @@ function ensureThinkingStyles(doc) {
             .catch(function () { return null; });
     }
 
-    function loadFilesForEval(openPath, openContent) {
-        const paths = DEFAULT_APP_PATHS.slice();
+    // eval #31: only attach the AI2 chat/router sources when the ask is about
+    // the AI editor/chat itself. Before, every "review/evaluate" ask about any
+    // page got ~190K chars of AI2 code, so free models answered about AI2.
+    function isAboutAiEditor(text, openPath) {
+        const p = String(text || '').toLowerCase() + ' ' + String(openPath || '').toLowerCase();
+        return /\bai2\b|ai editor|ai-editor|chat with ai|\bchat\.pm\b|\brouter\.pm\b|coderead|\/ai2\//.test(p);
+    }
+
+    function loadFilesForEval(openPath, openContent, promptText) {
+        const paths = isAboutAiEditor(promptText, openPath) ? DEFAULT_APP_PATHS.slice() : [];
+        if (openPath && openContent && String(openContent).length
+            && paths.indexOf(openPath) === -1 && !/^(lib|root\/static|sql|script|t)\//.test(openPath)) {
+            // Open .tt or other buffer: send what is in the editor, then the rest.
+            return Promise.all(paths.map(fetchLoadFile)).then(function (rows) {
+                return [{ path: openPath, content: openContent }].concat(rows.filter(Boolean));
+            });
+        }
         if (openPath && /^(lib|root\/static|sql|script|t)\//.test(openPath)
             && paths.indexOf(openPath) === -1) {
             paths.unshift(openPath);
         }
         return Promise.all(paths.map(fetchLoadFile)).then(function (rows) {
-            return rows.filter(Boolean);
+            const got = rows.filter(Boolean);
+            if (!got.length && openPath && openContent && String(openContent).length) {
+                return [{ path: openPath, content: openContent }];
+            }
+            return got;
         });
     }
 
+    // Total cap so a turn never ships 200K+ chars to a free model (eval #31).
+    const MAX_PROMPT_FILE_CHARS = 90000;
     function filesToPromptBlob(files) {
         if (!files || !files.length) return '';
-        return files.map(function (f) {
-            const body = String(f.content || '').slice(0, 48000);
-            return '[FILE: ' + f.path + '] (live /ai2/load_file)\n```\n' + body + '\n```';
-        }).join('\n\n');
+        let left = MAX_PROMPT_FILE_CHARS;
+        const out = [];
+        files.forEach(function (f) {
+            if (left <= 2000) {
+                out.push('[FILE: ' + f.path + '] (not attached: size limit; ask with [READ_FILE: ' + f.path + ':START-END])');
+                return;
+            }
+            const full = String(f.content || '');
+            const cap = Math.min(48000, left);
+            let body = full.slice(0, cap);
+            if (full.length > cap) {
+                body += '\n... [cut at ' + cap + ' of ' + full.length + ' chars; ask with [READ_FILE: ' + f.path + ':START-END]]';
+            }
+            left -= body.length;
+            out.push('[FILE: ' + f.path + '] (live /ai2/load_file)\n```\n' + body + '\n```');
+        });
+        return out.join('\n\n');
     }
 
     function isDiskCapabilityPrompt(text) {
@@ -674,15 +848,31 @@ function ensureThinkingStyles(doc) {
 
 
     // --- Agent + phase (clarify → analyze → plan → verify → implement) ---
-    // Budget: clarify + most analyze/plan stay on free models; implement uses a free
-    // code model by default. Header model select still overrides when set.
-    const CLARIFY_MODEL = 'openrouter|google/gemma-4-31b-it:free';
-    const ANALYZE_MODEL = 'openrouter|google/gemma-4-31b-it:free';
+    // Planning local hints (nimble/tev1) for DailyPlan work when the user
+    // actually picks them. Header select wins only after a change event.
+    // Otherwise send empty so the server Router classifies
+    // (SuperGrok if allotment OK, else paid, else free).
+    const CLARIFY_MODEL = 'ollama|tev1:0.8b';
+    const ANALYZE_MODEL = 'ollama|nimble';
+    const PLAN_MODEL    = 'ollama|nimble';
     const IMPLEMENT_MODEL = 'openrouter|cohere/north-mini-code:free';
+    let _userPickedModel = false;
+    let _escalatedThisSend = false;
     let _editorPhase = 'analyze'; // clarify | analyze | plan | implement
     let _planApproved = false;
     // Pending clarify session: original vague ask + gap questions awaiting answers.
     let _clarifySession = null; // { original, gaps, askedAt }
+    // 2026-10-15: one conversation per open file. Server only knows history we
+    // send, so keep a short raw-text history (no file blobs) and the first ask.
+    let _editorConv = { id: null, file: null, firstAsk: '', history: [] };
+    const EDITOR_RETRY_MODEL = 'openrouter|google/gemma-4-31b-it:free';
+    function editorConvFor(filePath) {
+        const f = filePath || '';
+        if (_editorConv.file !== f) {
+            _editorConv = { id: null, file: f, firstAsk: '', history: [] };
+        }
+        return _editorConv;
+    }
 
     function currentEditorAgentId() {
         const sel = document.getElementById('ai-editor-agent');
@@ -707,22 +897,27 @@ function ensureThinkingStyles(doc) {
     }
 
     function resolveEditorModel(phase) {
-        // Header model select always wins when user picks something other than empty.
+        const filePath = currentFilePath() || '';
+        const isPlanningContext = /dailyplan|planning|todo.*sort|focus.*queue/i.test(filePath) ||
+                                  /daily.*plan|planning.*page/i.test(document.title || '');
+
+        // Header model select usually wins, but for planning/DailyPlan analysis we bias
+        // hard toward local nimble (the model actually used for todo/daily planning sort).
         const picked = (window.ComservChat && ComservChat.modelSelect)
             ? ComservChat.modelSelect.getSelectedValue()
             : '';
-        if (phase === 'clarify') {
-            return picked || CLARIFY_MODEL;
-        }
-        // Analyze worker stays on the cheap analyze model unless user overrides.
-        if (currentEditorAgentId() === 'analyze') {
+        // Header pick wins only after the user changes the dropdown.
+        // Otherwise return empty so the server Router classifies.
+        if (_userPickedModel && picked) {
+            if (isPlanningContext && (phase === 'plan' || phase === 'analyze')) {
+                return picked || PLAN_MODEL;
+            }
+            if (phase === 'clarify') return picked || CLARIFY_MODEL;
+            if (phase === 'implement') return picked || IMPLEMENT_MODEL;
+            if (phase === 'plan') return picked || PLAN_MODEL;
             return picked || ANALYZE_MODEL;
         }
-        if (phase === 'implement') {
-            return picked || IMPLEMENT_MODEL;
-        }
-        // analyze / plan: prefer cheap free model; keep user pick if set
-        return picked || ANALYZE_MODEL;
+        return '';
     }
 
     // Local gap detection — no tokens. Used before any clarify/analyze model call.
@@ -781,13 +976,18 @@ function ensureThinkingStyles(doc) {
         const t = String(text || '').trim();
         if (!t) return true;
         if (looksLikeLogNoise(t)) return true;
+        if (/^\{\s*"source"\s*:/.test(t)) return true;
+        if (/^[\[{]/.test(t) && /[\]}]$/.test(t)) {
+            try { JSON.parse(t); return true; } catch (e) { /* not pure JSON */ }
+        }
         if (/\[ACTION:\s*\{/i.test(t) && t.length < 800) return true;
         if (/^\s*\[ACTION:/i.test(t)) return true;
         if ((phase === 'analyze' || phase === 'plan' || phase === 'clarify')
-            && /list_files|read_file|run_terminal/i.test(t)
+            && (/list_files|read_file|run_terminal|\[run,\s*cwd=/i.test(t))
             && !/root cause|enabled_modules|SiteModule|can_beekeep/i.test(t)) {
             return true;
         }
+        if ((t.match(/\[run,\s*cwd=/gi) || []).length >= 3) return true;
         return false;
     }
 
@@ -811,12 +1011,18 @@ function ensureThinkingStyles(doc) {
     }
 
     function synthesizePrompt(original, answers, filePath) {
+        const conv = editorConvFor(filePath);
+        const first = String(conv.firstAsk || '').trim();
+        const orig = String(original || '').trim();
         const lines = [
             '## Refined engineering task (fabricated from clarify)',
-            '',
-            '### Original ask',
-            String(original || '').trim(),
-            '',
+            ''
+        ];
+        if (first && first !== orig) {
+            lines.push('### First ask in this conversation (still required)', first, '');
+        }
+        lines.push('### Latest ask', orig, '');
+        lines.push(
             '### Clarifications from user',
             String(answers || '').trim() || '(none — user skipped; infer carefully from code)',
             '',
@@ -824,12 +1030,14 @@ function ensureThinkingStyles(doc) {
             'Open file: ' + (filePath || '(none)'),
             '',
             '### Required output',
-            '1. Reproduce / locate the real gate in Comserv code (not guesswork about DNS/addons unless evidence).',
-            '2. Name root cause with file/symbol references.',
-            '3. Propose the smallest safe fix.',
-            '4. How to verify on aisystem :4006 (no prod deploy).',
-            'Do not invent infrastructure. Prefer site *features* / enabled_modules / nav gating over "paid addon" language unless the code literally says addon.'
-        ];
+            // eval #32: was hard-wired to an old brew/beekeeping "addon gate" bug,
+            // which pushed every refined ask toward that topic.
+            '1. Answer every ask above (first ask and latest ask) about the open file and its controller.',
+            '2. Use evidence from the loaded files (file and sub/line names). If a needed file is missing, request it with [READ_FILE: path].',
+            '3. If something is broken: root cause, then the smallest safe fix.',
+            '4. How to check it on aisystem :4006 (no prod deploy).',
+            'Do not invent infrastructure or tool calls. Do not switch to another topic.'
+        );
         return lines.join('\n');
     }
 
@@ -853,28 +1061,33 @@ function ensureThinkingStyles(doc) {
         if (target && target.status) target.status('Clarify — waiting for your answers');
     }
 
-    function phaseContract(phase, agentId) {
+    function phaseContract(phase, agentId, promptText) {
+        const navRelevant = /\b(nav|menu|feature|module|addon|enabled_modules|site_modules)\b/i.test(String(promptText || ''));
         const lines = [
             '[AI Editor agent=' + agentId + ' phase=' + phase + ']',
             'Contract:',
             '0) clarify — ask only for missing facts; do not analyze code deeply yet.',
             'A) analyze — cost-effective analysis; no ## FIX / large rewrites.',
-            'B) plan — short plan for user verify; MAY include docs/planning/todo updates before code; end by asking for "approve plan".',
+            'B) plan — short plan for user verify; docs/changelog notes only as text; do not create todos; end by asking for "approve plan".',
             'C) implement — code suggestion only after plan approval (or explicit implement request).'
         ];
+        // Note on open file vs analyzed page (key during refactoring and error fixing)
+        lines.push('CONTEXT NOTE: Primary open file (buffer) is usually the clicked page, but can differ (e.g. open editor from stable page to fix a broken one). Error messages are often supplied — use them + auto-attached pipeline controllers.');
+
         if (agentId === 'analyze') {
-            lines.push('You are the Analyze worker: read open buffers and named paths; explain root cause and a short plan only. Never emit ## FIX, never rewrite files, never ask the user to paste files already loaded via /ai2/load_file.');
+            lines.push('You are the Analyze worker: read open buffers and named paths; explain root cause and a short plan only. Never emit ## FIX, never rewrite files, never ask the user to paste files already loaded via /ai2/load_file. Use auto-attached controller for pipeline understanding.');
         } else if (agentId === 'documentation') {
             lines.push('You are in documentation mode: prefer docs/changelog/planning guidance; do not emit code file rewrites unless asked.');
         } else {
-            lines.push('You are in programming mode: do NOT divert to FocusTune todo ranking; stay on code/docs/plan for this file.');
+            lines.push('You are in programming mode: do NOT divert to FocusTune; never create todos or emit [ACTION: create_todo]; stay on code/docs/plan for this file.');
         }
         if (phase === 'clarify') {
             lines.push('Current phase CLARIFY: ask 2–4 short questions about missing context only. No root-cause essay.');
         } else if (phase === 'analyze') {
-            lines.push('Current phase ANALYZE: respond with analysis only. Prefer evidence from loaded files and Comserv patterns (features/modules/nav).');
+            lines.push('Current phase ANALYZE: respond with analysis only. Prefer evidence from loaded files'
+                + (navRelevant ? ' and Comserv patterns (features/modules/nav).' : ' (template, controller, settings).'));
         } else if (phase === 'plan') {
-            lines.push('Current phase PLAN: propose the plan; wait for user "approve plan" / Verify before code.');
+            lines.push('Current phase PLAN: propose the plan; wait for user "approve plan" / Verify before code. Reference background pipeline from auto-loaded files.');
         } else {
             lines.push('Current phase IMPLEMENT: provide concrete code suggestion for Approve/Reject.');
         }
@@ -932,7 +1145,8 @@ function ensureThinkingStyles(doc) {
         }
     }
 
-    function sendPrompt(prompt, target) {
+    function sendPrompt(prompt, target, opts) {
+        opts = opts || {};
         target = target || {
             messages: document.getElementById('chat-messages'),
             input: document.getElementById('ai-chat-input'),
@@ -945,7 +1159,8 @@ function ensureThinkingStyles(doc) {
 
         if (target.status) target.status('Starting…');
         // Record to the shared chat log (survives attach/detach).
-        recordMessage('You', escapeHtml(prompt));
+        if (!opts.retry) recordMessage('You', escapeHtml(prompt));
+        const rawAsk = prompt;
 
         if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '...'; }
 
@@ -958,8 +1173,13 @@ function ensureThinkingStyles(doc) {
 
         const filePathEarly = currentFilePath();
 
+        const conv = editorConvFor(filePathEarly);
+        if (!opts.retry && !conv.firstAsk && !_clarifySession) conv.firstAsk = String(prompt).trim();
+
         // Answer an open clarify session → fabricate analyze prompt (no extra clarify model $).
-        if (_clarifySession) {
+        if (opts.retry) {
+            // junk-reply retry: same prompt, fixed model, no clarify/phase changes
+        } else if (_clarifySession) {
             const original = _clarifySession.original;
             const answers = isSkipClarify(prompt) ? '' : prompt;
             _clarifySession = null;
@@ -988,11 +1208,15 @@ function ensureThinkingStyles(doc) {
         }
 
         // Agent + phase first so thinking UI can name model/phase immediately.
-        maybeAdvancePhaseFromUser(prompt);
+        if (!opts.retry) maybeAdvancePhaseFromUser(prompt);
         const agentId = currentEditorAgentId();
         const phase = currentEditorPhase() === 'clarify' ? 'analyze' : currentEditorPhase();
         if (currentEditorPhase() === 'clarify') setEditorPhase('analyze');
-        const model = resolveEditorModel(phase);
+        const model = opts.model || resolveEditorModel(phase);
+        // Retry (opts.model) is an explicit next-model. A header pin is not a
+        // user choice — leave model empty so the server picks.
+        const sendModel = opts.model || ((_userPickedModel && model) ? model : '');
+        const route = _escalatedThisSend ? 'escalate' : (sendModel ? 'explicit' : 'auto');
         const filePath = filePathEarly;
 
         if (target.status) target.status('AI thinking…');
@@ -1007,38 +1231,82 @@ function ensureThinkingStyles(doc) {
             liveThink.addStep('Loaded editor buffer' + (fileContent && fileContent.length
                 ? ' (' + fileContent.length + ' chars)' : ' (empty)'));
             const wantEval = isEvaluatePrompt(prompt);
-            const filesP = wantEval
-                ? loadFilesForEval(filePath, fileContent)
+            let filesP = wantEval
+                ? loadFilesForEval(filePath, fileContent, prompt)
                 : Promise.resolve(fileContent && fileContent.length
                     ? [{ path: filePath, content: fileContent }] : []);
+
+            // NEW: Auto-load related pipeline files (controller etc.) early for .tt / page analysis.
+            // This gives the AI direct knowledge of the background pipeline (stash population,
+            // models, includes, date logic, etc.) before clarify/analyze/plan. Greatly improves
+            // self-direction and planning accuracy.
+            if (!wantEval && filePath) {
+                // Beefed up inference is async (tries resolve_route + error extraction)
+                filesP = filesP.then(async function (baseFiles) {
+                    const promptForHint = prompt || '';
+                    const pipelinePaths = await inferRelatedPipelineFiles(filePath, promptForHint);
+                    const extra = await Promise.all(pipelinePaths.map(function (rp) {
+                        if (rp === filePath) return null;
+                        return fetchLoadFile(rp);
+                    })).then(function (extras) { return extras.filter(Boolean); });
+
+                    const seen = new Set(baseFiles.map(function (f) { return f.path; }));
+                    extra.forEach(function (ef) {
+                        if (!seen.has(ef.path)) {
+                            baseFiles.push(ef);
+                            seen.add(ef.path);
+                        }
+                    });
+                    return baseFiles;
+                });
+            }
+
             return filesP.then(function (files) {
                 const blob = filesToPromptBlob(files);
-                const contract = phaseContract(phase, agentId) + todoStartReminder();
+                const contract = phaseContract(phase, agentId, prompt) + todoStartReminder();
+                const ctx = getEditorContext();
+                let contextNote = '';
+                if (ctx.pageVsFileDiffer) {
+                    contextNote = '\n[EDITOR CONTEXT] Open file for editing: ' + (ctx.openFile || 'none') +
+                        ' | Analyzed / current page: ' + (ctx.currentPage || 'unknown') +
+                        ' (may differ when fixing errors from another surface; error details usually in prompt)';
+                }
                 const fullPrompt = blob
-                    ? (contract + '\n\n' + prompt + '\n\n---\nThese files were loaded live from this app via GET /ai2/load_file. They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n' + blob)
-                    : (contract + '\n\n' + prompt);
+                    ? (contract + contextNote + '\n\n' + prompt + '\n\n---\nThese files were loaded live from this app via GET /ai2/load_file (including auto pipeline controllers). They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n' + blob)
+                    : (contract + contextNote + '\n\n' + prompt);
                 if (files.length) {
                     liveThink.addStep('Attached files: ' + files.map(function (f) { return f.path; }).join(', '));
                     if (target.status) target.status('Loaded ' + files.map(function (f) { return f.path; }).join(', '));
                 }
                 liveThink.addStep('Calling /ai2/chat (waiting on provider)…');
                 if (target.status) target.status('Asking AI…');
+                const history = buildConversationHistory(8);
+
                 return fetch('/ai2/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         prompt: fullPrompt,
-                        model: model,
+                        ...(sendModel ? { model: sendModel } : {}),
+                        route: route,
+                        user_picked: _userPickedModel ? 1 : 0,
                         agent_id: agentId,
+                        phase: phase,
                         page_path: filePath || (files[0] && files[0].path) || '',
                         page_title: filePath ? filePath.split('/').pop() : '',
-                        page_content: (files[0] && files[0].content) || fileContent || ''
+                        page_content: (files[0] && files[0].content) || fileContent || '',
+                        history: (conv.history && conv.history.length) ? conv.history.slice(-6) : history,
+                        ...((conv.id || _lastConversationId) ? { conversation_id: conv.id || _lastConversationId } : {})
                     })
                 });
             });
         }).then(function (res) { return res.json(); })
           .then(function (data) {
               if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+              // Remember conversation_id for next turn
+              if (data && data.conversation_id) {
+                  _lastConversationId = String(data.conversation_id);
+              }
               if (!data || data.success === 0 || data.error) {
                   const err = (data && data.error) ? data.error : 'No response';
                   const serverSteps = (data && data.thinking && data.thinking.length) ? data.thinking : [];
@@ -1047,6 +1315,7 @@ function ensureThinkingStyles(doc) {
                   if (target.status) target.status('AI error: ' + err, true);
                   return;
               }
+              if (data.conversation_id && conv.file === (filePath || '')) conv.id = data.conversation_id;
               const usedModel = (data.model ? data.model + (data.provider ? ' (' + data.provider + ')' : '') : EDITOR_MODEL);
               const resp = data.response || '';
               const serverSteps = (data.thinking && data.thinking.length) ? data.thinking : [];
@@ -1064,33 +1333,75 @@ function ensureThinkingStyles(doc) {
                   : { cleanText: resp, actions: [] };
               const display = extracted.cleanText || resp;
               // Prefix the reply with the model actually used, for transparency.
+              if (looksLikeJunkAnalyzeReply(display, phase) && !opts.retry) {
+                  // 2026-10-15: retry once on the next model in the chain before giving up.
+                  const nextModel = /gemma-4-31b/i.test(String(data.model || model || ''))
+                      ? 'openrouter|cohere/north-mini-code:free' : EDITOR_RETRY_MODEL;
+                  liveThink.finalize(false, ['Rejected junk reply from ' + (data.model || 'model') + '; retrying on ' + nextModel]);
+                  recordMessage('AI', '<span style="color:#f88;font-size:0.85em;">[rejected junk reply from '
+                      + escapeHtml(data.model || 'model') + ' — retrying once on ' + escapeHtml(nextModel) + ']</span>');
+                  sendPrompt(prompt, target, { retry: true, model: nextModel });
+                  return;
+              }
               if (looksLikeJunkAnalyzeReply(display, phase)) {
+                  if (!_escalatedThisSend) {
+                      _escalatedThisSend = true;
+                      liveThink.addStep('Reply was junk — asking the router to pick another available model');
+                      recordMessage('AI',
+                          '<span style="color:#ffd27a;">[switch]</span> That reply was not usable. '
+                          + 'Asking the router to pick from the models that are actually available.');
+                      if (target.status) target.status('Switching model…');
+                      return fetch('/ai2/chat', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                              prompt: fullPrompt,
+                              model: '',
+                              route: 'escalate',
+                              user_picked: 0,
+                              agent_id: agentId,
+                              phase: phase,
+                              page_path: filePath || '',
+                              page_title: filePath ? filePath.split('/').pop() : '',
+                              page_content: fileContent || '',
+                              history: history,
+                              conversation_id: _lastConversationId || ''
+                          })
+                      }).then(function (res2) { return res2.json(); }).then(function (data2) {
+                          if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+                          if (data2 && data2.conversation_id) _lastConversationId = String(data2.conversation_id);
+                          const used2 = (data2 && data2.model) ? data2.model : 'router';
+                          const text2 = (data2 && data2.response) || (data2 && data2.error) || '';
+                          if (!data2 || data2.success === 0 || looksLikeJunkAnalyzeReply(text2, phase)) {
+                              recordMessage('AI',
+                                  '<span style="color:#f88;">[rejected reply]</span> '
+                                  + 'The router retry also failed'
+                                  + (used2 ? ' (' + escapeHtml(used2) + ')' : '') + '.');
+                              if (target.status) target.status('Model switch did not produce a usable reply', true);
+                              return;
+                          }
+                          recordMessage('AI',
+                              '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(used2) + ']</span> '
+                              + escapeHtml(text2).replace(/\n/g, '<br>'));
+                          if (target.status) target.status('Reply from ' + used2);
+                      });
+                  }
                   liveThink.finalize(false, ['Rejected junk/log-like model reply']);
                   recordMessage('AI',
                       '<span style="color:#f88;">[rejected reply]</span> '
-                      + 'That model response was shell/SQL log noise or a fake <code>[ACTION:…]</code> — '
-                      + '<strong>not</strong> an analysis of your bug.<br><br>'
-                      + 'Try again with Agent <strong>Analyze</strong>, Phase <strong>A Analyze</strong>, '
-                      + 'and clear the header model (or pick a free analyze model). '
-                      + 'Say <code>clarify</code> if you want gap questions first.<br>'
-                      + '<details style="margin-top:6px;opacity:0.75;"><summary>Show rejected snippet</summary>'
-                      + '<pre style="max-height:120px;overflow:auto;">'
-                      + escapeHtml(display).slice(0, 600) + '</pre></details>');
+                      + 'That model response was not an analysis of the task.');
                   if (target.status) target.status('Rejected junk model reply', true);
                   // Re-open clarify on the last real user ask (not fabricated blob) when possible.
                   if (!_clarifySession) {
-                      var gaps = [
-                          'Confirm the bug in one sentence (e.g. brew+beekeeping nav show on sitename 3d but should not).',
-                          'Where do you see it — top nav, Features menu, or /brew page?',
-                          'Expected: those features hidden/disabled for 3d — correct?'
-                      ];
-                      beginClarifySession(
-                          'Brew and beekeeping features appear for sitename 3d but should not (not subscribed / not enabled).',
-                          gaps, target, sendBtn
-                      );
+                      beginClarifySession(conv.firstAsk || rawAsk, [
+                          'Confirm what should change, in one sentence.',
+                          'Name any file, setting or URL you already know is involved.'
+                      ], target, sendBtn);
                   }
                   return;
               }
+              conv.history.push({ role: 'user', content: String(rawAsk).slice(0, 4000) });
+              conv.history.push({ role: 'assistant', content: String(display).slice(0, 4000) });
               var bodyHtml = escapeHtml(display).replace(/\n/g, '<br>');
               recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + bodyHtml);
 
@@ -1176,6 +1487,11 @@ function ensureThinkingStyles(doc) {
             if (data && data.success) {
                 if (saveBtn) { saveBtn.style.display = 'none'; }
                 setStatus('Saved');
+                // Success hook for learning: a good analysis + approved change was applied.
+                // Future: POST to a learning endpoint or log compact record (original prompt + files + outcome)
+                // so future sessions can retrieve "[SUCCESSFUL PIPELINE ANALYSIS]" patterns.
+                // Ties into comserv2-ai-learning-system (DB for app, skills for agent-side).
+                console.log('[AI Editor Success] Approved & saved for', filePath);
             } else {
                 const msg = 'Save failed: ' + ((data && (data.error || data.detail)) || 'unknown error');
                 setStatus(msg, true);
@@ -1197,6 +1513,8 @@ function ensureThinkingStyles(doc) {
     //     the admin's in-progress edits. Updates the status-bar timestamp. ---
     let _dirty = false;
     let _autoTimer = null;
+    let _checksumInFlight = false;
+    let _changeWired = false;
 
     function markDirty() { _dirty = true; }
     function markClean() { _dirty = false; }
@@ -1205,6 +1523,10 @@ function ensureThinkingStyles(doc) {
         const filePath = currentFilePath();
         const lastModEl = document.getElementById('last-modified');
         const statusEl = document.getElementById('auto-refresh-status');
+        if (_autoTimer) {
+            clearInterval(_autoTimer);
+            _autoTimer = null;
+        }
         if (statusEl) statusEl.textContent = 'Auto-refresh: ON (4s)';
         if (!filePath) {
             if (statusEl) statusEl.textContent = 'Auto-refresh: off (no file)';
@@ -1212,31 +1534,39 @@ function ensureThinkingStyles(doc) {
         }
 
         const editor = getEditor();
-        if (editor) {
+        if (editor && !_changeWired) {
+            _changeWired = true;
             editor.session.on('change', function () { _dirty = true; });
         }
 
         _autoTimer = setInterval(function () {
-            if (_dirty) return;   // don't overwrite unsaved work
+            if (_dirty) return;
+            if (_checksumInFlight) return;
+            if (typeof document.hidden === 'boolean' && document.hidden) return;
+            if (!window.AI2EditorCore || typeof window.AI2EditorCore.getFileMtime !== 'function') return;
+            _checksumInFlight = true;
             window.AI2EditorCore.getFileMtime(filePath).then(function (mtime) {
                 if (!mtime) return;
                 const last = initAutoRefresh._lastMtime || 0;
                 initAutoRefresh._lastMtime = mtime;
                 if (last && mtime !== last) {
-                    // File changed on disk — reload it
-                    window.AI2EditorCore.loadFileContent(filePath).then(function (data) {
+                    return window.AI2EditorCore.loadFileContent(filePath).then(function (data) {
                         if (data && data.content !== undefined) {
                             const ed = getEditor();
                             if (ed) { ed.setValue(data.content, -1); ed.clearSelection(); }
                             if (lastModEl) lastModEl.textContent = 'updated ' + new Date().toLocaleTimeString();
                             setStatus('Reloaded (external change)');
                         }
-                    }).catch(function () {});
-                } else if (!last) {
+                    });
+                }
+                if (!last) {
                     initAutoRefresh._lastMtime = mtime;
                     if (lastModEl) lastModEl.textContent = 'loaded ' + new Date().toLocaleTimeString();
                 }
-            }).catch(function () {});
+            }).catch(function () {
+            }).then(function () {
+                _checksumInFlight = false;
+            });
         }, 4000);
     }
 
@@ -1252,6 +1582,12 @@ function ensureThinkingStyles(doc) {
                 pinModel: 'cohere/north-mini-code:free',
                 onReady: function () {
                     console.log('[AI2EditorChat] model-select populated by shared module');
+                    if (!modelSel._userPickWired) {
+                        modelSel._userPickWired = true;
+                        modelSel.addEventListener('change', function () {
+                            _userPickedModel = true;
+                        });
+                    }
                 },
                 onError: function (e) {
                     console.error('[AI2EditorChat] model-select failed', e);
@@ -1396,7 +1732,9 @@ function ensureThinkingStyles(doc) {
                 window._aiChatWin = null;
             }
             applyViewState();
-        }
+        },
+        // Exposed for core.js early preload and external use during AI2 refactor / testing.
+        preloadRelatedPipeline: preloadRelatedPipeline
     };
     window[NS] = window.AI2Chat;
 })();

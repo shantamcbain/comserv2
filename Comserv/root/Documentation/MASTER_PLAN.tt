@@ -69,6 +69,7 @@ sub-plan remains the authoritative spec for its own work.</p>
             <a href="#wv2" class="doc-navlink">V2 Migration</a>
             <a href="#aisystem-jump" class="doc-navlink" title="Scroll to the AISYSTEM jump: plan document, project #280, and todo #2217 (in-chat Todo-create agent).">AISYSTEM</a>
             <a href="#3dprint-jump" class="doc-navlink" title="Scroll to the 3D printing coordinator plan jump (3dPrintingPlan + project #206).">3D Printing</a>
+            <a href="#inv-camera-barcode" class="doc-navlink" title="Inventory camera photo + barcode capture plan (add item + count, NFS images, barcode_type, duplicate switch).">Inventory Camera+Barcode</a>
         </div>
         <p>
             <a href="/Documentation/MASTER_PLAN" target="_blank" rel="noopener" class="doc-navlink">↗ Open this plan in its own browser tab</a>
@@ -98,6 +99,16 @@ sub-plan remains the authoritative spec for its own work.</p>
         <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-navlink" target="_blank" rel="noopener" title="Opens project #206 3DPRINT — the database project that coordinator is attached to.">Project #206 3DPRINT</a>
         <a href="[% c.uri_for('/todo') %]?project_id=206" class="doc-navlink" target="_blank" rel="noopener" title="Lists todos on project #206 3DPRINT.">Todos on #206</a>
         <a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-navlink" target="_blank" rel="noopener" title="Child plan: HDRY dryer import playbook (PDF BOM).">Dryer playbook (child)</a>
+    </div>
+</div>
+
+<div class="doc-success" id="inv-camera-barcode">
+    <h2 class="doc-h3">Inventory Camera + Barcode Plan</h2>
+    <p class="doc-body">Camera for item visual (NFS via File Manager or external URL) + barcode scan/decode on add item page and count sheet. barcode_type column, duplicate switch to edit/receive/adjust, multi-location via stock_levels.</p>
+    <div class="doc-navrow">
+        <a href="[% c.uri_for('/Documentation/InventoryCameraBarcodePlan') %]" class="doc-navlink" target="_blank" rel="noopener" title="The plan document for camera photo + barcode capture feature.">InventoryCameraBarcodePlan (document)</a>
+        <a href="[% c.uri_for('/todo/details') %]?record_id=2549" class="doc-navlink" target="_blank" rel="noopener" title="Todo #2549 — started with status 5 for time tracking.">Todo #2549 (started)</a>
+        <a href="http://workstation.local:4005/todo/details?record_id=2549" class="doc-navlink" target="_blank" rel="noopener">Full link (port 4005 planning)</a>
     </div>
 </div>
 
@@ -447,7 +458,7 @@ DailyPlanSystem.tt ────────────────────�
     <li><a href="[% c.uri_for('/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY') %]">Docker &amp; Kubernetes Migration Strategy</a></li>
     <li><a href="[% c.uri_for('/Documentation/DockerMasterPlan') %]">Docker &amp; Kubernetes Plans — Coordinator</a> (project #271 DOCKER-SYS — indexes every Docker/K8s plan below)</li>
     <li><a href="[% c.uri_for('/Documentation/CREDENTIALS_AUDIT_AND_PLAN') %]">Credentials Audit &amp; Unified Management Plan</a></li>
-    <li><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">CSC Gateway Plan</a></li>
+    <li><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">CSC Gateway Plan</a> (proj #87 v1.2 — no WAN :3001; named access without hosts file)</li>
     <li><a href="[% c.uri_for('/Documentation/SchemaMasterPlan') %]">Schema Master Plan</a> (consolidates Result-file-first authority, Maria↔Postgres split, clone pipeline, naming, ACCENT, connections; flags missing ACCPG/ACCON)</li>
     <li><a href="[% c.uri_for('/Documentation/SchemaSystemPlan') %]">Schema System Plan (W0.1)</a> — G0–G5 detail owned by the schema branch</li>
     <li><a href="[% c.uri_for('/Documentation/SchemaNamingStandardizationPlan') %]">Schema Naming Standardization Plan</a></li>
@@ -522,7 +533,7 @@ DailyPlanSystem.tt ────────────────────�
         · Todos: <a href="[% c.uri_for('/todo') %]?project_id=280" class="doc-link" target="_blank" rel="noopener" title="Lists every todo attached to project #280.">under #280</a>
         · In-chat Todo-create: <a href="[% c.uri_for('/todo/details') %]?record_id=2217" class="doc-link" target="_blank" rel="noopener" title="Todo #2217 — WRITE path is code now.">#2217 code</a>
         · Scheduler: <a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-link" target="_blank" rel="noopener" title="Todo #2218 — Scheduler specified, not built.">#2218 specified</a>
-        (child of #114; waves #281–284). Orders AIMPS + Hermes focus + AGENTS. W1.0 delivered: SuperGrok is its own prepaid provider (not xAI). Do not start W3 agents before the W2 gate.</li>
+        (child of #114; waves #281–284). Orders AIMPS + Hermes focus + AGENTS. W1.0 delivered: SuperGrok is its own weekly-subscription provider (not xAI). 2026-09-25 Now: grok.com Usage via Firefox add-on; Hermes daily guard until reset 2026-10-01 10:31 PDT. Do not start W3 agents before the W2 gate.</li>
     <li><strong>AI Model Presentation &amp; Selection</strong> — <a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]\">/Documentation/AIModelPresentationPlan</a> (proj <a href="/project/details?project_id=252">#252 AIMPS</a>; phases P1–P5 = #253–257, P5 = v2 migration sync). Next execution is AISYSTEM W1.</li>
     <li><strong>Point System</strong> — proj <a href="/project/details?project_id=193">#193 PointSystem</a> (phases: Ledger #194, Currency #195, PayPal #196, Spend #197, Crypto #198).</li>
     <li><strong>3D Printing System</strong> —
@@ -644,7 +655,7 @@ V2 MIG   V2MIG (#259) + P1-P5 (#260-264) ─ own top-level project; P4 = Plannin
         <tr><td class="doc-td">Docker &amp; K8s Migration Strategy</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY') %]">/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td"><strong>Docker &amp; Kubernetes Plans — Coordinator</strong> (proj #271 DOCKER-SYS)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DockerMasterPlan') %]">/Documentation/DockerMasterPlan</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Credentials Audit &amp; Plan</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/CREDENTIALS_AUDIT_AND_PLAN') %]">/Documentation/CREDENTIALS_AUDIT_AND_PLAN</a></td><td class="doc-td">—</td></tr>
-        <tr><td class="doc-td">Gateway Plan</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">/Documentation/GatewayPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Gateway Plan (proj #87, v1.2 — no WAN :3001; named access without hosts)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">/Documentation/GatewayPlan</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Schema Naming Standardization</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/SchemaNamingStandardizationPlan') %]">/Documentation/SchemaNamingStandardizationPlan</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Canonical Deploy Workflow</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]">/Documentation/DEPLOY_WORKFLOW</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Development Plans index</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DevelopmentPlans') %]">/Documentation/DevelopmentPlans</a></td><td class="doc-td">—</td></tr>

@@ -1,0 +1,40 @@
+{
+  "report_date": "2026-09-23",
+  "source": "Grok Bot",
+  "created_by": "Grok Bot (read from local persistence, not live API)",
+  "summary": "Daily AI eval ~7:11 AM PT. Grok Bot 42% left; OpenRouter $19.49 / month $40.43; Super Grok 0% used (reset Sep 24). Hermes quiet, flash-only. Keep Bot thin; Hermes max_tokens still 4096.",
+  "markdown": "Daily AI eval — ~7:11 AM PT (Lumby teaching visit day)\n\n**Budget**\nGrok Bot last spoken **42%** left (Sep 22 ~11:18 AM PT; rose from 13% that morning — logged, not a refund). Soft remaining about **8%/day** to Mon Sep 28 ~8:00 AM PT. OpenRouter: balance ≈ **$19.49**; day/week spend **$0**; month **$40.43** — under soft caps. Super Grok still **0% used**, resets **tomorrow** Sep 24 10:31 AM — scarce coding pot, not for Hermes loops.\n\n**What worked**\nHermes quiet (0 new sessions), flash-only on `:9119`. Beemaster: newsletter issue 43 sent with public `beemaster.ca` links; workshop id 9 enriched; Pages families seeded. CSC `:3001` health ok.\n\n**Still open**\nHermes `max_tokens` still 4096 (want 1536); commented OPENROUTER key fragile on restart; Bot thrash yesterday from mid-course pivots — keep Bot thin orchestration today. No new Chat UX samples; no HelpDesk this run.\n\n**Today:** soft Bot ~8%/day; Hermes flash-only; Super Grok scarce until reset tomorrow. Workshop home for class: `https://beemaster.ca/workshop/details?id=9`.\n",
+  "metrics": {
+    "bot": {
+      "percent_left": 42,
+      "spoken_at": "2026-09-22T18:18:00Z",
+      "soft_pct_per_day": 8
+    },
+    "openrouter": {
+      "balance_usd": 19.49,
+      "day_usd": 0,
+      "week_usd": 0,
+      "month_usd": 40.43
+    },
+    "super_grok": {
+      "percent_used": 0,
+      "reset_local": "2026-09-24T10:31:00-07:00"
+    },
+    "hermes": {
+      "sessions": 0,
+      "policy": "flash-only"
+    },
+    "chat": {}
+  },
+  "proposals": [
+    {
+      "title": "Hermes max_tokens 1536 (idle)",
+      "change_type": "config",
+      "target": "hermes.max_tokens",
+      "rationale": "Eval asked for 1536 instead of 4096 to stop idle Super Grok / Bot burn.",
+      "payload": {
+        "max_tokens": 1536
+      }
+    }
+  ]
+}

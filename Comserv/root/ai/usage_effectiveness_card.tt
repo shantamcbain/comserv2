@@ -1,0 +1,155 @@
+[%# Agent x model cost-effectiveness + output quality (admin only) — included
+  # from ai/usage.tt. Data: UsageMonitor->agent_effectiveness via ledger_summary
+  # (DBIx::Class group_by, no raw SQL).
+  #
+  # Answers the two questions a model-switch decision needs:
+  #   1. What did we GET for the money — success rate, grounded rate, and
+  #      flagged (uncited/hallucinated) sentences per call, per agent x model.
+  #   2. Which combinations WASTE time and money — ranked by cost_wasted (spend
+  #      that bought a failed call), each with a stated reason.
+  #
+  # No JS, no CDNs. %]
+[% lm = ledger_monitor %]
+[% ae = lm.agent_effectiveness %]
+<div id="agent-effectiveness" class="card" style="margin:16px 0;">
+  <div class="card-header">Agent cost-effectiveness &amp; output quality (admin) — last [% ae.days %] days</div>
+  <div class="card-body">
+    [% FOREACH e IN ae.errors %]<div class="doc-warning" role="alert">[% e | html %]</div>[% END %]
+
+    [% IF !ae.by_agent.size %]
+      <p class="doc-muted">No AI calls recorded in this window.</p>
+    [% ELSE %]
+
+      <h4>Wasting time and money</h4>
+      [% IF ae.worst.size %]
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Verdict</th><th>Agent</th><th>Model</th>
+              <th style="text-align:right;">Calls</th>
+              <th style="text-align:right;">OK&nbsp;%</th>
+              <th style="text-align:right;">$/OK</th>
+              <th style="text-align:right;">Wasted&nbsp;$</th>
+              <th style="text-align:right;">Flagged/call</th>
+              <th>Why</th>
+            </tr>
+          </thead>
+          <tbody>
+            [% FOREACH w IN ae.worst %]
+              <tr>
+                <td>
+                  [% IF w.verdict == 'replace' %]
+                    <strong style="color:var(--error-color, var(--primary-color));">replace</strong>
+                  [% ELSE %]
+                    <strong style="color:var(--warning-color, var(--primary-color));">watch</strong>
+                  [% END %]
+                </td>
+                <td><code>[% w.agent | html %]</code></td>
+                <td><code>[% w.provider | html %]/[% w.model | html %]</code></td>
+                <td style="text-align:right;">[% w.calls %]</td>
+                <td style="text-align:right;">[% w.ok_rate %]</td>
+                <td style="text-align:right;">[% IF w.cost_per_ok.defined %][% w.cost_per_ok %][% ELSE %]<span class="doc-muted">—</span>[% END %]</td>
+                <td style="text-align:right;"><strong>[% w.cost_wasted %]</strong></td>
+                <td style="text-align:right;">[% IF w.flagged_per_call.defined %][% w.flagged_per_call %][% ELSE %]<span class="doc-muted">—</span>[% END %]</td>
+                <td class="doc-muted">[% w.why | html %]</td>
+              </tr>
+            [% END %]
+          </tbody>
+        </table>
+        <p class="doc-muted">
+          <strong>Wasted&nbsp;$</strong> is real spend that bought a failed call — a failure still burns
+          tokens, so this is money spent for nothing, not a score.
+          Verdict rule: <em>replace</em> when fewer than 80% of calls succeeded or 0.50+ uncited
+          sentences were flagged per call; <em>watch</em> below 95% or 0.01+ flagged per call.
+          Pairings with fewer than 10 calls are not judged.
+        </p>
+      [% ELSE %]
+        <p class="doc-muted">No pairing met the evidence threshold for a call-out in this window.</p>
+      [% END %]
+
+      <h4 style="margin-top:18px;">Every agent &times; model</h4>
+      <p class="doc-muted">
+        <strong>$/OK</strong> = money per <em>successful</em> call. A cheap model that fails half its
+        calls is worse than a dear one that works, and raw totals hide that.
+        <strong>Flagged/call</strong> = uncited factual sentences stripped by the grounding
+        post-check — a hallucination rate.
+        Agent column is grouped by <code>[% ae.source | html %]</code>[% IF ae.source == 'request_type' %]
+        (the Ledger <code>feature</code> column is not in the DB yet; it appears once schema-compare
+        adds it)[% END %][% IF ae.quality_source == 'none' %]; no grounding data recorded yet, so
+        quality columns are blank[% ELSIF ae.quality_source %] (quality from <code>[% ae.quality_source | html %]</code>)[% END %].
+      </p>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Agent</th><th>Model</th><th>Verdict</th>
+            <th style="text-align:right;">Calls</th>
+            <th style="text-align:right;">OK&nbsp;%</th>
+            <th style="text-align:right;">Grounded&nbsp;%</th>
+            <th style="text-align:right;">Flagged/call</th>
+            <th style="text-align:right;">Cost&nbsp;$</th>
+            <th style="text-align:right;">$/OK</th>
+            <th style="text-align:right;">Wasted&nbsp;$</th>
+            <th style="text-align:right;">Avg&nbsp;ms</th>
+            <th style="text-align:right;">Avg&nbsp;tok</th>
+          </tr>
+        </thead>
+        <tbody>
+          [% FOREACH a IN ae.by_agent %]
+            [% FOREACH m IN a.models %]
+              <tr>
+                <td>[% IF loop.first %]<code>[% a.agent | html %]</code>[% END %]</td>
+                <td><code>[% m.provider | html %]/[% m.model | html %]</code></td>
+                <td>
+                  [% IF m.verdict == 'replace' %]<strong style="color:var(--error-color, var(--primary-color));">replace</strong>
+                  [% ELSIF m.verdict == 'watch' %]<strong style="color:var(--warning-color, var(--primary-color));">watch</strong>
+                  [% ELSIF m.verdict == 'keep' %]<span style="color:var(--success-color, var(--primary-color));">keep</span>
+                  [% ELSE %]<span class="doc-muted">unknown</span>[% END %]
+                </td>
+                <td style="text-align:right;">[% m.calls %]</td>
+                <td style="text-align:right;">[% m.ok_rate %]</td>
+                <td style="text-align:right;">[% IF m.grounded_rate.defined %][% m.grounded_rate %][% ELSE %]<span class="doc-muted">—</span>[% END %]</td>
+                <td style="text-align:right;">[% IF m.flagged_per_call.defined %][% m.flagged_per_call %][% ELSE %]<span class="doc-muted">—</span>[% END %]</td>
+                <td style="text-align:right;">[% m.cost %]</td>
+                <td style="text-align:right;">[% IF m.cost_per_ok.defined %][% m.cost_per_ok %][% ELSE %]<span class="doc-muted">—</span>[% END %]</td>
+                <td style="text-align:right;">[% m.cost_wasted %]</td>
+                <td style="text-align:right;">[% IF m.avg_ms.defined %][% m.avg_ms %][% ELSE %]<span class="doc-muted">—</span>[% END %]</td>
+                <td style="text-align:right;">[% m.avg_tokens %]</td>
+              </tr>
+            [% END %]
+            <tr style="font-weight:600;border-top:2px solid var(--border-color);">
+              <td colspan="3">[% a.agent | html %] — all models</td>
+              <td style="text-align:right;">[% a.calls %]</td>
+              <td style="text-align:right;">[% a.ok_rate %]</td>
+              <td style="text-align:right;">[% IF a.grounded_rate.defined %][% a.grounded_rate %][% ELSE %]<span class="doc-muted">—</span>[% END %]</td>
+              <td style="text-align:right;">[% IF a.flagged_per_call.defined %][% a.flagged_per_call %][% ELSE %]<span class="doc-muted">—</span>[% END %]</td>
+              <td style="text-align:right;">[% a.cost %]</td>
+              <td style="text-align:right;">[% IF a.cost_per_ok.defined %][% a.cost_per_ok %][% ELSE %]<span class="doc-muted">—</span>[% END %]</td>
+              <td style="text-align:right;">[% a.cost_wasted %]</td>
+              <td style="text-align:right;">[% IF a.avg_ms.defined %][% a.avg_ms %][% ELSE %]<span class="doc-muted">—</span>[% END %]</td>
+              <td style="text-align:right;">[% a.avg_tokens %]</td>
+            </tr>
+          [% END %]
+          <tr style="font-weight:600;border-top:2px solid var(--primary-color);">
+            <td colspan="3">All agents</td>
+            <td style="text-align:right;">[% ae.totals.calls %]</td>
+            <td style="text-align:right;">[% ae.totals.ok_rate %]</td>
+            <td style="text-align:right;">[% IF ae.totals.grounded_rate.defined %][% ae.totals.grounded_rate %][% ELSE %]<span class="doc-muted">—</span>[% END %]</td>
+            <td style="text-align:right;">[% IF ae.totals.flagged_per_call.defined %][% ae.totals.flagged_per_call %][% ELSE %]<span class="doc-muted">—</span>[% END %]</td>
+            <td style="text-align:right;">[% ae.totals.cost %]</td>
+            <td style="text-align:right;">[% IF ae.totals.cost_per_ok.defined %][% ae.totals.cost_per_ok %][% ELSE %]<span class="doc-muted">—</span>[% END %]</td>
+            <td style="text-align:right;">[% ae.totals.cost_wasted %]</td>
+            <td style="text-align:right;">[% IF ae.totals.avg_ms.defined %][% ae.totals.avg_ms %][% ELSE %]<span class="doc-muted">—</span>[% END %]</td>
+            <td style="text-align:right;">[% ae.totals.avg_tokens %]</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="doc-muted">
+        Model handoffs (one model failing over to another) are tracked separately in the ledger's
+        <em>combinations</em> table. What a model actually <em>did</em> — the task it was given and
+        whether the output was accepted — is not recorded per call anywhere yet; that needs the
+        outcome scoring that posts to <a href="[% c.uri_for('/ai/eval') %]">/ai/eval</a>.
+      </p>
+    [% END %]
+  </div>
+</div>

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(perl -c lib/Comserv/Controller/Pages.pm)",
+      "Bash(perl -c lib/Comserv/Controller/Shop.pm)",
+      "Bash(perl -Ilib -c lib/Comserv/Controller/Shop.pm)",
+      "Bash(perl -Ilib -c lib/Comserv/Model/Schema/Ency/Result/Page.pm)",
+      "Bash(perl -Ilib -c lib/Comserv/Model/Schema/Ency/Result/PageContent.pm)",
+      "Bash(perl -Ilib -c lib/Comserv/Model/Schema/Ency/Result/PageTb.pm)",
+      "Bash(perl -Ilib script/comserv_server.pl --help)",
+      "Bash(perl -Ilib -e 'use Comserv;')"
+    ]
+  }
+}

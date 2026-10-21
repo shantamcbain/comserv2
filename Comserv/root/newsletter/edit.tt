@@ -10,7 +10,7 @@
         </div>
         <div style="display:flex;gap:8px;">
             <a href="[% c.uri_for('/page', page.page_code) %]" class="btn btn-secondary">Preview</a>
-            <a href="[% c.uri_for('/mail/newsletter/send', page.id) %]" class="btn btn-primary">Send Newsletter</a>
+            <a href="[% c.uri_for('/mail/newsletter/send', page.id) %]" class="btn btn-success" style="font-weight:bold;">Email subscribers →</a>
         </div>
     </div>
 
@@ -108,6 +108,25 @@
                body_content  = page.body
             %]
 
+            <div class="form-group" style="margin-top:18px;">
+                <div style="font-weight:bold;font-size:1.05em;margin-bottom:8px;">
+                    What the newsletter looks like
+                    <small style="font-weight:normal;color:var(--text-muted-color);">
+                        — rendered issue body (same content as <a href="[% c.uri_for('/page', page.page_code) %]" target="_blank">/page/[% page.page_code | html %]</a>)
+                    </small>
+                </div>
+                <div id="nl-issue-looks-like" class="newsletter-issue-preview"
+                     style="min-height:280px;max-height:640px;overflow:auto;padding:20px 24px;
+                            border:2px solid #1565c0;border-radius:8px;background:#fff;">
+                    [% page.body %]
+                </div>
+                <p style="margin:8px 0 0;font-size:0.9em;color:var(--text-muted-color);">
+                    This is the <strong>full issue</strong> readers get online.
+                    To see the <strong>exact email</strong> and pick recipients,
+                    use <a href="[% c.uri_for('/mail/newsletter/send', page.id) %]">Send Newsletter</a>.
+                </p>
+            </div>
+
             <div class="form-group">
                 <label for="status">Status</label>
                 <select name="status" id="status">
@@ -140,7 +159,7 @@
                         title="Save changes then open the email send screen">
                     Save &amp; Send Email →
                 </button>
-                <a href="[% c.uri_for('/mail/newsletter/send', page.id) %]" class="btn btn-secondary">Send (without saving)</a>
+                <a href="[% c.uri_for('/mail/newsletter/send', page.id) %]" class="btn btn-success">Email subscribers (without saving)</a>
                 <a href="[% c.uri_for('/mail/newsletters') %]" class="btn btn-secondary">Back</a>
             </div>
             <p style="margin:8px 0 0;font-size:0.85em;color:var(--text-muted-color);">

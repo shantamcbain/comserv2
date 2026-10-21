@@ -1,0 +1,64 @@
+[% META title = 'Invoice Classification' %]
+[% IF debug_mode == 1 %][% PageVersion = '/CSC/mail/mail.invoice_view.tt,v 0.01 2026/09/12 shanta Exp shanta ' %][% END %]
+
+<div class="invoice-container">
+    <h1>Invoice Classification</h1>
+    
+    [% IF classification_data %]
+        <div class="invoice-summary">
+            <h2>Classification Summary</h2>
+            <p>Generated: [% classification_data.metadata.generated_at %]</p>
+            <p>Total Messages: [% classification_data.metadata.total_messages_scanned %]</p>
+            <p>Source: [% classification_data.metadata.source %]</p>
+        </div>
+        
+        <div class="invoice-categories">
+            [% FOREACH cat IN classification_data.categories.keys %]
+                <div class="invoice-category-card" style="border-left: 4px solid var(--primary-color);">
+                    <h3>[% classification_data.categories.$cat.label %]</h3>
+                    <p>Count: [% classification_data.categories.$cat.count %]</p>
+                    <p>Sites: [% classification_data.categories.$cat.sites.join(', ') %]</p>
+                    
+                    [% IF classification_data.categories.$cat.invoices.size > 0 %]
+                        <table class="invoice-table">
+                            <thead>
+                                <tr>
+                                    <th>Subject</th>
+                                    <th>From</th>
+                                    <th>Date</th>
+                                    <th>Category</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH inv IN classification_data.categories.$cat.invoices %]
+                                    <tr>
+                                        <td>[% inv.subject %]</td>
+                                        <td>[% inv.from %]</td>
+                                        <td>[% inv.date %]</td>
+                                        <td>[% cat %]</td>
+                                        <td>
+                                            <a href="#" class="btn btn-sm btn-primary">Create Invoice</a>
+                                            <a href="#" class="btn btn-sm btn-secondary">Create Receipt</a>
+                                            <a href="#" class="btn btn-sm btn-warning">Sort to Site</a>
+                                        </td>
+                                    </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    [% END %]
+                </div>
+            [% END %]
+        </div>
+    [% ELSE %]
+        <div class="alert alert-info">
+            <p>No classification data found. <a href="[% c.uri_for('/mail/classify_invoices') %]">Run classification</a> first.</p>
+        </div>
+    [% END %]
+    
+    <div class="invoice-actions">
+        <a href="[% c.uri_for('/mail/invoice/sort') %]" class="btn btn-primary">Sort Invoices</a>
+        <a href="[% c.uri_for('/mail/invoice/api/data') %]" class="btn btn-secondary">Download JSON</a>
+        <a href="[% c.uri_for('/mail/classify_invoices') %]" class="btn btn-success">Reclassify</a>
+    </div>
+</div>

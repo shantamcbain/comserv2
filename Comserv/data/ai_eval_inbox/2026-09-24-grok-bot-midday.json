@@ -1,0 +1,50 @@
+{
+  "report_date": "2026-09-24",
+  "source": "Grok Bot midday",
+  "created_by": "Grok Bot (read from local persistence, not live API)",
+  "summary": "Today’s AI usage midnight→~1:13 PM PT. Spoken Bot 78% left (43→78 treated as meter noise, not a refund). Hermes 16 sessions all grok-4.6 xAI OAuth, 991 calls. OpenRouter still ~$19.49. Chat 1 usable / 3 calls, 2 Nemotron 404s.",
+  "markdown": "Today’s AI usage (midnight → ~1:13 PM PT) — checked.\n\n**Grok Bot (spoken only)**\nLogged **78%** left now. Soft ceiling if that holds: about **21%/day** to Mon Sep 28 ~8:00 AM PT (~3.8 days). Spoken bar also jumped **43% → 78%** overnight — I will **not** treat that as a refund. You’re right that soft caps were too optimistic last cycle when you hit ~**93% used** before reset; from now on I’ll track **drops only**, ignore rises, and alert on burn rate instead of leftover comfort.\n\n**Hermes today (heavy)**\n- **16** sessions (4 CLI + 12 TUI), all primary work on **`grok-4.6` via xAI OAuth** — no DeepSeek coding today.\n- **991** API calls · ~**6.7M** input / ~**636k** output tokens (plus large cache-read). Cost marked unknown/$0 in Hermes (subscription path, not OpenRouter cash).\n- Active roughly **7:45 AM–1:10 PM PT**. Session chat notes around **10:34–10:35 AM** mention **94% / 93%** — that lines up with **Super Grok** just before/at the ~10:31 AM reset, not the Bot weekly meter. Hermes kept working on xAI after reset (noon and ~1 PM).\n\n**OpenRouter cash**\nBalance ≈ **$19.49**. Today ≈ **$0.0004**, week ≈ **$0.0005**, month ≈ **$40.43** — under soft day/week caps; month still under **$50**. Free-model quota **11/1000** used today. Auxiliary Hermes title-gen was DeepSeek flash (~that tiny daily $).\n\n**Chat (`:3001` / `:4006` ai_usage, today only)**\n3 calls: **1** real answer (Cohere free, ~6.5k tokens), **2** 404s on free Nemotron (zero tokens). Chat’s logged **$0.0048** does **not** match OpenRouter’s daily field — I’m not combining those until reconciled.\n\n**Going forward on Bot estimates**\n1. Spoken % is authority; rises = meter noise.\n2. Soft daily max = spoken / days to Monday 8 AM, but warn from **implied burn on drops**.\n3. Keep Bot / Super Grok / OpenRouter / Chat as separate ledgers.\n4. After the next chunk of Bot work, send another spoken % if you can — that recalibrates faster than my guesses.\n\nFull write-up was `/workspace/ai-usage-today-2026-09-24.md` inside the Bot sandbox (not copied; this JSON is the persistence extract).\n",
+  "metrics": {
+    "bot": {
+      "percent_left": 78,
+      "soft_pct_per_day": 21,
+      "track": "drops_only"
+    },
+    "openrouter": {
+      "balance_usd": 19.49,
+      "day_usd": 0.0004,
+      "week_usd": 0.0005,
+      "month_usd": 40.43,
+      "free_quota_used": 11,
+      "free_quota_limit": 1000
+    },
+    "hermes": {
+      "sessions": 16,
+      "cli": 4,
+      "tui": 12,
+      "api_calls": 991,
+      "input_tokens": 6700000,
+      "output_tokens": 636000,
+      "model": "grok-4.6",
+      "provider": "xai-oauth"
+    },
+    "chat": {
+      "calls": 3,
+      "usable": 1,
+      "http_404": 2,
+      "zero_token_ok": 0
+    }
+  },
+  "proposals": [
+    {
+      "title": "Track Grok Bot % drops only; ignore meter rises",
+      "change_type": "other",
+      "target": "eval.bot_meter",
+      "rationale": "Spoken bar jumped 43%→78%; treat rises as noise. Alert on burn rate, not leftover comfort.",
+      "payload": {
+        "authority": "spoken_percent",
+        "ignore_rises": true
+      }
+    }
+  ]
+}

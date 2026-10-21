@@ -1,0 +1,57 @@
+[% PageVersion = 'Documentation/3d/PrinterLanFileManagementPlan.tt,v 0.01 2026/10/08 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+<h1>3D Printer LAN File Management Enhancements</h1>
+
+<p class="last-updated">Last Updated: 2026-10-08 | Version: 0.01 | Status: In Progress | <a href="[% c.uri_for('/project/details') %]?project_id=206">Project #206 (3DPRINT)</a> | <a href="[% c.uri_for('/todo') %]?project_id=206">Todos</a></p>
+
+<div id="toc" class="row">
+<a href="#overview" class="doc-navlink">Overview</a>
+<a href="#requirements" class="doc-navlink">Requirements</a>
+<a href="#plan" class="doc-navlink">Implementation Plan</a>
+<a href="#tracking" class="doc-navlink">Tracking</a>
+</div>
+
+<h2 id="overview" class="doc-h2">Overview</h2>
+<p class="doc-body">Enhance the Anycubic Kobra 3 LAN Mode integration to allow full management of files on the printer (list, upload, delete, start print), integrate printer file checks into the print queue for direct start, and ensure newly plugged SSDs (udisk) are fully visible and usable.</p>
+
+<h2 id="requirements" class="doc-h2">Requirements</h2>
+<ul class="doc-body">
+<li>1. Manage all files on the printer: add upload support, improve browsing for SSD.</li>
+<li>2. In print queue: check if STL-derived file exists on assigned printer's local storage and provide start print action.</li>
+<li>3. SSD support: ensure listUdisk and commands work for newly plugged SSD.</li>
+<li>Use API for todo/project tracking and start the session todo for time tracking.</li>
+<li>Human-visible plan in Documentation system.</li>
+<li>Changelog at end of coding.</li>
+</ul>
+
+<h2 id="plan" class="doc-h2">Implementation Plan</h2>
+<h3>Phase 0: Tracking Setup</h3>
+<ol>
+<li>1. Use API to search for appropriate todo (3d printer or file management under 3DPRINT project); create if none; start the todo for session time tracking.</li>
+<li>2. Create/register human-visible plan in Documentation system linked to project/todo.</li>
+</ol>
+<h3>Phase 1: Printer File Management</h3>
+<ol>
+<li>3. Enhance Anycubic adapter for full file ops including upload_file using fileUploadurl (HTTP POST multipart).</li>
+<li>4. Update PrinterLan and printer_control.tt for upload UI, improved SSD/udisk listing and commands.</li>
+</ol>
+<h3>Phase 2: Queue Integration</h3>
+<ol>
+<li>5. Add helper to check if STL file exists on printer local storage.</li>
+<li>6. Integrate into queue (use thin util to avoid growing 3d.pm); add UI in queue.tt for check and direct start print action.</li>
+</ol>
+<h3>Phase 3: Verification and Close</h3>
+<ol>
+<li>7. Verify with curl to /3d/printer_lan/control and /3d/queue; perl -c touched files.</li>
+<li>8. Add changelog fragment at end of coding.</li>
+</ol>
+
+<h2 id="tracking" class="doc-h2">Tracking</h2>
+<p class="doc-body">This plan is synced to project/todo system using sync_ai_plan_to_projects.pl. Session todo started for time tracking via open_log.</p>
+
+<div class="doc-footer">
+<p>Tracked under Project 206. See /Documentation/MASTER_PLAN for coordinator. Use /todo for session todo.</p>
+</div>
+</div>

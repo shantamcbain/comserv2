@@ -18,6 +18,14 @@
     <tr>
       <th><label for="category">Category</label></th>
       <td>
+        [% IF category_options.size %]
+        <select id="category_id" name="category_id" onchange="if(this.value){document.getElementById('category').value=this.options[this.selectedIndex].dataset.path}">
+          <option value="">— choose from category list —</option>
+          [% FOREACH o IN category_options %]
+          <option value="[% o.id %]" data-path="[% o.path | html %]"[% IF current_category_ids.grep('^' _ o.id _ '$').size || (item.category && item.category == o.path) %] selected[% END %]>[% '&nbsp;&nbsp;' FILTER repeat(o.depth) %][% o.name | html %]</option>
+          [% END %]
+        </select><br>
+        [% END %]
         <input type="text" id="category" name="category" maxlength="100"
                list="category-suggestions"
                placeholder="Apiary, Garden, Hardware, 3D Print, Craft…">
@@ -32,6 +40,10 @@
           <option value="Supplies">Supplies</option>
           <option value="Apiary">Apiary</option>
           <option value="Garden">Garden</option>
+          <option value="food">Food</option>
+          <option value="herb">Herb</option>
+          <option value="spice">Spice</option>
+          <option value="produce">Produce</option>
           <option value="Craft">Craft</option>
           <option value="Electronics">Electronics</option>
           <option value="Office">Office</option>
@@ -79,8 +91,47 @@
     </tr>
     <tr>
       <th><label for="barcode">Barcode</label></th>
-      <td><input type="text" id="barcode" name="barcode" maxlength="100">
-          <small>UPC / EAN / QR / Code128</small></td>
+      <td><input type="text" id="barcode" name="barcode" maxlength="100" placeholder="Scan or enter">
+          <small>UPC / EAN / QR / Code128 / internal</small></td>
+    </tr>
+    <tr>
+      <th><label for="barcode_type">Barcode Type</label></th>
+      <td>
+        <select id="barcode_type" name="barcode_type">
+          <option value="">— unknown —</option>
+          <option value="upc">UPC</option>
+          <option value="ean">EAN</option>
+          <option value="qr">QR</option>
+          <option value="internal">Internal / custom</option>
+          <option value="other">Other</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="image_path">Image / Visual</label></th>
+      <td>
+        <input type="text" id="image_path" name="image_path" maxlength="500" placeholder="http://... or /data/nfs/... (leave blank to capture)">
+        <small>External URL for universal items (e.g. can of beans) or NFS path after capture. Use camera below for specific photo (optional — only if you want to keep the picture).</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="barcode_type">Barcode Type</label></th>
+      <td>
+        <select id="barcode_type" name="barcode_type">
+          <option value="">— unknown —</option>
+          <option value="upc">UPC</option>
+          <option value="ean">EAN</option>
+          <option value="qr">QR</option>
+          <option value="internal">Internal / custom</option>
+          <option value="other">Other</option>
+        </select>
+        <small> (camera scan will help set this)</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="image_path">Image / Photo Path</label></th>
+      <td><input type="text" id="image_path" name="image_path" maxlength="500" placeholder="NFS path or https://...">
+          <small>Optional visual. <strong>On ZeroTier (no HTTPS):</strong> Use your phone's camera app to take the photo, then upload it via File Manager to get an NFS path (e.g. /data/nfs/inventory/xxx.jpg). Paste that path here. External URLs also work for common items.</small></td>
     </tr>
     <tr>
       <th><label for="reorder_point">Reorder Point</label></th>
@@ -221,6 +272,29 @@
     </tr>
   </table>
 </form>
+
+<!-- Camera / scan for visual + barcode (optional) -->
+<div style="margin: 1rem 0; padding: 0.75rem; border: 1px solid var(--border-color, #ccc); border-radius: 4px; font-size: 0.9em;">
+  <strong>📷 Camera (photo for visual reference + scan barcode)</strong><br>
+  <small><strong>Important for ZeroTier users:</strong> In-browser camera requires HTTPS. On ZeroTier (plain HTTP) this is blocked on phones/tablets. The buttons below will show a friendly message. See recommended mobile workflow below.</small><br>
+
+  <div style="margin-top:0.5rem; padding:0.4rem; background:#f8f8f8; border-radius:3px; font-size:0.85em;">
+    <strong>Recommended on phone/tablet via ZeroTier:</strong><br>
+    1. Use your device's native Camera app to take the photo.<br>
+    2. Upload the photo using the File Manager (gets you a /data/nfs/... path).<br>
+    3. Paste the path into the "Image / Photo Path" field above.<br>
+    4. For barcode: Use a free barcode scanner app on your phone, then type or paste the result into the Barcode field.
+  </div>
+  <button type="button" id="start-cam">Start Camera (desktop/HTTPS only)</button>
+  <button type="button" id="stop-cam">Stop</button>
+  <button type="button" id="capture">Capture Photo</button>
+  <button type="button" id="scan-barcode">Simulate Scan (works everywhere)</button>
+  <video id="video" style="display:none; max-width: 220px; vertical-align: middle;"></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+  <img id="preview" style="display:none; max-width: 120px; vertical-align: middle;">
+  <div id="cam-status" style="font-size:0.8em; color:#666; margin-top:0.25rem;"></div>
+</div>
+
 <script>
 (function() {
     var cat = document.getElementById('category');
@@ -233,6 +307,152 @@
     cat.addEventListener('input', toggle3d);
     cat.addEventListener('change', toggle3d);
     toggle3d();
+
+    // Camera + scan helpers (getUserMedia + placeholder decode)
+    // Note: Camera requires a secure context (HTTPS). On Android/mobile over plain HTTP it often fails.
+    var video = document.getElementById('video');
+    var canvas = document.getElementById('canvas');
+    var preview = document.getElementById('preview');
+    var status = document.getElementById('cam-status');
+    var stream = null;
+
+    function cameraSupported() {
+        return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    }
+
+    document.getElementById('start-cam').addEventListener('click', async function() {
+        if (!cameraSupported()) {
+            status.textContent = 'Camera disabled (ZeroTier/HTTP has no HTTPS). Use phone camera app + File Manager instead.';
+            alert('In-browser camera is blocked on ZeroTier (no HTTPS). On phones/tablets use your native camera app and the File Manager to upload photos, then paste the NFS path.');
+            return;
+        }
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            video.srcObject = stream;
+            video.style.display = 'inline';
+            status.textContent = 'Camera active. Position item or barcode.';
+        } catch (e) {
+            status.textContent = 'Camera error: ' + e.message;
+            alert('Could not access camera: ' + e.message);
+        }
+    });
+
+    document.getElementById('stop-cam').addEventListener('click', function() {
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+            stream = null;
+        }
+        video.style.display = 'none';
+        status.textContent = '';
+    });
+
+    document.getElementById('capture').addEventListener('click', function() {
+        if (!stream) { 
+            status.textContent = 'Start camera first (or use manual entry on mobile).'; 
+            return; 
+        }
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        preview.src = canvas.toDataURL('image/jpeg');
+        preview.style.display = 'inline';
+        status.textContent = 'Photo captured. Use File Manager to save to NFS (/data/nfs) and paste path into Image Path field (or use external URL).';
+    });
+
+    document.getElementById('scan-barcode').addEventListener('click', function() {
+        // Scan button can be used as a simulator even without live camera
+        var bc = document.getElementById('barcode');
+        var bt = document.getElementById('barcode_type');
+        if (bc) {
+            bc.value = 'SCAN-' + Date.now().toString().slice(-8);
+            if (bt) bt.value = 'internal';
+            status.textContent = 'Placeholder scan (camera not required for this). Submit to test duplicate switch or create.';
+        } else if (!stream) {
+            status.textContent = 'Start camera first for live capture, or just type the barcode manually.';
+        }
+    });
+})();
+</script>
+
+<!-- Camera / Barcode Capture (P2) -->
+<div style="margin:1rem 0; padding:1rem; border:1px solid var(--border-color); border-radius:6px; background:var(--bg-secondary);">
+  <strong>Camera Capture (optional — only keep the picture if you want a specific visual)</strong>
+  <div>
+    <button type="button" id="start-cam" style="margin:0.5rem 0;">📷 Start Camera</button>
+    <button type="button" id="capture-photo" disabled>Capture Photo (for visual)</button>
+    <button type="button" id="scan-barcode" disabled>Scan Barcode</button>
+    <video id="cam-video" style="display:none; max-width:300px; border:1px solid var(--border-color);" autoplay></video>
+    <canvas id="cam-canvas" style="display:none;"></canvas>
+    <img id="photo-preview" style="display:none; max-width:200px; margin-top:0.5rem; border:1px solid var(--border-color);" alt="Captured photo preview">
+  </div>
+  <small>Use external URL above for universal items (e.g. stock photo of "can of beans") to save space. Captured photos go to NFS via File Manager (manual or future auto).</small>
+</div>
+
+<script>
+(function() {
+  var video = document.getElementById('cam-video');
+  var canvas = document.getElementById('cam-canvas');
+  var preview = document.getElementById('photo-preview');
+  var startBtn = document.getElementById('start-cam');
+  var captureBtn = document.getElementById('capture-photo');
+  var scanBtn = document.getElementById('scan-barcode');
+  var stream = null;
+
+  startBtn.addEventListener('click', async function() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+      video.style.display = 'block';
+      captureBtn.disabled = false;
+      scanBtn.disabled = false;
+      startBtn.textContent = 'Stop Camera';
+    } catch(e) {
+      alert('Camera access failed: ' + e.message + ' (use HTTPS or localhost)');
+    }
+  });
+
+  captureBtn.addEventListener('click', function() {
+    if (!stream) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    var dataUrl = canvas.toDataURL('image/jpeg');
+    preview.src = dataUrl;
+    preview.style.display = 'block';
+    // For now set a placeholder path; real flow: upload blob to /file/upload_file targeting NFS dir then set the returned path
+    var imgInput = document.getElementById('image_path');
+    if (imgInput && !imgInput.value) {
+      imgInput.value = 'data:image/jpeg;base64,' + dataUrl.split(',')[1].substring(0,100) + '... (capture saved to NFS via File Manager)';
+    }
+    alert('Photo captured. In full impl this would POST to File Manager for /data/nfs path. For now the preview is shown and path noted.');
+  });
+
+  scanBtn.addEventListener('click', function() {
+    if (!stream) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    var barcodeInput = document.getElementById('barcode');
+    if (barcodeInput) {
+      // Placeholder for real decode (jsQR / BarcodeDetector / server)
+      barcodeInput.value = 'SCAN-' + Date.now().toString().slice(-8);
+      // Simulate lookup + duplicate handling
+      setTimeout(function() {
+        alert('Barcode scanned (placeholder decode). In full: lookup by barcode, if exists offer:\n- Edit existing item\n- New stock (receive)\n- Location adjust (count)\n\nCurrent: form has duplicate redirect on submit.');
+      }, 100);
+    }
+  });
+
+  // On barcode field change, could trigger AJAX lookup in full impl
+  var bc = document.getElementById('barcode');
+  if (bc) {
+    bc.addEventListener('blur', function() {
+      if (bc.value.length > 4) {
+        // Placeholder for real /api lookup
+        console.log('Would lookup barcode: ' + bc.value);
+      }
+    });
+  }
 })();
 </script>
 

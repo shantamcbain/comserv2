@@ -1,172 +1,318 @@
 [% META
   title = 'CSC Gateway Plan'
-  description = 'Routing policy, zero.{domain} naming, tool roles, and drift detection for OPNsense, Cloudflare, HAProxy, and NPM'
+  description = 'Routing policy for OPNsense, Unbound, HAProxy, and Cloudflare. Dev never production. Starman :3001 is LAN/ZT only. Named access for devices with no hosts file.'
   roles = 'admin,developer'
   TemplateType = 'Documentation'
   category = 'Infrastructure'
-  page_version = '1.0'
-  last_updated = 'Mon Jun 15 2026'
+  page_version = '1.2'
+  last_updated = 'Sat Sep 26 2026'
   site_specific = 'false'
+  project_id = '87'
+  project_code = 'Gateway'
 %]
+[% PageVersion = 'Documentation/system/GatewayPlan.tt,v 1.2 2026/09/26 hermes-agent Exp shanta - Edge rules: no WAN :3001, no public ZT A default, named access without hosts' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container">
-  <h1 style="color: var(--text-color);">CSC Gateway Plan</h1>
-  <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
-    Last Updated: 2026-06-15 | Version: 1.0 | Status: Active (Phase 1 — plan in software)
-  </div>
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'CSC Gateway Plan'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
 
-  <p style="color: var(--text-color);">
-    This document is the canonical reference for how CSC routes traffic across OPNsense, Cloudflare,
-    HAProxy, NPM, and application hosts. The live admin view is at
-    <a href="[% c.uri_for('/admin/infrastructure/opnsense') %]">OPNsense Gateway Management</a>.
-    Policy is stored in <code>config/infrastructure/gateway_plan.json</code>.
-  </p>
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <p class="doc-muted">Jump to section:</p>
+            <div class="doc-navrow">
+                <a href="#now" class="doc-navlink">Now</a>
+                <a href="#overview" class="doc-navlink">Overview</a>
+                <a href="#hard-rules" class="doc-navlink">Hard rules</a>
+                <a href="#access" class="doc-navlink">How to reach the app</a>
+                <a href="#nameless" class="doc-navlink">No hosts file</a>
+                <a href="#fix-all-dev" class="doc-navlink">Fix all dev</a>
+                <a href="#zero-naming" class="doc-navlink">zero.{domain}</a>
+                <a href="#hosts" class="doc-navlink">Key hosts</a>
+                <a href="#tools" class="doc-navlink">Tool roles</a>
+                <a href="#identity" class="doc-navlink">Identity</a>
+                <a href="#work" class="doc-navlink">Work items</a>
+                <a href="#project-tracking" class="doc-navlink">Project tracking</a>
+                <a href="#see-also" class="doc-navlink">See also</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
 
-  <h2 id="zero-naming">1. <code>zero.{domain}</code> — per site, not on the gateway</h2>
-  <p style="color: var(--text-color);">
-    Each hosted domain gets its own <strong>ZeroTier / remote entry hostname</strong>:
-    <code>zero.computersystemconsulting.ca</code>, <code>zero.beemaster.ca</code>, etc.
-    These names resolve to the <strong>application host</strong> (production1, a container, or dev workstation),
-    not to the OPNsense firewall.
-  </p>
+    <div class="row">
+        <div class="col-100">
+            <h2 id="now" class="doc-h2">Now</h2>
+            <ul class="doc-body">
+                <li><strong>Current.</strong> WAN port forward of workstation :3001 was disabled (2026-09-26). LAN <code>/health</code> on :3001 is 200. Public <code>computersystemconsulting.ca:3001</code> times out. Policy json is <code>config/infrastructure/gateway_plan.json</code> v1.2.</li>
+                <li><strong>Blocked by.</strong> Single-thread Starman cannot be an internet origin. Public ZeroTier A records and a WAN HAProxy frontend would put the same worker back in the scanner queue.</li>
+                <li><strong>Next.</strong> Named access for phones/laptops that have neither <code>/etc/hosts</code> nor ZeroTier (LAN = Unbound + mDNS; remote = authenticated HTTPS on 443, never :3001). Gateway audit must flag WAN DNAT/UPnP to .199:3001 as error.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
 
-  <h3>Why not one <code>zero</code> on the gateway?</h3>
-  <table style="width:100%; border-collapse:collapse; margin:16px 0;">
-    <tr>
-      <th style="padding:8px; border:1px solid var(--border-color);">Concern</th>
-      <th style="padding:8px; border:1px solid var(--border-color);">Per-domain <code>zero.{domain}</code></th>
-      <th style="padding:8px; border:1px solid var(--border-color);">Single <code>zero</code> on gateway</th>
-    </tr>
-    <tr>
-      <td style="padding:8px; border:1px solid var(--border-color);">Multi-site hosting</td>
-      <td style="padding:8px; border:1px solid var(--border-color);">Each domain → correct backend IP</td>
-      <td style="padding:8px; border:1px solid var(--border-color);">One IP; cannot serve many apps cleanly</td>
-    </tr>
-    <tr>
-      <td style="padding:8px; border:1px solid var(--border-color);">TLS certificates</td>
-      <td style="padding:8px; border:1px solid var(--border-color);">ACME per hostname (HAProxy / NPM / CF)</td>
-      <td style="padding:8px; border:1px solid var(--border-color);">Wrong SAN; cookie domain breaks</td>
-    </tr>
-    <tr>
-      <td style="padding:8px; border:1px solid var(--border-color);">Dev vs production</td>
-      <td style="padding:8px; border:1px solid var(--border-color);"><code>dev.{domain}</code> → workstation; <code>zero.{domain}</code> → prod</td>
-      <td style="padding:8px; border:1px solid var(--border-color);">Toggling one record affects everything</td>
-    </tr>
-    <tr>
-      <td style="padding:8px; border:1px solid var(--border-color);">Split DNS</td>
-      <td style="padding:8px; border:1px solid var(--border-color);">LAN (Unbound → 192.168.x) vs public (CF → 172.30.x)</td>
-      <td style="padding:8px; border:1px solid var(--border-color);">Gateway IP wrong for both LAN apps and ZT mesh</td>
-    </tr>
-    <tr>
-      <td style="padding:8px; border:1px solid var(--border-color);">Operational clarity</td>
-      <td style="padding:8px; border:1px solid var(--border-color);">Gateway = route/filter; apps = named services</td>
-      <td style="padding:8px; border:1px solid var(--border-color);">Conflates firewall with application endpoint</td>
-    </tr>
-  </table>
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" class="doc-h2">Overview</h2>
+            <p class="doc-body">
+                Canonical routing for CSC across OPNsense, Cloudflare, HAProxy, NPM, and application hosts.
+                Live admin: <a class="doc-link" href="[% c.uri_for('/admin/infrastructure/opnsense') %]">OPNsense Gateway Management</a>.
+                Policy file: <code>config/infrastructure/gateway_plan.json</code>.
+            </p>
+            <p class="doc-body">
+                <code>dev.{domain}</code> is served by the workstation Starman
+                (192.168.1.199 LAN / 172.30.131.126 ZeroTier), never production (192.168.1.126).
+                That is a <strong>hostname</strong> policy. It is not a reason to publish TCP 3001 on the WAN.
+            </p>
+            <div class="doc-warning">
+                <p><strong>2026-09-26.</strong> A WAN port forward TCP 3001 → 192.168.1.199 let scanners occupy the single <code>comserv_server.pl -r</code> worker (Recv-Q, multi-minute page loads). HAProxy on LAN :80 for <code>dev.computersystemconsulting.ca</code> was the intended design. The NAT was not.</p>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
 
-  <h2 id="hosts">2. Key hosts</h2>
-  <table style="width:100%; border-collapse:collapse;">
-    <tr><th style="padding:8px;border:1px solid var(--border-color);">Role</th><th style="padding:8px;border:1px solid var(--border-color);">LAN</th><th style="padding:8px;border:1px solid var(--border-color);">ZeroTier</th><th style="padding:8px;border:1px solid var(--border-color);">Port</th></tr>
-    <tr><td style="padding:8px;border:1px solid var(--border-color);">OPNsense gateway</td><td>192.168.1.1</td><td>172.30.117.133</td><td>8443 (API)</td></tr>
-    <tr><td style="padding:8px;border:1px solid var(--border-color);">production1 (Docker Catalyst)</td><td>192.168.1.126</td><td>172.30.50.206</td><td>5000</td></tr>
-    <tr><td style="padding:8px;border:1px solid var(--border-color);">Dev workstation</td><td>192.168.1.199</td><td>172.30.131.126</td><td>3001</td></tr>
-    <tr><td style="padding:8px;border:1px solid var(--border-color);">NPM (reverse proxy)</td><td>—</td><td>172.30.159.100</td><td>81 / 443</td></tr>
-  </table>
-  <p>See also: <a href="[% c.uri_for('/Documentation/system/Server_Room_IP_Registry') %]">Server Room IP Registry</a>.</p>
+    <div class="row">
+        <div class="col-100">
+            <h2 id="hard-rules" class="doc-h2">Hard rules</h2>
+            <ul class="doc-body">
+                <li><strong>No WAN DNAT of 3001</strong> (or UPnP / 1:1 / WAN pass to 192.168.1.199:3001). Bind <code>0.0.0.0</code> on the workstation is fine for LAN+ZT; it does not by itself publish the internet.</li>
+                <li><strong>No public A record to a ZeroTier IP by default.</strong> RFC1918 in public DNS. Some resolvers strip it; visitors on 172.30 hit the wrong box. Keep Unbound, mDNS, and real ZT names.</li>
+                <li><strong>Dev HAProxy frontend is LAN</strong> (or a later authenticated tunnel). Production HAProxy+ACME on WAN is a different role. Do not orange-cloud <code>dev.*</code> at the public IP:3001.</li>
+                <li><strong>Gate ≠ app login.</strong> OPNsense / Access / client cert decides whether you may reach the host. Comserv session still owns SiteName and roles.</li>
+                <li><strong>Starman on the desk is one worker.</strong> Public sockets or Recv-Q on 3001 is an incident, not “dev is up.”</li>
+                <li><strong>Do not use</strong> <code>computersystemconsulting.ca:3001</code> as a URL. Use the names in <a href="#access">How to reach the app</a>.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
 
-  <h2 id="tools">3. Best tool per function</h2>
-  <ul style="color: var(--text-color);">
-    <li><strong>OPNsense Unbound</strong> — Internal DNS overrides for LAN clients (e.g. <code>dev.beemaster.ca → 199</code>).</li>
-    <li><strong>Cloudflare (Application DNS)</strong> — Public DNS for <code>zero.{domain}</code> and internet-facing records.</li>
-    <li><strong>OPNsense HAProxy + ACME</strong> — WAN HTTPS termination, health checks, failover (Step 4 in Docker pipeline).</li>
-    <li><strong>NPM</strong> — Per-container reverse proxy and Let's Encrypt for docker-delivered sites.</li>
-    <li><strong>Comserv Gateway Plan</strong> — Declared rules, drift vs live Unbound, admin guidelines.</li>
-  </ul>
+    <div class="row">
+        <div class="col-100">
+            <h2 id="access" class="doc-h2">How to reach the app</h2>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Client</th>
+                    <th class="doc-th">DNS / name</th>
+                    <th class="doc-th">URL</th>
+                    <th class="doc-th">Notes</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Office LAN, DHCP uses OPNsense (192.168.1.1)</td>
+                    <td class="doc-td">Unbound. No hosts file.</td>
+                    <td class="doc-td"><code>http://dev.computersystemconsulting.ca/</code> (portless :80 → HAProxy → :3001). Other <code>dev.{zone}</code> need <code>:3001</code> until they share that frontend.</td>
+                    <td class="doc-td">Default for phones and laptops on office Wi‑Fi.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Office LAN, mDNS</td>
+                    <td class="doc-td"><code>workstation.local</code></td>
+                    <td class="doc-td"><code>http://workstation.local:3001/</code></td>
+                    <td class="doc-td">No hosts file. Avahi/Bonjour.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Office LAN, known IP</td>
+                    <td class="doc-td">none</td>
+                    <td class="doc-td"><code>http://192.168.1.199:3001/</code></td>
+                    <td class="doc-td">Always works on this LAN.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">ZeroTier member</td>
+                    <td class="doc-td"><code>workstation.zero</code></td>
+                    <td class="doc-td"><code>http://workstation.zero:3001/</code></td>
+                    <td class="doc-td">Private overlay. Do not put 172.30.131.126 in Cloudflare.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Remote, no ZT, no hosts</td>
+                    <td class="doc-td">Named HTTPS (not built yet)</td>
+                    <td class="doc-td">See <a href="#nameless">No hosts file</a></td>
+                    <td class="doc-td">Must not be WAN:3001 and must not be a public ZT A record.</td>
+                </tr>
+            </table>
+            <p class="doc-body">Admin pages on the office LAN do not need ZeroTier. Cloudflare at <a class="doc-link" href="[% c.uri_for('/admin/dns') %]">/admin/dns</a> is a normal app page (admin login), not a VPN.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
 
-  <h2 id="access">4. Do I need ZeroTier to use admin pages?</h2>
-  <p style="color: var(--text-color);">
-    <strong>No</strong> — if you are on the same LAN as the workstation, open Comserv at
-    <code>http://workstation.local:3001</code> or <code>http://192.168.1.199:3001</code>.
-    ZeroTier is for <em>remote</em> access (<code>172.30.131.126</code>) when you are not on office Wi‑Fi.
-  </p>
-  <p style="color: var(--text-color);">
-    Application DNS (Cloudflare) at <a href="[% c.uri_for('/admin/dns') %]">/admin/dns</a> is a normal HTTPS page —
-    it does not require ZeroTier. You need admin login and Cloudflare API credentials configured in Comserv.
-  </p>
+    <div class="row">
+        <div class="col-100">
+            <h2 id="nameless" class="doc-h2">Devices with no hosts file</h2>
+            <p class="doc-body">
+                <code>/etc/hosts</code> is optional and local-only. Most phones, tablets, and guest laptops will never have it.
+                They still need a <strong>name</strong>, not a ZeroTier address to type.
+            </p>
+            <h3 class="doc-h3">LAN (do this now)</h3>
+            <ul class="doc-body">
+                <li>DHCP DNS = 192.168.1.1 (Unbound). Specific <code>dev</code> host override beats zone wildcard.</li>
+                <li><code>dev.computersystemconsulting.ca</code> → 192.168.1.1:80 → HAProxy → 192.168.1.199:3001.</li>
+                <li><code>workstation.local</code> via mDNS for the raw Starman port.</li>
+            </ul>
+            <h3 class="doc-h3">Remote without ZeroTier (work item)</h3>
+            <p class="doc-body">
+                Build a named front door on <strong>443</strong> that authenticates, then proxies to 192.168.1.199:3001 on the LAN.
+                Preferred: Cloudflare Tunnel + Access (or equivalent). Alternative: OPNsense HAProxy :443 with client certificate or IdP, origin still LAN.
+                Staff who can install a client keep ZeroTier. Casual clients do not get a P12 in email as the only path.
+            </p>
+            <div class="doc-info">
+                <p><strong>Rejected.</strong> Public DNS A = 172.30.131.126. That only works if the device is already on ZeroTier, and it publishes overlay addressing.</p>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
 
-  <h2 id="hosts-file">5. Should this be hosts-file only?</h2>
-  <p style="color: var(--text-color);">
-    <strong>No — hosts file is optional, local-only.</strong> Use three layers:
-  </p>
-  <ul style="color: var(--text-color);">
-    <li><strong>/etc/hosts</strong> (optional) — convenience on your laptop for dev names; affects only that machine.</li>
-    <li><strong>OPNsense Unbound</strong> — office LAN clients that use <code>192.168.1.1</code> as DNS.</li>
-    <li><strong>Cloudflare</strong> — anyone on the internet resolving public names like <code>zero.computersystemconsulting.ca</code>.</li>
-  </ul>
+    <div class="row">
+        <div class="col-100">
+            <h2 id="fix-all-dev" class="doc-h2">What “Fix all dev.* → workstation” does</h2>
+            <p class="doc-body">If the green button on the OPNsense admin page succeeds, it rewires <strong>names</strong>. It must not open WAN:3001.</p>
+            <ul class="doc-body">
+                <li>Unbound + HAProxy for <code>dev.computersystemconsulting.ca</code> (LAN :80 → workstation :3001).</li>
+                <li>Unbound <code>dev.{other zone}</code> → 192.168.1.199.</li>
+                <li>Today the code also writes Cloudflare A records to the workstation ZeroTier IP (DNS-only). <strong>That default is withdrawn in this plan</strong> — leave public <code>dev</code> unpublished until the 443 front door exists.</li>
+                <li>Flashes an <code>/etc/hosts</code> snippet for machines that bypass Unbound. Optional. Not the LAN or remote design.</li>
+            </ul>
+            <p class="doc-body">Code: <code>Comserv::Util::GatewayOrchestrator::apply_all_dev_to_workstation</code>. WAN <code>add_port_forward</code> defaults in <code>Opnsense.pm</code> are a foot-gun; do not use them for Starman.</p>
+            <p class="doc-body">Customer subdomains are not stored one-by-one in the json. <code>GatewayOrchestrator</code> builds rules from <code>hosting_accounts</code> when the gateway page loads. Audit flags <code>dev.*</code> shadowed by wildcard or pointing at production.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
 
-  <h2 id="wildcard-dev">6. Wildcard <code>*</code> vs <code>dev</code> — precedence</h2>
-  <p style="color: var(--text-color);">
-    On OPNsense Unbound, a <strong>specific</strong> host override (<code>dev</code> + domain) wins over a
-    <strong>wildcard</strong> (<code>*</code> + domain). Example: <code>dev.beemaster.ca → 199</code> works today
-    even though <code>*.computersystemconsulting.ca → 126</code> exists for CSC.
-  </p>
-  <p style="color: var(--text-color);">
-    Comserv <strong>drift detection</strong> checks each planned rule independently. It does
-    <strong>not yet auto-apply</strong> overrides in priority order (Phase 4). Until then, add
-    <code>dev.computersystemconsulting.ca → 192.168.1.199</code> manually on the OPNsense admin page or in the UI form.
-  </p>
+    <div class="row">
+        <div class="col-100">
+            <h2 id="zero-naming" class="doc-h2">zero.{domain} — per site, not on the gateway</h2>
+            <p class="doc-body">
+                Each hosted domain may have <code>zero.{domain}</code> as a ZeroTier / remote entry hostname
+                pointing at the <strong>application host</strong> (production1, a container, or the workstation), not OPNsense.
+                That name is for members already on the overlay. It is not public internet access and should not be the Cloudflare default for people without ZeroTier.
+            </p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
 
-  <h2 id="automation">7. Automated hosting — no per-domain static routes</h2>
-  <p style="color: var(--text-color);">
-    Customer subdomains are <strong>not</strong> added to <code>gateway_plan.json</code> one by one.
-    <code>Comserv::Util::GatewayOrchestrator</code> builds rules from <code>hosting_accounts</code> when the gateway page loads.
-    When a user signs up for <code>coop.beemaster.ca</code>, Site Provisioning runs in order:
-  </p>
-  <ol style="color: var(--text-color);">
-    <li>Site + SiteDomain in Comserv DB</li>
-    <li>Cloudflare A record (public)</li>
-    <li>OPNsense Unbound — <strong>only if needed</strong> (dev prefix, apex, or zone without wildcard)</li>
-    <li>Shared prod on <code>*.computersystemconsulting.ca</code> needs <strong>no</strong> extra Unbound row</li>
-    <li>Private/dedicated VM + NAT — Phase 4</li>
-  </ol>
-  <p style="color: var(--text-color);">
-    The OPNsense admin page runs a <strong>gateway audit</strong> and flags problems such as
-    <code>dev.beemaster.ca</code> shadowed by wildcard, or <code>dev.csc</code> pointing at production instead of the workstation.
-    One-click <strong>Apply dev override</strong> buttons write to Unbound via API.
-  </p>
+    <div class="row">
+        <div class="col-100">
+            <h2 id="hosts" class="doc-h2">Key hosts</h2>
+            <table class="doc-table">
+                <tr><th class="doc-th">Role</th><th class="doc-th">LAN</th><th class="doc-th">ZeroTier</th><th class="doc-th">Port</th></tr>
+                <tr><td class="doc-td">OPNsense gateway</td><td class="doc-td">192.168.1.1</td><td class="doc-td">172.30.117.133</td><td class="doc-td">8443 (API)</td></tr>
+                <tr class="doc-tr-alt"><td class="doc-td">production1 (Docker Catalyst)</td><td class="doc-td">192.168.1.126</td><td class="doc-td">172.30.50.206</td><td class="doc-td">5000</td></tr>
+                <tr><td class="doc-td">Dev workstation</td><td class="doc-td">192.168.1.199</td><td class="doc-td">172.30.131.126</td><td class="doc-td">3001 (LAN/ZT only)</td></tr>
+                <tr class="doc-tr-alt"><td class="doc-td">NPM (reverse proxy)</td><td class="doc-td">—</td><td class="doc-td">172.30.159.100</td><td class="doc-td">81 / 443</td></tr>
+            </table>
+            <p class="doc-body">See <a class="doc-link" href="[% c.uri_for('/Documentation/Server_Room_IP_Registry') %]">Server Room IP Registry</a>.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
 
-  <h2 id="new-domain">8. New subdomain checklist (e.g. <code>coop.computersystemconsulting.ca</code>)</h2>
-  <p style="color: var(--text-color);">What <strong>Site Provisioning</strong> does today vs what is still manual:</p>
-  <table style="width:100%; border-collapse:collapse; margin:16px 0;">
-    <tr>
-      <th style="padding:8px;border:1px solid var(--border-color);">Step</th>
-      <th style="padding:8px;border:1px solid var(--border-color);">Tool</th>
-      <th style="padding:8px;border:1px solid var(--border-color);">Automated today?</th>
-    </tr>
-    <tr><td style="padding:8px;border:1px solid var(--border-color);">1. Site + SiteDomain in DB</td><td>Site Provisioning</td><td>Yes</td></tr>
-    <tr><td style="padding:8px;border:1px solid var(--border-color);">2. Public DNS A record</td><td>Cloudflare</td><td>Yes (if zone exists + SERVER_PUBLIC_IP set)</td></tr>
-    <tr><td style="padding:8px;border:1px solid var(--border-color);">3. LAN DNS override</td><td>OPNsense Unbound</td><td>No — manual / Phase 4</td></tr>
-    <tr><td style="padding:8px;border:1px solid var(--border-color);">4. HTTPS reverse proxy</td><td>HAProxy or NPM</td><td>No — manual / Phase 3</td></tr>
-    <tr><td style="padding:8px;border:1px solid var(--border-color);">5. NAT / firewall pass</td><td>OPNsense</td><td>No — only if WAN port forward needed</td></tr>
-    <tr><td style="padding:8px;border:1px solid var(--border-color);">6. Gateway plan entry</td><td>gateway_plan.json</td><td>Manual — add rule + verify drift</td></tr>
-  </table>
-  <p style="color: var(--text-color);">
-    <strong>Intended order (Phase 4):</strong> DB site → Cloudflare (public) → Unbound (LAN) → HAProxy/NPM (SSL) → firewall → gateway plan sync.
-  </p>
+    <div class="row">
+        <div class="col-100">
+            <h2 id="tools" class="doc-h2">Best tool per function</h2>
+            <ul class="doc-body">
+                <li><strong>OPNsense Unbound</strong> — LAN DNS so devices with no hosts file still resolve <code>dev.*</code> (and <code>dev.csc</code> to the gateway for portless HTTP).</li>
+                <li><strong>OPNsense HAProxy</strong> — LAN :80 for <code>dev.computersystemconsulting.ca</code>. Production WAN HTTPS+ACME is a separate frontend.</li>
+                <li><strong>Cloudflare</strong> — public DNS for internet-facing production names. Not for publishing workstation ZT or :3001.</li>
+                <li><strong>NPM</strong> — per-container reverse proxy and certs for docker-delivered sites.</li>
+                <li><strong>Tunnel + Access / client certs</strong> — remote people without ZeroTier; machines (AI API) use mTLS or tokens, not a cookie.</li>
+                <li><strong>Comserv Gateway Plan</strong> — declared rules, drift vs live Unbound, this document.</li>
+            </ul>
+            <p class="doc-body">Unbound: a specific host override (<code>dev</code> + domain) beats a wildcard (<code>*</code> + domain).</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
 
-  <h2 id="phases">9. Implementation phases</h2>
-  <ol style="color: var(--text-color);">
-    <li><strong>Phase 1 (now)</strong> — Plan in <code>gateway_plan.json</code>; display on OPNsense admin; drift detection for Unbound.</li>
-    <li><strong>Phase 2</strong> — Add <code>dev.computersystemconsulting.ca</code> Unbound override; firewall pass to workstation :3001.</li>
-    <li><strong>Phase 3</strong> — HAProxy on OPNsense with ACME; per-domain SSL for production docker sites.</li>
-    <li><strong>Phase 4</strong> — Apply/sync from Comserv; tie Hosting provisioning to gateway rules automatically.</li>
-  </ol>
+    <div class="row">
+        <div class="col-100">
+            <h2 id="identity" class="doc-h2">Identity: OPNsense vs Comserv</h2>
+            <p class="doc-body">OPNsense is the door (VPN group, HAProxy client cert, Access). Comserv is the room (session, SiteName, roles). Stack them. Do not store shop vs accounting RBAC in OPNsense users.</p>
+            <p class="doc-body">Client certificates: good for AI/API and a few known workers (<code>curl --cert</code>). They keep scanners off Starman if HAProxy verifies the cert on 443. They are a poor login for casual clients on a phone.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
 
-  <h2 id="related">5. Related documentation</h2>
-  <ul>
-    <li><a href="[% c.uri_for('/Documentation/proxmox/opnsense_vm_proxmox_k83_setup') %]">OPNsense VM setup (Proxmox)</a></li>
-    <li><a href="[% c.uri_for('/Documentation/CloudflareIntegration') %]">Cloudflare integration</a></li>
-    <li><a href="[% c.uri_for('/admin/docker_containers') %]">Docker deployment pipeline (HAProxy step)</a></li>
-    <li><a href="[% c.uri_for('/admin/infrastructure/opnsense') %]">OPNsense Gateway Management (live)</a></li>
-  </ul>
+    <div class="row">
+        <div class="col-100">
+            <h2 id="work" class="doc-h2">Work items</h2>
+            <p class="doc-muted">Named items (not numbered phases). Owner project <a class="doc-link" href="[% c.uri_for('/project/details') %]?project_id=87">#87 Gateway</a>.</p>
+            <table class="doc-table">
+                <tr><th class="doc-th">Item</th><th class="doc-th">Gate (done when)</th><th class="doc-th">Todo</th></tr>
+                <tr>
+                    <td class="doc-td">WAN :3001 closed</td>
+                    <td class="doc-td">No Port Forward / UPnP / 1:1 to .199:3001. Public connect to WAN:3001 fails. Recv-Q 0 unless LAN/ZT.</td>
+                    <td class="doc-td"><a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2511">#2511</a> DONE 2026-09-26 (audit still #2505)</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Gateway audit flags public Starman</td>
+                    <td class="doc-td">OPNsense admin shows error if NAT/UPnP/WAN pass publishes 3001.</td>
+                    <td class="doc-td"><a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2505">#2505</a> NEW P2</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Stop Cloudflare ZT A as default</td>
+                    <td class="doc-td">Cloudflare sync does not write 172.30.131.126. “Fix all dev” does not create those records.</td>
+                    <td class="doc-td"><a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2506">#2506</a> NEW P2</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">LAN names without hosts</td>
+                    <td class="doc-td">Phone on office Wi‑Fi opens <code>http://dev.computersystemconsulting.ca/</code> with only DHCP DNS. mDNS <code>workstation.local:3001</code> works.</td>
+                    <td class="doc-td"><a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2507">#2507</a> NEW P4</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Remote named access (no ZT, no hosts)</td>
+                    <td class="doc-td">A hostname on 443 with Access/IdP/client-cert reaches workstation :3001. Document the URL. No WAN:3001.</td>
+                    <td class="doc-td"><a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2508">#2508</a> NEW P3</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Client certs for machine API</td>
+                    <td class="doc-td">HAProxy or app verifies certs for AI/ingest; scanners without cert never hit Starman.</td>
+                    <td class="doc-td"><a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2509">#2509</a> NEW P5</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Foot-gun: WAN add_port_forward</td>
+                    <td class="doc-td"><code>Opnsense.pm</code> does not default interface WAN / dest wan:ip / port 3001 for Comserv dev.</td>
+                    <td class="doc-td"><a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2510">#2510</a> NEW P2</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">ROUTINE re-audit</td>
+                    <td class="doc-td">Plan still matches live NAT/Unbound/HAProxy/Cloudflare; :3001 not on WAN.</td>
+                    <td class="doc-td"><a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2512">#2512</a> recurring P10</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" class="doc-h2">Project tracking</h2>
+            <div class="doc-success">
+                <p>
+                    <a class="doc-link" href="[% c.uri_for('/project/details') %]?project_id=87">Open project #87 (Gateway)</a>
+                    · <a class="doc-link" href="[% c.uri_for('/todo') %]?project_id=87">View todos</a>
+                    · <a class="doc-link" href="[% c.uri_for('/project') %]">All projects</a>
+                </p>
+            </div>
+            <p class="doc-muted">Edge-policy todos: <a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2505">#2505</a>–<a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2512">#2512</a> (plus older ISP/Webmin/Ollama rows on the same project). List: <a class="doc-link" href="[% c.uri_for('/todo') %]?project_id=87">/todo?project_id=87</a>.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="see-also" class="doc-h2">See also</h2>
+            <ul class="doc-body">
+                <li><a class="doc-link" href="[% c.uri_for('/admin/infrastructure/opnsense') %]">OPNsense Gateway Management</a></li>
+                <li><a class="doc-link" href="[% c.uri_for('/Documentation/MASTER_PLAN') %]">MASTER_PLAN</a></li>
+                <li><a class="doc-link" href="[% c.uri_for('/Documentation/DockerMasterPlan') %]">Docker Master Plan</a></li>
+                <li><a class="doc-link" href="[% c.uri_for('/Documentation/K3S_APP_HA_PLAN') %]">Availability / INFRA-HA</a></li>
+                <li><a class="doc-link" href="[% c.uri_for('/Documentation/opnsense_vm_proxmox_k83_setup') %]">OPNsense VM setup</a></li>
+                <li><a class="doc-link" href="[% c.uri_for('/Documentation/CloudflareIntegration') %]">Cloudflare integration</a></li>
+            </ul>
+            <p class="doc-footer">Policy json <code>Comserv/config/infrastructure/gateway_plan.json</code>. Last updated 2026-09-26.</p>
+[%# ai-plan-sync created todo_ids: 2505,2506,2507,2508,2509,2510,2511,2512 under project_id=87 %]
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
 </div>

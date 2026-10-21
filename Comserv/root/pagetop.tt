@@ -161,22 +161,7 @@ header h1 {
     word-break: break-word !important;
 }
 
-/* ---- Mobile nav toggle button ---- */
-.nav-toggle {
-    display: none;
-    background: var(--button-bg, #f0f0f0);
-    color: var(--button-text, #333);
-    border: 1px solid var(--border-color, #ccc);
-    border-radius: 4px;
-    padding: 6px 12px;
-    font-size: 20px;
-    cursor: pointer;
-    line-height: 1;
-    margin: 4px 8px;
-}
-
 @media (max-width: 768px) {
-    .nav-toggle { display: inline-block; }
     .server-info { font-size: 11px; }
     .server-info > div {
         text-align: left !important;
@@ -259,6 +244,17 @@ header h1 {
 </div>
 [% END %]
 
+<!-- AI model guard banner: shown to admin/developer on every page when a
+     paid model should be switched away from (SuperGrok cap, OpenRouter spend
+     cap, or credits exhausted).  Checked in Root::auto. -->
+[% IF supergrok_guard_locked && is_admin && supergrok_guard_notice %]
+<div class="ai-guard-banner" role="alert" style="margin:0;padding:10px 16px;border-bottom:2px solid var(--warning-color,#d97706);background:var(--schema-alert-warning-bg,#fff3cd);color:var(--text-color);font-size:14px;text-align:center;">
+  <strong>⚠ [% supergrok_guard_notice | html %]</strong>
+  <span style="margin-left:12px;font-size:12px;opacity:0.8;">Start a new Hermes session or run <code style="font-size:12px;">hermes config set model.default openrouter/cohere/north-mini-code:free</code> to match.</span>
+  <a href="/ai/usage#ai-health" style="margin-left:12px;font-size:12px;">Details</a>
+</div>
+[% END %]
+
 <!-- Include Debug Template - shows session/stash when debug_mode=1 -->
 [% IF c.session.debug_mode == 1 %]
 [% INCLUDE 'debug.tt' %]
@@ -271,37 +267,6 @@ header h1 {
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // --- Hamburger nav toggle ---
-    const navToggle = document.querySelector('.nav-toggle');
-    const menuList  = document.getElementById('main-menu-list');
-    if (navToggle && menuList) {
-        navToggle.addEventListener('click', function() {
-            const open = menuList.classList.toggle('nav-open');
-            navToggle.setAttribute('aria-expanded', open);
-            navToggle.textContent = open ? '\u2715' : '\u2630';
-        });
-        // Touch-friendly dropdown: tap dropbtn to open, tap outside to close
-        document.querySelectorAll('.dropbtn').forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-                if (window.innerWidth > 768) return;
-                const li = btn.closest('.horizontal-dropdown');
-                const wasOpen = li.classList.contains('touch-open');
-                document.querySelectorAll('.horizontal-dropdown.touch-open').forEach(function(el) {
-                    el.classList.remove('touch-open');
-                });
-                if (!wasOpen) { li.classList.add('touch-open'); e.preventDefault(); }
-            });
-        });
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('#main-menu')) {
-                document.querySelectorAll('.horizontal-dropdown.touch-open').forEach(function(el) {
-                    el.classList.remove('touch-open');
-                });
-            }
-        });
-    }
-
-    // --- Theme editor toggle ---
     const toggleBtn = document.getElementById('css-edit-toggle');
     if (toggleBtn) {
         toggleBtn.addEventListener('click', function(e) {
@@ -331,7 +296,11 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<header>
+[%# Site theme header/footer from the page table (page_code site_header / site_footer), e.g. cloned sites %]
+[% SET theme_site = SiteName || c.stash.SiteName || c.session.SiteName %]
+[% TRY %][% SET site_header_page = c.model('DBEncy').resultset('Page').search({ sitename => theme_site, page_code => 'site_header', status => 'active' }).first %][% CATCH %][% END %]
+<header[% IF site_header_page %] class="has-site-header"[% END %]>
+    [% IF site_header_page %]<div class="site-header">[% site_header_page.body %]</div>[% END %]
     <h1>
         Welcome [% IF c.session.username %]
 [% c.session.first_name || c.session.username %] [% c.session.last_name %][% IF is_admin %] Administrator[% END %]
@@ -343,13 +312,10 @@ document.addEventListener('DOMContentLoaded', function() {
 [%# LEGACY MENU MODE: Membership / Subscriptions bar disabled %]
 
 [% IF !c.session.user_id %]
-<div style="background:#e65c00;color:#fff;padding:5px 18px;font-size:0.92em;text-align:right;font-weight:bold;">
-    <a href="/mail/subscribe"
-       style="color:#fff;text-decoration:none;">
-        &#9993; Join Our Mailing List
-    </a>
+<div class="guest-join-bar">
+    <a href="/mail/subscribe">&#9993; Join Our Mailing List</a>
     &nbsp;&middot;&nbsp;
-    <a href="/user/login" style="color:rgba(255,255,255,0.85);text-decoration:none;font-weight:normal;">Sign In</a>
+    <a href="/user/login">Sign In</a>
 </div>
 [% END %]
 

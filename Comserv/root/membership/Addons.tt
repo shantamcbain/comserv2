@@ -172,7 +172,13 @@
               <td class="addon-no-popup">
                 <div class="addon-no-popup" style="display: flex; gap: 4px; align-items: center;">
                   [% IF module.user_access %]
-                    <a href="[% c.uri_for(module.route) %]" class="btn btn-sm btn-primary" style="text-decoration:none;display:inline-block;padding:4px 10px;border-radius:3px;">Open &rarr;</a>
+                    <a href="[% c.uri_for(module.route) %]" class="btn btn-sm btn-primary">Open &rarr;</a>
+                    [% IF module.key == 'healthkitchen' && c.session.user_id %]
+                    <form method="post" action="[% c.uri_for('/membership/disable_addon') %]" class="addon-no-popup">
+                      <input type="hidden" name="service_name" value="healthkitchen" />
+                      <button type="submit" class="btn btn-sm btn-secondary">Remove from my account</button>
+                    </form>
+                    [% END %]
                   [% END %]
                   [% IF is_admin OR _is_global_admin %]
                     [% IF site_is_csc %]
@@ -191,8 +197,13 @@
                       [% END %]
                     [% END %]
                     <a href="[% c.uri_for('/admin/site_modules/edit_addon', { key => module.key, sitename => site_name }) %]" class="btn btn-sm" style="background:#ffc107;color:#212529;text-decoration:none;display:inline-block;padding:4px 10px;border-radius:3px;font-weight:bold;" title="Catalog, pricing, route, and site enable/min role">&#9998; Edit Addon</a>
+                  [% ELSIF module.key == 'healthkitchen' && c.session.user_id %]
+                    <form method="post" action="[% c.uri_for('/membership/enable_addon') %]" class="addon-no-popup">
+                      <input type="hidden" name="service_name" value="healthkitchen" />
+                      <button type="submit" class="btn btn-sm btn-primary">Add to my account</button>
+                    </form>
                   [% ELSIF !module.user_access %]
-                    <a href="[% c.uri_for('/membership') %]" class="btn btn-sm btn-secondary" style="text-decoration:none;display:inline-block;padding:4px 10px;border-radius:3px;">View Plans</a>
+                    <a href="[% c.uri_for('/membership') %]" class="btn btn-sm btn-secondary">View Plans</a>
                   [% END %]
                 </div>
               </td>

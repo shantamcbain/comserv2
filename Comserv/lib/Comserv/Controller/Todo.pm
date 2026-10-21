@@ -316,6 +316,28 @@ sub todo :Path('/todo') :Args(0) {
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
+    # Jump-by-number: "2447" / "#2447" opens that todo; a HelpDesk ticket
+    # number like CSC-20260928-9565 opens that ticket. Lookups use DBIC
+    # (placeholder-bound); nothing from the search box is interpolated into SQL.
+    (my $jump = $search_term) =~ s/^\s+|\s+$//g;
+    if ($jump =~ /^#?(\d{1,10})$/) {
+        my $rid = $1;
+        my $hit = eval { $schema->resultset('Todo')->find($rid) };
+        if ($hit) {
+            $c->res->redirect($c->uri_for('/todo/details', { record_id => $hit->record_id }));
+            $c->detach;
+        }
+        $c->stash(error_msg => "No todo #$rid found; searching text instead.");
+    } elsif ($jump =~ /^([A-Za-z0-9]{1,20}-\d{8}-\d{4})$/) {
+        my $tn = uc $1;
+        my $tk = eval { $schema->resultset('SupportTicket')->search({ ticket_number => $tn }, { rows => 1 })->single };
+        if ($tk) {
+            $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $tk->ticket_number));
+            $c->detach;
+        }
+        $c->stash(error_msg => "No HelpDesk ticket $tn found; searching todo text instead.");
+    }
+
     # Get a DBIx::Class::ResultSet object
     my $rs = $schema->resultset('Todo');
 
@@ -3641,15 +3663,15 @@ sub open_log :Path('open_log') :Args(0) {
         $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$err")) . '}');
         return;
     }
-    if ($res->{action} eq 'stopped') {
+    if (($res->{action} // '') eq 'already_active' || $res->{already_active}) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'open_log',
-            "Start toggle stopped active log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
-        $c->response->body('{"ok":1,"stopped":1,"log_id":' . ($res->{log_id}//0) . ',"duration_mins":' . ($res->{duration_mins}//0) . '}');
+            "Start skipped — todo $record_id already being worked (status 5, log_id=" . ($res->{log_id}//0) . ")");
+        $c->response->body('{"ok":1,"already_active":1,"log_id":' . ($res->{log_id}//0) . ',"todo_status":' . ($res->{todo_status}//5) . '}');
         return;
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'open_log',
         "Log opened for todo $record_id by $username (log_id=$res->{log_id})");
-    $c->response->body('{"ok":1,"log_id":' . ($res->{log_id} // 0) . '}');
+    $c->response->body('{"ok":1,"log_id":' . ($res->{log_id} // 0) . ',"todo_status":' . ($res->{todo_status}//5) . '}');
 }
 
 sub close_log :Path('close_log') :Args(0) {
@@ -3701,8 +3723,12 @@ sub close_log :Path('close_log') :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'close_log',
-        "Closed log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
-    $c->response->body('{"ok":1,"duration_mins":' . ($res->{duration_mins} // 0) . '}');
+        $res->{recovered}
+            ? "Recovered stuck status 5 -> 2 for todo $record_id (no open log)"
+            : "Closed log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
+    $c->response->body('{"ok":1,"duration_mins":' . ($res->{duration_mins} // 0)
+        . ',"todo_status":' . ($res->{todo_status}//2)
+        . ',"recovered":' . ($res->{recovered} ? 1 : 0) . '}');
 }
 
 sub done_with_log :Path('done_with_log') :Args(0) {
@@ -3749,7 +3775,7 @@ sub done_with_log :Path('done_with_log') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'done_with_log',
         "Todo $record_id marked done by $username" . ($res->{log_closed} ? " (log closed)" : " (completed log inserted)"));
-    $c->response->body('{"ok":1}');
+    $c->response->body('{"ok":1,"already_done":' . ($res->{already_done} ? 1 : 0) . ',"todo_status":' . ($res->{todo_status}//3) . '}');
 }
 
 sub next_step :Path('next_step') :Args(0) {

@@ -23,7 +23,7 @@
   </div>
   <div>
     <strong>Notes:</strong><br>
-    <pre style="white-space:pre-wrap; background:#f8f8f8; padding:0.5rem; border:1px solid #ddd; max-width:40em;">[% po.notes | html %]</pre>
+    <pre style="white-space:pre-wrap; background:var(--surface-alt, var(--bg-secondary, transparent)); padding:0.5rem; border:1px solid var(--border-color); max-width:40em; color:var(--text-color);">[% po.notes | html %]</pre>
   </div>
 </div>
 
@@ -36,6 +36,7 @@
       <th>Item</th>
       <th>Qty Ordered</th>
       <th>Qty Received</th>
+      <th>Open</th>
       <th>Unit Cost</th>
       <th>Supplier SKU</th>
       <th>Notes</th>
@@ -43,11 +44,13 @@
   </thead>
   <tbody>
   [% FOREACH ln IN po.lines %]
+    [% SET open_qty = ln.quantity_ordered - ln.quantity_received %]
     <tr>
       <td>[% ln.item ? ln.item.sku : ln.item_id %]</td>
       <td>[% ln.item ? ln.item.name : '—' | html %]</td>
       <td>[% ln.quantity_ordered %]</td>
       <td>[% ln.quantity_received %]</td>
+      <td>[% open_qty %]</td>
       <td>[% ln.unit_cost ? '$' _ ln.unit_cost : '—' %]</td>
       <td>[% ln.supplier_sku || '—' %]</td>
       <td>[% ln.notes || '' | html %]</td>
@@ -73,7 +76,29 @@
     </label>
     <input type="submit" value="Mark as Sent (update status + log method)">
   </form>
-  <p style="font-size:0.8rem;">This appends to notes and sets status to 'sent'. (Later: email generation, attachments, etc.)</p>
+  <p style="font-size:0.8rem;color:var(--text-color);">This appends to notes and sets status to 'sent'. Increments quantity_on_order.</p>
+[% END %]
+
+[% IF po.status == 'sent' || po.status == 'partial' || po.status == 'draft' %]
+  <h3 style="margin-top:1.5rem;color:var(--text-color);">Receive against this PO</h3>
+  <form method="POST" action="/Inventory/po/receive/[% po.id %]">
+    <table>
+      [% FOREACH ln IN po.lines %]
+        [% SET open_qty = ln.quantity_ordered - ln.quantity_received %]
+        [% IF open_qty > 0 %]
+        <tr>
+          <td>[% ln.item ? ln.item.sku : ln.item_id %]</td>
+          <td>
+            <label>Qty
+              <input type="number" name="qty_[% ln.id %]" value="[% open_qty %]" min="0" max="[% open_qty %]" step="any">
+            </label>
+          </td>
+        </tr>
+        [% END %]
+      [% END %]
+    </table>
+    <input type="submit" value="Receive (stock + on_order, no GL post)">
+  </form>
 [% END %]
 
 <p><a href="/Inventory/po">← All Purchase Orders</a></p>

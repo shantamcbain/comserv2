@@ -132,7 +132,7 @@
         <tr><th class="doc-th">Plan</th><th class="doc-th">Route</th><th class="doc-th">Status / note</th></tr>
         <tr><td class="doc-td">CSC Gateway Plan</td>
             <td class="doc-td"><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">/Documentation/GatewayPlan</a></td>
-            <td class="doc-td">Edge / ingress — relevant where containers are exposed.</td></tr>
+            <td class="doc-td">Edge / ingress. Starman :3001 is LAN/ZT only; do not WAN-DNAT it. Named access without hosts: Unbound on LAN, 443 front door remote (work item).</td></tr>
         <tr><td class="doc-td">Credentials Audit &amp; Unified Management Plan</td>
             <td class="doc-td"><a href="[% c.uri_for('/Documentation/CREDENTIALS_AUDIT_AND_PLAN') %]">/Documentation/CREDENTIALS_AUDIT_AND_PLAN</a></td>
             <td class="doc-td">Includes #239 IMGSEC (Docker image credential leak remediation).</td></tr>

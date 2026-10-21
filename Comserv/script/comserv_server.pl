@@ -388,6 +388,15 @@ sub _start_health_evaluator {
                         );
                     };
 
+                    # Hermes overrun guard (thrash / OpenRouter day-week-month caps).
+                    # Idempotent with the */5 cron runner (flock + min interval).
+                    eval {
+                        require Comserv::Util::AI::HermesOverrunGuard;
+                        Comserv::Util::AI::HermesOverrunGuard->new(
+                            app_root => ($ENV{CATALYST_HOME} // "$FindBin::Bin/.."),
+                        )->run;
+                    };
+
                     # Alert CSC admin if health has deteriorated
                     if ($score < $alert_threshold && $last_alert_status eq 'OK') {
                         _send_health_alert($schema, $health, $summary, $logger);

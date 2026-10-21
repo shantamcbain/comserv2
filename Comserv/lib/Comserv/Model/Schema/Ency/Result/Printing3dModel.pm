@@ -87,6 +87,20 @@ __PACKAGE__->add_columns(
         size          => [8, 3],
         is_nullable   => 1,
     },
+    # Visibility for /3d/browse (3 categories):
+    #   Public        -> is_public = 1
+    #   Individual    -> is_public = 0 AND owner_user_id set (only that user sees it)
+    #   In-house      -> is_public = 0, no owner (farm internal; hidden from browse)
+    # Public-area uploads default to owner_user_id + is_public = 0.
+    # Admin flips is_public via the model manager.
+    owner_user_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    is_public => {
+        data_type     => 'tinyint',
+        default_value => 0,
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
