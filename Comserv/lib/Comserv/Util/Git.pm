@@ -907,7 +907,22 @@ sub secret_guard {
     my $out = '';
     IPC::Run3::run3([ 'bash', $script, @mode_args, $repo ], \undef, \$out, \$out);
     my $code = $? >> 8;
-    return $code == 0 ? { ok => 1, output => $out } : { ok => 0, output => $out };
+    my $res = $code == 0 ? { ok => 1, output => $out } : { ok => 0, output => $out };
+    if (!$res->{ok}) {
+        my $report_ok = eval {
+            require Comserv::Util::GitGuardReport;
+            $res->{hits} = Comserv::Util::GitGuardReport->enrich($out);
+            $res->{remediation} = Comserv::Util::GitGuardReport->text_for($res->{hits});
+            1;
+        };
+        if (!$report_ok) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'secret_guard',
+                "guard report failed: $@");
+            $res->{hits} = [];
+            $res->{remediation} = '';
+        }
+    }
+    return $res;
 }
 
 =head2 commit($c, $message)
@@ -923,8 +938,11 @@ sub commit {
     # Secret guard: refuse key files / raw keys / gitleaks hits. Never --no-verify.
     my $guard = $self->secret_guard($c);
     return { success => 0, exit_code => 1, output => $guard->{output} // q{},
+             hits => $guard->{hits} || [],
              error => "Commit refused by secret guard (possible key/secret staged). "
-                    . "Unstage the flagged file(s) and retry." }
+                    . "Unstage the flagged file(s) and retry. "
+                    . "Only the primary DB key belongs in the env; other keys belong in the database.\n"
+                    . ($guard->{remediation} || $guard->{output} // q{}) }
         unless $guard->{ok};
     return $self->_run($c, 'commit', '-m', $message);
 }
@@ -1828,9 +1846,10 @@ sub merge_branch {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
             "merge_branch: secret guard refused merging '$branch' into $current");
         $result->{error_msg} = "Merge refused by secret guard: '$branch' would bring in a key/secret file. "
-                             . "Remove it from the branch (keys belong in ~/.comserv/keys), then retry.\n"
-                             . ($guard->{output} // q{});
+                             . "Only the primary DB key belongs in the env; other keys belong in the database.\n"
+                             . ($guard->{remediation} || $guard->{output} // q{});
         $result->{output}    = $guard->{output} // q{};
+        $result->{hits}      = $guard->{hits} || [];
         $result->{reason}    = 'secret_guard';
         return $result;
     }
