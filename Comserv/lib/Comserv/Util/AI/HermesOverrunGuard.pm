@@ -14,6 +14,7 @@ use JSON::PP ();
 use HTTP::Tiny;
 use Fcntl qw(:flock);
 use POSIX qw(strftime);
+use Comserv::Util::AI::PaidBlock ();
 use File::Copy ();
 use Time::Local qw(timegm timelocal);
 
@@ -1265,10 +1266,46 @@ sub ledger {
 }
 
 # ---- main ------------------------------------------------------------------
+# Oct 22 2026: Hermes cron jobs that pin model 'grok-4.7' with no provider inherit the main
+# provider (openrouter) and get billed as x-ai/grok-4.7 ($1.45 on Oct 22, 5:00-6:32 AM PT).
+# pure: list of job ids whose model is a grok id and whose provider is not xai-oauth.
+sub cron_grok_fix_plan {
+    my ($jobs) = @_;
+    return [] unless ref $jobs eq 'ARRAY';
+    my @ids;
+    for my $j (@$jobs) {
+        next unless ref $j eq 'HASH';
+        next unless Comserv::Util::AI::PaidBlock::is_grok_id($j->{model} // '');
+        next if ($j->{provider} // '') eq 'xai-oauth';
+        push @ids, $j->{id};
+    }
+    return \@ids;
+}
+
+# Pin every grok cron job to xai-oauth (Super Grok), never openrouter. Backs up jobs.json first.
+sub fix_cron_grok_jobs {
+    my $s = shift;
+    my $f = $s->{cron_jobs} // "$s->{hermes_home}/cron/jobs.json";
+    open my $fh, '<', $f or return [];
+    my $raw = do { local $/; eval { $J->decode(<$fh>) } }; close $fh;
+    return [] unless $raw;
+    my $jobs = ref $raw eq 'HASH' ? $raw->{jobs} : $raw;
+    my $ids = cron_grok_fix_plan($jobs);
+    return $ids if !@$ids || $s->{dry_run};
+    my %fix = map { ($_ // '') => 1 } @$ids;
+    $_->{provider} = 'xai-oauth' for grep { ref $_ eq 'HASH' && $fix{$_->{id} // ''} } @$jobs;
+    require File::Copy;
+    File::Copy::copy($f, "$f.bak-overrun-" . strftime('%Y%m%d-%H%M%S', localtime $s->_now));
+    eval { _atomic_write($f, $J->encode($raw)); 1 } or return [];
+    $s->log_line("cron grok jobs pinned to xai-oauth (never openrouter): @$ids");
+    return $ids;
+}
+
 sub run {
     my ($s, %o) = @_;
     open my $lk, '>', $s->{lock_file} or return { action => 'error', error => "lock: $!" };
     flock($lk, LOCK_EX | LOCK_NB) or return { action => 'skip', reason => 'locked' };
+    eval { $s->fix_cron_grok_jobs };
     my $st = $s->read_state;
     my $t  = $s->_now;
     my $lite = 0;

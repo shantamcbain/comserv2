@@ -628,4 +628,24 @@ ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID
     ok !@{ $d->{reasons} || [] }, 'real $1.51 + small delta: no cap reasons';
 }
 
+# Oct 22 2026: grok cron jobs must never inherit the openrouter provider (paid x-ai/grok-4.7).
+{
+    my $plan = Comserv::Util::AI::HermesOverrunGuard::cron_grok_fix_plan([
+        { id => 'a', model => 'grok-4.7', provider => undef },
+        { id => 'b', model => 'grok-4.7', provider => 'openrouter' },
+        { id => 'c', model => 'grok-4.7', provider => 'xai-oauth' },
+        { id => 'd', model => 'qwen/qwen3-coder', provider => 'openrouter' },
+        { id => 'e', model => undef },
+    ]);
+    is_deeply($plan, ['a', 'b'], 'cron grok jobs without xai-oauth are pinned (never openrouter)');
+    require File::Temp;
+    my $dir = File::Temp::tempdir(CLEANUP => 1);
+    mkdir "$dir/.hermes"; mkdir "$dir/.hermes/cron"; mkdir "$dir/.hermes/logs";
+    open my $fh, '>', "$dir/.hermes/cron/jobs.json" or die; print $fh '{"jobs":[{"id":"x","model":"grok-4.7","provider":null}]}'; close $fh;
+    my $g = Comserv::Util::AI::HermesOverrunGuard->new(home => $dir);
+    is_deeply($g->fix_cron_grok_jobs, ['x'], 'fix_cron_grok_jobs rewrites jobs.json');
+    open $fh, '<', "$dir/.hermes/cron/jobs.json" or die; my $txt = do { local $/; <$fh> };
+    like($txt, qr/"provider":"xai-oauth"/, 'grok cron job now on xai-oauth');
+}
+
 done_testing();
