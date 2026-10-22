@@ -1258,8 +1258,18 @@ sub old_code_would_trip {
     return 0;
 }
 sub shield_step {
-    my ($s, $st, $t, $or) = @_;
+    my ($s, $st, $t, $or, %o) = @_;
     my $sg = $s->supergrok_state;
+    # Oct 22 9:24 AM PT: hold_reason set but tripped=0 => an old-code server ran its restore, i.e. old
+    # servers no longer see a cap breach. Re-raising tripped=1 only feeds their restore path, whose
+    # notify-send ('cleared') is unconditional. Release the shield and stay down; re-enter only right
+    # after restoring a real old-code trip.
+    if (($st->{hold_reason} // '') eq $SHIELD && !$st->{tripped}) {
+        delete @$st{qw(hold_reason hold_since hold_pt)};
+        $st->{shield_released_at} = $t; $st->{shield_released_pt} = pt($t);
+        $s->log_line('shield released ' . pt($t) . ': old servers restored (not over); not re-raising');
+        $s->{shield_released} = 1;
+    }
     my $grok_ok = supergrok_budget_left($sg);
     my $on = $st->{tripped} && ($st->{hold_reason} // '') eq $SHIELD;
     my $rep = exists $s->{reported_or} ? $s->{reported_or} : ($st->{last_openrouter} || {});
@@ -1273,7 +1283,7 @@ sub shield_step {
         return { cleared => 1 };
     }
     # enter only when the daily guard has Hermes locked off grok (no daily-guard state = no shield)
-    return undef unless $on || (!$grok_ok && ref $sg eq 'HASH' && %$sg);
+    return undef unless $on || ($o{after_restore} && !$s->{shield_released} && !$grok_ok && ref $sg eq 'HASH' && %$sg);
     my $want = shield_want($sg, $t);
     my $cur  = $s->current_model || {};
     my @did;
@@ -1580,7 +1590,7 @@ sub run {
         $st->{reasons} = $d->{reasons} if @{ $d->{reasons} };
     }
     if ($d->{action} eq 'none' || $d->{action} eq 'restore') {
-        my $sh = eval { $s->shield_step($st, $t, $or) };
+        my $sh = eval { $s->shield_step($st, $t, $or, after_restore => ($d->{action} eq 'restore' ? 1 : 0)) };
         $d->{shield} = $sh if $sh;
         $d->{shield_error} = $@ if $@;
     }

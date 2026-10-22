@@ -686,7 +686,7 @@ ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID
     my $mk = sub { my (%a) = @_; $G->new(home => $h, app_root => $h, no_ledger => 1, no_notify => 1, base_urls => [], now => 7000000,
                      set_cb => $cb, reported_or => $rep, %a) };
     my $st = { tripped => 0 };
-    my $r = $mk->(supergrok => $locked, live_all => $over_live)->shield_step($st, 7000000, $rep);
+    my $r = $mk->(supergrok => $locked, live_all => $over_live)->shield_step($st, 7000000, $rep, after_restore => 1);
     ok($r->{on}, 'locked off grok + caps clear -> shield on');
     is($st->{tripped}, 1, 'tripped=1 so old servers hold');
     is($st->{hold_reason}, 'shield_old_servers', 'hold_reason marks it as not a money trip');
@@ -709,7 +709,21 @@ ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID
     is($st->{tripped}, 0, 'tripped=0'); ok(!exists $st->{hold_reason}, 'hold_reason gone');
     is($st->{hand_off_supergrok}, 1, 'hand_off to daily guard');
     # not shielded and Super Grok open -> nothing
-    is($mk->(supergrok => $open, live_all => $clear_live)->shield_step({ tripped => 0 }, 7000300, $rep), undef, 'normal path untouched');
+    is($mk->(supergrok => $open, live_all => $clear_live)->shield_step({ tripped => 0 }, 7000300, $rep, after_restore => 1), undef, 'normal path untouched');
+}
+
+# Oct 22 9:24: an old-code restore (tripped=0, hold_reason left) releases the shield; no re-raise loop.
+{
+    my $h = tempdir(CLEANUP => 1); mkdir "$h/.hermes"; mkdir "$h/.hermes/logs";
+    my $locked = { mode => 'openrouter', off_today => 1, switch_provider => 'openrouter', switch_model => 'qwen/qwen3-coder' };
+    my $g = $G->new(home => $h, app_root => $h, no_ledger => 1, no_notify => 1, base_urls => [], now => 8000000,
+                    supergrok => $locked, live_all => { ok => 1, day_usd => 4.29 }, reported_or => { ok => 1, day_usd => 1.5, week_usd => 1.5, month_usd => 9 });
+    my $st = { tripped => 0, hold_reason => 'shield_old_servers' };
+    is($g->shield_step($st, 8000000, {}), undef, 'old restore seen -> no shield');
+    is($st->{tripped}, 0, 'tripped stays 0 (old restore path not fed)');
+    ok(!exists $st->{hold_reason}, 'hold_reason cleared'); ok($st->{shield_released_at}, 'release recorded');
+    is($g->shield_step($st, 8000060, {}), undef, 'plain none run never raises shield');
+    is($st->{tripped}, 0, 'still 0 on next run');
 }
 
 done_testing();
