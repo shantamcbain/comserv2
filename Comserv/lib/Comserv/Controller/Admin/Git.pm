@@ -350,8 +350,18 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
             # Secret guard (same script as the global pre-commit hook). Never --no-verify.
             my $guard = $self->git_service->secret_guard($c);
             unless ($guard->{ok}) {
-                $msg = "Commit refused by secret guard \x{2014} a staged file looks like a key or secret. "
-                     . "Unstage it (keys belong in ~/.comserv/keys) and retry.\n" . ($guard->{output} // q{});
+                my $where = join(', ', map {
+                    $_->{file} . ($_->{line} ? ":$_->{line}" : '')
+                } @{ $guard->{hits} || [] });
+                $msg = "Commit refused by secret guard. "
+                     . ($where ? "Location: $where. " : '')
+                     . "Only the primary DB key belongs in the env; other keys belong in the database. "
+                     . "Use the fix route below. Do not use --no-verify.";
+                if ($guard->{hits} && @{ $guard->{hits} }) {
+                    $c->flash->{guard_hits_json} = encode_json($guard->{hits});
+                } else {
+                    $msg .= "\n" . ($guard->{output} // q{});
+                }
                 goto COMMIT_DONE;
             }
             my ($out, $code) = $self->_git_list($c, 'commit', '-m', $message);
@@ -718,6 +728,16 @@ sub index :Path('/admin/git') :Args(0) {
     my $target_key = $c->stash->{git_target} // '';
 
     my $status = $self->get_git_status($c);
+
+    if (my $raw = $c->flash->{guard_hits_json}) {
+        my $hits = eval { decode_json($raw) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+                "guard_hits_json decode failed: $@");
+        } elsif (ref $hits eq 'ARRAY') {
+            $c->stash(guard_hits => $hits);
+        }
+    }
 
     $c->stash(
         repo_path       => $self->repo_path($c),
@@ -2278,17 +2298,12 @@ sub merge :Path('/admin/git/merge') :Args(0) {
             }));
             return;
         }
-        # Secret guard: refuse if merging main would bring in a key/secret file.
-        my $guard = $self->git_service->secret_guard($c, $dest, '--merge', 'main');
-        unless ($guard->{ok}) {
-            $c->response->body(encode_json({
-                success => 0,
-                reason  => 'secret_guard',
-                error   => "Merge refused by secret guard: main would bring a key/secret file into '$target'.\n"
-                         . ($guard->{output} // q{}),
-            }));
-            return;
-        }
+        # Do not pre-scan `main` with secret_guard --merge. That scan diffs the
+        # whole main range and gitleaks hangs, and it refuses files already on
+        # main (which blocks every worktree update). The pre-merge-commit hook
+        # still blocks a blob this branch newly adds or changes, and that refusal
+        # includes the file:line fix route. If the hook leaves MERGE_HEAD, the
+        # failure path below aborts it.
         my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $dest });
         # --autostash: the worktree routinely has uncommitted WIP; a plain merge
         # refuses ("Your local changes would be overwritten"). Autostash stashes
@@ -2325,6 +2340,14 @@ sub merge :Path('/admin/git/merge') :Args(0) {
                     ? "Merge conflict bringing main into '$target': " . join(', ', @files)
                     : "Merge conflict bringing main into '$target'.";
                 $fix_hint = "Resolve in the '$target' worktree, commit, or abort.";
+            }
+            elsif ($combined =~ /secret-guard:|pre-merge-commit:|BLOCKED:/) {
+                $reason = 'secret_guard';
+                # Hook refused the merge commit and left MERGE_HEAD. Abort so
+                # the worktree is not stuck mid-merge.
+                $self->git_service->_run($c, 'merge', '--abort', { repo => $dest });
+                $fail_msg = "Merge of main into '$target' refused by secret guard. The incomplete merge was aborted.";
+                $fix_hint = "See BLOCKED paths in detail. Do not retry until those files are removed from main or allow-listed.";
             }
             elsif ($combined =~ /Please commit or stash|local changes.*would be overwritten/i) {
                 $reason = 'uncommitted';
@@ -2415,7 +2438,8 @@ sub merge :Path('/admin/git/merge') :Args(0) {
     }
 
     if (!$res->{success}) {
-        my $level = ($res->{conflict} || $res->{uncommitted}) ? 'warn' : 'error';
+        my $level = ($res->{conflict} || $res->{uncommitted}
+                     || ($res->{reason} // '') eq 'secret_guard') ? 'warn' : 'error';
         $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_merge',
             "merge failed direction=$direction source=$source target=$target"
             . " reason=" . ($res->{reason} // 'unknown')

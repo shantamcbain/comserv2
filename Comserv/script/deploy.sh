@@ -1019,7 +1019,16 @@ stamp_build_version() {
     branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
     commit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
     dirty=""
-    git diff --quiet --ignore-submodules HEAD -- 2>/dev/null || dirty="+local"
+    # +local = tracked files differ from HEAD. Name them so the label is explainable.
+    # version.json and data/ai_openrouter_prices.json are generated/runtime files and
+    # are no longer tracked (they used to make every build "+local").
+    local dirty_files
+    dirty_files=$(git diff --name-only --ignore-submodules HEAD -- 2>/dev/null)
+    if [ -n "$dirty_files" ]; then
+        dirty="+local"
+        echo "⚠ Build is +local: uncommitted changes in tracked files:"
+        printf '%s\n' "$dirty_files" | sed 's/^/    /'
+    fi
     build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     build_host=$(hostname -f 2>/dev/null || hostname)
     python3 - "$branch" "${commit}${dirty}" "$build_date" "$build_host" <<'PY'
@@ -1436,6 +1445,7 @@ if [ "${DEPLOY_MODE:-}" = "local-rebuild" ]; then
         echo "❌ REFUSING to build on production. Build on the workstation."
         exit 1
     fi
+    stamp_build_version || { echo "❌ Could not generate version.json — aborting before build."; exit 1; }
     if ! BUILDKIT_PROGRESS=plain docker compose $COMPOSE_ARGS build --pull web-prod; then
         echo "❌ Local build failed — running container untouched."
         exit 1
@@ -1709,6 +1719,18 @@ for candidate in $NFS_MOUNT_CANDIDATES; do
         break
     fi
 done
+# Docker Compose mounts 192.168.1.175:/mnt/data as a named volume, not a host
+# bind at /home/ubuntu/nfs. That mount IS production NFS. Missing the host bind
+# made every monitor tick exit 1 before self-heal (2026-10-21).
+NFS_DOCKER_VOLUME=0
+if [ -z "$NFS_MOUNT_DIR" ]; then
+    DOCKER_NFS_MP=$(mount | awk '/type nfs/ && /192\.168\.1\.175/ { for (i=1; i<=NF; i++) if ($i=="on") { print $(i+1); exit } }')
+    if [ -n "$DOCKER_NFS_MP" ]; then
+        NFS_MOUNT_DIR="$DOCKER_NFS_MP"
+        NFS_DOCKER_VOLUME=1
+        echo "NFS detected via docker volume at $NFS_MOUNT_DIR (192.168.1.175:/mnt/data)"
+    fi
+fi
 NFS_LOCAL_DIR="$NFS_MOUNT_DIR"
 
 # Default paths (local fallback if NFS not mounted)
@@ -1718,7 +1740,17 @@ NFS_DATA_DIR=""
 WORKSHOP_LOCAL_DIR=""
 NFS_DEPLOY_LOG=""
 
-if [ -n "$NFS_MOUNT_DIR" ]; then
+if [ -n "$NFS_MOUNT_DIR" ] && [ "$NFS_DOCKER_VOLUME" = "1" ]; then
+    # Volume mountpoint is root-owned; do not mkdir/migrate/df-fail on it.
+    # The container already has this NFS at /data/nfs.
+    echo "NFS is the docker volume; host bind path is not required."
+    COMSERV_LOGS_DIR="$HOME/comserv-logs"
+    NFS_DATA_DIR="$NFS_MOUNT_DIR"
+    WORKSHOP_LOCAL_DIR="$NFS_MOUNT_DIR"
+    mkdir -p "$COMSERV_LOGS_DIR" 2>/dev/null || true
+    echo "   Container logs: $COMSERV_LOGS_DIR (local)"
+    echo "   Workshop/NFS storage stays on the docker volume (not a host bind)."
+elif [ -n "$NFS_MOUNT_DIR" ]; then
     echo "NFS detected at $NFS_MOUNT_DIR"
     # Keep application logs local to avoid NFS flock/getattr latency hangs!
     # The application itself (Logging.pm) asynchronously copies archived/rotated logs to NFS.
@@ -2052,6 +2084,30 @@ fi
 
 cd "$(dirname "$COMPOSE_FILE")"
 
+# Workers stuck in R (userspace) for >20 min are the Starman spin class.
+# /health can still return 200, so Docker health stays "healthy" and the
+# restart path never runs. Kill only those; the master keeps the accept pool.
+recycle_spun_starman_workers() {
+    local ctn="$1"
+    [ -n "$ctn" ] || return 0
+    docker inspect "$ctn" >/dev/null 2>&1 || return 0
+    local pids
+    pids=$(docker exec "$ctn" ps -eo pid,stat,etime,comm 2>/dev/null | awk '
+        $4 ~ /starman/ && $2 ~ /^R/ {
+            e=$3
+            spin=0
+            if (e ~ /-/) spin=1
+            else if (split(e, a, ":") == 3 && (a[1]+0 > 0 || a[2]+0 >= 20)) spin=1
+            else if (split(e, a, ":") == 2 && a[1]+0 >= 20) spin=1
+            if (spin) print $1
+        }
+    ' || true)
+    if [ -n "$pids" ]; then
+        echo "   Recycling Starman workers stuck in R for >20 min: $pids"
+        docker exec "$ctn" kill -TERM $pids || true
+    fi
+}
+
 # ── Container Viability & Auto-Recovery Check ─────────────────────────────────
 # If the container is dead or unhealthy during a routine check, we restart it.
 # If restarts fail, we roll back to backup-1. If rollback fails, we fall back to host Starman.
@@ -2381,6 +2437,7 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
             fi
         fi
     else
+        recycle_spun_starman_workers "$CONTAINER"
         echo "   ✓ Container $CONTAINER is running and healthy."
     fi
 fi

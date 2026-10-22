@@ -29,6 +29,7 @@ services:
     labels:
       - "description=Development web server with hot reload and debugging support"
     environment:
+      COMSERV_KEY_DIR: /opt/comserv/keys
       CATALYST_ENV: development
       CATALYST_DEBUG: 1
       WEB_PORT: 3000
@@ -74,6 +75,8 @@ services:
       - ./script:/opt/comserv/script:delegated
       - ./root:/opt/comserv/root:delegated
       - ./config:/opt/comserv/config:delegated
+      - ${COMSERV_HOST_KEY_DIR:-${HOME}/.comserv/keys}:/opt/comserv/keys:ro
+      - ${COMSERV_HOST_SECRETS_DIR:-${HOME}/.comserv/secrets}:/home/comserv/.comserv/secrets:ro
       - ./t:/opt/comserv/t:delegated
       # Shared with host for ttyd start requests + log status (Docker cannot see host :7682)
       - ./var:/opt/comserv/var:delegated

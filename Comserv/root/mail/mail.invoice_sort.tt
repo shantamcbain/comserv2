@@ -1,0 +1,99 @@
+[% PageVersion = 'mail/mail.invoice_sort.tt,v 0.02 2026/10/21 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% META title = 'Invoice queue' %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Invoice queue</h1>
+    <p>One block is one invoice. Its items are listed under it. Changing SiteName moves that invoice or that item. It does not rewrite stock. Chemicals, GMO, and filament-barcode data are not stored yet.</p>
+  </div>
+  [% IF c.flash.error_msg %]<p>[% c.flash.error_msg | html %]</p>[% END %]
+  [% IF c.flash.success_msg %]<p>[% c.flash.success_msg | html %]</p>[% END %]
+  [% IF queue_note %]<p>[% queue_note | html %]</p>[% END %]
+  [% IF invoices.size %]
+  <p>[% invoices.size %] invoice[% IF invoices.size != 1 %]s[% END %].</p>
+  [% FOREACH inv IN invoices %]
+  <section>
+    <h2>[% inv.invoice || '(no number)' | html %]</h2>
+    <p>[% inv.date | html %] · [% inv.status | html %] · [% inv.lines.size %] item[% IF inv.lines.size != 1 %]s[% END %]</p>
+    <form method="post" action="[% c.uri_for('/mail/invoice/sort/invoice') %]">
+      <input type="hidden" name="invoice_id" value="[% inv.id | html %]">
+      <label>SiteName
+        <select name="sitename">
+          [% FOREACH site IN sites %]
+          <option value="[% site | html %]"[% IF site == inv.sitename %] selected[% END %]>[% site | html %]</option>
+          [% END %]
+        </select>
+      </label>
+      <label>Supplier
+        <select name="supplier_id">
+          [% IF inv.supplier_id %]
+          <option value="[% inv.supplier_id | html %]">[% inv.supplier | html %][% IF inv.supplier_site %] ([% inv.supplier_site | html %])[% END %]</option>
+          [% END %]
+          [% FOREACH sup IN suppliers %]
+          [% NEXT IF sup.id == inv.supplier_id %]
+          <option value="[% sup.id | html %]">[% sup.name | html %][% IF sup.sitename %] ([% sup.sitename | html %])[% END %]</option>
+          [% END %]
+        </select>
+      </label>
+      <button type="submit">Save invoice</button>
+    </form>
+    [% IF inv.lines.size %]
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Qty</th>
+          <th>Cost</th>
+          <th>Item site</th>
+          <th>Barcode</th>
+        </tr>
+      </thead>
+      <tbody>
+        [% FOREACH line IN inv.lines %]
+        <tr>
+          <td>
+            [% IF line.item_id %]
+            <details>
+              <summary>[% line.item | html %][% IF line.sku %] <small>[% line.sku | html %]</small>[% END %]</summary>
+              <form method="post" action="[% c.uri_for('/mail/invoice/sort/item') %]">
+                <input type="hidden" name="item_id" value="[% line.item_id | html %]">
+                <label>SiteName
+                  <select name="sitename">
+                    [% FOREACH site IN sites %]
+                    <option value="[% site | html %]"[% IF site == line.item_site %] selected[% END %]>[% site | html %]</option>
+                    [% END %]
+                  </select>
+                </label>
+                <label>Barcode
+                  <input type="text" name="barcode" value="[% line.barcode | html %]" maxlength="100">
+                </label>
+                <button type="submit">Save item</button>
+              </form>
+              <p><a href="[% c.uri_for('/Inventory/item/edit', line.item_id) %]">Full item edit</a></p>
+            </details>
+            [% ELSE %]
+            [% line.item | html %] <small>no inventory item</small>
+            [% END %]
+          </td>
+          <td>[% line.qty | html %]</td>
+          <td>[% line.cost | html %]</td>
+          <td>[% line.item_site | html %]</td>
+          <td>[% line.barcode | html %]</td>
+        </tr>
+        [% END %]
+      </tbody>
+    </table>
+    [% ELSE %]
+    <p>No lines on this invoice.</p>
+    [% END %]
+  </section>
+  [% END %]
+  [% ELSE %]
+  <p>No invoices filed for 3d, CSC, or Shanta.</p>
+  [% END %]
+  <p>
+    <a href="[% c.uri_for('/Inventory/email-config') %]">Email addresses</a>
+    <a href="[% c.uri_for('/mail/classify_invoices') %]">Run classification</a>
+  </p>
+</div>
