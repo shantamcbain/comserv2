@@ -1,0 +1,221 @@
+[% META
+   title = "AI Skills and Web Search — v2 design"
+   description = "How the v2 AI stack gains DB-backed approval-gated skills and a working, scope-controlled web search. Records why skills live in MariaDB, why search is self-hosted, the search tiers, and what is still pending."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "planning,ai"
+   page_version = "0.1"
+   last_updated = "Wed Sep 10 2026"
+   site_specific = "false"
+   project_id = "280"
+   project_code = "AISYSTEM"
+%]
+[% PageVersion = 'Documentation/AiSkillsAndWebSearch.tt,v 0.1 2026/09/10 hermes-agent Exp - Skills + web search design' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'AI Skills and Web Search — v2 design'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <div class="doc-navrow">
+                <a href="#summary" class="doc-navlink">Summary</a>
+                <a href="#skills" class="doc-navlink">Skills</a>
+                <a href="#approval" class="doc-navlink">Approval</a>
+                <a href="#search" class="doc-navlink">Web search</a>
+                <a href="#why-selfhost" class="doc-navlink">Why self-host</a>
+                <a href="#tiers" class="doc-navlink">Tiers</a>
+                <a href="#done" class="doc-navlink">Done</a>
+                <a href="#pending" class="doc-navlink">Pending</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="summary" class="row">
+        <div class="col-100">
+            <h2 class="doc-h2">Summary</h2>
+            <p class="doc-body">
+                Two capabilities are being added to the v2 AI stack
+                (<code>Comserv::Model::AI2::*</code>):
+            </p>
+            <ul class="doc-body">
+                <li><strong>Skills</strong> — remembered, reusable ways of doing a
+                    recurring AI task, stored in the database and gated behind human
+                    approval.</li>
+                <li><strong>Web search that works, with controllable scope</strong> —
+                    the toggle has never functioned, and hosted APIs cannot limit
+                    which sources are searched.</li>
+            </ul>
+            <p class="doc-body">
+                v1 (<code>Controller::AI.pm</code>) is dead and out of scope.
+                Everything here is v2 only.
+            </p>
+        </div>
+    </div>
+
+    <div id="skills" class="row">
+        <div class="col-100">
+            <h2 class="doc-h2">Skills — why the database, not a JSON file</h2>
+            <p class="doc-body">
+                A skills file under <code>root/static/config/</code> would only
+                reach production at the next deploy, and each branch mutates its
+                own copy independently. Database rows are live on every worktree
+                and every site the moment they are approved.
+            </p>
+            <p class="doc-body">
+                Result class:
+                <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/AiSkill.pm</code>
+                — table <code>ai_skills</code>.
+            </p>
+            <table class="doc-table">
+                <tr><th>Column</th><th>Purpose</th></tr>
+                <tr><td><code>skill_key</code></td><td>Stable machine name (unique)</td></tr>
+                <tr><td><code>trigger_pattern</code></td><td>Matched against the incoming prompt</td></tr>
+                <tr><td><code>steps</code></td><td>Ordered procedure to follow</td></tr>
+                <tr><td><code>examples_good</code></td><td>What a correct answer looks like</td></tr>
+                <tr><td><code>examples_bad</code></td><td>What to avoid — carries most of the weight</td></tr>
+                <tr><td><code>min_role</code></td><td>Who may invoke it</td></tr>
+                <tr><td><code>status</code></td><td>pending / approved / rejected</td></tr>
+                <tr><td><code>source</code></td><td>Provenance — who, when, on what evidence</td></tr>
+            </table>
+            <p class="doc-body doc-muted">
+                Note: this DBIx::Class build has no working <code>add_index</code>
+                (it crashes on reload), so uniqueness is declared with
+                <code>add_unique_constraint</code>.
+            </p>
+        </div>
+    </div>
+
+    <div id="approval" class="row">
+        <div class="col-100">
+            <h2 class="doc-h2">Approval — AI cannot self-authorise a skill</h2>
+            <p class="doc-body">
+                Skills change how the AI behaves, so an AI-written skill must never
+                go live on its own. New rows default to <code>pending</code>, and
+                <strong>only <code>approved</code> rows are ever injected into a
+                prompt</strong>.
+            </p>
+            <ul class="doc-body">
+                <li><strong>Admin</strong> — the AI proposes; the admin approves in
+                    chat and it takes effect immediately.</li>
+                <li><strong>Everyone else</strong> — the submission is queued and a
+                    todo is raised for admin attention.</li>
+                <li>Every skill keeps a <code>source</code> value recording who
+                    created it, when, and on what evidence, so it stays auditable.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="search" class="row">
+        <div class="col-100">
+            <h2 class="doc-h2">Web search — the toggle never worked</h2>
+            <p class="doc-body">
+                The widget's search checkbox set <code>use_search</code>, and
+                <code>Provider/Grok.pm</code> already implemented the matching
+                <code>search_parameters</code> — but the flag was dropped between
+                them. <code>Chat.pm</code> and <code>Router.pm</code> contained no
+                reference to it at all, so the provider always received false.
+                <strong>Fixed 2026-09-09</strong> by threading it through the call
+                chain as an options hash.
+            </p>
+        </div>
+    </div>
+
+    <div id="why-selfhost" class="row">
+        <div class="col-100">
+            <h2 class="doc-h2">Why self-hosted search</h2>
+            <p class="doc-body">
+                The requirement is to control the <em>extent</em> of a search — for
+                example, ENCY looking up herbal remedies should be able to search
+                European and traditional sources rather than only the North
+                American medical industry.
+            </p>
+            <p class="doc-body">
+                Measured 2026-09-09: OpenRouter's
+                <code>web_search_options.search_domain_filter</code> is
+                <strong>silently ignored</strong>. A strict
+                <code>["en.wikipedia.org"]</code> filter returned 16 sources with
+                <strong>zero</strong> from Wikipedia — identical to the unfiltered
+                control, while still billing. Hosted APIs therefore cannot deliver
+                scope control, so the <code>free</code> tier is a service we run:
+                <code>comserv2-search</code> (SearXNG), defined in
+                <code>services/search/</code> and reached via a full URL in
+                <code>root/config/services.json</code>.
+            </p>
+            <p class="doc-body doc-muted">
+                SearXNG is a <em>metasearch</em> aggregator, not a web index — it
+                fans out to upstream engines that are explicitly enabled in
+                <code>settings.yml</code>. Commercial engines (Google, Bing, Brave,
+                Startpage) ship disabled; enable them only if you accept that
+                queries go to them.
+            </p>
+        </div>
+    </div>
+
+    <div id="tiers" class="row">
+        <div class="col-100">
+            <h2 class="doc-h2">Search tiers</h2>
+            <table class="doc-table">
+                <tr><th>Tier</th><th>Backend</th><th>Cost</th><th>Who</th></tr>
+                <tr><td><code>internal</code></td><td>MariaDB full text over documentation / ENCY</td><td>free</td><td>everyone</td></tr>
+                <tr><td><code>free</code></td><td>self-hosted <code>comserv2-search</code></td><td>free</td><td>default</td></tr>
+                <tr><td><code>cheap</code></td><td><code>perplexity/sonar</code> via OpenRouter</td><td>~$0.005/query</td><td>admin, developer</td></tr>
+                <tr><td><code>best</code></td><td>Grok native search</td><td>quota-bound</td><td>admin, developer</td></tr>
+            </table>
+            <p class="doc-body">
+                Programming questions are <strong>searched live, never indexed</strong>
+                — crawling and storing programming documentation would waste
+                resources on an already-solved problem.
+            </p>
+        </div>
+    </div>
+
+    <div id="done" class="row">
+        <div class="col-100">
+            <h2 class="doc-h2">Done</h2>
+            <ul class="doc-body">
+                <li><code>use_search</code> threaded through <code>Chat.pm</code> and
+                    <code>Router.pm</code> — verified 4/4.</li>
+                <li>Grok quota 403 no longer reported as an expired login
+                    (<code>Grok.pm</code>, <code>Router.pm</code>,
+                    <code>Admin/Git.pm</code>).</li>
+                <li><code>AiSkill</code> Result class written and registered —
+                    DBIC resolves <code>ai_skills</code>.</li>
+                <li><code>AI2::Search</code> client written — verified 16/16,
+                    including that a disabled service issues no request.</li>
+                <li><code>services/search/</code> scaffold plus a
+                    <code>services.json</code> entry shipping
+                    <code>enabled: 0</code>.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="pending" class="row">
+        <div class="col-100">
+            <h2 class="doc-h2">Pending</h2>
+            <ul class="doc-body">
+                <li><strong>Create the <code>ai_skills</code> table</strong> —
+                    todo <strong>#2430</strong>. Admin action via in-app
+                    schema-compare; never hand-written DDL. This belongs to the
+                    <code>schema</code> branch.</li>
+                <li><strong>Build and start the search container</strong> —
+                    <code>cd services/search &amp;&amp; docker compose up -d --build</code>,
+                    then set <code>enabled: 1</code>.</li>
+                <li>Skill loader and write-back (blocked on the table).</li>
+                <li>Tool registry: register existing capabilities behind one
+                    dispatch table.</li>
+                <li>Context engineering: world/constraint blocks and per-agent bad
+                    examples.</li>
+            </ul>
+        </div>
+    </div>
+
+</div>

@@ -1,0 +1,13 @@
+{
+   "_comment": "Super Grok pacing (Oct 11 2026). day_start_hour: work day starts here (PT); daily budget, lock/restore and day-rise use it. alerts.check_hour/budget_fraction: work-window alert. week_off_at: weekly cutoff. Weekly reset stays Thu 10:31 PT.",
+   "alerts": {
+      "budget_fraction": 0.6,
+      "check_hour": 9,
+      "day_rise_pts": 15
+   },
+   "day_start_hour": 5,
+   "week_off_at": 90,
+   "allow_overrun_date": "2026-10-15",
+   "_overrun_note": "Shanta 6:48 AM PT Oct 15: grok-4.7 may use the rest of Super Grok until the 10:31 reset; 98% hard cap still applies. Expires on its own (date only matches Oct 15). Shanta 6:49 AM PT: cap 100% for this window only (overrun_hard_cap; ignored on other days).",
+   "overrun_hard_cap": 100
+}
