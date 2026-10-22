@@ -64,32 +64,8 @@ sub _set_lan_host_notes {
 sub _follow_printer {
     my ($self, $c, $row) = @_;
     return { ok => 0, error => 'No printer row' } unless $row;
-    my $notes  = eval { $row->notes } || '';
-    my $host   = _lan_host_from_notes($notes);
-    my $serial = _lan_cn_from_notes($notes);
-    my $adapter = Comserv::Util::Printing3d::Adapter::Anycubic->new;
-    my $found = $adapter->relocate($c, $host, $serial);
-    unless ($found->{ok}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_follow_printer',
-            "printer_id=" . $row->id . " " . ($found->{error} || 'not found')
-            . " stored=" . ($host || ''));
-        return $found;
-    }
-    my $changed = ($found->{host} || '') ne ($host || '')
-        || (($found->{serial} || '') ne ($serial || '') && $found->{serial});
-    if ($changed) {
-        my $new_notes = _set_lan_host_notes($notes, $found->{host}, $found->{serial});
-        eval { $row->update({ notes => $new_notes }) };
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_follow_printer',
-                "notes update failed id=" . $row->id . ": $@");
-        } else {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_follow_printer',
-                "printer_id=" . $row->id . " LAN_HOST " . ($host || '(none)')
-                . " -> $found->{host}");
-        }
-    }
-    return $found;
+    require Comserv::Util::Printing3d::LanMap;
+    return Comserv::Util::Printing3d::LanMap->new->follow($c, $row);
 }
 
 # GET /3d/printer_lan/discover?subnet=192.168.2.0/24
@@ -188,7 +164,7 @@ sub ping :Path('/3d/printer_lan/ping') :Args(0) {
         if ($printer_row) {
             my $notes = eval { $printer_row->notes } || '';
             $paused = 1 if $notes =~ /\[LAN_PAUSED:/;
-            $paused ||= 1 if ($printer_row->status || '') =~ /^(maintenance|offline)$/;
+            $paused ||= 1 if ($printer_row->status || '') eq 'maintenance';
             unless ($paused) {
                 my $found = $self->_follow_printer($c, $printer_row);
                 $host = $found->{host} if $found->{ok};
@@ -686,7 +662,7 @@ sub _resolve_printer {
     }
     my $notes = eval { $row->notes } || '';
     my $paused = ($notes =~ /\[LAN_PAUSED:/) ? 1 : 0;
-    $paused ||= 1 if ($row->status || '') =~ /^(maintenance|offline)$/;
+    $paused ||= 1 if ($row->status || '') eq 'maintenance';
     my $host = _lan_host_from_notes($notes);
     unless ($paused) {
         my $found = $self->_follow_printer($c, $row);
@@ -1004,15 +980,18 @@ sub files :Path('/3d/printer_lan/files') :Args(0) {
     }
 
     my $notes = eval { $row->notes } || '';
+    my $paused = ($notes =~ /\[LAN_PAUSED:/) ? 1 : 0;
+    $paused ||= 1 if ($row->status || '') eq 'maintenance';
     my $host = _lan_host_from_notes($notes);
+    unless ($paused) {
+        my $found = $self->_follow_printer($c, $row);
+        $host = $found->{host} if $found->{ok};
+    }
     unless ($host) {
         $c->res->content_type('application/json');
         $c->res->body(encode_json({ ok => 0, error => 'No LAN host configured' }));
         $c->detach;
     }
-
-    my $paused = ($notes =~ /\[LAN_PAUSED:/) ? 1 : 0;
-    $paused ||= 1 if ($row->status || '') =~ /^(maintenance|offline)$/;
     if ($paused) {
         $c->res->content_type('application/json');
         $c->res->body(encode_json({ ok => 0, error => 'LAN paused for this printer' }));

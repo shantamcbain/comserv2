@@ -1,0 +1,55 @@
+[% META
+   title = "Health Kitchen review queue"
+   description = "Staff approve/reject user-submitted ENCY additions"
+   roles = "admin,site_admin,staff,editor"
+   TemplateType = "Application"
+   category = "HealthKitchen"
+   page_version = "0.01"
+   last_updated = "2026-10-18"
+%]
+[% PageVersion = 'healthkitchen/review.tt,v 0.01 2026/10/18 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+<div class="app-container">
+    <div class="page-header">
+        <h1>ENCY submissions review</h1>
+        <p>
+            <a href="[% c.uri_for('/healthkitchen') %]">Health Kitchen</a> ·
+            [% FOREACH s IN ['pending','approved','rejected'] %]
+                [% IF s == hk_review_status %]<strong>[% s %]</strong>[% ELSE %]<a href="[% c.uri_for('/healthkitchen/review', { status => s }) %]">[% s %]</a>[% END %][% UNLESS loop.last %] · [% END %]
+            [% END %]
+        </p>
+    </div>
+    [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+    [% IF !hk_pending_ready %]
+        <div class="alert alert-warning">Create table <code>HealthKitchen::PendingEncyAddition</code> via Schema Compare first.</div>
+    [% ELSIF !hk_review_rows.size %]
+        <p class="doc-muted">No [% hk_review_status | html %] submissions.</p>
+    [% ELSE %]
+        <table class="table">
+            <tr><th>#</th><th>Type</th><th>Name</th><th>Description</th><th>Submitted</th><th>ENCY match</th><th>[% IF hk_review_status == 'pending' %]Decision[% ELSE %]Review[% END %]</th></tr>
+            [% FOREACH r IN hk_review_rows %]
+            <tr>
+                <td>[% r.id | html %]</td>
+                <td>[% r.entity_type | html %]</td>
+                <td>[% r.name | html %]</td>
+                <td>[% r.description | html %]</td>
+                <td>[% r.submitted_by | html %]<br /><small>[% r.created_at | html %]</small></td>
+                <td>[% IF r.existing_match %]existing #[% r.existing_match | html %] (approve links to it)[% ELSE %]new[% END %]</td>
+                <td>
+                [% IF hk_review_status == 'pending' %]
+                    <form method="post" action="[% c.uri_for('/healthkitchen/review') %]">
+                        <input type="hidden" name="id" value="[% r.id | html %]" />
+                        <textarea name="notes" maxlength="2000" placeholder="Notes (optional)"></textarea>
+                        <button type="submit" name="decision" value="approve" class="btn btn-sm btn-primary">Approve</button>
+                        <button type="submit" name="decision" value="reject" class="btn btn-sm btn-secondary">Reject</button>
+                    </form>
+                [% ELSE %]
+                    [% r.reviewer | html %][% IF r.ency_record_id %] → ENCY #[% r.ency_record_id | html %][% END %]<br />[% r.review_notes | html %]
+                [% END %]
+                </td>
+            </tr>
+            [% END %]
+        </table>
+    [% END %]
+</div>

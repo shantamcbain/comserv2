@@ -33,7 +33,7 @@
 </p>
 
 <table cellpadding="6">
-  <tr><th>Supplier</th><td>[% invoice.supplier.name | html %]</td></tr>
+  <tr><th>Supplier</th><td>[% IF invoice.supplier %]<a href="/Inventory/supplier/view/[% invoice.supplier.id %]">[% invoice.supplier.name | html %]</a>[% ELSE %]—[% END %]</td></tr>
   <tr><th>Invoice #</th><td>[% invoice.invoice_number || '—' %]</td></tr>
   <tr><th>Invoice Date</th><td>[% invoice.invoice_date %]</td></tr>
   <tr><th>Due Date</th><td>[% invoice.due_date || '—' %]</td></tr>

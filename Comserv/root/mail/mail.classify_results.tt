@@ -1,0 +1,45 @@
+[% PageVersion = 'mail/mail.classify_results.tt,v 0.02 2026/10/17 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% META title = 'Classification Results' %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Classification results</h1>
+  </div>
+
+  [% IF classification_result %]
+  <div class="content-section">
+    <h2>Mail login</h2>
+    [% IF classification_result.metadata.mailbox_logins.size %]
+    <ul>
+      [% FOREACH box IN classification_result.metadata.mailbox_logins %]
+      <li>
+        [% box.email_address | html %] at [% box.imap_host | html %]:[% box.imap_port | html %] —
+        [% IF box.ok %]login worked, [% box.fetched %] messages read[% ELSE %]login failed: [% box.error | html %][% END %]
+      </li>
+      [% END %]
+    </ul>
+    [% ELSE %]
+    <p>No mail-server login was attempted. This run only read the local mail directory. A saved mail server is used after :4001 restarts and you run classification again.</p>
+    [% END %]
+    [% IF classification_result.metadata.local_maildir %]
+    <p>Local mail directory: [% classification_result.metadata.local_maildir | html %]</p>
+    [% ELSE %]
+    <p>No local mail directory on this computer.</p>
+    [% END %]
+  </div>
+
+  <p>Scanned <strong>[% classification_result.metadata.total_messages_scanned %]</strong> messages. Counts only. The message list is not printed here.</p>
+  [% IF classification_result.categories.keys.size %]
+  <ul>
+    [% FOREACH cat IN classification_result.categories.keys %]
+    <li>[% classification_result.categories.$cat.label | html %]: [% classification_result.categories.$cat.count %]</li>
+    [% END %]
+  </ul>
+  [% END %]
+  [% ELSE %]
+  <p>No results.</p>
+  [% END %]
+
+  <p><a href="[% c.uri_for('/Inventory/email-config') %]">Email addresses</a></p>
+</div>

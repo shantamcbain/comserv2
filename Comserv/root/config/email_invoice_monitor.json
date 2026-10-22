@@ -1,0 +1,37 @@
+{
+   "sites" : {
+      "3d" : {
+         "category_filter" : [],
+         "email_addresses" : [
+            "shanta@usbm.ca"
+         ],
+         "monitored_suppliers" : []
+      },
+      "Shanta" : {
+         "category_filter" : [],
+         "email_addresses" : [
+            "shanta@forager.com"
+         ],
+         "monitored_suppliers" : []
+      },
+      "CSC" : {
+         "category_filter" : [
+            "csc_internet",
+            "hosting",
+            "domain"
+         ],
+         "email_addresses" : [
+            "shanta@forager.com",
+            "paypal@forager.com",
+            "patrion@forager.com",
+            "aica@forager.com"
+         ],
+         "monitored_suppliers" : [
+            "shanta@forager.com",
+            "paypal@forager.com",
+            "patrion@forager.com",
+            "aica@forager.com"
+         ]
+      }
+   }
+}

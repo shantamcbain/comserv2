@@ -131,6 +131,16 @@ __PACKAGE__->add_columns(
         data_type   => 'datetime',
         is_nullable => 1,
     },
+    labour_cost => {
+        data_type   => "decimal",
+        size        => [10, 4],
+        is_nullable => 1,
+    },
+    cost_breakdown => {
+        data_type   => "text",
+        is_nullable => 1,
+        comment     => "JSON: per-step minutes, components, scrap, unit cost",
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
@@ -165,4 +175,13 @@ __PACKAGE__->belongs_to(
     { join_type => 'left' }
 );
 
+# Child rows live in printing_3d_job_filaments. cascade_delete stays off until
+# that table exists — a delete must not query a missing table.
+__PACKAGE__->has_many(
+    job_filaments => 'Comserv::Model::Schema::Ency::Result::Printing3dJobFilament',
+    'job_id',
+    { cascade_delete => 0 },
+);
+
 1;
+

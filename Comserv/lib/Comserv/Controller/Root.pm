@@ -52,6 +52,15 @@ my $_DB_CONN_TTL            = 300;     # seconds between re-reads
 # blow past Cloudflare's origin timeout (HTTP 521). Keyed by SiteName; each
 # Starman worker keeps its own copy. Only the site-wide (non-user-specific)
 # portion is cached — per-user overrides/grants still run live below.
+# Canonical module key: lower-case, trimmed, spaces/dashes -> underscore.
+sub _module_key {
+    my ($k) = @_;
+    $k = '' unless defined $k;
+    $k = lc $k;
+    $k =~ s/^\s+|\s+$//g;
+    $k =~ s/[\s-]+/_/g;
+    return $k;
+}
 my %_site_modules_cache;              # sitename => { modules => {...}, at => epoch }
 my $_SITE_MODULES_TTL      = 120;     # seconds between re-checks
 my %_shop_flag_cache;                 # sitename => { val => 0|1, at => epoch }
@@ -199,8 +208,10 @@ sub auto :Private {
     # Cheap assets and probe URLs must not run site/DB auto (~1s+). One HTML
     # page pulls many /static/js files; on a single worker that serializes into
     # minutes when mixed with WAN scanners.
+    # cgi-bin/: old Perl CGI URLs hit by crawlers (Oct 19 2026 522 outage);
+    # answered by Controller::LegacyCgi with no site/session/DB/theme work.
     my $path = $c->req->path // '';
-    if ($path =~ m{^(?:static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
+    if ($path =~ m{^(?:cgi-bin(?:/|$)|static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
         return 1;
     }
 
@@ -734,7 +745,10 @@ sub auto :Private {
                     { columns  => [qw(module_name enabled)] }
                 )->all;
                 for my $row (@site_mods) {
-                    $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
+                    my $k = _module_key($row->module_name);
+                    next unless length $k;
+                    # Any enabled row for the key wins over a disabled duplicate.
+                    $enabled{$k} = ($enabled{$k} || ($row->enabled ? 1 : 0)) ? 1 : 0;
                 }
 
                 # Hosting requested_* column historically named "addons"; treat as site features.
@@ -749,7 +763,7 @@ sub auto :Private {
                 if ($hosting && $hosting->requested_addons) {
                     my @addons = split(/\s*,\s*/, $hosting->requested_addons);
                     for my $a (@addons) {
-                        my $lc_addon = lc($a);
+                        my $lc_addon = _module_key($a);
                         # Brew / Beekeeping: site_modules (or Brew/BMaster / brew.*)
                         # only — never from hosting requested_addons. Skip BEFORE
                         # the generic enable so a missing row cannot re-open them.
@@ -793,22 +807,30 @@ sub auto :Private {
                 $c->stash->{brew_feature_active} = 1;
             }
 
-            # Apply per-user overrides from user_module_access
+            # Per-user grants from user_module_access. enabled_modules is the UNION
+            # of site modules and the user's own modules (CSC-20260909-2862), so a
+            # granted row adds a module; a granted=0 row no longer removes a
+            # module the site itself has turned on.
             if ($c->session->{username}) {
                 my @overrides = $c->model('DBEncy')->resultset('UserModuleAccess')->search({
                     username => $c->session->{username},
-                    sitename => $mod_site,
+                    -or => [ { sitename => $mod_site }, \[ 'LOWER(TRIM(sitename)) = ?', lc($mod_site) ] ],
                 })->all;
                 for my $ov (@overrides) {
-                    $enabled{ $ov->module_name } = $ov->granted ? 1 : 0;
+                    my $k = _module_key($ov->module_name);
+                    next unless length $k && $ov->granted;
+                    $enabled{$k} = 1;
                 }
             }
 
             # Apply per-user service grants from membership_service_access
             # (e.g. beekeeping access granted by purchasing a BMaster membership plan)
             if ($c->session->{user_id}) {
+                # Case/whitespace-insensitive: session SiteName casing and sites.name
+                # (e.g. 'SB ') do not always match exactly.
                 my $svc_site = $c->model('DBEncy')->resultset('Site')->search(
-                    { name => $mod_site }, { rows => 1 }
+                    { -or => [ { name => $mod_site }, \[ 'LOWER(TRIM(name)) = ?', lc($mod_site) ] ] },
+                    { rows => 1 }
                 )->single;
                 if ($svc_site) {
                     my @svc_grants = $c->model('DBEncy')->resultset('MembershipServiceAccess')->search({
@@ -818,9 +840,15 @@ sub auto :Private {
                     })->all;
                     for my $sg (@svc_grants) {
                         next if $sg->is_expired;
-                        $enabled{ $sg->service_name } = 1;
+                        my $k = _module_key($sg->service_name);
+                        $enabled{$k} = 1 if length $k;
                     }
                 }
+            }
+            # Keep alias pairs in sync so templates can use either key.
+            for my $pair (['3d', 'printing_3d'], ['workshop', 'workshops'], ['beekeeping', 'apiary']) {
+                my ($x, $y) = @$pair;
+                if ($enabled{$x} || $enabled{$y}) { $enabled{$x} = $enabled{$y} = 1 }
             }
             $c->stash->{enabled_modules} = \%enabled;
         };
@@ -847,6 +875,15 @@ sub auto :Private {
             }
         }
         $c->stash->{can_plan} = $can_plan;
+
+        # Planning menu (CSC-20260909-2862): developers, editors and admins on
+        # every site; other users only when planning is in enabled_modules.
+        # session->{roles} is an arrayref (normalized above from a comma list).
+        my $pr = $c->stash->{user_roles} || [];
+        $pr = [ split /\s*,\s*/, $pr ] unless ref $pr eq 'ARRAY';
+        my $planning_staff = $c->stash->{is_admin}
+            || (grep { my $r = lc($_ // ''); $r =~ s/^\s+|\s+$//g; $r =~ /^(developer|editor|admin)$/ } @$pr);
+        $c->stash->{planning_staff} = $planning_staff ? 1 : 0;
 
         # Beekeeping nav — site addon (hosting/site_modules), BMaster site, or per-user grant.
         # Admin role alone does not enable the menu (unlike the old TopDropListBeekeeping bypass).
@@ -1332,6 +1369,8 @@ sub auto :Private {
     # Error handling for auto() method
     if ($@) {
         my $error = $@;
+        # $c->detach inside auto() is normal control flow, not an error; rethrow it.
+        die $error if !ref($error) && $error =~ /^catalyst_detach/;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', 
             "Exception in auto() method: $error");
         
@@ -2587,7 +2626,7 @@ sub begin :Private {
     if ($c->req->path =~ m{^/?health(?:/|$)}) {
         return;
     }
-    if (($c->req->path // '') =~ m{^(?:static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
+    if (($c->req->path // '') =~ m{^(?:cgi-bin(?:/|$)|static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
         return;
     }
 

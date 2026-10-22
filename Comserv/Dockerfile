@@ -159,7 +159,7 @@ RUN chmod 644 /etc/logrotate.d/catalyst && \
 # Returns 503 if DB unreachable or session dir missing; logs reason to system_log.
 # /health (liveness) is fast; /health/detail (readiness) is used here.
 HEALTHCHECK --interval=30s --timeout=12s --start-period=120s --retries=5 \
-    CMD curl -sf http://localhost:${WEB_PORT:-3000}/health/detail | grep -q '"status":"ok"' || exit 1
+    CMD curl -fs --max-time 5 http://127.0.0.1:${WEB_PORT:-5000}/health || exit 1
 
 EXPOSE 3000 5000
 

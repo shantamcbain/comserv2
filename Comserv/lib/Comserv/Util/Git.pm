@@ -874,6 +874,42 @@ sub unstage {
     return $self->_run($c, 'restore', '--staged', '--', @$paths);
 }
 
+=head2 secret_guard($c, $repo, @mode_args)
+
+Run the shared secret guard (Comserv/script/git/secret_guard.sh, falling back to
+~/.git-hooks/secret-guard.sh) against the staged index of $repo (default: the
+request's resolved local repo). Optional @mode_args are passed to the script,
+e.g. ('--merge', $branch) to scan what a merge would bring in. Returns C<{ ok => 1 }> when clean or when the
+target is remote (the remote host's own hooks apply), else
+C<{ ok => 0, output => $redacted_report }>. Never prints secret values — the
+script reports file names / rule ids only.
+
+=cut
+
+sub secret_guard {
+    my ($self, $c, $repo, @mode_args) = @_;
+    unless ($repo) {
+        my $req_target = ($c && $c->stash->{git_target})
+                      // ($c && $c->req ? $c->req->param('target') : undef);
+        my $t = $self->resolve_target($c, $req_target);
+        return { ok => 1, skipped => 'remote' } if ($t->{mode} // '') ne 'local';
+        $repo = $t->{repo};
+    }
+    return { ok => 0, output => 'secret guard: no repository resolved' }
+        unless defined $repo && length $repo;
+    my @cand = ("$repo/Comserv/script/git/secret_guard.sh",
+                ($ENV{HOME} ? "$ENV{HOME}/.git-hooks/secret-guard.sh" : ()));
+    my ($script) = grep { -x $_ } @cand;
+    return { ok => 0, output => 'secret guard script not found; refusing to commit '
+                              . '(expected Comserv/script/git/secret_guard.sh)' }
+        unless $script;
+    require IPC::Run3;
+    my $out = '';
+    IPC::Run3::run3([ 'bash', $script, @mode_args, $repo ], \undef, \$out, \$out);
+    my $code = $? >> 8;
+    return $code == 0 ? { ok => 1, output => $out } : { ok => 0, output => $out };
+}
+
 =head2 commit($c, $message)
 
 Commit staged changes with $message. Returns the uniform hash.
@@ -884,6 +920,12 @@ sub commit {
     my ($self, $c, $message) = @_;
     return { success => 0, error => 'Commit message required' }
         unless defined $message && length $message;
+    # Secret guard: refuse key files / raw keys / gitleaks hits. Never --no-verify.
+    my $guard = $self->secret_guard($c);
+    return { success => 0, exit_code => 1, output => $guard->{output} // q{},
+             error => "Commit refused by secret guard (possible key/secret staged). "
+                    . "Unstage the flagged file(s) and retry." }
+        unless $guard->{ok};
     return $self->_run($c, 'commit', '-m', $message);
 }
 
@@ -1779,6 +1821,19 @@ sub merge_branch {
     }
     my %seen_d; @dirty = grep { !$seen_d{$_}++ } @dirty;
     $result->{uncommitted_files} = \@dirty if @dirty;
+
+    # Secret guard on the incoming merge diff (merge-base..branch). Refuse on a hit.
+    my $guard = $self->secret_guard($c, $repo, '--merge', $branch);
+    unless ($guard->{ok}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "merge_branch: secret guard refused merging '$branch' into $current");
+        $result->{error_msg} = "Merge refused by secret guard: '$branch' would bring in a key/secret file. "
+                             . "Remove it from the branch (keys belong in ~/.comserv/keys), then retry.\n"
+                             . ($guard->{output} // q{});
+        $result->{output}    = $guard->{output} // q{};
+        $result->{reason}    = 'secret_guard';
+        return $result;
+    }
 
     my $r = $self->_run($c, 'merge', '--no-ff', $branch, $run_opts);
     # CRITICAL: git prints almost all merge failures on stderr. _run keeps

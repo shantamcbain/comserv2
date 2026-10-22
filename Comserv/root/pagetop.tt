@@ -296,7 +296,11 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<header>
+[%# Site theme header/footer from the page table (page_code site_header / site_footer), e.g. cloned sites %]
+[% SET theme_site = SiteName || c.stash.SiteName || c.session.SiteName %]
+[% TRY %][% SET site_header_page = c.model('DBEncy').resultset('Page').search({ sitename => theme_site, page_code => 'site_header', status => 'active' }).first %][% CATCH %][% END %]
+<header[% IF site_header_page %] class="has-site-header"[% END %]>
+    [% IF site_header_page %]<div class="site-header">[% site_header_page.body %]</div>[% END %]
     <h1>
         Welcome [% IF c.session.username %]
 [% c.session.first_name || c.session.username %] [% c.session.last_name %][% IF is_admin %] Administrator[% END %]

@@ -11,6 +11,7 @@
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="app-container">
+    [% INCLUDE 'healthkitchen/_disclaimer.tt' %]
     <div class="page-header">
         <h1>Active symptoms</h1>
         <p>
@@ -43,6 +44,25 @@
             <button type="submit" class="btn btn-primary">Set active</button>
         </form>
 
+        <form method="post" action="[% c.uri_for('/healthkitchen/symptoms') %]" class="content-section">
+            <input type="hidden" name="hk_action" value="new" />
+            <p class="doc-muted">Not in the list? Submit it for staff review. It shows below as “pending review” until approved, then becomes active. If the name already exists in ENCY (case-insensitive), it is set active right away.</p>
+            <label>New symptom name <input type="text" name="new_name" maxlength="120" required /></label>
+            <label>Description (optional) <textarea name="new_description" maxlength="2000"></textarea></label>
+            <label>Severity <input type="text" name="severity" /></label>
+            <button type="submit" class="btn btn-secondary">Submit for review</button>
+        </form>
+
+        [% IF hk_pending_symptoms && hk_pending_symptoms.size %]
+            <h3>Pending review</h3>
+            <table class="table">
+                <tr><th>Symptom</th><th>Severity</th><th>Status</th></tr>
+                [% FOREACH ps IN hk_pending_symptoms %]
+                    <tr><td>[% ps.name | html %]</td><td>[% ps.severity | html %]</td><td><em>pending review</em></td></tr>
+                [% END %]
+            </table>
+        [% END %]
+
         [% IF hk_active && hk_active.size %]
             <table class="table">
                 <tr><th>Symptom</th><th>Severity</th><th></th></tr>
@@ -72,6 +92,19 @@
             <label>Diet flags <input type="text" name="diet_flags" value="[% hk_profile.diet_flags | html %]" /></label>
             <label>Allergies <textarea name="allergies">[% hk_profile.allergies | html %]</textarea></label>
             <label>Goals <textarea name="goals">[% hk_profile.goals | html %]</textarea></label>
+            [% IF hk_prefs_ready %]
+                <input type="hidden" name="prefs_submitted" value="1" />
+                <fieldset><legend>Food sourcing preferences</legend>
+                    <label><input type="checkbox" name="prefer_organic" value="1" [% IF hk_profile.prefer_organic %]checked[% END %] /> Prefer certified organic</label>
+                    <label><input type="checkbox" name="avoid_feedlot" value="1" [% IF hk_profile.avoid_feedlot %]checked[% END %] /> Avoid feedlot animal products</label>
+                    <label>Ethics weight
+                        <select name="ethics_weight">[% FOREACH w IN [0,1,2,3,4,5] %]<option value="[% w %]" [% IF (hk_profile.ethics_weight || 0) == w %]selected[% END %]>[% w %][% IF w == 0 %] (off)[% END %]</option>[% END %]</select>
+                    </label>
+                    <small class="doc-muted">Used to rank meal-plan suggestions and guide AI recipes.</small>
+                </fieldset>
+            [% ELSE %]
+                <p class="doc-muted">Sourcing preferences need new profile columns; run Schema Compare (HealthKitchen::UserHealthProfile).</p>
+            [% END %]
             <button type="submit" class="btn btn-primary">Save profile</button>
         </form>
     [% END %]
@@ -87,6 +120,14 @@
                 </ul>
             [% ELSE %]
                 <p class="doc-muted">No in-pantry herb matches for the active set.</p>
+            [% END %]
+            [% IF hk_match.not_in_pantry && hk_match.not_in_pantry.size %]
+                <h3>ENCY herbs linked to these symptoms (not in your pantry)</h3>
+                <ul>
+                    [% FOREACH h IN hk_match.not_in_pantry %]
+                        <li><a href="[% c.uri_for('/ENCY/Herb') %]/[% h.herb_id %]">[% h.name || h.herb_id | html %]</a>[% IF h.contra_indications %] <small class="doc-muted">— cautions: [% h.contra_indications | html %]</small>[% END %]</li>
+                    [% END %]
+                </ul>
             [% END %]
         </div>
     [% END %]

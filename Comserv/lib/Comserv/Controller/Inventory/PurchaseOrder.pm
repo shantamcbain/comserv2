@@ -201,7 +201,44 @@ sub po_receive :Path('/Inventory/po/receive') :Args(1) {
     $c->res->redirect($c->uri_for('/Inventory/po/view', [$id]));
 }
 
-# POST /Inventory/api/invoice/draft_from_mail  {sitename}
+# POST /Inventory/invoice/apply_mail_stock
+# Current site, or every configured site when all_sites=1 and the session is CSC.
+sub apply_mail_stock :Path('/Inventory/invoice/apply_mail_stock') :Args(0) {
+    my ($self, $c) = @_;
+    my $back = $c->uri_for('/Inventory/email-config');
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->redirect($back);
+        return;
+    }
+    my $session_site = $c->session->{SiteName} || 'CSC';
+    my $all = $c->req->body_parameters->{all_sites} ? 1 : 0;
+    my $csc = ($session_site =~ /^CSC\b/i) || (($c->session->{username} || '') eq 'Shanta');
+    if ($all && !$csc) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'apply_mail_stock',
+            "all-sites refused for $session_site");
+        $c->flash->{error_msg} = 'Only a CSC admin can apply mail stock for every site.';
+        $c->res->redirect($back);
+        return;
+    }
+    require Comserv::Util::Inventory::MailInvoiceStock;
+    my $res = eval {
+        Comserv::Util::Inventory::MailInvoiceStock->new->apply($c,
+            ($all ? () : (sitename => $session_site)),
+        );
+    };
+    if ($@ || !$res || !$res->{ok}) {
+        my $err = $@ || ($res && $res->{error}) || 'fail';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'apply_mail_stock', $err);
+        $c->flash->{error_msg} = $err;
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'apply_mail_stock',
+            $res->{summary} || 'applied');
+        $c->flash->{success_msg} = $res->{summary} || 'Mail invoices applied.';
+    }
+    $c->res->redirect($back);
+}
+
+# POST /Inventory/api/invoice/draft_from_mail  {sitename} or {all_sites:1}
 sub api_draft_from_mail :Path('/Inventory/api/invoice/draft_from_mail') :Args(0) {
     my ($self, $c) = @_;
     unless (uc($c->req->method || '') eq 'POST') {
@@ -211,10 +248,15 @@ sub api_draft_from_mail :Path('/Inventory/api/invoice/draft_from_mail') :Args(0)
         $c->detach;
     }
     my $p = $self->_json_body($c) || {};
-    $p->{sitename} ||= $c->session->{SiteName} || $c->req->params->{sitename} || 'CSC';
-    require Comserv::Util::MailInvoiceClassifier;
+    my %args;
+    if ($p->{all_sites}) {
+        # every configured sitename
+    } else {
+        $args{sitename} = $p->{sitename} || $c->session->{SiteName} || $c->req->params->{sitename} || 'CSC';
+    }
+    require Comserv::Util::Inventory::MailInvoiceStock;
     my $res = eval {
-        Comserv::Util::MailInvoiceClassifier->new->draft_supplier_invoices($c, sitename => $p->{sitename});
+        Comserv::Util::Inventory::MailInvoiceStock->new->apply($c, %args);
     };
     if ($@ || !$res || !$res->{ok}) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_draft_from_mail',
@@ -286,6 +328,35 @@ sub api_stock_unreserve :Path('/Inventory/api/stock/unreserve') :Args(0) {
     $c->res->content_type('application/json');
     $c->res->body(encode_json({ success => 1, %$res }));
     $c->detach;
+}
+
+# POST /Inventory/invoice/save_mailbox
+# Saves an IMAP login for one watched address. Password is encrypted; never logged.
+sub save_invoice_mailbox :Path('/Inventory/invoice/save_mailbox') :Args(0) {
+    my ($self, $c) = @_;
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->redirect($c->uri_for('/Inventory/email-config'));
+        return;
+    }
+    require Comserv::Util::MailInvoiceClassifier;
+    my $p = $c->req->body_parameters;
+    my $err = Comserv::Util::MailInvoiceClassifier->new->save_mailbox(
+        $c,
+        sitename       => $c->session->{SiteName} || '',
+        email_address  => $p->{email_address},
+        imap_host      => $p->{imap_host},
+        imap_port      => $p->{imap_port},
+        imap_security  => $p->{imap_security},
+        imap_folders   => $p->{imap_folders},
+        login_username => $p->{login_username},
+        password       => $p->{password},
+    );
+    if ($err) {
+        $c->flash->{error_msg} = $err;
+    } else {
+        $c->flash->{success_msg} = 'Mail server saved. Classification reads that mailbox, and the local mail dir when this computer has one.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/email-config'));
 }
 
 __PACKAGE__->meta->make_immutable;

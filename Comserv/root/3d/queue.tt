@@ -54,6 +54,30 @@
 .btn-assign   { background: #17a2b8; }
 .btn-complete { background: #28a745; }
 .btn-cancel   { background: #dc3545; }
+.printer-live > summary {
+    cursor: pointer;
+    color: var(--heading-color, var(--text-color));
+    font-size: 1.15em;
+    font-weight: bold;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.3em;
+    margin-bottom: 0.6em;
+}
+.printer-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6em;
+    align-items: stretch;
+}
+.printer-card {
+    flex: 1 1 14em;
+    max-width: 22em;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.6em 0.8em;
+    background: var(--secondary-color);
+    color: var(--text-color);
+}
 </style>
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;">
@@ -91,6 +115,149 @@
     <strong>Queue load error:</strong> [% queue_error | html %]
 </div>
 [% END %]
+
+
+<div class="queue-section">
+    <h2>Active — Printing ([% active_jobs.size %])</h2>
+    [% IF active_jobs && active_jobs.size %]
+    <table class="queue-table">
+        <thead>
+            <tr>
+                <th>#</th><th>Model / Item</th><th>User</th><th>Printer</th>
+                <th>Filament</th><th>Status</th><th>Started</th><th>Complete / Cancel</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH job IN active_jobs %]
+            <tr>
+                <td>[% job.id %]</td>
+                <td>
+                    [% IF job.model_name %][% job.model_name | html %][% ELSIF job.item_name %][% job.item_name | html %][% ELSE %]#[% job.id %][% END %]
+                    [% IF job.quantity > 1 %]<span style="margin-left:0.4em;background:var(--accent-color,#007bff);color:white;padding:0.1em 0.5em;border-radius:10px;font-size:0.8em;font-weight:bold;" title="Quantity to print">×[% job.quantity %]</span>[% END %]
+                    [% IF job.model_id && job.source_type == 'sign' %]
+                    <br><a href="/signgenerator/download/[% job.model_id %]/3mf?job_id=[% job.id %]" style="font-size:0.8em;color:var(--accent-color,#007bff);" title="Two-colour 3MF from the order filament picks">⬇ Download 3MF</a>
+                    [% ELSIF job.model_id %]
+                    <br><a href="/3d/model_download/[% job.model_id %]" style="font-size:0.8em;color:var(--accent-color,#007bff);" title="Download the STL/3MF currently linked to this model — verify the filename matches the part before slicing">⬇ Download File</a>
+                    <form method="post" action="/3d/model_upload/[% job.model_id %]" enctype="multipart/form-data" style="display:inline;margin-left:0.4em;font-size:0.75em;">
+                        <input type="file" name="stl_file" accept=".stl,.STL,.3mf,.3MF,.obj,.OBJ,.gcode,.step,.stp" style="display:none" id="stl_up_active_[% job.id %]" onchange="this.form.submit()">
+                        <label for="stl_up_active_[% job.id %]" style="color:var(--accent-color,#007bff);cursor:pointer;text-decoration:underline;" title="Upload replacement STL — the file you downloaded, modified in your slicer, and are re-uploading">⬆ Upload New</label>
+                    </form>
+                    [% IF job.model_file %]<br><small style="color:var(--text-muted-color);">[% job.model_file | html %]</small>[% END %]
+                    [% END %]
+                </td>
+                <td>[% job.username | html %]</td>
+                <td>
+                    [% IF job.printer_name %][% job.printer_name | html %]
+                        [% IF job.printer_id %]
+                        [% ps = printer_states ? printer_states.item(job.printer_id) : undef %]
+                        [% IF ps %]
+                            <br>
+                            <span style="font-size:0.78em;font-weight:bold;">
+                            [% IF ps.ok %]
+                                [% IF ps.print_state == 'busy' %]
+                                <span style="color:#28a745;">● busy — printing</span>
+                                [% IF ps.filename %]<br><small style="color:var(--text-muted-color);font-weight:normal;">[% ps.filename | html %][% IF ps.progress != '' %] · [% ps.progress %]%%[% END %]</small>[% END %]
+                                [% ELSIF ps.print_state == 'free' %]
+                                <span style="color:#ffc107;">● idle — print not started</span>
+                                [% ELSE %]
+                                <span style="color:var(--muted-color,#888);">● state unknown</span>
+                                [% END %]
+                            [% ELSE %]
+                                <span style="color:#dc3545;">● offline — unreachable</span>
+                            [% END %]
+                            </span>
+                        [% END %]
+                        <br>
+                        <a href="/3d/printer_lan/control?printer_id=[% job.printer_id %]" target="_blank" style="font-size:0.75em;color:var(--accent-color,#007bff);">Control Printer</a>
+                        [% IF ps && ps.ok && ps.print_state == 'free' %]
+                        <button type="button" onclick="showPrinterFiles([% job.printer_id %], '[% job.printer_name | html %]', '[% job.model_name | html %]', '[% job.item_sku | html %]', [% job.model_id || 0 %])" style="font-size:0.75em;margin-left:0.3em;background:#28a745;color:white;border:none;border-radius:4px;padding:0.25em 0.6em;font-weight:bold;cursor:pointer;" title="Printer is really idle — start the assigned job on it (pick the file in the popup)">▶ Start Print</button>
+                        [% END %]
+                        <button type="button" onclick="showPrinterFiles([% job.printer_id %], '[% job.printer_name | html %]', '[% job.model_name | html %]', '[% job.item_sku | html %]', [% job.model_id || 0 %])" style="font-size:0.7em;margin-left:0.3em;">Files on Printer (popup)</button>
+                        [% END %]
+                    [% ELSE %]&mdash;[% END %]
+                </td>
+                <td class="job-filament" data-job-id="[% job.id %]">
+                    [% IF job.filament_plan && job.filament_plan.size %]
+                    [% FOREACH slot IN job.filament_plan %]
+                    <div style="font-size:0.85em;color:var(--text-color);">
+                      <span style="display:inline-block;width:0.75em;height:0.75em;border:1px solid var(--border-color);background:[% slot.color_hex || 'transparent' %];"></span>
+                      [% slot.filament_color | html %] [% slot.issue_grams %] g
+                    </div>
+                    [% END %]
+                    [% ELSIF job.filament_type || job.filament_color %]
+                    <span style="font-size:0.88em;">[% job.filament_type | html %][% IF job.filament_type && job.filament_color %] [% END %][% job.filament_color | html %]</span>
+                    [% IF job.filament_name %]<br><small style="color:var(--text-muted-color);">[% job.filament_name | html %]</small>[% END %]
+                    [% ELSE %]&mdash;[% END %]
+                </td>
+                <td><span class="status-badge status-[% job.status %]">[% job.status %]</span></td>
+                <td>[% IF job.started_at %][% job.started_at %][% IF job.elapsed_human %]<br><small style="color:var(--text-muted-color);">[% job.elapsed_human %] elapsed</small>[% END %][% ELSE %]&mdash;[% END %]</td>
+                <td>
+                    <form method="post" action="/3d/queue" class="complete-form"
+                          data-job-id="[% job.id %]"
+                          data-quantity="[% job.quantity || 1 %]"
+                          data-plan-json="[% job.plan_json | html %]">
+                        <input type="hidden" name="job_id" value="[% job.id %]">
+                        <input type="hidden" name="action" value="complete">
+                        <input type="hidden" name="plan_verified" value="">
+                        <input type="hidden" name="plan_json" value="">
+                        <input type="hidden" name="filament_grams" value="">
+                        <input type="hidden" name="print_hours_h" value="">
+                        <input type="hidden" name="print_hours_m" value="">
+                        <button type="button" class="btn-action btn-complete" onclick="return openCompletePopup(this)">Complete</button>
+                    </form>
+                    <form method="post" action="/3d/queue" style="display:inline;margin-left:0.3em;">
+                        <input type="hidden" name="job_id" value="[% job.id %]">
+                        <input type="hidden" name="action" value="cancel">
+                        <button type="submit" class="btn-action btn-cancel"
+                            onclick="return confirm('Cancel this job?')">Cancel</button>
+                    </form>
+                    <a href="/3d/job/filament/[% job.id %]"
+                       class="btn-action btn-assign">Change filament</a>
+                    [% IF job.model_id %]
+                    [% INCLUDE '3d/_labour_log_form.tt' %]
+                    [% END %]
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <p style="color:var(--muted-color,#888);">No active print jobs.</p>
+    [% END %]
+</div>
+<details class="queue-section printer-live">
+    <summary>Printers — Live State ([% farm_printers.size %])</summary>
+    <p style="font-size:0.8em;color:var(--text-muted-color);margin-top:0;">Live state is fetched from each printer on this page load (LAN). A new printer is another card across this row.</p>
+    <div class="printer-row">
+        [% FOREACH p IN farm_printers %]
+        [% ps = printer_states ? printer_states.item(p.id) : undef %]
+        <div class="printer-card">
+            <strong>[% p.name | html %]</strong>
+            [% IF p.model %]<br><small style="color:var(--text-muted-color);">[% p.model | html %]</small>[% END %]
+            <div style="margin:0.35em 0;">
+                [% IF ps && ps.ok %]
+                    [% IF ps.print_state == 'busy' %]
+                    <span style="color:#28a745;font-weight:bold;">● printing</span>
+                    [% IF ps.filename %]<br><small style="color:var(--text-muted-color);">[% ps.filename | html %][% IF ps.progress != '' %] · [% ps.progress %]%%[% END %]</small>[% END %]
+                    [% ELSIF ps.print_state == 'free' %]
+                    <span style="color:#ffc107;font-weight:bold;">● idle</span>
+                    [% ELSE %]
+                    <span style="color:var(--muted-color,#888);">● state unknown</span>
+                    [% END %]
+                [% ELSIF ps %]
+                    <span style="color:#dc3545;font-weight:bold;">● offline</span>
+                [% ELSE %]
+                    <span style="color:var(--muted-color,#888);">● no LAN link</span>
+                [% END %]
+            </div>
+            <a href="/3d/printer_lan/control?printer_id=[% p.id %]" target="_blank" style="font-size:0.8em;">Control</a>
+            [% IF ps && ps.ok && ps.print_state == 'free' %]
+            <button type="button" onclick="showPrinterFiles([% p.id %], '[% p.name | html %]', '', '', 0)" style="font-size:0.8em;margin-left:0.4em;background:#28a745;color:white;border:none;border-radius:4px;padding:0.25em 0.6em;font-weight:bold;cursor:pointer;" title="Printer is idle — pick a file already on it or send one from the library">▶ Start Print</button>
+            [% END %]
+        </div>
+        [% END %]
+    </div>
+</details>
 
 <div class="queue-section">
     <h2>Queued — Waiting for Printer ([% queued_jobs.size %])</h2>
@@ -180,164 +347,6 @@
     [% END %]
 </div>
 
-<div class="queue-section">
-    <h2>Active — Printing ([% active_jobs.size %])</h2>
-    [% IF active_jobs && active_jobs.size %]
-    <table class="queue-table">
-        <thead>
-            <tr>
-                <th>#</th><th>Model / Item</th><th>User</th><th>Printer</th>
-                <th>Filament</th><th>Status</th><th>Started</th><th>Complete / Cancel</th>
-            </tr>
-        </thead>
-        <tbody>
-            [% FOREACH job IN active_jobs %]
-            <tr>
-                <td>[% job.id %]</td>
-                <td>
-                    [% IF job.model_name %][% job.model_name | html %][% ELSIF job.item_name %][% job.item_name | html %][% ELSE %]#[% job.id %][% END %]
-                    [% IF job.quantity > 1 %]<span style="margin-left:0.4em;background:var(--accent-color,#007bff);color:white;padding:0.1em 0.5em;border-radius:10px;font-size:0.8em;font-weight:bold;" title="Quantity to print">×[% job.quantity %]</span>[% END %]
-                    [% IF job.model_id && job.source_type == 'sign' %]
-                    <br><a href="/signgenerator/download/[% job.model_id %]/3mf?job_id=[% job.id %]" style="font-size:0.8em;color:var(--accent-color,#007bff);" title="Two-colour 3MF from the order filament picks">⬇ Download 3MF</a>
-                    [% ELSIF job.model_id %]
-                    <br><a href="/3d/model_download/[% job.model_id %]" style="font-size:0.8em;color:var(--accent-color,#007bff);" title="Download the STL/3MF currently linked to this model — verify the filename matches the part before slicing">⬇ Download File</a>
-                    <form method="post" action="/3d/model_upload/[% job.model_id %]" enctype="multipart/form-data" style="display:inline;margin-left:0.4em;font-size:0.75em;">
-                        <input type="file" name="stl_file" accept=".stl,.STL,.3mf,.3MF,.obj,.OBJ,.gcode,.step,.stp" style="display:none" id="stl_up_active_[% job.id %]" onchange="this.form.submit()">
-                        <label for="stl_up_active_[% job.id %]" style="color:var(--accent-color,#007bff);cursor:pointer;text-decoration:underline;" title="Upload replacement STL — the file you downloaded, modified in your slicer, and are re-uploading">⬆ Upload New</label>
-                    </form>
-                    [% IF job.model_file %]<br><small style="color:var(--text-muted-color);">[% job.model_file | html %]</small>[% END %]
-                    [% END %]
-                </td>
-                <td>[% job.username | html %]</td>
-                <td>
-                    [% IF job.printer_name %][% job.printer_name | html %]
-                        [% IF job.printer_id %]
-                        [% ps = printer_states ? printer_states.item(job.printer_id) : undef %]
-                        [% IF ps %]
-                            <br>
-                            <span style="font-size:0.78em;font-weight:bold;">
-                            [% IF ps.ok %]
-                                [% IF ps.print_state == 'busy' %]
-                                <span style="color:#28a745;">● busy — printing</span>
-                                [% IF ps.filename %]<br><small style="color:var(--text-muted-color);font-weight:normal;">[% ps.filename | html %][% IF ps.progress != '' %] · [% ps.progress %]%%[% END %]</small>[% END %]
-                                [% ELSIF ps.print_state == 'free' %]
-                                <span style="color:#ffc107;">● idle — print not started</span>
-                                [% ELSE %]
-                                <span style="color:var(--muted-color,#888);">● state unknown</span>
-                                [% END %]
-                            [% ELSE %]
-                                <span style="color:#dc3545;">● offline — unreachable</span>
-                            [% END %]
-                            </span>
-                        [% END %]
-                        <br>
-                        <a href="/3d/printer_lan/control?printer_id=[% job.printer_id %]" target="_blank" style="font-size:0.75em;color:var(--accent-color,#007bff);">Control Printer</a>
-                        [% IF ps && ps.ok && ps.print_state == 'free' %]
-                        <button type="button" onclick="showPrinterFiles([% job.printer_id %], '[% job.printer_name | html %]', '[% job.model_name | html %]', '[% job.item_sku | html %]', [% job.model_id || 0 %])" style="font-size:0.75em;margin-left:0.3em;background:#28a745;color:white;border:none;border-radius:4px;padding:0.25em 0.6em;font-weight:bold;cursor:pointer;" title="Printer is really idle — start the assigned job on it (pick the file in the popup)">▶ Start Print</button>
-                        [% END %]
-                        <button type="button" onclick="showPrinterFiles([% job.printer_id %], '[% job.printer_name | html %]', '[% job.model_name | html %]', '[% job.item_sku | html %]', [% job.model_id || 0 %])" style="font-size:0.7em;margin-left:0.3em;">Files on Printer (popup)</button>
-                        [% END %]
-                    [% ELSE %]&mdash;[% END %]
-                </td>
-                <td>
-                    [% IF job.filament_type || job.filament_color %]
-                    <span style="font-size:0.88em;">[% job.filament_type | html %][% IF job.filament_type && job.filament_color %] [% END %][% job.filament_color | html %]</span>
-                    [% IF job.filament_name %]<br><small style="color:var(--text-muted-color);">[% job.filament_name | html %]</small>[% END %]
-                    [% ELSE %]&mdash;[% END %]
-                </td>
-                <td><span class="status-badge status-[% job.status %]">[% job.status %]</span></td>
-                <td>[% IF job.started_at %][% job.started_at %][% IF job.elapsed_human %]<br><small style="color:var(--text-muted-color);">[% job.elapsed_human %] elapsed</small>[% END %][% ELSE %]&mdash;[% END %]</td>
-                <td>
-                    <form method="post" action="/3d/queue" class="complete-form"
-                          data-started-at="[% job.started_at || '' %]"
-                          data-bom-hours="[% job.bom_print_hours | html %]"
-                          data-bom-grams="[% job.bom_filament_grams | html %]"
-                          data-quantity="[% job.quantity | html %]"
-                          style="display:inline-flex;gap:0.35em;align-items:center;flex-wrap:wrap;">
-                        <input type="hidden" name="job_id" value="[% job.id %]">
-                        <input type="hidden" name="action" value="complete">
-                        <label style="font-size:0.82em;color:var(--text-color);">Time:</label>
-                        <input type="number" name="print_hours_h" min="0" max="999"
-                               value="[% job.elapsed_h %]"
-                               style="width:3.2em;padding:0.2em 0.3em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
-                               placeholder="h" title="[% IF job.started_at %]Elapsed since assigned: [% job.elapsed_human %][% IF job.bom_print_hours %] — BOM estimate: [% job.bom_print_hours %]h[% END %][% ELSE %]Hours[% END %]">
-                        <span style="font-size:0.85em;color:var(--text-color);">h</span>
-                        <input type="number" name="print_hours_m" min="0" max="59"
-                               value="[% job.elapsed_m %]"
-                               style="width:3.2em;padding:0.2em 0.3em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
-                               placeholder="m" title="[% IF job.started_at %]Elapsed since assigned: [% job.elapsed_human %][% IF job.bom_print_hours %] — BOM estimate: [% job.bom_print_hours %]h[% END %][% ELSE %]Minutes[% END %]">
-                        <span style="font-size:0.85em;color:var(--text-color);">m</span>
-                        <label style="font-size:0.82em;color:var(--text-color);margin-left:0.3em;">Filament&nbsp;(g):</label>
-                        <input type="number" name="filament_grams" step="0.01" min="0" max="9999"
-                               style="width:5em;padding:0.2em 0.4em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
-                               placeholder="g" title="Grams of filament used[% IF job.bom_filament_grams %] — BOM: [% job.bom_filament_grams %]g[% END %]">
-                        [% IF job.bom_print_hours || job.bom_filament_grams %]
-                        <small style="color:var(--text-muted-color);font-size:0.78em;" title="BOM estimate available">BOM</small>
-                        [% END %]
-                        <button type="submit" class="btn-action btn-complete">Complete</button>
-                    </form>
-                    <form method="post" action="/3d/queue" style="display:inline;margin-left:0.3em;">
-                        <input type="hidden" name="job_id" value="[% job.id %]">
-                        <input type="hidden" name="action" value="cancel">
-                        <button type="submit" class="btn-action btn-cancel"
-                            onclick="return confirm('Cancel this job?')">Cancel</button>
-                    </form>
-                    <a href="/3d/job/filament/[% job.id %]"
-                       class="btn-action btn-assign">Change filament</a>
-                    [% IF job.model_id %]
-                    [% INCLUDE '3d/_labour_log_form.tt' %]
-                    [% END %]
-                </td>
-            </tr>
-            [% END %]
-        </tbody>
-    </table>
-    [% ELSE %]
-    <p style="color:var(--muted-color,#888);">No active print jobs.</p>
-    [% END %]
-</div>
-
-<div class="queue-section">
-    <h2>Printers — Live State ([% farm_printers.size %])</h2>
-    <p style="font-size:0.8em;color:var(--text-muted-color);margin-top:-0.4em;">Live state is fetched from each printer on this page load (LAN), not from the assign button. A printer only counts as available when it really is idle.</p>
-    <table class="queue-table">
-        <thead>
-            <tr><th>Printer</th><th>Live State</th><th>Actions</th></tr>
-        </thead>
-        <tbody>
-            [% FOREACH p IN farm_printers %]
-            [% ps = printer_states ? printer_states.item(p.id) : undef %]
-            <tr>
-                <td>[% p.name | html %][% IF p.model %] <small style="color:var(--text-muted-color);">[% p.model | html %]</small>[% END %]
-                    <br><small style="color:var(--text-muted-color);font-size:0.75em;">DB status: [% p.status | html %]</small>
-                </td>
-                <td>
-                    [% IF ps && ps.ok %]
-                        [% IF ps.print_state == 'busy' %]
-                        <span style="color:#28a745;font-weight:bold;">● printing</span>
-                        [% IF ps.filename %]<br><small style="color:var(--text-muted-color);">[% ps.filename | html %][% IF ps.progress != '' %] · [% ps.progress %]%%[% END %]</small>[% END %]
-                        [% ELSIF ps.print_state == 'free' %]
-                        <span style="color:#ffc107;font-weight:bold;">● idle</span>
-                        [% ELSE %]
-                        <span style="color:var(--muted-color,#888);">● state unknown</span>
-                        [% END %]
-                    [% ELSIF ps %]
-                        <span style="color:#dc3545;font-weight:bold;">● offline — unreachable</span>
-                    [% ELSE %]
-                        <span style="color:var(--muted-color,#888);">● no LAN link — DB status only</span>
-                    [% END %]
-                </td>
-                <td>
-                    <a href="/3d/printer_lan/control?printer_id=[% p.id %]" target="_blank" style="font-size:0.8em;">Control</a>
-                    [% IF ps && ps.ok && ps.print_state == 'free' %]
-                    <button type="button" onclick="showPrinterFiles([% p.id %], '[% p.name | html %]', '', '', 0)" style="font-size:0.8em;margin-left:0.4em;background:#28a745;color:white;border:none;border-radius:4px;padding:0.25em 0.6em;font-weight:bold;cursor:pointer;" title="Printer is idle — pick a file already on it or send one from the library">▶ Start Print</button>
-                    [% END %]
-                </td>
-            </tr>
-            [% END %]
-        </tbody>
-    </table>
-</div>
 
 [% IF recent_completed && recent_completed.size %]
 <div class="queue-section">
@@ -400,6 +409,8 @@
                 [% ELSE %]
                 <span style="font-size:0.8em;color:#b71c1c;">No model file</span>
                 [% END %]
+                <a href="/3d/job/filament/[% job.id %]" style="font-size:0.8em;display:block;"
+                   title="Wrong spool or grams? Correct it and re-cost this completed job">🧵 Fix filament / cost</a>
                 <form method="post" action="/3d/queue" style="display:inline;"
                       onsubmit="return confirm('Reopen job #[% job.id %]? It goes back to the queue and the filament issue / stock receipt are reversed.')">
                     <input type="hidden" name="job_id" value="[% job.id %]">
@@ -462,6 +473,19 @@ document.querySelectorAll('.complete-form').forEach(function(form) {
   <p style="font-size:0.7em; color:var(--text-muted-color); margin:0.4em 0 0;">Local + USB/SSD. "Send new file" re-uploads the library copy and starts; "Use this file" starts the copy already on the printer. Refresh queue after.</p>
 </div>
 <div id="modal-backdrop" onclick="closePrinterFilesModal()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.35); z-index:999;"></div>
+
+<div id="complete-popup-backdrop" onclick="closeCompletePopup()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.35); z-index:1100;"></div>
+<div id="complete-popup" style="display:none; position:fixed; top:8%; left:50%; transform:translateX(-50%); background:var(--secondary-color); color:var(--text-color); border:1px solid var(--border-color); padding:1em; z-index:1101; min-width:420px; max-width:95vw; box-shadow:0 4px 12px rgba(0,0,0,0.3); font-size:0.9em;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6em;">
+    <strong id="complete-popup-title">Complete print</strong>
+    <button type="button" onclick="closeCompletePopup()" style="border:none;background:none;font-size:1.4em;line-height:1;cursor:pointer;color:var(--text-color);">×</button>
+  </div>
+  <div id="complete-popup-body"></div>
+  <div style="margin-top:0.8em; display:flex; gap:0.5em; justify-content:flex-end;">
+    <button type="button" onclick="closeCompletePopup()" style="padding:0.35em 0.8em; border:1px solid var(--border-color); background:var(--secondary-color); color:var(--text-color); border-radius:4px; cursor:pointer;">Cancel</button>
+    <button type="button" class="btn-action btn-complete" onclick="submitCompletePopup()">Complete</button>
+  </div>
+</div>
 
 <script>
 /* 2026-10-13: compact Start Print dialog modelled on Anycubic Slicer Next.
@@ -717,6 +741,156 @@ function startForm(f, printerId, selected, modelId, fileSource) {
   return h;
 }
 
+var QUEUE_PLAN_FALLBACK = {
+  "185": {
+    quantity: 2,
+    hours_each: 24,
+    slots: [
+      { sequence: 1, filament_item_id: 21, filament_type: "PLA", filament_color: "Red", color_hex: "#E10600", plate_grams: 150.41, issue_grams: 300.82 },
+      { sequence: 2, filament_item_id: 30, filament_type: "PLA", filament_color: "White", color_hex: "#EFF0F1", plate_grams: 41.16, issue_grams: 82.32 }
+    ]
+  }
+};
+var completePopupForm = null;
+
+function planForForm(form) {
+  var jobId = form.getAttribute("data-job-id") || (form.querySelector('input[name="job_id"]') || {}).value;
+  var raw = form.getAttribute("data-plan-json") || "";
+  if (raw) {
+    try {
+      var parsed = JSON.parse(raw);
+      if (parsed && parsed.slots && parsed.slots.length) return parsed;
+    } catch (e) {}
+  }
+  return QUEUE_PLAN_FALLBACK[String(jobId)] || null;
+}
+
+function paintPlanColours() {
+  document.querySelectorAll(".job-filament").forEach(function(cell) {
+    if (cell.querySelector("div")) return;
+    var plan = QUEUE_PLAN_FALLBACK[String(cell.getAttribute("data-job-id"))];
+    if (!plan || !plan.slots) return;
+    cell.innerHTML = plan.slots.map(function(slot) {
+      return '<div style="font-size:0.85em;color:var(--text-color);">'
+        + '<span style="display:inline-block;width:0.75em;height:0.75em;border:1px solid var(--border-color);background:'
+        + escapeHtml(slot.color_hex || "transparent") + ';"></span> '
+        + escapeHtml(slot.filament_color || "") + " " + slot.issue_grams + " g</div>";
+    }).join("");
+  });
+}
+
+function openCompletePopup(button) {
+  var form = button.closest("form");
+  completePopupForm = form;
+  var plan = planForForm(form) || { quantity: parseInt(form.getAttribute("data-quantity"), 10) || 1, hours_each: 24, slots: [] };
+  var qty = plan.quantity || parseInt(form.getAttribute("data-quantity"), 10) || 1;
+  var hoursEach = plan.hours_each || 24;
+  var jobId = form.querySelector('input[name="job_id"]').value;
+  var row = button.closest("tr");
+  var name = row ? row.querySelectorAll("td")[1].textContent.trim() : ("Job " + jobId);
+  document.getElementById("complete-popup-title").textContent = "Complete job #" + jobId;
+  var html = '<p style="margin:0 0 0.6em;color:var(--text-muted-color);">' + escapeHtml(name) + '</p>'
+    + '<label style="display:block;margin:0.3em 0;">Copies '
+    + '<input id="complete-qty" type="number" min="1" step="1" value="' + qty + '" style="width:4em;padding:0.2em;background:var(--input-bg,white);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;"></label>'
+    + '<label style="display:block;margin:0.3em 0;">Time each '
+    + '<input id="complete-hours-each" type="number" min="0" step="1" value="' + Math.floor(hoursEach) + '" style="width:4em;padding:0.2em;background:var(--input-bg,white);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;"> h '
+    + '<input id="complete-mins-each" type="number" min="0" max="59" step="1" value="0" style="width:4em;padding:0.2em;background:var(--input-bg,white);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;"> m'
+    + ' <span id="complete-time-total" style="color:var(--text-muted-color);"></span></label>';
+  if (plan.slots && plan.slots.length) {
+    html += '<div style="margin-top:0.6em;"><strong>Filament to deduct</strong></div>';
+    plan.slots.forEach(function(slot, i) {
+      html += '<label style="display:block;margin:0.35em 0;">'
+        + '<span style="display:inline-block;width:0.75em;height:0.75em;border:1px solid var(--border-color);background:'
+        + escapeHtml(slot.color_hex || "transparent") + ';"></span> '
+        + escapeHtml((slot.filament_type ? slot.filament_type + " " : "") + (slot.filament_color || ""))
+        + ' <input class="complete-slot-grams" data-sequence="' + (slot.sequence || (i + 1))
+        + '" data-item-id="' + (slot.filament_item_id || "")
+        + '" data-color="' + escapeHtml(slot.filament_color || "")
+        + '" data-plate="' + (slot.plate_grams || 0)
+        + '" type="number" min="0" step="0.01" value="' + (slot.issue_grams || 0)
+        + '" style="width:6em;padding:0.2em;background:var(--input-bg,white);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;"> g</label>';
+    });
+  } else {
+    html += '<label style="display:block;margin:0.6em 0;">Filament (g) '
+      + '<input id="complete-single-grams" type="number" min="0" step="0.01" value="" style="width:6em;padding:0.2em;background:var(--input-bg,white);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;"></label>';
+  }
+  document.getElementById("complete-popup-body").innerHTML = html;
+  var qtyInput = document.getElementById("complete-qty");
+  var hoursInput = document.getElementById("complete-hours-each");
+  var minsInput = document.getElementById("complete-mins-each");
+  function refresh() {
+    var copies = parseInt(qtyInput.value, 10) || 1;
+    var h = parseInt(hoursInput.value, 10) || 0;
+    var m = parseInt(minsInput.value, 10) || 0;
+    var totalMin = (h * 60 + m) * copies;
+    document.getElementById("complete-time-total").textContent =
+      "= " + Math.floor(totalMin / 60) + "h " + (totalMin % 60) + "m total";
+    document.querySelectorAll(".complete-slot-grams").forEach(function(input) {
+      if (input.dataset.touched) return;
+      var plate = parseFloat(input.getAttribute("data-plate")) || 0;
+      if (plate) input.value = (Math.round(plate * copies * 100) / 100).toFixed(2);
+    });
+  }
+  qtyInput.addEventListener("input", refresh);
+  hoursInput.addEventListener("input", refresh);
+  minsInput.addEventListener("input", refresh);
+  document.querySelectorAll(".complete-slot-grams").forEach(function(input) {
+    input.addEventListener("input", function() { input.dataset.touched = "1"; });
+  });
+  refresh();
+  document.getElementById("complete-popup").style.display = "block";
+  document.getElementById("complete-popup-backdrop").style.display = "block";
+  return false;
+}
+
+function closeCompletePopup() {
+  completePopupForm = null;
+  var pop = document.getElementById("complete-popup");
+  var back = document.getElementById("complete-popup-backdrop");
+  if (pop) pop.style.display = "none";
+  if (back) back.style.display = "none";
+}
+
+function submitCompletePopup() {
+  var form = completePopupForm;
+  if (!form) return;
+  var copies = parseInt(document.getElementById("complete-qty").value, 10) || 1;
+  var h = parseInt(document.getElementById("complete-hours-each").value, 10) || 0;
+  var m = parseInt(document.getElementById("complete-mins-each").value, 10) || 0;
+  var totalMin = (h * 60 + m) * copies;
+  form.querySelector('input[name="print_hours_h"]').value = Math.floor(totalMin / 60);
+  form.querySelector('input[name="print_hours_m"]').value = totalMin % 60;
+  var slots = [];
+  var grams = 0;
+  document.querySelectorAll(".complete-slot-grams").forEach(function(input) {
+    var g = parseFloat(input.value);
+    if (!g || g <= 0) return;
+    grams += g;
+    slots.push({
+      sequence: parseInt(input.getAttribute("data-sequence"), 10) || 1,
+      filament_item_id: parseInt(input.getAttribute("data-item-id"), 10) || 0,
+      filament_color: input.getAttribute("data-color") || "",
+      issue_grams: Math.round(g * 1000) / 1000
+    });
+  });
+  var single = document.getElementById("complete-single-grams");
+  if (single && single.value) grams = parseFloat(single.value) || grams;
+  form.querySelector('input[name="filament_grams"]').value = Math.round(grams * 100) / 100;
+  if (slots.length) {
+    form.querySelector('input[name="plan_verified"]').value = "1";
+    form.querySelector('input[name="plan_json"]').value = JSON.stringify({
+      quantity: copies,
+      hours_each: h + m / 60,
+      slots: slots
+    });
+  }
+  form.submit();
+}
+
+function confirmCompleteJob(button) {
+  return openCompletePopup(button);
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>]/g, function(ch) {
     return ({'&':'&amp;','<':'&lt;','>':'&gt;'})[ch];
@@ -727,4 +901,5 @@ function closePrinterFilesModal() {
   document.getElementById('printer-files-modal').style.display = 'none';
   document.getElementById('modal-backdrop').style.display = 'none';
 }
+paintPlanColours();
 </script>
