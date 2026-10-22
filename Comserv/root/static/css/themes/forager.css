@@ -68,3 +68,13 @@ body.theme-forager td { border-color: #c8e6c9; }
 body.theme-forager tr:nth-child(even) td { background: #f8fdf4; }
 /* Footer */
 body.theme-forager .site-footer, body.theme-forager footer { background: #e8f3e0; color: #2d5a27; border-top: 3px solid #7ab648; }
+/* Hero buttons: cream text, beats generic link colours */
+body.theme-forager .forager-hero .hero-links a,
+body.theme-forager .forager-hero .hero-links a:visited { color: #fffbe6 !important; }
+body.theme-forager .forager-hero .hero-links a:hover { color: #ffffff !important; }
+/* Newsletter "Stay connected" bar: green instead of blue */
+body.theme-forager #ml-subscribe-banner {
+  background: linear-gradient(90deg, #2d5a27, #4a8c3f) !important; color: #fff !important;
+}
+body.theme-forager #ml-subscribe-banner a[href="/mail/my_subscriptions"],
+body.theme-forager #ml-subscribe-banner a[href="/mail/subscribe"] { color: #2d5a27 !important; }
