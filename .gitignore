@@ -218,6 +218,9 @@ Comserv/data/ai_usage_readings.jsonl
 Comserv/data/ai_eval_inbox/
 Comserv/data/ai_eval_inbox/**
 Comserv/data/ai_hermes_overrun*.json
+Comserv/data/ai_commit_gate.json
+Comserv/data/ai_review_scores.json
+Comserv/data/ai_reviewer_spend.json
 Comserv/root/static/ai/*usage*.json*
 Comserv/root/static/ai/*monitor*.json*
 
