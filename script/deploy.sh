@@ -145,6 +145,15 @@ case "${1:-}" in
     --push-only|push-only)
         DEPLOY_MODE_DETECTED="push-only"
         ;;
+    --run-image|run-image)
+        DEPLOY_MODE_DETECTED="run-image"
+        ;;
+    --flow|flow)
+        # Image-first deploy flow (preview by default). Dispatched HERE, before any
+        # top-level side effects below (artifact sync, git checks, secrets setup),
+        # so a preview never touches anything.
+        exec "$(dirname "$(readlink -f "$0")")/deploy-flow.sh" "${@:2}"
+        ;;
 esac
 
 # If a mode flag was passed, export it so the rest of the script can see it
@@ -195,6 +204,15 @@ fi
 PROD_UP_SERVICES="web-prod"
 [ -z "$COMPOSE_FILE" ] && COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.prod.yml"
 IMAGE="shantamcsbain/comserv-web-prod:latest"
+# deploy-flow.sh passes a fixed tag (commit-time) so the SAME image is run/pulled
+# everywhere. Only this repository is accepted.
+if [ -n "${DEPLOY_IMAGE:-}" ]; then
+    case "$DEPLOY_IMAGE" in
+        shantamcsbain/comserv-web-prod:[A-Za-z0-9]*) IMAGE="$DEPLOY_IMAGE" ;;
+        *) echo "❌ DEPLOY_IMAGE must be shantamcsbain/comserv-web-prod:<tag>"; exit 1 ;;
+    esac
+    IMAGE="${IMAGE//[^A-Za-z0-9._:\/-]/}"
+fi
 # Standard container name is "comserv2-web-prod" (matches comserv2-config-db,
 # comserv2-redis, etc.). A legacy container may still exist under the old name
 # "comserv-web-prod" — detect it so the monitor/deploy manages it instead of
@@ -976,7 +994,7 @@ start_prod_container_from_image() {
         --name "$name" \
         --restart unless-stopped \
         --network comserv_default \
-        -p 5000:5000 \
+        -p "${HOST_PORT:-5000}:5000" \
         --log-driver json-file --log-opt max-size=20m --log-opt max-file=5 \
         -e ENVIRONMENT=production \
         -e PORT=5000 \
@@ -1000,7 +1018,7 @@ start_prod_container_from_image() {
         -v comserv2_cache:/cache \
         -v comserv2_logs:/opt/comserv/root/log \
         -v "$NFS_VOLUME_NAME:/data/nfs:rw" \
-        -v comserv2_sessions:/tmp/comserv/session \
+        -v "${SESSION_VOLUME:-comserv2_sessions}:/tmp/comserv/session" \
         -v comserv2_cache:/tmp/comserv/cache \
         -v comserv2_temp:/tmp/comserv/temp \
         -v comserv2_themes:/opt/comserv/root/themes \
@@ -1070,6 +1088,14 @@ PY
     return $rc
 }
 
+# Host keys are VERIFIED (was StrictHostKeyChecking=no). The target's key must
+# already be in known_hosts; an unknown/changed key fails the SSH call.
+_ssh_hostkey_opts() {
+    local kh="${COMSERV_SSH_KNOWN_HOSTS:-$HOME/.ssh/known_hosts}"
+    kh="${kh//[^A-Za-z0-9._\/-]/}"
+    echo "-o StrictHostKeyChecking=yes -o UserKnownHostsFile=$kh"
+}
+
 canonical_deploy() {
     local TARGET_HOST="${1:-local}"
     local SVC="web-prod"
@@ -1082,9 +1108,9 @@ canonical_deploy() {
         # back to the keyfile-based ssh so key auth still works. Build the
         # command as a function so both branches are used consistently.
         if [ -n "${SSHPASS:-}" ]; then
-            REMOTE_SSH="sshpass -e ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@${TARGET_HOST}"
+            REMOTE_SSH="sshpass -e ssh $(_ssh_hostkey_opts) -o ConnectTimeout=15 ubuntu@${TARGET_HOST}"
         else
-            REMOTE_SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i ${SSH_KEYFILE:-$HOME/.ssh/id_ed25519} ubuntu@${TARGET_HOST}"
+            REMOTE_SSH="ssh $(_ssh_hostkey_opts) -o ConnectTimeout=15 -i ${SSH_KEYFILE:-$HOME/.ssh/id_ed25519} ubuntu@${TARGET_HOST}"
         fi
         # When deploying to a remote we build+push locally first, then the
         # remote only pulls+runs (never rebuilds). Local build stays on this host.
@@ -1313,7 +1339,7 @@ recreate_local_web_prod() {
     local HEALTHY=0 i OK
     for i in $(seq 1 30); do
         OK=0
-        curl -fs --max-time 8 http://127.0.0.1:5000/health >/dev/null 2>&1 && OK=1
+        curl -fs --max-time 8 "http://127.0.0.1:${HOST_PORT:-5000}/health" >/dev/null 2>&1 && OK=1
         if [ "$OK" = "1" ]; then HEALTHY=1; echo "✅ healthy (attempt $i)"; break; fi
         echo "  health attempt $i failed, waiting 5s..."
         sleep 5
@@ -1418,22 +1444,36 @@ if [ "${DEPLOY_MODE:-}" = "build-push" ]; then
 fi
 
 if [ "${DEPLOY_MODE:-}" = "push-only" ]; then
-    echo "=== PUSH ONLY (no build, no container recreate) ==="
+    # Push Image button = SAFE PUSH. It used to re-tag WHATEVER image the local
+    # web-prod container ran as :latest and push it (could publish a weeks-old
+    # image and roll production back on the next Pull & Deploy). Now it pushes only
+    # the fixed <commit-time> tag running HEALTHY on workstation :5000, then moves :latest.
     if is_production_host; then
         echo "❌ REFUSING to push from production. Push from the workstation."
         exit 1
     fi
-    # Prefer the image currently used by the local web-prod container; fall back to :latest tag name.
-    local_img=$(docker inspect --format='{{.Image}}' comserv2-web-prod 2>/dev/null || docker inspect --format='{{.Image}}' comserv-web-prod 2>/dev/null || true)
-    if [ -n "$local_img" ]; then
-        echo "Tagging running container image $local_img as $IMAGE"
-        docker tag "$local_img" "$IMAGE" || { echo "❌ docker tag failed"; exit 1; }
-    else
-        echo "No local web-prod container — pushing existing $IMAGE if present"
+    exec "$(dirname "$(readlink -f "$0")")/deploy-flow.sh" safe-push --apply
+fi
+
+if [ "${DEPLOY_MODE:-}" = "run-image" ]; then
+    # deploy.sh --run-image <repo:tag> <container> <host-port>
+    # Used by deploy-flow.sh (stage :4000/:3000, promote to :5000, rollback).
+    # Same rename-to-backup -> start -> /health gate -> auto-restore as Rebuild.
+    if is_production_host; then
+        echo "❌ --run-image is for the workstation. production1 uses --pull-deploy."; exit 1
     fi
-    docker push "$IMAGE" || { echo "❌ docker push failed"; exit 1; }
-    echo "✅ Pushed $IMAGE (running container untouched)"
-    exit 0
+    RI_IMG="${CLI_ARG2:-}"; RI_NAME="${3:-}"; RI_PORT="${4:-}"
+    case "$RI_NAME:$RI_PORT" in
+        comserv2-web-prod:5000|comserv2-web-test:4000|comserv2-web-alt:3000) ;;
+        *) echo "❌ container/port must be comserv2-web-prod:5000, comserv2-web-test:4000 or comserv2-web-alt:3000"; exit 1 ;;
+    esac
+    case "$RI_IMG" in shantamcsbain/comserv-web-prod:[A-Za-z0-9]*) ;; *) echo "❌ bad image $RI_IMG"; exit 1 ;; esac
+    IMAGE="$RI_IMG"; CONTAINER="$RI_NAME"; export HOST_PORT="$RI_PORT"
+    [ "$RI_PORT" != "5000" ] && export SESSION_VOLUME="comserv2_sessions_$RI_PORT"
+    if docker image inspect "$IMAGE" >/dev/null 2>&1; then SKIP_PULL=1; fi
+    echo "=== RUN IMAGE $IMAGE as $CONTAINER on :$HOST_PORT (no build) ==="
+    SKIP_PULL="${SKIP_PULL:-0}" recreate_local_web_prod
+    exit $?
 fi
 
 if [ "${DEPLOY_MODE:-}" = "local-rebuild" ]; then
