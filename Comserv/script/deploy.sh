@@ -912,7 +912,14 @@ start_prod_container_from_image() {
             secrets="/opt/comserv/secrets"
         fi
     fi
-    ident="${SYSTEM_IDENTIFIER:-production1}"
+    # Identifier follows the host this runs on unless the caller set it (prod1 vs prod2).
+    if [ -z "${SYSTEM_IDENTIFIER:-}" ]; then
+        case "$(hostname)" in
+            *production2*|*prod2*) SYSTEM_IDENTIFIER=production2 ;;
+            *) SYSTEM_IDENTIFIER=production1 ;;
+        esac
+    fi
+    ident="$SYSTEM_IDENTIFIER"
     echo "    secrets dir: ${secrets:-NONE}"
     purge_workstation_web_siblings
 
@@ -937,13 +944,42 @@ start_prod_container_from_image() {
         docker volume create "$v" >/dev/null 2>&1 || true
     done
 
-    # Seed override volumes FROM THE IMAGE if they are empty (volume-shadow trap).
-    docker run --rm --entrypoint sh \
-        -v comserv2_theme_css:/dest "$img" \
-        -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/css/themes/. /dest/ 2>/dev/null || true; fi'
-    docker run --rm --entrypoint sh \
-        -v comserv2_theme_config:/dest "$img" \
-        -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/config/. /dest/ 2>/dev/null || true; fi'
+    # Themes: THEMES_NFS=1 (default) = ONE shared, writable copy on NFS
+    # (192.168.1.175:/mnt/data/comserv_themes/{css_themes,config,themes}) used by
+    # every node. It is the single source of truth, so it is NEVER seeded or
+    # overwritten from the image. THEMES_NFS=0 = old per-node local volumes
+    # (rollback), seeded from the image only when empty.
+    local th_css th_cfg th_root tv tdir topts
+    if [ "${THEMES_NFS:-1}" = "1" ]; then
+        th_css=comserv2_theme_css_nfs; th_cfg=comserv2_theme_config_nfs; th_root=comserv2_themes_nfs
+        for tv in "$th_css:css_themes" "$th_cfg:config" "$th_root:themes"; do
+            tdir="${tv#*:}"; tv="${tv%%:*}"
+            if ! docker volume inspect "$tv" >/dev/null 2>&1; then
+                echo "    creating Docker NFS theme volume $tv"
+                docker volume create --driver local --opt type=nfs \
+                    --opt 'o=addr=192.168.1.175,rw,nfsvers=3,hard,timeo=600,retrans=2' \
+                    --opt "device=:/mnt/data/comserv_themes/$tdir" "$tv" >/dev/null || return 1
+            fi
+            topts=$(docker volume inspect "$tv" --format '{{index .Options "type"}}|{{index .Options "device"}}' 2>/dev/null || true)
+            if [ "$topts" != "nfs|:/mnt/data/comserv_themes/$tdir" ]; then
+                echo "❌ $tv is not the shared NFS theme volume: ${topts:-no options}"; return 1
+            fi
+        done
+        if ! docker run --rm --entrypoint sh -v "$th_cfg:/t:ro" "$img" -c 'test -s /t/theme_definitions.json'; then
+            echo "❌ shared NFS themes missing theme_definitions.json — refusing to start (set THEMES_NFS=0 to use local volumes)"; return 1
+        fi
+        echo "    themes: shared NFS ($th_css, $th_cfg, $th_root)"
+    else
+        th_css=comserv2_theme_css; th_cfg=comserv2_theme_config; th_root=comserv2_themes
+        # Seed override volumes FROM THE IMAGE if they are empty (volume-shadow trap).
+        docker run --rm --entrypoint sh \
+            -v comserv2_theme_css:/dest "$img" \
+            -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/css/themes/. /dest/ 2>/dev/null || true; fi'
+        docker run --rm --entrypoint sh \
+            -v comserv2_theme_config:/dest "$img" \
+            -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/config/. /dest/ 2>/dev/null || true; fi'
+        echo "    themes: LOCAL per-node volumes (THEMES_NFS=0)"
+    fi
 
     # Seed DB connection secrets (K8s-secret style) into the secrets volume so
     # RemoteDB.pm finds them. Source = the secure store on this host (same place
@@ -1003,9 +1039,9 @@ start_prod_container_from_image() {
         -v comserv2_sessions:/tmp/comserv/session \
         -v comserv2_cache:/tmp/comserv/cache \
         -v comserv2_temp:/tmp/comserv/temp \
-        -v comserv2_themes:/opt/comserv/root/themes \
-        -v comserv2_theme_config:/opt/comserv/root/static/config \
-        -v comserv2_theme_css:/opt/comserv/root/static/css/themes \
+        -v "$th_root:/opt/comserv/root/themes" \
+        -v "$th_cfg:/opt/comserv/root/static/config" \
+        -v "$th_css:/opt/comserv/root/static/css/themes" \
         -v comserv2_whisper_venv:/opt/comserv/whisper_venv \
         -v comserv2_cpan_cache:/root/.cpan \
         "${extra[@]}" \
@@ -1205,7 +1241,8 @@ EOF
         if ! $REMOTE_SSH bash -s <<EOF
 $(declare -f is_production_host purge_workstation_web_siblings ensure_nfs_volume start_prod_container_from_image)
 NFS_VOLUME_NAME=${NFS_VOLUME_NAME}
-export SYSTEM_IDENTIFIER=production1
+export SYSTEM_IDENTIFIER=$(_target_system_identifier "$TARGET_HOST")
+export THEMES_NFS=${THEMES_NFS:-1}
 start_prod_container_from_image ${IMAGE} ${CONTAINER}
 EOF
         then
@@ -1373,6 +1410,15 @@ canonical_deploy_to_nodes() {
 
 # Late dispatch — canonical_deploy* AND _normalize_deploy_node exist now.
 # --prod must be after _normalize_deploy_node: canonical_deploy_to_nodes calls it.
+# Map a deploy target (name or IP) to the SYSTEM_IDENTIFIER the container should carry.
+_target_system_identifier() {
+    case "${1:-}" in
+        production2|prod2|192.168.1.127) echo "production2" ;;
+        production1|prod1|192.168.1.126|172.30.50.206) echo "production1" ;;
+        *) echo "${SYSTEM_IDENTIFIER:-production1}" ;;
+    esac
+}
+
 _normalize_deploy_node() {
     case "${1:-}" in
         production1|prod1) echo "192.168.1.126" ;;

@@ -28,7 +28,7 @@ has 'logging' => (
 # ===================================================================
 
 sub _resolve_api_key {
-    my ($self, $c, $api_key) = @_;
+    my ($self, $c, $api_key, %o) = @_;
 
     # Explicit key passed (already decrypted) takes precedence.
     return $api_key if $api_key && length $api_key;
@@ -43,21 +43,66 @@ sub _resolve_api_key {
     }
     return $ENV{OPENROUTER_API_KEY} if $ENV{OPENROUTER_API_KEY} && length $ENV{OPENROUTER_API_KEY};
 
-    my $user_id = $c->session->{user_id} or return undef;
-    my $roles   = $c->session->{roles} || [];
-    $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
-    my $is_admin = grep { $_ =~ /^(admin|developer)$/i } @$roles;
-    return undef unless $is_admin;   # key sync is admin-only (per v1)
+    # 2026-10-16: servers started without a login shell (Git page button,
+    # systemd) miss OPENROUTER_API_KEY from ~/.bashrc. Fall back to the
+    # workstation secret file (one line, chmod 600) before the DB lookup.
+    if (my $home = $ENV{HOME}) {
+        for my $f ("$home/.comserv/secrets/openrouter_api_key") {
+            next unless -r $f && open(my $fh, '<', $f);
+            my $k;
+            while (my $l = <$fh>) {
+                if ($f =~ /\.env$/) { ($k) = $l =~ /^\s*(?:export\s+)?OPENROUTER_API_KEY\s*=\s*['"]?([^'"\s]+)/ and last; }
+                else { chomp $l; $k = $l if length $l; last; }
+            }
+            close $fh;
+            return $k if $k && length $k;
+        }
+    }
 
+    # 2026-10-17: every logged-in user's chat may use a shared key (it is only
+    # used server-side, never shown). Order: user's own row -> a row tagged with
+    # this site_id -> the workstation-wide row (site_id NULL, newest first).
+    # user_id is NOT NULL in user_api_keys, so "shared" = site/global scope.
+    # 2026-10-21: no session (usage_live, daily eval, guard) -> skip the user row
+    # and use the shared rows, then the workstation key files.
+    # Chat stays logged-in only; system => 1 (status/eval/guard) may use shared keys.
+    my $user_id = eval { $c->session->{user_id} };
+    return undef unless defined $user_id || $o{system};
+    my $key_obj = eval { _db_key($c, $user_id) };
+    my $k = $key_obj && $key_obj->api_key_encrypted ? eval { $key_obj->get_api_key() } : undef;
+    return $k if $k && length $k;
+    return $o{system} ? shared_file_key() : undef;
+}
+
+# Workstation files, same names as script/load_shared_keys.pl, plus ~/.hermes/.env.
+# Returns the value only; never logged.
+sub shared_file_key {
+    my $home = shift // $ENV{HOME} or return undef;
+    for my $f ("$home/.comserv/secrets/api_keys.env", "$home/.bashrc", "$home/.hermes/.env") {
+        next unless -r $f && open(my $fh, '<', $f);
+        my $k;
+        while (my $l = <$fh>) {
+            ($k) = $l =~ /^\s*(?:export\s+)?OPENROUTER_API_KEY\s*=\s*['"]?([^'"\s#]+)/ or next;
+            last if $k =~ /^\S{8,}$/ && $k !~ /^\$/;
+            undef $k;
+        }
+        close $fh;
+        return $k if $k;
+    }
+    return undef;
+}
+
+sub _db_key {
+    my ($c, $user_id) = @_;
     my $schema = eval { $c->model('DBEncy')->schema } or return undef;
-    my $key_obj = $schema->resultset('UserApiKeys')->search(
-        { user_id => $user_id, service => 'openrouter', is_active => '1' }
-    )->first || $schema->resultset('UserApiKeys')->search(
-        { service => 'openrouter', is_active => '1' }
-    )->first;
-
-    return undef unless $key_obj && $key_obj->api_key_encrypted;
-    return eval { $key_obj->get_api_key() } || undef;
+    my $rs = $schema->resultset('UserApiKeys');
+    my %base = (service => 'openrouter', is_active => '1');
+    my %newest = (order_by => { -desc => 'updated_at' }, rows => 1);
+    my $site_id = eval { $c->stash->{site_id} } // eval { $c->session->{site_id} };
+    my $key_obj = (defined $user_id ? $rs->search({ %base, user_id => $user_id }, \%newest)->first : undef)
+        || (defined $site_id ? $rs->search({ %base, site_id => $site_id }, \%newest)->first : undef)
+        || $rs->search({ %base, site_id => undef }, \%newest)->first;
+    return $key_obj;
 }
 
 sub list_models {
@@ -116,6 +161,16 @@ sub _per_million {
 # Chat completion against OpenRouter (OpenAI-compatible). Returns the v2 shape.
 sub _chat_http {
     my ($self, $c, %args) = @_;
+
+    # 2026-10-15 last-line guard: OpenRouter is never called for any grok id
+    # or deepseek-v4-pro. Callers should have rerouted grok to Super Grok.
+    require Comserv::Util::AI::PaidBlock;
+    if (Comserv::Util::AI::PaidBlock->blocked_on_openrouter($args{model} // '')) {
+        my $was = $args{model};
+        $args{model} = $Comserv::Util::AI::PaidBlock::FREE_MODEL;
+        eval { $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'openrouter_chat',
+            "Blocked paid OpenRouter model $was; sent $args{model} instead") };
+    }
 
     my $api_key = $self->_resolve_api_key($c, $args{api_key});
     unless ($api_key) {

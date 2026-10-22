@@ -14,6 +14,7 @@ use JSON::PP ();
 use HTTP::Tiny;
 use Fcntl qw(:flock);
 use POSIX qw(strftime);
+use Comserv::Util::AI::PaidBlock ();
 use File::Copy ();
 use Time::Local qw(timegm timelocal);
 
@@ -60,7 +61,7 @@ our %SUPERGROK_CAPS = ( %SUPERGROK, name => 'xai-oauth/grok-4.7', default => 'gr
 our $BANNED_RE      = qr/deepseek-v4-pro/i;   # never written anywhere by the guard
 # Paid models whose recent use (last 10 min) trips the guard early once the day is
 # at $NEAR_CAP_FRAC of the cap (proposal #34b adds tencent/hy4-preview).
-our @PAID_WATCH     = ('deepseek-v4-pro', 'tencent/hy4-preview', 'x-ai/grok');
+our @PAID_WATCH     = ('deepseek-v4-pro', 'tencent/hy4-preview', 'x-ai/grok', 'qwen/qwen3-coder');   # Oct 21: 98 % stop paid coder
 # Oct 15 2026 (Shanta): grok only through xai-oauth (Super Grok). Any OpenRouter grok id is
 # BLOCKED, not just watched: set_model/set_aliases/write_fallback_providers rewrite it, and
 # every run sweeps config default, aliases, fallback, auxiliary and delegation (or_grok_block_plan).
@@ -240,6 +241,11 @@ sub supergrok_budget_left {
     my ($sg) = @_;
     return 0 unless ref $sg eq 'HASH' && %$sg;
     return 0 if $sg->{locked} || $sg->{off_today};
+    # 2026-10-17: never hand Hermes to Super Grok at/above the weekly hard stop (~98 %).
+    my $hard = $sg->{hard_week_cap} // 98;
+    for my $u ($sg->{build}, (ref $sg->{daily_budget} eq 'HASH' ? $sg->{daily_budget}{used_now_pct} : undef)) {
+        return 0 if defined $u && $u =~ /^[\d.]+$/ && $hard =~ /^[\d.]+$/ && $u >= $hard;
+    }
     my $b = $sg->{daily_budget};
     unless (ref $b eq 'HASH' && %$b) {
         # app pacing unreachable: trust the daily guard's own call. deferred_mode 'grok' means it
@@ -312,7 +318,9 @@ sub candidate_order {
     my @ol = grep {  $_->{ollama} } @c;
     if (($kind // 'thrash') eq 'caps') {
         return ({%SUPERGROK_CAPS}, @or, {%SUPERGROK}, @ol) if supergrok_budget_left($sg);
-        return (@or, {%SUPERGROK}, @ol);
+        # 2026-10-17: no Super Grok budget -> free models only (north-mini first);
+        # never fall onto Super Grok the daily guard has ruled out.
+        return (@or, @ol);
     }
     return ({%SUPERGROK}, @or, @ol);
 }
@@ -762,7 +770,9 @@ sub openrouter_endpoints {
 
 # IO
 sub live_spend {
-    my ($self) = @_;
+    my ($self, %a) = @_;
+    my $after = $a{after};
+    my $after_usd = 0;
     my $logf = $self->{agent_log};
     return { ok => 0 } unless $logf && -f $logf;
     open my $fh, '<', $logf or return { ok => 0 };
@@ -785,15 +795,13 @@ sub live_spend {
         my $cost = price_call($c, { $m => $epc{$m} });
         $by{$m} ||= { calls => 0, usd => 0 };
         $by{$m}{calls}++;
-        if (defined $cost) {
-            $usd += $cost;
-            $by{$m}{usd} += $cost;
-        } else {
+        if (!defined $cost) {
             # no endpoint pricing (network down, new model): conservative flat rate, never $0
             $unp++;
-            my $fb = ($c->{in} // 0) * $UNPRICED_IN + ($c->{out} // 0) * $UNPRICED_OUT;
-            $usd += $fb; $by{$m}{usd} += $fb;
+            $cost = ($c->{in} // 0) * $UNPRICED_IN + ($c->{out} // 0) * $UNPRICED_OUT;
         }
+        $usd += $cost; $by{$m}{usd} += $cost;
+        $after_usd += $cost if defined $after && defined $c->{t} && $c->{t} > $after;
         if ($m =~ $PAID_WATCH_RE) {
             if (!defined $last_v4 || $c->{t} > $last_v4) { $last_v4 = $c->{t}; $last_watch = $m }
         }
@@ -801,6 +809,7 @@ sub live_spend {
     return {
         ok => 1,
         day_usd => $usd,
+        (defined $after ? (after_usd => $after_usd, after => $after) : ()),
         calls => scalar(@$calls),
         unpriced => $unp,
         by_model => \%by,
@@ -809,11 +818,39 @@ sub live_spend {
     };
 }
 
+# pure: an OpenRouter reading older than $max (default 1h) is not trusted: its day/week
+# are dropped so the guard runs on the live estimate only (no stale week + live double count).
+our $SNAPSHOT_MAX_AGE = 3600;
+sub stale_guard {
+    my ($or, $now, $max) = @_;
+    return $or unless ref $or eq 'HASH' && $or->{ok};
+    $max //= $SNAPSHOT_MAX_AGE;
+    my $age = $or->{fetched_at} ? $now - $or->{fetched_at} : undef;
+    return $or if !defined $age || $age <= $max;   # no fetched_at: caller-supplied/unknown age, trust as before
+    return { ok => 0, stale => 1, error => sprintf('openrouter reading stale (%dm old)', $age/60),
+             (defined $or->{balance_usd} ? (balance_usd => $or->{balance_usd}) : ()) };
+}
+
 # pure
 sub merge_live {
     my ($or, $live) = @_;
     $or ||= {};
     my %out = %$or;
+    if (ref $live eq 'HASH' && $live->{ok} && $or->{ok} && !$or->{stale}
+        && defined $live->{after_usd} && defined $or->{fetched_at}
+        && defined $live->{after} && $live->{after} == $or->{fetched_at}) {
+        # Oct 22: fresh /auth/key reading already includes everything up to fetched_at;
+        # add only the estimate for calls made after it (no double count).
+        my $add = $live->{after_usd} > 0 ? $live->{after_usd} : 0;
+        $out{reported_day_usd} = $or->{day_usd};
+        $out{day_usd} = ($or->{day_usd} // 0) + $add;
+        $out{week_usd} += $add if defined $out{week_usd};
+        $out{month_usd} += $add if defined $out{month_usd};
+        $out{live_day_usd} = $live->{day_usd};
+        $out{live_after_usd} = $add;
+        $out{live_applied} = 1 if $add > 0;
+        return \%out;
+    }
     if (ref $live eq 'HASH' && $live->{ok}) {
         my $l_day = $live->{day_usd} // 0;
         my $r_day = $or->{day_usd};
@@ -967,7 +1004,8 @@ sub current_model {
 sub read_state { my $s = shift; open my $fh, '<', $s->{state_file} or return {}; local $/; eval { $J->decode(<$fh>) } || {} }
 sub write_state {
     my ($s, $st) = @_;
-    my $tmp = "$s->{state_file}.tmp";
+    # Oct 22: per-process tmp name so servers never clobber each other's half-written file; rename is atomic.
+    my $tmp = "$s->{state_file}.tmp.$$";
     open my $fh, '>', $tmp or return; print $fh JSON::PP->new->canonical->pretty->encode($st); close $fh;
     rename $tmp, $s->{state_file};
 }
@@ -1195,6 +1233,95 @@ sub desktop_notify {
     };
 }
 
+# Oct 22 2026 (Shanta 7:33 AM PT) "shield": old-code servers (other branches) count all of today's
+# agent.log spend and re-trip to north-mini every minute. They honor tripped=1 (hold; hold leaves a
+# non-grok / xai-oauth model alone), so while the money caps are really clear but those servers would
+# still trip, keep tripped=1 + hold_reason=shield and let THIS code own the model:
+#   Super Grok has budget -> xai-oauth grok-4.7; otherwise the daily guard's paid coder (qwen3-coder).
+# saved_model = that model, so an old-code restore (after UTC midnight) writes the same thing.
+# Cleared once Super Grok has budget AND the old-style all-day estimate is under the caps.
+our $SHIELD = 'shield_old_servers';
+sub shield_want {
+    my ($sg, $now) = @_;
+    return { map { ($_ => $SUPERGROK_CAPS{$_}) } @MODEL_KEYS } if supergrok_budget_left($sg);
+    my $m = supergrok_daily_target($sg);
+    return { map { ($_ => $m->{$_}) } @MODEL_KEYS };
+}
+sub old_code_would_trip {
+    my ($s, $or, $live_all) = @_;
+    my $m = merge_live({ %{ $or || {} } }, $live_all);
+    return 0 unless $m->{ok};
+    for my $w (qw(day week month)) {
+        my $v = $m->{"${w}_usd"};
+        return 1 if defined $v && defined $CAPS{$w} && $v >= $CAPS{$w};
+    }
+    return 0;
+}
+sub shield_step {
+    my ($s, $st, $t, $or, %o) = @_;
+    my $sg = $s->supergrok_state;
+    # Oct 22 9:24 AM PT: hold_reason set but tripped=0 => an old-code server ran its restore, i.e. old
+    # servers no longer see a cap breach. Re-raising tripped=1 only feeds their restore path, whose
+    # notify-send ('cleared') is unconditional. Release the shield and stay down; re-enter only right
+    # after restoring a real old-code trip.
+    if (($st->{hold_reason} // '') eq $SHIELD && !$st->{tripped}) {
+        delete @$st{qw(hold_reason hold_since hold_pt)};
+        $st->{shield_released_at} = $t; $st->{shield_released_pt} = pt($t);
+        $s->log_line('shield released ' . pt($t) . ': old servers restored (not over); not re-raising');
+        $s->{shield_released} = 1;
+    }
+    my $grok_ok = supergrok_budget_left($sg);
+    my $on = $st->{tripped} && ($st->{hold_reason} // '') eq $SHIELD;
+    my $rep = exists $s->{reported_or} ? $s->{reported_or} : ($st->{last_openrouter} || {});
+    my $live_all = exists $s->{live_all} ? $s->{live_all} : $s->live_spend;
+    my $old_trip = $s->old_code_would_trip($rep, $live_all);
+    if ($on && $grok_ok && !$old_trip) {
+        delete @$st{qw(hold_reason hold_since hold_pt)};
+        $st->{tripped} = 0;
+        $st->{hand_off_supergrok} = 1;    # daily guard (no longer deferred) syncs aliases/fallback
+        $s->log_line('shield cleared ' . pt($t) . ': Super Grok has budget and old servers would not trip');
+        return { cleared => 1 };
+    }
+    # enter only when the daily guard has Hermes locked off grok (no daily-guard state = no shield)
+    return undef unless $on || ($o{after_restore} && !$s->{shield_released} && !$grok_ok && ref $sg eq 'HASH' && %$sg);
+    my $want = shield_want($sg, $t);
+    my $cur  = $s->current_model || {};
+    my @did;
+    if (($cur->{default} // '') ne $want->{default} || ($cur->{provider} // '') ne $want->{provider}) {
+        assert_safe_model($want);
+        my $bak = $s->backup_config;
+        $s->set_model($want);
+        my %al = map { ($_ => alias_value($want)) } grep { exists(($s->read_aliases || {})->{$_}) } qw(code coder);
+        $s->set_aliases(\%al) if %al;
+        push @did, "model -> $want->{provider}/$want->{default} (backup " . ($bak // 'FAILED') . ')';
+        _append($s->{events_file}, $J->encode({ at => $t, at_pt => pt($t), action => 'shield', to => $want->{default}, backup => $bak }));
+    }
+    unless ($on) { $st->{hold_since} = $t; $st->{hold_pt} = pt($t) }
+    %$st = (%$st, tripped => 1, paused => 0, hold_reason => $SHIELD,
+            saved_model => { %$want }, target => alias_value($want), target_default => $want->{default});
+    $s->log_line('shield ' . pt($t) . ': ' . (@did ? join('; ', @did) : "holding $want->{default}")) if @did || !$on;
+    $s->notify_change($st, 'normal', $want->{default}, 'Hermes on ' . $want->{default},
+        "Hermes default is $want->{default} (money caps clear; Super Grok " . ($grok_ok ? 'open' : 'locked') . ').') ;
+    return { on => 1, model => $want->{default}, did => \@did };
+}
+
+# Oct 22 2026 (Shanta 7:14 AM PT): one alert per state. last_notified {mode, model} lives in the shared
+# state file (written under the run() flock, atomic rename); alert only when that pair changes.
+sub notify_change {
+    my ($s, $st, $mode, $model, $title, $body) = @_;
+    my $key = join '|', $mode // '', $model // '';
+    my $ln  = ref $st->{last_notified} eq 'HASH' ? $st->{last_notified} : {};
+    if (defined $ln->{key} && $ln->{key} eq $key) {
+        $s->log_line("alert suppressed (unchanged $key since " . ($ln->{at_pt} // '?') . "): $title");
+        return 0;
+    }
+    my $t = $s->_now;
+    $st->{last_notified} = { mode => $mode, model => $model, key => $key, at => $t, at_pt => pt($t), title => $title };
+    push @{ $s->{notified} }, { mode => $mode, model => $model, title => $title };
+    $s->desktop_notify($title, $body);
+    return 1;
+}
+
 sub set_model {
     my ($s, $m) = @_;
     if (ref $m eq 'HASH' && is_or_grok($m->{provider}, $m->{default})) {
@@ -1229,32 +1356,76 @@ sub ledger {
 }
 
 # ---- main ------------------------------------------------------------------
+# Oct 22 2026: Hermes cron jobs that pin model 'grok-4.7' with no provider inherit the main
+# provider (openrouter) and get billed as x-ai/grok-4.7 ($1.45 on Oct 22, 5:00-6:32 AM PT).
+# pure: list of job ids whose model is a grok id and whose provider is not xai-oauth.
+sub cron_grok_fix_plan {
+    my ($jobs) = @_;
+    return [] unless ref $jobs eq 'ARRAY';
+    my @ids;
+    for my $j (@$jobs) {
+        next unless ref $j eq 'HASH';
+        next unless Comserv::Util::AI::PaidBlock::is_grok_id($j->{model} // '');
+        next if ($j->{provider} // '') eq 'xai-oauth';
+        push @ids, $j->{id};
+    }
+    return \@ids;
+}
+
+# Pin every grok cron job to xai-oauth (Super Grok), never openrouter. Backs up jobs.json first.
+sub fix_cron_grok_jobs {
+    my $s = shift;
+    my $f = $s->{cron_jobs} // "$s->{hermes_home}/cron/jobs.json";
+    open my $fh, '<', $f or return [];
+    my $raw = do { local $/; eval { $J->decode(<$fh>) } }; close $fh;
+    return [] unless $raw;
+    my $jobs = ref $raw eq 'HASH' ? $raw->{jobs} : $raw;
+    my $ids = cron_grok_fix_plan($jobs);
+    return $ids if !@$ids || $s->{dry_run};
+    my %fix = map { ($_ // '') => 1 } @$ids;
+    $_->{provider} = 'xai-oauth' for grep { ref $_ eq 'HASH' && $fix{$_->{id} // ''} } @$jobs;
+    require File::Copy;
+    File::Copy::copy($f, "$f.bak-overrun-" . strftime('%Y%m%d-%H%M%S', localtime $s->_now));
+    eval { _atomic_write($f, $J->encode($raw)); 1 } or return [];
+    $s->log_line("cron grok jobs pinned to xai-oauth (never openrouter): @$ids");
+    return $ids;
+}
+
 sub run {
     my ($s, %o) = @_;
     open my $lk, '>', $s->{lock_file} or return { action => 'error', error => "lock: $!" };
     flock($lk, LOCK_EX | LOCK_NB) or return { action => 'skip', reason => 'locked' };
+    eval { $s->fix_cron_grok_jobs };
     my $st = $s->read_state;
     my $t  = $s->_now;
     my $lite = 0;
     my $or;
-    if (!$o{force} && $st->{last_check} && $t - $st->{last_check} < $s->{min_interval}) {
-        if (ref $st->{last_openrouter} eq 'HASH' && $st->{last_openrouter}{ok}) {
+    # Oct 22: reuse the saved OpenRouter reading only while it is itself fresh (fetched_at within
+    # min_interval). Cron runs every minute, so keying this on last_check reused an Oct 16 snapshot forever.
+    my $snap = ref $st->{last_openrouter} eq 'HASH' ? $st->{last_openrouter} : {};
+    my $snap_age = $snap->{fetched_at} ? $t - $snap->{fetched_at} : 9e9;
+    if (!$o{force} && $st->{last_check} && $t - $st->{last_check} < $s->{min_interval}
+        && $snap->{ok} && $snap_age < $s->{min_interval}) {
+        if (1) {
             $or = { %{$st->{last_openrouter}} };
             $lite = 1;
-        } else {
-            return { action => 'skip', reason => 'interval', state => $st };
         }
     } else {
         $or = exists $o{openrouter} ? $o{openrouter} : $s->openrouter_status;
     }
+    $or = stale_guard($or, $t, $SNAPSHOT_MAX_AGE);
     my $thrash = exists $o{thrash} ? $o{thrash} : $s->thrash_count;
     my $tbc = exists $o{thrash_by_class} ? $o{thrash_by_class} : $s->thrash_by_class;
     my $lims = $s->thrash_limits;
     my $reported_or = { %$or };
-    my $live = exists $o{live} ? $o{live} : $s->live_spend;
+    $s->{reported_or} = $reported_or unless exists $s->{reported_or};
+    my $live = exists $o{live} ? $o{live} : $s->live_spend(after => $or->{fetched_at});
     $or = merge_live($or, $live);
     my $v4pro_recent = (ref $live eq 'HASH' && $live->{ok} && $live->{last_v4pro_at} && $t - $live->{last_v4pro_at} < 600) ? 1 : 0;
-    my $d = decide(thrash_by_class => $tbc, limits => $lims, thrash => $thrash, openrouter => $or, state => $st, v4pro_recent => $v4pro_recent,
+    # Oct 22 (Shanta 7:33 AM PT): tripped=1 with hold_reason=shield is NOT a money-cap trip; decide as untripped.
+    my $shielded = ($st->{tripped} && ($st->{hold_reason} // '') eq $SHIELD) ? 1 : 0;
+    my $dst = $shielded ? { %$st, tripped => 0 } : $st;
+    my $d = decide(thrash_by_class => $tbc, limits => $lims, thrash => $thrash, openrouter => $or, state => $dst, v4pro_recent => $v4pro_recent,
                    watch_model => (ref $live eq 'HASH' ? $live->{last_watch_model} : undef));
     $d->{thrash} = $thrash;
     if (ref $tbc eq 'HASH' && $tbc->{ok}) {
@@ -1309,6 +1480,7 @@ sub run {
         my $fdone = eval { $s->write_fallback_providers($plan->{fallback}) } || []; push @errs, $@ if $@;
         my $xdone = eval { $s->set_auxiliary($plan->{auxiliary}) } || []; push @errs, $@ if $@;
         my $err = join ' ', @errs;
+        delete @$st{qw(hold_reason hold_since hold_pt)};
         %$st = (%$st, tripped => 1, paused => $paused, since => $t, since_pt => pt($t),
                 reasons => $d->{reasons}, kind => $plan->{kind}, saved_model => $cur, saved_aliases => $aplan->{saved},
                 saved_fallback => $ctx{current_fallback}, saved_auxiliary => $ctx{auxiliary},
@@ -1324,7 +1496,7 @@ sub run {
         _write_notice($s, $msg . "\nAuto-restores when per-provider thrash limits are clear and OpenRouter day/week/month are under \$$CAPS{day}/\$$CAPS{week}/\$$CAPS{month}.");
         $s->write_session_notice({ at => $t, at_pt => pt($t), action => 'trip', reasons => $d->{reasons},
             target => $target->{name}, text => $msg });
-        $s->desktop_notify('Hermes overrun guard TRIPPED',
+        $s->notify_change($st, ($paused ? 'paused' : 'tripped'), $target->{name}, 'Hermes overrun guard TRIPPED',
             ($paused ? 'Hermes PAUSED. ' : "Switched to $target->{name}. ")
             . 'End/restart open sessions. Details: ~/.hermes/overrun_notice.txt');
         $s->log_line($msg . ($err ? " set_error=$err" : ''));
@@ -1371,7 +1543,8 @@ sub run {
         $s->log_line($msg . ($err ? " set_error=$err" : ''));
         _write_notice($s, $msg);
         $s->write_session_notice({ at => $t, at_pt => pt($t), action => 'clear', text => $msg });
-        $s->desktop_notify('Hermes overrun guard cleared', $msg);
+        $s->notify_change($st, 'normal', ($dec->{restore_default} ? $want->{default} : $cur->{default}),
+            'Hermes overrun guard cleared', $msg);
         my $ev = { at => $t, at_pt => pt($t), action => 'restore',
                    to => ($dec->{restore_default} ? $want->{default} : $cur->{default}),
                    preserved_manual => $dec->{restore_default} ? 0 : 1,
@@ -1415,6 +1588,11 @@ sub run {
     }
     if ($d->{action} eq 'hold') {
         $st->{reasons} = $d->{reasons} if @{ $d->{reasons} };
+    }
+    if ($d->{action} eq 'none' || $d->{action} eq 'restore') {
+        my $sh = eval { $s->shield_step($st, $t, $or, after_restore => ($d->{action} eq 'restore' ? 1 : 0)) };
+        $d->{shield} = $sh if $sh;
+        $d->{shield_error} = $@ if $@;
     }
     # Oct 15 2026: block OpenRouter grok every run (re-read config: trip/restore may have written).
     {

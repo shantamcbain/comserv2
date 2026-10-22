@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Comserv grok.com usage",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "description": "Read grok.com Settings \u2192 Usage (SuperGrok Build/Chat % and Grok Bot %) and post to the local Comserv app (:4006, then fallbacks). Numbers only \u2014 no cookies.",
   "browser_specific_settings": {
     "gecko": {

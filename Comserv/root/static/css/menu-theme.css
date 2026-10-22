@@ -504,6 +504,24 @@ header h1 {
     word-break: break-word;
 }
 
+header h1 .site-brand-icon,
+header h1 img.site-brand-icon {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 0.35em;
+    line-height: 1;
+}
+
+header h1 span.site-brand-icon {
+    font-size: 1.15em;
+}
+
+header h1 img.site-brand-icon {
+    height: 1.4em;
+    width: auto;
+    max-width: 4em;
+}
+
 .guest-join-bar {
     background: var(--accent-color);
     color: var(--button-text, var(--nav-text));
