@@ -317,7 +317,9 @@ sub pacing {
     my ($alert_used, $basis) = ($used, 'estimate');
     if (my $m = $in{meter_now}) {
         if (defined $m->{value} && $m->{value} =~ /^\d+(?:\.\d+)?$/ && $m->{at}
-            && $m->{at} >= $cs && $now - $m->{at} < 2 * 3600) {
+            # Oct 22 2026: the add-on re-posts an unchanged value with a new 'at'; the value only
+            # counts for this cycle if it first appeared (changed_at) after the reset.
+            && $m->{at} >= $cs && ($m->{changed_at} // $m->{at}) >= $cs && $now - $m->{at} < 2 * 3600) {
             ($alert_used, $basis) = (0 + $m->{value}, 'meter');
         }
     }
@@ -347,6 +349,12 @@ sub meter_status {
     # Oct 20 2026: history only gets a row when the value changes; the add-on still
     # posts unchanged values (grokcom_usage.json 'at' = last seen). Fresher wins.
     my $ls = $in{last_seen};
+    # Oct 22 2026: a re-posted value first seen before the latest reset is last week's - not a reading.
+    my $pre_reset = 0;
+    if ($ls && defined $ls->{changed_at}) {
+        my ($cs) = cycle_bounds($now, $in{anchor});
+        if ($ls->{changed_at} < $cs) { $pre_reset = 1; $ls = { at => $ls->{at} } }
+    }
     if ($ls && defined $ls->{at} && defined $ls->{value} && $ls->{value} =~ /^-?\d+(?:\.\d+)?$/
         && (!$last || $ls->{at} > $last->{at})) {
         $last = { at => $ls->{at}, value => $ls->{value}, kind => 'used', source => 'addon' };
@@ -356,7 +364,9 @@ sub meter_status {
     my $addon_down = !defined $addon_age_h || $addon_age_h > $ADDON_DOWN_H ? 1 : 0;
     my $stale = !defined $age_h || $age_h > $METER_STALE_H ? 1 : 0;
     my $fresh = (!$stale && defined $age_h && $age_h <= $ADDON_DOWN_H) ? 1 : 0;
+    if ($pre_reset && $last) { my ($cs) = cycle_bounds($now, $in{anchor}); $fresh = 0 if $last->{at} < $cs }
     return {
+        pre_reset => $pre_reset,
         addon_down => $addon_down, fresh => $fresh, addon_down_after_h => $ADDON_DOWN_H,
         ($addon_down ? (addon_status => sprintf('Super Grok add-on down: no post for %s; last value not fresh',
                                                 defined $addon_age_h ? sprintf('%.1f h', $addon_age_h) : 'ever')) : (addon_status => 'ok')),

@@ -270,4 +270,24 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
     ok !$f->{addon_down} && $f->{fresh}, 'add-on 10 min ago -> fresh';
 }
 
+# Oct 22 2026: last week's 99 re-posted after the 10:31 reset (new 'at', value first seen 06:42).
+{
+    my $P = 'Comserv::Util::AI::SuperGrokPacing';
+    local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+    my $reset = Time::Local::timelocal(0, 31, 10, 22, 9, 2026);
+    my $now   = Time::Local::timelocal(0, 40, 10, 22, 9, 2026);
+    my $seen  = Time::Local::timelocal(0, 42, 6, 22, 9, 2026);
+    my @rd = ({ at => $seen, value => 99, kind => 'used', source => 'addon' });
+    my $units = sub { 0 };
+    my %base = (readings => \@rd, units => $units, rate => 3, now => $now, alert_cfg => {});
+    my $p = $P->can('pacing')->(%base, meter_now => { value => 99, at => $now - 120, changed_at => $seen });
+    ok !(grep { $_->{kind} eq 'day_rise' } @{ $p->{alerts} }), 'pre-reset 99 re-post -> no day_rise';
+    cmp_ok $p->{used_pct}, '<', 1, 'usage ~0 after reset';
+    my $q = $P->can('pacing')->(%base, meter_now => { value => 30, at => $now - 60, changed_at => $reset + 300 });
+    ok( (grep { $_->{kind} eq 'day_rise' && $_->{basis} eq 'meter' } @{ $q->{alerts} }), 'fresh post-reset value still drives alerts');
+    my $ms = $P->can('meter_status')->(readings => \@rd, now => $now, last_seen => { at => $now - 120, value => 99, changed_at => $seen });
+    ok $ms->{pre_reset}, 'meter_status flags pre_reset';
+    ok !$ms->{fresh}, 'pre-reset value not fresh';
+}
+
 done_testing;

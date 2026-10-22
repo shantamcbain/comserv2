@@ -1931,8 +1931,31 @@ sub _grokcom_now {
     return eval {
         require JSON::MaybeXS; open my $gfh, '<', "$root/root/static/ai/grokcom_usage.json" or die;
         local $/; my $j = JSON::MaybeXS::decode_json(<$gfh>); close $gfh;
-        { value => $j->{build}, at => Comserv::Util::AI::HealthChecks::iso_epoch($j->{at}) };
+        my $r = { value => $j->{build}, at => Comserv::Util::AI::HealthChecks::iso_epoch($j->{at}) };
+        # Oct 22 2026: when did this value first appear? 'at' is only last-seen.
+        my $ch = _grokcom_changed_at($root, $j->{build});
+        $r->{changed_at} = $ch if defined $ch;
+        $r;
     };
+}
+
+# Epoch the add-on first saw $value: native_host's grokcom_build_seen.json ([[epoch, value]]), else the
+# last history row whose build equals it (history only gets a row on change).
+sub _grokcom_changed_at {
+    my ($root, $value) = @_;
+    return undef unless defined $value && $value =~ /^\d+(?:\.\d+)?$/;
+    my $ch;
+    if (open my $fh, '<', "$root/root/static/ai/grokcom_build_seen.json") {
+        local $/; my $s = eval { JSON::PP->new->decode(<$fh>) }; close $fh;
+        if (ref $s eq 'ARRAY' && ref $s->[-1] eq 'ARRAY' && defined $s->[-1][1] && $s->[-1][1] == $value) { $ch = $s->[-1][0] }
+    }
+    if (!defined $ch && open my $hf, '<', "$root/root/static/ai/grokcom_usage_history.jsonl") {
+        my $lastrow;
+        while (my $l = <$hf>) { my $d = eval { JSON::PP->new->decode($l) } or next; $lastrow = $d if defined $d->{build} }
+        close $hf;
+        $ch = Comserv::Util::AI::HealthChecks::iso_epoch($lastrow->{at}) if $lastrow && $lastrow->{build} == $value;
+    }
+    return $ch;
 }
 
 sub supergrok_pacing {
