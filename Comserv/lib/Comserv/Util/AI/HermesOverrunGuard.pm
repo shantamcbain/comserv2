@@ -1004,7 +1004,8 @@ sub current_model {
 sub read_state { my $s = shift; open my $fh, '<', $s->{state_file} or return {}; local $/; eval { $J->decode(<$fh>) } || {} }
 sub write_state {
     my ($s, $st) = @_;
-    my $tmp = "$s->{state_file}.tmp";
+    # Oct 22: per-process tmp name so servers never clobber each other's half-written file; rename is atomic.
+    my $tmp = "$s->{state_file}.tmp.$$";
     open my $fh, '>', $tmp or return; print $fh JSON::PP->new->canonical->pretty->encode($st); close $fh;
     rename $tmp, $s->{state_file};
 }
@@ -1232,6 +1233,23 @@ sub desktop_notify {
     };
 }
 
+# Oct 22 2026 (Shanta 7:14 AM PT): one alert per state. last_notified {mode, model} lives in the shared
+# state file (written under the run() flock, atomic rename); alert only when that pair changes.
+sub notify_change {
+    my ($s, $st, $mode, $model, $title, $body) = @_;
+    my $key = join '|', $mode // '', $model // '';
+    my $ln  = ref $st->{last_notified} eq 'HASH' ? $st->{last_notified} : {};
+    if (defined $ln->{key} && $ln->{key} eq $key) {
+        $s->log_line("alert suppressed (unchanged $key since " . ($ln->{at_pt} // '?') . "): $title");
+        return 0;
+    }
+    my $t = $s->_now;
+    $st->{last_notified} = { mode => $mode, model => $model, key => $key, at => $t, at_pt => pt($t), title => $title };
+    push @{ $s->{notified} }, { mode => $mode, model => $model, title => $title };
+    $s->desktop_notify($title, $body);
+    return 1;
+}
+
 sub set_model {
     my ($s, $m) = @_;
     if (ref $m eq 'HASH' && is_or_grok($m->{provider}, $m->{default})) {
@@ -1401,7 +1419,7 @@ sub run {
         _write_notice($s, $msg . "\nAuto-restores when per-provider thrash limits are clear and OpenRouter day/week/month are under \$$CAPS{day}/\$$CAPS{week}/\$$CAPS{month}.");
         $s->write_session_notice({ at => $t, at_pt => pt($t), action => 'trip', reasons => $d->{reasons},
             target => $target->{name}, text => $msg });
-        $s->desktop_notify('Hermes overrun guard TRIPPED',
+        $s->notify_change($st, ($paused ? 'paused' : 'tripped'), $target->{name}, 'Hermes overrun guard TRIPPED',
             ($paused ? 'Hermes PAUSED. ' : "Switched to $target->{name}. ")
             . 'End/restart open sessions. Details: ~/.hermes/overrun_notice.txt');
         $s->log_line($msg . ($err ? " set_error=$err" : ''));
@@ -1448,7 +1466,8 @@ sub run {
         $s->log_line($msg . ($err ? " set_error=$err" : ''));
         _write_notice($s, $msg);
         $s->write_session_notice({ at => $t, at_pt => pt($t), action => 'clear', text => $msg });
-        $s->desktop_notify('Hermes overrun guard cleared', $msg);
+        $s->notify_change($st, 'normal', ($dec->{restore_default} ? $want->{default} : $cur->{default}),
+            'Hermes overrun guard cleared', $msg);
         my $ev = { at => $t, at_pt => pt($t), action => 'restore',
                    to => ($dec->{restore_default} ? $want->{default} : $cur->{default}),
                    preserved_manual => $dec->{restore_default} ? 0 : 1,

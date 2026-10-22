@@ -648,4 +648,25 @@ ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID
     like($txt, qr/"provider":"xai-oauth"/, 'grok cron job now on xai-oauth');
 }
 
+
+# Oct 22: one alert per (mode, model); flip-flops and repeat runs stay quiet; state survives write/read.
+{
+    my $h = tempdir(CLEANUP => 1); mkdir "$h/.hermes"; mkdir "$h/.hermes/logs";
+    my $g = $G->new(home => $h, app_root => $h, no_ledger => 1, no_notify => 1, base_urls => [], now => 6000000);
+    my $st = {};
+    is($g->notify_change($st, 'tripped', 'north-mini', 'T', 'b'), 1, 'first trip alerts');
+    is($g->notify_change($st, 'tripped', 'north-mini', 'T', 'b'), 0, 'same trip again: silent');
+    $g->write_state($st);
+    my $st2 = $g->read_state;
+    is($st2->{last_notified}{key}, 'tripped|north-mini', 'last_notified stored in shared state');
+    ok(!-e "$h/.hermes/overrun_guard_state.json.tmp.$$", 'atomic write leaves no tmp');
+    is($g->notify_change($st2, 'tripped', 'north-mini', 'T', 'b'), 0, 'other server/process, same state: silent');
+    # old-code server rewrites state but keeps unknown keys -> still deduped
+    $st2->{tripped} = 0;
+    is($g->notify_change($st2, 'normal', 'qwen/qwen3-coder', 'C', 'b'), 1, 'switch back alerts once');
+    is($g->notify_change($st2, 'normal', 'qwen/qwen3-coder', 'C', 'b'), 0, 'then silent');
+    is($g->notify_change($st2, 'tripped', 'other-model', 'T', 'b'), 1, 'move to another model alerts');
+    is(scalar @{ $g->{notified} }, 3, 'three alerts total');
+}
+
 done_testing();
