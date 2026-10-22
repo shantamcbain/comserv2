@@ -53,6 +53,7 @@ our @CANONICAL_VOLUMES = qw(
     comserv2_config_db_data comserv2_redis_data comserv2_logs
     comserv2_sessions comserv2_nfs_data comserv2_whisper_venv
     comserv2_cpan_cache comserv2_temp comserv2_themes comserv2_cache
+            comserv2_themes_nfs comserv2_theme_config_nfs comserv2_theme_css_nfs
 );
 
 # Production-specific volumes (from docker-compose.prod.yml)
