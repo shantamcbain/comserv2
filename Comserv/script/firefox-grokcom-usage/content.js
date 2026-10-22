@@ -1,4 +1,5 @@
 /* Watch grok.com Settings -> Usage. Read visible %. Never touch cookies.
+ * 1.4.6 (Oct 15 2026): settled Super Grok value only (see superGrokPct).
  * 1.4.4 (Oct 14 2026): Super Grok overall % from the aria-label (e.g. "93%") under
  * "Weekly SuperGrok Limit"; Grok Bot % from aria-valuenow on the "Grok Bot usage"
  * bar; reset dates from the "Resets <date> at <time>" lines. Build/Voice sub-bars are extras. */
@@ -37,21 +38,47 @@
         return seg;
     }
 
-    function superGrokPct(root) {
-        // 1.4.5: first "%"-labelled number (number-flow-react / role=img) that sits
-        // after the "Weekly SuperGrok Limit" label and before "Weekly Grok Bot Limit".
+    // 1.4.6 (Oct 15 2026): the Super Grok reading flipped 93 <-> 100. Read ONLY the
+    // aria-label of number elements inside the "Weekly SuperGrok Limit" section
+    // (after its label, before "Weekly Grok Bot Limit"), never sub-bars, and only
+    // report a value once two reads >= 1s apart agree (number-flow animates its
+    // digits; transient values are dropped). If the section's own progress bar
+    // disagrees with the label, report nothing this round.
+    var sgLast = { v: null, at: 0 };
+    function inSgSection(el, sgLab, botLab) {
+        var F = Node.DOCUMENT_POSITION_FOLLOWING;
+        if (!(sgLab.compareDocumentPosition(el) & F)) return false;
+        if (botLab && !(el.compareDocumentPosition(botLab) & F)) return false;
+        return true;
+    }
+    function superGrokRaw(root) {
         var sgLab = labelEl(root, 'Weekly SuperGrok Limit');
         if (!sgLab) return null;
         var botLab = labelEl(root, 'Weekly Grok Bot Limit');
-        var F = Node.DOCUMENT_POSITION_FOLLOWING;
-        var cands = root.querySelectorAll('number-flow-react, [role="img"][aria-label], [aria-label$="%"]');
-        for (var i = 0; i < cands.length; i++) {
-            var el = cands[i];
-            if (!(sgLab.compareDocumentPosition(el) & F)) continue;
-            if (botLab && !(el.compareDocumentPosition(botLab) & F)) continue;
-            var v = pct(el.getAttribute('aria-label'));
-            if (v != null && /%/.test(el.getAttribute('aria-label') || '')) return v;
+        var label = null;
+        var nums = root.querySelectorAll('number-flow-react[aria-label], [role="img"][aria-label$="%"]');
+        for (var i = 0; i < nums.length && label == null; i++) {
+            var a = nums[i].getAttribute('aria-label') || '';
+            if (!/^\s*\d{1,3}(?:\.\d+)?\s*%\s*$/.test(a)) continue;   // "93%" only
+            if (inSgSection(nums[i], sgLab, botLab)) label = pct(a);
         }
+        var bar = null;
+        var bars = root.querySelectorAll('[role="progressbar"][aria-valuenow]');
+        for (var k = 0; k < bars.length && bar == null; k++) {
+            var bl = bars[k].getAttribute('aria-label') || '';
+            if (/grok\s*bot|build|voice|chat|imagine/i.test(bl)) continue;
+            if (inSgSection(bars[k], sgLab, botLab)) bar = pct(bars[k].getAttribute('aria-valuenow'));
+        }
+        if (label != null && bar != null && Math.abs(label - bar) > 1) return null;
+        return label != null ? label : bar;
+    }
+    function superGrokPct(root) {
+        var v = superGrokRaw(root);
+        var now = Date.now();
+        if (v == null) { sgLast = { v: null, at: 0 }; return null; }
+        if (sgLast.v === v && now - sgLast.at >= 1000) return v;
+        if (sgLast.v !== v) sgLast = { v: v, at: now };
+        setTimeout(send, 1500);           // confirm with a second read
         return null;
     }
 
