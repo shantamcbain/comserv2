@@ -609,4 +609,23 @@ sub cb_for {
 is Comserv::Util::AI::HermesOverrunGuard::supergrok_daily_target({ switch_model => 'qwen/qwen3-coder' })->{default}, 'qwen/qwen3-coder', '98% stop paid coder kept';
 ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID_WATCH_RE, 'qwen3-coder on paid watch';
 
+# Oct 22 2026: stale OpenRouter snapshot (Oct 16) must not be reused / added to live estimate.
+{
+    my $sg = $G->can('stale_guard');
+    my $now = 2_000_000;
+    my $fresh = { ok => 1, day_usd => 1.51, week_usd => 1.51, fetched_at => $now - 120 };
+    is $sg->($fresh, $now)->{week_usd}, 1.51, 'fresh reading (<1h) kept';
+    my $old = $sg->({ ok => 1, day_usd => 0, week_usd => 9.62, balance_usd => 20, fetched_at => $now - 6*86400 }, $now);
+    ok !$old->{ok} && $old->{stale}, 'reading >1h old marked stale, not ok';
+    ok !defined $old->{week_usd}, 'stale week dropped';
+    my $ml = $G->can('merge_live');
+    my $m = $ml->($fresh, { ok => 1, day_usd => 4.29, after_usd => 0.05, after => $fresh->{fetched_at} });
+    is sprintf('%.2f', $m->{day_usd}), '1.56', 'fresh reading + only calls after it (no 4.29 estimate replace)';
+    is sprintf('%.2f', $m->{week_usd}), '1.56', 'week = fresh week + after-only estimate';
+    my $mo = $ml->($old, { ok => 1, day_usd => 0.40, after_usd => 0, after => undef });
+    ok $mo->{live_only} && !defined $mo->{week_usd}, 'stale -> estimate-only, no stale week';
+    my $d = $G->can('decide')->(thrash => 0, openrouter => $m, state => { tripped => 1 });
+    ok !@{ $d->{reasons} || [] }, 'real $1.51 + small delta: no cap reasons';
+}
+
 done_testing();

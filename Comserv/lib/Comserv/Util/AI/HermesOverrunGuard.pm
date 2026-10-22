@@ -769,7 +769,9 @@ sub openrouter_endpoints {
 
 # IO
 sub live_spend {
-    my ($self) = @_;
+    my ($self, %a) = @_;
+    my $after = $a{after};
+    my $after_usd = 0;
     my $logf = $self->{agent_log};
     return { ok => 0 } unless $logf && -f $logf;
     open my $fh, '<', $logf or return { ok => 0 };
@@ -792,15 +794,13 @@ sub live_spend {
         my $cost = price_call($c, { $m => $epc{$m} });
         $by{$m} ||= { calls => 0, usd => 0 };
         $by{$m}{calls}++;
-        if (defined $cost) {
-            $usd += $cost;
-            $by{$m}{usd} += $cost;
-        } else {
+        if (!defined $cost) {
             # no endpoint pricing (network down, new model): conservative flat rate, never $0
             $unp++;
-            my $fb = ($c->{in} // 0) * $UNPRICED_IN + ($c->{out} // 0) * $UNPRICED_OUT;
-            $usd += $fb; $by{$m}{usd} += $fb;
+            $cost = ($c->{in} // 0) * $UNPRICED_IN + ($c->{out} // 0) * $UNPRICED_OUT;
         }
+        $usd += $cost; $by{$m}{usd} += $cost;
+        $after_usd += $cost if defined $after && defined $c->{t} && $c->{t} > $after;
         if ($m =~ $PAID_WATCH_RE) {
             if (!defined $last_v4 || $c->{t} > $last_v4) { $last_v4 = $c->{t}; $last_watch = $m }
         }
@@ -808,6 +808,7 @@ sub live_spend {
     return {
         ok => 1,
         day_usd => $usd,
+        (defined $after ? (after_usd => $after_usd, after => $after) : ()),
         calls => scalar(@$calls),
         unpriced => $unp,
         by_model => \%by,
@@ -816,11 +817,39 @@ sub live_spend {
     };
 }
 
+# pure: an OpenRouter reading older than $max (default 1h) is not trusted: its day/week
+# are dropped so the guard runs on the live estimate only (no stale week + live double count).
+our $SNAPSHOT_MAX_AGE = 3600;
+sub stale_guard {
+    my ($or, $now, $max) = @_;
+    return $or unless ref $or eq 'HASH' && $or->{ok};
+    $max //= $SNAPSHOT_MAX_AGE;
+    my $age = $or->{fetched_at} ? $now - $or->{fetched_at} : undef;
+    return $or if !defined $age || $age <= $max;   # no fetched_at: caller-supplied/unknown age, trust as before
+    return { ok => 0, stale => 1, error => sprintf('openrouter reading stale (%dm old)', $age/60),
+             (defined $or->{balance_usd} ? (balance_usd => $or->{balance_usd}) : ()) };
+}
+
 # pure
 sub merge_live {
     my ($or, $live) = @_;
     $or ||= {};
     my %out = %$or;
+    if (ref $live eq 'HASH' && $live->{ok} && $or->{ok} && !$or->{stale}
+        && defined $live->{after_usd} && defined $or->{fetched_at}
+        && defined $live->{after} && $live->{after} == $or->{fetched_at}) {
+        # Oct 22: fresh /auth/key reading already includes everything up to fetched_at;
+        # add only the estimate for calls made after it (no double count).
+        my $add = $live->{after_usd} > 0 ? $live->{after_usd} : 0;
+        $out{reported_day_usd} = $or->{day_usd};
+        $out{day_usd} = ($or->{day_usd} // 0) + $add;
+        $out{week_usd} += $add if defined $out{week_usd};
+        $out{month_usd} += $add if defined $out{month_usd};
+        $out{live_day_usd} = $live->{day_usd};
+        $out{live_after_usd} = $add;
+        $out{live_applied} = 1 if $add > 0;
+        return \%out;
+    }
     if (ref $live eq 'HASH' && $live->{ok}) {
         my $l_day = $live->{day_usd} // 0;
         my $r_day = $or->{day_usd};
@@ -1244,21 +1273,25 @@ sub run {
     my $t  = $s->_now;
     my $lite = 0;
     my $or;
-    if (!$o{force} && $st->{last_check} && $t - $st->{last_check} < $s->{min_interval}) {
-        if (ref $st->{last_openrouter} eq 'HASH' && $st->{last_openrouter}{ok}) {
+    # Oct 22: reuse the saved OpenRouter reading only while it is itself fresh (fetched_at within
+    # min_interval). Cron runs every minute, so keying this on last_check reused an Oct 16 snapshot forever.
+    my $snap = ref $st->{last_openrouter} eq 'HASH' ? $st->{last_openrouter} : {};
+    my $snap_age = $snap->{fetched_at} ? $t - $snap->{fetched_at} : 9e9;
+    if (!$o{force} && $st->{last_check} && $t - $st->{last_check} < $s->{min_interval}
+        && $snap->{ok} && $snap_age < $s->{min_interval}) {
+        if (1) {
             $or = { %{$st->{last_openrouter}} };
             $lite = 1;
-        } else {
-            return { action => 'skip', reason => 'interval', state => $st };
         }
     } else {
         $or = exists $o{openrouter} ? $o{openrouter} : $s->openrouter_status;
     }
+    $or = stale_guard($or, $t, $SNAPSHOT_MAX_AGE);
     my $thrash = exists $o{thrash} ? $o{thrash} : $s->thrash_count;
     my $tbc = exists $o{thrash_by_class} ? $o{thrash_by_class} : $s->thrash_by_class;
     my $lims = $s->thrash_limits;
     my $reported_or = { %$or };
-    my $live = exists $o{live} ? $o{live} : $s->live_spend;
+    my $live = exists $o{live} ? $o{live} : $s->live_spend(after => $or->{fetched_at});
     $or = merge_live($or, $live);
     my $v4pro_recent = (ref $live eq 'HASH' && $live->{ok} && $live->{last_v4pro_at} && $t - $live->{last_v4pro_at} < 600) ? 1 : 0;
     my $d = decide(thrash_by_class => $tbc, limits => $lims, thrash => $thrash, openrouter => $or, state => $st, v4pro_recent => $v4pro_recent,
