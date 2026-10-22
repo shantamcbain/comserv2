@@ -912,7 +912,14 @@ start_prod_container_from_image() {
             secrets="/opt/comserv/secrets"
         fi
     fi
-    ident="${SYSTEM_IDENTIFIER:-production1}"
+    # Identifier follows the host this runs on unless the caller set it (prod1 vs prod2).
+    if [ -z "${SYSTEM_IDENTIFIER:-}" ]; then
+        case "$(hostname)" in
+            *production2*|*prod2*) SYSTEM_IDENTIFIER=production2 ;;
+            *) SYSTEM_IDENTIFIER=production1 ;;
+        esac
+    fi
+    ident="$SYSTEM_IDENTIFIER"
     echo "    secrets dir: ${secrets:-NONE}"
     purge_workstation_web_siblings
 
@@ -1019,7 +1026,16 @@ stamp_build_version() {
     branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
     commit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
     dirty=""
-    git diff --quiet --ignore-submodules HEAD -- 2>/dev/null || dirty="+local"
+    # +local = tracked files differ from HEAD. Name them so the label is explainable.
+    # version.json and data/ai_openrouter_prices.json are generated/runtime files and
+    # are no longer tracked (they used to make every build "+local").
+    local dirty_files
+    dirty_files=$(git diff --name-only --ignore-submodules HEAD -- 2>/dev/null)
+    if [ -n "$dirty_files" ]; then
+        dirty="+local"
+        echo "⚠ Build is +local: uncommitted changes in tracked files:"
+        printf '%s\n' "$dirty_files" | sed 's/^/    /'
+    fi
     build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     build_host=$(hostname -f 2>/dev/null || hostname)
     python3 - "$branch" "${commit}${dirty}" "$build_date" "$build_host" <<'PY'
@@ -1196,7 +1212,7 @@ EOF
         if ! $REMOTE_SSH bash -s <<EOF
 $(declare -f is_production_host purge_workstation_web_siblings ensure_nfs_volume start_prod_container_from_image)
 NFS_VOLUME_NAME=${NFS_VOLUME_NAME}
-export SYSTEM_IDENTIFIER=production1
+export SYSTEM_IDENTIFIER=$(_target_system_identifier "$TARGET_HOST")
 start_prod_container_from_image ${IMAGE} ${CONTAINER}
 EOF
         then
@@ -1364,6 +1380,15 @@ canonical_deploy_to_nodes() {
 
 # Late dispatch — canonical_deploy* AND _normalize_deploy_node exist now.
 # --prod must be after _normalize_deploy_node: canonical_deploy_to_nodes calls it.
+# Map a deploy target (name or IP) to the SYSTEM_IDENTIFIER the container should carry.
+_target_system_identifier() {
+    case "${1:-}" in
+        production2|prod2|192.168.1.127) echo "production2" ;;
+        production1|prod1|192.168.1.126|172.30.50.206) echo "production1" ;;
+        *) echo "${SYSTEM_IDENTIFIER:-production1}" ;;
+    esac
+}
+
 _normalize_deploy_node() {
     case "${1:-}" in
         production1|prod1) echo "192.168.1.126" ;;
@@ -1436,6 +1461,7 @@ if [ "${DEPLOY_MODE:-}" = "local-rebuild" ]; then
         echo "❌ REFUSING to build on production. Build on the workstation."
         exit 1
     fi
+    stamp_build_version || { echo "❌ Could not generate version.json — aborting before build."; exit 1; }
     if ! BUILDKIT_PROGRESS=plain docker compose $COMPOSE_ARGS build --pull web-prod; then
         echo "❌ Local build failed — running container untouched."
         exit 1
