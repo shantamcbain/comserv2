@@ -1,7 +1,8 @@
 /* Theme: forager — earthy greens taken from the Forager home-page hero (root/Forager/index.tt) */
 :root {
   --accent-color: #7ab648;
-  --background-color: #f8fdf4;
+  --background-color: #e8f3e0;
+  --background-image: none;
   --body-font: Verdana, Helvetica, sans-serif;
   --border-color: #c8e6c9;
   --button-bg: #4a8c3f;
@@ -29,7 +30,8 @@
   --text-muted-color: #5a6b55;
   --warning-color: #c62828;
 }
-body.theme-forager { background: #f8fdf4; color: #2b2b2b; }
+body.theme-forager { background: #e8f3e0; color: #2b2b2b; }
+html:has(body.theme-forager) { background: #e8f3e0; }
 /* Top user bar: "Welcome <user> to forager.com..." styled like the hero */
 body.theme-forager header {
   background: linear-gradient(135deg, #2d5a27 0%, #4a8c3f 50%, #7ab648 100%) !important;
@@ -38,12 +40,56 @@ body.theme-forager header {
 body.theme-forager header h1, body.theme-forager header a { color: #fff !important; }
 body.theme-forager .guest-join-bar { background: #e8f3e0; color: #2d5a27; }
 body.theme-forager .guest-join-bar a { color: #2d5a27; }
-/* Main nav + dropdowns */
-body.theme-forager nav#main-menu, body.theme-forager .horizontal-menu { background: #2d5a27 !important; }
-body.theme-forager nav#main-menu > ul > li > a,
-body.theme-forager nav#main-menu .dropbtn { color: #fff !important; background: transparent; }
-body.theme-forager nav#main-menu > ul > li > a:hover,
-body.theme-forager .horizontal-dropdown:hover > .dropbtn { background: #4a8c3f !important; }
+/* Main nav: top buttons match the Forager home pill row. Dropdowns stay menus. */
+body.theme-forager nav#main-menu,
+body.theme-forager nav#main-menu .horizontal-menu {
+  background: var(--nav-bg, #2d5a27) !important;
+}
+body.theme-forager nav#main-menu .horizontal-menu {
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.6rem;
+}
+body.theme-forager nav#main-menu .dropbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.2rem;
+  padding: 0.45rem 1.1rem;
+  background: rgba(255,255,255,0.2) !important;
+  color: var(--nav-text, #fff) !important;
+  border: 2px solid rgba(255,255,255,0.6);
+  border-radius: 24px;
+  font-weight: 700;
+  text-decoration: none;
+  line-height: 1.2;
+}
+body.theme-forager nav#main-menu .dropbtn:hover,
+body.theme-forager .horizontal-dropdown:hover > .dropbtn {
+  background: rgba(255,255,255,0.4) !important;
+  color: var(--nav-text, #fff) !important;
+}
+body.theme-forager nav#main-menu .dropbtn [class*="icon-"],
+body.theme-forager nav#main-menu .dropbtn .fas {
+  width: 1.05em;
+  height: 1.05em;
+  margin-right: 0.15em;
+  background-color: currentColor;
+  flex: none;
+}
+/* Shop, ENCY, and Workshops SVGs use a fill the mask cannot paint. Use a glyph. */
+body.theme-forager nav#main-menu .dropbtn .fa-store,
+body.theme-forager nav#main-menu .dropbtn .icon-ency,
+body.theme-forager nav#main-menu .dropbtn .icon-workshop {
+  width: auto;
+  height: auto;
+  background: none;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+body.theme-forager nav#main-menu .dropbtn .fa-store::before { content: "\1F3EA" !important; }
+body.theme-forager nav#main-menu .dropbtn .icon-ency::before { content: "\1F4DA" !important; }
+body.theme-forager nav#main-menu .dropbtn .icon-workshop::before { content: "\1F33F" !important; }
 body.theme-forager .dropdown-content, body.theme-forager .submenu {
   background: #f8fdf4 !important; border: 1px solid #c8e6c9;
 }
