@@ -912,7 +912,14 @@ start_prod_container_from_image() {
             secrets="/opt/comserv/secrets"
         fi
     fi
-    ident="${SYSTEM_IDENTIFIER:-production1}"
+    # Identifier follows the host this runs on unless the caller set it (prod1 vs prod2).
+    if [ -z "${SYSTEM_IDENTIFIER:-}" ]; then
+        case "$(hostname)" in
+            *production2*|*prod2*) SYSTEM_IDENTIFIER=production2 ;;
+            *) SYSTEM_IDENTIFIER=production1 ;;
+        esac
+    fi
+    ident="$SYSTEM_IDENTIFIER"
     echo "    secrets dir: ${secrets:-NONE}"
     purge_workstation_web_siblings
 
@@ -1205,7 +1212,7 @@ EOF
         if ! $REMOTE_SSH bash -s <<EOF
 $(declare -f is_production_host purge_workstation_web_siblings ensure_nfs_volume start_prod_container_from_image)
 NFS_VOLUME_NAME=${NFS_VOLUME_NAME}
-export SYSTEM_IDENTIFIER=production1
+export SYSTEM_IDENTIFIER=$(_target_system_identifier "$TARGET_HOST")
 start_prod_container_from_image ${IMAGE} ${CONTAINER}
 EOF
         then
@@ -1373,6 +1380,15 @@ canonical_deploy_to_nodes() {
 
 # Late dispatch — canonical_deploy* AND _normalize_deploy_node exist now.
 # --prod must be after _normalize_deploy_node: canonical_deploy_to_nodes calls it.
+# Map a deploy target (name or IP) to the SYSTEM_IDENTIFIER the container should carry.
+_target_system_identifier() {
+    case "${1:-}" in
+        production2|prod2|192.168.1.127) echo "production2" ;;
+        production1|prod1|192.168.1.126|172.30.50.206) echo "production1" ;;
+        *) echo "${SYSTEM_IDENTIFIER:-production1}" ;;
+    esac
+}
+
 _normalize_deploy_node() {
     case "${1:-}" in
         production1|prod1) echo "192.168.1.126" ;;
