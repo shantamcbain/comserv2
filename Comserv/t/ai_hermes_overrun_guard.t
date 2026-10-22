@@ -669,4 +669,47 @@ ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID
     is(scalar @{ $g->{notified} }, 3, 'three alerts total');
 }
 
+# Oct 22 (7:33 AM PT): shield = tripped=1 + hold_reason, owned by this code; not a money-cap trip.
+{
+    my $h = tempdir(CLEANUP => 1); mkdir "$h/.hermes"; mkdir "$h/.hermes/logs";
+    my $cfg = "$h/.hermes/config.yaml";
+    open my $fh, '>', $cfg; print $fh "model:\n  default: cohere/north-mini-code:free\n  provider: openrouter\n  base_url: https://openrouter.ai/api/v1\n  api_mode: chat_completions\n  aliases:\n    code: openrouter/cohere/north-mini-code:free\n"; close $fh;
+    my $cb = sub { my ($k,$v)=@_; open my $in,'<',$cfg; my @l=<$in>; close $in;
+        if ($k =~ /^model\.aliases\.(.+)$/) { my $a=$1; s/^    \Q$a\E: .*/    $a: $v/ for @l }
+        else { (my $kk=$k)=~s/^model\.//; s/^  \Q$kk\E: .*/  $kk: $v/ for @l }
+        open my $o,'>',$cfg; print $o @l; close $o };
+    my $locked = { mode => 'openrouter', off_today => 1, switch_provider => 'openrouter', switch_model => 'qwen/qwen3-coder' };
+    my $open   = { mode => 'openrouter', build => 10, daily_budget => { remaining_today_pct => 10 } };
+    my $over_live  = { ok => 1, day_usd => 4.29 };
+    my $clear_live = { ok => 1, day_usd => 0.2 };
+    my $rep = { ok => 1, day_usd => 1.51, week_usd => 1.51, month_usd => 38 };
+    my $mk = sub { my (%a) = @_; $G->new(home => $h, app_root => $h, no_ledger => 1, no_notify => 1, base_urls => [], now => 7000000,
+                     set_cb => $cb, reported_or => $rep, %a) };
+    my $st = { tripped => 0 };
+    my $r = $mk->(supergrok => $locked, live_all => $over_live)->shield_step($st, 7000000, $rep);
+    ok($r->{on}, 'locked off grok + caps clear -> shield on');
+    is($st->{tripped}, 1, 'tripped=1 so old servers hold');
+    is($st->{hold_reason}, 'shield_old_servers', 'hold_reason marks it as not a money trip');
+    my $g = $mk->(supergrok => $locked, live_all => $over_live);
+    is($g->current_model->{default}, 'qwen/qwen3-coder', 'Hermes on qwen3-coder');
+    is($g->read_aliases->{code}, 'openrouter/qwen/qwen3-coder', 'code alias follows');
+    is($st->{saved_model}{default}, 'qwen/qwen3-coder', 'saved_model = shield model (old-code restore is harmless)');
+    # decide treats shield as untripped: over -> trip (real money trip), clear -> none (not restore)
+    my $dst = { %$st, tripped => 0 };
+    is(Comserv::Util::AI::HermesOverrunGuard::decide(openrouter => { ok => 1, day_usd => 2, week_usd => 2, month_usd => 2 }, thrash => 0, state => $dst)->{action}, 'trip', 'real cap over during shield -> trip');
+    is(Comserv::Util::AI::HermesOverrunGuard::decide(openrouter => $rep, thrash => 0, state => $dst)->{action}, 'none', 'clear during shield -> none, not restore');
+    # after reset: Super Grok has budget but old servers would still trip -> stay shielded on grok-4.7
+    $r = $mk->(supergrok => $open, live_all => $over_live)->shield_step($st, 7000100, $rep);
+    is($r->{model}, 'grok-4.7', 'after reset: grok-4.7 under shield');
+    is($mk->(supergrok => $open)->current_model->{provider}, 'xai-oauth', 'via xai-oauth');
+    is($st->{tripped}, 1, 'still shielded while old servers would trip');
+    # old servers' all-day estimate clears -> flag cleared, handoff to daily guard
+    $r = $mk->(supergrok => $open, live_all => $clear_live)->shield_step($st, 7000200, $rep);
+    ok($r->{cleared}, 'shield cleared');
+    is($st->{tripped}, 0, 'tripped=0'); ok(!exists $st->{hold_reason}, 'hold_reason gone');
+    is($st->{hand_off_supergrok}, 1, 'hand_off to daily guard');
+    # not shielded and Super Grok open -> nothing
+    is($mk->(supergrok => $open, live_all => $clear_live)->shield_step({ tripped => 0 }, 7000300, $rep), undef, 'normal path untouched');
+}
+
 done_testing();

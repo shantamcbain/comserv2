@@ -1233,6 +1233,68 @@ sub desktop_notify {
     };
 }
 
+# Oct 22 2026 (Shanta 7:33 AM PT) "shield": old-code servers (other branches) count all of today's
+# agent.log spend and re-trip to north-mini every minute. They honor tripped=1 (hold; hold leaves a
+# non-grok / xai-oauth model alone), so while the money caps are really clear but those servers would
+# still trip, keep tripped=1 + hold_reason=shield and let THIS code own the model:
+#   Super Grok has budget -> xai-oauth grok-4.7; otherwise the daily guard's paid coder (qwen3-coder).
+# saved_model = that model, so an old-code restore (after UTC midnight) writes the same thing.
+# Cleared once Super Grok has budget AND the old-style all-day estimate is under the caps.
+our $SHIELD = 'shield_old_servers';
+sub shield_want {
+    my ($sg, $now) = @_;
+    return { map { ($_ => $SUPERGROK_CAPS{$_}) } @MODEL_KEYS } if supergrok_budget_left($sg);
+    my $m = supergrok_daily_target($sg);
+    return { map { ($_ => $m->{$_}) } @MODEL_KEYS };
+}
+sub old_code_would_trip {
+    my ($s, $or, $live_all) = @_;
+    my $m = merge_live({ %{ $or || {} } }, $live_all);
+    return 0 unless $m->{ok};
+    for my $w (qw(day week month)) {
+        my $v = $m->{"${w}_usd"};
+        return 1 if defined $v && defined $CAPS{$w} && $v >= $CAPS{$w};
+    }
+    return 0;
+}
+sub shield_step {
+    my ($s, $st, $t, $or) = @_;
+    my $sg = $s->supergrok_state;
+    my $grok_ok = supergrok_budget_left($sg);
+    my $on = $st->{tripped} && ($st->{hold_reason} // '') eq $SHIELD;
+    my $rep = exists $s->{reported_or} ? $s->{reported_or} : ($st->{last_openrouter} || {});
+    my $live_all = exists $s->{live_all} ? $s->{live_all} : $s->live_spend;
+    my $old_trip = $s->old_code_would_trip($rep, $live_all);
+    if ($on && $grok_ok && !$old_trip) {
+        delete @$st{qw(hold_reason hold_since hold_pt)};
+        $st->{tripped} = 0;
+        $st->{hand_off_supergrok} = 1;    # daily guard (no longer deferred) syncs aliases/fallback
+        $s->log_line('shield cleared ' . pt($t) . ': Super Grok has budget and old servers would not trip');
+        return { cleared => 1 };
+    }
+    # enter only when the daily guard has Hermes locked off grok (no daily-guard state = no shield)
+    return undef unless $on || (!$grok_ok && ref $sg eq 'HASH' && %$sg);
+    my $want = shield_want($sg, $t);
+    my $cur  = $s->current_model || {};
+    my @did;
+    if (($cur->{default} // '') ne $want->{default} || ($cur->{provider} // '') ne $want->{provider}) {
+        assert_safe_model($want);
+        my $bak = $s->backup_config;
+        $s->set_model($want);
+        my %al = map { ($_ => alias_value($want)) } grep { exists(($s->read_aliases || {})->{$_}) } qw(code coder);
+        $s->set_aliases(\%al) if %al;
+        push @did, "model -> $want->{provider}/$want->{default} (backup " . ($bak // 'FAILED') . ')';
+        _append($s->{events_file}, $J->encode({ at => $t, at_pt => pt($t), action => 'shield', to => $want->{default}, backup => $bak }));
+    }
+    unless ($on) { $st->{hold_since} = $t; $st->{hold_pt} = pt($t) }
+    %$st = (%$st, tripped => 1, paused => 0, hold_reason => $SHIELD,
+            saved_model => { %$want }, target => alias_value($want), target_default => $want->{default});
+    $s->log_line('shield ' . pt($t) . ': ' . (@did ? join('; ', @did) : "holding $want->{default}")) if @did || !$on;
+    $s->notify_change($st, 'normal', $want->{default}, 'Hermes on ' . $want->{default},
+        "Hermes default is $want->{default} (money caps clear; Super Grok " . ($grok_ok ? 'open' : 'locked') . ').') ;
+    return { on => 1, model => $want->{default}, did => \@did };
+}
+
 # Oct 22 2026 (Shanta 7:14 AM PT): one alert per state. last_notified {mode, model} lives in the shared
 # state file (written under the run() flock, atomic rename); alert only when that pair changes.
 sub notify_change {
@@ -1346,10 +1408,14 @@ sub run {
     my $tbc = exists $o{thrash_by_class} ? $o{thrash_by_class} : $s->thrash_by_class;
     my $lims = $s->thrash_limits;
     my $reported_or = { %$or };
+    $s->{reported_or} = $reported_or unless exists $s->{reported_or};
     my $live = exists $o{live} ? $o{live} : $s->live_spend(after => $or->{fetched_at});
     $or = merge_live($or, $live);
     my $v4pro_recent = (ref $live eq 'HASH' && $live->{ok} && $live->{last_v4pro_at} && $t - $live->{last_v4pro_at} < 600) ? 1 : 0;
-    my $d = decide(thrash_by_class => $tbc, limits => $lims, thrash => $thrash, openrouter => $or, state => $st, v4pro_recent => $v4pro_recent,
+    # Oct 22 (Shanta 7:33 AM PT): tripped=1 with hold_reason=shield is NOT a money-cap trip; decide as untripped.
+    my $shielded = ($st->{tripped} && ($st->{hold_reason} // '') eq $SHIELD) ? 1 : 0;
+    my $dst = $shielded ? { %$st, tripped => 0 } : $st;
+    my $d = decide(thrash_by_class => $tbc, limits => $lims, thrash => $thrash, openrouter => $or, state => $dst, v4pro_recent => $v4pro_recent,
                    watch_model => (ref $live eq 'HASH' ? $live->{last_watch_model} : undef));
     $d->{thrash} = $thrash;
     if (ref $tbc eq 'HASH' && $tbc->{ok}) {
@@ -1404,6 +1470,7 @@ sub run {
         my $fdone = eval { $s->write_fallback_providers($plan->{fallback}) } || []; push @errs, $@ if $@;
         my $xdone = eval { $s->set_auxiliary($plan->{auxiliary}) } || []; push @errs, $@ if $@;
         my $err = join ' ', @errs;
+        delete @$st{qw(hold_reason hold_since hold_pt)};
         %$st = (%$st, tripped => 1, paused => $paused, since => $t, since_pt => pt($t),
                 reasons => $d->{reasons}, kind => $plan->{kind}, saved_model => $cur, saved_aliases => $aplan->{saved},
                 saved_fallback => $ctx{current_fallback}, saved_auxiliary => $ctx{auxiliary},
@@ -1511,6 +1578,11 @@ sub run {
     }
     if ($d->{action} eq 'hold') {
         $st->{reasons} = $d->{reasons} if @{ $d->{reasons} };
+    }
+    if ($d->{action} eq 'none' || $d->{action} eq 'restore') {
+        my $sh = eval { $s->shield_step($st, $t, $or) };
+        $d->{shield} = $sh if $sh;
+        $d->{shield_error} = $@ if $@;
     }
     # Oct 15 2026: block OpenRouter grok every run (re-read config: trip/restore may have written).
     {
