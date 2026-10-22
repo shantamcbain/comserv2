@@ -28,6 +28,7 @@ our $MIDWEEK_BEHIND   = 10;        # points behind on Mon/Tue -> warn
 our $ENDGAME_H        = 36;
 our $ENDGAME_LEFT     = 20;
 our $METER_STALE_H    = 24;
+our $ADDON_DOWN_H     = 2;   # Oct 22 2026: add-on silent > 2 h = down, value not fresh
 our $JOB_MODEL        = 'grok-4.7';  # Oct 8 2026: 4.7 fixed the :3001 git push in one pass where grok-build failed (45 calls)
 our $TOKENS_PER_CALL  = 160_000;   # grok-4.7 agent call avg 161K tokens, 91% cached (grok-build ~102K)
 our @METER_SOURCES    = qw(manual addon spoken screenshot);
@@ -351,8 +352,14 @@ sub meter_status {
         $last = { at => $ls->{at}, value => $ls->{value}, kind => 'used', source => 'addon' };
     }
     my $age_h = $last ? ($now - $last->{at}) / 3600 : undef;
+    my $addon_age_h = ($ls && defined $ls->{at}) ? ($now - $ls->{at}) / 3600 : $age_h;
+    my $addon_down = !defined $addon_age_h || $addon_age_h > $ADDON_DOWN_H ? 1 : 0;
     my $stale = !defined $age_h || $age_h > $METER_STALE_H ? 1 : 0;
+    my $fresh = (!$stale && defined $age_h && $age_h <= $ADDON_DOWN_H) ? 1 : 0;
     return {
+        addon_down => $addon_down, fresh => $fresh, addon_down_after_h => $ADDON_DOWN_H,
+        ($addon_down ? (addon_status => sprintf('Super Grok add-on down: no post for %s; last value not fresh',
+                                                defined $addon_age_h ? sprintf('%.1f h', $addon_age_h) : 'ever')) : (addon_status => 'ok')),
         last_at_pt => ($last ? pt($last->{at}) : 'never'), last_value => _used($last), last_source => ($last ? $last->{source} : undef),
         age_h => (defined $age_h ? sprintf('%.1f', $age_h) : undef), stale => $stale, stale_after_h => $METER_STALE_H,
         ($stale ? (prompt => sprintf('Super Grok meter has not reported for %s (last: %s). Please enter a manual reading from grok.com Settings > Usage.',

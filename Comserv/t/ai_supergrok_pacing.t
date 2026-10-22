@@ -260,4 +260,14 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
     ok $P->can('meter_status')->(readings => \@rd, now => $now, last_seen => { at => $now - 240, value => undef })->{stale}, 'last_seen without value ignored';
 }
 
+# Oct 22 2026: add-on silent > 2 h -> addon_down, value not fresh
+{
+    my $now = 2_000_000; my $ms = $P->can('meter_status');
+    my $d = $ms->(readings => [], now => $now, last_seen => { at => $now - 3*3600, value => 88 });
+    ok $d->{addon_down} && !$d->{fresh}, 'add-on 3 h silent -> addon_down, not fresh';
+    like $d->{addon_status}, qr/down/, 'addon_status says down';
+    my $f = $ms->(readings => [], now => $now, last_seen => { at => $now - 600, value => 99 });
+    ok !$f->{addon_down} && $f->{fresh}, 'add-on 10 min ago -> fresh';
+}
+
 done_testing;
