@@ -1019,7 +1019,16 @@ stamp_build_version() {
     branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
     commit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
     dirty=""
-    git diff --quiet --ignore-submodules HEAD -- 2>/dev/null || dirty="+local"
+    # +local = tracked files differ from HEAD. Name them so the label is explainable.
+    # version.json and data/ai_openrouter_prices.json are generated/runtime files and
+    # are no longer tracked (they used to make every build "+local").
+    local dirty_files
+    dirty_files=$(git diff --name-only --ignore-submodules HEAD -- 2>/dev/null)
+    if [ -n "$dirty_files" ]; then
+        dirty="+local"
+        echo "⚠ Build is +local: uncommitted changes in tracked files:"
+        printf '%s\n' "$dirty_files" | sed 's/^/    /'
+    fi
     build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     build_host=$(hostname -f 2>/dev/null || hostname)
     python3 - "$branch" "${commit}${dirty}" "$build_date" "$build_host" <<'PY'
@@ -1436,6 +1445,7 @@ if [ "${DEPLOY_MODE:-}" = "local-rebuild" ]; then
         echo "❌ REFUSING to build on production. Build on the workstation."
         exit 1
     fi
+    stamp_build_version || { echo "❌ Could not generate version.json — aborting before build."; exit 1; }
     if ! BUILDKIT_PROGRESS=plain docker compose $COMPOSE_ARGS build --pull web-prod; then
         echo "❌ Local build failed — running container untouched."
         exit 1
