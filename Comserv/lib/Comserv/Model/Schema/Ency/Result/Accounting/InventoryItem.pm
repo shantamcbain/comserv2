@@ -224,6 +224,19 @@ __PACKAGE__->add_columns(
         data_type => 'decimal',
         size => [10, 2],
         is_nullable => 1,
+    },
+
+    # Manufacturing costing (Util::Manufacturing::Costing)
+    markup_percent => {
+        data_type   => 'decimal',
+        size        => [6, 2],
+        is_nullable => 1,   # NULL = <Manufacturing> markup_percent default
+    },
+    manual_price => {
+        data_type     => 'tinyint',
+        size          => 1,
+        default_value => 0,
+        is_nullable   => 0, # 1 = never auto-update selling_price
     });
 
 __PACKAGE__->set_primary_key('id');

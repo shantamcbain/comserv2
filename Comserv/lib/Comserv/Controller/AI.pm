@@ -6009,8 +6009,9 @@ sub _do_web_search {
         if ($provider eq 'ddg') {
             eval {
                 require URI::Escape;
+                my $q = eval { URI::Escape::uri_escape_utf8($query) } || URI::Escape::uri_escape($query);
                 my $url  = 'https://api.duckduckgo.com/?q='
-                         . URI::Escape::uri_escape($query)
+                         . $q
                          . '&format=json&no_html=1&skip_disambig=1';
                 my $req  = HTTP::Request->new(GET => $url);
                 my $resp = $ua->request($req);
@@ -9337,6 +9338,7 @@ sub action :Local :Args(0) {
                 priority      => $priority,
                 status        => 'open',
                 created_at    => $now_str,
+                metadata      => eval { JSON->new->canonical->encode({ entry_path => "chat_ai", client_ip => (scalar($c->req->header("CF-Connecting-IP")) || $c->req->address), remote_addr => $c->req->address, user_agent => scalar($c->req->user_agent), sitename => $site_name }) },
             });
         };
         if ($@ || !$new_ticket) {

@@ -69,6 +69,7 @@ sub-plan remains the authoritative spec for its own work.</p>
             <a href="#wv2" class="doc-navlink">V2 Migration</a>
             <a href="#aisystem-jump" class="doc-navlink" title="Scroll to the AISYSTEM jump: plan document, project #280, and todo #2217 (in-chat Todo-create agent).">AISYSTEM</a>
             <a href="#3dprint-jump" class="doc-navlink" title="Scroll to the 3D printing coordinator plan jump (3dPrintingPlan + project #206).">3D Printing</a>
+            <a href="#inv-camera-barcode" class="doc-navlink" title="Inventory camera photo + barcode capture plan (add item + count, NFS images, barcode_type, duplicate switch).">Inventory Camera+Barcode</a>
         </div>
         <p>
             <a href="/Documentation/MASTER_PLAN" target="_blank" rel="noopener" class="doc-navlink">↗ Open this plan in its own browser tab</a>
@@ -98,6 +99,16 @@ sub-plan remains the authoritative spec for its own work.</p>
         <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-navlink" target="_blank" rel="noopener" title="Opens project #206 3DPRINT — the database project that coordinator is attached to.">Project #206 3DPRINT</a>
         <a href="[% c.uri_for('/todo') %]?project_id=206" class="doc-navlink" target="_blank" rel="noopener" title="Lists todos on project #206 3DPRINT.">Todos on #206</a>
         <a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-navlink" target="_blank" rel="noopener" title="Child plan: HDRY dryer import playbook (PDF BOM).">Dryer playbook (child)</a>
+    </div>
+</div>
+
+<div class="doc-success" id="inv-camera-barcode">
+    <h2 class="doc-h3">Inventory Camera + Barcode Plan</h2>
+    <p class="doc-body">Camera for item visual (NFS via File Manager or external URL) + barcode scan/decode on add item page and count sheet. barcode_type column, duplicate switch to edit/receive/adjust, multi-location via stock_levels.</p>
+    <div class="doc-navrow">
+        <a href="[% c.uri_for('/Documentation/InventoryCameraBarcodePlan') %]" class="doc-navlink" target="_blank" rel="noopener" title="The plan document for camera photo + barcode capture feature.">InventoryCameraBarcodePlan (document)</a>
+        <a href="[% c.uri_for('/todo/details') %]?record_id=2549" class="doc-navlink" target="_blank" rel="noopener" title="Todo #2549 — started with status 5 for time tracking.">Todo #2549 (started)</a>
+        <a href="http://workstation.local:4005/todo/details?record_id=2549" class="doc-navlink" target="_blank" rel="noopener">Full link (port 4005 planning)</a>
     </div>
 </div>
 

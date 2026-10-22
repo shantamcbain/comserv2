@@ -194,7 +194,7 @@ sub stock_reorder_list {
             },
             {
                 prefetch => [ 'stock_levels', { item_suppliers => 'supplier' } ],
-                order_by => ['category', 'name'],
+                order_by => ['me.category', 'me.name'],
             }
         )->all;
 

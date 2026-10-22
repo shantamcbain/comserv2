@@ -7,7 +7,7 @@
     Styles: /static/css/git-dashboard.css (loaded via Header.tt on this route).
     JS: /static/js/git-dashboard.js (js_load.tt). No inline <script>/<style>.
 %]
-[% PageVersion = 'admin/git/index.tt,v 0.02 2026/07/31 shanta Exp shanta ' %]
+[% PageVersion = 'admin/git/index.tt,v 0.03 2026/10/21 shanta Exp shanta ' %]
 
 [%# Absolute-URL building for branch links (RELATIVE-URL TRAP: a relative path
     resolves against the current page origin, so the Open button would reopen
@@ -64,6 +64,25 @@
             [% IF c.flash.error_msg %]
                 <div class="admin-alert admin-alert-danger">
                     <strong>Error:</strong> [% c.flash.error_msg | html %]
+                </div>
+            [% END %]
+            [% IF guard_hits && guard_hits.size %]
+                <div class="admin-alert admin-alert-danger" id="git-guard-hits">
+                    <strong>Secret guard — how to fix</strong>
+                    <p>Only one encryption key belongs in the env (the primary key for the initial DB password). Other keys belong in the database, not in git. Secret values are not shown.</p>
+                    [% FOREACH h IN guard_hits %]
+                    <div class="git-guard-hit">
+                        <p><code class="code-inline">[% h.file | html %][% IF h.line %]:[% h.line %][% END %]</code> — [% h.reason | html %]</p>
+                        [% IF h.editor_note %]<p>[% h.editor_note | html %]</p>[% END %]
+                        [% IF h.editor_url %]
+                        <p>
+                            <a class="admin-btn admin-btn-sm admin-btn-primary" href="[% h.editor_url | html %]" target="AI2Editor" rel="noopener">Open in AI editor</a>
+                            <button type="button" class="admin-btn admin-btn-sm" data-guard-copy="1">Copy fix prompt</button>
+                        </p>
+                        [% END %]
+                        <textarea class="form-control" rows="8" readonly data-guard-prompt="1">[% h.prompt | html %]</textarea>
+                    </div>
+                    [% END %]
                 </div>
             [% END %]
             [% IF c.flash.success_msg %]
@@ -465,6 +484,7 @@
 
                     <div data-git-merge-status="1" class="git-merge-status"></div>
                     <pre data-git-merge-output="1" class="git-merge-output" style="display:none;"></pre>
+                    <div data-git-guard-hits="1" hidden></div>
                 </div>
             </details>
 

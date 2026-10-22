@@ -36,8 +36,15 @@ sub try_chat_fix {
 
     my $router = $c->model('AI2::Router');
 
-    # Router chooses best model for analysis (coding/analysis context)
-    my ($analysis_prov, $analysis_model) = $router->select_model($c, context => 'coding', agent_id => 'gitfix');
+    # Router picks from the live SuperGrok / OpenRouter / Ollama lists,
+    # with coding context so classification can still prefer a code model.
+    my ($analysis_prov, $analysis_model) = $router->select_model($c,
+        agent_id => 'gitfix-analysis',
+        prompt   => $prompt,
+        route    => 'auto',
+        phase    => 'analyze',
+        context  => 'coding',
+    );
 
     my $analysis_prompt = "Diagnose this Comserv2 git commit rejection. The validator in Admin/Git.pm only accepts paths that exactly match the strings from `git status --porcelain` on the bound target. Error: " . substr($prompt, 0, 2000) . "\n\nRoot causes and minimal fix (ignores for runtime data, better error message, path collection fix).";
 

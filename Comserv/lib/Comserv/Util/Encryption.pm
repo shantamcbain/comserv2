@@ -172,9 +172,19 @@ sub _get_encryption_key {
         }
     }
 
+    # No key found. Never silently invent one: a new key makes every existing
+    # ciphertext undecryptable. Generation is only allowed when explicitly
+    # requested (COMSERV_ALLOW_KEYGEN=1, e.g. from script/generate_encryption_key.pl).
+    unless ($ENV{COMSERV_ALLOW_KEYGEN}) {
+        my $msg = "No encryption key for namespace '$namespace' (looked in env $env_var_name, "
+                . "\$COMSERV_KEY_DIR, ~/.comserv/keys, legacy config/). Refusing to generate one. "
+                . "Mount the key dir and set COMSERV_KEY_DIR, or run script/generate_encryption_key.pl for a NEW install.";
+        $logging->log_with_details(undef, 'error', __FILE__, __LINE__, "_get_encryption_key", $msg);
+        die "$msg\n";
+    }
     # Generate new key — 32 raw bytes from /dev/urandom (AES-256)
     $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, "_get_encryption_key",
-        "No encryption key found for namespace '$namespace', generating new one");
+        "COMSERV_ALLOW_KEYGEN set: generating new key for namespace '$namespace'");
 
     my $key;
     if (open my $urandom, '<:raw', '/dev/urandom') {
@@ -213,8 +223,21 @@ sub _get_key_file_path {
     my ($class, $namespace) = @_;
     $namespace ||= 'default';
     
+    my $name = '.' . $namespace . '_encryption_key';
+    # Shared key dir (outside the repo) so every checkout/server uses the same key:
+    #   1. $ENV{COMSERV_KEY_DIR} if set (used for both lookup and generation)
+    #   2. ~/.comserv/keys/<name> if that file already exists
+    #   3. legacy per-checkout config/<name> (unchanged behaviour)
+    if (my $dir = $ENV{COMSERV_KEY_DIR}) {
+        return File::Spec->catfile($dir, $name);
+    }
+    my $home = $ENV{COMSERV_HOME} || ($ENV{HOME} ? File::Spec->catdir($ENV{HOME}, '.comserv') : undef);
+    if ($home) {
+        my $shared = File::Spec->catfile($home, 'keys', $name);
+        return $shared if -f $shared;
+    }
     my $config_dir = $class->_get_config_dir();
-    return File::Spec->catfile($config_dir, '.' . $namespace . '_encryption_key');
+    return File::Spec->catfile($config_dir, $name);
 }
 
 =head2 _get_config_dir()
@@ -240,6 +263,13 @@ Ensure the config directory exists, create if necessary.
 
 sub _ensure_config_dir {
     my ($class) = @_;
+    if (my $dir = $ENV{COMSERV_KEY_DIR}) {
+        return if -d $dir;
+        require File::Path;
+        File::Path::make_path($dir, { mode => 0700 });
+        die "Failed to create key dir $dir\n" unless -d $dir;
+        return;
+    }
     my $config_dir = $class->_get_config_dir();
     
     return if -d $config_dir;

@@ -78,7 +78,7 @@
         <div class="search-row">
             <div class="search-group">
                 <label for="search_input">Search in todos:</label>
-                <input type="text" id="search_input" name="search" placeholder="Search in subject, description, comments..." value="[% search_term %]">
+                <input type="text" id="search_input" name="search" placeholder="Todo # (e.g. 2447), ticket (CSC-20260928-9565), or text..." value="[% search_term %]">
             </div>
         </div>
         <input type="hidden" name="filter" value="[% filter_type %]">

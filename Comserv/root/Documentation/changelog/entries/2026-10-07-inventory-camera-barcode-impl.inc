@@ -1,0 +1,6 @@
+<div id="2026-10-07-inventory-camera-barcode-impl" class="cl-entry">
+<h3>2026-10-07 — Inventory Camera + Barcode: Add + Count UI + Duplicate Switch</h3>
+<p class="doc-body"><strong>What.</strong> barcode_type in Result + forms. Duplicate check by barcode in item_add (switches to edit). Camera capture + scan JS in add.tt (getUserMedia, preview, placeholder for NFS upload). Count page: barcodes in rows/table, quick scan-to-highlight, camera for evidence photos. Enhanced rows in controller.</p>
+<p class="doc-body"><strong>Why.</strong> Complete core of camera visual + barcode read/extract + duplicate handling before model switch. Supports optional NFS photos or external URLs. Real links and todo tracking.</p>
+<p class="doc-body"><strong>Files.</strong> <code>lib/Comserv/Model/Schema/.../InventoryItem.pm</code>, <code>Controller/Inventory.pm</code> (duplicate + rows), <code>root/Inventory/items/add.tt</code> + <code>edit.tt</code> (fields + camera), <code>root/Inventory/count.tt</code> + controller (scan + camera + barcodes), plan + MASTER_PLAN + changelog.</p>
+</div>

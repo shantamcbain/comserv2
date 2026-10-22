@@ -54,6 +54,7 @@
                 <a href='/admin/view_log'><i class="icon-view"></i>View Log</a>
                 [% IF c.session.roles.grep('admin').size %]
                 <a href="[% c.uri_for('/mail/invoice/api') %]"><i class="icon-invoice"></i>Invoice Classification</a>
+                <a href="[% c.uri_for('/Inventory/email-config') %]"><i class="icon-mail"></i>Set Invoice Email Addresses</a>
                 <a href="[% c.uri_for('/mail/invoice/sort') %]"><i class="icon-sort"></i>Sort Invoices by Site</a>
                 [% END %]
                 [% SET admin_sub_db = c.stash.admin_submenu_links || [] %]
@@ -246,6 +247,8 @@
                 <a href="/Inventory/locations"><i class="icon-location"></i>Locations</a>
                 <a href="/Inventory/bom/list"><i class="fas fa-sitemap"></i>Bill of Materials</a>
                 <a href="/Inventory/invoice"><i class="icon-invoice"></i>Supplier Invoices (AP)</a>
+                <a href="/Inventory/unknown-lines"><i class="icon-invoice"></i>Unknown invoice lines</a>
+                <a href="/Inventory/email-config"><i class="icon-mail"></i>Set Invoice Email Addresses</a>
                 <a href="/Inventory/sales"><i class="icon-invoice"></i>Sales Invoices (AR)</a>
                 <div class="submenu-section">
                     <span class="submenu-section-title">Shop / Orders</span>
@@ -259,6 +262,7 @@
                 <div class="submenu-section">
                     <span class="submenu-section-title">Accounting</span>
                     <a href="/Accounting"><i class="icon-accounting"></i>Accounting Dashboard</a>
+                    <a href="/Inventory/email-config"><i class="icon-mail"></i>Set Invoice Email Addresses</a>
                     <a href="/Accounting/coa"><i class="icon-coa"></i>Chart of Accounts</a>
                     <a href="/Accounting/gl"><i class="icon-gl"></i>General Ledger</a>
                 </div>

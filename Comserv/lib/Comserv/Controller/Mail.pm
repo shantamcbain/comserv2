@@ -2831,13 +2831,17 @@ sub classify_invoices :Local :Args(0) {
     try {
         require Comserv::Util::MailInvoiceClassifier;
         my $classifier = Comserv::Util::MailInvoiceClassifier->new();
+        my ($accounts, $mail_note) = $classifier->accounts_for_site($c, $c->session->{SiteName} || '');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'classify_invoices', $mail_note);
         my $result = $classifier->classify_all_mail(
-            source => 'maildir',
+            source => 'auto',
             first_run => 1,
+            accounts => $accounts,
         );
         
         $c->stash(
             classification_result => $result,
+            mail_source_note => $mail_note,
             template => 'mail/mail.classify_results.tt',
         );
         $c->forward($c->view('TT'));
@@ -2915,31 +2919,69 @@ sub invoice_api_data :Path('/mail/invoice/api/data') :Args(0) {
     $c->res->body($json_text);
 }
 
-sub invoice_sort :Path('/mail/invoice/sort') :Args(0) {
+sub _invoice_queue_admin {
     my ($self, $c) = @_;
-    
     my $is_admin = grep { $_ eq 'admin' } @{$c->session->{roles} || []};
     unless ($is_admin) {
         $c->res->status(403);
         $c->response->body('Access denied');
-        return;
+        return 0;
     }
-    
-    my $schema = $c->model('DBEncy');
-    my $site_id = $self->_get_site_id($c);
-    
-    # Get all sites
-    my $sites_rs = $schema->resultset('Site')->search({}, { order_by => 'name' });
-    my @sites;
-    while (my $site = $sites_rs->next) {
-        push @sites, { id => $site->id, name => $site->name };
-    }
-    
+    return 1;
+}
+
+sub invoice_sort :Path('/mail/invoice/sort') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_invoice_queue_admin($c);
+
+    require Comserv::Util::Inventory::MailInvoiceStock;
+    my $queue = Comserv::Util::Inventory::MailInvoiceStock->new->queue_invoices($c);
     $c->stash(
-        sites => \@sites,
-        template => 'mail/mail.invoice_sort.tt',
+        invoices  => $queue->{invoices},
+        suppliers => $queue->{suppliers},
+        sites     => $queue->{sites},
+        queue_note => $queue->{note},
+        template  => 'mail/mail.invoice_sort.tt',
     );
     $c->forward($c->view('TT'));
+}
+
+sub invoice_sort_update :Path('/mail/invoice/sort/invoice') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_invoice_queue_admin($c);
+    my $p = $c->req->body_parameters;
+    require Comserv::Util::Inventory::MailInvoiceStock;
+    my $r = Comserv::Util::Inventory::MailInvoiceStock->new->update_invoice_assignment(
+        $c,
+        invoice_id  => $p->{invoice_id},
+        sitename    => $p->{sitename},
+        supplier_id => $p->{supplier_id},
+    );
+    if ($r->{ok}) {
+        $c->flash->{success_msg} = 'Invoice SiteName and supplier saved.';
+    } else {
+        $c->flash->{error_msg} = $r->{error} || 'Could not save the invoice.';
+    }
+    $c->res->redirect($c->uri_for('/mail/invoice/sort'));
+}
+
+sub invoice_sort_item :Path('/mail/invoice/sort/item') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_invoice_queue_admin($c);
+    my $p = $c->req->body_parameters;
+    require Comserv::Util::Inventory::MailInvoiceStock;
+    my $r = Comserv::Util::Inventory::MailInvoiceStock->new->update_item_site(
+        $c,
+        item_id  => $p->{item_id},
+        sitename => $p->{sitename},
+        barcode  => $p->{barcode},
+    );
+    if ($r->{ok}) {
+        $c->flash->{success_msg} = 'Item SiteName saved.';
+    } else {
+        $c->flash->{error_msg} = $r->{error} || 'Could not save the item.';
+    }
+    $c->res->redirect($c->uri_for('/mail/invoice/sort'));
 }
 
 # ============================================================
@@ -2950,9 +2992,12 @@ sub classify_invoices_cron :Private {
     try {
         require Comserv::Util::MailInvoiceClassifier;
         my $classifier = Comserv::Util::MailInvoiceClassifier->new();
+        my ($accounts, $mail_note) = $classifier->accounts_for_site($c, $c->session->{SiteName} || '');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'classify_invoices_cron', $mail_note);
         my $result = $classifier->classify_all_mail(
-            source => 'maildir',
+            source => 'auto',
             first_run => 0,
+            accounts => $accounts,
         );
         return $result;
     } catch {
