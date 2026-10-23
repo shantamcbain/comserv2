@@ -5,11 +5,11 @@
  "cap_usd_per_day": 0.50,
  "primary": "anthropic/claude-sonnet-5.5",
  "alternate": "openai/gpt-6-sol",
- "fixer": "deepseek/deepseek-v4-pro",
+ "fixer": "cohere/north-mini-code:free",
  "prices": {
   "anthropic/claude-sonnet-5.5": { "in": 2.0, "out": 10.0 },
   "openai/gpt-6-sol": { "in": 2.0, "out": 10.0 },
-  "deepseek/deepseek-v4-pro": { "in": 0.44, "out": 0.87 }
+  "cohere/north-mini-code:free": { "in": 0, "out": 0 }
  },
  "max_diff_chars": 60000,
  "max_tokens": 1500

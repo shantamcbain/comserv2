@@ -28,6 +28,7 @@ our $MIDWEEK_BEHIND   = 10;        # points behind on Mon/Tue -> warn
 our $ENDGAME_H        = 36;
 our $ENDGAME_LEFT     = 20;
 our $METER_STALE_H    = 24;
+our $ADDON_DOWN_H     = 2;   # Oct 22 2026: add-on silent > 2 h = down, value not fresh
 our $JOB_MODEL        = 'grok-4.7';  # Oct 8 2026: 4.7 fixed the :3001 git push in one pass where grok-build failed (45 calls)
 our $TOKENS_PER_CALL  = 160_000;   # grok-4.7 agent call avg 161K tokens, 91% cached (grok-build ~102K)
 our @METER_SOURCES    = qw(manual addon spoken screenshot);
@@ -151,11 +152,22 @@ sub burn_alerts {
     my (%in) = @_;
     my $c = alert_config($in{cfg});
     my @a;
+    # 2026-10-18: after midnight the 05:00-05:00 work day still belongs to the
+    # previous calendar day; its alerts are no longer "today" - send nothing.
+    if (defined $in{day_from} && defined $in{now}) {
+        local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+        my ($d0, $d1) = (strftime('%Y-%m-%d', localtime $in{day_from}), strftime('%Y-%m-%d', localtime $in{now}));
+        POSIX::tzset();
+        return \@a if $d0 ne $d1;
+    }
     my $rise = $in{used} - $in{used_day_start};
+    my $basis = $in{used_basis} // 'estimate';
     if ($rise > $c->{day_rise_pts}) {
-        push @a, { kind => 'day_rise', level => 'critical', value => sprintf('%.1f', $rise),
-                   message => sprintf('Super Grok burned %.0f points today (since %s; limit %s): now %.0f%% used. Slow down or stop the big sessions.',
-                                      $rise, pt($in{day_from}), $c->{day_rise_pts}, $in{used}) };
+        my $day = defined $in{day_from} ? do { local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+            my $x = strftime('%a %b %d', localtime $in{day_from}); POSIX::tzset(); $x } : 'today';
+        push @a, { kind => 'day_rise', level => 'critical', value => sprintf('%.1f', $rise), basis => $basis,
+                   message => sprintf('Super Grok burned %.0f points in the %s work day (since %s; limit %s): now %.0f%% used (%s). Slow down or stop the big sessions.',
+                                      $rise, $day, pt($in{day_from}), $c->{day_rise_pts}, $in{used}, $basis) };
     }
     # Work-window check: hours since the work-day start >= check_hour - day_start_hour.
     my $dsh = $in{day_start_hour} // $DAY_START_HOUR;
@@ -300,7 +312,18 @@ sub pacing {
     $o{daily_budget} = daily_budget(used => $used, used_day_start => $used_day_start, day_from => $day_from,
                                     reset => $reset, now => $now, cfg => $in{daily_cfg});
     $o{day_start_hour} = $dsh;
-    $o{alerts} = burn_alerts(used => $used, used_day_start => $used_day_start, day_from => $day_from,
+    # 2026-10-18: a grok.com meter value under 2 h old beats the token estimate
+    # for the burn alerts (estimate said 44 %, meter 36 %).
+    my ($alert_used, $basis) = ($used, 'estimate');
+    if (my $m = $in{meter_now}) {
+        if (defined $m->{value} && $m->{value} =~ /^\d+(?:\.\d+)?$/ && $m->{at}
+            # Oct 22 2026: the add-on re-posts an unchanged value with a new 'at'; the value only
+            # counts for this cycle if it first appeared (changed_at) after the reset.
+            && $m->{at} >= $cs && ($m->{changed_at} // $m->{at}) >= $cs && $now - $m->{at} < 2 * 3600) {
+            ($alert_used, $basis) = (0 + $m->{value}, 'meter');
+        }
+    }
+    $o{alerts} = burn_alerts(used => $alert_used, used_basis => $basis, used_day_start => $used_day_start, day_from => $day_from,
                              expected => $expected, now => $now, cfg => $in{alert_cfg},
                              day_start_hour => $dsh, budget_pct => $o{daily_budget}{effective_budget_pct});
     $o{alert_config} = alert_config($in{alert_cfg});
@@ -323,9 +346,30 @@ sub meter_status {
     my %ok = map { ($_ => 1) } @METER_SOURCES;
     my @m = grep { $ok{ $_->{source} // '' } } @{ clean_readings($in{readings}) };
     my $last = $m[-1];
+    # Oct 20 2026: history only gets a row when the value changes; the add-on still
+    # posts unchanged values (grokcom_usage.json 'at' = last seen). Fresher wins.
+    my $ls = $in{last_seen};
+    # Oct 22 2026: a re-posted value first seen before the latest reset is last week's - not a reading.
+    my $pre_reset = 0;
+    if ($ls && defined $ls->{changed_at}) {
+        my ($cs) = cycle_bounds($now, $in{anchor});
+        if ($ls->{changed_at} < $cs) { $pre_reset = 1; $ls = { at => $ls->{at} } }
+    }
+    if ($ls && defined $ls->{at} && defined $ls->{value} && $ls->{value} =~ /^-?\d+(?:\.\d+)?$/
+        && (!$last || $ls->{at} > $last->{at})) {
+        $last = { at => $ls->{at}, value => $ls->{value}, kind => 'used', source => 'addon' };
+    }
     my $age_h = $last ? ($now - $last->{at}) / 3600 : undef;
+    my $addon_age_h = ($ls && defined $ls->{at}) ? ($now - $ls->{at}) / 3600 : $age_h;
+    my $addon_down = !defined $addon_age_h || $addon_age_h > $ADDON_DOWN_H ? 1 : 0;
     my $stale = !defined $age_h || $age_h > $METER_STALE_H ? 1 : 0;
+    my $fresh = (!$stale && defined $age_h && $age_h <= $ADDON_DOWN_H) ? 1 : 0;
+    if ($pre_reset && $last) { my ($cs) = cycle_bounds($now, $in{anchor}); $fresh = 0 if $last->{at} < $cs }
     return {
+        pre_reset => $pre_reset,
+        addon_down => $addon_down, fresh => $fresh, addon_down_after_h => $ADDON_DOWN_H,
+        ($addon_down ? (addon_status => sprintf('Super Grok add-on down: no post for %s; last value not fresh',
+                                                defined $addon_age_h ? sprintf('%.1f h', $addon_age_h) : 'ever')) : (addon_status => 'ok')),
         last_at_pt => ($last ? pt($last->{at}) : 'never'), last_value => _used($last), last_source => ($last ? $last->{source} : undef),
         age_h => (defined $age_h ? sprintf('%.1f', $age_h) : undef), stale => $stale, stale_after_h => $METER_STALE_H,
         ($stale ? (prompt => sprintf('Super Grok meter has not reported for %s (last: %s). Please enter a manual reading from grok.com Settings > Usage.',

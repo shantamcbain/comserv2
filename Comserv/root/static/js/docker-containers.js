@@ -489,7 +489,7 @@
                     : '') +
                 // Push Image (no-build): just push the existing image, workstation only
                 (c.name && c.name.match(/^comserv2?-web-prod/) && isLocal
-                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="push-only" title="Push the current local image to Docker Hub without rebuilding" style="background:#0056b3;color:#fff;padding:2px 8px;font-size:0.78em;">Push Image</button>'
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="push-only" title="Safe Push: pushes only the tested fixed tag running healthy on workstation :5000, then moves :latest (refuses otherwise). Was: Push the current local image to Docker Hub without rebuilding" style="background:#0056b3;color:#fff;padding:2px 8px;font-size:0.78em;">Push Image</button>'
                     : '') +
                 // Pull & Deploy: only on production targets for comserv-web-prod
                 (c.name && c.name.match(/^comserv2?-web-prod/) && !isLocal
@@ -735,7 +735,7 @@
                     setTimeout(loadAll, 5000);
                 });
         } else if (act === 'push-only') {
-            if (!confirm('Push image for ' + cid + ' to Docker Hub?\n\nThis will push the current local image without rebuilding. Use this when the container is already working and you just need to push the image for production deployment.')) return;
+            if (!confirm('Push image for ' + cid + ' to Docker Hub?\n\nSAFE PUSH: pushes only the fixed tested tag (commit-time) running HEALTHY on workstation :5000, then points :latest at it. It refuses if :5000 is unhealthy or not a fixed tag. Use Deploy Flow (/admin/docker/flow) to build, test on :4000 and promote.')) return;
             stopRebuildPolling();
             log('=== PUSH IMAGE: ' + cid + ' ===', 'info');
             log('Pushing image to Docker Hub (no rebuild)...', 'info');

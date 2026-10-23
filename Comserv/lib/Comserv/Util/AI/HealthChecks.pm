@@ -158,7 +158,7 @@ sub supergrok_estimate {
 sub guard_banner {
     my ($guard) = @_;
     return undef unless ref $guard eq 'HASH' && $guard->{locked};
-    my $model = $guard->{switch_model} || 'deepseek/deepseek-v4-pro';
+    my $model = $guard->{switch_model} || 'cohere/north-mini-code:free';  # was v4-pro until 2026-10-15
     my $prov  = $guard->{switch_provider} || 'openrouter';
     my $reset = iso_epoch($guard->{reset_at});
     return sprintf('Super Grok daily cap reached — coding switched to %s (%s) for the app and Hermes until reset %s. Reason: %s',

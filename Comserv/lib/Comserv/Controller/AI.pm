@@ -3260,6 +3260,27 @@ sub chat :Local :Args(0) {
         $is_openrouter = 1;
         $provider = 'openrouter';
     }
+    # 2026-10-15: never send a grok id (or v4-pro) through paid OpenRouter.
+    # Grok -> Super Grok prepaid key when the guard has budget, else north-mini.
+    my $supergrok_prepaid_key = '';
+    if ($is_openrouter && $model) {
+        require Comserv::Util::AI::PaidBlock;
+        if (Comserv::Util::AI::PaidBlock->blocked_on_openrouter($model)) {
+            my $sg_ok = 0;
+            if (Comserv::Util::AI::PaidBlock->is_grok_id($model)) {
+                my $guard = eval { $c->model('AI2::Router')->supergrok_guard($c) } || {};
+                my $gp = eval { $c->model('AI2::Provider::Grok') };
+                $supergrok_prepaid_key = ($gp && !$guard->{locked}) ? (eval { $gp->resolve_prepaid_key($c) } || '') : '';
+                $sg_ok = $supergrok_prepaid_key ? 1 : 0;
+            }
+            my ($np, $nm, $note) = Comserv::Util::AI::PaidBlock->rewrite_openrouter($model, $sg_ok);
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'chat', $note);
+            $model = $nm;
+            if ($np eq 'supergrok') {
+                $is_openrouter = 0; $is_grok_model = 1; $provider = 'grok';
+            }
+        }
+    }
     my $chat_provider_label = $is_openrouter ? 'openrouter' : ($is_grok_model ? 'grok' : 'ollama');
 
     # Role-based capability injection into messages (insert as system message)
@@ -3415,9 +3436,10 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'chat', "Routing to Grok API for model: $model, user_id: $user_id");
 
-            my $grok_api_key = '';
-            my $key_found = 0;
+            my $grok_api_key = $supergrok_prepaid_key || '';
+            my $key_found = $grok_api_key ? 1 : 0;
             try {
+                die "supergrok prepaid key in use\n" if $grok_api_key;
                 my $schema = $c->model('DBEncy')->schema;
                 my $key_obj = $schema->resultset('UserApiKeys')->search(
                     { user_id => $user_id, service => 'grok', is_active => '1' },
@@ -3438,7 +3460,8 @@ sub chat :Local :Args(0) {
                 }
             } catch {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-                    'chat', "Failed to fetch grok API key for user $user_id: $_");
+                    'chat', "Failed to fetch grok API key for user $user_id: $_")
+                    unless /supergrok prepaid key in use/;
             };
 
             unless ($grok_api_key) {

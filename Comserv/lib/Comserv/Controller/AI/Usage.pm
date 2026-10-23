@@ -374,7 +374,16 @@ sub auto_reading :Path('/ai/usage_auto') :Args(0) {
     }
     require JSON::MaybeXS;
     my $raw = '';
-    if (my $fh = $c->req->body) { local $/; seek($fh, 0, 0); $raw = <$fh> // ''; }
+    # FD-leak fix 2026-10-16: HTTP::Body buffers each POST into a /tmp File::Temp
+    # that stayed open (1008 of 1023 FDs were add-on posts). Read, then close+unlink.
+    if (my $fh = $c->req->body) {
+        if (ref $fh) {
+            local $/; seek($fh, 0, 0); $raw = <$fh> // '';
+            my $fn = eval { "$fh" =~ m{^/} ? "$fh" : $fh->filename };
+            close $fh;
+            unlink $fn if defined $fn && $fn =~ m{^/tmp/};
+        } else { $raw = $fh; }
+    }
     my $msg = eval { JSON::MaybeXS::decode_json($raw) };
     unless (ref $msg eq 'HASH') {
         $res->status(400); $res->body('{"ok":false,"error":"bad json"}'); return;
@@ -397,7 +406,7 @@ sub auto_reading :Path('/ai/usage_auto') :Args(0) {
         my $pid = IPC::Open2::open2(my $rd, my $wr, '/usr/bin/python3', $host);
         binmode $wr; binmode $rd;
         print {$wr} pack('V', length $json) . $json; close $wr;
-        local $/; my $buf = <$rd> // ''; waitpid($pid, 0);
+        local $/; my $buf = <$rd> // ''; close $rd; waitpid($pid, 0);
         $out = length($buf) > 4 ? substr($buf, 4) : '{"ok":false,"error":"no reply"}';
         1;
     };

@@ -364,9 +364,16 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
                 }
                 goto COMMIT_DONE;
             }
+
+            # 2026-10-15: reviewer gate before the commit goes through.
+            my $g = $self->_dashboard_commit_gate($c, $message);
+            unless ($g->{proceed}) { $msg = $g->{msg}; $c->flash->{commit_message_keep} = $message; goto COMMIT_DONE; }
+
             my ($out, $code) = $self->_git_list($c, 'commit', '-m', $message);
             $ok = ($code == 0);
             $msg = $ok ? "Committed staged changes." : "Commit failed: $out";
+            $msg .= ' ' . $g->{note} if $ok && $g->{note};
+            $self->_save_user_gate($c, undef) if $ok;
         }
         COMMIT_DONE:
     }
@@ -508,6 +515,38 @@ so no new AI plumbing is introduced. One-shot call — does NOT create a convers
 JSON: { success, message, model } or { success => 0, error }.
 
 =cut
+
+# 2026-10-15: AI Editor commit form (root/ai2/editor/right_dock_commit.tt).
+# step=review: review the staged diff with the in-app reviewer, return findings.
+# step=confirm: commit the reviewed diff; a blocked diff needs override_reason
+# ("commit anyway"). Cap hit / reviewer error -> warning, commit allowed.
+sub editor_commit :Path('/admin/git/editor_commit') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_commit');
+    unless ($c->req->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+    my $step = $c->req->param('step') // 'review';
+    my $out;
+    if ($step eq 'review') {
+        my $r = $self->_review_for_commit($c, $c->req->param('commit_message'), []);
+        my $gate = $c->stash->{commit_review} || {};
+        my $view = $self->_reviewer_for($c)->gate_view($gate->{review} || {});
+        $out = { success => ($r->{error_msg} && !$view->{blocking}) ? 0 : 1, step => 'review',
+                 message => $r->{success_msg} // $r->{error_msg} // '',
+                 error => ($view->{blocking} ? undef : $r->{error_msg}),
+                 paths => $gate->{paths} || [], %$view };
+    } elsif ($step eq 'confirm') {
+        my $r = $self->_confirm_reviewed_commit($c);
+        $out = { success => $r->{error_msg} ? 0 : 1, step => 'confirm',
+                 message => $r->{success_msg} // '', error => $r->{error_msg}, output => $r->{output} // '' };
+    } else {
+        $out = { success => 0, error => "unknown step $step" };
+    }
+    $c->response->body(encode_json($out));
+}
 
 sub suggest_commit_message :Path('/admin/git/suggest_message') :Args(0) {
     my ($self, $c) = @_;
@@ -1640,6 +1679,61 @@ sub _save_user_gate {
     if (defined $gate) { $all->{ $self->_gate_user($c) } = $gate }
     else { delete $all->{ $self->_gate_user($c) } }
     $self->_write_gates($c, $all);
+}
+
+# 2026-10-15: commit gate for the Git dashboard (the AI Editor's Git panel).
+# First click reviews the staged diff and shows findings. A clean review
+# commits at once; findings need a second click on the same diff; a
+# high-severity finding needs a "commit anyway" reason (8+ chars).
+# Reviewer off / cap hit / error -> warning, commit allowed.
+sub _format_findings {
+    my ($self, $view) = @_;
+    my @l = map { sprintf('[%s] %s%s %s', $_->{severity} || 'note', $_->{file},
+                          (length $_->{line} ? ":$_->{line}" : ''), $_->{issue}) } @{ $view->{findings} || [] };
+    return join(' | ', @l);
+}
+
+sub _dashboard_commit_gate {
+    my ($self, $c, $message) = @_;
+    my ($diff) = $self->_git_list($c, 'diff', '--cached');
+    $diff //= '';
+    require Digest::SHA;
+    my $sha = Digest::SHA::sha256_hex($diff);
+    my $rv = $self->_reviewer_for($c);
+    my $reason = $c->req->param('override_reason') // '';
+    $reason =~ s/^\s+|\s+$//g;
+    my $prev = eval { $self->_user_gate($c) };
+    if ($prev && ref $prev eq 'HASH' && ($prev->{diff_sha} // '') eq $sha && $prev->{dashboard}) {
+        my $view = $rv->gate_view($prev->{review});
+        if ($view->{blocking}) {
+            return { proceed => 0, msg => 'Still blocked by the reviewer: ' . $self->_format_findings($view)
+                     . ' To commit anyway, type a reason (8+ characters) in "Commit anyway reason" and click Commit again.' }
+                if length($reason) < 8;
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, '_dashboard_commit_gate',
+                'commit anyway by ' . $self->_gate_user($c) . ': ' . $reason);
+            eval { $rv->append_score({ at => time, source => 'commit_override', diff_sha => $sha, verdict => 'override',
+                                       override => 1, override_by => $self->_gate_user($c), override_reason => $reason }) };
+            return { proceed => 1, note => "Committed anyway over the reviewer's block (reason: $reason)." };
+        }
+        return { proceed => 1, note => 'Reviewed findings were confirmed.' };
+    }
+    my $res = eval { $rv->review($c, diff => $diff, files => [ $diff =~ /^diff --git a\/(.+?) b\//mg ],
+                                 diff_sha => $sha, task => $message, source => 'commit_gate') };
+    $res = { ok => 0, skipped => 1, reason => 'review call failed' . ($@ ? ": $@" : '') } if $@ || !$res;
+    my $view = $rv->gate_view($res);
+    $res->{blocking} = $view->{blocking};
+    $self->_save_user_gate($c, { at => time, diff_sha => $sha, message => $message, review => $res, dashboard => 1 });
+    return { proceed => 1, note => $view->{warning} } unless $view->{reviewed};
+    if ($view->{blocking}) {
+        return { proceed => 0, msg => 'Commit blocked by the reviewer (' . ($view->{model} || 'reviewer') . '): '
+                 . $self->_format_findings($view)
+                 . ' Fix it, or type a reason (8+ characters) in "Commit anyway reason" and click Commit again.' };
+    }
+    if (@{ $view->{findings} || [] }) {
+        return { proceed => 0, msg => 'Reviewer findings (not blocking): ' . $self->_format_findings($view)
+                 . ' Click Commit again to confirm. Nothing has been committed yet.' };
+    }
+    return { proceed => 1, note => 'Reviewer found no problems (' . ($view->{model} || 'reviewer') . ').' };
 }
 
 sub _reviewer_for {

@@ -274,7 +274,8 @@
 
                         <p>
                             <textarea name="message" placeholder="Commit / stash message"
-                                      class="form-control" rows="2" data-git-message="1"></textarea>
+                                      class="form-control" rows="2" data-git-message="1">[% c.flash.commit_message_keep | html %]</textarea>
+                            <input type="text" name="override_reason" placeholder="Commit anyway reason (only if the reviewer blocked the commit)" style="width:100%;margin-top:4px;">
                         </p>
                         <p>
                             <label for="git-commit-ai-model">AI model for commit message:</label>
