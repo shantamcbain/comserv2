@@ -65,7 +65,7 @@ __PACKAGE__->config(
         # /static/js, so include_path must be 'root' (file = root/static/...).
         # include_path => ['root/static'] looked for root/static/static/js and
         # 404'd every asset. Restrict with dirs, not a nested include_path.
-        include_path => [ 'root' ],
+        include_path => [ (do { require Comserv::Util::ThemePaths; my $s = Comserv::Util::ThemePaths::static_include_shim(); $s ? ($s) : () }), 'root' ],
         dirs => [ 'static', 'LegacyStaticPages' ],
         ignore_dirs => [ 'config' ],
         ignore => [ qr{^config/} ],
