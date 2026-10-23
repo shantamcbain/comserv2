@@ -1395,11 +1395,6 @@ sub build_worktree_list {
         label => 'MAIN',
         url   => '/planning/daily',
         cmd   => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r',
-        # Hermes CLI for THIS checkout. cwd = checkout so Hermes loads .hermes.md.
-        # Do NOT pass -w: Comserv worktrees ARE the isolation. `hermes chat -w`
-        # creates a nested hermes/hermes-* branch (often from origin/main) and
-        # the agent then edits the wrong tree.
-        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && hermes chat',
     };
 
     my $cfg = eval { _worktree_config() } // { branches => {} };
