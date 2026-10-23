@@ -494,7 +494,7 @@ sub _run {
     # pre-merge-commit / secret_guard.sh refusal. Expected policy block, not a
     # git failure. Logging it as ERROR spawned audit todos whose only text was
     # "Created autostash" because the BLOCKED lines are on stderr.
-    my $secret_guard_block = $combined =~ /secret-guard:|pre-merge-commit:|^\s*BLOCKED:/m;
+    my $secret_guard_block = $combined =~ /secret-guard:|junk-guard:|pre-merge-commit:|^\s*BLOCKED:/m;
     my $benign   = !$result->{success}
                 && ( $asks_upstream
                   || $checkout_collision
@@ -933,6 +933,75 @@ sub secret_guard {
     return $res;
 }
 
+=head2 junk_patterns($repo)
+
+Read <repo>/.commit-junk-patterns (glob per line, "!" exempts, # comments).
+Returns ( \@block_globs, \@exempt_globs ). Falls back to backup-copy globs.
+
+=head2 junk_files($c, \@paths, $repo)
+
+Return the subset of @paths (repo-relative) that match the junk patterns:
+backup copies and app runtime data that must not be committed. Same rules as
+the junk guard in Comserv/script/git/secret_guard.sh ("*" also matches "/").
+
+=cut
+
+sub _glob_to_re {
+    my ($g) = @_;
+    my $re = join '', map { $_ eq '*' ? '.*' : $_ eq '?' ? '.' : quotemeta($_) }
+                      split /(\*|\?)/, $g;
+    return qr/\A$re\z/;
+}
+
+sub junk_patterns {
+    my ($self, $repo) = @_;
+    my (@pat, @not);
+    my $file = (defined $repo && length $repo) ? "$repo/.commit-junk-patterns" : '';
+    if ($file && -f $file && open(my $fh, '<', $file)) {
+        while (my $l = <$fh>) {
+            $l =~ s/#.*//; $l =~ s/^\s+|\s+$//g;
+            next unless length $l;
+            if ($l =~ s/^!//) { push @not, $l } else { push @pat, $l }
+        }
+        close $fh;
+    } else {
+        @pat = ('*.bak', '*.bak-*', '*~', '*.orig');
+    }
+    return ([ map { _glob_to_re($_) } @pat ], [ map { _glob_to_re($_) } @not ]);
+}
+
+sub junk_files {
+    my ($self, $c, $paths, $repo) = @_;
+    return [] unless $paths && @$paths;
+    unless (defined $repo && length $repo) {
+        my $req_target = ($c && $c->stash->{git_target})
+                      // ($c && $c->req ? $c->req->param('target') : undef);
+        my $t = $self->resolve_target($c, $req_target);
+        $repo = ($t->{mode} // '') eq 'local' ? $t->{repo} : $self->main_repo_path($c);
+    }
+    my ($pat, $not) = $self->junk_patterns($repo);
+    my %seen;
+    my @hits = grep {
+        my $p = $_;
+        defined $p && length $p && !$seen{$p}++
+            && (grep { $p =~ $_ } @$pat) && !(grep { $p =~ $_ } @$not)
+    } @$paths;
+    return \@hits;
+}
+
+=head2 staged_junk($c)
+
+Junk files (see junk_files) among the staged additions/modifications.
+
+=cut
+
+sub staged_junk {
+    my ($self, $c) = @_;
+    my $r = $self->_run($c, 'diff', '--cached', '--name-only', '--diff-filter=ACMR');
+    my @staged = grep { length } split /\n/, ($r->{output} // '');
+    return $self->junk_files($c, \@staged);
+}
+
 =head2 commit($c, $message)
 
 Commit staged changes with $message. Returns the uniform hash.
@@ -943,6 +1012,15 @@ sub commit {
     my ($self, $c, $message) = @_;
     return { success => 0, error => 'Commit message required' }
         unless defined $message && length $message;
+    # Junk guard: refuse staged backup copies / app runtime data (same rules as the hook).
+    my $junk = eval { $self->staged_junk($c) } || [];
+    if (@$junk) {
+        return { success => 0, exit_code => 1, junk_files => $junk,
+                 error => "Commit refused: backup copies / app runtime data are staged: "
+                        . join(', ', @$junk) . ". Use 'Untrack + gitignore' on the Git page, or run: "
+                        . join(' && ', map { "git rm --cached -- '$_'" } @$junk)
+                        . " and add them to .gitignore." };
+    }
     # Secret guard: refuse key files / raw keys / gitleaks hits. Never --no-verify.
     my $guard = $self->secret_guard($c);
     return { success => 0, exit_code => 1, output => $guard->{output} // q{},

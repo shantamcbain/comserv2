@@ -25,6 +25,7 @@
     <div class="admin-section">
         <h2><i class="fas fa-info-circle"></i> Current Git Status</h2>
         [% IF git_status.has_changes %]
+        [% INCLUDE admin/git/junk_warning.tt %]
             <div class="git-status-changes">
                 <div class="status-indicator status-changes">
                     <i class="fas fa-exclamation-circle"></i>

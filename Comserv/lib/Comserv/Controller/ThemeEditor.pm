@@ -13,7 +13,7 @@ sub edit : Local {
     my ( $self, $c ) = @_;
 
     # Use the canonical theme_definitions.json location in static/config
-    my $json_file = $c->path_to('root', 'static', 'config', 'theme_definitions.json');
+    my $json_file = $c->model('ThemeConfig')->get_theme_definitions_path($c);
 
     my $theme_data = {};
     if (-e $json_file) {

@@ -145,6 +145,20 @@ case "${1:-}" in
     --push-only|push-only)
         DEPLOY_MODE_DETECTED="push-only"
         ;;
+    --run-image|run-image)
+        DEPLOY_MODE_DETECTED="run-image"
+        ;;
+    --local-test|local-test)
+        # Build on the workstation and run it ONLY as comserv2-web-test on :4000
+        # (tag <commit-time> + :test, never :latest, never pushed). :5000 untouched.
+        exec "$(dirname "$(readlink -f "$0")")/deploy-flow.sh" local-test "${@:2}"
+        ;;
+    --flow|flow)
+        # Image-first deploy flow (preview by default). Dispatched HERE, before any
+        # top-level side effects below (artifact sync, git checks, secrets setup),
+        # so a preview never touches anything.
+        exec "$(dirname "$(readlink -f "$0")")/deploy-flow.sh" "${@:2}"
+        ;;
 esac
 
 # If a mode flag was passed, export it so the rest of the script can see it
@@ -195,6 +209,15 @@ fi
 PROD_UP_SERVICES="web-prod"
 [ -z "$COMPOSE_FILE" ] && COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.prod.yml"
 IMAGE="shantamcsbain/comserv-web-prod:latest"
+# deploy-flow.sh passes a fixed tag (commit-time) so the SAME image is run/pulled
+# everywhere. Only this repository is accepted.
+if [ -n "${DEPLOY_IMAGE:-}" ]; then
+    case "$DEPLOY_IMAGE" in
+        shantamcsbain/comserv-web-prod:[A-Za-z0-9]*) IMAGE="$DEPLOY_IMAGE" ;;
+        *) echo "❌ DEPLOY_IMAGE must be shantamcsbain/comserv-web-prod:<tag>"; exit 1 ;;
+    esac
+    IMAGE="${IMAGE//[^A-Za-z0-9._:\/-]/}"
+fi
 # Standard container name is "comserv2-web-prod" (matches comserv2-config-db,
 # comserv2-redis, etc.). A legacy container may still exist under the old name
 # "comserv-web-prod" — detect it so the monitor/deploy manages it instead of
@@ -648,7 +671,7 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
             # starts. Late dispatch after the function definition runs it.
             ;;
 
-        "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild"|"push-only")
+        "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild"|"push-only"|"run-image")
             # Functions are defined below; late dispatch after canonical_deploy*.
             ;;
 
@@ -783,7 +806,7 @@ is_production_host() {
     local hn ip
     hn=$(hostname 2>/dev/null || true)
     ip=$(hostname -I 2>/dev/null || true)
-    echo "$hn $ip" | grep -Eqi 'comservproduction1|192\.168\.1\.126'
+    echo "$hn $ip" | grep -Eqi 'comservproduction1|comservproduction2|192\.168\.1\.126|192\.168\.1\.127'
 }
 
 # Workstation-only web services (same image as prod). A bare `compose up` on
@@ -912,7 +935,14 @@ start_prod_container_from_image() {
             secrets="/opt/comserv/secrets"
         fi
     fi
-    ident="${SYSTEM_IDENTIFIER:-production1}"
+    # Identifier follows the host this runs on unless the caller set it (prod1 vs prod2).
+    if [ -z "${SYSTEM_IDENTIFIER:-}" ]; then
+        case "$(hostname)" in
+            *production2*|*prod2*) SYSTEM_IDENTIFIER=production2 ;;
+            *) SYSTEM_IDENTIFIER=production1 ;;
+        esac
+    fi
+    ident="$SYSTEM_IDENTIFIER"
     echo "    secrets dir: ${secrets:-NONE}"
     purge_workstation_web_siblings
 
@@ -937,13 +967,42 @@ start_prod_container_from_image() {
         docker volume create "$v" >/dev/null 2>&1 || true
     done
 
-    # Seed override volumes FROM THE IMAGE if they are empty (volume-shadow trap).
-    docker run --rm --entrypoint sh \
-        -v comserv2_theme_css:/dest "$img" \
-        -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/css/themes/. /dest/ 2>/dev/null || true; fi'
-    docker run --rm --entrypoint sh \
-        -v comserv2_theme_config:/dest "$img" \
-        -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/config/. /dest/ 2>/dev/null || true; fi'
+    # Themes: THEMES_NFS=1 (default) = ONE shared, writable copy on NFS
+    # (192.168.1.175:/mnt/data/comserv_themes/{css_themes,config,themes}) used by
+    # every node. It is the single source of truth, so it is NEVER seeded or
+    # overwritten from the image. THEMES_NFS=0 = old per-node local volumes
+    # (rollback), seeded from the image only when empty.
+    local th_css th_cfg th_root tv tdir topts
+    if [ "${THEMES_NFS:-1}" = "1" ]; then
+        th_css=comserv2_theme_css_nfs; th_cfg=comserv2_theme_config_nfs; th_root=comserv2_themes_nfs
+        for tv in "$th_css:css_themes" "$th_cfg:config" "$th_root:themes"; do
+            tdir="${tv#*:}"; tv="${tv%%:*}"
+            if ! docker volume inspect "$tv" >/dev/null 2>&1; then
+                echo "    creating Docker NFS theme volume $tv"
+                docker volume create --driver local --opt type=nfs \
+                    --opt 'o=addr=192.168.1.175,rw,nfsvers=3,hard,timeo=600,retrans=2' \
+                    --opt "device=:/mnt/data/comserv_themes/$tdir" "$tv" >/dev/null || return 1
+            fi
+            topts=$(docker volume inspect "$tv" --format '{{index .Options "type"}}|{{index .Options "device"}}' 2>/dev/null || true)
+            if [ "$topts" != "nfs|:/mnt/data/comserv_themes/$tdir" ]; then
+                echo "❌ $tv is not the shared NFS theme volume: ${topts:-no options}"; return 1
+            fi
+        done
+        if ! docker run --rm --entrypoint sh -v "$th_cfg:/t:ro" "$img" -c 'test -s /t/theme_definitions.json'; then
+            echo "❌ shared NFS themes missing theme_definitions.json — refusing to start (set THEMES_NFS=0 to use local volumes)"; return 1
+        fi
+        echo "    themes: shared NFS ($th_css, $th_cfg, $th_root)"
+    else
+        th_css=comserv2_theme_css; th_cfg=comserv2_theme_config; th_root=comserv2_themes
+        # Seed override volumes FROM THE IMAGE if they are empty (volume-shadow trap).
+        docker run --rm --entrypoint sh \
+            -v comserv2_theme_css:/dest "$img" \
+            -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/css/themes/. /dest/ 2>/dev/null || true; fi'
+        docker run --rm --entrypoint sh \
+            -v comserv2_theme_config:/dest "$img" \
+            -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/config/. /dest/ 2>/dev/null || true; fi'
+        echo "    themes: LOCAL per-node volumes (THEMES_NFS=0)"
+    fi
 
     # Seed DB connection secrets (K8s-secret style) into the secrets volume so
     # RemoteDB.pm finds them. Source = the secure store on this host (same place
@@ -976,10 +1035,11 @@ start_prod_container_from_image() {
         --name "$name" \
         --restart unless-stopped \
         --network comserv_default \
-        -p 5000:5000 \
+        -p "${HOST_PORT:-5000}:5000" \
         --log-driver json-file --log-opt max-size=20m --log-opt max-file=5 \
         -e ENVIRONMENT=production \
         -e PORT=5000 \
+        -e COMSERV_JOBS="${COMSERV_JOBS:-1}" \
         -e CATALYST_ENV=production \
         -e CATALYST_DEBUG=0 \
         -e WEB_PORT=5000 \
@@ -1000,12 +1060,12 @@ start_prod_container_from_image() {
         -v comserv2_cache:/cache \
         -v comserv2_logs:/opt/comserv/root/log \
         -v "$NFS_VOLUME_NAME:/data/nfs:rw" \
-        -v comserv2_sessions:/tmp/comserv/session \
+        -v "${SESSION_VOLUME:-comserv2_sessions}:/tmp/comserv/session" \
         -v comserv2_cache:/tmp/comserv/cache \
         -v comserv2_temp:/tmp/comserv/temp \
-        -v comserv2_themes:/opt/comserv/root/themes \
-        -v comserv2_theme_config:/opt/comserv/root/static/config \
-        -v comserv2_theme_css:/opt/comserv/root/static/css/themes \
+        -v "$th_root:/opt/comserv/root/themes" \
+        -v "$th_cfg:/opt/comserv/root/static/config" \
+        -v "$th_css:/opt/comserv/root/static/css/themes" \
         -v comserv2_whisper_venv:/opt/comserv/whisper_venv \
         -v comserv2_cpan_cache:/root/.cpan \
         "${extra[@]}" \
@@ -1070,6 +1130,14 @@ PY
     return $rc
 }
 
+# Host keys are VERIFIED (was StrictHostKeyChecking=no). The target's key must
+# already be in known_hosts; an unknown/changed key fails the SSH call.
+_ssh_hostkey_opts() {
+    local kh="${COMSERV_SSH_KNOWN_HOSTS:-$HOME/.ssh/known_hosts}"
+    kh="${kh//[^A-Za-z0-9._\/-]/}"
+    echo "-o StrictHostKeyChecking=yes -o UserKnownHostsFile=$kh"
+}
+
 canonical_deploy() {
     local TARGET_HOST="${1:-local}"
     local SVC="web-prod"
@@ -1082,9 +1150,9 @@ canonical_deploy() {
         # back to the keyfile-based ssh so key auth still works. Build the
         # command as a function so both branches are used consistently.
         if [ -n "${SSHPASS:-}" ]; then
-            REMOTE_SSH="sshpass -e ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@${TARGET_HOST}"
+            REMOTE_SSH="sshpass -e ssh $(_ssh_hostkey_opts) -o ConnectTimeout=15 ubuntu@${TARGET_HOST}"
         else
-            REMOTE_SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i ${SSH_KEYFILE:-$HOME/.ssh/id_ed25519} ubuntu@${TARGET_HOST}"
+            REMOTE_SSH="ssh $(_ssh_hostkey_opts) -o ConnectTimeout=15 -i ${SSH_KEYFILE:-$HOME/.ssh/id_ed25519} ubuntu@${TARGET_HOST}"
         fi
         # When deploying to a remote we build+push locally first, then the
         # remote only pulls+runs (never rebuilds). Local build stays on this host.
@@ -1205,7 +1273,8 @@ EOF
         if ! $REMOTE_SSH bash -s <<EOF
 $(declare -f is_production_host purge_workstation_web_siblings ensure_nfs_volume start_prod_container_from_image)
 NFS_VOLUME_NAME=${NFS_VOLUME_NAME}
-export SYSTEM_IDENTIFIER=production1
+export SYSTEM_IDENTIFIER=$(_target_system_identifier "$TARGET_HOST")
+export THEMES_NFS=${THEMES_NFS:-1}
 start_prod_container_from_image ${IMAGE} ${CONTAINER}
 EOF
         then
@@ -1313,7 +1382,7 @@ recreate_local_web_prod() {
     local HEALTHY=0 i OK
     for i in $(seq 1 30); do
         OK=0
-        curl -fs --max-time 8 http://127.0.0.1:5000/health >/dev/null 2>&1 && OK=1
+        curl -fs --max-time 8 "http://127.0.0.1:${HOST_PORT:-5000}/health" >/dev/null 2>&1 && OK=1
         if [ "$OK" = "1" ]; then HEALTHY=1; echo "✅ healthy (attempt $i)"; break; fi
         echo "  health attempt $i failed, waiting 5s..."
         sleep 5
@@ -1373,6 +1442,15 @@ canonical_deploy_to_nodes() {
 
 # Late dispatch — canonical_deploy* AND _normalize_deploy_node exist now.
 # --prod must be after _normalize_deploy_node: canonical_deploy_to_nodes calls it.
+# Map a deploy target (name or IP) to the SYSTEM_IDENTIFIER the container should carry.
+_target_system_identifier() {
+    case "${1:-}" in
+        production2|prod2|192.168.1.127) echo "production2" ;;
+        production1|prod1|192.168.1.126|172.30.50.206) echo "production1" ;;
+        *) echo "${SYSTEM_IDENTIFIER:-production1}" ;;
+    esac
+}
+
 _normalize_deploy_node() {
     case "${1:-}" in
         production1|prod1) echo "192.168.1.126" ;;
@@ -1418,22 +1496,42 @@ if [ "${DEPLOY_MODE:-}" = "build-push" ]; then
 fi
 
 if [ "${DEPLOY_MODE:-}" = "push-only" ]; then
-    echo "=== PUSH ONLY (no build, no container recreate) ==="
+    # Push Image button = SAFE PUSH. It used to re-tag WHATEVER image the local
+    # web-prod container ran as :latest and push it (could publish a weeks-old
+    # image and roll production back on the next Pull & Deploy). Now it pushes only
+    # the fixed <commit-time> tag running HEALTHY on workstation :5000, then moves :latest.
     if is_production_host; then
         echo "❌ REFUSING to push from production. Push from the workstation."
         exit 1
     fi
-    # Prefer the image currently used by the local web-prod container; fall back to :latest tag name.
-    local_img=$(docker inspect --format='{{.Image}}' comserv2-web-prod 2>/dev/null || docker inspect --format='{{.Image}}' comserv-web-prod 2>/dev/null || true)
-    if [ -n "$local_img" ]; then
-        echo "Tagging running container image $local_img as $IMAGE"
-        docker tag "$local_img" "$IMAGE" || { echo "❌ docker tag failed"; exit 1; }
-    else
-        echo "No local web-prod container — pushing existing $IMAGE if present"
+    exec "$(dirname "$(readlink -f "$0")")/deploy-flow.sh" safe-push --apply
+fi
+
+if [ "${DEPLOY_MODE:-}" = "run-image" ]; then
+    # deploy.sh --run-image <repo:tag> <container> <host-port>
+    # Used by deploy-flow.sh (stage :4000/:3000, promote to :5000, rollback).
+    # Same rename-to-backup -> start -> /health gate -> auto-restore as Rebuild.
+    if is_production_host; then
+        echo "❌ --run-image is for the workstation. production1 uses --pull-deploy."; exit 1
     fi
-    docker push "$IMAGE" || { echo "❌ docker push failed"; exit 1; }
-    echo "✅ Pushed $IMAGE (running container untouched)"
-    exit 0
+    RI_IMG="${CLI_ARG2:-}"; RI_NAME="${3:-}"; RI_PORT="${4:-}"
+    case "$RI_NAME:$RI_PORT" in
+        comserv2-web-prod:5000|comserv2-web-test:4000|comserv2-web-alt:3000) ;;
+        *) echo "❌ container/port must be comserv2-web-prod:5000, comserv2-web-test:4000 or comserv2-web-alt:3000"; exit 1 ;;
+    esac
+    case "$RI_IMG" in shantamcsbain/comserv-web-prod:[A-Za-z0-9]*) ;; *) echo "❌ bad image $RI_IMG"; exit 1 ;; esac
+    IMAGE="$RI_IMG"; CONTAINER="$RI_NAME"; export HOST_PORT="$RI_PORT"
+    [ "$RI_PORT" != "5000" ] && export SESSION_VOLUME="comserv2_sessions_$RI_PORT"
+    if [ "$RI_PORT" = "4000" ]; then
+        # Test slot: own identity, no background jobs (COMSERV_JOBS honoured once
+        # the jobs-switch branch is merged; harmless before).
+        # Line ~232 already defaults SYSTEM_IDENTIFIER to the hostname, so force the test identity here.
+        export SYSTEM_IDENTIFIER="${LOCAL_TEST_IDENTIFIER:-workstation-test}" COMSERV_JOBS="${COMSERV_JOBS:-0}"
+    fi
+    if docker image inspect "$IMAGE" >/dev/null 2>&1; then SKIP_PULL=1; fi
+    echo "=== RUN IMAGE $IMAGE as $CONTAINER on :$HOST_PORT (no build) ==="
+    SKIP_PULL="${SKIP_PULL:-0}" recreate_local_web_prod
+    exit $?
 fi
 
 if [ "${DEPLOY_MODE:-}" = "local-rebuild" ]; then

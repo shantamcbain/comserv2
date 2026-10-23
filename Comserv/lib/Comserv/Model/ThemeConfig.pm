@@ -18,7 +18,8 @@ has 'logging' => (
 # Canonical: read from static/config/theme_definitions.json
 sub get_theme_definitions_path {
     my ($self, $c) = @_;
-    return $c->path_to('root', 'static', 'config', 'theme_definitions.json');
+    require Comserv::Util::ThemePaths;
+    return Comserv::Util::ThemePaths->definitions_file($c);
 }
 
 sub get_theme_mappings_path {
@@ -29,7 +30,8 @@ sub get_theme_mappings_path {
 
 sub get_theme_css_directory {
     my ($self, $c) = @_;
-    return $c->path_to('root', 'static', 'css', 'themes');
+    require Comserv::Util::ThemePaths;
+    return Comserv::Util::ThemePaths->css_dir($c);
 }
 
 sub get_theme_definitions {
@@ -326,7 +328,7 @@ sub save_theme {
     
     try {
         # Load current theme definitions
-        my $config_file = $c->path_to('root', 'static', 'config', 'theme_definitions.json');
+        my $config_file = $self->get_theme_definitions_path($c);
         
         my $config_data = {};
         if (-f $config_file) {

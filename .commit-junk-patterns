@@ -1,0 +1,23 @@
+# .commit-junk-patterns — files that must not be committed (backup copies and
+# app-written runtime data). One glob per line, matched against the repo-relative
+# path ("*" also matches "/"). Lines starting with "!" exempt a path. # = comment.
+# Used by Comserv/script/git/secret_guard.sh (pre-commit hook) and the in-app
+# commit checks (Comserv::Util::Git->junk_files).
+# Fix for a flagged file:  git rm --cached <file> && echo <file> >> .gitignore
+
+# Backup copies
+*.bak
+*.bak-*
+*~
+*.orig
+
+# Runtime data written by the app
+Comserv/data/ai_usage_readings.jsonl
+Comserv/data/*_cache.json
+Comserv/data/*_state.json
+Comserv/data/*_seen.json
+Comserv/data/ai_commit_gate.json
+Comserv/data/ai_review_scores.json
+Comserv/data/ai_reviewer_spend.json
+Comserv/data/supergrok_pacing.json
+Comserv/root/static/ai/*_seen.json
