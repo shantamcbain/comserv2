@@ -299,9 +299,20 @@ document.addEventListener('DOMContentLoaded', function() {
 [%# Site theme header/footer from the page table (page_code site_header / site_footer), e.g. cloned sites %]
 [% SET theme_site = SiteName || c.stash.SiteName || c.session.SiteName %]
 [% TRY %][% SET site_header_page = c.model('DBEncy').resultset('Page').search({ sitename => theme_site, page_code => 'site_header', status => 'active' }).first %][% CATCH %][% END %]
-<header[% IF site_header_page %] class="has-site-header"[% END %]>
+[%# Per-SiteName brand mark. sites.app_logo: image path/URL, a glyph, or empty (no icon). %]
+[% TRY %][% SET site_brand = c.model('DBEncy').resultset('Site').search({ name => theme_site }).first %][% CATCH %][% END %]
+[% SET app_logo = '' %]
+[% IF site_brand %][% SET app_logo = site_brand.app_logo || '' %][% END %]
+<header class="site-[% theme_site | html %][% IF site_header_page %] has-site-header[% END %]">
     [% IF site_header_page %]<div class="site-header">[% site_header_page.body %]</div>[% END %]
     <h1>
+        [% IF app_logo %]
+        [% IF app_logo.match('^https?://') OR app_logo.match('^/') %]
+        <img class="site-brand-icon" src="[% app_logo | html %]" alt="[% (site_brand.app_logo_alt || theme_site) | html %]"[% IF site_brand.app_logo_width %] width="[% site_brand.app_logo_width %]"[% END %][% IF site_brand.app_logo_height %] height="[% site_brand.app_logo_height %]"[% END %]>
+        [% ELSE %]
+        <span class="site-brand-icon" role="img" aria-label="[% (site_brand.app_logo_alt || theme_site) | html %]">[% app_logo | html %]</span>
+        [% END %]
+        [% END %]
         Welcome [% IF c.session.username %]
 [% c.session.first_name || c.session.username %] [% c.session.last_name %][% IF is_admin %] Administrator[% END %]
 [% ELSE %]

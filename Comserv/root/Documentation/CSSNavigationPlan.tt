@@ -5,7 +5,7 @@
    TemplateType = "Documentation"
    category = "development"
    page_version = "0.01"
-   last_updated = "2026-10-16"
+   last_updated = "2026-10-21"
    site_specific = "false"
    project_id = "305"
    project_code = "CSSNAV"
@@ -18,15 +18,15 @@
 <div class="container">
 [% INCLUDE 'admin/documentation/_doc_header.tt'
     page_title = 'Small-screen navigation and theme chrome'
-    last_updated = '2026-10-16'
+    last_updated = '2026-10-21'
     doc_project_id = 305
     doc_project_code = 'CSSNAV'
 %]
 
 <div class="doc-info" id="now">
-<p class="doc-body"><strong>Now.</strong> The phone menu stays a wrapping desktop row because <code>sub-menu.js</code> writes inline <code>display:flex</code> over the hamburger rules in <code>menu-theme.css</code>. Todo <a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2585">#2585</a> is the fix. Verify on port 4012, not 3001.</p>
-<p class="doc-body"><strong>Blocked by.</strong> Nothing for the menu fix. The admin info-bar collapse (<a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2586">#2586</a>) is not started. Missing <code>sunfire.css</code> is owned by Theme Management, todo <a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2588">#2588</a> on project #77 — not absorbed here.</p>
-<p class="doc-body"><strong>Next.</strong> Hard-refresh <code>/planning/daily</code> on the CSSNavigation port after #2585. Then pick the next page that is hard to use on a tablet.</p>
+<p class="doc-body"><strong>Now.</strong> <a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2585">#2585</a> is done. Under 640px the hamburger toggles <code>nav-open</code> and taps open accordions. Wider than that the menu wraps and hover still works. JavaScript does not write inline <code>display</code> on menu nodes. Verified on port 4012, not 3001.</p>
+<p class="doc-body"><strong>Blocked by.</strong> Nothing for the menu. The admin info-bar collapse (<a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2586">#2586</a>) is not started. Missing <code>sunfire.css</code> is owned by Theme Management, todo <a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2588">#2588</a> on project #77 — not absorbed here.</p>
+<p class="doc-body"><strong>Next.</strong> Hard-refresh a page on port 4012 and narrow the window below 640px. Then <a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2586">#2586</a>.</p>
 </div>
 
 <div id="toc" class="row">
@@ -131,17 +131,17 @@
 <tr>
 <td class="doc-td">Stop inline display overrides; tap opens panels</td>
 <td class="doc-td"><code>root/static/js/sub-menu.js</code></td>
-<td class="doc-td">#2585</td>
+<td class="doc-td">Done. Class toggles only. Served on :4012.</td>
 </tr>
 <tr class="doc-tr-alt">
 <td class="doc-td">One small-screen query, accordion submenus</td>
 <td class="doc-td"><code>root/static/css/menu-theme.css</code></td>
-<td class="doc-td">#2585</td>
+<td class="doc-td">Done. 640px query, 44px targets, accordion.</td>
 </tr>
 <tr>
 <td class="doc-td">Move hamburger CSS and script out of the template</td>
 <td class="doc-td"><code>root/pagetop.tt</code></td>
-<td class="doc-td">#2585</td>
+<td class="doc-td">Done. Hamburger markup only. Guest bar uses <code>var(--accent-color)</code>.</td>
 </tr>
 <tr class="doc-tr-alt">
 <td class="doc-td">Admin info bar</td>

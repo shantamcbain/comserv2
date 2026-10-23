@@ -8,7 +8,7 @@
 [% SET _cur_path   = c.req.path %]
 [% IF _cur_path == '' OR _cur_path == '/' %]
 <div id="ml-subscribe-banner"
-     style="display:none;background:linear-gradient(90deg,var(--primary-color,#1565c0),#1976d2);color:#fff;
+     style="display:none;background:linear-gradient(90deg,var(--primary-color,#1565c0),var(--button-bg,#1976d2));color:#fff;
             padding:10px 20px;text-align:center;font-size:0.95em;position:relative;z-index:100;">
     [% IF c.session.user_id %]
         <span style="margin-right:12px;">&#9993; <strong>Stay connected</strong> — manage which newsletters you receive.</span>
