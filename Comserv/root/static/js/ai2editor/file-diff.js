@@ -13,6 +13,12 @@
 
     var NS = 'AI2FileDiff';
 
+    function openDiffToolTab() {
+        if (window.AI2RightSidebar && typeof AI2RightSidebar.openDiff === 'function') {
+            AI2RightSidebar.openDiff();
+        }
+    }
+
     // Build a Set of repo-relative-ish editor paths that are changed. The
     // server returns paths relative to the repo root (one level above the app);
     // the file tree uses app-relative paths (e.g. "root/...", "lib/..."). We
@@ -214,6 +220,7 @@
     function loadDiff(li) {
         var path = li.getAttribute('data-path');
         if (!path) return;
+        openDiffToolTab();
         var pane = ensureDiffPane();
         ComservGitDiff.showLoading(pane, 'Loading diff for ' + path + ' …');
 
@@ -288,6 +295,7 @@
         var opened = window.AI2_FILE_TO_LOAD;
         if (opened) {
             setTimeout(function () {
+                openDiffToolTab();
                 var pane = ensureDiffPane();
                 if (!pane) return;
                 ComservGitDiff.showLoading(pane, 'Loading diff for ' + opened + ' …');
@@ -374,10 +382,12 @@
     function loadDiffForCurrentFile() {
         var path = currentEditorPath();
         if (!path) {
+            openDiffToolTab();
             var pane = ensureDiffPane();
             if (pane) ComservGitDiff.showMessage(pane, 'Open a file first to diff it.');
             return;
         }
+        openDiffToolTab();
         var pane = ensureDiffPane();
         if (!pane) return;
         ComservGitDiff.showLoading(pane, 'Loading diff for ' + path + ' …');

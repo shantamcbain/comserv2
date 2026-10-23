@@ -274,7 +274,7 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         $validated = $self->_validate_paths($c, \@paths);
         if (@{ $validated->{invalid} }) {
             $c->flash->{error_msg} =
-                "Rejected unsafe or unknown path(s): " . join(', ', @{ $validated->{invalid} });
+                "Rejected unsafe or unknown path(s): " . join(', ', @{ $validated->{invalid} }) . " (must exactly match git status --porcelain on the bound target. Refresh view or select only current dirty paths for this target. Runtime data should be gitignored.)";
             $c->response->redirect($c->uri_for('/admin/git'));
             return;
         }
@@ -347,21 +347,50 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
                 goto COMMIT_DONE;
             }
 
+            # Secret guard (same script as the global pre-commit hook). Never --no-verify.
+            my $guard = $self->git_service->secret_guard($c);
+            unless ($guard->{ok}) {
+                my $where = join(', ', map {
+                    $_->{file} . ($_->{line} ? ":$_->{line}" : '')
+                } @{ $guard->{hits} || [] });
+                $msg = "Commit refused by secret guard. "
+                     . ($where ? "Location: $where. " : '')
+                     . "Only the primary DB key belongs in the env; other keys belong in the database. "
+                     . "Use the fix route below. Do not use --no-verify.";
+                if ($guard->{hits} && @{ $guard->{hits} }) {
+                    $c->flash->{guard_hits_json} = encode_json($guard->{hits});
+                } else {
+                    $msg .= "\n" . ($guard->{output} // q{});
+                }
+                goto COMMIT_DONE;
+            }
+
+            # 2026-10-15: reviewer gate before the commit goes through.
+            my $g = $self->_dashboard_commit_gate($c, $message);
+            unless ($g->{proceed}) { $msg = $g->{msg}; $c->flash->{commit_message_keep} = $message; goto COMMIT_DONE; }
+
             my ($out, $code) = $self->_git_list($c, 'commit', '-m', $message);
             $ok = ($code == 0);
             $msg = $ok ? "Committed staged changes." : "Commit failed: $out";
+            $msg .= ' ' . $g->{note} if $ok && $g->{note};
+            $self->_save_user_gate($c, undef) if $ok;
         }
         COMMIT_DONE:
     }
     elsif ($op eq 'push') {
         my $branch = $self->get_current_branch($c);
         my $tracking = $self->get_tracking_info($c);
-        if (!$tracking->{upstream} && !$c->req->param('set_upstream')) {
+        # main/master on the primary checkout (:3001) always publishes to origin.
+        # Worktree branches still require an explicit set-upstream checkbox.
+        my $publish = ($branch eq 'main' || $branch eq 'master');
+        if (!$tracking->{upstream} && !$publish && !$c->req->param('set_upstream')) {
             $msg = "Branch '$branch' has no upstream. Re-submit with 'set upstream' checked to push.";
         }
         else {
             my @cmd = ('push');
-            push @cmd, '--set-upstream' if !$tracking->{upstream};
+            # Restore branch.<name>.merge when it is missing so the next load
+            # uses @{u} instead of the origin/<branch> inference.
+            push @cmd, '--set-upstream' if !$tracking->{upstream_configured};
             push @cmd, 'origin', $branch;
             my ($out, $code) = $self->_git_list($c, @cmd);
             $ok = ($code == 0);
@@ -487,6 +516,38 @@ JSON: { success, message, model } or { success => 0, error }.
 
 =cut
 
+# 2026-10-15: AI Editor commit form (root/ai2/editor/right_dock_commit.tt).
+# step=review: review the staged diff with the in-app reviewer, return findings.
+# step=confirm: commit the reviewed diff; a blocked diff needs override_reason
+# ("commit anyway"). Cap hit / reviewer error -> warning, commit allowed.
+sub editor_commit :Path('/admin/git/editor_commit') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_commit');
+    unless ($c->req->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+    my $step = $c->req->param('step') // 'review';
+    my $out;
+    if ($step eq 'review') {
+        my $r = $self->_review_for_commit($c, $c->req->param('commit_message'), []);
+        my $gate = $c->stash->{commit_review} || {};
+        my $view = $self->_reviewer_for($c)->gate_view($gate->{review} || {});
+        $out = { success => ($r->{error_msg} && !$view->{blocking}) ? 0 : 1, step => 'review',
+                 message => $r->{success_msg} // $r->{error_msg} // '',
+                 error => ($view->{blocking} ? undef : $r->{error_msg}),
+                 paths => $gate->{paths} || [], %$view };
+    } elsif ($step eq 'confirm') {
+        my $r = $self->_confirm_reviewed_commit($c);
+        $out = { success => $r->{error_msg} ? 0 : 1, step => 'confirm',
+                 message => $r->{success_msg} // '', error => $r->{error_msg}, output => $r->{output} // '' };
+    } else {
+        $out = { success => 0, error => "unknown step $step" };
+    }
+    $c->response->body(encode_json($out));
+}
+
 sub suggest_commit_message :Path('/admin/git/suggest_message') :Args(0) {
     my ($self, $c) = @_;
 
@@ -562,13 +623,11 @@ Diff${\ ($truncated ? ' (truncated)' : '')}:
 $diff
 PROMPT
 
-    # An explicit model from the Git dashboard wins. The dropdown offers the
-    # FULL catalog (Ollama + Grok + OpenRouter); the selected value is
-    # "provider|model" (e.g. "openrouter|tencent/hy3"). If empty, the Router
-    # falls back to the app-wide default (openrouter|tencent/hy3) unless no
-    # external key is configured, in which case it uses local Ollama — so the
-    # behavior is consistent with the chat widget and editor.
-    my $requested_model = $c->req->param('model') || '';
+    # An explicit model from the Git dashboard wins. For commit message suggestion
+    # we default to north-mini-code:free (cheap, reliable coding model) rather than
+    # letting routing pick Grok/SuperGrok. The dropdown offers the full catalog;
+    # value is "provider|model".
+    my $requested_model = $c->req->param('model') || 'openrouter|cohere/north-mini-code:free';
     $requested_model = '' if $requested_model =~ /[\x00\r\n]/;
 
     # SINGLE dispatch brain — identical code path to the chat widget and the
@@ -591,6 +650,7 @@ PROMPT
             $requested_model,
             $messages,
             can_select => 1,
+            log_usage  => 'git_commit_message',
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
@@ -602,7 +662,12 @@ PROMPT
         my $err = ($resp && $resp->{error}) ? $resp->{error} : 'AI returned no message';
         # UI surfaces this verbatim — never dump full OAuth JSON / JWT bodies.
         $err =~ s/\s+/ /g;
-        if ($err =~ /unauthenticated|bad-credentials|token could not be validated/i
+        if ($err =~ /spending.?limit|personal-team-blocked|out of credits|add credits|upgrade at/i
+            && $err !~ /unauthenticated|bad-credentials|token could not be validated/i) {
+            # Not a credential problem — re-auth would be a waste of time.
+            $err = 'SuperGrok/xAI quota or spending limit reached — add credits or wait for the reset; another model was tried automatically';
+        }
+        elsif ($err =~ /unauthenticated|bad-credentials|token could not be validated/i
             || ($resp && $resp->{auth_failed})) {
             $err = 'SuperGrok/xAI login expired or invalid — re-auth Hermes (xai-oauth), then run script/sync_supergrok_token.pl';
         }
@@ -703,9 +768,24 @@ sub index :Path('/admin/git') :Args(0) {
 
     my $status = $self->get_git_status($c);
 
+    if (my $raw = $c->flash->{guard_hits_json}) {
+        my $hits = eval { decode_json($raw) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+                "guard_hits_json decode failed: $@");
+        } elsif (ref $hits eq 'ARRAY') {
+            $c->stash(guard_hits => $hits);
+        }
+    }
+
     $c->stash(
         repo_path       => $self->repo_path($c),
         current_branch  => $self->get_current_branch($c),
+        # current_worktree = registry key from app_workflow (path-based worktree dir name under ~/.comserv/worktrees/).
+        # Used to highlight the matching row in Develop Servers / Branch Servers list (b.name).
+        # This can differ from current_branch (live git) if a feature branch was checked out inside a worktree slot.
+        # The list itself is registry-driven; highlighting marks "this running server".
+        current_worktree => $c->stash->{app_workflow} || 'main',
         local_branches  => $self->get_local_branches($c),
         branch_details  => $self->git_service->get_branch_details($c),
         recent_commits  => $self->get_recent_commits($c),
@@ -721,6 +801,15 @@ sub index :Path('/admin/git') :Args(0) {
         worktree_list   => $self->git_service->build_worktree_list,
         template        => 'admin/git/index.tt',
     );
+
+    # Body-only embed for AI2 editor Git tab iframe (?embed=1).
+    # Use ai_popup_mode (not bare no_wrapper) so layout.tt still loads Header CSS + js_load.tt.
+    if ($c->req->param('embed')) {
+        $c->stash(
+            git_embed     => 1,
+            ai_popup_mode => 1,
+        );
+    }
 
     if ($c->session->{debug_mode}) {
         push @{$c->stash->{debug_msg}}, "Git dashboard - Template: admin/git/index.tt";
@@ -1474,13 +1563,15 @@ sub git_commit_management :Path('/admin/git_commit') :Args(0) {
         if ($action eq 'add_files') {
             my @files = $c->req->param('files');
             $result = $self->execute_git_add($c, \@files);
-        } elsif ($action eq 'commit') {
-            my $message = $c->req->param('commit_message');
-            $result = $self->execute_git_commit($c, $message);
-        } elsif ($action eq 'add_and_commit') {
-            my @files = $c->req->param('files');
-            my $message = $c->req->param('commit_message');
-            $result = $self->execute_git_add_and_commit($c, \@files, $message);
+        } elsif ($action eq 'commit' || $action eq 'add_and_commit') {
+            my @files = $action eq 'add_and_commit' ? $c->req->param('files') : ();
+            $result = $self->_review_for_commit($c, $c->req->param('commit_message'), \@files);
+        } elsif ($action eq 'confirm_commit') {
+            $result = $self->_confirm_reviewed_commit($c);
+        } elsif ($action eq 'ask_fixer') {
+            $result = $self->_ask_fixer($c);
+        } elsif ($action eq 'apply_fixer') {
+            $result = $self->_apply_fixer($c);
         }
         
         $c->stash(%$result) if $result;
@@ -1493,6 +1584,12 @@ sub git_commit_management :Path('/admin/git_commit') :Args(0) {
     # Get recent commits
     my $recent_commits = $self->get_recent_commits($c);
     $c->stash(recent_commits => $recent_commits);
+    my $gate = eval { $self->_user_gate($c) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'git_commit_management',
+            "commit gate read failed: $@");
+    }
+    $c->stash(commit_review => $gate) if $gate && ref $gate eq 'HASH' && !$c->stash->{commit_review};
     
     if ($c->session->{debug_mode}) {
         push @{$c->stash->{debug_msg}}, "Git controller git_commit view - Template: admin/git_commit.tt";
@@ -1524,6 +1621,330 @@ sub execute_git_add {
 Execute git commit operation
 
 =cut
+
+=head2 execute_git_commit
+
+Execute git commit operation. The commit form does not call this until a review is confirmed.
+
+=cut
+
+sub _app_root {
+    my ($self, $c) = @_;
+    my $r = '' . $c->path_to('');
+    $r =~ s{/$}{};
+    return $r;
+}
+
+sub _gate_user {
+    my ($self, $c) = @_;
+    return $c->session->{username} || ($c->user ? $c->user->username : '') || 'admin';
+}
+
+sub _gate_path {
+    my ($self, $c) = @_;
+    return $self->_app_root($c) . '/data/ai_commit_gate.json';
+}
+
+sub _read_gates {
+    my ($self, $c) = @_;
+    my $f = $self->_gate_path($c);
+    open my $fh, '<', $f or return {};
+    local $/;
+    my $d = eval { JSON->new->decode(scalar <$fh>) };
+    close $fh;
+    return ref $d eq 'HASH' ? $d : {};
+}
+
+sub _write_gates {
+    my ($self, $c, $all) = @_;
+    my $f = $self->_gate_path($c);
+    if (open my $fh, '>', "$f.tmp") {
+        print $fh JSON->new->canonical->pretty->encode($all);
+        close $fh;
+        rename "$f.tmp", $f or $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_write_gates', "rename failed: $!");
+    } else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_write_gates', "cannot write $f: $!");
+    }
+}
+
+sub _user_gate {
+    my ($self, $c) = @_;
+    return $self->_read_gates($c)->{ $self->_gate_user($c) };
+}
+
+sub _save_user_gate {
+    my ($self, $c, $gate) = @_;
+    my $all = $self->_read_gates($c);
+    if (defined $gate) { $all->{ $self->_gate_user($c) } = $gate }
+    else { delete $all->{ $self->_gate_user($c) } }
+    $self->_write_gates($c, $all);
+}
+
+# 2026-10-15: commit gate for the Git dashboard (the AI Editor's Git panel).
+# First click reviews the staged diff and shows findings. A clean review
+# commits at once; findings need a second click on the same diff; a
+# high-severity finding needs a "commit anyway" reason (8+ chars).
+# Reviewer off / cap hit / error -> warning, commit allowed.
+sub _format_findings {
+    my ($self, $view) = @_;
+    my @l = map { sprintf('[%s] %s%s %s', $_->{severity} || 'note', $_->{file},
+                          (length $_->{line} ? ":$_->{line}" : ''), $_->{issue}) } @{ $view->{findings} || [] };
+    return join(' | ', @l);
+}
+
+sub _dashboard_commit_gate {
+    my ($self, $c, $message) = @_;
+    my ($diff) = $self->_git_list($c, 'diff', '--cached');
+    $diff //= '';
+    require Digest::SHA;
+    my $sha = Digest::SHA::sha256_hex($diff);
+    my $rv = $self->_reviewer_for($c);
+    my $reason = $c->req->param('override_reason') // '';
+    $reason =~ s/^\s+|\s+$//g;
+    my $prev = eval { $self->_user_gate($c) };
+    if ($prev && ref $prev eq 'HASH' && ($prev->{diff_sha} // '') eq $sha && $prev->{dashboard}) {
+        my $view = $rv->gate_view($prev->{review});
+        if ($view->{blocking}) {
+            return { proceed => 0, msg => 'Still blocked by the reviewer: ' . $self->_format_findings($view)
+                     . ' To commit anyway, type a reason (8+ characters) in "Commit anyway reason" and click Commit again.' }
+                if length($reason) < 8;
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, '_dashboard_commit_gate',
+                'commit anyway by ' . $self->_gate_user($c) . ': ' . $reason);
+            eval { $rv->append_score({ at => time, source => 'commit_override', diff_sha => $sha, verdict => 'override',
+                                       override => 1, override_by => $self->_gate_user($c), override_reason => $reason }) };
+            return { proceed => 1, note => "Committed anyway over the reviewer's block (reason: $reason)." };
+        }
+        return { proceed => 1, note => 'Reviewed findings were confirmed.' };
+    }
+    my $res = eval { $rv->review($c, diff => $diff, files => [ $diff =~ /^diff --git a\/(.+?) b\//mg ],
+                                 diff_sha => $sha, task => $message, source => 'commit_gate') };
+    $res = { ok => 0, skipped => 1, reason => 'review call failed' . ($@ ? ": $@" : '') } if $@ || !$res;
+    my $view = $rv->gate_view($res);
+    $res->{blocking} = $view->{blocking};
+    $self->_save_user_gate($c, { at => time, diff_sha => $sha, message => $message, review => $res, dashboard => 1 });
+    return { proceed => 1, note => $view->{warning} } unless $view->{reviewed};
+    if ($view->{blocking}) {
+        return { proceed => 0, msg => 'Commit blocked by the reviewer (' . ($view->{model} || 'reviewer') . '): '
+                 . $self->_format_findings($view)
+                 . ' Fix it, or type a reason (8+ characters) in "Commit anyway reason" and click Commit again.' };
+    }
+    if (@{ $view->{findings} || [] }) {
+        return { proceed => 0, msg => 'Reviewer findings (not blocking): ' . $self->_format_findings($view)
+                 . ' Click Commit again to confirm. Nothing has been committed yet.' };
+    }
+    return { proceed => 1, note => 'Reviewer found no problems (' . ($view->{model} || 'reviewer') . ').' };
+}
+
+sub _reviewer_for {
+    my ($self, $c) = @_;
+    require Comserv::Util::AI::CodeReviewer;
+    return Comserv::Util::AI::CodeReviewer->new(root => $self->_app_root($c));
+}
+
+sub _diff_for_commit {
+    my ($self, $c, $files) = @_;
+    if ($files && @$files) {
+        return $self->git_service->diff($c, paths => $files) // '';
+    }
+    return $self->git_service->diff($c, cached => 1) // '';
+}
+
+sub _review_for_commit {
+    my ($self, $c, $message, $files) = @_;
+    $files = [ grep { defined && !ref && length } @{ $files || [] } ];
+    my $result = { success => 0, output => '' };
+    unless (defined $message && length $message) {
+        $result->{error_msg} = 'Commit message required before review.';
+        return $result;
+    }
+    my $diff = eval { $self->_diff_for_commit($c, $files) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_review_for_commit', "diff failed: $@");
+        $result->{error_msg} = 'Could not read the diff. Nothing was committed.';
+        return $result;
+    }
+    $diff //= '';
+    require Digest::SHA;
+    my $sha = Digest::SHA::sha256_hex($diff);
+    my @paths = @$files ? @$files : ($diff =~ /^diff --git a\/(.+?) b\//mg);
+    my @am;
+    eval {
+        require Comserv::Model::AI2::TaskTracker;
+        my $author = Comserv::Model::AI2::TaskTracker->new(root => $self->_app_root($c))->author_for_paths(@paths);
+        @am = @{ $author->{models} || [] } if $author;
+        1;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, '_review_for_commit',
+            "author lookup failed: $@");
+    }
+    my $rv = $self->_reviewer_for($c);
+    my $res = eval {
+        $rv->review($c,
+            diff => $diff, author_models => \@am, files => \@paths, diff_sha => $sha,
+            task => $message, source => 'commit_gate');
+    };
+    if ($@ || !$res) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_review_for_commit',
+            'review failed: ' . ($@ || 'no result'));
+        $res = { ok => 0, skipped => 1, reason => 'review call failed; confirm is allowed', blocking => 0 };
+    }
+    $res->{blocking} = ($res->{skipped} || !$res->{ok}) ? 0 : ($rv->should_block($res) ? 1 : 0);
+    my $gate = {
+        at => time, diff => substr($diff, 0, 60000), diff_sha => $sha,
+        files => $files, paths => \@paths, message => $message,
+        author_models => \@am, review => $res, preview => undef,
+    };
+    $self->_save_user_gate($c, $gate);
+    $c->stash(commit_review => $gate);
+    if ($diff !~ /\S/) {
+        $result->{success_msg} = 'No diff to review. Confirm only if that is what you meant.';
+    } elsif ($res->{skipped} || !$res->{ok}) {
+        $result->{success_msg} = 'Not reviewed: ' . ($res->{reason} // 'skipped') . '. You may confirm the commit.';
+    } elsif ($res->{blocking}) {
+        $result->{error_msg} = 'Review blocked this commit. Read the findings, ask the fixer, or override with a reason.';
+    } else {
+        $result->{success_msg} = 'Review finished. Confirm to commit. Nothing has been committed yet.';
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_review_for_commit',
+        'sha=' . substr($sha, 0, 12) . ' blocking=' . $res->{blocking} . ' model=' . ($res->{model} // ''));
+    return $result;
+}
+
+sub _confirm_reviewed_commit {
+    my ($self, $c) = @_;
+    my $gate = $self->_user_gate($c);
+    my $result = { success => 0, output => '' };
+    unless ($gate && ref $gate eq 'HASH' && $gate->{diff_sha}) {
+        $result->{error_msg} = 'No review on file. Review the diff first.';
+        return $result;
+    }
+    my $files = $gate->{files} || [];
+    my $diff = eval { $self->_diff_for_commit($c, $files) } // '';
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_confirm_reviewed_commit', "diff failed: $@");
+        $result->{error_msg} = 'Could not re-read the diff.';
+        $c->stash(commit_review => $gate);
+        return $result;
+    }
+    require Digest::SHA;
+    my $sha = Digest::SHA::sha256_hex($diff);
+    if ($sha ne $gate->{diff_sha}) {
+        $result->{error_msg} = 'The diff changed after review. Review it again before committing.';
+        $c->stash(commit_review => $gate);
+        return $result;
+    }
+    my $reason = $c->req->param('override_reason') // '';
+    $reason =~ s/^\s+|\s+$//g;
+    if ($gate->{review}{blocking} && length($reason) < 8) {
+        $result->{error_msg} = 'This diff is blocked. Override needs a reason of at least 8 characters, or ask the fixer.';
+        $c->stash(commit_review => $gate);
+        return $result;
+    }
+    if ($gate->{review}{blocking}) {
+        eval {
+            $self->_reviewer_for($c)->append_score({
+                at => time,
+                author_models => $gate->{author_models} || [],
+                reviewer_model => $gate->{review}{model},
+                source => 'commit_override',
+                files => $gate->{paths} || [],
+                correctness => ($gate->{review}{review} || {})->{correctness},
+                security => ($gate->{review}{review} || {})->{security},
+                quality => ($gate->{review}{review} || {})->{quality},
+                verdict => 'override',
+                high_findings => 0,
+                diff_sha => $sha,
+                override => 1,
+                override_by => $self->_gate_user($c),
+                override_reason => $reason,
+            });
+            1;
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_confirm_reviewed_commit',
+                "override score failed: $@");
+        }
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, '_confirm_reviewed_commit',
+            'override by ' . $self->_gate_user($c) . ': ' . $reason);
+    }
+    if (@$files) {
+        my $add = $self->execute_git_add($c, $files);
+        unless ($add->{success}) {
+            $c->stash(commit_review => $gate);
+            return $add;
+        }
+    }
+    my $commit = $self->execute_git_commit($c, $gate->{message});
+    if ($commit->{success}) { $self->_save_user_gate($c, undef) }
+    else { $c->stash(commit_review => $gate) }
+    return $commit;
+}
+
+sub _ask_fixer {
+    my ($self, $c) = @_;
+    my $gate = $self->_user_gate($c);
+    my $result = { success => 0, output => '' };
+    unless ($gate && $gate->{diff}) {
+        $result->{error_msg} = 'No reviewed diff to fix.';
+        return $result;
+    }
+    my $findings = (($gate->{review} || {})->{review} || {})->{findings} || [];
+    my $fix = eval {
+        $self->_reviewer_for($c)->propose_fix($c,
+            diff => $gate->{diff},
+            findings => $findings,
+            author_models => $gate->{author_models} || [],
+            reviewer_model => $gate->{review}{model},
+        );
+    };
+    if ($@ || !$fix) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_ask_fixer', 'fixer failed: ' . ($@ || 'no result'));
+        $result->{error_msg} = 'Fixer did not run.';
+        $c->stash(commit_review => $gate);
+        return $result;
+    }
+    if (!$fix->{ok}) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, '_ask_fixer', $fix->{reason} // 'fixer skipped');
+        $result->{error_msg} = $fix->{reason} // 'Fixer did not return a patch.';
+        $c->stash(commit_review => $gate);
+        return $result;
+    }
+    $gate->{preview} = $fix->{patch};
+    $gate->{fixer_model} = $fix->{model};
+    $self->_save_user_gate($c, $gate);
+    $c->stash(commit_review => $gate);
+    $result->{success_msg} = 'Fixer preview from ' . $fix->{model} . '. Nothing is written until you click Apply.';
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_ask_fixer', 'preview from ' . $fix->{model});
+    return $result;
+}
+
+sub _apply_fixer {
+    my ($self, $c) = @_;
+    my $gate = $self->_user_gate($c);
+    my $result = { success => 0, output => '' };
+    unless ($gate && $gate->{preview}) {
+        $result->{error_msg} = 'No fixer preview to apply.';
+        return $result;
+    }
+    my $applied = eval { $self->git_service->apply_patch($c, $gate->{preview}) };
+    if ($@ || !$applied || !$applied->{success}) {
+        my $err = $@ || ($applied && ($applied->{error} || $applied->{output})) || 'apply failed';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_apply_fixer', $err);
+        $result->{error_msg} = "Patch was not applied: $err";
+        $c->stash(commit_review => $gate);
+        return $result;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_apply_fixer',
+        'applied preview from ' . ($gate->{fixer_model} // 'fixer'));
+    $gate->{preview} = undef;
+    $self->_save_user_gate($c, $gate);
+    my $again = $self->_review_for_commit($c, $gate->{message}, $gate->{files} || []);
+    $again->{success_msg} = 'Patch applied. ' . ($again->{success_msg} || $again->{error_msg} || 'Review it again before committing.');
+    delete $again->{error_msg} if $again->{success_msg};
+    return $again;
+}
 
 sub execute_git_commit {
     my ($self, $c, $message) = @_;
@@ -1842,19 +2263,35 @@ sub merge_to_main :Path('/admin/git/merge_to_main') :Args(0) {
     }
 
     my $res = $self->git_service->merge_branch($c, $branch, { repo => $main_repo });
-    if ($res->{conflict}) {
+    if (!$res->{success}) {
+        my $level = $res->{conflict} || $res->{uncommitted} ? 'warn' : 'error';
+        $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_merge',
+            "merge_to_main failed branch='$branch' reason="
+            . ($res->{reason} // 'unknown')
+            . ' msg=' . ($res->{error_msg} // '')
+            . ' detail=' . substr($res->{output} // '', 0, 500));
         $c->response->body(encode_json({
-            success  => 0,
-            conflict => 1,
-            error    => "Merge conflict in '$branch'. Resolve in the worktree, then retry (or abort).",
-            output   => $res->{output},
+            success            => 0,
+            conflict           => $res->{conflict} ? 1 : 0,
+            uncommitted        => $res->{uncommitted} ? 1 : 0,
+            reason             => $res->{reason},
+            fix_hint           => $res->{fix_hint},
+            conflict_files     => $res->{conflict_files} || [],
+            uncommitted_files  => $res->{uncommitted_files} || [],
+            checkout_path      => $res->{checkout_path},
+            target_branch      => $res->{target_branch},
+            error              => $res->{error_msg}
+                || "Merge of '$branch' into main failed.",
+            output             => $res->{output},
         }));
         return;
     }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_merge',
+        "merge_to_main: merged '$branch' into main (success)");
     $c->response->body(encode_json({
-        success => $res->{success} ? 1 : 0,
+        success => 1,
         output  => $res->{output},
-        error   => $res->{error_msg},
+        error   => undef,
     }));
 }
 
@@ -1955,6 +2392,12 @@ sub merge :Path('/admin/git/merge') :Args(0) {
             }));
             return;
         }
+        # Do not pre-scan `main` with secret_guard --merge. That scan diffs the
+        # whole main range and gitleaks hangs, and it refuses files already on
+        # main (which blocks every worktree update). The pre-merge-commit hook
+        # still blocks a blob this branch newly adds or changes, and that refusal
+        # includes the file:line fix route. If the hook leaves MERGE_HEAD, the
+        # failure path below aborts it.
         my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $dest });
         # --autostash: the worktree routinely has uncommitted WIP; a plain merge
         # refuses ("Your local changes would be overwritten"). Autostash stashes
@@ -1969,13 +2412,69 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         # that distinctly so the user knows to recover via Stash Pop.
         my $autostash_conflict = ($combined // '') =~ /Cannot store stash|Please commit or stash|stash.*conflict/i
             && $autostash_used ? 1 : 0;
+        my $fail_msg;
+        my $reason;
+        my $fix_hint;
+        my $uncommitted = 0;
+        my $conflict = ($combined // '') =~ /CONFLICT|Automatic merge failed|overwritten by merge/ ? 1 : 0;
+        if (!$up->{success}) {
+            if ($combined =~ /already used by worktree|already checked out/i) {
+                $reason = 'worktree_collision';
+                $fail_msg =
+                    "Git refused to merge main into '$target' (worktree checkout collision). "
+                  . "Stay on the branch worktree; do not checkout main there.";
+                $fix_hint =
+                    "Run this merge from the branch worktree dashboard (or primary) without switching branches.";
+            }
+            elsif ($conflict) {
+                $reason = 'conflict';
+                my @files = $combined =~ /Merge conflict in ([^\s]+)/g;
+                my %sf; @files = grep { !$sf{$_}++ } @files;
+                $fail_msg = @files
+                    ? "Merge conflict bringing main into '$target': " . join(', ', @files)
+                    : "Merge conflict bringing main into '$target'.";
+                $fix_hint = "Resolve in the '$target' worktree, commit, or abort.";
+            }
+            elsif ($combined =~ /secret-guard:|pre-merge-commit:|BLOCKED:/) {
+                $reason = 'secret_guard';
+                # Hook refused the merge commit and left MERGE_HEAD. Abort so
+                # the worktree is not stuck mid-merge.
+                $self->git_service->_run($c, 'merge', '--abort', { repo => $dest });
+                $fail_msg = "Merge of main into '$target' refused by secret guard. The incomplete merge was aborted.";
+                $fix_hint = "See BLOCKED paths in detail. Do not retry until those files are removed from main or allow-listed.";
+            }
+            elsif ($combined =~ /Please commit or stash|local changes.*would be overwritten/i) {
+                $reason = 'uncommitted';
+                $uncommitted = 1;
+                $fail_msg =
+                    "Merge of main into '$target' blocked by uncommitted changes in the worktree.";
+                $fix_hint =
+                    "Commit/stash WIP, or retry (this path uses --autostash when possible).";
+            }
+            else {
+                $reason = 'merge_failed';
+                my $first = '';
+                for my $line (split /\n/, $combined) {
+                    next unless defined $line && $line =~ /\S/;
+                    next if $line =~ /^\s*hint:/i;
+                    $first = $line; last;
+                }
+                $fail_msg = length $first
+                    ? "Merge of main into '$target' failed: $first"
+                    : "Merge of main into '$target' failed.";
+                $fix_hint = "See detail and server log (git_merge).";
+            }
+        }
         $res = {
             success   => $up->{success} ? 1 : 0,
             output    => $combined,
             autostash => $autostash_used,
             autostash_conflict => $autostash_conflict,
-            error_msg => $up->{success} ? undef : ($up->{error} || $up->{output} || 'merge failed'),
-            conflict  => ($combined // '') =~ /CONFLICT|Automatic merge failed|overwritten by merge/ ? 1 : 0,
+            error_msg => $up->{success} ? undef : $fail_msg,
+            reason    => $reason,
+            fix_hint  => $fix_hint,
+            uncommitted => $uncommitted,
+            conflict  => $conflict,
         };
     }
     elsif ($source ne 'main' && $target eq 'main') {
@@ -2011,10 +2510,17 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         }
         my $mr = $self->git_service->merge_branch($c, $source, { repo => $main_repo });
         $res = {
-            success   => $mr->{success} ? 1 : 0,
-            output    => $mr->{output} // '',
-            error_msg => $mr->{error_msg},
-            conflict  => $mr->{conflict} ? 1 : 0,
+            success           => $mr->{success} ? 1 : 0,
+            output            => $mr->{output} // '',
+            error_msg         => $mr->{error_msg},
+            conflict          => $mr->{conflict} ? 1 : 0,
+            uncommitted       => $mr->{uncommitted} ? 1 : 0,
+            reason            => $mr->{reason},
+            fix_hint          => $mr->{fix_hint},
+            conflict_files    => $mr->{conflict_files} || [],
+            uncommitted_files => $mr->{uncommitted_files} || [],
+            checkout_path     => $mr->{checkout_path},
+            target_branch     => $mr->{target_branch},
         };
     }
     else {
@@ -2025,36 +2531,56 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         return;
     }
 
-    if ($res->{conflict}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
-            "merge conflict: direction=$direction source=$source target=$target");
-        # Name the conflicting files (and the uncommitted-changes case) in the
-        # error itself — the raw output <pre> stays as supporting detail.
-        my $why = $res->{error_msg} // "Merge conflict. Resolve in the worktree, then retry (or abort).";
+    if (!$res->{success}) {
+        my $level = ($res->{conflict} || $res->{uncommitted}
+                     || ($res->{reason} // '') eq 'secret_guard') ? 'warn' : 'error';
+        $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_merge',
+            "merge failed direction=$direction source=$source target=$target"
+            . " reason=" . ($res->{reason} // 'unknown')
+            . " conflict=" . ($res->{conflict} ? 1 : 0)
+            . " uncommitted=" . ($res->{uncommitted} ? 1 : 0)
+            . " msg=" . ($res->{error_msg} // '')
+            . " detail=" . substr($res->{output} // '', 0, 500));
+
+        my $why = $res->{error_msg}
+            // ($res->{conflict}
+                ? "Merge conflict. Resolve, then retry (or abort)."
+                : "Merge of '$source' into '$target' failed.");
+        if ($res->{fix_hint} && CORE::index($why, $res->{fix_hint}) < 0) {
+            $why .= "\n\nWhat to do: " . $res->{fix_hint};
+        }
+
         $c->response->body(encode_json({
-            success  => 0,
-            conflict => 1,
-            target   => $target,
-            direction => $direction,
-            conflict_files => $res->{conflict_files} || [],
-            uncommitted    => $res->{uncommitted} ? 1 : 0,
-            error    => $why,
-            output   => $res->{output},
+            success            => 0,
+            conflict           => $res->{conflict} ? 1 : 0,
+            uncommitted        => $res->{uncommitted} ? 1 : 0,
+            reason             => $res->{reason},
+            fix_hint           => $res->{fix_hint},
+            target             => $target,
+            direction          => $direction,
+            conflict_files     => $res->{conflict_files} || [],
+            uncommitted_files  => $res->{uncommitted_files} || [],
+            checkout_path      => $res->{checkout_path},
+            target_branch      => $res->{target_branch},
+            error              => $why,
+            output             => $res->{output},
+            autostash          => $res->{autostash} ? 1 : 0,
+            autostash_conflict => $res->{autostash_conflict} ? 1 : 0,
         }));
         return;
     }
 
-    $self->logging->log_with_details($c, $res->{success} ? 'info' : 'error', __FILE__, __LINE__,
-        'git_merge', "direction=$direction source=$source target=$target success=" . ($res->{success} // 0));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'git_merge', "direction=$direction source=$source target=$target success=1");
 
     $c->response->body(encode_json({
-        success   => $res->{success} ? 1 : 0,
+        success   => 1,
         target    => $target,
         direction => $direction,
         conflict  => 0,
         autostash => $res->{autostash} ? 1 : 0,
         autostash_conflict => $res->{autostash_conflict} ? 1 : 0,
-        error     => $res->{error_msg},
+        error     => undef,
         output    => $res->{output},
     }));
 }

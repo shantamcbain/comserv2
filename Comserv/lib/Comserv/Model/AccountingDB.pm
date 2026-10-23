@@ -243,7 +243,8 @@ sub provision_site_for_owner {
             my $reg = $c->model('DBEncy')->resultset('SiteAccountingDb')
                           ->find({ sitename => $sitename });
             if ($reg) {
-                my $stamp = scalar(localtime);
+                require Comserv::Util::AppTime;
+                my $stamp = Comserv::Util::AppTime->now_utc;
                 my $note  = "Provisioned by '$actor' on $stamp (self-serve).";
                 my $prev  = $reg->notes // '';
                 $reg->update({ notes => ($prev ? "$prev\n$note" : $note) });
@@ -389,7 +390,8 @@ sub provision_site {
     # Data-driven: base archetype from site_map.json + capability overlays
     # derived from enabled site_modules. Idempotent — existing accnos skipped.
     eval {
-        my $coa = Comserv::Model::CoaTemplate->instance;
+        # CoaTemplate is a plain Moose object (no singleton). Other callers use ->new.
+        my $coa = Comserv::Model::CoaTemplate->new;
         my ($base_id, $overlay_ids) = $coa->chart_for_site($c, $sitename);
         my $site_schema = $self->schema_for_site($c, $sitename);
         if ($site_schema) {

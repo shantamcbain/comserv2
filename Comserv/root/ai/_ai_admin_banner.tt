@@ -1,0 +1,27 @@
+[%# Admin banners: SuperGrok guard switch + stale AI meters. Data from
+  # UsageMonitor->ai_banner (/ai) or ->ai_health (/ai/usage). No JS. %]
+[% bn = ai_health || ai_admin_banner %]
+[% IF bn.overrun_banner %]
+<div class="alert alert-danger ai-overrun-banner" id="hermes-overrun" role="alert" style="margin:8px 0;padding:10px;border:2px solid var(--danger-color,#dc2626);border-radius:6px;">
+  <strong>⛔ [% bn.overrun_banner | html %]</strong>
+  <span class="doc-muted">Last check [% bn.overrun.last_check_pt | html %]. Backup: <code>[% bn.overrun.backup | html %]</code>. Notice: <code>~/.hermes/overrun_notice.txt</code> / <code>~/.hermes/overrun_session_notice.json</code>. Live sessions keep their model: run <code>/model cheap</code> or end them, then start a new session. Aliases code/coder are forced free while tripped. <a href="/ai/usage#ai-health">Details</a></span>
+</div>
+[% END %]
+[% IF bn.handoff_banner %]
+<div class="alert alert-success ai-handoff-banner" id="hermes-supergrok-handoff" role="status" style="margin:8px 0;padding:10px;border:2px solid var(--success-color,#16a34a);border-radius:6px;">
+  <strong>✅ [% bn.handoff_banner | html %]</strong>
+  <span class="doc-muted">Notice: <code>~/.hermes/supergrok_notice.txt</code> / <code>~/.hermes/overrun_session_notice.json</code>. Open Hermes TUI sessions keep their old model — run <code>/model grok-build-0.1</code> or end and start a new session. <a href="/ai/usage#ai-health">Details</a></span>
+</div>
+[% END %]
+[% IF bn.guard_banner %]
+<div class="alert alert-warning ai-guard-banner" role="status" style="margin:8px 0;padding:10px;border:2px solid var(--warning-color,#d97706);border-radius:6px;">
+  <strong>⚠ [% bn.guard_banner | html %]</strong>
+  <span class="doc-muted">Flash stays for idle / title work only. <a href="/ai/usage#ai-health">Details</a></span>
+</div>
+[% END %]
+[% stale_list = bn.stale_meters || bn.meters.stale %]
+[% IF stale_list.size %]
+<div class="alert alert-info ai-meter-banner" role="status" style="margin:8px 0;padding:8px;border:1px solid var(--border-color,#ccc);border-radius:6px;">
+  AI meter reading older than 6 h: [% stale_list.join(', ') | html %]. Our own estimate is used instead - <a href="/ai/usage#ai-health">see Health &amp; preflight</a>.
+</div>
+[% END %]

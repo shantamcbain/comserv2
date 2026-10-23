@@ -1,0 +1,126 @@
+/* Theme: forager — earthy greens taken from the Forager home-page hero (root/Forager/index.tt) */
+:root {
+  --accent-color: #7ab648;
+  --background-color: #e8f3e0;
+  --background-image: none;
+  --body-font: Verdana, Helvetica, sans-serif;
+  --border-color: #c8e6c9;
+  --button-bg: #4a8c3f;
+  --button-border: #2d5a27;
+  --button-hover-bg: #2d5a27;
+  --button-hover-border: #1f3f1b;
+  --button-text: #ffffff;
+  --font-size-base: 16px;
+  --font-size-large: 20px;
+  --font-size-small: 14px;
+  --font-size-xlarge: 24px;
+  --header-font: Verdana, Helvetica, sans-serif;
+  --header-bg: #2d5a27;
+  --link-color: #2d5a27;
+  --link-hover-color: #4a8c3f;
+  --nav-bg: #2d5a27;
+  --nav-hover-bg: #4a8c3f;
+  --nav-text: #ffffff;
+  --dropdown-bg: #f8fdf4;
+  --primary-color: #2d5a27;
+  --secondary-color: #f8fdf4;
+  --success-color: #4a8c3f;
+  --table-header-bg: #e8f3e0;
+  --text-color: #2b2b2b;
+  --text-muted-color: #5a6b55;
+  --warning-color: #c62828;
+}
+body.theme-forager { background: #e8f3e0; color: #2b2b2b; }
+html:has(body.theme-forager) { background: #e8f3e0; }
+/* Top user bar: "Welcome <user> to forager.com..." styled like the hero */
+body.theme-forager header {
+  background: linear-gradient(135deg, #2d5a27 0%, #4a8c3f 50%, #7ab648 100%) !important;
+  color: #fff !important; border: 0;
+}
+body.theme-forager header h1, body.theme-forager header a { color: #fff !important; }
+body.theme-forager .guest-join-bar { background: #e8f3e0; color: #2d5a27; }
+body.theme-forager .guest-join-bar a { color: #2d5a27; }
+/* Main nav: top buttons match the Forager home pill row. Dropdowns stay menus. */
+body.theme-forager nav#main-menu,
+body.theme-forager nav#main-menu .horizontal-menu {
+  background: var(--nav-bg, #2d5a27) !important;
+}
+body.theme-forager nav#main-menu .horizontal-menu {
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.6rem;
+}
+body.theme-forager nav#main-menu .dropbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.2rem;
+  padding: 0.45rem 1.1rem;
+  background: rgba(255,255,255,0.2) !important;
+  color: var(--nav-text, #fff) !important;
+  border: 2px solid rgba(255,255,255,0.6);
+  border-radius: 24px;
+  font-weight: 700;
+  text-decoration: none;
+  line-height: 1.2;
+}
+body.theme-forager nav#main-menu .dropbtn:hover,
+body.theme-forager .horizontal-dropdown:hover > .dropbtn {
+  background: rgba(255,255,255,0.4) !important;
+  color: var(--nav-text, #fff) !important;
+}
+body.theme-forager nav#main-menu .dropbtn [class*="icon-"],
+body.theme-forager nav#main-menu .dropbtn .fas {
+  width: 1.05em;
+  height: 1.05em;
+  margin-right: 0.15em;
+  background-color: currentColor;
+  flex: none;
+}
+/* Shop, ENCY, and Workshops SVGs use a fill the mask cannot paint. Use a glyph. */
+body.theme-forager nav#main-menu .dropbtn .fa-store,
+body.theme-forager nav#main-menu .dropbtn .icon-ency,
+body.theme-forager nav#main-menu .dropbtn .icon-workshop {
+  width: auto;
+  height: auto;
+  background: none;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+body.theme-forager nav#main-menu .dropbtn .fa-store::before { content: "\1F3EA" !important; }
+body.theme-forager nav#main-menu .dropbtn .icon-ency::before { content: "\1F4DA" !important; }
+body.theme-forager nav#main-menu .dropbtn .icon-workshop::before { content: "\1F33F" !important; }
+body.theme-forager .dropdown-content, body.theme-forager .submenu {
+  background: #f8fdf4 !important; border: 1px solid #c8e6c9;
+}
+body.theme-forager .dropdown-content a, body.theme-forager .submenu a { color: #2d5a27 !important; }
+body.theme-forager .dropdown-content a:hover, body.theme-forager .submenu a:hover { background: #e8f3e0 !important; }
+body.theme-forager .dropdown-divider { border-color: #c8e6c9; background: #c8e6c9; }
+/* Links, headings */
+body.theme-forager a { color: #2d5a27; }
+body.theme-forager a:hover { color: #4a8c3f; }
+body.theme-forager h1, body.theme-forager h2, body.theme-forager h3 { color: #2d5a27; }
+body.theme-forager .forager-hero h1, body.theme-forager .forager-hero a { color: #fff; }
+/* Buttons */
+body.theme-forager button, body.theme-forager .btn, body.theme-forager input[type=submit],
+body.theme-forager input[type=button] {
+  background: #4a8c3f; color: #fff; border: 1px solid #2d5a27; border-radius: 4px;
+}
+body.theme-forager button:hover, body.theme-forager .btn:hover,
+body.theme-forager input[type=submit]:hover { background: #2d5a27; }
+/* Tables */
+body.theme-forager th { background: #e8f3e0 !important; color: #2d5a27; border-color: #c8e6c9; }
+body.theme-forager td { border-color: #c8e6c9; }
+body.theme-forager tr:nth-child(even) td { background: #f8fdf4; }
+/* Footer */
+body.theme-forager .site-footer, body.theme-forager footer { background: #e8f3e0; color: #2d5a27; border-top: 3px solid #7ab648; }
+/* Hero buttons: cream text, beats generic link colours */
+body.theme-forager .forager-hero .hero-links a,
+body.theme-forager .forager-hero .hero-links a:visited { color: #fffbe6 !important; }
+body.theme-forager .forager-hero .hero-links a:hover { color: #ffffff !important; }
+/* Newsletter "Stay connected" bar: green instead of blue */
+body.theme-forager #ml-subscribe-banner {
+  background: linear-gradient(90deg, #2d5a27, #4a8c3f) !important; color: #fff !important;
+}
+body.theme-forager #ml-subscribe-banner a[href="/mail/my_subscriptions"],
+body.theme-forager #ml-subscribe-banner a[href="/mail/subscribe"] { color: #2d5a27 !important; }

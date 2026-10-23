@@ -1,0 +1,21 @@
+# PREPARED Oct 10 2026 - NOT enabled. Install with script/autostart/install_autostart.sh
+# :5000 = Docker container comserv2-web-prod (image shantamcsbain/comserv-web-prod:latest,
+# built Sep 15 2026 from main's docker-compose.prod.yml). Docker already has
+# restart=unless-stopped, but after the Oct 9 power loss the restart FAILED:
+# the NFS volume (192.168.1.175:/mnt/data) was not reachable yet ("no route to host")
+# and Docker does not retry. This unit waits for NFS, then starts the existing
+# container (no rebuild, no recreate, no pull).
+[Unit]
+Description=Start comserv2-web-prod (:5000) once NFS 192.168.1.175 is reachable
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'for i in $(seq 1 60); do timeout 3 bash -c "echo > /dev/tcp/192.168.1.175/2049" 2>/dev/null && break; sleep 10; done; \
+  if [ "$(docker inspect -f "{{.State.Running}}" comserv2-web-prod)" != "true" ]; then docker start comserv2-web-prod; else echo already running; fi'
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

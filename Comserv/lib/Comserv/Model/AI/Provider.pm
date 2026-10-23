@@ -213,6 +213,16 @@ sub _build_openai_compatible_client {
         chat => sub {
             my %chat_args = @_;
             my $messages = $chat_args{messages} || [];
+            my $harm = eval {
+                require Comserv::Util::AI::HarmRefusal;
+                Comserv::Util::AI::HarmRefusal::scan_messages($messages);
+            };
+            if ($@) {
+                return { success => 0, refused => 1, error => 'Chat safety check failed. The question was not sent.' };
+            }
+            if ($harm) {
+                return Comserv::Util::AI::HarmRefusal::reply_hash($harm);
+            }
 
             my $payload = {
                 model       => $model || 'gpt-3.5-turbo',

@@ -27,19 +27,12 @@ has 'db_pw' => (
     default => sub { Comserv::Util::DbConfigPassword->new }
 );
 
-# RemoteDB is a plain Moose class, not Catalyst::Model.
-# $c->model('RemoteDB') therefore returns the class NAME string; Moose
-# accessors then die: Can't use string ("Comserv::Model::RemoteDB") as a HASH ref.
+# Prefer the Catalyst-registered model (Model::RemoteDB now extends Catalyst::Model).
+# from_context still handles bare class-name strings during mid-reload windows.
 sub _remote_db {
     my ($self, $c) = @_;
-    my $m = eval { $c->model('RemoteDB') };
-    if ($@) {
-        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, '_remote_db',
-            "model('RemoteDB') threw: $@ — instantiating Comserv::Model::RemoteDB->new");
-    }
-    return $m if ref $m;
     require Comserv::Model::RemoteDB;
-    return Comserv::Model::RemoteDB->new();
+    return Comserv::Model::RemoteDB->from_context($c);
 }
 
 # Main page for remote database management
@@ -302,14 +295,19 @@ sub change_password :Path('change_password') :Args(1) {
             $form_error = 'New password and confirmation do not match';
         } elsif ($new eq $current) {
             $form_error = 'New password must be different from the current password';
-        } else {
-            my $stored;
-            for my $path (@paths) {
-                $stored = eval { $self->db_pw->stored_password_for($path, $conn_name) };
-                last if defined $stored && length $stored;
-            }
-            if (defined $stored && length $stored && $stored ne $current) {
-                $form_error = 'Current password does not match the stored value';
+        }
+
+        # The stored JSON value is only a cache; the LIVE database server is the source of
+        # truth. If the user is rotating the live server, the only thing that matters is that
+        # $current actually authenticates against MariaDB. We no longer reject a mismatch
+        # between $current and the stored JSON, because that JSON can be stale (e.g. after a
+        # prior .env-only change) and would otherwise block a legitimate unlock. If a live
+        # login is requested and fails, the catch block reports the real cause.
+        if (!$form_error && $rotate) {
+            my $probe = eval { $self->db_pw->test_login($cfg, $current) };
+            if (!$probe || !$probe->{ok}) {
+                my $err = $@ || ($probe && $probe->{error}) || 'login failed';
+                $form_error = "Could not log in to the database server with the current password you entered ($err). This must be the password the server currently has. The stored/cached value is not used for authentication.";
             }
         }
 

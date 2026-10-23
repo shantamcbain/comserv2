@@ -8,7 +8,7 @@
    last_updated = "2026-04-03"
 %]
 [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
-[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg && c.flash.error_msg != error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
 [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
 
 <div class="app-container">
@@ -40,6 +40,7 @@
         </div>
       </div>
 
+      [% IF recent_unavailable %]<p class="doc-muted">Recent activity is temporarily unavailable; your balance above is correct.</p>[% END %]
       [% IF recent.size %]
       <div class="content-section">
         <h2>Recent Transactions</h2>

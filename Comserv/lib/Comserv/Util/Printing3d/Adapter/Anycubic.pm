@@ -1,0 +1,1280 @@
+package Comserv::Util::Printing3d::Adapter::Anycubic;
+
+use strict;
+use warnings;
+use Moose;
+use namespace::autoclean -except => [qw(try catch finally)];
+use Try::Tiny;
+use HTTP::Tiny;
+use LWP::UserAgent;
+use IO::Socket::INET;
+use Digest::MD5 qw(md5_hex);
+use MIME::Base64 qw(decode_base64);
+use JSON qw(encode_json decode_json);
+use JSON::PP ();   # JSON::PP::true()/false() encode as real JSON booleans under JSON::XS
+use Time::HiRes qw(time);
+use Comserv::Util::Logging;
+
+=head1 NAME
+
+Comserv::Util::Printing3d::Adapter::Anycubic
+
+=head1 DESCRIPTION
+
+Stock Anycubic Kobra 3 family LAN Mode (not cloud, not Moonraker).
+GET http://HOST:18910/info then signed POST /ctrl then MQTTS :9883.
+Do not log token, password, cert, or upload secrets.
+ACE dryer is MQTT multiColorBox on this printer — not a farm row.
+Local start-print is a file already on the machine (confirm in UI). No gcode upload here.
+
+=cut
+
+has 'logging' => (
+    is      => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
+
+sub sanitize_host {
+    my ($self, $host) = @_;
+    $host = '' unless defined $host;
+    $host =~ s/^\s+|\s+$//g;
+    return unless $host =~ /\A(?:\d{1,3}(?:\.\d{1,3}){3}|[A-Za-z0-9][A-Za-z0-9.\-]{0,253})\z/;
+    return if $host =~ m{[:@/\\]};
+    return $host;
+}
+
+sub ping {
+    my ($self, $c, $host, $port) = @_;
+    my $st = $self->fetch_info($c, $host, $port);
+    return {
+        ok      => $st->{ok} ? 1 : 0,
+        status  => $st->{http_status},
+        url     => $st->{url},
+        snippet => $st->{model_name} || $st->{error},
+        error   => $st->{ok} ? undef : $st->{error},
+    };
+}
+
+sub fetch_info {
+    my ($self, $c, $host, $port, $timeout) = @_;
+    my $safe = $self->sanitize_host($host);
+    return { ok => 0, error => 'Invalid host' } unless $safe;
+    $port = 18910 unless $port && $port =~ /\A\d{2,5}\z/ && $port > 0 && $port < 65536;
+    $timeout = 4 unless defined $timeout && $timeout > 0 && $timeout <= 20;
+    my $url = "http://$safe:$port/info";
+    my $res;
+    my $fail;
+    try {
+        my $ua = HTTP::Tiny->new(timeout => $timeout, max_redirect => 0);
+        $res = $ua->get($url);
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fetch_info',
+            "exception host=$safe: $_");
+        $fail = { ok => 0, error => "GET /info failed: $_", url => $url, host => $safe };
+    };
+    return $fail if $fail;
+    unless ($res && $res->{success}) {
+        my $status = $res ? ($res->{status} || 0) : 0;
+        my $body = ($res && $res->{content}) ? $res->{content} : '';
+        my $timed_out = ($status == 599 && $body =~ /timed?\s*out/i) ? 1 : 0;
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fetch_info',
+            "host=$safe http=$status" . ($timed_out ? ' timeout' : ''));
+        return {
+            ok          => 0,
+            error       => $timed_out ? 'timeout' : ('HTTP ' . $status),
+            url         => $url,
+            host        => $safe,
+            http_status => $status,
+            timeout     => $timed_out,
+        };
+    }
+    my $raw = $res->{content} || '';
+    my $j;
+    try { $j = decode_json($raw) } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fetch_info',
+            "JSON parse failed host=$safe: $_");
+    };
+    unless ($j && ref($j) eq 'HASH') {
+        return { ok => 0, error => 'GET /info was not JSON', url => $url, host => $safe };
+    }
+    my $cam = $j->{rtspUrl} || '';
+    $cam = '' unless $cam =~ m{\Ahttps?://[\w.:/-]+\z};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_info',
+        "host=$safe model=" . ($j->{modelName} || '') . " ctrl=" . ($j->{ctrlType} || ''));
+    return {
+        ok           => 1,
+        host         => $safe,
+        url          => $url,
+        http_status  => $res->{status},
+        model_name   => $j->{modelName} || '',
+        model_id     => $j->{modelId} || '',
+        device_name  => $j->{deviceName} || '',
+        device_type  => $j->{deviceType} || '',
+        serial       => $j->{cn} || '',
+        ctrl_type    => $j->{ctrlType} || '',
+        camera_url   => $cam,
+        has_upload   => ($j->{fileUploadurl} ? 1 : 0),
+        has_token    => ($j->{token} ? 1 : 0),
+        ctrl_info_url => $j->{ctrlInfoUrl} || '',
+        _token       => $j->{token} || '',
+        _info        => $j,
+    };
+}
+
+# Signed POST /ctrl. Caller must not stash password/cert.
+sub handshake {
+    my ($self, $c, $host, $port, $timeout) = @_;
+    my $info = $self->fetch_info($c, $host, $port, $timeout);
+    return $info unless $info->{ok};
+    if (($info->{ctrl_type} || '') eq 'cloud') {
+        return { ok => 0, error => 'Printer is in cloud mode — enable LAN Mode', %$info };
+    }
+    my $token = $info->{_token} || '';
+    my $ctrl_url = $info->{ctrl_info_url} || '';
+    unless (length($token) >= 32 && $ctrl_url =~ m{\Ahttp://}) {
+        return { ok => 0, error => 'Printer did not offer a signed LAN handshake', %$info };
+    }
+    my $ts = int(time() * 1000);
+    my $nonce = _rand_alnum(6);
+    my $did = _rand_did(32);
+    my $first = md5_hex(substr($token, 0, 16));
+    my $sign = md5_hex($first . $ts . $nonce);
+    my $url = $ctrl_url . "?ts=$ts&nonce=$nonce&sign=$sign&did=$did";
+    my $res;
+    my $fail;
+    try {
+        my $ua = HTTP::Tiny->new(timeout => 6, max_redirect => 0);
+        $res = $ua->post($url);
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'handshake',
+            "POST /ctrl exception host=$info->{host}: $_");
+        $fail = { ok => 0, error => "POST /ctrl failed: $_" };
+    };
+    return $fail if $fail;
+    unless ($res && $res->{success}) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'handshake',
+            "POST /ctrl http=" . ($res ? ($res->{status} || 0) : 0));
+        return { ok => 0, error => 'POST /ctrl HTTP ' . ($res ? ($res->{status} || '?') : 'none') };
+    }
+    my $ctrl;
+    try { $ctrl = decode_json($res->{content} || '{}') } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'handshake',
+            "ctrl JSON: $_");
+    };
+    unless ($ctrl && ($ctrl->{code} || 0) == 200 && $ctrl->{data} && $ctrl->{data}{info}) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'handshake',
+            "ctrl code=" . ($ctrl ? ($ctrl->{code} || '?') : 'parse'));
+        return { ok => 0, error => 'LAN handshake rejected by printer' };
+    }
+    my $plain;
+    try {
+        $plain = _decrypt_ctrl($ctrl->{data}{info}, $token, $ctrl->{data}{token} || '');
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'handshake',
+            "AES decrypt failed: $_");
+    };
+    unless ($plain && $plain->{broker} && $plain->{username} && $plain->{password}) {
+        return { ok => 0, error => 'Handshake decrypt did not yield MQTT broker' };
+    }
+    my ($bhost, $bport) = ($plain->{broker} =~ m{mqtts?://([^:/]+):(\d+)});
+    unless ($bhost && $bport) {
+        return { ok => 0, error => 'Broker URL was not mqtts://host:port' };
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'handshake',
+        "MQTT broker=$bhost port=$bport device_id_len=" . length($plain->{deviceId} || ''));
+    return {
+        ok          => 1,
+        host        => $info->{host},
+        model_name  => $info->{model_name},
+        model_id    => $info->{model_id} || $plain->{modeId} || '',
+        serial      => $info->{serial},
+        ctrl_type   => $info->{ctrl_type},
+        camera_url  => $info->{camera_url},
+        has_upload  => $info->{has_upload},
+        broker_host => $bhost,
+        broker_port => $bport,
+        device_id   => $plain->{deviceId} || '',
+        _user       => $plain->{username},
+        _pass       => $plain->{password},
+    };
+}
+
+sub fetch_state {
+    my ($self, $c, $host, $port, $opts) = @_;
+    $opts ||= {};
+    my $hs = $self->handshake($c, $host, $port, $opts->{timeout});
+    my $out = {
+        ok          => $hs->{ok} ? 1 : 0,
+        error       => $hs->{error},
+        timeout     => $hs->{timeout} ? 1 : 0,
+        host        => $hs->{host} || $host,
+        model_name  => $hs->{model_name} || '',
+        model_id    => $hs->{model_id} || '',
+        serial      => $hs->{serial} || '',
+        ctrl_type   => $hs->{ctrl_type} || '',
+        camera_url  => $hs->{camera_url} || '',
+        mqtt_ok     => 0,
+        ace_ok      => 0,
+        local_files => [],
+        ace_slots   => [],
+    };
+    return $out unless $hs->{ok};
+    my @msgs = (
+        { type => 'info',      action => 'query' },
+        { type => 'tempature', action => 'query' },
+        { type => 'print',     action => 'query' },
+    );
+    if ($opts->{ace}) {
+        push @msgs, { type => 'multiColorBox', action => 'getInfo' };
+    }
+    if ($opts->{files}) {
+        push @msgs, { type => 'file', action => 'listLocal', data => { path => '/' } };
+    }
+    my $wait = ($opts->{ace} || $opts->{files}) ? 6 : 4;
+    my $reports = $self->_mqtt_roundtrip($c, $hs, \@msgs, $wait);
+    $out->{mqtt_ok} = $reports->{ok} ? 1 : 0;
+    $out->{error} = $reports->{error} if $reports->{error};
+    my $info = $reports->{by_type}{info} || {};
+    my $temp = $reports->{by_type}{tempature} || $info->{temp} || {};
+    my $proj = $info->{project} || {};
+    $out->{print_state}    = $info->{state} || '';
+    $out->{firmware}       = $info->{version} || '';
+    $out->{filename}       = $proj->{filename} || '';
+    $out->{progress}       = defined $proj->{progress} ? $proj->{progress} : '';
+    $out->{curr_layer}     = $proj->{curr_layer};
+    $out->{total_layers}   = $proj->{total_layers};
+    $out->{print_time_min} = $proj->{print_time};
+    $out->{remain_time_min}= $proj->{remain_time};
+    $out->{pause}          = $proj->{pause};
+    $out->{nozzle_temp}    = _first_defined($temp->{curr_nozzle_temp}, $info->{temp}{curr_nozzle_temp});
+    $out->{bed_temp}       = _first_defined($temp->{curr_hotbed_temp}, $info->{temp}{curr_hotbed_temp});
+    $out->{target_nozzle}  = _first_defined($temp->{target_nozzle_temp}, $info->{temp}{target_nozzle_temp});
+    $out->{target_bed}     = _first_defined($temp->{target_hotbed_temp}, $info->{temp}{target_hotbed_temp});
+    _fill_ace($out, $reports->{by_type}{multiColorBox}) if $opts->{ace};
+    _fill_files($out, $reports->{by_type}{file}) if $opts->{files};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_state',
+        "host=$out->{host} mqtt_ok=$out->{mqtt_ok} state=" . ($out->{print_state} || '')
+        . " progress=" . ($out->{progress} eq '' ? '-' : $out->{progress})
+        . " ace=" . ($out->{ace_ok} ? 1 : 0)
+        . " files=" . scalar(@{ $out->{local_files} || [] }));
+    return $out;
+}
+
+sub send_command {
+    my ($self, $c, $host, $port, $cmd, $opts) = @_;
+    $cmd = lc($cmd || '');
+    $opts ||= {};
+    unless ($cmd =~ /\A(pause|resume|stop|drying_start|drying_stop|start_print|camera_start|camera_stop|delete_local|delete_udisk)\z/) {
+        return { ok => 0, error => 'Unknown command' };
+    }
+    my $hs = $self->handshake($c, $host, $port);
+    return $hs unless $hs->{ok};
+
+    my $payload;
+    if ($cmd =~ /\A(pause|resume|stop)\z/) {
+        $payload = {
+            type      => 'print',
+            action    => $cmd,
+            timestamp => int(time() * 1000),
+            msgid     => _rand_alnum(16),
+            data      => { taskid => '-1' },
+        };
+    }
+    elsif ($cmd eq 'drying_start') {
+        my $temp = $opts->{target_temp};
+        my $dur  = $opts->{duration};
+        $temp = 45 unless defined $temp && $temp =~ /\A\d+\z/;
+        $dur  = 240 unless defined $dur && $dur =~ /\A\d+\z/;
+        $temp = 35 if $temp < 35;
+        $temp = 85 if $temp > 85;
+        $dur  = 10 if $dur < 10;
+        $dur  = 1440 if $dur > 1440;
+        my $box = $opts->{box_id};
+        $box = 0 unless defined $box && $box =~ /\A\d+\z/;
+        $payload = {
+            type      => 'multiColorBox',
+            action    => 'setDry',
+            timestamp => int(time() * 1000),
+            msgid     => _rand_alnum(16),
+            data      => {
+                multi_color_box => [{
+                    id            => 0 + $box,
+                    drying_status => {
+                        status      => 1,
+                        target_temp => 0 + $temp,
+                        duration    => 0 + $dur,
+                    },
+                }],
+            },
+        };
+    }
+    elsif ($cmd eq 'drying_stop') {
+        my $box = $opts->{box_id};
+        $box = 0 unless defined $box && $box =~ /\A\d+\z/;
+        $payload = {
+            type      => 'multiColorBox',
+            action    => 'setDry',
+            timestamp => int(time() * 1000),
+            msgid     => _rand_alnum(16),
+            data      => {
+                multi_color_box => [{
+                    id            => 0 + $box,
+                    drying_status => { status => 0 },
+                }],
+            },
+        };
+    }
+    elsif ($cmd eq 'start_print') {
+        my $fn = _safe_filename($opts->{filename});
+        unless ($fn) {
+            return { ok => 0, error => 'Filename must be a gcode/3mf already on the printer' };
+        }
+        my $path = _safe_path($opts->{path}) || '/';
+        my $data = {
+            filename => $fn,
+            filepath => $path,
+            taskid   => '-1',
+            filetype => 1,
+        };
+        # Anycubic Slicer Next sends ams_settings (model colour -> ACE slot
+        # mapping) and task_settings (auto leveling, vibration compensation,
+        # flow calibration, timelapse) with every start. Mirroring the captured
+        # payload (2026-10-12, plan 2026-10-12-send-to-printer.md) lets the
+        # queue reproduce the slicer's behaviour.
+        my $ams  = _build_ams_settings($opts);
+        my $task = _build_task_settings($opts);
+        $data->{ams_settings}  = $ams  if $ams;
+        $data->{task_settings} = $task if $task;
+        $payload = {
+            type      => 'print',
+            action    => 'start',
+            timestamp => int(time() * 1000),
+            msgid     => _rand_alnum(16),
+            data      => $data,
+        };
+    }
+    elsif ($cmd eq 'delete_local' || $cmd eq 'delete_udisk') {
+        my $fn = _safe_filename($opts->{filename});
+        unless ($fn) {
+            return { ok => 0, error => 'Need a safe filename to delete' };
+        }
+        my $path = _safe_path($opts->{path}) || '/';
+        $payload = {
+            type      => 'file',
+            action    => ($cmd eq 'delete_udisk' ? 'deleteUdisk' : 'deleteLocal'),
+            timestamp => int(time() * 1000),
+            msgid     => _rand_alnum(16),
+            data      => {
+                filename => $fn,
+                path     => $path,
+                filetype => -1,
+            },
+        };
+    }
+    elsif ($cmd eq 'camera_start' || $cmd eq 'camera_stop') {
+        $payload = {
+            type      => 'video',
+            action    => ($cmd eq 'camera_start' ? 'startCapture' : 'stopCapture'),
+            timestamp => int(time() * 1000),
+            msgid     => _rand_alnum(16),
+            data      => undef,
+        };
+    }
+
+    my $reports = $self->_mqtt_roundtrip($c, $hs, [$payload], 4);
+    $self->logging->log_with_details($c, $reports->{ok} ? 'info' : 'error', __FILE__, __LINE__,
+        'send_command', "cmd=$cmd mqtt_ok=" . ($reports->{ok} ? 1 : 0)
+        . ($reports->{error} ? " err=$reports->{error}" : ''));
+    return {
+        ok    => $reports->{ok} ? 1 : 0,
+        error => $reports->{error},
+        cmd   => $cmd,
+    };
+}
+
+# The Kobra's LAN broker only serves one client at a time. When the connect or
+# the CONNACK fails, the usual cause is Anycubic Slicer Next (or the phone app)
+# still holding the session — say that plainly instead of the raw socket text.
+# The caller logs the raw error, so nothing is hidden from the audit trail.
+sub _mqtt_busy_error {
+    my ($raw) = @_;
+    my $hint = 'Could not talk to the printer over MQTT — another client is probably '
+        . 'already connected (Anycubic Slicer Next or the Anycubic app holds the only '
+        . 'LAN session). Close/disconnect it and try again.';
+    my $detail = defined $raw ? $raw : '';
+    $detail =~ s/\s+$//;
+    return $detail ? "$hint (printer said: $detail)" : $hint;
+}
+
+# ams_settings: map each model paint colour onto a physical ACE slot, the way
+# Anycubic Slicer Next does on every start (captured 2026-10-12).
+#
+# $opts->{ams_mapping} = [
+#   { paint_index => 0, paint_color => [r,g,b,a], ams_index => 1,
+#     ams_color   => [r,g,b,a],      # optional, defaults to paint_color
+#     material_type => 'PLA' },
+#   ... up to 4 entries ...
+# ]
+#
+# Returns undef when nothing is mapped: the caller then sends the plain
+# filename-only start rather than a half-built block. Callers pass an empty
+# mapping deliberately to say "do not use the ACE".
+sub _build_ams_settings {
+    my ($opts) = @_;
+    my $map = $opts->{ams_mapping};
+    return undef unless $map && ref($map) eq 'ARRAY' && @$map;
+
+    my @mapping;
+    my $seq = 0;
+    for my $m (@$map) {
+        next unless $m && ref($m) eq 'HASH';
+        my $slot = (defined $m->{ams_index} && $m->{ams_index} =~ /\A\d+\z/)
+            ? 0 + $m->{ams_index}
+            : $seq;
+        next if $slot < 0 || $slot > 3;
+
+        my @pc = @{ $m->{paint_color} || [255, 255, 255, 255] };
+        @pc = map { (defined $_ && $_ =~ /\A\d+\z/) ? 0 + $_ : 255 } @pc[0 .. 3];
+        my @ac = ($m->{ams_color} && ref($m->{ams_color}) eq 'ARRAY' && @{ $m->{ams_color} })
+            ? @{ $m->{ams_color} }
+            : @pc;
+        @ac = map { (defined $_ && $_ =~ /\A\d+\z/) ? 0 + $_ : 255 } @ac[0 .. 3];
+
+        push @mapping, {
+            paint_index   => (defined $m->{paint_index} && $m->{paint_index} =~ /\A\d+\z/)
+                                ? 0 + $m->{paint_index} : $seq,
+            paint_color   => \@pc,
+            ams_index     => $slot,
+            ams_color     => \@ac,
+            material_type => ($m->{material_type} || 'PLA'),
+        };
+        $seq++;
+    }
+    return undef unless @mapping;
+
+    return {
+        use_ams         => JSON::PP::true(),
+        padding1        => 0,
+        padding2        => 0,
+        padding3        => 0,
+        ams_box_mapping => \@mapping,
+    };
+}
+
+# task_settings: the pre-print options the slicer sends with a start
+# (captured 2026-10-12). auto leveling, vibration (resonance) compensation
+# and flow calibration default ON to match the slicer; time-lapse defaults
+# OFF because it needs the camera and slows the job. Callers override any of
+# them through $opts->{task_settings}.
+sub _build_task_settings {
+    my ($opts) = @_;
+    my $t = $opts->{task_settings} || {};
+    my $flag = sub {
+        my ($v, $default) = @_;
+        return $default unless defined $v && length $v;
+        return $v ? 1 : 0;
+    };
+
+    return {
+        auto_leveling          => $flag->($t->{auto_leveling},          1),
+        vibration_compensation => $flag->($t->{vibration_compensation}, 1),
+        flow_calibration       => $flag->($t->{flow_calibration},      1),
+        dry_mode               => $flag->($t->{dry_mode},              0),
+        timelapse              => {
+            status => $flag->($t->{timelapse}, 0),
+            mode   => 0,
+            type   => 0,
+            count  => 0,
+        },
+        ai_settings     => { status => 0, mode => 0, type => 0, count => 0 },
+        drying_settings => { status => 0, target_temp => 0, duration => 0, remain_time => 0 },
+        model_objects_skip_parts => [],
+    };
+}
+
+# Local storage or USB. Separate MQTT roundtrip so telemetry is not stalled.
+sub list_files {
+    my ($self, $c, $host, $port, $opts) = @_;
+    $opts ||= {};
+    my $storage = lc($opts->{storage} || 'local');
+    $storage = 'local' unless $storage eq 'udisk';
+    my $path = _safe_path($opts->{path}) || '/';
+    my $hs = $self->handshake($c, $host, $port);
+    my $out = {
+        ok       => $hs->{ok} ? 1 : 0,
+        error    => $hs->{error},
+        storage  => $storage,
+        path     => $path,
+        files    => [],
+        names    => [],
+    };
+    return $out unless $hs->{ok};
+    my $action = $storage eq 'udisk' ? 'listUdisk' : 'listLocal';
+    my $reports = $self->_mqtt_roundtrip($c, $hs, [{
+        type   => 'file',
+        action => $action,
+        data   => { path => $path },
+    }], 8);
+    $out->{ok} = $reports->{ok} ? 1 : 0;
+    $out->{error} = $reports->{error} if $reports->{error};
+    my $data = $reports->{by_type}{file};
+    my $rows = _parse_file_rows($data);
+    $out->{files} = $rows;
+    for my $row (@$rows) {
+        my $base = $path;
+        $base = '' if $base eq '/';
+        $row->{open_path} = $base . '/' . ($row->{name} || '');
+    }
+    $out->{names} = [ map { $_->{name} } grep { !$_->{is_dir} } @$rows ];
+    my $keys = ($data && ref($data) eq 'HASH') ? join(',', sort keys %$data) : '';
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'list_files',
+        "storage=$storage path=$path n=" . scalar(@$rows) . " keys=$keys"
+        . ($reports->{empty} ? ' empty_mqtt=1' : ''));
+    return $out;
+}
+
+# Create subdirectory on local or udisk storage.
+sub mkdir {
+    my ($self, $c, $host, $port, $opts) = @_;
+    $opts ||= {};
+    my $storage = lc($opts->{storage} || 'local');
+    $storage = 'local' unless $storage eq 'udisk';
+    my $path = _safe_path($opts->{path}) || '/';
+    my $name = _safe_filename($opts->{name} || $opts->{dirname});
+    return { ok => 0, error => 'Invalid directory name' } unless $name;
+
+    my $hs = $self->handshake($c, $host, $port);
+    return $hs unless $hs->{ok};
+
+    my $action = 'mkdir';
+    my $reports = $self->_mqtt_roundtrip($c, $hs, [{
+        type   => 'file',
+        action => $action,
+        data   => { path => $path, name => $name, storage => $storage },
+    }], 6);
+
+    $self->logging->log_with_details($c, $reports->{ok} ? 'info' : 'error', __FILE__, __LINE__, 'mkdir',
+        "storage=$storage path=$path name=$name ok=" . ($reports->{ok}?1:0));
+
+    return {
+        ok    => $reports->{ok} ? 1 : 0,
+        error => $reports->{error},
+        storage => $storage,
+        path    => $path,
+        name    => $name,
+    };
+}
+
+# Rename a file or dir on the printer storage.
+sub rename_file {
+    my ($self, $c, $host, $port, $opts) = @_;
+    $opts ||= {};
+    my $storage = lc($opts->{storage} || 'local');
+    $storage = 'local' unless $storage eq 'udisk';
+    my $path = _safe_path($opts->{path}) || '/';
+    my $old = _safe_filename($opts->{old} || $opts->{old_name});
+    my $new = _safe_filename($opts->{new} || $opts->{new_name});
+    return { ok => 0, error => 'Invalid old or new name' } unless $old && $new;
+
+    my $hs = $self->handshake($c, $host, $port);
+    return $hs unless $hs->{ok};
+
+    my $reports = $self->_mqtt_roundtrip($c, $hs, [{
+        type   => 'file',
+        action => 'rename',
+        data   => { path => $path, old => $old, new => $new, storage => $storage },
+    }], 6);
+
+    $self->logging->log_with_details($c, $reports->{ok} ? 'info' : 'error', __FILE__, __LINE__, 'rename_file',
+        "storage=$storage path=$path old=$old new=$new ok=" . ($reports->{ok}?1:0));
+
+    return {
+        ok    => $reports->{ok} ? 1 : 0,
+        error => $reports->{error},
+        storage => $storage,
+        path    => $path,
+        old     => $old,
+        new     => $new,
+    };
+}
+
+# Move a file to another path (subdir) on the same storage.
+sub move_file {
+    my ($self, $c, $host, $port, $opts) = @_;
+    $opts ||= {};
+    my $storage = lc($opts->{storage} || 'local');
+    $storage = 'local' unless $storage eq 'udisk';
+    my $from_path = _safe_path($opts->{from_path} || $opts->{path}) || '/';
+    my $filename = _safe_filename($opts->{filename});
+    my $to_path = _safe_path($opts->{to_path});
+    return { ok => 0, error => 'Invalid filename or target path' } unless $filename && $to_path;
+
+    my $hs = $self->handshake($c, $host, $port);
+    return $hs unless $hs->{ok};
+
+    my $reports = $self->_mqtt_roundtrip($c, $hs, [{
+        type   => 'file',
+        action => 'move',
+        data   => { from_path => $from_path, filename => $filename, to_path => $to_path, storage => $storage },
+    }], 6);
+
+    $self->logging->log_with_details($c, $reports->{ok} ? 'info' : 'error', __FILE__, __LINE__, 'move_file',
+        "storage=$storage from=$from_path/$filename to=$to_path ok=" . ($reports->{ok}?1:0));
+
+    return {
+        ok    => $reports->{ok} ? 1 : 0,
+        error => $reports->{error},
+        storage => $storage,
+    };
+}
+
+# Probe TCP 18910 then GET /info. subnet e.g. 192.168.2.0/24 (caller may override).
+sub discover {
+    my ($self, $c, $subnet) = @_;
+    $subnet ||= '192.168.2.0/24';
+
+    my $base;
+    if ($subnet =~ /\A(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}\/\d+\z/) {
+        $base = $1;
+    }
+    elsif ($subnet =~ /\A(\d{1,3}\.\d{1,3}\.\d{1,3})\z/) {
+        $base = $1;
+    }
+    unless ($base) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'discover',
+            "Bad subnet '$subnet'");
+        return [];
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'discover',
+        "Scanning $base.1-254 tcp/18910 then GET /info");
+
+    my @found;
+    my $ua = HTTP::Tiny->new(timeout => 1, max_redirect => 0);
+    for my $i (1 .. 254) {
+        my $ip = "$base.$i";
+        my $sock = IO::Socket::INET->new(
+            PeerAddr => $ip,
+            PeerPort => 18910,
+            Proto    => 'tcp',
+            Timeout  => 0.15,
+        );
+        next unless $sock;
+        close $sock;
+
+        my $url = "http://$ip:18910/info";
+        my $res = eval { $ua->get($url) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'discover',
+                "GET $url: $@");
+        }
+        my $content = ($res && $res->{content}) ? $res->{content} : '';
+        my $status  = $res ? ($res->{status} || 0) : 0;
+        my $model = 'LAN device :18910';
+        if ($content =~ /kobra\s*3/i) {
+            $model = 'Kobra 3';
+        }
+        elsif ($content =~ /anycubic/i) {
+            $model = 'Anycubic';
+        }
+        elsif ($content =~ /kobra/i) {
+            $model = 'Kobra';
+        }
+        push @found, {
+            ip     => $ip,
+            port   => 18910,
+            model  => $model,
+            status => ($res && $res->{success}) ? 'online' : 'port-open',
+            info   => substr($content, 0, 120),
+            http   => $status,
+        };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'discover',
+            "Found $ip:18910 http=$status model=$model");
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'discover',
+        "Scan done subnet=$base.0 found=" . scalar(@found));
+    return \@found;
+}
+
+# Follow a printer when DHCP moves it. Identity is the /info serial (cn), not the IP.
+# Tries the stored host first. On failure, scans that host's /24 (then 192.168.2 and
+# 192.168.1) and keeps the device whose serial matches. Does not log tokens.
+sub relocate {
+    my ($self, $c, $host, $serial) = @_;
+    $host   = $self->sanitize_host($host) || '';
+    $serial = '' unless defined $serial;
+    $serial =~ s/\s+//g;
+
+    if ($host) {
+        my $info;
+        for my $try (1 .. 3) {
+            $info = $self->fetch_info($c, $host, 18910, $try == 1 ? 8 : 12);
+            if ($info->{ok} && _serial_ok($serial, $info->{serial})) {
+                return {
+                    ok     => 1,
+                    host   => $info->{host},
+                    serial => $info->{serial} || $serial,
+                    moved  => 0,
+                };
+            }
+            last unless $info->{timeout};
+        }
+        # A timeout is not proof the address moved. Scanning on a 0.15s sweep
+        # misses this printer and was marking it offline while it was still here.
+        if ($info && $info->{timeout}) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'relocate',
+                "stored host=$host timed out; not scanning and not treating it as gone");
+            return { ok => 0, timeout => 1, host => $host, serial => $serial,
+                     error => 'Printer slow to answer; address unchanged' };
+        }
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'relocate',
+            "stored host=$host failed; scanning for serial=" . ($serial || '(any Kobra 3)'));
+    }
+
+    # DHCP usually moves the last octet a little. Probe neighbours before a full /24 sweep.
+    if ($host =~ /\A(\d{1,3}\.\d{1,3}\.\d{1,3})\.(\d{1,3})\z/) {
+        my ($prefix, $last) = ($1, $2 + 0);
+        for my $delta (-8 .. 8) {
+            next if $delta == 0;
+            my $n = $last + $delta;
+            next if $n < 1 || $n > 254;
+            my $ip = "$prefix.$n";
+            my $sock = IO::Socket::INET->new(
+                PeerAddr => $ip, PeerPort => 18910, Proto => 'tcp', Timeout => 0.4,
+            );
+            next unless $sock;
+            close $sock;
+            my $st = $self->fetch_info($c, $ip, 18910);
+            next unless $st->{ok} && _serial_ok($serial, $st->{serial});
+            next if !$serial && ($st->{model_id} || '') ne '20024'
+                && ($st->{model_name} || '') !~ /kobra\s*3/i;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'relocate',
+                "neighbour match $host -> $ip");
+            return {
+                ok       => 1,
+                host     => $st->{host},
+                serial   => $st->{serial} || $serial,
+                moved    => 1,
+                previous => $host,
+            };
+        }
+    }
+
+    my @nets;
+    if ($host =~ /\A(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}\z/) {
+        push @nets, "$1.0/24";
+    }
+    push @nets, '192.168.2.0/24', '192.168.1.0/24';
+    my %seen;
+    my @candidates;
+    for my $net (@nets) {
+        next if $seen{$net}++;
+        my $found = $self->discover($c, $net) || [];
+        for my $p (@$found) {
+            my $st = $self->fetch_info($c, $p->{ip}, 18910);
+            next unless $st->{ok};
+            if ($serial) {
+                next unless $st->{serial} && $st->{serial} eq $serial;
+            }
+            elsif (($st->{model_id} || '') ne '20024' && ($st->{model_name} || '') !~ /kobra\s*3/i) {
+                next;
+            }
+            push @candidates, $st;
+        }
+        last if @candidates;
+    }
+
+    if (@candidates > 1 && !$serial) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'relocate',
+            'More than one Kobra 3 and no stored serial; not guessing');
+        return { ok => 0, error => 'Several printers found; serial not stored yet', host => $host };
+    }
+    unless (@candidates) {
+        return { ok => 0, error => 'Printer not found on LAN', host => $host, serial => $serial };
+    }
+    my $hit = $candidates[0];
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'relocate',
+        "moved " . ($host || '(none)') . " -> $hit->{host} serial=" . ($hit->{serial} || ''));
+    return {
+        ok       => 1,
+        host     => $hit->{host},
+        serial   => $hit->{serial} || $serial,
+        moved    => ($host && $hit->{host} ne $host) ? 1 : 0,
+        previous => $host,
+    };
+}
+
+sub _serial_ok {
+    my ($want, $got) = @_;
+    return 1 unless $want;
+    return ($got && $got eq $want) ? 1 : 0;
+}
+
+sub _mqtt_roundtrip {
+    my ($self, $c, $hs, $messages, $wait_s) = @_;
+    $wait_s ||= 4;
+    unless (eval { require IO::Socket::SSL; 1 }) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_mqtt_roundtrip',
+            "IO::Socket::SSL missing: $@");
+        return { ok => 0, error => 'IO::Socket::SSL is not installed' };
+    }
+    my $sock;
+    my $fail;
+    try {
+        $sock = IO::Socket::SSL->new(
+            PeerHost        => $hs->{broker_host},
+            PeerPort        => $hs->{broker_port},
+            SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
+            Timeout         => 5,
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_mqtt_roundtrip',
+            "TLS connect: $_");
+        $fail = { ok => 0, error => _mqtt_busy_error("TLS connect: $_") };
+    };
+    return $fail if $fail;
+    unless ($sock) {
+        my $err = IO::Socket::SSL->errstr || $!;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_mqtt_roundtrip',
+            "TLS connect failed: $err");
+        return { ok => 0, error => _mqtt_busy_error("TLS connect failed: $err") };
+    }
+    $sock->autoflush(1);
+    my $cid = 'cs' . _rand_alnum(8);
+    my $ok_conn = eval {
+        _mqtt_send($sock, 0x10, _mqtt_connect_payload($cid, $hs->{_user}, $hs->{_pass}));
+        my ($type, $pl) = _mqtt_read($sock, 5);
+        die "no CONNACK\n" unless defined $type && ($type >> 4) == 2 && length($pl) >= 2;
+        my $rc = ord(substr($pl, 1, 1));
+        die "CONNACK rc=$rc\n" unless $rc == 0;
+        1;
+    };
+    if (!$ok_conn) {
+        my $err = $@ || 'connect';
+        chomp $err;
+        close $sock;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_mqtt_roundtrip',
+            "MQTT CONNECT: $err");
+        return { ok => 0, error => _mqtt_busy_error($err) };
+    }
+    my $mid = $hs->{model_id};
+    my $did = $hs->{device_id};
+    my $sub_topic = "anycubic/anycubicCloud/v1/printer/public/$mid/$did/#";
+    eval {
+        _mqtt_send($sock, 0x82, pack('n', 1) . _mqtt_str($sub_topic) . chr(0));
+        _mqtt_read($sock, 3);
+        1;
+    } or do {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_mqtt_roundtrip',
+            "SUBSCRIBE: $@");
+    };
+    for my $m (@$messages) {
+        my $mtype = $m->{type} || 'info';
+        my $topic = "anycubic/anycubicCloud/v1/web/printer/$mid/$did/$mtype";
+        my $body = encode_json({
+            type      => $mtype,
+            action    => $m->{action} || 'query',
+            timestamp => $m->{timestamp} || int(time() * 1000),
+            msgid     => $m->{msgid} || _rand_alnum(16),
+            data      => exists $m->{data} ? $m->{data} : undef,
+        });
+        eval {
+            _mqtt_send($sock, 0x30, _mqtt_str($topic) . $body);
+            1;
+        } or do {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_mqtt_roundtrip',
+                "PUBLISH $mtype: $@");
+        };
+    }
+    my %by_type;
+    my $deadline = time() + $wait_s;
+    while (time() < $deadline) {
+        my ($type, $pl) = _mqtt_read($sock, $deadline - time());
+        last unless defined $type;
+        next unless ($type >> 4) == 3;
+        next unless length($pl) >= 2;
+        my $tlen = unpack('n', substr($pl, 0, 2));
+        next unless length($pl) >= 2 + $tlen;
+        my $payload = substr($pl, 2 + $tlen);
+        my $obj;
+        try { $obj = decode_json($payload) } catch {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_mqtt_roundtrip',
+                "report JSON: $_");
+        };
+        next unless $obj && ref($obj) eq 'HASH';
+        next if (($obj->{action} || '') eq 'query' && !defined $obj->{data} && !exists $obj->{state});
+        my $mt = $obj->{type} || '';
+        if ($mt eq 'file') {
+            my $d = defined $obj->{data} ? $obj->{data} : $obj;
+            $by_type{file} = $d if _file_payload_has_list($d) || (ref($d) eq 'HASH' && keys %$d);
+        }
+        elsif (defined $obj->{data}) {
+            $by_type{$mt} = $obj->{data} if $mt;
+        }
+        elsif ($mt eq 'print' || $mt eq 'info') {
+            $by_type{$mt} ||= $obj;
+        }
+        my $ready = 1;
+        for my $m (@$messages) {
+            my $need = $m->{type} or next;
+            unless ($by_type{$need}) {
+                $ready = 0;
+                last;
+            }
+            if ($need eq 'file' && !_file_payload_has_list($by_type{file})) {
+                $ready = 0;
+                last;
+            }
+        }
+        last if $ready;
+    }
+    eval { _mqtt_send($sock, 0xE0, ''); 1 };
+    close $sock;
+    unless (keys %by_type) {
+        return { ok => 1, by_type => {}, error => undef, empty => 1 };
+    }
+    return { ok => 1, by_type => \%by_type };
+}
+
+sub _decrypt_ctrl {
+    my ($info_b64, $token, $local_token) = @_;
+    require Crypt::CBC;
+    my $key = substr($token, 16, 16);
+    my $iv  = substr(($local_token || '') . ("\0" x 16), 0, 16);
+    my $cipher = Crypt::CBC->new(
+        -key         => $key,
+        -cipher      => 'Rijndael',
+        -iv          => $iv,
+        -header      => 'none',
+        -padding     => 'standard',
+        -literal_key => 1,
+        -keysize     => 16,
+    );
+    my $plain = $cipher->decrypt(decode_base64($info_b64));
+    return decode_json($plain);
+}
+
+sub _mqtt_connect_payload {
+    my ($cid, $user, $pass) = @_;
+    my $flags = 0xC2;    # username + password + clean session
+    my $vh = _mqtt_str('MQTT') . chr(4) . chr($flags) . pack('n', 60);
+    return $vh . _mqtt_str($cid) . _mqtt_str($user) . _mqtt_str($pass);
+}
+
+sub _mqtt_str {
+    my ($s) = @_;
+    $s = '' unless defined $s;
+    return pack('n', length($s)) . $s;
+}
+
+sub _mqtt_send {
+    my ($sock, $hdr, $payload) = @_;
+    $payload = '' unless defined $payload;
+    my $n = length($payload);
+    my $rl = '';
+    do {
+        my $d = $n % 128;
+        $n = int($n / 128);
+        $d |= 0x80 if $n;
+        $rl .= chr($d);
+    } while $n;
+    my $buf = chr($hdr) . $rl . $payload;
+    my $off = 0;
+    while ($off < length($buf)) {
+        my $w = $sock->syswrite($buf, length($buf) - $off, $off);
+        die "MQTT write failed: $!\n" unless defined $w && $w > 0;
+        $off += $w;
+    }
+}
+
+sub _mqtt_read {
+    my ($sock, $timeout) = @_;
+    $timeout = 1 if !defined $timeout || $timeout <= 0;
+    my $hdr = _ssl_read_n($sock, 1, $timeout);
+    return unless defined $hdr && length($hdr) == 1;
+    my $mul = 1;
+    my $len = 0;
+    for (1 .. 4) {
+        my $b = _ssl_read_n($sock, 1, 3);
+        return unless defined $b && length($b) == 1;
+        my $n = ord($b);
+        $len += ($n & 0x7f) * $mul;
+        last unless $n & 0x80;
+        $mul *= 128;
+    }
+    my $pl = $len ? _ssl_read_n($sock, $len, 5) : '';
+    return unless defined $pl && length($pl) == $len;
+    return (ord($hdr), $pl);
+}
+
+# IO::Select on SSL sockets is a lie (readable TLS records ≠ app data).
+sub _ssl_read_n {
+    my ($sock, $n, $timeout) = @_;
+    my $buf = '';
+    eval {
+        local $SIG{ALRM} = sub { die "timeout\n" };
+        alarm int($timeout + 1);
+        while (length($buf) < $n) {
+            my $chunk;
+            my $got = $sock->sysread($chunk, $n - length($buf));
+            die "eof\n" unless defined $got && $got > 0;
+            $buf .= $chunk;
+        }
+        alarm 0;
+        1;
+    } or do {
+        alarm 0;
+    };
+    return $buf if length($buf) == $n;
+    return;
+}
+
+sub _rand_alnum {
+    my ($n) = @_;
+    my @c = ('a'..'z', 'A'..'Z', 0..9);
+    return join '', map { $c[int(rand @c)] } 1 .. $n;
+}
+
+sub _rand_did {
+    my ($n) = @_;
+    my @c = ('A'..'Z', 0..9);
+    return join '', map { $c[int(rand @c)] } 1 .. $n;
+}
+
+sub _fill_ace {
+    my ($out, $data) = @_;
+    return unless $data && ref($data) eq 'HASH';
+    my $boxes = $data->{multi_color_box};
+    return unless $boxes && ref($boxes) eq 'ARRAY' && @$boxes;
+    my $box = $boxes->[0] || {};
+    my $dry = $box->{drying_status} || {};
+    $out->{ace_ok} = 1;
+    $out->{ace_temp} = $box->{temp};
+    $out->{ace_humidity} = defined $box->{humidity} ? $box->{humidity} : $dry->{humidity};
+    $out->{ace_loaded_slot} = $box->{loaded_slot};
+    $out->{drying_active} = ($dry->{status} || 0) ? 1 : 0;
+    $out->{drying_target} = $dry->{target_temp};
+    $out->{drying_duration} = $dry->{duration};
+    $out->{drying_remain} = $dry->{remain_time};
+    my @slots;
+    for my $s (@{ $box->{slots} || [] }) {
+        next unless $s && ref($s) eq 'HASH';
+        push @slots, {
+            index => $s->{index},
+            type  => $s->{type} || '',
+            color => $s->{color} || $s->{color_group} || undef,
+            pct   => $s->{consumables_percent},
+            sku   => $s->{sku} || '',
+        };
+    }
+    $out->{ace_slots} = \@slots;
+}
+
+sub _fill_files {
+    my ($out, $data) = @_;
+    my $rows = _parse_file_rows($data);
+    $out->{file_rows} = $rows;
+    $out->{local_files} = [ map { $_->{name} } grep { !$_->{is_dir} } @$rows ];
+}
+
+sub _parse_file_rows {
+    my ($data) = @_;
+    return [] unless $data && ref($data) eq 'HASH';
+    my $recs = $data->{records} || $data->{file_lists} || $data->{files}
+        || $data->{filelist} || $data->{list} || [];
+    $recs = [] unless ref($recs) eq 'ARRAY';
+    my @rows;
+    my %seen;
+    for my $r (@$recs) {
+        my $n;
+        my $is_dir = 0;
+        my $size;
+        my $child_path;
+        if (ref($r) eq 'HASH') {
+            $n = $r->{filename} || $r->{name} || $r->{file_name} || $r->{fn};
+            $is_dir = 1 if ($r->{is_dir} || $r->{isdir} || $r->{type} || '') =~ /dir|folder/i;
+            $is_dir = 1 if ($r->{filetype} || 0) == 0 && ($r->{size} || 0) == 0 && ($n && $n !~ /\./);
+            $size = $r->{size} || $r->{filesize};
+            $child_path = $r->{path};
+        }
+        else {
+            $n = $r;
+        }
+        next unless defined $n && length $n;
+        $n =~ s{.*/}{};
+        next if $seen{$n}++;
+        push @rows, {
+            name   => $n,
+            is_dir => $is_dir ? 1 : 0,
+            size   => $size,
+            path   => $child_path,
+        };
+    }
+    return \@rows;
+}
+
+sub _file_payload_has_list {
+    my ($d) = @_;
+    return 0 unless $d && ref($d) eq 'HASH';
+    for my $k (qw(records file_lists files filelist list)) {
+        return 1 if ref($d->{$k}) eq 'ARRAY';
+    }
+    return 0;
+}
+
+sub _safe_filename {
+    my ($fn) = @_;
+    $fn = '' unless defined $fn;
+    $fn =~ s/^\s+|\s+$//g;
+    return if $fn eq '' || $fn eq '.' || $fn eq '..';
+    return if $fn =~ m{[\\/]};
+    return unless $fn =~ /\A[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,200}\z/;
+    return $fn;
+}
+
+sub _safe_path {
+    my ($p) = @_;
+    $p = '/' unless defined $p && length $p;
+    $p =~ s/\\/\//g;
+    return if $p =~ /\.\./;
+    return unless $p =~ /\A\/[A-Za-z0-9._\/()-]{0,200}\z/;
+    $p =~ s{/+}{/}g;
+    $p = '/' if $p eq '';
+    return $p;
+}
+
+sub _first_defined {
+    for my $v (@_) {
+        return $v if defined $v;
+    }
+    return;
+}
+
+# Upload a file to the printer using the fileUploadurl from /info if available.
+# For LAN mode, this typically allows sending gcode/3mf to local storage.
+sub upload_file {
+    my ($self, $c, $host, $port, $filename, $content_or_path) = @_;
+    $filename = _safe_filename($filename);
+    return { ok => 0, error => 'Invalid filename' } unless $filename;
+
+    my $info = $self->fetch_info($c, $host, $port);
+    return $info unless $info->{ok};
+
+    my $upload_url = $info->{_info}{fileUploadurl} || '';
+    unless ($upload_url =~ m{^https?://}) {
+        return { ok => 0, error => 'Printer did not provide a usable fileUploadurl' };
+    }
+
+    my $content;
+    if (ref($content_or_path) eq 'SCALAR' || -f $content_or_path) {
+        if (-f $content_or_path) {
+            open my $fh, '<', $content_or_path or return { ok => 0, error => "Cannot read $content_or_path: $!" };
+            binmode $fh;
+            local $/;
+            $content = <$fh>;
+            close $fh;
+        } else {
+            $content = $$content_or_path;
+        }
+    } else {
+        $content = $content_or_path;
+    }
+
+    # The Kobra 3 upload endpoint expects a multipart/form-data POST with a
+    # "file" field; a raw octet-stream body makes the printer close the
+    # connection (HTTP::Tiny reports that as 599). Use LWP multipart instead.
+    my $ua = LWP::UserAgent->new(timeout => 300);
+    my $res = $ua->post(
+        $upload_url,
+        'X-File-Length' => length($content),
+        Content_Type => 'form-data',
+        Content => [
+            # Field name must be "gcode" (what Anycubic Slicer Next sends). With
+            # "file" the Kobra 3 (fw 2.4.6.7) answers code 19007 "Invalid gcode file"
+            # even for a real sliced file. Verified 2026-10-13.
+            gcode => [ undef, $filename, 'Content-Type' => 'application/octet-stream', Content => $content ],
+        ],
+    );
+
+    my $http_ok = $res->is_success;
+    my $body    = eval { $res->decoded_content } || '';
+    my $json    = eval { JSON::PP::decode_json($body) } || {};
+    my $code    = ref($json) eq 'HASH' ? $json->{code} : undef;
+    my $json_ok = !defined $code || $code == 0 || $code == 200;
+    my $ok      = $http_ok && $json_ok;
+
+    $self->logging->log_with_details($c, $ok ? 'info' : 'error', __FILE__, __LINE__, 'upload_file',
+        "host=$host file=$filename status=" . ($res->code || 0) . ' json_code=' . (defined $code ? $code : 'none'));
+
+    return {
+        ok          => $ok ? 1 : 0,
+        error       => $ok ? undef : ($http_ok ? ($json->{message} || 'Printer rejected upload (code=' . (defined $code ? $code : 'unknown') . ')')
+                                              : 'Upload failed: ' . ($res->code || $res->message || 'unknown')),
+        url         => $upload_url,
+        http_status => $res->code,
+    };
+}
+
+# Helper to get files for a printer (used by queue and control)
+sub get_local_files {
+    my ($self, $c, $host, $port, $storage) = @_;
+    $storage ||= 'local';
+    my $listing = $self->list_files($c, $host, $port, { storage => $storage, path => '/' });
+    return $listing->{names} || [];
+}
+
+# Download a file from the printer (for analysis, 3MF parsing, copying to model system).
+# Uses fileDownloadurl from /info if present, otherwise attempts a reasonable fallback.
+sub download_file {
+    my ($self, $c, $host, $port, $filename, $path, $storage) = @_;
+    $filename = _safe_filename($filename);
+    return { ok => 0, error => 'Invalid filename' } unless $filename;
+    $path = _safe_path($path) || '/';
+    $storage = lc($storage || 'local');
+    $storage = 'local' unless $storage eq 'udisk';
+
+    my $info = $self->fetch_info($c, $host, $port);
+    return $info unless $info->{ok};
+
+    my $download_url = $info->{_info}{fileDownloadurl} || $info->{_info}{file_download_url} || '';
+    my $content;
+
+    if ($download_url =~ m{^https?://}) {
+        # Append filename/path if the url is a base
+        my $full_url = $download_url;
+        if ($full_url !~ /\?/) {
+            $full_url .= '?filename=' . $filename . '&path=' . $path . '&storage=' . $storage;
+        }
+        my $ua = HTTP::Tiny->new(timeout => 60);
+        my $res = $ua->get($full_url);
+        if ($res->{success}) {
+            $content = $res->{content};
+        } else {
+            return { ok => 0, error => 'Download failed: ' . ($res->{status} || $res->{reason} || 'unknown') };
+        }
+    } else {
+        # Fallback: try common Anycubic LAN download path on the printer web port
+        my $fallback = "http://$host:18910/download?filename=" . $filename . "&path=" . $path . "&storage=" . $storage;
+        my $ua = HTTP::Tiny->new(timeout => 60);
+        my $res = $ua->get($fallback);
+        if ($res->{success}) {
+            $content = $res->{content};
+        } else {
+            return { ok => 0, error => 'No download URL provided by printer and fallback failed' };
+        }
+    }
+
+    $self->logging->log_with_details($c, $content ? 'info' : 'error', __FILE__, __LINE__, 'download_file',
+        "host=$host file=$filename path=$path storage=$storage size=" . (defined $content ? length($content) : 0));
+
+    return {
+        ok => defined $content ? 1 : 0,
+        error => defined $content ? undef : 'Download returned no content',
+        content => $content,
+        filename => $filename,
+    };
+}
+
+__PACKAGE__->meta->make_immutable;
+1;

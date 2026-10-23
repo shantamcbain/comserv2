@@ -1,0 +1,6 @@
+<div id="2026-09-05-helpdesk-ticket-assign-feature" class="cl-entry">
+<h3>2026-09-05 — Add ticket assignment to user/staff in HelpDesk</h3>
+<p class="doc-body"><strong>What.</strong> Added full ability to assign (and unassign) support tickets to a user or staff member via new <code>assign_ticket</code> action and UI form in ticket view. "Work On" now auto-claims/assigns the ticket to the acting staff member. Display of assignee already existed in ticket view header; now visible in list tables and editable.</p>
+<p class="doc-body"><strong>Why.</strong> Staff needed a way to claim ownership of tickets, hand off work, and see who is responsible in queues and lists. Schema column <code>assigned_to</code> (varchar) was present but unused in HelpDesk flows.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/lib/Comserv/Controller/HelpDesk.pm</code> (new assign_ticket, enhanced create_todo + view_ticket stash), <code>Comserv/root/CSC/HelpDesk/ticket_view.tt</code> (assign form with "Assign", "Me", "Unassign"), <code>Comserv/root/CSC/HelpDesk/admin_tickets.tt</code> and <code>ticket_status.tt</code> (Assigned column in tables), <code>Comserv/root/Documentation/changelog/entries/2026-09-05-helpdesk-ticket-assign-feature.inc</code></p>
+</div>

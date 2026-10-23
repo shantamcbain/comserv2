@@ -1,0 +1,6 @@
+<div id="2026-09-10-inventory-item-view-workflow-status" class="cl-entry">
+<h3>2026-09-10 — Item view shows workflow status (print queue, orders, traveler state)</h3>
+<p class="doc-body"><strong>What.</strong> Added a "Workflow Status" card to the inventory item view page that shows the item's current state in the manufacturing pipeline: whether it's in the print queue, ordered via purchase order, printed/ready to pick, or in the pick box. The card uses the same color scheme as the traveler (green=in box, blue=printed, red=in queue, purple=need print, amber=need order). It includes drill-down tables for recent print queue jobs and purchase order lines.</p>
+<p class="doc-body"><strong>Why.</strong> The user needed to see at a glance on the item page whether a printed part has been queued, ordered, or is already in stock — without jumping to the traveler or queue pages.</p>
+<p class="doc-body"><strong>Files.</strong> <code>lib/Comserv/Controller/Inventory.pm</code> (item_view action — added queue_jobs, po_lines, traveler_state queries and stash), <code>root/Inventory/items/view.tt</code> (added Workflow Status card section with color-coded state, queue job table, PO table).</p>
+</div>

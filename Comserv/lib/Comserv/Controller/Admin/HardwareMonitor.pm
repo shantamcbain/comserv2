@@ -523,14 +523,15 @@ sub watchdog :Path('/admin/hardware_monitor/watchdog') :Args(0) {
     }
 
     my ($sys_id, $hostname) = $self->_node_identity($c);
+    my $lookup_keys = $self->_node_identity_lookup_keys($sys_id);
 
-    # Match on system_identifier ONLY. `run` writes system_identifier as the
-    # canonical node key via _node_identity(); the separate `hostname` column is
-    # derived with sanitization that diverges between endpoints, so requiring an
-    # exact hostname match makes the watchdog unable to find its own heartbeat.
+    # Match on system_identifier ONLY (not hostname). Accept alias keys so a
+    # Standalone :3001 watchdog keyed as short "workstation" still sees a fresh
+    # cron heartbeat written by Docker :5000 under the FQDN SYSTEM_IDENTIFIER
+    # (and vice versa). Exact-only match caused false CRITICAL missed-window.
     my ($last) = eval {
         $c->model('DBEncy')->resultset('HardwareMetrics')->search(
-            { system_identifier => $sys_id, metric_name => 'monitor_heartbeat' },
+            { system_identifier => { -in => $lookup_keys }, metric_name => 'monitor_heartbeat' },
             { order_by => { -desc => 'timestamp' }, rows => 1 },
         )->single;
     };
@@ -580,25 +581,64 @@ sub _attempt_with_reconnect {
     return (0, $err);
 }
 
-# Canonical, deterministic node identity shared by `run` (writes the heartbeat)
+# Canonical short-host node identity shared by `run` (writes the heartbeat)
 # and `watchdog` (queries it). get_system_identifier() appends a volatile runtime
-# tag (" (Standalone)"/" (Docker)") and the listening port, which is detected
-# non-deterministically per request in the dev server — so `run` and `watchdog`
-# would otherwise compute DIFFERENT keys and the watchdog could never find the
-# heartbeat row `run` wrote. We normalize both to the bare host identity here so
-# the two endpoints always agree.
+# tag (" (Standalone)"/" (Docker)") and the listening port, and Docker often sets
+# SYSTEM_IDENTIFIER to the FQDN while Standalone resolves the bare hostname —
+# so without collapsing those forms, cron→:5000 heartbeats never satisfy a
+# :3001 watchdog (false CRITICAL missed window). Normalize to the short host.
+sub _canonicalize_node_key {
+    my ($self, $raw) = @_;
+    my $id = defined $raw ? $raw : '';
+    # Strip volatile " (Standalone)"/" (Docker)" runtime tag.
+    $id =~ s/\s*\([^)]*\)//g;
+    # Strip trailing ":port" if present.
+    $id =~ s/:\d+$//;
+    $id =~ s/[^A-Za-z0-9._-]//g;
+    return 'unknown' unless length $id;
+
+    # FQDN / .local → short host (workstation.computersystemconsulting.ca → workstation)
+    if ($id =~ /^([A-Za-z0-9_-]+)\.(?:local|computersystemconsulting\.ca)$/i) {
+        $id = $1;
+    }
+
+    # Non-FQDN synonyms used elsewhere in this controller / LAN registry
+    my %aliases = (
+        # LAN registry synonym for production1 only (do not collapse production2)
+        comservproduction1 => 'production1',
+    );
+    my $lc = lc $id;
+    $id = $aliases{$lc} if exists $aliases{$lc};
+    return $id;
+}
+
+# All system_identifier values that mean the same physical node as $sys_id.
+# Watchdog searches this set so peer-runtime heartbeats under an alias count.
+sub _node_identity_lookup_keys {
+    my ($self, $sys_id) = @_;
+    my $canon = $self->_canonicalize_node_key($sys_id);
+    my @keys = (
+        $canon,
+        "$canon.local",
+        "$canon.computersystemconsulting.ca",
+    );
+    if ($canon eq 'production1') {
+        push @keys, 'comservproduction1';
+    }
+    my %seen;
+    return [ grep { length && !$seen{$_}++ } @keys ];
+}
+
 sub _node_identity {
     my ($self, $c) = @_;
 
-    my $sys_id = Comserv::Util::Logging->get_system_identifier();
-    # Strip volatile " (Standalone)"/" (Docker)" runtime tag.
-    $sys_id =~ s/\s*\([^)]*\)//g;
-    # Strip trailing ":port" if present.
-    $sys_id =~ s/:\d+$//;
-    $sys_id =~ s/[^A-Za-z0-9._-]//g;
+    my $sys_id = $self->_canonicalize_node_key(
+        Comserv::Util::Logging->get_system_identifier()
+    );
 
     my $hostname = $ENV{HW_HOSTNAME_OVERRIDE} || $sys_id || `hostname -s 2>/dev/null` || 'unknown';
     chomp $hostname;
+    $hostname = $self->_canonicalize_node_key($hostname);
     $hostname =~ s/[^A-Za-z0-9._-]//g;
 
     return ($sys_id, $hostname);

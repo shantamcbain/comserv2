@@ -18,7 +18,7 @@
         <h1>Create Account</h1>
         <h2 class="page-subtitle">Step 1 of 3 — Enter your username and email</h2>
         <p class="page-subtitle" style="font-size: var(--font-size-small); margin-top: 4px;">
-            <a href="/Documentation/UserRegistrationGuide" target="_blank" style="color: var(--link-color);">&#9432; Registration Help &amp; Tutorial</a>
+            <a href="/Documentation/UserRegistrationGuide" target="_blank" style="color: var(--link-color);">&#9432; Registration Help & Tutorial</a>
         </p>
     </div>
 
@@ -28,6 +28,12 @@
 
             [% IF c.stash.error_msg %]
                 <div class="error">[% c.stash.error_msg %]</div>
+            [% ELSIF flash.error_msg %]
+                <div class="error">[% flash.error_msg | html %]</div>
+            [% END %]
+
+            [% IF flash.success_msg %]
+                <div class="success">[% flash.success_msg | html %]</div>
             [% END %]
 
             <div class="form-container">

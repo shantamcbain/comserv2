@@ -102,3 +102,15 @@ The primary issue was that the DSN string was missing the proper database driver
 
 The correct format for MySQL connections is now used consistently:
 "dbi:mysql:database=DATABASE_NAME;host=HOST;port=PORT"
+
+## Later note (2026-08-29) — do not treat this file as current SoT
+
+This document is a historical DSN-format note. Current RemoteDB behaviour:
+
+- Callers use `Comserv::Model::RemoteDB->from_context($c)` (plain Moose; not Catalyst::Model).
+- `select_connection` accepts `postgresql|postgres|pg` as well as mysql/mariadb/sqlite.
+- PG DSNs use `dbi:Pg:...` (not forced mysql).
+- Plan of record: `/Documentation/SchemaComparePostgresPlan` (SCPG-REMOTEDB done; next SCPG-COMPARE).
+- API notes: `/Documentation/models/RemoteDB`.
+
+Do not paste live passwords into docs; use `~/.comserv/secrets/dbi/` only.

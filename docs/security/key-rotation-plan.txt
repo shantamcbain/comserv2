@@ -1,0 +1,100 @@
+# Key rotation plan: mail and Proxmox encryption keys
+
+Status: PLAN ONLY. Nothing has been rotated yet. Written 2026-10-20 by Code Guard for Shanta.
+
+## Why
+Since 2026-05-02 (commits f197a8634 / fe81c14dd / 4b2d33d10, last touched in fc091846b),
+`Comserv/config/.mail_encryption_key` and `Comserv/config/.proxmox_encryption_key` were
+tracked in git and pushed to GitHub (main + 8 branches). `.secret-guard-allow` whitelisted them.
+On branch `codeguard` they are untracked (still on disk) and copied to `~/.comserv/keys/` (0600).
+**Treat both keys as compromised.** Rotate them, and rotate the secrets they protect, because anyone
+holding an old copy of the repo plus a copy of the ciphertext can decrypt.
+
+## How the keys are used (from the code)
+- `Comserv::Util::Encryption`: AES-256-CBC (Crypt::CBC, salted header), output `ENC:<base64>`.
+  Key lookup order for namespace N (`_get_encryption_key` / `_get_key_file_path`):
+  1. env `N_ENCRYPTION_KEY` (64 hex chars, or >=32 chars),
+  2. `$COMSERV_KEY_DIR/.N_encryption_key` if COMSERV_KEY_DIR is set,
+  3. `~/.comserv/keys/.N_encryption_key` if it exists,
+  4. legacy `Comserv/config/.N_encryption_key`,
+  5. otherwise it **creates a new random key** and writes it. DANGER: if no key is found, existing
+     ciphertext stops decrypting without any error (decrypt returns '').
+- Namespace `mail`: `Comserv::Util::MailInvoiceClassifier` encrypts/decrypts the IMAP/SMTP password
+  in DB table **`user_mailboxes`**, column **`password_enc`** (ENCY DB, one row per site + mailbox address).
+- Namespace `proxmox`: `Comserv::Util::ProxmoxCredentials` encrypts `token_value` into
+  **`Comserv/config/proxmox_credentials.json` → `<server>.token_value_encrypted`** (currently one
+  server, `DEll710`). This JSON file is ALSO tracked in git, so the old ciphertext is public too.
+  Helpers: `script/migrate_proxmox_credentials.pl`, `script/test_proxmox_encryption.pl`.
+- Containers: `docker-compose.dev.yml` / `docker-compose.staging.yml` mount `./config` into
+  `/opt/comserv/config` (staging read-only), so containers read the legacy path unless
+  `COMSERV_KEY_DIR` or `*_ENCRYPTION_KEY` env is supplied.
+
+## The safest fix: rotate the underlying secrets
+Re-encrypting with a new key only protects the copies made from now on. The old key plus the old
+ciphertext (git history, backups) still decrypt to the CURRENT passwords. So:
+1. **Proxmox**: in the Proxmox UI on DEll710, revoke the existing API token, create a new one.
+2. **Mail**: change the password of every mailbox listed in `user_mailboxes` (at the mail host / cPanel).
+3. Then store the new values encrypted with the NEW keys (below). Doing (1)+(2) is what actually closes the leak.
+
+## Steps
+0. Pick a quiet window. Note which sites/containers run Comserv (workstation dev, staging, production).
+1. **Backup** (keep offline, 0600):
+   - `mysqldump ency user_mailboxes > ~/.comserv/keys/backup-<date>/user_mailboxes.sql`
+   - copy `Comserv/config/proxmox_credentials.json` and both old key files into that backup dir.
+2. **Generate new keys** (never in the repo):
+   `head -c 32 /dev/urandom > ~/.comserv/keys/.mail_encryption_key.new; chmod 600 ...` (same for proxmox).
+3. **Re-encrypt script** (`script/rotate_encryption_key.pl`, to be written; outline):
+   ```
+   usage: rotate_encryption_key.pl --namespace mail|proxmox --old FILE --new FILE [--dry-run]
+   - load old and new raw keys from files (not env, not argv values)
+   - mail: for each row in user_mailboxes with password_enc LIKE 'ENC:%':
+       plain = decrypt_with(old, row.password_enc); die if plain eq ''   # never write blanks
+       row.update({ password_enc => encrypt_with(new, plain) })  inside ONE DB transaction
+   - proxmox: same for every token_value_encrypted in proxmox_credentials.json, write file atomically
+   - after writing, decrypt each value with NEW key and compare to plain; rollback txn on any mismatch
+   - print counts only (rows ok / failed); never print plaintext or keys
+   ```
+   If you rotate the passwords/token (recommended), simply re-enter them in the admin UI after the
+   new key is in place instead of decrypting the old values.
+4. **Deploy order**:
+   a. Merge `codeguard` first ONLY after every checkout/server has its keys in `~/.comserv/keys`
+      (or `COMSERV_KEY_DIR`). Pulling the merge deletes nothing on disk for this checkout, but on a
+      fresh clone or a checkout where git removes the file, step 1 of key lookup must find the shared copy.
+   b. Containers: mount `~/.comserv/keys` read-only at e.g. `/opt/comserv/keys` and set
+      `COMSERV_KEY_DIR=/opt/comserv/keys` in each compose file / k8s secret, so they stop relying on `./config`.
+   c. Stop writers (app containers / Starman) on all sites, run the script with `--dry-run`, then for real.
+   d. Move `.new` → live key name in `~/.comserv/keys` (and the container secret), start the apps.
+   e. Delete the legacy `Comserv/config/.*_encryption_key` copies from every checkout once verified.
+5. **Verify**: open Mail settings (each mailbox shows "has password" and IMAP login works), run
+   `script/test_proxmox_encryption.pl` and list Proxmox VMs from the admin page. Check app logs for
+   "Decryption failed" or "generating new one".
+6. **Rollback**: stop apps, restore old key files to `~/.comserv/keys`, restore `user_mailboxes` from
+   the dump and `proxmox_credentials.json` from backup, start apps. (Rolling back the key does not
+   un-rotate a revoked Proxmox token or a changed mailbox password: re-enter the new ones.)
+
+## Other items found during the audit (not done yet; need Shanta's decision)
+- Tracked env files with literal-looking passwords: `.env`, `.env.production`, `.env.development`
+  (since 2025-10-28) and `Comserv/.env.staging` (since 2025-10-31): DB, DB root, ENCY DB, Redis, SMTP
+  passwords and a staging API key. Rotate them and untrack them the same way.
+- `Comserv/config/nginx/npm-{development,staging,production}.conf` contain a JWT `api_key`
+  (Nginx Proxy Manager token). Rotate it.
+- `comserv.conf` cPanel `api_token` (line 26) is a placeholder (all-caps word with "here"-style text), not a real token.
+- GitHub: turn on **Secret scanning** and **Push protection** under Settings → Code security
+  (the `gh` CLI isn't installed on the workstation, so this couldn't be checked or enabled from here). Make
+  `secret-scan / scan` a required status check on `main`.
+- Optionally purge history (git filter-repo + force push) after rotation; rotation is what matters.
+
+## Addendum 2026-10-20: .env, NPM and other untracked items (prod first)
+Copies of the untracked files are in ~/.comserv/secrets/repo-untracked/ (600). For each item:
+change it at the source, update the copy / future app_secrets row, restart, verify, then delete the old.
+1. Production MySQL app user + root (DB_PASSWORD, DB_ROOT_PASSWORD, COMSERV_DB_ENCY_PRODUCTION_PASSWORD
+   in .env.production / .env.staging): ALTER USER on the prod DB, update ~/.comserv/secrets/dbi/*.json,
+   restart comserv2-web-prod, check login + a page that reads ENCY.
+2. Production Redis (REDIS_PASSWORD): requirepass in redis config, update env, restart redis then app.
+3. SMTP (SMTP_PASS in Comserv/.env.staging): change at mail host; send a test mail.
+4. NPM JWT api_key (npm-*.conf): in Nginx Proxy Manager, revoke/re-issue the API token (or change the
+   NPM user password, which invalidates tokens); update the conf copies.
+5. Staging API key (API_KEY_COMSERV_STAGING): re-issue.
+6. Proxmox token + mail/proxmox encryption keys: as above.
+7. Dev/staging DB passwords (.env, .env.development) and the values that were in .env.example.
+8. Verify old values fail; record date of each rotation (not the value).

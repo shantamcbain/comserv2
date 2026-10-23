@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- HelpDesk tab icon — same HD badge as legacy port 4013 /favicon/helpdesk -->
+  <rect width="32" height="32" rx="4" fill="#1a7a4a"/>
+  <text x="16" y="22" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="13" fill="white">HD</text>
+</svg>

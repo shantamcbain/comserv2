@@ -1,0 +1,16 @@
+{
+ "_comment": "In-app code reviewer (eval #34). Shanta approved Oct 12 9:35 AM PT: review at commit with Sonnet 5.5, $0.50/day cap. mode 'warn' never blocks. Prices are USD per million tokens (openrouter.ai/api/v1/models, Oct 12 2026).",
+ "enabled": 1,
+ "mode": "block",
+ "cap_usd_per_day": 0.50,
+ "primary": "anthropic/claude-sonnet-5.5",
+ "alternate": "openai/gpt-6-sol",
+ "fixer": "deepseek/deepseek-v4-pro",
+ "prices": {
+  "anthropic/claude-sonnet-5.5": { "in": 2.0, "out": 10.0 },
+  "openai/gpt-6-sol": { "in": 2.0, "out": 10.0 },
+  "deepseek/deepseek-v4-pro": { "in": 0.44, "out": 0.87 }
+ },
+ "max_diff_chars": 60000,
+ "max_tokens": 1500
+}

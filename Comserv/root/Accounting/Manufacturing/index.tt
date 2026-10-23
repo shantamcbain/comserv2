@@ -1,0 +1,115 @@
+[% PageVersion = 'Accounting/Manufacturing/index.tt,v 0.05 2026/09/03 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% META
+    title = 'Manufacturing — Customers with open orders'
+    description = 'Customers that have open orders needing manufacturing or picking'
+    roles = 'admin,accounting'
+    TemplateType = 'ApplicationTtTemplate'
+%]
+
+<div class="content-card" style="max-width: 1100px; margin: 1.5rem auto; padding: 1.25rem;">
+  <h1 style="color: var(--text-color, #222); margin-top: 0;">Manufacturing Traveler</h1>
+  <p class="doc-body" style="color: var(--text-color, #444);">
+    Customers with open orders. Open a customer to see their orders that need picking / printing,
+    then open the traveler for the full BOM.
+  </p>
+
+  [% IF load_error %]
+  <p style="color: var(--danger-color, #b00020);">Could not load some orders: [% load_error | html %]</p>
+  [% END %]
+
+  [% IF c.flash.success_msg %]
+  <div style="background: #d4edda; color: #155724; padding: 0.5rem 1rem; margin-bottom: 1rem; border: 1px solid #c3e6cb; border-radius: 4px;">
+    [% c.flash.success_msg | html %]
+  </div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div style="background: #f8d7da; color: #721c24; padding: 0.5rem 1rem; margin-bottom: 1rem; border: 1px solid #f5c6cb; border-radius: 4px;">
+    [% c.flash.error_msg | html %]
+  </div>
+  [% END %]
+
+  [% IF customers && customers.size %]
+  <h2 style="color: var(--text-color, #222);">Customers</h2>
+  <table class="table" style="width: 100%; border-collapse: collapse; color: var(--text-color, #222);">
+    <thead>
+      <tr style="border-bottom: 2px solid var(--border-color, #ccc); text-align: left;">
+        <th style="padding: 0.5rem;">Customer</th>
+        <th style="padding: 0.5rem;">Open orders</th>
+        <th style="padding: 0.5rem;">Latest</th>
+        <th style="padding: 0.5rem;">Items (preview)</th>
+        <th style="padding: 0.5rem;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      [% FOREACH cust IN customers %]
+      <tr style="border-bottom: 1px solid var(--border-color, #ddd);">
+        <td style="padding: 0.6rem;"><strong>[% cust.customer | html %]</strong></td>
+        <td style="padding: 0.6rem;">[% cust.order_count %]</td>
+        <td style="padding: 0.6rem;">[% cust.latest_date | html %]</td>
+        <td style="padding: 0.6rem; font-size: 0.95em;">
+          [% FOREACH p IN cust.items_preview %]
+            <div>[% p | html %]</div>
+          [% END %]
+        </td>
+        <td style="padding: 0.6rem; white-space: nowrap;">
+          <a class="btn btn-primary" href="[% cust.customer_link %]">View orders</a>
+        </td>
+      </tr>
+      [% END %]
+    </tbody>
+  </table>
+
+  <h2 style="color: var(--text-color, #222); margin-top: 2rem;">All open orders</h2>
+  <table class="table" style="width: 100%; border-collapse: collapse; color: var(--text-color, #222);">
+    <thead>
+      <tr style="border-bottom: 2px solid var(--border-color, #ccc); text-align: left;">
+        <th style="padding: 0.5rem;">Customer</th>
+        <th style="padding: 0.5rem;">Order</th>
+        <th style="padding: 0.5rem;">Date</th>
+        <th style="padding: 0.5rem;">Status</th>
+        <th style="padding: 0.5rem;">Items</th>
+        <th style="padding: 0.5rem;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      [% FOREACH o IN open_orders %]
+      <tr style="border-bottom: 1px solid var(--border-color, #ddd);">
+        <td style="padding: 0.6rem;"><strong>[% o.customer | html %]</strong></td>
+        <td style="padding: 0.6rem;">#[% o.order_id | html %]</td>
+        <td style="padding: 0.6rem;">[% o.order_date | html %]</td>
+        <td style="padding: 0.6rem;">[% o.status | html %]</td>
+        <td style="padding: 0.6rem;">
+          [% o.items | html %]
+          [% IF o.scope_note %]
+            <br><span style="color: var(--text-color, #666); font-size: 0.9em;">[% o.scope_note | html %]</span>
+          [% END %]
+        </td>
+        <td style="padding: 0.6rem; white-space: nowrap;">
+          <a class="btn btn-primary" href="[% o.link %]" style="margin-right: 0.4rem;">Open Traveler</a>
+          <a class="btn btn-secondary" href="[% o.print_link %]">Print Form</a>
+          [% UNLESS o.status.match('cancel|void') %]
+          <form method="post" action="[% c.uri_for('/Accounting/manufacturing/cancel', o.order_id) %]" style="display:inline;">
+            <button type="submit" class="btn btn-danger" style="padding:2px 6px;" onclick="return confirm('Cancel this order and release its jobs/reservations globally?');">Cancel</button>
+          </form>
+          [% END %]
+        </td>
+      </tr>
+      [% END %]
+    </tbody>
+  </table>
+  [% ELSE %]
+  <p style="color: var(--text-color, #666);">
+    No open manufacturing orders found for this site.
+    Create orders under <a href="[% c.uri_for('/CustomerOrder') %]">Customer orders</a>.
+  </p>
+  [% END %]
+
+  <p style="margin-top: 1.5rem;">
+    <a href="[% c.uri_for('/Accounting') %]">← Accounting</a>
+    &nbsp;|&nbsp;
+    <a href="[% c.uri_for('/CustomerOrder') %]">Customer orders</a>
+    &nbsp;|&nbsp;
+    <a href="[% c.uri_for('/3d/admin') %]">3D Admin</a>
+  </p>
+</div>

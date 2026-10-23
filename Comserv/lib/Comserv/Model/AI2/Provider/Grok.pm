@@ -15,6 +15,7 @@ use Comserv::Util::Logging;
 # Used when the live /v1/models call fails but the prepaid OAuth token is present
 # so the picker still offers the same set this workstation chats with.
 my @SUPERGROK_CHAT_FALLBACK = qw(
+    grok-4.7
     grok-4.6
     grok-build-0.1
     grok-4.3
@@ -22,6 +23,46 @@ my @SUPERGROK_CHAT_FALLBACK = qw(
     grok-4.20-0309-non-reasoning
     grok-4.20-multi-agent-0309
 );
+
+# x.AI list price table — USD per 1M tokens, standard (< 200k prompt) tier.
+#
+# x.AI's GET /v1/models returns NO pricing field at all. Downstream we used to
+# read that as "price 0" and therefore "free", which labelled every Grok model
+# free (and leaked the whole paid x.AI catalog to guests). This table is the
+# authoritative fallback so cost is displayed and role-filtered correctly.
+#
+# Source: docs.x.ai/developers/pricing (per-million USD). Kept as a table
+# because x.AI publishes no machine-readable price endpoint; entries missing
+# here are reported as price_known => 0 (NOT free) rather than as zero-cost.
+my %XAI_PRICING = (
+    'grok-4.6'                      => [ 2.00,  6.00 ],
+    'grok-4.5'                      => [ 2.00,  6.00 ],
+    'grok-4.3'                      => [ 1.25,  2.50 ],
+    'grok-4.20-0309-reasoning'      => [ 1.25,  2.50 ],
+    'grok-4.20-0309-non-reasoning'  => [ 1.25,  2.50 ],
+    'grok-4.20-multi-agent-0309'    => [ 1.25,  2.50 ],
+    'grok-build-0.1'                => [ 1.00,  2.00 ],
+    'grok-4.1-fast'                 => [ 0.20,  0.50 ],
+    'grok-4-1-fast'                 => [ 0.20,  0.50 ],
+    'grok-4.1-fast-reasoning'       => [ 0.20,  0.50 ],
+    'grok-4.1-fast-non-reasoning'   => [ 0.20,  0.50 ],
+    'grok-3-mini'                   => [ 0.30,  0.50 ],
+    'grok-3'                        => [ 3.00, 15.00 ],
+    'grok-4'                        => [ 3.00, 15.00 ],
+    'grok-2-latest'                 => [ 2.00, 10.00 ],
+    'grok-2'                        => [ 2.00, 10.00 ],
+);
+
+# Look up list price for a model id. Returns (prompt, completion, known).
+# $known is 0 for ids absent from the table — the caller MUST treat those as
+# "cost unknown" (paid-by-default), never as free.
+sub _xai_price {
+    my ($id) = @_;
+    return (undef, undef, 0) unless defined $id && length $id;
+    my $row = $XAI_PRICING{$id};
+    return (undef, undef, 0) unless $row;
+    return ( $row->[0], $row->[1], 1 );
+}
 
 has 'logging' => (
     is      => 'ro',
@@ -125,6 +166,15 @@ sub _sanitize_provider_error {
     my ($code, $body) = @_;
     $body //= '';
     $body =~ s/\s+/ /g;
+    # x.AI answers 403 for BOTH "credential rejected" and "subscription/credit
+    # limit reached". Collapsing both into "login expired" sent humans to
+    # re-auth a perfectly valid token AND hid the real cause from Router's
+    # _credits_exhausted, so the free-model fallback never engaged and the turn
+    # just dead-ended (todo #2374).
+    if ($body =~ /spending.?limit|personal-team-blocked|out of credits|add credits|upgrade at/i
+        && $body !~ /unauthenticated|bad-credentials|invalid.?token|token could not be validated/i) {
+        return 'SuperGrok/xAI quota or spending limit reached — add credits or wait for the reset; falling back to a free model';
+    }
     if ($code == 401 || $code == 403
         || $body =~ /unauthenticated|bad-credentials|invalid.?token|token could not be validated/i) {
         return 'SuperGrok/xAI login expired or invalid — re-auth (hermes auth add xai-oauth) then run script/sync_supergrok_token.pl';
@@ -228,10 +278,19 @@ sub _label_models {
     my @out;
     for my $id (@ids) {
         next unless $id && _is_chat_model_id($id);
+
+        # Attach real list price. x.AI's /v1/models carries no pricing, so we
+        # use the local table. $known is 0 when the id is not in the table —
+        # those are NOT free; the UI shows "cost not published" instead of $0.
+        my ($pp, $pc, $known) = _xai_price($id);
+
         push @out, {
             id      => $id,
             label   => $prepaid ? "SuperGrok: $id" : $id,
             prepaid => $prepaid ? 1 : 0,
+            price_prompt     => ($known ? $pp : undef),
+            price_completion => ($known ? $pc : undef),
+            price_known      => $known ? 1 : 0,
         };
     }
     # Pin grok-4.6 first — same as the Hermes SuperGrok picker.
@@ -255,6 +314,17 @@ sub list_models {
         $api_key = $self->_resolve_api_key($c, $api_key);
     }
     return { success => 0, error => 'No active SuperGrok/Grok credential found' } unless $api_key;
+
+    # eval #33: when the live list fails (OAuth often 403s /v1/models) the
+    # page poll retried every ~20 s, waiting up to 8 s and logging a warning
+    # each time (1,846 warnings in 7 days). Remember the failure for 15 min.
+    our %LIVE_FAIL_UNTIL;
+    my $fail_key = $mode . '|' . substr($api_key, -6);
+    if (($LIVE_FAIL_UNTIL{$fail_key} || 0) > time && $self->is_prepaid_source) {
+        my @out = $self->_label_models(@SUPERGROK_CHAT_FALLBACK);
+        return { success => 1, models => \@out, count => scalar @out,
+                 source => $self->{_last_cred_source} || '', fallback => 1 };
+    }
 
     my $ua  = LWP::UserAgent->new(timeout => 8);
     my $res = try {
@@ -284,9 +354,11 @@ sub list_models {
     # catalog). Still offer the Hermes SuperGrok chat set so the picker works.
     if ($self->is_prepaid_source) {
         my @out = $self->_label_models(@SUPERGROK_CHAT_FALLBACK);
+        $LIVE_FAIL_UNTIL{$fail_key} = time + 15 * 60;
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
             'grok_list_models',
-            'Live x.AI model list failed; using SuperGrok prepaid fallback catalog');
+            'Live x.AI model list failed (HTTP ' . ($res ? $res->code : 'none')
+            . '); using SuperGrok prepaid fallback catalog for 15 min');
         return { success => 1, models => \@out, count => scalar @out,
                  source => $self->{_last_cred_source} || '', fallback => 1 };
     }
@@ -306,7 +378,25 @@ sub chat {
     return { success => 0, error => 'No messages provided' }
         unless ref($messages) eq 'ARRAY' && @$messages;
 
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::scan_messages($messages);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'chat',
+            "HarmRefusal failed closed: $@");
+        return { success => 0, refused => 1, error => 'Chat safety check failed. The question was not sent.' };
+    }
+    if ($harm) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, eval { $c->session->{user_id} }));
+        return Comserv::Util::AI::HarmRefusal::reply_hash($harm);
+    }
+
     my $model = $args{model} || ($self->is_prepaid_source ? 'grok-4.6' : 'grok-3');
+    # Never send "supergrok/grok-4.6" / "supergrok|grok-4.6" to x.AI — bare id only
+    # (CSC-20260914-4380). Router should already strip; belt-and-suspenders here.
+    $model =~ s/^(?:supergrok|grok-oauth|grok|x-ai)[|\/]//i if defined $model;
     my $payload = {
         model       => $model,
         messages    => $messages,
@@ -336,8 +426,16 @@ sub chat {
         my $code = $res ? $res->code : 599;
         my $raw  = $res ? ($res->decoded_content // '') : 'no response';
         my $safe = _sanitize_provider_error($code, substr($raw, 0, 300));
-        my $auth_fail = ($code == 401 || $code == 403
-            || $raw =~ /unauthenticated|bad-credentials|invalid.?token/i) ? 1 : 0;
+        # A 403 is NOT automatically an auth failure: x.AI also returns 403 for
+        # a spent subscription ("personal-team-blocked:spending-limit"). Flagging
+        # that as auth_failed made callers (Git.pm suggest_commit_message) tell
+        # the user to re-auth when the real fix is credits/fallback
+        # (todo #2374 / #2375).
+        my $is_quota = ($raw =~ /spending.?limit|personal-team-blocked|out of credits|add credits|upgrade at/i
+            && $raw !~ /unauthenticated|bad-credentials|invalid.?token|token could not be validated/i) ? 1 : 0;
+        my $auth_fail = (!$is_quota
+            && ($code == 401 || $code == 403
+                || $raw =~ /unauthenticated|bad-credentials|invalid.?token/i)) ? 1 : 0;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
             'grok_chat',
             "x.AI chat HTTP $code source=" . ($self->{_last_cred_source} || '?')

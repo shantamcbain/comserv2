@@ -348,7 +348,7 @@
         <li><a href="/project/details?project_id=202" class="doc-link">Project #202 (INFRA-HA)</a> - live Step tracking</li>
         <li><a href="/Documentation/AuthenticationEvolutionPlan" class="doc-link">Authentication Evolution Plan</a> - owns AUTH-R1..R4</li>
         <li><a href="/Documentation/ImmutableImageDeployPlan" class="doc-link">Immutable Image Deploy Plan</a> - LAN registry prerequisite</li>
-        <li><a href="/Documentation/GatewayPlan" class="doc-link">Gateway Plan</a> - OPNsense HAProxy + ACME (edge only, if configured)</li>
+        <li><a href="/Documentation/GatewayPlan" class="doc-link">Gateway Plan</a> - LAN HAProxy for dev; Starman :3001 not on WAN; named access without hosts</li>
         <li><a href="/Documentation/CREDENTIALS_AUDIT_AND_PLAN" class="doc-link">Credentials Audit &amp; Plan</a> - gates Step 3</li>
         <li><a href="/Documentation/STANDARD" class="doc-link">Documentation System Standard</a> - S1-S7 authoring rules</li>
         <li><a href="/Documentation/MASTER_PLAN" class="doc-link">Master Plan (coordinator)</a></li>

@@ -37,7 +37,7 @@ our $CACHE_ARR;
 our $CACHE_RAW;       # raw Router catalog (array of hashes with name/provider) for grouping
 our $CACHE_AT = 0;
 our $TTL      = 600;   # seconds; providers change rarely
-our $CACHE_GEN = 5;    # bump when catalog shape/providers/guest-default change
+our $CACHE_GEN = 7;    # bump when catalog shape/providers/guest-default change
 our $CACHE_GEN_LOADED = 0;
 
 sub _expired {
@@ -95,16 +95,18 @@ sub filter_catalog_for_role {
         next unless $m && ref($m) eq 'HASH';
         my $svc  = $m->{provider} || '';
         my $name = $m->{name} // $m->{id} // '';
-        my $free = $m->{free} || ( $name =~ /:free$/ ) ? 1 : 0;
+        my $pp = ($m->{price_prompt}     // 0) + 0;
+        my $pc = ($m->{price_completion} // 0) + 0;
+        my $max = ( $pp > $pc ) ? $pp : $pc;
         my $local = $m->{local} || ( $svc eq 'ollama' ) ? 1 : 0;
+        my $free = $m->{free} || ( $name =~ /:free$/ )
+            || (!$local && $max == 0 && !($m->{price_tier} // '')) ? 1 : 0;
         if ($tier eq 'guest') {
+            # #2024: guests never see paid/premium (Grok included).
             push @out, $m if $free || $local;
         } else { # member
             next if $svc eq 'grok' || $svc eq 'supergrok';
-            my $pp = ($m->{price_prompt}     // 0) + 0;
-            my $pc = ($m->{price_completion} // 0) + 0;
-            my $max = ( $pp > $pc ) ? $pp : $pc;
-            next if $max > 5;
+            next if $max > 5;   # premium excluded for members
             push @out, $m;
         }
     }
@@ -274,14 +276,37 @@ Returns a "provider|model" string, or '' when the catalog is empty.
 # Ollama — that burns workstation GPU. First entry is the startup default.
 our @FREE_PREFERENCE = (
     'openrouter|google/gemma-4-31b-it:free',           # 31B IT, 256k ctx, free
-    'openrouter|google/gemma-4-26b-a4b-it:free',
-    'openrouter|nvidia/nemotron-3-nano-30b-a3b:free',
+    'openrouter|nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',  # successor to nano-30b-a3b (dropped from free tier 2026-09-24)
     'openrouter|nvidia/nemotron-nano-9b-v2:free',
     'openrouter|nvidia/nemotron-3.5-lightning:free',
     'openrouter|stealth/ox-alpha',                     # 0/0 priced, no :free suffix
 );
 
-our $CODING_DEFAULT = 'openrouter|tencent/hy3';
+our $CODING_DEFAULT = 'openrouter|cohere/north-mini-code:free';
+
+# AISYSTEM plan §5e: the ordered lists now live in data/ai_model_chains.json
+# (admin-tunable from /ai/eval). @FREE_PREFERENCE / $CODING_DEFAULT above are
+# only the last-resort default when that file is missing or invalid
+# (Comserv::Util::AI::ModelChains logs when it falls back).
+sub free_preference {
+    my ($class, $c) = @_;
+    my @out = eval {
+        require Comserv::Util::AI::ModelChains;
+        my $ld = Comserv::Util::AI::ModelChains->load($c);
+        grep { /^(?:openrouter|external)\|/ } Comserv::Util::AI::ModelChains->chain($ld, 'chat');
+    };
+    return @out ? @out : @FREE_PREFERENCE;
+}
+
+sub coding_default {
+    my ($class, $c) = @_;
+    my $first = eval {
+        require Comserv::Util::AI::ModelChains;
+        my $ld = Comserv::Util::AI::ModelChains->load($c);
+        (grep { !/\|auto$/ } Comserv::Util::AI::ModelChains->chain($ld, 'coding'))[0];
+    };
+    return $first || $CODING_DEFAULT;
+}
 
 sub default_for {
     my ($class, $c, %opts) = @_;
@@ -293,15 +318,24 @@ sub default_for {
 
     my $tier = $class->_role_tier($c);
 
-    # Coding surfaces get the designated coding model when the user may use it.
-    if ($page eq 'editor' && $have{$CODING_DEFAULT} && $class->_is_priv($c)) {
-        return $CODING_DEFAULT;
+    # Coding surfaces (editor/git/code) get the designated coding model
+    # when the user may use it. Page class is Router-owned (AIMPS #2026/#2029).
+    my $page_class = 'general';
+    eval {
+        my $router = $c->model('AI2::Router');
+        $page_class = $router->page_class_for($page) if $router && $router->can('page_class_for');
+        1;
+    };
+    my $coding_default = $class->coding_default($c);
+    if ($page_class eq 'coding' && $have{$coding_default} && $class->_is_priv($c)) {
+        return $coding_default;
     }
+    my @free_pref = $class->free_preference($c);
 
     # Guests and members: first available FREE OpenRouter model. Never Ollama —
     # local models consume the workstation GPU (user: guest default must be a
     # free, available OpenRouter agent for nav / helpdesk / general questions).
-    for my $v (@FREE_PREFERENCE) {
+    for my $v (@free_pref) {
         return $v if $have{$v};
     }
     for my $m (@$cat) {
@@ -309,14 +343,14 @@ sub default_for {
         return $m->{value} if $m->{free};
     }
     if ($tier eq 'guest' || $tier eq 'member') {
-        return $FREE_PREFERENCE[0];
+        return $free_pref[0];
     }
 
     # Privileged: any remaining free, then coding default, then local.
     for my $m (@$cat) {
         return $m->{value} if $m->{free};
     }
-    return $CODING_DEFAULT if $have{$CODING_DEFAULT} && $class->_is_priv($c);
+    return $coding_default if $have{$coding_default} && $class->_is_priv($c);
     for my $m (@$cat) {
         return $m->{value} if $m->{local};
     }
@@ -339,8 +373,35 @@ Drop the cache so the next call rebuilds (use after a provider/key change).
 sub invalidate {
     $CACHE_JSON = undef;
     $CACHE_ARR  = undef;
+    $CACHE_RAW  = undef;
     $CACHE_AT   = 0;
+    $CACHE_GEN_LOADED = 0;
     return 1;
+}
+
+=head2 shortlist($c, %opts)
+
+Role-filtered catalog, then Router page-class shortlist (AIMPS W1.1).
+C<page> defaults to C<chat>. Pass C<page => 'all'> to skip the cap.
+
+=cut
+
+sub shortlist {
+    my ($class, $c, %opts) = @_;
+    my $all = $class->catalog($c);
+    return $all unless $all && @$all;
+    my $page = $opts{page} || 'chat';
+    my $router = eval { $c->model('AI2::Router') };
+    unless ($router && $router->can('shortlist_models')) {
+        eval {
+            require Comserv::Util::Logging;
+            Comserv::Util::Logging->instance->log_with_details(
+                $c, 'warning', __FILE__, __LINE__,
+                'shortlist', 'AI2::Router shortlist_models unavailable; returning role catalog');
+        };
+        return $all;
+    }
+    return $router->shortlist_models($all, page => $page);
 }
 
 =head2 prime($c, $catalog)
@@ -380,6 +441,20 @@ sub _flatten {
         # Skip Router sentinels — they are status markers, not selectable models.
         next if $name =~ /^(ollama_empty|ollama_unreachable)$/;
         next if $name =~ /_unconfigured$/;
+
+        # Is the price actually known? x.AI's /v1/models publishes no pricing,
+        # so Grok entries previously arrived with price 0 and were flattened as
+        # free/paid=0 — which is exactly why every Grok model showed as free.
+        my $known = $m->{price_known};
+        $known = ( defined $m->{price_prompt} || defined $m->{price_completion}
+                   || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0
+            unless defined $known;
+
+        my $pp = ( $m->{price_prompt}     // 0 ) + 0;
+        my $pc = ( $m->{price_completion} // 0 ) + 0;
+        my $is_free = ( $name =~ /:free$/ )
+                   || ( $known && $pp == 0 && $pc == 0 );
+
         push @flat, {
             value    => "$svc|$name",
             label    => ( defined $m->{label} ? $m->{label} : $name ),
@@ -389,14 +464,16 @@ sub _flatten {
             #   local : runs on our own hardware — no cash cost, but it does
             #           consume workstation GPU/VRAM, so it is NOT the guest default
             #   paid  : bills real money per token
-            free     => ( $name =~ /:free$/ ? 1 : 0 ),
+            free     => $is_free ? 1 : 0,
             local    => ( $svc eq 'ollama' ? 1 : 0 ),
-            paid     => ( $svc ne 'ollama' && $svc ne 'supergrok' && $name !~ /:free$/ ? 1 : 0 ),
+            # Unknown price => treat as PAID, never free (fail closed).
+            paid     => ( $svc ne 'ollama' && $svc ne 'supergrok' && !$is_free ? 1 : 0 ),
             # AIMPS-P1 (#253): real per-token cost from the provider feed.
             # price_prompt / price_completion are USD per 1M tokens; price_tier
             # is threshold-derived (never a hardcoded model list, see plan §3).
-            price_prompt     => ( $m->{price_prompt}     // 0 ) + 0,
-            price_completion => ( $m->{price_completion} // 0 ) + 0,
+            price_prompt     => $pp,
+            price_completion => $pc,
+            price_known      => $known ? 1 : 0,
             price_tier       => $class->_price_tier($m),
         };
     }
@@ -415,7 +492,18 @@ sub _price_tier {
     my $pc = ( $m->{price_completion} // 0 ) + 0;
     my $max = ( $pp > $pc ) ? $pp : $pc;   # rank by the dearer side
     return 'prepaid' if ($m->{provider} || '') eq 'supergrok' || $m->{prepaid};
-    return 'free'   if $max <= 0;
+    return 'free'   if ($m->{name} // '') =~ /:free$/;
+
+    # Only call a zero price "free" when the price is genuinely known.
+    # x.AI publishes no pricing in /v1/models, so its entries used to land here
+    # with $max == 0 and be tiered "free". Fail closed: unknown => 'unknown'.
+    my $known = $m->{price_known};
+    $known = ( defined $m->{price_prompt} || defined $m->{price_completion}
+               || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0
+        unless defined $known;
+    return 'free' if $known && $max <= 0;
+    return 'unknown' unless $known;
+
     return 'cheap'  if $max <= 1;
     return 'mid'    if $max <= 5;
     return 'premium';

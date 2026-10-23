@@ -10,6 +10,7 @@ our %ALLOWED_KEYS = (
     'calendar.site_colors'    => 'object',
     'calendar.fixed_lane_pct' => 'number',
     'ui.theme_override'       => 'string',
+    'ui.timezone'             => 'string',   # IANA TZ; display via AppTime
     'dev_server.saved_commands' => 'object',
 );
 
@@ -52,6 +53,12 @@ sub validate_value {
     if ($key eq 'ui.theme_override') {
         return 1 if !defined $value || $value eq '';
         return $value =~ /^[a-zA-Z0-9_-]{1,64}$/;
+    }
+
+    if ($key eq 'ui.timezone') {
+        return 1 if !defined $value || $value eq '';
+        require Comserv::Util::AppTime;
+        return Comserv::Util::AppTime->is_valid_tz($value) ? 1 : 0;
     }
 
     return 0;
@@ -116,6 +123,11 @@ sub set_many {
             my $val = $incoming->{$key};
 
             if ($key eq 'ui.theme_override' && (!defined $val || $val eq '')) {
+                $rs->search({ user_id => $user_id, pref_key => $key })->delete;
+                next;
+            }
+
+            if ($key eq 'ui.timezone' && (!defined $val || $val eq '')) {
                 $rs->search({ user_id => $user_id, pref_key => $key })->delete;
                 next;
             }

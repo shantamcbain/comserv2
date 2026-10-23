@@ -1,7 +1,9 @@
 package Comserv::Controller::CustomerOrder;
 use Moose;
 use namespace::autoclean;
+use JSON;
 use Comserv::Util::Logging;
+use Comserv::Util::AppTime;
 
 has 'logging' => (
     is      => 'ro',
@@ -16,11 +18,17 @@ BEGIN { extends 'Catalyst::Controller'; }
 
 sub _sitename {
     my ($self, $c) = @_;
-    return $c->session->{SiteName} || 'default';
+    return $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+}
+
+sub _json_attr {
+    my ($self, $data) = @_;
+    return eval { JSON->new->utf8(0)->encode($data) } // '[]';
 }
 
 sub _schema {
     my ($self, $c) = @_;
+
     return $c->model('DBEncy');
 }
 
@@ -38,10 +46,7 @@ sub _is_admin {
 }
 
 sub _now {
-    my ($self) = @_;
-    my @t = localtime;
-    return sprintf('%04d-%02d-%02d %02d:%02d:%02d',
-        $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+    return Comserv::Util::AppTime->now_utc;
 }
 
 # -------------------------------------------------------------------------
@@ -64,52 +69,83 @@ sub order_new :Path('/CustomerOrder/new') :Args(0) {
             }
         }
 
-        my $error;
-        eval {
-            $schema->txn_do(sub {
-                my $order = $schema->resultset('Accounting::InventoryCustomerOrder')->create({
-                    sitename       => $sitename,
-                    customer_name  => $params->{customer_name},
-                    customer_email => $params->{customer_email} || undef,
-                    customer_phone => $params->{customer_phone} || undef,
-                    status         => 'pending',
-                    notes          => $params->{notes},
-                    created_by     => $c->session->{username} || $params->{customer_email} || 'guest',
-                    created_at     => $now,
-                    updated_at     => $now,
-                });
+        my @initial_lines;
+        for my $idx (sort { $a <=> $b } keys %lines_by_idx) {
+            my $l = $lines_by_idx{$idx};
+            next unless ($l->{item_id} || $l->{description});
+            push @initial_lines, {
+                item_id     => $l->{item_id} || '',
+                description => $l->{description} || '',
+                quantity    => $l->{quantity} || 1,
+                notes       => $l->{notes_line} || '',
+            };
+        }
 
-                my $total = 0;
-                for my $idx (sort { $a <=> $b } keys %lines_by_idx) {
-                    my $l = $lines_by_idx{$idx};
-                    next unless ($l->{item_id} || $l->{description});
-                    my $qty   = $l->{quantity} || 1;
-                    my $price = 0;
-                    my $item;
-                    if ($l->{item_id}) {
-                        eval { $item = $schema->resultset('Accounting::InventoryItem')->find($l->{item_id}) };
-                        $price = $item ? ($item->unit_price || 0) : 0;
-                    }
-                    my $lt = $qty * $price;
-                    $total += $lt;
-                    $order->create_related('lines', {
-                        item_id     => $l->{item_id}     || undef,
-                        description => $l->{description} || ($item ? $item->name : undef),
-                        quantity    => $qty,
-                        unit_price  => $price,
-                        line_total  => $lt,
-                        notes       => $l->{notes_line}  || undef,
+        unless ($params->{customer_name}) {
+            $c->stash->{error_msg} = 'Name is required.';
+            $c->stash->{submitted} = $params;
+            $c->stash->{initial_lines} = \@initial_lines;
+        }
+        elsif (!@initial_lines) {
+            $c->stash->{error_msg} = 'Add at least one item (use + Add Line, then pick an item).';
+            $c->stash->{submitted} = $params;
+            $c->stash->{initial_lines} = \@initial_lines;
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'order_new',
+                "Submit with no lines sitename=$sitename");
+        }
+        else {
+            my $created_id;
+            eval {
+                $schema->txn_do(sub {
+                    my $order = $schema->resultset('Accounting::InventoryCustomerOrder')->create({
+                        sitename       => $sitename,
+                        customer_name  => $params->{customer_name},
+                        customer_email => $params->{customer_email} || undef,
+                        customer_phone => $params->{customer_phone} || undef,
+                        status         => 'pending',
+                        notes          => $params->{notes},
+                        created_by     => $c->session->{username} || $params->{customer_email} || 'guest',
+                        created_at     => $now,
+                        updated_at     => $now,
                     });
-                }
-                $order->update({ total_amount => $total });
-            });
-        };
-        if ($@) {
-            $c->stash->{error_msg}  = "Failed to submit order: $@";
-            $c->stash->{submitted}  = $params;
-        } else {
-            $c->stash->{success_msg} = 'Your order has been submitted! We will contact you shortly.';
-            $c->stash->{submitted}   = {};
+                    $created_id = $order->id;
+
+                    my $total = 0;
+                    for my $l (@initial_lines) {
+                        my $qty   = $l->{quantity} || 1;
+                        my $price = 0;
+                        my $item;
+                        if ($l->{item_id}) {
+                            eval { $item = $schema->resultset('Accounting::InventoryItem')->find($l->{item_id}) };
+                            $price = $item ? ($item->unit_price || 0) : 0;
+                        }
+                        my $lt = $qty * $price;
+                        $total += $lt;
+                        $order->create_related('lines', {
+                            item_id     => $l->{item_id}     || undef,
+                            description => $l->{description} || ($item ? $item->name : undef),
+                            quantity    => $qty,
+                            unit_price  => $price,
+                            line_total  => $lt,
+                            notes       => $l->{notes}       || undef,
+                        });
+                    }
+                    $order->update({ total_amount => $total });
+                });
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'order_new',
+                    "Failed to submit order sitename=$sitename: $@");
+                $c->stash->{error_msg}  = "Failed to submit order: $@";
+                $c->stash->{submitted}  = $params;
+                $c->stash->{initial_lines} = \@initial_lines;
+            } else {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'order_new',
+                    "Order $created_id created sitename=$sitename lines=" . scalar(@initial_lines));
+                $c->stash->{success_msg} = "Your order has been submitted (ref #$created_id). Open it on Manufacturing to attach a traveler.";
+                $c->stash->{submitted}   = {};
+                $c->stash->{initial_lines} = [];
+            }
         }
     }
 
@@ -120,12 +156,31 @@ sub order_new :Path('/CustomerOrder/new') :Args(0) {
             { order_by => 'name' }
         )->all;
     };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'order_new',
+            "Item list failed sitename=$sitename: $@");
+    }
 
+    my @item_rows = map {
+        {
+            id          => $_->id,
+            name        => $_->name // '',
+            sku         => $_->sku  // '',
+            price       => sprintf('%.2f', $_->unit_price || 0),
+            description => $_->description // '',
+        }
+    } @items;
+
+    my $initial = $c->stash->{initial_lines} || [];
     $c->stash(
-        items    => \@items,
-        sitename => $sitename,
-        template => 'CustomerOrder/new.tt',
+        items              => \@items,
+        items_json         => $self->_json_attr(\@item_rows),
+        initial_lines_json => $self->_json_attr($initial),
+        sitename           => $sitename,
+        template           => 'CustomerOrder/new.tt',
     );
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'order_new',
+        "Form sitename=$sitename items=" . scalar(@item_rows));
 }
 
 # -------------------------------------------------------------------------

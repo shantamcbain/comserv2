@@ -26,9 +26,13 @@ sub auto :Private {
     return 1 if $c->action->name eq 'health';
     return 1 if $c->request->path =~ m{^/static/};
     
-    # Check RemoteDB configuration status (NEW: graceful error handling)
-    my $remotedb = try { $c->model('RemoteDB') } catch { return undef };
-    if ($remotedb && $remotedb->{configuration_status}) {
+    # Check RemoteDB configuration status (NEW: graceful error handling).
+    # Must be a real object — bare class-name strings crash Moose accessors (#2343).
+    my $remotedb = try {
+        require Comserv::Model::RemoteDB;
+        Comserv::Model::RemoteDB->from_context($c);
+    } catch { undef };
+    if ($remotedb && ref($remotedb) && $remotedb->{configuration_status}) {
         if ($remotedb->{configuration_status} =~ /^(MISSING|ERROR|FALLBACK)$/) {
             my $error_msg = $remotedb->{configuration_error} || "Unknown configuration error";
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
@@ -165,7 +169,8 @@ sub k8s_secrets :Path('/setup/k8s-secrets') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'k8s_secrets',
         "K8s secrets setup page accessed - development mode");
     
-    my $remotedb = $c->model('RemoteDB');
+    require Comserv::Model::RemoteDB;
+    my $remotedb = Comserv::Model::RemoteDB->from_context($c);
     my $db_config_path = $c->path_to('db_config.json');
     my $db_config_content = '';
     my $db_config_exists = 0;

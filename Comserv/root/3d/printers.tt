@@ -1,4 +1,4 @@
-[% PageVersion = '3d/printers.tt,v 1.00 2026/04/10 Shanta Exp shanta' %]
+[% PageVersion = '3d/printers.tt,v 1.01 2026/08/31 shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <style>
@@ -85,6 +85,10 @@
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;">
     <h1>Printer Farm</h1>
     <div>
+        <form method="get" action="/3d/printer_lan/discover" style="display:inline;margin-right:0.8em;">
+            <input type="hidden" name="subnet" value="192.168.2.0/24">
+            <button type="submit" class="btn-sm btn-idle">Discover Printers</button>
+        </form>
         <a href="/3d/queue" style="font-size:0.9em;">Print Queue</a> |
         <a href="/3d/admin" style="font-size:0.9em;">Admin Dashboard</a>
     </div>
@@ -102,7 +106,8 @@
     </thead>
     <tbody>
         [% FOREACH p IN printers %]
-        [% SET eq = p.inventory_item ? p.inventory_item.equipment : undef %]
+        [% SET eq = undef %]
+        [% IF p.inventory_item %][% SET eq = p.inventory_item.equipment %][% END %]
         <tr>
             <td>
                 [% p.name | html %]
@@ -120,6 +125,35 @@
             <td>[% IF eq && eq.wattage %][% eq.wattage %]W[% ELSE %]—[% END %]</td>
             <td>[% p.notes | truncate(40) | html %]</td>
             <td>
+                [%# TT2: no ternary; no leading-underscore vars (private); match bare LAN_PAUSED: %]
+                [% SET lan_paused = 0 %]
+                [% SET lan_notes = p.notes %]
+                [% IF !lan_notes %][% SET lan_notes = '' %][% END %]
+                [% IF lan_notes.match('LAN_PAUSED:') || p.status == 'maintenance' || p.status == 'offline' %]
+                    [% SET lan_paused = 1 %]
+                [% END %]
+                [% IF lan_paused %]
+                    <span style="color:#dc3545;font-size:0.8em;font-weight:bold;">LAN paused</span>
+                    <form method="post" action="/3d/printers" style="display:inline; margin-left:0.4em;">
+                        <input type="hidden" name="action" value="resume_lan">
+                        <input type="hidden" name="printer_id" value="[% p.id %]">
+                        <button type="submit" class="btn-sm btn-idle" style="font-size:0.75em;padding:0.15em 0.4em;">Resume LAN</button>
+                    </form>
+                [% ELSE %]
+                    <a class="btn-sm btn-idle" href="/3d/printer_lan/control?printer_id=[% p.id %]">Control</a>
+                    <form method="get" action="/3d/printer_lan/ping" class="app-form" style="display:inline;">
+                        <input type="hidden" name="printer_id" value="[% p.id %]">
+                        <input type="text" name="host" placeholder="192.168.2.x" size="14">
+                        <input type="hidden" name="port" value="18910">
+                        <button type="submit" class="btn-sm btn-idle">LAN ping</button>
+                    </form>
+                    <form method="post" action="/3d/printers" style="display:inline; margin-left:0.3em;">
+                        <input type="hidden" name="action" value="pause_lan">
+                        <input type="hidden" name="printer_id" value="[% p.id %]">
+                        <button type="submit" class="btn-sm" style="background:#6c757d;color:white;font-size:0.75em;padding:0.15em 0.4em;">Pause LAN today</button>
+                    </form>
+                [% END %]
+
                 [% IF p.status != 'idle' %]
                 <form method="post" action="/3d/printers" style="display:inline;">
                     <input type="hidden" name="action" value="update_status">
@@ -141,7 +175,14 @@
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="printer_id" value="[% p.id %]">
                     <button type="submit" class="btn-sm btn-delete"
-                        onclick="return confirm('Remove [% p.name | html %]?')">Remove</button>
+                        onclick="return confirm('Remove [% p.name | html %]? This will unassign any active jobs.')">Remove</button>
+                </form>
+                [% ELSE %]
+                <form method="post" action="/3d/printers" style="display:inline;">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="printer_id" value="[% p.id %]">
+                    <button type="submit" class="btn-sm btn-delete"
+                        onclick="return confirm('Remove [% p.name | html %]? Any jobs assigned to it will go back to queued.')">Remove</button>
                 </form>
                 [% END %]
             </td>

@@ -4,12 +4,12 @@
     roles = 'admin,developer,editor'
     TemplateType = 'model'
     category = 'models,database,configuration'
-    page_version = '0.02'
-    last_updated = '2026-01-11'
+    page_version = '0.03'
+    last_updated = '2026-08-29'
     site_specific = ''
 %]
 
-[% PageVersion = 'Documentation/models/RemoteDB.tt,v 0.02 2026/01/11 DocumentationSyncAgent Exp - Version consolidation from 1.01; all methods validated against HEAD' %]
+[% PageVersion = 'Documentation/models/RemoteDB.tt,v 0.03 2026/08/29 shanta Exp - from_context + PG allowlist (SCPG-REMOTEDB / #2343)' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -23,6 +23,7 @@
                 <strong>Contents:</strong>
                 <ul style="margin: 10px 0 0 20px;">
                     <li><a href="#overview">Overview</a></li>
+                    <li><a href="#caller-rule">Caller rule (from_context)</a></li>
                     <li><a href="#configuration">Configuration (K8s Secrets, Environment, Files)</a></li>
                     <li><a href="#connections">Connection Management</a></li>
                     <li><a href="#api">Public API Methods</a></li>
@@ -32,16 +33,13 @@
             </div>
 
             <div class="alert alert-success" id="recent-changes">
-                <h3 style="margin-top: 0;">📝 Recent Changes (v0.02 - Jan 11, 2026)</h3>
-                <p><strong>Version Consolidation Update:</strong> Consolidated from v1.01 to v0.02. All multi-database connection methods verified against HEAD commits. K8s Secrets integration confirmed functional.</p>
-                <p><strong>Previous v1.01 Changes (Jan 8, 2026):</strong></p>
+                <h3 style="margin-top: 0;">Recent Changes (v0.03 - 2026-08-29)</h3>
                 <ul style="margin: 5px 0 0 20px;">
-                    <li><strong>Commit 06e153c1:</strong> Major refactor - separated config loading into helper methods (_load_from_k8s_secrets, _load_from_env_variables, _find_db_config_file)</li>
-                    <li><strong>Commit 20375ea1:</strong> Fixed db_config.json path lookup - corrected relative path for development environment</li>
-                    <li><strong>Commit 5ea1762a:</strong> Fixed path resolution for production database connectivity</li>
-                    <li><strong>New Features:</strong> Configuration status tracking (ACTIVE/FALLBACK/MISSING/ERROR), enhanced K8s Secrets support with multiple mount point detection</li>
-                    <li><strong>Documentation Updated:</strong> Reflects new helper methods, configuration status attributes, and K8s Secrets path detection</li>
+                    <li><strong>from_context($c)</strong> — Catalyst callers must use this (or <code>Controller::RemoteDB::_remote_db</code>). <code>$c-&gt;model('RemoteDB')</code> often returns the bare class-name string because this is plain Moose, not <code>Catalyst::Model</code>. Do not <code>extends 'Catalyst::Model'</code> — class-level <code>config</code> collides with the Moose <code>has config</code> (error todo #2343).</li>
+                    <li><strong>PostgreSQL allowlist</strong> — <code>select_connection</code> accepts <code>postgresql|postgres|pg</code> in addition to mysql/mariadb/sqlite (SCPG-REMOTEDB #2325). <code>test_connection</code> / <code>get_connection</code> build <code>dbi:Pg</code> for those slots (#2326).</li>
+                    <li>Regression test: <code>t/model_RemoteDB_from_context.t</code>. Plan: <a href="[% c.uri_for('/Documentation/SchemaComparePostgresPlan') %]">SchemaComparePostgresPlan</a>.</li>
                 </ul>
+                <p><strong>Previous v0.02 (Jan 11, 2026):</strong> Version consolidation; K8s Secrets helper methods; configuration_status tracking.</p>
             </div>
             
             <section id="overview">
@@ -56,14 +54,43 @@
                     <li>Environment variable-based configuration (COMSERV_DB_*)</li>
                     <li>Legacy db_config.json fallback (deprecated)</li>
                     <li>User-specific database preferences</li>
-                    <li>Connection testing and validation</li>
+                    <li>Connection testing and validation (MySQL/MariaDB <em>and</em> PostgreSQL)</li>
                     <li>Dynamic connection switching</li>
-                    <li>Schema comparison and validation</li>
+                    <li>Schema comparison helpers (engine-aware work continues under SCHEMAPG)</li>
                 </ul>
                 <p>
-                    RemoteDB is a Moose-based singleton model that loads database configuration from multiple sources 
-                    with a strict priority order, ensuring flexible deployment across development, staging, and production 
-                    environments.
+                    RemoteDB is a <strong>plain Moose class</strong> (not a Catalyst::Model subclass). It loads database
+                    configuration from multiple sources with a strict priority order, ensuring flexible deployment
+                    across development, staging, and production environments. Standalone code (e.g. <code>DBEncy::COMPONENT</code>)
+                    may still call <code>Comserv::Model::RemoteDB-&gt;new()</code>.
+                </p>
+            </section>
+
+            <section id="caller-rule">
+                <h2>Caller rule (from_context) — locked 2026-08-29</h2>
+                <p class="doc-warning" style="border-left: 4px solid var(--warning-color); padding: var(--spacing-medium);">
+                    <strong>Never</strong> call Moose accessors on the raw return of <code>$c-&gt;model('RemoteDB')</code>.
+                    That call often yields the string <code>"Comserv::Model::RemoteDB"</code> (not a blessed object),
+                    which then dies with <em>Can't use string ... as a HASH ref</em> on <code>-&gt;config</code> /
+                    <code>-&gt;connections</code> / etc.
+                </p>
+                <pre><code># Correct (Catalyst request path)
+my $rdb = Comserv::Model::RemoteDB->from_context($c);
+# or, inside Controller::RemoteDB:
+my $rdb = $self->_remote_db($c);
+
+# Correct (no Catalyst context)
+my $rdb = Comserv::Model::RemoteDB->new();
+
+# Wrong
+my $rdb = $c->model('RemoteDB');
+$rdb->config;   # may crash if $rdb is a class-name string
+                </code></pre>
+                <p>
+                    <code>from_context</code> returns the model object when Catalyst already has a real instance,
+                    otherwise constructs <code>-&gt;new()</code>. All in-tree Catalyst call sites were routed through
+                    this path on 2026-08-29 (Controller::RemoteDB, Setup, Root, Util::RemoteDB,
+                    View::Helper::Database, RemoteDBExample).
                 </p>
             </section>
 
@@ -257,26 +284,37 @@ foreach my $name (keys %connections) {
 }
                 </code></pre>
 
+                <h4>from_context($c)</h4>
+                <p><strong>Class method.</strong> Returns a usable RemoteDB object from a Catalyst context.
+                Prefer this over bare <code>$c-&gt;model('RemoteDB')</code>.</p>
+                <pre><code>my $model = Comserv::Model::RemoteDB->from_context($c);</code></pre>
+
                 <h4>select_connection($name)</h4>
-                <p><strong>Parameters:</strong> Connection name (e.g., 'ency', 'forager')</p>
-                <p><strong>Returns:</strong> True on success, dies on failure</p>
+                <p><strong>Parameters:</strong> Logical name (e.g. 'ency', 'csc', 'forager') or a secret slot key</p>
+                <p><strong>Returns:</strong> True on success; skips candidates with invalid shape</p>
+                <p><strong>db_type allowlist:</strong> <code>mysql</code>, <code>mariadb</code>, <code>sqlite</code>,
+                <code>postgresql</code>, <code>postgres</code>, <code>pg</code> (case-insensitive). Other values are
+                skipped as Invalid db_type (fixed 2026-08-29, #2325).</p>
                 <p><strong>Usage:</strong></p>
                 <pre><code>
 $model->select_connection('ency');
-# All subsequent operations use ency database
+# or a SiteName that maps to a PG secret:
+$model->select_connection('csc');
+# All subsequent operations use the selected connection
                 </code></pre>
 
                 <h4>get_connection($name)</h4>
-                <p><strong>Returns:</strong> Connection details HashRef for given name</p>
-                <p><strong>Fields:</strong> host, port, username, password, database</p>
+                <p><strong>Returns:</strong> Live DBI handle for the named slot (or dies/logs on failure)</p>
+                <p>Builds <code>dbi:mysql:...</code> or <code>dbi:Pg:...</code> from the secret's <code>db_type</code>.
+                Verified for <code>db_production_postgres</code> on the schema branch (2026-08-29, #2326).</p>
 
                 <h4>get_connection_info()</h4>
-                <p><strong>Returns:</strong> Details of currently selected connection</p>
+                <p><strong>Returns:</strong> Details of currently selected connection (host/port/database/db_type; never log passwords)</p>
 
                 <h4>test_connection($name)</h4>
                 <p><strong>Parameters:</strong> Connection name to test</p>
                 <p><strong>Returns:</strong> Boolean (true if connection successful)</p>
-                <p><strong>Usage:</strong> Validates database connectivity before use</p>
+                <p><strong>Usage:</strong> Validates database connectivity before use (MySQL and PostgreSQL DSNs)</p>
 
                 <h3>Database Operations</h3>
                 
@@ -344,8 +382,8 @@ $model->select_connection('ency');
 
                 <h3>Basic Connection Selection</h3>
                 <pre><code>
-# In Catalyst controller
-my $model = $c->model('RemoteDB');
+# In Catalyst controller — always from_context
+my $model = Comserv::Model::RemoteDB->from_context($c);
 $model->select_connection('ency');
 
 # Execute query against ency database
@@ -387,14 +425,26 @@ $model->select_connection_with_preference($user_id);
             <section id="troubleshooting">
                 <h2>Troubleshooting</h2>
 
+                <h3>Can't use string ("Comserv::Model::RemoteDB") as a HASH ref</h3>
+                <p><strong>Cause:</strong> Calling Moose accessors on the bare class-name string returned by
+                <code>$c-&gt;model('RemoteDB')</code>. This is plain Moose, not Catalyst::Model.</p>
+                <p><strong>Fix:</strong> <code>my $model = Comserv::Model::RemoteDB-&gt;from_context($c);</code>
+                (todo #2343, 2026-08-29). Do not <code>extends 'Catalyst::Model'</code>.</p>
+
+                <h3>Invalid db_type / PG slot skipped</h3>
+                <p><strong>Cause (pre-2026-08-29):</strong> allowlist was mysql|sqlite|mariadb only.</p>
+                <p><strong>Fix:</strong> allowlist now includes postgresql|postgres|pg. Secret files should set
+                <code>"db_type": "postgresql"</code>. Named connect verified for
+                <code>db_production_postgres</code> (#2325/#2326).</p>
+
                 <h3>Check Configuration Status (NEW in v1.01)</h3>
                 <p>
                     Use the new <code>configuration_status</code> attribute to diagnose config loading issues:
                 </p>
                 <pre><code>
-my $model = $c->model('RemoteDB');
-warn "Status: " . ($model->{configuration_status} // 'UNKNOWN');
-warn "Error: " . ($model->{configuration_error} // 'None');
+my $model = Comserv::Model::RemoteDB->from_context($c);
+warn "Status: " . ($model->configuration_status // 'UNKNOWN') if $model->can('configuration_status');
+# Prefer documented accessors over poking the hash guts.
                 </code></pre>
                 <p><strong>Status meanings:</strong></p>
                 <ul>

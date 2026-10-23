@@ -1,0 +1,171 @@
+[% META
+    title = "Kobra 3 LAN Mode — discovery, state, control"
+    description = "Stock Anycubic LAN Mode (not cloud, not Moonraker): discover :18910, attach [LAN_HOST] on an existing farm row, GET /info identity, signed POST /ctrl, MQTTS :9883 telemetry and pause/resume/stop."
+    roles = "admin,developer"
+    TemplateType = "Documentation"
+    category = "3d-printing,lan-mode,printer-farm"
+    last_updated = "2026-09-05"
+    page_version = "0.2"
+    site_specific = "false"
+    project_id = "206"
+    project_code = "3DPRINT"
+%]
+[% PageVersion = 'Documentation/3d/Kobra3LanMode.tt,v 0.2 2026/09/05 hermes-agent Exp - live .53 state + control page' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'Kobra 3 LAN Mode — discovery, state, control'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <div class="doc-navrow">
+                <a href="#now" class="doc-navlink">Now</a>
+                <a href="#network" class="doc-navlink">Network</a>
+                <a href="#protocol" class="doc-navlink">Protocol</a>
+                <a href="#code" class="doc-navlink">Code / URLs</a>
+                <a href="#next" class="doc-navlink">Next session</a>
+                <a href="#out" class="doc-navlink">Out of scope</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="now" class="doc-h2">Now (2026-09-05)</h2>
+            <div class="doc-success">
+                <p class="doc-body"><strong>Current.</strong> Farm printer id=1 is linked
+                <code>[LAN_HOST:192.168.2.53]</code>. Live probe: modelId 20024 Anycubic Kobra 3,
+                ctrlType=lan, MQTT handshake OK. Job telemetry (file, %, nozzle/bed) comes from
+                MQTTS :9883 after signed POST /ctrl — not from GET /info alone.</p>
+                <p class="doc-body"><strong>Operator.</strong>
+                Discover on <a href="[% c.uri_for('/3d/printers') %]" class="doc-link">/3d/printers</a>
+                → Control
+                <a href="[% c.uri_for('/3d/printer_lan/control') %]?printer_id=1" class="doc-link">/3d/printer_lan/control?printer_id=1</a>
+                (Pause / Resume / Stop with cancel checkbox). Page auto-refreshes 15s.</p>
+                <p class="doc-body"><strong>Blocked / next.</strong> Do not upload gcode or start a
+                print from Comserv yet. Do not add host/port columns until schema-compare.
+                Next: feed live progress/temps into queue Complete; optional user subnet field
+                (scan already accepts <code>?subnet=</code>).</p>
+            </div>
+            <p class="doc-body">Tracking:
+                <a href="[% c.uri_for('/todo/details') %]?record_id=2334" class="doc-link">todo #2334</a>
+                ·
+                <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-link">project #206 3DPRINT</a>
+                · coordinator
+                <a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-link">3dPrintingPlan</a>.
+            </p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="network" class="doc-h2">Network</h2>
+            <ul class="doc-body">
+                <li><strong>Workstation</strong> — dual-home 192.168.1.0 (Ethernet) and 192.168.2.0 (WiFi).</li>
+                <li><strong>Production1</strong> — 192.168.1.0 only; OPNsense routes to 192.168.2.0.</li>
+                <li><strong>Kobra 3</strong> — WiFi only, 192.168.2.0/24. Proven at <strong>192.168.2.53</strong> (port 18910 HTTP, 9883 MQTTS, 18088 camera FLV).</li>
+            </ul>
+            <p class="doc-body">Cloud/app login is not used. LAN Mode on the printer:
+            Settings → Network → LAN Mode. Cloud drops while LAN is on.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="protocol" class="doc-h2">Protocol (stock firmware)</h2>
+            <ol class="doc-body">
+                <li><strong>Discover</strong> — TCP :18910 on the chosen subnet (default 192.168.2.1–254), then GET /info. Any open 18910 is a farm candidate.</li>
+                <li><strong>Identity</strong> — GET http://HOST:18910/info JSON: modelName, modelId, cn, ctrlType, camera URL, upload URL, token. Not temps or progress.</li>
+                <li><strong>Handshake</strong> — signed POST to ctrlInfoUrl with query <code>ts</code> (ms), <code>nonce</code>, <code>sign=md5(md5(token[0:16])+ts+nonce)</code>, <code>did</code>. AES-CBC decrypt <code>data.info</code>. Yields MQTTS broker + username/password. Never log token/password/cert.</li>
+                <li><strong>Telemetry / control</strong> — MQTTS :9883, TLS verify off. Subscribe <code>anycubic/anycubicCloud/v1/printer/public/{modelId}/{deviceId}/#</code>. Query types include <code>info</code>, <code>tempature</code> (firmware spelling), <code>print</code>. Pause/resume/stop: type print, action pause|resume|stop, data taskid=-1.</li>
+            </ol>
+            <p class="doc-warning">GET /info is not Moonraker (:7125). Do not invent a preheat-while-idle HTTP command. Stop cancels the job on the machine.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="code" class="doc-h2">Code and URLs</h2>
+            <table class="doc-table">
+                <tr><th class="doc-th">Piece</th><th class="doc-th">Where</th></tr>
+                <tr>
+                    <td class="doc-td">Adapter</td>
+                    <td class="doc-td"><code>Util::Printing3d::Adapter::Anycubic</code> — sanitize_host, ping, discover, fetch_info, handshake, fetch_state, send_command</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Controller</td>
+                    <td class="doc-td"><code>Controller::PrinterLan</code> — do not grow <code>3d.pm</code></td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Farm IP</td>
+                    <td class="doc-td">Stored as <code>[LAN_HOST:x.x.x.x]</code> in <code>printing_3d_printers.notes</code>. No host column until schema-compare.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Discover</td>
+                    <td class="doc-td"><code>/3d/printer_lan/discover?subnet=192.168.2.0/24</code> — attach existing row, do not create a duplicate printer</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Control</td>
+                    <td class="doc-td"><code>/3d/printer_lan/control?printer_id=</code> · POST <code>/3d/printer_lan/command</code> cmd=pause|resume|stop</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Templates</td>
+                    <td class="doc-td"><code>root/3d/printers.tt</code>, <code>printer_discover.tt</code>, <code>printer_control.tt</code></td>
+                </tr>
+            </table>
+            <p class="doc-body">Changelog fragments:
+            <code>2026-09-05-anycubic-discover-compile-fix.inc</code>,
+            <code>2026-09-05-kobra3-lan-control.inc</code>.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="next" class="doc-h2">Next session</h2>
+            <ol class="doc-body">
+                <li>Show live % / remaining minutes on <code>/3d/queue</code> Complete (true print time vs elapsed-since-assign). Todo #2334 remaining.</li>
+                <li>Subnet box on Discover is already a form field — keep default 192.168.2.0/24; do not hard-tie the server NIC.</li>
+                <li>Camera FLV at :18088 — link only until a theme-safe player exists (no new per-page JS).</li>
+                <li>If Control 404s, the :4003 worker has not loaded new <code>:Path</code> actions — human restarts <code>perl script/comserv_server.pl -p 4003 -r</code>. AI does not restart servers.</li>
+            </ol>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="out" class="doc-h2">Out of scope</h2>
+            <ul class="doc-body">
+                <li>Start print / gcode_upload from Comserv until ping + telemetry stay stable on the live IP.</li>
+                <li>Anycubic cloud MQTT / account login.</li>
+                <li>Rinkhals / Moonraker :7125 unless the printer is rooted.</li>
+                <li>Result columns host/port/adapter_type before schema-compare (unknown column 500s /3d/printers).</li>
+                <li>Duplicate farm rows — attach updates the existing Kobra 3.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Project #206 3DPRINT · todo #2334. Route basename
+                <a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">/Documentation/Kobra3LanMode</a>
+                (file lives under Documentation/3d/).</p>
+            </div>
+        </div>
+    </div>
+</div>

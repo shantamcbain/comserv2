@@ -2,7 +2,7 @@
 //
 // Eliminates the divergent model code that used to live separately in
 // local-chat.js (general "Chat with AI" widget) and ai2editor/chat.js (editor
-// chat, which hard-coded tencent/hy3). Both widgets now call THIS module,
+// chat, which hard-coded the coding default). Both widgets now call THIS module,
 // filtered by a `context` so each widget gets the catalog it needs without
 // duplicating the fetch/render logic.
 //
@@ -11,8 +11,8 @@
 //
 // API:
 //   ComservChat.modelSelect.init({ selectEl, context, pinModel, onReady, onError })
-//   ComservChat.modelSelect.getSelectedValue()   -> "provider|model"  (e.g. "openrouter|tencent/hy3")
-//   ComservChat.modelSelect.resolveDefault(ctx)   -> default model string for a context ("code" -> "tencent/hy3")
+//   ComservChat.modelSelect.getSelectedValue()   -> "provider|model"  (e.g. "openrouter|cohere/north-mini-code:free")
+//   ComservChat.modelSelect.resolveDefault(ctx)   -> default model string for a context ("code" -> coding default)
 //   ComservChat.modelSelect.onChange(cb)          -> register a change listener
 //   ComservChat.modelSelect.isChatModel(id)      -> bool (shared helper, moved from local-chat.js)
 //   ComservChat.modelSelect.modelSizeScore(id)   -> number (shared helper, moved from local-chat.js)
@@ -43,8 +43,10 @@
     var _listeners = [];          // onChange callbacks
     var _lastSelectEl = null;     // the select currently managed
     var _ctx = 'chat';            // context of the active select
-    var _pinnedValue = null;      // value pinned to top (e.g. openrouter|tencent/hy3)
+    var _pinnedValue = null;      // value pinned to top (e.g. openrouter|cohere/north-mini-code:free)
     var _ollamaOnly = false;      // when true, render only Ollama models (skip xAI/OpenRouter)
+    var _showAll = false;         // AIMPS #2024: premium hidden unless user opts in
+    var _rawCatalog = null;       // unfiltered live list; _catalogCache is the shortlist
 
     // NOTE: there is intentionally NO static fallback model list. The catalog
     // comes only from the live sources (window.ComservConfig.models /
@@ -55,7 +57,7 @@
     // Turn a "provider|model" value into a human label. Deriving the provider
     // from the value itself is the ONLY correct way: callers used to assume
     // "not grok therefore ollama", which mislabelled every OpenRouter model
-    // (e.g. openrouter|tencent/hy3 shown as "Ollama (Local): tencent/hy3").
+    // (e.g. openrouter|cohere/north-mini-code:free shown as "Ollama (Local): ...").
     function describeModel(value, opts) {
         opts = opts || {};
         if (!value) return 'AI Assistant';
@@ -111,6 +113,128 @@
         return 4;
     }
 
+    // ---- cost labelling ----------------------------------------------------
+    // One place that decides how a model's cost is shown, so the chat dropdown
+    // and every other surface can never disagree.
+    //
+    // The bug this fixes: "price missing" was rendered as "free". x.AI's
+    // /v1/models publishes NO pricing, so every Grok model arrived with
+    // price 0 and was labelled free even though it costs real money.
+    // Rule now: only say "free" when the price is known AND zero. Anything
+    // with an unknown price is labelled "cost not published" — it is never
+    // advertised as free.
+    function costKnown(m) {
+        if (!m) return false;
+        if (m.price_known != null) return !!m.price_known;
+        // Server did not send the flag (older cache): infer it. A price is
+        // known only when a numeric price or a raw pricing hash came back.
+        return (m.price_prompt != null || m.price_completion != null || !!m.pricing);
+    }
+
+    function fmtMoney(n) {
+        return (Math.round((Number(n) || 0) * 100) / 100).toFixed(2);
+    }
+
+    function costSuffix(m, svc) {
+        if (!m) return '';
+        if (m.local || svc === 'ollama') return ' — local';
+
+        var pp = Number(m.price_prompt) || 0;
+        var pc = Number(m.price_completion) || 0;
+        var known = costKnown(m);
+
+        // A ":free" slug (OpenRouter) is explicitly published as free.
+        var freeSlug = /(^|:)(free)$/i.test(String(m.value || m.name || ''));
+        if (m.free || freeSlug) return ' — free';
+
+        // Price published but genuinely zero (e.g. stealth/ox-alpha).
+        if (known && pp === 0 && pc === 0) return ' — free';
+
+        // Paid: show the real numbers.
+        if (known && (pp > 0 || pc > 0)) {
+            var tier = m.price_tier || (pp <= 1 && pc <= 1 ? 'cheap' : (pp <= 5 && pc <= 5 ? 'mid' : 'premium'));
+            return ' — $' + fmtMoney(pp) + '/$' + fmtMoney(pc) + ' per 1M (' + tier + ')';
+        }
+
+        // Unknown price — paid by default, never advertised as free.
+        return ' — cost not published';
+    }
+
+    function isPremiumModel(m) {
+        if (!m) return false;
+        if (m.free || /(^|:)(free)$/i.test(String(m.value || ''))) return false;
+        if (String(m.price_tier || '') === 'premium') return true;
+        var p = Math.max(Number(m.price_prompt) || 0, Number(m.price_completion) || 0);
+        return p > 5;
+    }
+
+    function isCodingModel(m) {
+        var v = String((m && m.value) || '');
+        var svc = (m && m.provider) || v.split('|')[0] || '';
+        if (svc === 'supergrok' || m.prepaid) return true;
+        return /coder|code|hy3|north-mini|starcoder|deepseek-v|qwen3-coder|qwen2\.5-coder|grok-build|grok-code/i.test(v);
+    }
+
+    // AIMPS #2024/#2025: collapse premium; cap chat list; free/cheap first already
+    // happens in render(). Show-all bypasses the cap.
+    function applyShortlist(models, context) {
+        if (!models || !models.length) return models || [];
+        if (_showAll) return models;
+        var coding = (context === 'code' || context === 'editor' || context === 'git');
+        var kept = models.filter(function (m) {
+            if (isPremiumModel(m)) return false;
+            if (coding) return isCodingModel(m);
+            return true;
+        });
+        if (coding && !kept.length) {
+            kept = models.filter(function (m) { return !isPremiumModel(m); });
+        }
+        var max = coding ? 40 : 24;
+        if (kept.length > max) kept = kept.slice(0, max);
+        return kept;
+    }
+
+    function readShowAllPref() {
+        try { return localStorage.getItem('comserv_show_all_models') === '1'; } catch (e) { return false; }
+    }
+
+    function writeShowAllPref(on) {
+        try { localStorage.setItem('comserv_show_all_models', on ? '1' : '0'); } catch (e) { /* ignore */ }
+    }
+
+    function ensureShowAllToggle(selectEl) {
+        if (!selectEl || !selectEl.parentNode) return;
+        var id = 'ai-model-show-all';
+        var el = document.getElementById(id);
+        if (!el) {
+            var lab = document.createElement('label');
+            lab.setAttribute('for', id);
+            lab.style.fontSize = '0.8em';
+            lab.style.marginLeft = '0.5em';
+            lab.style.whiteSpace = 'nowrap';
+            el = document.createElement('input');
+            el.type = 'checkbox';
+            el.id = id;
+            lab.appendChild(el);
+            lab.appendChild(document.createTextNode(' Show all models'));
+            selectEl.parentNode.insertBefore(lab, selectEl.nextSibling);
+        }
+        el.checked = !!_showAll;
+        if (el._wired) return;
+        el._wired = true;
+        el.addEventListener('change', function () {
+            _showAll = !!el.checked;
+            writeShowAllPref(_showAll);
+            // page=chat/editor already shortlists on the server. Show-all must
+            // drop the cache and refetch page=all (or reuse the full global).
+            _catalogCache = null;
+            _catalogPromise = null;
+            fetchCatalog().then(function () {
+                if (_lastSelectEl) render(_lastSelectEl, _ctx, _pinnedValue || true);
+            }).catch(function () { /* keep current options */ });
+        });
+    }
+
     // ---- catalog normalization --------------------------------------------
     // Turn any known source shape into the internal flat list.
     function fromFlat(flat) {
@@ -130,6 +254,7 @@
                     price_completion: (m.price_completion != null) ? m.price_completion : 0,
                     pricing: m.pricing || null,
                     price_tier: m.price_tier || null,
+                    price_known: (m.price_known != null) ? !!m.price_known : null,
                     free: !!m.free,
                     local: !!m.local
                 };
@@ -150,7 +275,22 @@
             models.forEach(function (m) {
                 var id = m.id || m.value;
                 if (!id) return;
-                out.push({ value: svc + '|' + id, label: m.label || id, provider: svc });
+                // /ai2/providers may already return full "provider|model" ids —
+                // do not double-prefix when the pipe is present.
+                var value = (String(id).indexOf('|') !== -1) ? String(id) : (svc + '|' + id);
+                // Carry cost metadata (incl. price_known) through so a provider
+                // that publishes no price is never rendered as "free".
+                out.push({
+                    value: value,
+                    label: m.label || id,
+                    provider: svc,
+                    price_prompt: (m.price_prompt != null) ? m.price_prompt : null,
+                    price_completion: (m.price_completion != null) ? m.price_completion : null,
+                    price_known: (m.price_known != null) ? !!m.price_known : null,
+                    price_tier: m.price_tier || null,
+                    free: !!m.free,
+                    local: !!m.local
+                });
             });
         });
         return out.length ? out : null;
@@ -165,7 +305,8 @@
         var globalModels = (window.ComservConfig && window.ComservConfig.models) || [];
         var flat = fromFlat(globalModels);
         if (flat && flat.length) {
-            _catalogCache = flat;
+            _rawCatalog = flat;
+            _catalogCache = applyShortlist(flat, _ctx);
             return Promise.resolve(_catalogCache);
         }
 
@@ -178,7 +319,9 @@
                 done = true;
                 reject(new Error('providers request timed out'));
             }, 6000);
-            fetch('/ai2/providers', { method: 'GET', credentials: 'include' })
+            var page = _showAll ? 'all'
+                : ((_ctx === 'code' || _ctx === 'editor' || _ctx === 'git') ? 'editor' : 'chat');
+            fetch('/ai2/providers?page=' + encodeURIComponent(page), { method: 'GET', credentials: 'include' })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     if (done) return;
@@ -194,7 +337,8 @@
                 });
         })
             .then(function (models) {
-                _catalogCache = models;
+                _rawCatalog = models;
+                _catalogCache = applyShortlist(models, _ctx);
                 _catalogPromise = null;
                 return _catalogCache;
             })
@@ -239,10 +383,25 @@
             return ra - rb;
         });
 
-        var hy3Value = 'openrouter|tencent/hy3';
+        // Coding default (free north-mini-code). Accept full "provider|model" or bare slug.
+        var CODING_DEFAULT = 'openrouter|cohere/north-mini-code:free';
+        var pinTarget = null;
+        if (typeof pinModel === 'string' && pinModel) {
+            pinTarget = (pinModel.indexOf('|') !== -1)
+                ? pinModel
+                : ('openrouter|' + pinModel);
+        } else if (pinModel) {
+            // Truthy non-string (e.g. true) → coding default
+            pinTarget = CODING_DEFAULT;
+        }
+
         var pinnedOpt = null;
         var ollamaValues = [];
         var freeOpenRouterValues = [];
+        var shortLabel = function (v) {
+            var slug = String(v || '').split('|').pop();
+            return slug || v;
+        };
 
         svcs.forEach(function (svc) {
             if (_ollamaOnly && svc !== 'ollama') return;
@@ -262,22 +421,31 @@
                     .sort(function (a, b) {
                         return modelSizeScore(a.value) - modelSizeScore(b.value);
                     });
-            } else if (svc === 'openrouter') {
-                // Lowest cost first: free models at the very top, then by prompt
-                // price ascending (completion as tie-breaker), alphabetical last
-                // resort when prices are equal/missing.
+            } else {
+                // #2025: cost then capability, not alpha. Free first, then
+                // prompt/completion price, then coding-ness / size, then name.
                 var priceOf = function (m) {
                     return Math.max(Number(m.price_prompt) || 0, Number(m.price_completion) || 0);
+                };
+                var capOf = function (m) {
+                    var n = 0;
+                    if (isCodingModel(m)) n += 8;
+                    n += modelSizeScore(m.value);
+                    return n;
                 };
                 list.sort(function (a, b) {
                     var fa = m_free(a), fb = m_free(b);
                     if (fa !== fb) return fa ? -1 : 1;
                     var pa = priceOf(a), pb = priceOf(b);
                     if (pa !== pb) return pa - pb;
+                    var ca = capOf(a), cb = capOf(b);
+                    if (ca !== cb) return cb - ca;
                     return String(a.value).localeCompare(String(b.value));
                 });
                 function m_free(m) {
-                    return !!(m.free || /(^|:)(free)$/i.test(m.value));
+                    var p = priceOf(m);
+                    return !!(m.free || /(^|:)(free)$/i.test(m.value)
+                        || (!m.local && p === 0 && !m.price_tier));
                 }
             }
 
@@ -293,28 +461,14 @@
                 var text = (svc === 'ollama')
                     ? m.value.split('|').pop()
                     : String(m.label || m.value).replace(/\s*\([^)]*\)\s*$/, '');
-                // Per-token cost marker so the user sees what a choice costs
-                // before picking it (AIMPS-P2 / #254). Formatted in JS because
-                // the server already sends USD-per-1M numbers.
-                var pp = Number(m.price_prompt) || 0;
-                var pc = Number(m.price_completion) || 0;
-                if (m.local) {
-                    text += ' — local';
-                } else if (m.free || (svc === 'openrouter' && /(^|:)(free)$/i.test(m.value))
-                          || (!m.local && !m.pricing && pp === 0 && pc === 0)) {
-                    // Zero-priced external entries (stealth/ox-alpha,
-                    // openrouter/auto, ...) cost nothing — mark them free.
-                    text += ' — free';
-                } else if (pp > 0 || pc > 0 || m.pricing) {
-                    var fmt = function (n) { return (Math.round(n * 100) / 100).toFixed(2); };
-                    var tier = m.price_tier || (pp === 0 && pc === 0 ? 'free' : 'paid');
-                    text += ' — $' + fmt(pp) + '/$' + fmt(pc) + ' per 1M (' + tier + ')';
-                }
+                text += costSuffix(m, svc);
                 opt.textContent = text;
-                if (m.value === hy3Value) {
+                if (pinTarget && (m.value === pinTarget ||
+                        (m.value.split('|').pop() === pinTarget.split('|').pop() &&
+                         (m.value.split('|')[0] === pinTarget.split('|')[0] || pinTarget.indexOf('|') === -1)))) {
                     pinnedOpt = opt;
-                    opt.textContent = '⚡ tencent/hy3 (OpenRouter) — $' + (Math.round(pp * 100) / 100).toFixed(2)
-                        + '/$' + (Math.round(pc * 100) / 100).toFixed(2) + ' per 1M (' + (m.price_tier || 'paid') + ')';
+                    pinTarget = m.value; // normalize to catalog value
+                    opt.textContent = '⚡ ' + shortLabel(pinTarget) + ' (OpenRouter)' + costSuffix(m, svc);
                 }
                 if (svc === 'openrouter' && /(^|:)(free)$/i.test(m.value)) freeOpenRouterValues.push(m.value);
                 grp.appendChild(opt);
@@ -323,16 +477,13 @@
             selectEl.appendChild(grp);
         });
 
-        // Pin hy3 to the top (visible + selectable) when requested, but do NOT
-        // auto-select it. The DEFAULT selected model for a non-paying user is a
-        // FREE OpenRouter model (no local load, no cost). Ollama is intentionally
-        // NOT the default: running local models hammers the workstation, and we
-        // only use Ollama once its bug is fixed or the user explicitly demands
-        // privacy. Fall back to Ollama / hy3 only when no free OpenRouter model
-        // exists. The user can still pick any model (including Ollama or hy3).
-        if (pinnedOpt && pinModel) {
+        // Pin coding default to the top when requested. For context "code" or
+        // "editor", also auto-select it when present in the catalog. For chat
+        // (and other contexts), pin only — prefer free OpenRouter (gemma/
+        // nemotron) and do not force-select the coding model.
+        if (pinnedOpt && pinTarget) {
             selectEl.insertBefore(pinnedOpt, selectEl.firstChild);
-            _pinnedValue = hy3Value;
+            _pinnedValue = pinTarget;
         } else {
             _pinnedValue = null;
         }
@@ -344,13 +495,16 @@
             if (/gemma/i.test(v) || /nemotron-3-(nano|super)/i.test(v)) defaultFree = v;
         });
 
-        // Auto-select default: free OpenRouter > smallest Ollama > pinned hy3 > first.
-        if (defaultFree) {
+        var isCodingCtx = (context === 'code' || context === 'editor');
+        if (isCodingCtx && pinTarget && pinnedOpt) {
+            // Editor/code surfaces: auto-select the coding default when available.
+            selectEl.value = pinTarget;
+        } else if (defaultFree) {
             selectEl.value = defaultFree;
         } else if (ollamaValues.length) {
             selectEl.value = ollamaValues[0];   // already smallest-first
-        } else if (pinModel && pinnedOpt) {
-            selectEl.value = hy3Value;
+        } else if (pinTarget && pinnedOpt) {
+            selectEl.value = pinTarget;
         } else if (selectEl.options.length) {
             selectEl.selectedIndex = 0;
         }
@@ -363,9 +517,11 @@
         _ctx = opts.context || 'chat';
         _lastSelectEl = selectEl;
         _ollamaOnly = !!opts.ollamaOnly;
+        _showAll = readShowAllPref();
 
         return fetchCatalog().then(function () {
             render(selectEl, _ctx, opts.pinModel);
+            ensureShowAllToggle(selectEl);
             if (typeof opts.onReady === 'function') opts.onReady(_catalogCache);
             _emit(selectEl ? selectEl.value : null);
         }).catch(function (err) {

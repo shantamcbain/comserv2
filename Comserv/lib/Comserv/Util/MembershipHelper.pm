@@ -121,6 +121,7 @@ Checks (in order):
   1. membership_service_access override (manual/admin grant)
   2. plan_benefits access flag
   3. Legacy boolean plan column (has_beekeeping, has_planning, etc.)
+  healthkitchen uses (1) only until a plan benefit exists — members self-grant via /membership/enable_addon.
 
 =cut
 

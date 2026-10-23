@@ -13,6 +13,16 @@ use IO::Socket::INET;
 use POSIX qw(WNOHANG);
 use Comserv::Util::Logging;
 
+# Plain Moose class (NOT Catalyst::Model). Catalyst::Model already owns a class-level
+# `config` method; a Moose `has config` + `extends Catalyst::Model` collides and
+# makes even ->new() die with "Can't use string as a HASH ref".
+#
+# Consequence: $c->model('RemoteDB') returns the bare class-name string
+# "Comserv::Model::RemoteDB" (does NOT throw). Callers MUST use from_context()
+# (or Controller::RemoteDB::_remote_db) so Moose accessors run on a real object.
+# Error todo #2343 / RemoteDB::index was exactly that class-name-as-object bug.
+# Standalone callers may still use Comserv::Model::RemoteDB->new() (DBEncy::COMPONENT).
+
 has 'logging' => (
     is      => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -36,6 +46,15 @@ has 'selected_connection' => (
     isa     => 'HashRef',
     default => sub { {} },
 );
+
+# Resolve a usable instance from a Catalyst context. Prefer this over bare
+# $c->model('RemoteDB') everywhere — model() may return the class-name string.
+sub from_context {
+    my ($class, $c) = @_;
+    my $m = eval { $c && $c->model('RemoteDB') };
+    return $m if ref $m;
+    return $class->new();
+}
 
 use FindBin;
 use File::Spec;
@@ -305,14 +324,22 @@ sub test_connection {
     my $username = $conn_config->{username} // '';
     my $password = $conn_config->{password} // '';
     
+    my $is_pg = ($db_type =~ /^(postgresql|postgres|pg)$/i) ? 1 : 0;
     if ($db_type eq 'sqlite') {
         $dsn = "dbi:SQLite:dbname=" . $conn_config->{database_path};
+    } elsif ($is_pg) {
+        my $host = $conn_config->{host} // 'localhost';
+        my $port = $conn_config->{port} // 5432;
+        my $database = $conn_config->{database} // '';
+        my $connect_host = ($host eq 'localhost') ? '127.0.0.1' : $host;
+        $dsn = "dbi:Pg:dbname=$database;host=$connect_host;port=$port";
     } else {
         my $host = $conn_config->{host} // 'localhost';
         my $port = $conn_config->{port} // 3306;
         my $database = $conn_config->{database} // '';
+        my $connect_host = ($host eq 'localhost') ? '127.0.0.1' : $host;
 
-        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;mariadb_connect_timeout=2";
+        $dsn = "dbi:MariaDB:database=$database;host=$connect_host;port=$port;mariadb_connect_timeout=2";
     }
     
     # Fork a child to test the DBI connection so we can SIGKILL it after a timeout.
@@ -332,8 +359,12 @@ sub test_connection {
                 RaiseError => 1,
                 PrintError => 0,
                 AutoCommit => 1,
-                ($db_type ne 'sqlite' ? (mariadb_connect_timeout => 2) : ()),
             );
+            if ($is_pg) {
+                $connect_attrs{pg_connect_timeout} = 2;
+            } elsif ($db_type ne 'sqlite') {
+                $connect_attrs{mariadb_connect_timeout} = 2;
+            }
             my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
             $dbh->disconnect() if $dbh;
         };
@@ -400,7 +431,9 @@ sub select_connection {
         my $skip = 0;
         my $skip_reason = '';
         
-        if (!$conn->{db_type} || $conn->{db_type} !~ /^(mysql|sqlite|mariadb)$/i) {
+        # Accept mysql/mariadb/sqlite AND postgresql/postgres/pg (SCPG-REMOTEDB /
+        # todo #2325). get_connection already builds dbi:Pg for postgresql.
+        if (!$conn->{db_type} || $conn->{db_type} !~ /^(mysql|sqlite|mariadb|postgresql|postgres|pg)$/i) {
             $skip = 1;
             $skip_reason = "Invalid db_type";
         }

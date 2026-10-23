@@ -60,6 +60,7 @@
             <th>Status</th>
             <th>Printer</th>
             <th>Ordered</th>
+            <th></th>
         </tr>
     </thead>
     <tbody>
@@ -85,6 +86,13 @@
                 [% IF job.printer %][% job.printer.name | html %][% ELSE %]&mdash;[% END %]
             </td>
             <td>[% job.created_at %]</td>
+            <td>
+                [% IF job.model && job.model.source == 'sign_generator' %]
+                <a href="/signgenerator/download/[% job.model_id %]/3mf?job_id=[% job.id %]">3MF</a>
+                [% ELSIF job.model_id %]
+                <a href="/3d/model_download/[% job.model_id %]">File</a>
+                [% END %]
+            </td>
         </tr>
         [% END %]
     </tbody>

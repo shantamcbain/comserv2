@@ -1,0 +1,6 @@
+<div id="2026-10-19-prod-deploy-late-dispatch" class="cl-entry">
+<h3>2026-10-19 — Production deploy --prod never started</h3>
+<p class="doc-body"><strong>What.</strong> The dashboard production deploy (<code>script/deploy.sh --prod</code>) exited 127 with <code>canonical_deploy_to_nodes: command not found</code>. The new image never replaced <code>comserv2-web-prod</code> on 192.168.1.126. The 2026-10-18 pull that did start a container was rolled back because the image entrypoint <code>chmod -R</code>'d the session directory and the old 90s health gate killed it (exit 137) before Starman listened.</p>
+<p class="doc-body"><strong>Why.</strong> <code>--prod</code> called <code>canonical_deploy_to_nodes</code> in the early mode case, before that function is defined (exit 127, nothing built). Moving the call above <code>_normalize_deploy_node</code> still failed: that helper is what the node loop calls, so the image pushed and the production pull never started. <code>--prod</code> now runs only after both functions exist. The entrypoint fix (no recursive chmod of <code>/tmp/comserv/session</code>) and the 600s health gate were already in the tree but not in the image that was pushed on 2026-10-18.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/script/deploy.sh</code></p>
+</div>

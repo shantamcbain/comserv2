@@ -336,7 +336,7 @@
             </div>
             <div class="cluster-actions">
                 <a href="[% c.uri_for('/admin/infrastructure/opnsense') %]" class="btn btn-primary">Open Gateway</a>
-                <a href="[% c.uri_for('/Documentation/system/GatewayPlan') %]" class="btn btn-secondary">Gateway Plan Doc</a>
+                <a href="[% c.uri_for('/Documentation/GatewayPlan') %]" class="btn btn-secondary">Gateway Plan Doc</a>
             </div>
         </div>
 

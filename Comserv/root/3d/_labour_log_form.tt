@@ -1,0 +1,23 @@
+[%# Compact labour log — POST /3d/labour/log. Expects job.id in scope. %]
+<form method="post" action="[% c.uri_for('/3d/labour/log') %]"
+      style="margin-top:0.35em;display:flex;flex-wrap:wrap;gap:0.25em;align-items:center;">
+    <input type="hidden" name="job_id" value="[% job.id %]">
+    <label class="sr-only" for="lab_cat_[% job.id %]">Labour type</label>
+    <select id="lab_cat_[% job.id %]" name="category"
+            title="Labour category"
+            style="font-size:0.8em;padding:0.15em 0.3em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg, var(--secondary-color));color:var(--text-color);">
+        <option value="clean">clean</option>
+        <option value="pick">pick</option>
+        <option value="pack">pack</option>
+        <option value="qc">qc</option>
+        <option value="other">other</option>
+    </select>
+    <label class="sr-only" for="lab_min_[% job.id %]">Minutes</label>
+    <input id="lab_min_[% job.id %]" type="number" name="minutes" min="1" max="480" value="5" required
+           title="Minutes of human labour"
+           style="width:3.4em;font-size:0.8em;padding:0.15em 0.3em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg, var(--secondary-color));color:var(--text-color);">
+    <span style="font-size:0.75em;color:var(--text-muted-color, var(--text-color));">min</span>
+    <input type="text" name="notes" maxlength="200" placeholder="notes"
+           style="width:7em;font-size:0.8em;padding:0.15em 0.3em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg, var(--secondary-color));color:var(--text-color);">
+    <button type="submit" class="btn btn-sm btn-primary" title="Add labour cost to the linked inventory item">Log labour</button>
+</form>

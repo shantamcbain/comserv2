@@ -1,0 +1,6 @@
+<div id="2026-09-04-kobra3-lan-mode" class="cl-entry">
+<h3>2026-09-04 — Kobra 3 LAN Mode Direct Control (Docker-first)</h3>
+<p class="doc-body"><strong>What.</strong> Created tracking todo under project #206 and detailed work order for offline Kobra 3 LAN Mode integration. All code lives inside the Docker container (Dockerfile updated) so it works on any server including Production1 (LAN-only, routes to 192.168.2.0 WiFi subnet where printer lives).</p>
+<p class="doc-body"><strong>Why.</strong> Cloud login system is broken. Printer supports LAN Mode (local MQTT + HTTP on port 18910). Existing Anycubic adapter is the foundation. Containerising ensures portability and no host OS changes.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/root/Documentation/3d/Kobra3LanMode.tt</code> (new doc), <code>Comserv/root/Documentation/3dPrintingPlan.tt</code> (updated), <code>Comserv/lib/Comserv/Util/Printing3d/Adapter/Anycubic.pm</code>, <code>Dockerfile</code>, <code>docker-compose.prod.yml</code>, changelog entry, new tracking todo on #206.</p>
+</div>

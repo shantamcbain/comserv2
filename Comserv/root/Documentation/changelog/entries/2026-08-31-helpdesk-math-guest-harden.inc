@@ -1,0 +1,6 @@
+<div id="2026-08-31-helpdesk-math-guest-harden" class="cl-entry">
+<h3>2026-08-31 — HelpDesk guest math harden + no critical from public form</h3>
+<p class="doc-body"><strong>What.</strong> Public ticket/contact forms no longer render an empty “What is + ?” challenge: operands come from stash or session, and missing operands show a reload message instead of a blank sum. Guest math validation is fail-closed (sum must be 4–18, operands must match session, answer 0 always rejected, challenge expires after 2h). Guests cannot select High/Critical (UI + server clamp to medium). Crypto/phishing patterns extended for BMASTER-20260901-6247 (Transfer №, NEXT -&gt;&gt;, bitcoin-mining, bare graph.org). New-ticket admin email deep-links to <code>/HelpDesk/ticket/view/&lt;number&gt;</code>.</p>
+<p class="doc-body"><strong>Why.</strong> Grok guest test: blank math accepted 0; category Other + priority Critical matched spam ticket BMASTER-20260901-6247 on production that had not picked up the earlier filter deploy.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/lib/Comserv/Controller/HelpDesk.pm</code>, <code>Comserv/root/CSC/HelpDesk/new_ticket.tt</code>, <code>Comserv/root/CSC/HelpDesk/contact.tt</code></p>
+</div>

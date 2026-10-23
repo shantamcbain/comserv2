@@ -18,6 +18,14 @@
     <tr>
       <th><label for="category">Category</label></th>
       <td>
+        [% IF category_options.size %]
+        <select id="category_id" name="category_id" onchange="if(this.value){document.getElementById('category').value=this.options[this.selectedIndex].dataset.path}">
+          <option value="">— choose from category list —</option>
+          [% FOREACH o IN category_options %]
+          <option value="[% o.id %]" data-path="[% o.path | html %]"[% IF current_category_ids.grep('^' _ o.id _ '$').size || (item.category && item.category == o.path) %] selected[% END %]>[% '&nbsp;&nbsp;' FILTER repeat(o.depth) %][% o.name | html %]</option>
+          [% END %]
+        </select><br>
+        [% END %]
         <input type="text" id="category" name="category" maxlength="100"
                list="category-suggestions" value="[% item.category | html %]">
         <datalist id="category-suggestions">
@@ -31,6 +39,10 @@
           <option value="Supplies">Supplies</option>
           <option value="Apiary">Apiary</option>
           <option value="Garden">Garden</option>
+          <option value="food">Food</option>
+          <option value="herb">Herb</option>
+          <option value="spice">Spice</option>
+          <option value="produce">Produce</option>
           <option value="Craft">Craft</option>
           <option value="Electronics">Electronics</option>
           <option value="Office">Office</option>
@@ -79,7 +91,25 @@
     <tr>
       <th><label for="barcode">Barcode</label></th>
       <td><input type="text" id="barcode" name="barcode" maxlength="100" value="[% item.barcode | html %]">
-          <small>UPC / EAN / QR / Code128</small></td>
+          <small>UPC / EAN / QR / Code128 / internal</small></td>
+    </tr>
+    <tr>
+      <th><label for="barcode_type">Barcode Type</label></th>
+      <td>
+        <select id="barcode_type" name="barcode_type">
+          <option value="">— unknown —</option>
+          <option value="upc" [% IF item.barcode_type == 'upc' %]selected[% END %]>UPC</option>
+          <option value="ean" [% IF item.barcode_type == 'ean' %]selected[% END %]>EAN</option>
+          <option value="qr" [% IF item.barcode_type == 'qr' %]selected[% END %]>QR</option>
+          <option value="internal" [% IF item.barcode_type == 'internal' %]selected[% END %]>Internal / custom</option>
+          <option value="other" [% IF item.barcode_type == 'other' %]selected[% END %]>Other</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="image_path">Image / Photo Path</label></th>
+      <td><input type="text" id="image_path" name="image_path" maxlength="500" value="[% item.image_path | html %]">
+          <small>Optional visual. NFS path or external URL.</small></td>
     </tr>
     <tr>
       <th><label for="reorder_point">Reorder Point</label></th>

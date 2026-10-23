@@ -1,4 +1,14 @@
 #!/usr/bin/env perl
+BEGIN {
+    # Raise soft open-files limit to min(8192, hard); see script/raise_nofile.pl (2026-10-16 :4006 EMFILE).
+    require File::Spec; my $f = File::Spec->rel2abs(__FILE__); $f =~ s{[^/]*$}{raise_nofile.pl};
+    eval { require $f; comserv_raise_nofile(8192); 1 } or print STDERR "[nofile] skipped: $@";
+}
+BEGIN {
+    # Same API keys on every branch/port; see script/load_shared_keys.pl (2026-10-18).
+    require File::Spec; my $f = File::Spec->rel2abs(__FILE__); $f =~ s{[^/]*$}{load_shared_keys.pl};
+    eval { require $f; comserv_load_shared_keys(); 1 } or print STDERR "[keys] skipped: $@";
+}
 use Catalyst qw( Static::Simple );
 BEGIN {
     $ENV{CATALYST_SCRIPT_GEN} = 40;
@@ -388,6 +398,15 @@ sub _start_health_evaluator {
                         );
                     };
 
+                    # Hermes overrun guard (thrash / OpenRouter day-week-month caps).
+                    # Idempotent with the */5 cron runner (flock + min interval).
+                    eval {
+                        require Comserv::Util::AI::HermesOverrunGuard;
+                        Comserv::Util::AI::HermesOverrunGuard->new(
+                            app_root => ($ENV{CATALYST_HOME} // "$FindBin::Bin/.."),
+                        )->run;
+                    };
+
                     # Alert CSC admin if health has deteriorated
                     if ($score < $alert_threshold && $last_alert_status eq 'OK') {
                         _send_health_alert($schema, $health, $summary, $logger);
@@ -636,6 +655,22 @@ if ($use_twiggy) {
     my $root = $ENV{CATALYST_HOME} || "$FindBin::Bin/..";
     my $flag = "$root/var/twiggy.enabled";
     unlink $flag if -f $flag;
+}
+
+# Restrict -r/--restart file watching to 'lib' only (when no explicit --restart_directory given).
+# Watching the full app root (script/..) pulls in root/ (thousands of .tt files, site templates,
+# Documentation/, static/ etc.) which creates excessive inotify watches per server.
+# Combined with many concurrent -r servers across worktrees (3001/400x ports), this exhausts
+# fs.inotify.max_user_instances (default 128) or per-process fds (ulimit -n 1024).
+# Result: "Cannot construct a Linux::Inotify2 object: Too many open files".
+#
+# lib/ changes (.pm etc.) still auto-restart. For .tt / root/ / config changes, manually
+# restart the server or `touch lib/Comserv.pm` (or any watched .pm) to force a cycle.
+# This is consistent with the Twiggy (-w) path which already does `-R lib`.
+if ( grep { $_ eq '-r' || $_ eq '--restart' } @ARGV ) {
+    unless ( grep { /--?restart_directory/ } @ARGV ) {
+        push @ARGV, '--restart_directory', 'lib';
+    }
 }
 
 Catalyst::ScriptRunner->run('Comserv', 'Server');
