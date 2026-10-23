@@ -148,6 +148,11 @@ case "${1:-}" in
     --run-image|run-image)
         DEPLOY_MODE_DETECTED="run-image"
         ;;
+    --local-test|local-test)
+        # Build on the workstation and run it ONLY as comserv2-web-test on :4000
+        # (tag <commit-time> + :test, never :latest, never pushed). :5000 untouched.
+        exec "$(dirname "$(readlink -f "$0")")/deploy-flow.sh" local-test "${@:2}"
+        ;;
     --flow|flow)
         # Image-first deploy flow (preview by default). Dispatched HERE, before any
         # top-level side effects below (artifact sync, git checks, secrets setup),
@@ -666,7 +671,7 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
             # starts. Late dispatch after the function definition runs it.
             ;;
 
-        "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild"|"push-only")
+        "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild"|"push-only"|"run-image")
             # Functions are defined below; late dispatch after canonical_deploy*.
             ;;
 
@@ -801,7 +806,7 @@ is_production_host() {
     local hn ip
     hn=$(hostname 2>/dev/null || true)
     ip=$(hostname -I 2>/dev/null || true)
-    echo "$hn $ip" | grep -Eqi 'comservproduction1|192\.168\.1\.126'
+    echo "$hn $ip" | grep -Eqi 'comservproduction1|comservproduction2|192\.168\.1\.126|192\.168\.1\.127'
 }
 
 # Workstation-only web services (same image as prod). A bare `compose up` on
@@ -1034,6 +1039,7 @@ start_prod_container_from_image() {
         --log-driver json-file --log-opt max-size=20m --log-opt max-file=5 \
         -e ENVIRONMENT=production \
         -e PORT=5000 \
+        -e COMSERV_JOBS="${COMSERV_JOBS:-1}" \
         -e CATALYST_ENV=production \
         -e CATALYST_DEBUG=0 \
         -e WEB_PORT=5000 \
@@ -1516,6 +1522,12 @@ if [ "${DEPLOY_MODE:-}" = "run-image" ]; then
     case "$RI_IMG" in shantamcsbain/comserv-web-prod:[A-Za-z0-9]*) ;; *) echo "❌ bad image $RI_IMG"; exit 1 ;; esac
     IMAGE="$RI_IMG"; CONTAINER="$RI_NAME"; export HOST_PORT="$RI_PORT"
     [ "$RI_PORT" != "5000" ] && export SESSION_VOLUME="comserv2_sessions_$RI_PORT"
+    if [ "$RI_PORT" = "4000" ]; then
+        # Test slot: own identity, no background jobs (COMSERV_JOBS honoured once
+        # the jobs-switch branch is merged; harmless before).
+        # Line ~232 already defaults SYSTEM_IDENTIFIER to the hostname, so force the test identity here.
+        export SYSTEM_IDENTIFIER="${LOCAL_TEST_IDENTIFIER:-workstation-test}" COMSERV_JOBS="${COMSERV_JOBS:-0}"
+    fi
     if docker image inspect "$IMAGE" >/dev/null 2>&1; then SKIP_PULL=1; fi
     echo "=== RUN IMAGE $IMAGE as $CONTAINER on :$HOST_PORT (no build) ==="
     SKIP_PULL="${SKIP_PULL:-0}" recreate_local_web_prod
