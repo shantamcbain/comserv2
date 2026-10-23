@@ -1940,7 +1940,7 @@ sub track_application_start {
                 my $theme_id = $themes->{$theme_name}{id} || next;
                 next unless $theme_id;
                 my $css = $c->model('ThemeConfig')->generate_theme_css($c, $theme_id);
-                my $dir = $c->path_to('root', 'static', 'css', 'themes');
+                my $dir = $c->model('ThemeConfig')->get_theme_css_directory($c);
                 my $file = "$dir/$theme_name.css";
                 require File::Path;
                 unless (-d $dir) { File::Path::make_path($dir); }
