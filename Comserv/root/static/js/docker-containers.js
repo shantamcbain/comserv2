@@ -285,6 +285,28 @@
         deployFormVisible = false;
     }
 
+    // Stream /admin/docker/flow/log?offset=N into the same log window until
+    // the 'deploy-flow finished rc=N' marker appears.
+    function streamFlowLog(offset) {
+        setStatus('busy', 'Deploy running…');
+        var timer = setInterval(function() {
+            safeFetch('/admin/docker/flow/log?offset=' + offset, {})
+                .then(function(r){ return r.json(); })
+                .then(function(d) {
+                    if (!d || !d.ok) return;
+                    offset = d.next;
+                    (d.data || '').split('\n').forEach(function(l){ if (l) log(l, /❌|FAIL|refused/i.test(l) ? 'err' : 'dim'); });
+                    if (d.done) {
+                        clearInterval(timer);
+                        if (String(d.rc) === '0') { log('✅ FINISHED: SUCCESS (rc=0)', 'ok'); setStatus('ok', 'Deploy succeeded'); }
+                        else { log('❌ FINISHED: FAILED (rc=' + d.rc + ')', 'err'); setStatus('err', 'Deploy failed'); }
+                        setTimeout(loadAll, 2000);
+                    }
+                })
+                .catch(function(){ /* transient; keep polling */ });
+        }, 2000);
+    }
+
     function runFlowFromDialog(act) {
         var what = act === 'local-test'
             ? 'Build on the workstation, tag <commit-time> + :test, start comserv2-web-test on workstation :4000. No push. :5000 and production untouched.'
@@ -298,9 +320,10 @@
                 if (!confirm(what + '\n\nPreview is in the log. Apply now?')) { log('Cancelled (nothing changed).', 'dim'); return; }
                 return apiPost('/admin/docker/flow/run', 'action=' + encodeURIComponent(act) + '&dest=workstation&apply=1')
                     .then(function(r) {
-                        if (r.ok) log('Started in background. Progress: /admin/docker/flow/log', 'info');
-                        else log('❌ ' + (r.error || r.output || 'failed to start'), 'err');
-                        setTimeout(loadAll, 5000);
+                        if (!r.ok) { log('❌ ' + (r.error || r.output || 'failed to start'), 'err'); return; }
+                        log('Started. Live output follows here until it finishes.', 'info');
+                        if (outputBox) { var a = document.createElement('a'); a.href = '/admin/docker/flow/log'; a.target = '_blank'; a.textContent = 'Open full log in a new tab'; outputBox.appendChild(a); outputBox.appendChild(document.createTextNode('\n')); }
+                        streamFlowLog(r.offset || 0);
                     });
             })
             .catch(function(e){ log('❌ ' + e, 'err'); });
