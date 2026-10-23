@@ -104,6 +104,11 @@
 <!-- Theme class (moved from Header.tt) -->
 <!-- <script src="/static/js/theme-class.js?v=[% cv %]" defer></script> -->
 
+<!-- Theme inspector. Admin paintbrush in pagetop.tt. External module, not an inline script. -->
+[% IF is_admin %]
+<script src="/static/js/theme-editor.js?v=[% cv %]" defer></script>
+[% END %]
+
 <!-- Admin-only (conditional) -->
 [% IF is_admin && SiteName == 'CSC' && !is_dev_server %]
 <script src="/static/js/HealthMonitor.js" defer></script>
