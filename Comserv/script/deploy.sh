@@ -1525,7 +1525,8 @@ if [ "${DEPLOY_MODE:-}" = "run-image" ]; then
     if [ "$RI_PORT" = "4000" ]; then
         # Test slot: own identity, no background jobs (COMSERV_JOBS honoured once
         # the jobs-switch branch is merged; harmless before).
-        export SYSTEM_IDENTIFIER="${SYSTEM_IDENTIFIER:-workstation-test}" COMSERV_JOBS="${COMSERV_JOBS:-0}"
+        # Line ~232 already defaults SYSTEM_IDENTIFIER to the hostname, so force the test identity here.
+        export SYSTEM_IDENTIFIER="${LOCAL_TEST_IDENTIFIER:-workstation-test}" COMSERV_JOBS="${COMSERV_JOBS:-0}"
     fi
     if docker image inspect "$IMAGE" >/dev/null 2>&1; then SKIP_PULL=1; fi
     echo "=== RUN IMAGE $IMAGE as $CONTAINER on :$HOST_PORT (no build) ==="
