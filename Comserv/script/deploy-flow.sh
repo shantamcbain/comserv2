@@ -93,7 +93,7 @@ dest_hosts() {
 
 new_tag() {
     local sha; sha=$(git -C "$APP_DIR" rev-parse --short=9 HEAD 2>/dev/null || echo nogit)
-    echo "${sha}-$(date -u +%Y%m%d%H%M)"
+    echo "${sha}-$(TZ=America/Vancouver date +%Y%m%d%H%M)"   # tag time in Pacific
 }
 
 # ── plan builders: each fills STEPS; run_steps executes them only with --apply ──

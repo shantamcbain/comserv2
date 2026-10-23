@@ -38,7 +38,7 @@
         // Docker dates: "2026-07-06T23:18:14.59875699Z" or similar
         var d = new Date(isoStr);
         if (isNaN(d.getTime())) return isoStr.substring(0, 10);
-        return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+        return d.toLocaleString('en-CA', { timeZone: 'America/Vancouver', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZoneName: 'short' });
     }
 
     function paintDeployLog(raw) {
@@ -503,7 +503,7 @@
             var borderColor = unhealthy ? '#f0883e' : (running ? '#3fb950' : (c.is_backup_container ? '#6a0dad' : '#f85149'));
             var statusColor = unhealthy ? '#f0883e' : (running ? '#3fb950' : (c.is_backup_container ? '#6a0dad' : '#f85149'));
             var statusIcon = unhealthy ? '!' : (running ? '●' : (c.is_backup_container ? '↩' : '○'));
-            var created = c.created ? new Date(c.created).toLocaleDateString() : '';
+            var created = c.created ? new Date(c.created).toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' }) : '';
             var backupBadge = c.is_backup_container ? '<span style="display:inline-block;background:#6a0dad;color:#fff;font-size:0.65em;padding:1px 6px;border-radius:3px;margin-left:6px;font-weight:bold;letter-spacing:0.5px;">BACKUP</span>' : '';
             var hostBadge = '<span style="font-size:0.7em;background:#e2e8f0;color:#475569;padding:1px 5px;border-radius:3px;margin-left:4px;white-space:nowrap;">' + esc(currentTarget) + '</span>';
 
