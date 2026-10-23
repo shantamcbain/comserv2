@@ -5,7 +5,9 @@
 # Called by the deploy screen (/admin/docker/flow) or directly:
 #   deploy-flow.sh <action> [--image new|TAG] [--port 5000|4000|3000]
 #                  [--dest workstation|production1|both] [--apply]
-# actions: plan | build | stage | promote | safe-push | rollback | tags | state
+# actions: plan | build | stage | local-test | promote | safe-push | rollback | tags | state
+#   local-test = build on the workstation, tag <commit-time> AND :test, run as
+#   comserv2-web-test on :4000 only. Never :latest, never pushed, :5000 untouched.
 #
 # DEFAULT IS PREVIEW: without --apply nothing is built, started, pushed or pulled.
 # The preview prints exactly the steps --apply would run.
@@ -170,7 +172,27 @@ run_steps() {
 }
 CMDS=()
 
+tag_test() { docker tag "$REPO:$1" "$REPO:test"; }
+port_4000_free_or_test() {
+    local holder
+    holder=$(docker ps --filter publish=4000 --format '{{.Names}}' | head -1)
+    if [ -n "$holder" ] && [ "$holder" != "comserv2-web-test" ]; then die "host :4000 is used by container '$holder' — not touching it."; fi
+    if [ -z "$holder" ] && ss -ltn 2>/dev/null | grep -qE '[:.]4000[[:space:]]'; then die "host :4000 is in use by a non-Docker process — not touching it."; fi
+    return 0
+}
+
 case "$ACTION" in
+    local-test)
+        hn="$(hostname) $(hostname -I 2>/dev/null)"
+        echo "$hn" | grep -Eqi 'comservproduction|192\.168\.1\.12[67]' && die "local-test refuses to run on a production host."
+        port_4000_free_or_test
+        PORT=4000; DEST=workstation
+        TAG=$(new_tag); plan_build "$TAG"
+        step "TAG $REPO:$TAG also as $REPO:test (local only; never :latest, never pushed)"
+        CMDS+=("tag_test $TAG")
+        plan_run_on workstation 4000 "$TAG"
+        step "Destination: workstation :4000 (comserv2-web-test), SYSTEM_IDENTIFIER=workstation-test, COMSERV_JOBS=0. No push. :5000 is not touched."
+        run_steps ;;
     plan|stage)
         PORT="${PORT:-4000}"
         container_for_port "$PORT" >/dev/null || die "port must be 5000, 4000 or 3000"
@@ -227,5 +249,5 @@ case "$ACTION" in
             echo "workstation:$p $n $info${img:+ image=$img}$note current=$(state_get workstation $p current) previous=$(state_get workstation $p previous)"
         done
         echo "production1:5000 current=$(state_get production1 5000 current) previous=$(state_get production1 5000 previous)" ;;
-    *) die "unknown action '$ACTION' (plan|stage|promote|safe-push|rollback|tags|state)" ;;
+    *) die "unknown action '$ACTION' (plan|stage|local-test|promote|safe-push|rollback|tags|state)" ;;
 esac

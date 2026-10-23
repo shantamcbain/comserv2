@@ -64,6 +64,8 @@ Every button first shows a <b>Preview</b>; nothing happens until you press <b>Ap
 <fieldset><legend>Other actions</legend>
 <table>
  <tr><th>Action</th><th>What it does</th><th></th></tr>
+ <tr><td><b>Local test build (:4000)</b><br><small>Destination: <b>workstation :4000, no push</b></small></td><td>Builds a new image on the workstation from the current checkout, tags it <code>&lt;commit-time&gt;</code> and <code>:test</code> (never <code>:latest</code>, never pushed) and runs it as <code>comserv2-web-test</code> on :4000 with shared NFS themes, the same secrets, <code>SYSTEM_IDENTIFIER=workstation-test</code> and <code>COMSERV_JOBS=0</code>. Health-gated; :5000 is never touched. Refuses on production hosts or if another container holds :4000.</td>
+   <td><button data-act="local-test">Preview</button> <button data-act="local-test" data-apply="1" class="danger">Apply</button></td></tr>
  <tr><td><b>Promote 4000 → 5000</b></td><td>Takes the image that is running <i>healthy</i> on :4000 and starts the same image on :5000 for the chosen destination. No rebuild. The old :5000 is kept as <code>bk-…</code> for rollback, with a health check and automatic restore. For production1 it first pushes that tag.</td>
    <td><button data-act="promote">Preview</button> <button data-act="promote" data-apply="1" class="danger">Apply</button></td></tr>
  <tr><td><b>Safe Push</b></td><td>Pushes <i>only</i> the fixed tag running healthy on workstation :5000 to Docker Hub, then points <code>:latest</code> at it. Refuses if :5000 is unhealthy or not a fixed tag. Never pushes "whatever is running".</td>

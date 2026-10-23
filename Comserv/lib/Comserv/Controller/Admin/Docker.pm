@@ -1812,7 +1812,7 @@ sub docker_self :Path('/admin/docker/self') :Args(0) {
 # rename-to-backup / health gate / auto-restore). Preview is the default:
 # /run without apply=1 never builds, starts, pushes or pulls anything.
 # ─────────────────────────────────────────────────────────────────────────────
-my %FLOW_ACTIONS = map { $_ => 1 } qw(plan promote safe-push rollback);
+my %FLOW_ACTIONS = map { $_ => 1 } qw(plan local-test promote safe-push rollback);
 my %FLOW_PORTS   = map { $_ => 1 } qw(5000 4000 3000);
 my %FLOW_DESTS   = map { $_ => 1 } qw(workstation production1 both);
 
