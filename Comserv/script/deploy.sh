@@ -671,7 +671,7 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
             # starts. Late dispatch after the function definition runs it.
             ;;
 
-        "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild"|"push-only")
+        "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild"|"push-only"|"run-image")
             # Functions are defined below; late dispatch after canonical_deploy*.
             ;;
 
