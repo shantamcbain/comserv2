@@ -701,14 +701,20 @@ sub daily :Path('/planning/daily') :Args {
                 @branch_pids = ();
             }
             %branch_scope = map { $_ => 1 } @branch_pids;
-            my $matched = scalar grep {
+            # Branch worktrees show ONLY this branch's todos (Shanta, Oct 24 2026).
+            # Only main ranks every branch. ?filter_project=all is the escape hatch.
+            my $before_branch = scalar @all_sorted;
+            @all_sorted = grep {
                 Comserv::Util::FocusRanking::todo_matches_branch($_, $cur_branch, \%branch_scope)
             } @all_sorted;
+            my $matched = scalar @all_sorted;
+            my $hidden_other = $before_branch - $matched;
             $c->stash->{branch_focus_filter} = {
                 branch      => $cur_branch,
                 root_id     => $branch_pids[0],
                 project_ids => \@branch_pids,
                 matched     => $matched,
+                hidden      => $hidden_other,
             };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
                 "Branch focus '$cur_branch': $matched todos match branch "
