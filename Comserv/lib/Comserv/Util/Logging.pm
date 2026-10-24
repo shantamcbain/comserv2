@@ -375,6 +375,8 @@ sub get_system_identifier {
     $identifier .= " ($tag_str)" if $tag_str;
 
     # Append port to disambiguate multiple dev servers on the same host
+    # Host-published port (e.g. 4000 for comserv2-web-test) beats the in-container listen port.
+    $port = $ENV{COMSERV_PUBLIC_PORT} if ($ENV{COMSERV_PUBLIC_PORT} // '') =~ /^\d+$/;
     $port //= $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || ( $is_docker ? '3000' : '3001' );
     $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
 
