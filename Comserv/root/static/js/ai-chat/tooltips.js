@@ -35,7 +35,7 @@
         '#ai-reject-btn':             'Discard the AI’s suggested code change',
         '#ai-diff-pane':              'Proposed code change — Approve to apply, Reject to discard',
         '#branch-select':             'Active git branch for this editor session',
-        '#editor-select':             'Switch the editor (Ace code / Rich text)',
+        '#editor-select':             'Switch Ace source or Visual (WYSIWYG) for HTML and template files',
         '#refresh-btn':               'Reload the file from disk',
         '#merge-main-btn':            'Merge the current branch into main'
     };

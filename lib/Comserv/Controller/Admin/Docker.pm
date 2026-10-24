@@ -1804,4 +1804,135 @@ sub docker_self :Path('/admin/docker/self') :Args(0) {
     $c->response->body(encode_json({ container_id => $cid || '', in_docker => (-f '/.dockerenv' ? 1 : 0) }));
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Deploy flow screen (todo #2597): image-first deploys.
+#   build once with a fixed <commit>-<time> tag → test on :4000 → promote the SAME
+#   image to :5000 → Safe Push only the tested tag → roll back by tag.
+# All work is done by script/deploy-flow.sh (which reuses deploy.sh's
+# rename-to-backup / health gate / auto-restore). Preview is the default:
+# /run without apply=1 never builds, starts, pushes or pulls anything.
+# ─────────────────────────────────────────────────────────────────────────────
+my %FLOW_ACTIONS = map { $_ => 1 } qw(plan local-test promote safe-push rollback);
+my %FLOW_PORTS   = map { $_ => 1 } qw(5000 4000 3000);
+my %FLOW_DESTS   = map { $_ => 1 } qw(workstation production1 both);
+
+sub _flow_script {
+    my ($self, $c) = @_;
+    return $c->path_to('script', 'deploy-flow.sh')->stringify;
+}
+
+sub _flow_exec {    # list-form exec: no shell, no interpolation of user input
+    my ($self, @cmd) = @_;
+    my $pid = open(my $fh, '-|');
+    return ("could not fork: $!", 255) unless defined $pid;
+    if (!$pid) { open STDERR, '>&', \*STDOUT; exec @cmd; exit 127 }
+    local $/; my $out = <$fh> // ''; close $fh;
+    my $rc = $? >> 8;
+    # Script output is UTF-8 bytes; decode so encode_json does not double-encode (mojibake arrows).
+    require Encode; $out = Encode::decode('UTF-8', $out, Encode::FB_DEFAULT());
+    return ($out, $rc);
+}
+
+sub deploy_flow :Path('/admin/docker/flow') :Args(0) {
+    my ($self, $c) = @_;
+    unless ($self->_can_access_docker_widget($c)) {
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+    my $script = $self->_flow_script($c);
+    my ($state) = $self->_flow_exec($script, 'state');
+    my ($tags)  = $self->_flow_exec($script, 'tags');
+    my @tags = grep { $_ ne 'latest' && $_ !~ /^backup/ } map { (split /\t/)[0] } grep { length } split /\n/, ($tags // '');
+    $c->stash(
+        template   => 'admin/docker/deploy_flow.tt',
+        flow_state => $state,
+        flow_tags  => \@tags,
+        no_wrapper => 0,
+    );
+}
+
+sub deploy_flow_run :Path('/admin/docker/flow/run') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless ($self->_can_access_docker_widget($c)) {
+        $c->res->status(403);
+        $c->res->body(encode_json({ ok => 0, error => 'CSC admin (Shanta) on the workstation only' }));
+        return;
+    }
+    my $p      = $c->req->params;
+    my $action = $p->{action} // 'plan';
+    my $port   = $p->{port}   // '4000';
+    my $dest   = $p->{dest}   // 'workstation';
+    my $image  = $p->{image}  // 'new';
+    my $apply  = ($p->{apply} && $c->req->method eq 'POST') ? 1 : 0;
+    return $self->_flow_bad($c, 'Run this from the workstation app on the host (e.g. :3001), not from inside a container: it needs the host Docker.') if -f '/.dockerenv';
+    return $self->_flow_bad($c, 'unknown action')      unless $FLOW_ACTIONS{$action};
+    return $self->_flow_bad($c, 'port must be 5000, 4000 or 3000') unless $FLOW_PORTS{$port};
+    return $self->_flow_bad($c, 'bad destination')     unless $FLOW_DESTS{$dest};
+    return $self->_flow_bad($c, 'bad image tag')       unless $image eq 'new' || $image =~ /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+    my @cmd = ($self->_flow_script($c), $action);
+    push @cmd, '--image', $image, '--port', $port if $action eq 'plan';
+    push @cmd, '--dest', $dest;
+    push @cmd, '--apply' if $apply;
+
+    if (!$apply) {
+        my ($out, $rc) = $self->_flow_exec(@cmd);
+        $c->res->body(encode_json({ ok => ($rc == 0 ? 1 : 0), preview => 1, rc => $rc, output => $out }));
+        return;
+    }
+    # Apply: run in the background (builds take minutes), stream to a log file.
+    my $log = $c->path_to('root', 'log', 'deploy_flow.log')->stringify;
+    my $start_offset = (-s $log) || 0;
+    my $pid = fork();
+    if (!defined $pid) { return $self->_flow_bad($c, "fork failed: $!") }
+    if (!$pid) {
+        require POSIX; POSIX::setsid();
+        open STDIN, '<', '/dev/null'; open STDOUT, '>>', $log; open STDERR, '>&', \*STDOUT;
+        $| = 1;
+        print "\n[" . scalar(localtime) . "] deploy-flow: @cmd[1..$#cmd] (by " . ($c->session->{username} // '?') . ")\n";
+        my $rc = system(@cmd); $rc = $rc == -1 ? 127 : ($rc >> 8);
+        print "[" . scalar(localtime) . "] deploy-flow finished rc=$rc " . ($rc == 0 ? "SUCCESS" : "FAILED") . "\n";
+        POSIX::_exit($rc ? 1 : 0);
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'deploy_flow_run',
+        "deploy-flow apply started: @cmd[1..$#cmd] pid=$pid");
+    $c->res->body(encode_json({ ok => 1, preview => 0, started => 1, pid => $pid, log => '/admin/docker/flow/log', offset => $start_offset }));
+}
+
+sub deploy_flow_log :Path('/admin/docker/flow/log') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('text/plain; charset=utf-8');
+    unless ($self->_can_access_docker_widget($c)) { $c->res->status(403); $c->res->body("forbidden\n"); return }
+    my $log = $c->path_to('root', 'log', 'deploy_flow.log')->stringify;
+    if (defined(my $off = $c->req->params->{offset})) {
+        # Live tail for the Deploy dialog: bytes from offset up to the last newline.
+        $off = 0 unless $off =~ /^\d+$/;
+        my $size = (-s $log) || 0;
+        $off = 0 if $off > $size;
+        my $buf = '';
+        if (open my $fh, '<:raw', $log) { seek $fh, $off, 0; read $fh, $buf, 262144; close $fh }
+        my $nl = rindex($buf, "\n");
+        $buf = $nl >= 0 ? substr($buf, 0, $nl + 1) : '';
+        my $next = $off + length($buf);
+        require Encode; my $txt = Encode::decode('UTF-8', $buf, Encode::FB_DEFAULT());
+        my ($rc) = $txt =~ /deploy-flow finished rc=(\d+)/;
+        $c->res->content_type('application/json; charset=utf-8');
+        $c->res->body(encode_json({ ok => 1, data => $txt, next => $next, size => $size,
+            done => (defined $rc ? 1 : 0), rc => $rc }));
+        return;
+    }
+    my $txt = '';
+    if (open my $fh, '<', $log) { seek $fh, (-s $log > 60000 ? -60000 : 0), 2 if -s $log > 60000; local $/; $txt = <$fh> }
+    require Encode; $txt = Encode::decode('UTF-8', $txt // '', Encode::FB_DEFAULT());
+    $c->res->body($txt || "(no deploy-flow runs yet)\n");
+}
+
+sub _flow_bad {
+    my ($self, $c, $msg) = @_;
+    $c->res->status(400);
+    $c->res->body(encode_json({ ok => 0, error => $msg }));
+    return;
+}
+
 1;
