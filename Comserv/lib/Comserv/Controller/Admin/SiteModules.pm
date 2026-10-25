@@ -353,6 +353,7 @@ sub edit_addon :Path('/admin/site_modules/edit_addon') :Args(0) {
         my $min_role     = $c->req->param('min_role') || 'member';
         $edit_site       = $c->req->param('sitename') || $edit_site;
 
+        my $saved_ok = 0;
         try {
             $c->model('DBEncy')->resultset('SystemModule')->update_or_create(
                 {
@@ -375,14 +376,19 @@ sub edit_addon :Path('/admin/site_modules/edit_addon') :Args(0) {
                 },
                 { key => 'site_module_unique' }
             );
-            $c->flash->{success_msg} = "Add-on '$key' saved (catalog + site $edit_site).";
-            $c->res->redirect($c->uri_for('/membership/addons'));
-            return $c->detach;
+            $saved_ok = 1;
         } catch {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_addon',
                 "Failed to save addon: $_");
             $c->stash->{error_msg} = "Failed to save addon: $_";
         };
+        # Redirect/detach OUTSIDE try: detach throws catalyst_detach, which the
+        # catch block above would otherwise log as a save failure (#2600).
+        if ($saved_ok) {
+            $c->flash->{success_msg} = "Add-on '$key' saved (catalog + site $edit_site).";
+            $c->res->redirect($c->uri_for('/membership/addons'));
+            return $c->detach;
+        }
     }
 
     unless ($addon) {

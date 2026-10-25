@@ -921,6 +921,13 @@ sub chat :Local :Args(0) {
     my $username = $c->session->{username} || 'Guest';
     my $user_id  = $c->session->{user_id};
 
+    # 2026-10-24 (#2605): public-site Guests (no session user_id) may chat on
+    # the shared workstation OpenRouter key, FREE models only, per-IP limited
+    # (Provider::OpenRouter enforces both). The stash flag is the only way the
+    # provider opens that path; it is never set for a logged-in session.
+    my $is_guest_chat = (defined $user_id && length $user_id) ? 0 : 1;
+    $c->stash->{ai_guest_chat} = 1 if $is_guest_chat;
+
     # Parse JSON body (mirrors v1 parsing)
     my $json_data = {};
     my $content_type = $c->request->content_type || '';
@@ -935,6 +942,21 @@ sub chat :Local :Args(0) {
         };
     }
     $json_data //= {};
+
+    if ($is_guest_chat) {
+        # Guests: only prompt + sanitised history survive. model, provider,
+        # system, user_id, site, role(s), agent, tools and page links are
+        # dropped; the free-only rule and guest flag are server-side state.
+        require Comserv::Util::AI::GuestGuard;
+        my ($clean, $why) = Comserv::Util::AI::GuestGuard->scrub_request($json_data);
+        my $gip = Comserv::Util::AI::GuestGuard->client_ip($c);
+        if ($why) {
+            Comserv::Util::AI::GuestGuard->log_block($c, $gip, $why, $clean->{prompt});
+            $c->res->body(encode_json({ success => 0, error => Comserv::Util::AI::GuestGuard->refusal() }));
+            return;
+        }
+        $json_data = { prompt => $clean->{prompt}, history => $clean->{history}, agent_id => 'general' };
+    }
 
     my $prompt  = $json_data->{prompt} // '';
     my $model   = $json_data->{model}  // '';
@@ -995,7 +1017,7 @@ sub chat :Local :Args(0) {
     my $editor_skip_writes = Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id)
         || Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id_requested)
         || ($editor_phase =~ /^(?:clarify|analyze|plan|verify|implement)$/);
-    my $hd_hit = (!$skip_role_prompt && !$editor_skip_writes) && eval {
+    my $hd_hit = (!$is_guest_chat && !$skip_role_prompt && !$editor_skip_writes) && eval {
         require Comserv::Model::AI2::HelpDeskTicketCreate;
         my $hbrain = eval { $c->model('AI2::HelpDeskTicketCreate') };
         $hbrain = Comserv::Model::AI2::HelpDeskTicketCreate->new if !$hbrain || !ref $hbrain;
@@ -1027,7 +1049,7 @@ sub chat :Local :Args(0) {
     # invent a fake "Add" box instead of emitting [ACTION: create_todo].
     # AI Editor: never intercept, even if the buffer says "create a todo" (#2423).
     my $todo_hit;
-    if (!$skip_role_prompt && !$editor_skip_writes) {
+    if (!$is_guest_chat && !$skip_role_prompt && !$editor_skip_writes) {
         $todo_hit = eval {
             require Comserv::Model::AI2::TodoCreate;
             my $brain = eval { $c->model('AI2::TodoCreate') };
@@ -1058,7 +1080,7 @@ sub chat :Local :Args(0) {
     }
 
     # Invoice-create intent: BEFORE the LLM. Draft only; never posts GL.
-    my $inv_hit = (!$skip_role_prompt && !$editor_skip_writes) && eval {
+    my $inv_hit = (!$is_guest_chat && !$skip_role_prompt && !$editor_skip_writes) && eval {
         require Comserv::Model::AI2::InvoiceCreate;
         my $ibrain = eval { $c->model('AI2::InvoiceCreate') };
         $ibrain = Comserv::Model::AI2::InvoiceCreate->new if !$ibrain || !ref $ibrain;
@@ -1085,7 +1107,7 @@ sub chat :Local :Args(0) {
 
     # Scheduler: AFTER todo-create, BEFORE the LLM. Preview by default; WRITE
     # only on apply. Never bulk-reschedules (#2218).
-    my $sched_hit = (!$skip_role_prompt && !$editor_skip_writes) && eval {
+    my $sched_hit = (!$is_guest_chat && !$skip_role_prompt && !$editor_skip_writes) && eval {
         require Comserv::Model::AI2::Scheduler;
         my $sbrain = eval { $c->model('AI2::Scheduler') };
         $sbrain = Comserv::Model::AI2::Scheduler->new if !$sbrain || !ref $sbrain;
@@ -1111,7 +1133,7 @@ sub chat :Local :Args(0) {
     }
 
     # Code-read: "can you read the files" must not reach Hy3.
-    if (lc($agent_id) =~ /^(?:code|coding|programming)$/ || ($prompt =~ /\b(read|files|source|codebase|filesystem)\b/i)) {
+    if (!$is_guest_chat && (lc($agent_id) =~ /^(?:code|coding|programming)$/ || ($prompt =~ /\b(read|files|source|codebase|filesystem)\b/i))) {
         my $read_hit = eval {
             require Comserv::Model::AI2::CodeRead;
             my $brain = eval { $c->model('AI2::CodeRead') };
@@ -1143,7 +1165,8 @@ sub chat :Local :Args(0) {
 
     # Git path rejection fixer — Router chooses models per sub-step + decision models.
     # Triggered from AI editor when user pastes "Rejected unsafe or unknown path(s)" error.
-    my $gitfix_hit = eval {
+    # Admin tool: Guests never reach GitFix (router-analysed git/admin diagnosis).
+    my $gitfix_hit = $is_guest_chat ? undef : eval {
         require Comserv::Model::AI2::GitFix;
         my $brain = eval { $c->model('AI2::GitFix') } || Comserv::Model::AI2::GitFix->new;
         $brain->try_chat_fix($c, prompt => $prompt);
@@ -1170,7 +1193,8 @@ sub chat :Local :Args(0) {
     # Triggered by the 'focustune' agent_id OR a natural-language intent.
     # Programming/coding agents in AI Editor must not divert to FocusTune on plan/build words.
     my $editor_prog = (lc($agent_id // '') =~ /^(?:programming|coding|code|documentation|analyze)$/);
-    my $is_focus = (!$editor_prog) && ((lc($agent_id) eq 'focustune')
+    # Admin tool: FocusTune reads the todo queue; Guests never get it.
+    my $is_focus = (!$is_guest_chat) && (!$editor_prog) && ((lc($agent_id) eq 'focustune')
         || ($prompt =~ /\b(top\s*5|top five|most important|should i (do|work on|tackle)|what (todo|todos) (should|to) i|priorit)/i
             && $prompt =~ /\b(todo|todos|task|tasks|plan|next step|next steps|build)\b/i));
     if ($is_focus) {
@@ -1222,7 +1246,7 @@ sub chat :Local :Args(0) {
             audio_file_id      => $audio_file_id,
             transcript_file_id => $transcript_file_id,
             skip_role_prompt   => $skip_role_prompt,
-            skip_app_writes    => $editor_skip_writes ? 1 : 0,
+            skip_app_writes    => ($editor_skip_writes || $is_guest_chat) ? 1 : 0,
             surface            => $editor_skip_writes ? 'editor' : 'chat',
             phase              => $editor_phase,
             route              => $json_data->{route} || '',
