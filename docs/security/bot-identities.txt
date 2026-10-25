@@ -1,0 +1,47 @@
+BOT GIT IDENTITIES  (Code Guard for Shanta, 2026-10-24)
+
+PROBLEM
+Every commit showed "Zencoder <zencoder@workstation.local>" (global ~/.gitconfig), so it was
+impossible to tell which bot or person made a change.
+
+WHERE IT WAS SET
+Only the global ~/.gitconfig (user.name / user.email). No repo, worktree, GIT_AUTHOR_*/GIT_COMMITTER_*
+env var, Hermes config, Util/Git.pm or Admin/Git.pm override exists. Util/Git.pm runs plain
+"git commit -m" inside the branch worktree, so it automatically uses per-worktree identity.
+
+SOLUTION
+extensions.worktreeConfig=true (in the main repo's .git/config) plus "git config --worktree user.*"
+in each bot worktree. The identity is stored in <gitdir>/worktrees/<name>/config.worktree (main:
+.git/config.worktree). Author and committer are both the bot. The global identity stays as fallback.
+
+WORKTREE -> IDENTITY
+main (~/PycharmProjects/comserv2)       CSC developer <csc-developer@workstation.local>
+codeguard                               Code Guard <codeguard@workstation.local>
+aisystem                                Chat-with-AI fixer <aisystem@workstation.local>
+helpdesk                                HelpDesk <helpdesk@workstation.local>
+healthkitchen                           Health & Diet <healthkitchen@workstation.local>
+Bmaster                                 Beemaster <Bmaster@workstation.local>
+DockerHA                                Docker fixer <dockerfix@workstation.local>
+Hermes (no worktree of its own)         planned: Hermes <hermes@workstation.local> - set it with
+                                        git config --worktree in whichever worktree Hermes works in, or
+                                        export GIT_AUTHOR_NAME/EMAIL + GIT_COMMITTER_* in its launcher.
+NOT CHANGED (still Zencoder): 3d CSSNavigation Documentation InventoryAccounting ai aichatsystem-ef4e
+cgi-bin-legacy deployflow ency errlog-fix git(git-dev) helpdesk-spam herbs-then-web login-return
+mail-connect mailnewletter planning schema todo-search, ~/.grok/worktrees/* (detached).
+New worktrees need the same 2 commands (see below). Worktrees made by Util/Git.pm create_worktree
+do not set it yet: proposed one-line follow-up there (git config --worktree after worktree add),
+not made because it touches the app's commit flow.
+
+ADD / CHANGE ONE
+  git -C <worktree> config --worktree user.name  "Name"
+  git -C <worktree> config --worktree user.email "id@workstation.local"
+  git -C <worktree> var GIT_AUTHOR_IDENT        # verify
+
+LIMITS
+Identity is only a label, not authentication: anyone can set any name. Old commits are unchanged.
+Merge commits made on main show the main identity. If Hermes or a script sets GIT_AUTHOR_* env vars,
+those win over this config.
+
+RISK / UNDO
+Low. To undo one worktree:  git -C <worktree> config --worktree --unset user.name; ... --unset user.email
+To undo everything:         git config --unset extensions.worktreeConfig   (per-worktree files are then ignored)
