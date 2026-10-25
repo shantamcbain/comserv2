@@ -37,7 +37,7 @@ print {$fh} encode_json({
     version  => 1,
     branches => {
         aisystem => {
-            model => 'nimble:latest', gate => 0.30, window => 20,
+            model => 'nimble:latest', gate => 0.30, window => 15,
             computed_at => time,
             rows => {
                 2 => { score => 1.80, confidence => 0.60 },

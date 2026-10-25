@@ -1168,6 +1168,14 @@ Parameters:
 
 sub generate :Local :Args(0) {
     my ($self, $c) = @_;
+
+    # Chat with AI is development-only: public SiteName hosts cannot reach a model.
+    unless (Comserv::Util::SystemInfo::is_dev_request_host($c)) {
+        $c->response->status(403);
+        $c->response->content_type('application/json');
+        $c->response->body(encode_json({ success => JSON::false, error => 'Chat with AI is not available on this site.' }));
+        return;
+    }
     
     # Set response content type
     $c->response->content_type('application/json');
@@ -2981,6 +2989,14 @@ Parameters:
 
 sub chat :Local :Args(0) {
     my ($self, $c) = @_;
+
+    # Chat with AI is development-only: public SiteName hosts cannot reach a model.
+    unless (Comserv::Util::SystemInfo::is_dev_request_host($c)) {
+        $c->response->status(403);
+        $c->response->content_type('application/json');
+        $c->response->body(encode_json({ success => JSON::false, error => 'Chat with AI is not available on this site.' }));
+        return;
+    }
     
     # Set response content type
     $c->response->content_type('application/json');
