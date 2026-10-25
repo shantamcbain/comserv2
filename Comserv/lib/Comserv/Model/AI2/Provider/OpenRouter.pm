@@ -67,12 +67,61 @@ sub _resolve_api_key {
     # and use the shared rows, then the workstation key files.
     # Chat stays logged-in only; system => 1 (status/eval/guard) may use shared keys.
     my $user_id = eval { $c->session->{user_id} };
-    return undef unless defined $user_id || $o{system};
+    # 2026-10-24 (Shanta, #2605): public-site Guests may chat on the shared
+    # workstation row, FREE models only (enforced in _chat_http). Opt-in: the
+    # caller passes guest => 1 AND the /ai2/chat controller has marked this
+    # request (stash ai_guest_chat). Never opens the generic no-user path.
+    my $guest_ok = !defined $user_id && $o{guest} && is_guest_chat($c);
+    return undef unless defined $user_id || $o{system} || $guest_ok;
     my $key_obj = eval { _db_key($c, $user_id) };
     my $k = $key_obj && $key_obj->api_key_encrypted ? eval { $key_obj->get_api_key() } : undef;
     return $k if $k && length $k;
     return $o{system} ? shared_file_key() : undef;
 }
+
+# ---- Guest chat (public sites, no session user_id) -----------------------
+# Only the /ai2/chat controller sets stash ai_guest_chat, and only when the
+# session has no user_id. Background/no-session callers never carry the flag.
+our $GUEST_LIMIT  = 10;      # chat calls per IP per window
+our $GUEST_WINDOW = 3600;    # seconds
+my %GUEST_HITS;              # ip => [epoch, ...]  (per process, in memory)
+
+sub is_guest_chat {
+    my ($c) = @_;
+    return 0 unless $c;
+    my $uid = eval { $c->session->{user_id} };
+    return 0 if defined $uid && length $uid;
+    return eval { $c->stash->{ai_guest_chat} } ? 1 : 0;
+}
+
+# Free = OpenRouter ':free' id or the app's FREE_MODEL; never a PaidBlock id.
+sub guest_model_ok {
+    my ($model) = $_[-1];
+    return 0 unless defined $model && length $model;
+    $model =~ s/^[^|]+\|//;
+    require Comserv::Util::AI::PaidBlock;
+    return 0 if Comserv::Util::AI::PaidBlock->blocked_on_openrouter($model);
+    return ($model =~ /:free$/i || $model eq $Comserv::Util::AI::PaidBlock::FREE_MODEL) ? 1 : 0;
+}
+
+# 1 = allowed (and counted), 0 = over the per-IP limit. $now is injectable.
+sub guest_rate_ok {
+    my ($ip, $now) = @_;
+    $ip = 'unknown' unless defined $ip && length $ip;
+    $now //= time;
+    if (keys %GUEST_HITS > 5000) {
+        for my $k (keys %GUEST_HITS) {
+            @{ $GUEST_HITS{$k} } = grep { $now - $_ < $GUEST_WINDOW } @{ $GUEST_HITS{$k} };
+            delete $GUEST_HITS{$k} unless @{ $GUEST_HITS{$k} };
+        }
+    }
+    my $h = $GUEST_HITS{$ip} ||= [];
+    @$h = grep { $now - $_ < $GUEST_WINDOW } @$h;
+    return 0 if @$h >= $GUEST_LIMIT;
+    push @$h, $now;
+    return 1;
+}
+sub _guest_rate_reset { %GUEST_HITS = () }
 
 # Workstation files, same names as script/load_shared_keys.pl, plus ~/.hermes/.env.
 # Returns the value only; never logged.
@@ -164,6 +213,23 @@ sub _chat_http {
 
     # 2026-10-15 last-line guard: OpenRouter is never called for any grok id
     # or deepseek-v4-pro. Callers should have rerouted grok to Super Grok.
+    my $guest = is_guest_chat($c);
+    if ($guest) {
+        unless (guest_model_ok($args{model})) {
+            eval { $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'openrouter_chat',
+                "Guest chat refused non-free model " . ($args{model} // '(none)')) };
+            return { success => 0, error => 'Guests can use free models only. Please log in to use other models.' };
+        }
+        require Comserv::Util::AI::GuestGuard;
+        my $ip = Comserv::Util::AI::GuestGuard->client_ip($c);
+        unless (guest_rate_ok($ip)) {
+            eval { $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'openrouter_chat',
+                "Guest chat rate limit hit for " . ($ip // 'unknown')) };
+            return { success => 0, rate_limited => 1,
+                     error => "You've reached the guest chat limit for now ($GUEST_LIMIT messages per hour). Please try again later, or log in to keep chatting." };
+        }
+    }
+
     require Comserv::Util::AI::PaidBlock;
     if (Comserv::Util::AI::PaidBlock->blocked_on_openrouter($args{model} // '')) {
         my $was = $args{model};
@@ -172,12 +238,13 @@ sub _chat_http {
             "Blocked paid OpenRouter model $was; sent $args{model} instead") };
     }
 
-    my $api_key = $self->_resolve_api_key($c, $args{api_key});
+    my $api_key = $self->_resolve_api_key($c, $args{api_key}, ($guest ? (guest => 1) : ()));
     unless ($api_key) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'openrouter_chat',
             "No active openrouter API key found (user=" . ($c->session->{username} // 'Guest') . ")");
-        return { success => 0, error => 'No active openrouter API key found' };
+        return { success => 0, error => ($guest ? 'Chat is not available to guests right now. Please log in.' : 'No active openrouter API key found') };
     }
+    # A guest never supplies a key and never sees why a call failed upstream.
 
     my $messages = $args{messages} || [];
     return { success => 0, error => 'No messages provided' }

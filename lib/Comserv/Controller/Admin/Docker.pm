@@ -5,6 +5,16 @@ use Comserv::Util::Logging;
 use Comserv::Util::DockerDeploy;
 use JSON qw(encode_json decode_json);
 use DateTime;
+use POSIX ();
+
+# Local display time in Pacific with zone label (e.g. "Fri Oct 23 09:15:48 2026 PDT").
+sub _pt_now {
+    my $t = shift // time;
+    my $r;
+    { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset(); $r = POSIX::strftime('%a %b %d %H:%M:%S %Y %Z', localtime $t); }
+    POSIX::tzset();
+    return $r;
+}
 
 BEGIN { extends 'Comserv::Controller::Base'; }
 
@@ -179,7 +189,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
 
     if ($server_role eq 'production1') {
         # Running on production1: delegate to workstation (build/edit/execute must happen there)
-        push @lines, "[${\scalar localtime}] Detected production1 — SSHing to workstation to perform deploy (source: $trigger_source)...";
+        push @lines, "[${\ _pt_now()}] Detected production1 — SSHing to workstation to perform deploy (source: $trigger_source)...";
         # The workstation has the full source, docker build context, and rights.
         # We trigger the main deploy script on workstation (which will then push to prod if needed).
         my $workstation_host = 'workstation.local';  # or 192.168.1.199
@@ -235,6 +245,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
             }
             if ($pid == 0) {
                 # ── Child: detach from Catalyst and run the deploy ──
+                require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
                 eval {
                     require POSIX;
                     POSIX::setsid();
@@ -256,7 +267,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
                         no_cache => $no_cache,
                     );
                     my $ok = $deploy->deploy_to_target_safe();
-                    print $log_fh "[" . scalar(localtime) . "] === FINAL RESULT: " . ($ok ? "SUCCESS" : "FAILED") . " ===\n";
+                    print $log_fh "[" . _pt_now() . "] === FINAL RESULT: " . ($ok ? "SUCCESS" : "FAILED") . " ===\n";
                     close $log_fh;
                 };
                 unlink $pid_file;
@@ -264,7 +275,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
             }
 
             # ── Parent: reply immediately; the UI polls deploy_status ──
-            push @lines, "[${\scalar localtime}] $target deploy started in background (pid $pid, trigger: $trigger_source" . ($no_cache ? ", --no-cache" : "") . ").";
+            push @lines, "[${\ _pt_now()}] $target deploy started in background (pid $pid, trigger: $trigger_source" . ($no_cache ? ", --no-cache" : "") . ").";
             push @lines, "Progress streams to the log below via status polling.";
             $c->response->body(encode_json({
                 success     => 1,
@@ -287,7 +298,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         }
         my $compose_args = join(' ', @compose_files);
 
-        push @lines, "[${\scalar localtime}] === git pull ===";
+        push @lines, "[${\ _pt_now()}] === git pull ===";
         my $git_out  = `cd '$repo_path' && git pull 2>&1`;
         my $git_exit = $? >> 8;
         push @lines, $git_out;
@@ -295,16 +306,16 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         $success = 0 if $git_exit;
 
         # === Step: Create dated backup via Model (Catalyst norm) ===
-        push @lines, "[${\scalar localtime}] === Creating dated backup of $container ===";
+        push @lines, "[${\ _pt_now()}] === Creating dated backup of $container ===";
         my $backup_result = $c->model('Docker')->create_dated_backup($container);
         if ($backup_result->{success}) {
-            push @lines, "[${\scalar localtime}] Backup created: $backup_result->{backup_name}";
+            push @lines, "[${\ _pt_now()}] Backup created: $backup_result->{backup_name}";
         } else {
-            push @lines, "[${\scalar localtime}] Backup step skipped or failed";
+            push @lines, "[${\ _pt_now()}] Backup step skipped or failed";
         }
 
         # === Volume Normalization (ensure comserv2_* volumes) ===
-        push @lines, "[${\scalar localtime}] === Normalizing volumes (comserv2_* standard) ===";
+        push @lines, "[${\ _pt_now()}] === Normalizing volumes (comserv2_* standard) ===";
         my $norm_out = `cd '$repo_path/Comserv' && docker compose $compose_args config --quiet 2>&1 || true`;
         push @lines, $norm_out;
 
@@ -324,13 +335,13 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         if (@missing || @extra) {
             my $err = "VOLUME INCONSISTENCY DETECTED\n  Missing: " . join(', ', @missing) .
                       "\n  Extra:   " . join(', ', @extra);
-            push @lines, "[${\scalar localtime}] ERROR: $err";
+            push @lines, "[${\ _pt_now()}] ERROR: $err";
             $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'docker_deploy', $err);
             # Abort deploy
             $c->response->body(encode_json({ success => 0, message => 'Volume inconsistency', output => join("\n", @lines) })) if $c;
             exit 1;
         } else {
-            push @lines, "[${\scalar localtime}] Volume consistency check passed (all comserv2_* volumes present).";
+            push @lines, "[${\ _pt_now()}] Volume consistency check passed (all comserv2_* volumes present).";
         }
 
         # === Delegate to the SINGLE canonical pipeline (deploy.sh --prod) ===
@@ -341,16 +352,16 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         # This button already runs on the workstation app. Do NOT SSH to
         # 192.168.1.199 — that hop was the 2026-08-23 failed path (self-ssh,
         # then deploy.sh --deploy-to-node workstation).
-        push @lines, "[${\scalar localtime}] === Running deploy.sh locally (no SSH hop) ===";
+        push @lines, "[${\ _pt_now()}] === Running deploy.sh locally (no SSH hop) ===";
         my $ws_cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger_source' PROD_TARGET_HOST=192.168.1.126 script/deploy.sh --prod 2>&1";
         my $canon_out = `$ws_cmd`;
         push @lines, $canon_out;
         if ($? >> 8) { $success = 0; }
-        push @lines, "[${\scalar localtime}] Canonical deploy sequence complete.";
+        push @lines, "[${\ _pt_now()}] Canonical deploy sequence complete.";
     }
 
     my $elapsed = time() - $t0;
-    push @lines, "[${\scalar localtime}] Done in ${elapsed}s — " . ($success ? 'SUCCESS' : 'ERRORS DETECTED');
+    push @lines, "[${\ _pt_now()}] Done in ${elapsed}s — " . ($success ? 'SUCCESS' : 'ERRORS DETECTED');
 
     my $output = join("\n", @lines);
 
@@ -470,28 +481,29 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     }
 
     if ($pid == 0) {
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
         # CHILD – catch ALL fatal errors and write them to the log file
         local $SIG{__DIE__} = sub {
             my $err = shift || 'unknown error';
             if (open my $lf, '>>', $log_file) {
-                print $lf "[".scalar(localtime)."] CHILD CRASHED: $err\n";
+                print $lf "["._pt_now()."] CHILD CRASHED: $err\n";
                 close $lf;
             }
             unlink $pid_file;
-            exit(1);
+            Comserv::Util::ForkSafe::child_exit(1);
         };
 
         close_std_fds();
         open(my $log, '>>', $log_file) or do {
             warn "Cannot open $log_file: $!";
             unlink $pid_file;
-            exit(1);
+            Comserv::Util::ForkSafe::child_exit(1);
         };
         $| = 1;
         select((select($log), $|=1)[0]);
         eval { open STDOUT, '>>', $log_file; open STDERR, '>>', $log_file; 1 };
 
-        print $log "[".scalar(localtime)."] === DOCKER DEPLOY STARTED (trigger=$trigger, target=$target) ===\n";
+        print $log "["._pt_now()."] === DOCKER DEPLOY STARTED (trigger=$trigger, target=$target) ===\n";
         $log->flush();
 
         # Delegate to the SINGLE canonical pipeline (deploy.sh --deploy-to-node).
@@ -515,17 +527,17 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
                  : ($target eq "production2") ? "192.168.1.127"
                  : $target;
         my $cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger' script/deploy.sh --deploy-to-node $node";
-        print $log "[".scalar(localtime)."] Running deploy.sh locally --deploy-to-node $node. Output streams below.\n";
+        print $log "["._pt_now()."] Running deploy.sh locally --deploy-to-node $node. Output streams below.\n";
         $log->flush();
         close($log);
         my $rc = system('script', '-q', '-f', '-a', '-e', '-c', $cmd, $log_file);
         $rc = $rc >> 8;
         if (open my $lf, '>>', $log_file) {
-            print $lf "[".scalar(localtime)."] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
+            print $lf "["._pt_now()."] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
             close $lf;
         }
         unlink($pid_file);
-        exit(0);
+        Comserv::Util::ForkSafe::child_exit(0);
     }
 
     sub close_std_fds {
@@ -1041,28 +1053,29 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
     }
 
     if ($pid == 0) {
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
         # CHILD — run the deploy asynchronously
         local $SIG{__DIE__} = sub {
             my $err = shift || 'unknown error';
             if (open my $lf, '>>', $log_file) {
-                print $lf "[" . scalar(localtime) . "] CHILD CRASHED: $err\n";
+                print $lf "[" . _pt_now() . "] CHILD CRASHED: $err\n";
                 close $lf;
             }
             unlink $pid_file;
-            exit(1);
+            Comserv::Util::ForkSafe::child_exit(1);
         };
 
         close_std_fds();
         open(my $log, '>>', $log_file) or do {
             warn "Cannot open $log_file: $!";
             unlink $pid_file;
-            exit(1);
+            Comserv::Util::ForkSafe::child_exit(1);
         };
         $| = 1;
         select((select($log), $|=1)[0]);
         eval { open STDOUT, '>>', $log_file; open STDERR, '>>', $log_file; 1 };
 
-        print $log "[" . scalar(localtime) . "] === REBUILD STARTED (service=$service, target=$deploy_target, no_cache=" . ($no_cache ? 'yes' : 'no') . ", mode=$mode) ===\n";
+        print $log "[" . _pt_now() . "] === REBUILD STARTED (service=$service, target=$deploy_target, no_cache=" . ($no_cache ? 'yes' : 'no') . ", mode=$mode) ===\n";
         $log->flush();
 
         require Comserv::Util::DockerDeploy;
@@ -1084,11 +1097,11 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
             );
         };
         if ($@) {
-            print $log "[" . scalar(localtime) . "] Failed to create DockerDeploy: $@\n";
+            print $log "[" . _pt_now() . "] Failed to create DockerDeploy: $@\n";
             $log->flush();
             close($log);
             unlink($pid_file);
-            exit(1);
+            Comserv::Util::ForkSafe::child_exit(1);
         }
 
         # Delegate to the SINGLE canonical pipeline (deploy.sh --deploy-to-node)
@@ -1129,9 +1142,9 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
             $flag = '--deploy-to-node';
             $node_arg = " $node";
         }
-        print $log "[".scalar(localtime)."] Running deploy.sh locally $flag$node_arg (mode=$mode). Output streams below.\n";
+        print $log "["._pt_now()."] Running deploy.sh locally $flag$node_arg (mode=$mode). Output streams below.\n";
         if ($flag eq '--local-rebuild') {
-            print $log "[".scalar(localtime)."] This is a WORKSTATION-only rebuild. Production will NOT be updated.\n";
+            print $log "["._pt_now()."] This is a WORKSTATION-only rebuild. Production will NOT be updated.\n";
         }
         $log->flush();
         close($log);
@@ -1141,7 +1154,7 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
         my $rc = system('/bin/bash', '-lc', "$inner >>'$log_file' 2>&1");
         $rc = $rc >> 8;
         if (open my $lf, '>>', $log_file) {
-            print $lf "[" . scalar(localtime) . "] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
+            print $lf "[" . _pt_now() . "] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
             # Archive this run immediately so the next button press cannot erase evidence
             my $arch_dir = '/home/shanta/PycharmProjects/comserv2/log/docker_deploy/comserv2-web-prod';
             mkdir $arch_dir unless -d $arch_dir;
@@ -1151,7 +1164,7 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
             close $lf;
         }
         unlink($pid_file);
-        exit($rc ? 1 : 0);
+        Comserv::Util::ForkSafe::child_exit($rc ? 1 : 0);
     }
 
     # PARENT
@@ -1320,7 +1333,7 @@ sub start_backup :Path('/admin/docker/start_backup') :Args(0) {
     
     # Log the manual start
     my $log_entry = {
-        timestamp => scalar(localtime),
+        timestamp => _pt_now(),
         container => $container_name,
         reason => "Manual start of backup: $backup_tag",
         health_status => 'manual',
@@ -1449,7 +1462,7 @@ sub restore_backup :Path('/admin/docker/restore_backup') :Args(0) {
         my $existing = `$ssh_prefix \"cat $recovery_log 2>/dev/null || echo '[]'\"` || '[]';
         $existing =~ s/^\s+|\s+$//g;
         my $log_entry = {
-            timestamp => scalar(localtime),
+            timestamp => _pt_now(),
             container => $active_name,
             reason => "Manual restore from backup: $backup_name",
             health_status => $success ? 'started' : 'failed',
@@ -1825,7 +1838,7 @@ sub _flow_exec {    # list-form exec: no shell, no interpolation of user input
     my ($self, @cmd) = @_;
     my $pid = open(my $fh, '-|');
     return ("could not fork: $!", 255) unless defined $pid;
-    if (!$pid) { open STDERR, '>&', \*STDOUT; exec @cmd; exit 127 }
+    if (!$pid) { require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare(); open STDERR, '>&', \*STDOUT; exec @cmd; Comserv::Util::ForkSafe::child_exit(127) }
     local $/; my $out = <$fh> // ''; close $fh;
     my $rc = $? >> 8;
     # Script output is UTF-8 bytes; decode so encode_json does not double-encode (mojibake arrows).
@@ -1887,12 +1900,12 @@ sub deploy_flow_run :Path('/admin/docker/flow/run') :Args(0) {
     my $pid = fork();
     if (!defined $pid) { return $self->_flow_bad($c, "fork failed: $!") }
     if (!$pid) {
-        require POSIX; POSIX::setsid();
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare(); require POSIX; POSIX::setsid();
         open STDIN, '<', '/dev/null'; open STDOUT, '>>', $log; open STDERR, '>&', \*STDOUT;
         $| = 1;
-        print "\n[" . scalar(localtime) . "] deploy-flow: @cmd[1..$#cmd] (by " . ($c->session->{username} // '?') . ")\n";
+        print "\n[" . _pt_now() . "] deploy-flow: @cmd[1..$#cmd] (by " . ($c->session->{username} // '?') . ")\n";
         my $rc = system(@cmd); $rc = $rc == -1 ? 127 : ($rc >> 8);
-        print "[" . scalar(localtime) . "] deploy-flow finished rc=$rc " . ($rc == 0 ? "SUCCESS" : "FAILED") . "\n";
+        print "[" . _pt_now() . "] deploy-flow finished rc=$rc " . ($rc == 0 ? "SUCCESS" : "FAILED") . "\n";
         POSIX::_exit($rc ? 1 : 0);
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'deploy_flow_run',

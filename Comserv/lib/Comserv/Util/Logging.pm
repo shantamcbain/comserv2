@@ -214,12 +214,14 @@ sub _copy_archive_to_nfs_async {
         return;
     }
     if ($pid == 0) {
+        require Comserv::Util::ForkSafe;
+        Comserv::Util::ForkSafe::child_prepare();
         eval {
             make_path($nfs_archive_dir) unless -d $nfs_archive_dir;
             my (undef, undef, $fname) = File::Spec->splitpath($archived_log);
             File::Copy::copy($archived_log, File::Spec->catfile($nfs_archive_dir, $fname));
         };
-        exit 0;
+        Comserv::Util::ForkSafe::child_exit(0);
     }
 }
 

@@ -258,3 +258,5 @@ Comserv/data/ai_model_scorecard_cache.json
 Comserv/data/supergrok_alert_state.json
 Comserv/data/grokcom_bot_seen.json
 Comserv/root/static/ai/grokcom_build_seen.json
+Comserv/data/ai_eval_ingest_sources.jsonl
+Comserv/data/ai_rank_jobs/aisystem.json
