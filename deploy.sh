@@ -3,6 +3,8 @@ set -e
 
 # Ensure standard system bin paths are included in PATH (critical for non-interactive SSH)
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+# Show every local time in Pacific (PDT/PST); ISO build stamps stay UTC (date -u).
+export TZ="${DEPLOY_TZ:-America/Vancouver}"
 
 # ── Sync changed host/cron scripts to the host (FIRST, before any build/pull) ──
 # The container carries the app code, but host-side cron scripts (hardware_monitor.pl)
@@ -1055,6 +1057,7 @@ start_prod_container_from_image() {
         -e COMSERV_SESSION_DIR=/tmp/comserv/session \
         -e COMSERV_SESSION_COOKIE=comserv_session \
         -e SYSTEM_IDENTIFIER="$ident" \
+        -e COMSERV_PUBLIC_PORT="${HOST_PORT:-5000}" \
         -e RUNNING_IN_DOCKER=docker \
         -v "$secrets:/home/comserv/.comserv/secrets:ro" \
         -v comserv2_cache:/cache \

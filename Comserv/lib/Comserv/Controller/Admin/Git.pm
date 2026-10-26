@@ -469,15 +469,34 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         $msg ||= 'Nothing deleted.';
     }
     elsif ($op eq 'gitignore') {
-        # Only untracked files may be gitignored (tracked ones need git rm --cached first).
+        # Untracked files: add to .gitignore. Tracked files: also untrack them with
+        # 'git rm --cached' (file stays on disk) - .gitignore alone never stops git
+        # tracking a file it already tracks. .gitignore is staged afterwards.
         my @tracked = grep { !$validated->{untracked}{$_} } @{ $validated->{valid} };
-        my @ignore  = grep {  $validated->{untracked}{$_} } @{ $validated->{valid} };
-        $ok = $self->_append_gitignore($c, \@ignore);
-        $msg  = @ignore ? ($ok ? "Added to .gitignore: " . join(', ', @ignore) . "."
-                               : "Failed to update .gitignore.") : '';
-        $msg .= " Skipped (tracked — run 'git rm --cached' first): " . join(', ', @tracked) . "."
-            if @tracked;
-        $ok = 1 if @tracked && !@ignore;   # informational, not a failure
+        my @all     = @{ $validated->{valid} };
+        my (@untracked_done, @errors);
+        if (@tracked) {
+            my ($out, $code) = $self->_git_list($c, 'rm', '--cached', '-q', '--', @tracked);
+            if ($code == 0) { @untracked_done = @tracked; }
+            else            { push @errors, "git rm --cached failed: $out"; }
+        }
+        # Only ignore what is now untracked (skip tracked files whose rm failed).
+        my %rm_ok = map { $_ => 1 } @untracked_done;
+        my @ignore = grep { $validated->{untracked}{$_} || $rm_ok{$_} } @all;
+        my $gi_ok = $self->_append_gitignore($c, \@ignore);
+        push @errors, 'Failed to update .gitignore.' unless $gi_ok;
+        if ($gi_ok && @ignore) {
+            my ($out, $code) = $self->_git_list($c, 'add', '--', '.gitignore');
+            push @errors, "Could not stage .gitignore: $out" if $code != 0;
+        }
+        $ok  = (@ignore && !@errors) ? 1 : 0;
+        $msg = '';
+        $msg .= "Added to .gitignore: " . join(', ', @ignore) . ". " if @ignore && $gi_ok;
+        $msg .= "Stopped tracking (git rm --cached, files kept on disk): "
+              . join(', ', @untracked_done) . ". " if @untracked_done;
+        $msg .= ".gitignore and the removals are staged - commit to finish. " if $ok && @untracked_done;
+        $msg .= ".gitignore is staged - commit to finish. " if $ok && !@untracked_done;
+        $msg .= join(' ', @errors) if @errors;
     }
     elsif ($op eq 'stash') {
         my $message = $c->req->param('message') || '';
@@ -692,10 +711,19 @@ PROMPT
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'suggest_commit_message',
         "Suggested commit message (" . length($message) . " chars) via $used_model");
 
+    # Warn about backup copies / runtime data in the change set (commit would be refused).
+    my @chg;
+    my ($cached_names) = $self->_git_list($c, 'diff', '--cached', '--name-only', '--diff-filter=ACMR');
+    my ($wt_names)     = $self->_git_list($c, 'diff', 'HEAD', '--name-only', '--diff-filter=ACMR');
+    push @chg, grep { length } split /\n/, ($cached_names // '') . "\n" . ($wt_names // '');
+    push @chg, @paths;
+    my $junk = eval { $self->git_service->junk_files($c, \@chg) } || [];
+
     $c->response->body(encode_json({
-        success => 1,
-        message => $message,
-        model   => $used_model,
+        success    => 1,
+        message    => $message,
+        model      => $used_model,
+        junk_files => $junk,
     }));
 }
 
@@ -767,6 +795,11 @@ sub index :Path('/admin/git') :Args(0) {
     my $target_key = $c->stash->{git_target} // '';
 
     my $status = $self->get_git_status($c);
+
+    # Junk warning: backup copies / app runtime data among the changed files.
+    my @changed = map { @{ $status->{$_} || [] } } qw(staged_files modified_files untracked_files);
+    my $junk = eval { $self->git_service->junk_files($c, \@changed) } || [];
+    $c->stash(junk_files => $junk) if @$junk;
 
     if (my $raw = $c->flash->{guard_hits_json}) {
         my $hits = eval { decode_json($raw) };
@@ -1463,6 +1496,11 @@ sub git_stash_management :Path('/admin/git_stash') :Args(0) {
     # Get current git status
     my $git_status = $self->get_git_status($c);
     $c->stash(git_status => $git_status);
+    {
+        my @changed = map { @{ $git_status->{$_} || [] } } qw(staged_files modified_files untracked_files);
+        my $junk = eval { $self->git_service->junk_files($c, \@changed) } || [];
+        $c->stash(junk_files => $junk) if @$junk;
+    }
     
     if ($c->session->{debug_mode}) {
         push @{$c->stash->{debug_msg}}, "Git controller git_stash view - Template: admin/git_stash.tt";

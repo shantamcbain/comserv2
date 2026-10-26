@@ -31,6 +31,7 @@ sub _run {
     my (@cmd) = @_;
     my $pid = open(my $fh, '-|') // return;
     if (!$pid) {
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
         open STDERR, '>', File::Spec->devnull;
         exec { $cmd[0] } @cmd or POSIX::_exit(127);
     }

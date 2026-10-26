@@ -106,6 +106,13 @@ my @rows = grep { my $s = $_->{status} // '';
     } @rows;
 }
 
+# Branch worktrees rank ONLY their own branch's todos (matches the Daily Plan page).
+{
+    require Comserv::Util::FocusRanking;
+    my %scope_ids = map { $_ => 1 } @pids;
+    @rows = grep { Comserv::Util::FocusRanking::todo_matches_branch($_, $branch, \%scope_ids) } @rows;
+}
+
 die "no open todos to score\n" unless @rows;
 
 my $now = time;

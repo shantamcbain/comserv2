@@ -219,6 +219,7 @@
                 <div class="admin-panel-header"><h3>Working Tree</h3></div>
                 <div class="admin-panel-body">
                     [% IF git_status.has_changes %]
+                    [% INCLUDE admin/git/junk_warning.tt %]
                     <form method="post" action="[% c.uri_for('/admin/git/action') %]"
                           id="git-file-form" data-git-file-form="1">
                         <input type="hidden" name="confirm" value="1">
@@ -309,7 +310,7 @@
                                 <i class="fas fa-box"></i> Stash
                             </button>
                             <button type="button" class="admin-btn admin-btn-sm"
-                                    data-git-action="gitignore" data-git-confirm="Add the selected untracked file(s) to .gitignore?">
+                                    data-git-action="gitignore" data-git-confirm="Add the selected file(s) to .gitignore? Tracked files are also untracked with git rm --cached (kept on disk), and .gitignore is staged.">
                                 <i class="fas fa-eye-slash"></i> .gitignore
                             </button>
                             <button type="button" class="admin-btn admin-btn-sm admin-btn-danger"

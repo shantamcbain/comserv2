@@ -701,6 +701,12 @@
                             status.textContent = 'Drafted with ' + (data.model || 'AI') +
                                 ' — review before committing.';
                         }
+                        if (status && data.junk_files && data.junk_files.length) {
+                            status.textContent += ' Warning: backup/runtime file(s) in this change - ' +
+                                data.junk_files.join(', ') +
+                                '. The commit guard will refuse them; use "Untrack + gitignore"' +
+                                ' (reload the page if the button is not shown).';
+                        }
                     } else {
                         if (status) {
                             status.textContent = 'AI could not draft a message: ' +

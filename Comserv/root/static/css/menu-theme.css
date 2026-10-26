@@ -536,3 +536,89 @@ header h1 img.site-brand-icon {
     min-height: 44px;
     display: inline-block;
 }
+
+/* Admin server-info bar. Query must match SERVER_INFO_QUERY in common/ui.js. */
+.server-info {
+    background-color: var(--nav-bg);
+    color: var(--nav-text);
+    border-bottom: 1px solid var(--border-color);
+    padding: 5px 10px;
+    font-size: 0.75rem;
+}
+
+.server-info-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+    text-align: right;
+}
+
+.server-info-build {
+    cursor: help;
+}
+
+.server-info-commit {
+    font-size: 0.85em;
+}
+
+#server-info-content {
+    min-width: 0;
+}
+
+#server-info-toggle,
+#css-edit-toggle {
+    background: var(--button-bg);
+    color: var(--button-text);
+    border: 1px solid var(--button-border, var(--border-color));
+    border-radius: 4px;
+    padding: 6px 10px;
+    min-height: 44px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    line-height: 1.2;
+}
+
+#css-edit-toggle:hover,
+#server-info-toggle:hover {
+    background: var(--button-hover-bg);
+}
+
+#css-edit-toggle.edit-mode {
+    background: var(--warning-color);
+    color: var(--button-text);
+    border-color: var(--warning-color);
+}
+
+body.css-edit-mode * {
+    outline: 2px solid var(--accent-color);
+    position: relative;
+}
+
+body.css-edit-mode *:hover {
+    outline: 2px solid var(--warning-color);
+    cursor: crosshair;
+}
+
+#server-info-bar.is-collapsed #server-info-content {
+    display: none;
+}
+
+@media (max-width: 640px) {
+    #server-info-bar:not(.server-info-ready) #server-info-content,
+    #server-info-bar.is-collapsed #server-info-content {
+        display: none;
+    }
+
+    .server-info-row {
+        justify-content: flex-start;
+        text-align: left;
+    }
+
+    #server-info-content {
+        white-space: normal;
+        word-break: break-word;
+        line-height: 1.6;
+    }
+}

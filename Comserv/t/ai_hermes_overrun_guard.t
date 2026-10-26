@@ -6,6 +6,7 @@ use FindBin; use lib "$FindBin::Bin/../lib";
 use JSON::PP;
 use Comserv::Util::AI::HermesOverrunGuard;
 my $G = 'Comserv::Util::AI::HermesOverrunGuard';
+$Comserv::Util::AI::HermesOverrunGuard::COOLDOWN_S = 0;   # Oct 23: legacy tests restore within minutes; cool-down tested below
 # OpenRouter models list stand-in (validated ids only; no network in tests)
 my $IDS = { map { ($_ => 1) } 'cohere/north-mini-code:free', 'nvidia/nemotron-3.5-lightning:free',
             'deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-flash' };
@@ -620,8 +621,8 @@ ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID
     ok !defined $old->{week_usd}, 'stale week dropped';
     my $ml = $G->can('merge_live');
     my $m = $ml->($fresh, { ok => 1, day_usd => 4.29, after_usd => 0.05, after => $fresh->{fetched_at} });
-    is sprintf('%.2f', $m->{day_usd}), '1.56', 'fresh reading + only calls after it (no 4.29 estimate replace)';
-    is sprintf('%.2f', $m->{week_usd}), '1.56', 'week = fresh week + after-only estimate';
+    is sprintf('%.2f', $m->{day_usd}), '1.51', 'Oct 23: fresh /auth/key used as-is (no estimate added, no 4.29 replace)';
+    is sprintf('%.2f', $m->{week_usd}), '1.51', 'Oct 23: week = fresh week as-is';
     my $mo = $ml->($old, { ok => 1, day_usd => 0.40, after_usd => 0, after => undef });
     ok $mo->{live_only} && !defined $mo->{week_usd}, 'stale -> estimate-only, no stale week';
     my $d = $G->can('decide')->(thrash => 0, openrouter => $m, state => { tripped => 1 });
@@ -724,6 +725,50 @@ ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID
     ok(!exists $st->{hold_reason}, 'hold_reason cleared'); ok($st->{shield_released_at}, 'release recorded');
     is($g->shield_step($st, 8000060, {}), undef, 'plain none run never raises shield');
     is($st->{tripped}, 0, 'still 0 on next run');
+}
+
+# Oct 23 (6:57 AM PT): (A) cap trip on Super Grok blocks paid models only; (B) stale -> estimate; 30-min cool-down.
+{
+    my $po = $G->can('paid_only_trip');
+    ok $po->('caps', { provider => 'xai-oauth', default => 'grok-4.7' }), 'caps trip on xai-oauth -> paid-only';
+    ok !$po->('thrash', { provider => 'xai-oauth', default => 'grok-4.7' }), 'thrash trip not paid-only';
+    ok !$po->('caps', { provider => 'openrouter', default => 'qwen/qwen3-coder' }), 'caps trip on OpenRouter model -> normal trip';
+    my $ml = $G->can('merge_live');
+    my $now = 9_000_000;
+    my $stale = $G->can('stale_guard')->({ ok => 1, day_usd => 0.2, fetched_at => $now - 2 * 3600 }, $now, 3600);
+    ok !$stale->{ok}, '>1 h old reading dropped';
+    my $m = $ml->($stale, { ok => 1, day_usd => 0.9 });
+    is $m->{day_usd}, 0.9, 'stale/missing live reading -> estimate used';
+    my $f = $ml->({ ok => 1, day_usd => 0.2, week_usd => 1, fetched_at => $now - 60 }, { ok => 1, day_usd => 5, after => $now - 60, after_usd => 0.3 });
+    is $f->{day_usd}, 0.2, 'fresh reading wins over the estimate';
+
+    local $Comserv::Util::AI::HermesOverrunGuard::COOLDOWN_S = 1800;
+    my $h = tempdir(CLEANUP => 1); mkdir "$h/.hermes"; mkdir "$h/.hermes/logs";
+    my $cfg = "$h/.hermes/config.yaml";
+    open my $fh, '>', $cfg; print $fh "model:\n  default: grok-4.7\n  provider: xai-oauth\n  base_url: https://api.x.ai/v1\n  api_mode: chat_completions\n  aliases:\n    code: openrouter/qwen/qwen3-coder\n"; close $fh;
+    my $cb = sub { my ($k,$v)=@_; open my $in,'<',$cfg; my @l=<$in>; close $in;
+        if ($k =~ /^model\.aliases\.(.+)$/) { my $a=$1; s/^    \Q$a\E: .*/    $a: $v/ for @l }
+        else { (my $kk=$k)=~s/^model\.//; s/^  \Q$kk\E: .*/  $kk: $v/ for @l }
+        open my $o,'>',$cfg; print $o @l; close $o };
+    my $mk = sub { $G->new(home => $h, app_root => $h, no_ledger => 1, no_notify => 1, base_urls => [], ollama_url => 'http://127.0.0.1:9',
+                           or_ids => {}, supergrok => {}, set_cb => $cb, now => $_[0], live => { ok => 0 }) };
+    my $r = $mk->($now)->run(force => 1, thrash => 0, thrash_by_class => { ok => 1, counts => {} }, live => { ok => 0 },
+                             openrouter => { ok => 1, day_usd => 1.66, week_usd => 2, month_usd => 3 });
+    is $r->{action}, 'trip', 'cap trip';
+    is $r->{kind}, 'caps_paid_only', 'kind caps_paid_only';
+    my $g = $mk->($now);
+    is $g->current_model->{default}, 'grok-4.7', 'Hermes stays on grok-4.7';
+    is $g->current_model->{provider}, 'xai-oauth', 'via xai-oauth';
+    is $g->read_aliases->{code}, 'xai-oauth/grok-4.7', 'paid OpenRouter code alias blocked -> Super Grok';
+    ok $g->read_state->{paid_block_only}, 'paid_block_only in state';
+    $r = $mk->($now + 600)->run(force => 1, thrash => 0, thrash_by_class => { ok => 1, counts => {} }, live => { ok => 0 },
+                                openrouter => { ok => 1, day_usd => 0.5, week_usd => 2, month_usd => 3 });
+    is $r->{action}, 'hold', 'clear after 10 min -> hold (cool-down)';
+    ok $r->{cooldown_left_s} > 0, 'cool-down reported';
+    $r = $mk->($now + 1900)->run(force => 1, thrash => 0, thrash_by_class => { ok => 1, counts => {} }, live => { ok => 0 },
+                                 openrouter => { ok => 1, day_usd => 0.5, week_usd => 2, month_usd => 3 });
+    is $r->{action}, 'restore', 'clear after 31 min -> restore';
+    ok !$mk->($now + 1900)->read_state->{paid_block_only}, 'paid_block_only cleared';
 }
 
 done_testing();

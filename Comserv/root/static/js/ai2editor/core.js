@@ -149,6 +149,9 @@
                     const editor = ace.edit('ace-editor');
                     editor.setValue(data.content, -1);
                     editor.clearSelection();
+                    if (window.AI2Wysiwyg && typeof window.AI2Wysiwyg.refreshFromAce === 'function') {
+                        window.AI2Wysiwyg.refreshFromAce();
+                    }
                     editor.session.startNewLine = null;
                     if (typeof editor.session.$resetUndo === 'function') {
                         editor.session.$resetUndo();
@@ -223,8 +226,8 @@
     document.addEventListener('ai2:panel-close', resizeEditor);
     document.addEventListener('ai2:panel-resize', resizeEditor);
     const editors = {
-        ace: EditorAdapter,
-        // richtext: RichTextAdapter,   // TODO: add later
+        ace: EditorAdapter
+        // richtext is registered by adapters/richtext.js (visual overlay; Ace stays the buffer)
     };
 
     function registerEditor(name, AdapterClass) {

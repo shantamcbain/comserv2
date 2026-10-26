@@ -1,0 +1,23 @@
+[%# Junk-file warning: backup copies / app runtime data in the change set.
+    Matches .commit-junk-patterns (same rules as the pre-commit junk guard).
+    One click: git rm --cached (kept on disk) + add to .gitignore + stage .gitignore. %]
+[% IF junk_files && junk_files.size %]
+<div class="alert alert-warning git-junk-warning" data-git-junk-warning="1">
+    <strong><i class="fas fa-exclamation-triangle"></i> Don't commit these:</strong>
+    backup copies or app runtime data. The commit guard will refuse them.
+    <ul>
+        [% FOREACH f IN junk_files %]<li><code class="code-inline">[% f | html %]</code></li>[% END %]
+    </ul>
+    <form method="post" action="[% c.uri_for('/admin/git/action') %]" style="display:inline"
+          onsubmit="return confirm('Stop tracking these file(s) (they stay on disk), add them to .gitignore and stage .gitignore?');">
+        <input type="hidden" name="confirm" value="1">
+        <input type="hidden" name="op" value="gitignore">
+        [% IF git_target %]<input type="hidden" name="target" value="[% git_target | html %]">[% END %]
+        [% FOREACH f IN junk_files %]<input type="hidden" name="paths" value="[% f | html %]">[% END %]
+        <button type="submit" class="admin-btn admin-btn-sm admin-btn-primary">
+            <i class="fas fa-eye-slash"></i> Untrack + gitignore
+        </button>
+    </form>
+    <small>To keep a file tracked on purpose, add a <code>!path</code> line to <code>.commit-junk-patterns</code>.</small>
+</div>
+[% END %]

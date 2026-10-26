@@ -158,4 +158,22 @@ sub get_app_workflow {
     return $workflow || 'main';
 }
 
+=head2 is_dev_request_host
+
+Returns 1 when the request host is a development address (.local, .zero,
+localhost, 127.0.0.1 or ::1), else 0. Chat with AI is development-only, so
+public SiteName hosts must not reach its model endpoints.
+
+=cut
+
+sub is_dev_request_host {
+    my ($class_or_c, $c) = @_;
+    $c = $class_or_c if !defined $c && ref $class_or_c;
+    my $host = eval { $c->req->uri->host } // '';
+    $host = lc $host;
+    return 1 if $host =~ /^(?:localhost|127\.0\.0\.1|\[?::1\]?)$/;
+    return 1 if $host =~ /\.(?:local|zero)$/;
+    return 0;
+}
+
 1;

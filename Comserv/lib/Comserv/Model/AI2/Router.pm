@@ -372,7 +372,7 @@ sub _external_default_available {
     return 0 unless $prov && $prov->can('_resolve_api_key');
 
     # Key must resolve (k8s secret / env / DBEncy UserApiKeys).
-    my $key = try { $prov->_resolve_api_key($c) } catch { undef };
+    my $key = try { $prov->_resolve_api_key($c, undef, ($svc eq 'openrouter' ? (guest => 1) : ())) } catch { undef };
     return 0 unless $key;
 
     # Model must exist in the live catalog (skip the network check if the
@@ -1679,8 +1679,9 @@ sub _default_free_catalog {
                 if $has_key;
         }
         else {
-            $has_key = try { $prov->_resolve_api_key($c) } catch { undef };
-            $listed  = try { $prov->list_models($c) } catch { undef } if $has_key;
+            # guest => 1 only takes effect on the guest-chat path (stash flag).
+            $has_key = try { $prov->_resolve_api_key($c, undef, ($svc eq 'openrouter' ? (guest => 1) : ())) } catch { undef };
+            $listed  = try { $prov->list_models($c, ($c->session->{user_id} ? undef : $has_key)) } catch { undef } if $has_key;
         }
 
         if ($has_key) {

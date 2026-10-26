@@ -9,6 +9,8 @@ use Comserv::Util::AppTime;
 use Digest::SHA qw(sha256_hex);
 use Comserv::Util::Logging;
 use Comserv::Util::ApiTokenValidator;
+use Comserv::Util::ApiDbRead;
+use Comserv::Util::ApiSecretCompare;
 use Comserv::Util::DocumentationConfig;
 use Comserv::Util::ModelCatalog;
 use Comserv::Util::TodoLog;
@@ -2024,10 +2026,41 @@ sub _generate_random_token {
 # Start/Done buttons perform without holding a browser session.
 # ----------------------------------------------------------------------------
 
+# COMSERV_API_LAN_BYPASS_WRITES = warn (default) | off
+#   warn: LAN/localhost callers may still skip login on non-GET routes that use
+#         _api_local_ok, but each such call is logged (address, route, whether an
+#         X-Forwarded-For header was present; never bodies).
+#   off : non-GET requests through _api_local_ok are refused. GET/HEAD unchanged.
+# Any other value is treated as warn. This only affects _api_local_ok; the inline
+# copies of the LAN check elsewhere in this file are not rewired yet.
+sub _api_lan_bypass_mode {
+    my $v = lc($ENV{COMSERV_API_LAN_BYPASS_WRITES} // 'warn');
+    $v =~ s/^\s+|\s+$//g;
+    return $v eq 'off' ? 'off' : 'warn';
+}
+
 sub _api_local_ok {
     my ($c) = @_;
-    my $address = $c->req->address;
-    return ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./) ? 1 : 0;
+    my $address = $c->req->address // '';
+    my $local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./) ? 1 : 0;
+    return 0 unless $local;
+
+    my $method = uc($c->req->method // 'GET');
+    return 1 if $method eq 'GET' || $method eq 'HEAD';
+
+    my $route = '/' . ($c->req->path // '');
+    $route =~ s/[^A-Za-z0-9_\/.\-]/?/g;
+    my $has_xff = defined($c->req->header('X-Forwarded-For')) ? 'yes' : 'no';
+    my $mode = _api_lan_bypass_mode();
+    my $logging = Comserv::Util::Logging->instance;
+    if ($mode eq 'off') {
+        $logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_local_ok',
+            "LAN bypass REFUSED (mode=off) $method $route from $address (x-forwarded-for: $has_xff)");
+        return 0;
+    }
+    $logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_local_ok',
+        "LAN bypass used (mode=warn) $method $route from $address (x-forwarded-for: $has_xff)");
+    return 1;
 }
 
 sub _api_log_unauthorized {
@@ -3024,6 +3057,202 @@ sub _sitename_for_write {
     my $from_req = $c->stash->{SiteName} || $c->session->{SiteName} || '';
     return $from_req if $from_req ne '';
     return 'CSC';
+}
+
+# ----------------------------------------------------------------------------
+# Identity for the read-only DB/secrets endpoints (todo API auth plan, step 2)
+#
+# _api_identity($c) accepts ONLY: (a) a logged-in session user holding an allowed
+# role, else (b) a valid Bearer token (ApiTokenValidator: active, not revoked, not
+# expired) whose user is active and holds an allowed role. The LAN/localhost bypass
+# is deliberately NOT accepted here. On failure it returns undef and leaves
+# { status, error, code } in $c->stash->{api_identity_error}.
+# ----------------------------------------------------------------------------
+
+our @API_ALLOWED_ROLES = qw(admin developer devops editor);
+
+sub _api_roles_list {
+    my ($raw) = @_;
+    my @r = ref($raw) eq 'ARRAY' ? @$raw
+          : (defined $raw && !ref($raw) ? split(/[\s,;|]+/, $raw) : ());
+    return [ grep { length } map { lc } grep { defined && !ref } @r ];
+}
+
+sub _api_identity {
+    my ($c, %opt) = @_;
+    my %ok = map { lc($_) => 1 } @{ $opt{allowed_roles} || \@API_ALLOWED_ROLES };
+    delete $c->stash->{api_identity_error};
+
+    my $fail = sub {
+        my ($status, $error, $code) = @_;
+        $c->stash->{api_identity_error} = { status => $status, error => $error, code => $code };
+        return undef;
+    };
+
+    # (a) browser/app session. Do not create a session just to look for one.
+    my $session_denied = 0;
+    my $has_session = $c->can('sessionid') ? ($c->sessionid ? 1 : 0) : 1;
+    if ($has_session) {
+        my $s = $c->session || {};
+        if ($s->{username} && $s->{user_id}) {
+            my $roles = _api_roles_list($s->{roles});
+            if (grep { $ok{$_} } @$roles) {
+                return { username => $s->{username}, user_id => $s->{user_id},
+                         roles => $roles, via => 'session' };
+            }
+            $session_denied = 1;
+        }
+    }
+
+    # (b) Bearer token
+    my $auth = $c->req->header('Authorization') // '';
+    if ($auth =~ /^Bearer\s+\S/) {
+        my $v = Comserv::Util::ApiTokenValidator->validate_from_request($c);
+        unless ($v->{valid}) {
+            my $code = $v->{code} || 401;
+            my $status = $code == 403 ? 403 : $code == 500 ? 500 : 401;
+            return $fail->($status, $v->{error} || 'Authentication required', 'unauthorized');
+        }
+        my $row  = eval { $c->model('DBEncy')->resultset('ApiToken')->find($v->{api_token_id}) };
+        my $user = $row ? eval { $row->user } : undef;
+        return $fail->(403, 'Token user not found', 'forbidden') unless $user;
+        return $fail->(403, 'Token user is not active', 'forbidden')
+            if lc($user->status // '') ne 'active';
+        my $roles = _api_roles_list($user->roles);
+        return $fail->(403, 'Token user has no role permitted for this endpoint', 'forbidden')
+            unless grep { $ok{$_} } @$roles;
+        my $tname = defined $v->{token_name} && length $v->{token_name} ? $v->{token_name} : $v->{api_token_id};
+        $tname =~ s/[^A-Za-z0-9_.\-]/_/g;
+        return { username => $user->username, user_id => $user->id,
+                 roles => $roles, via => "token:$tname" };
+    }
+
+    return $fail->(403, 'Your account has no role permitted for this endpoint', 'forbidden') if $session_denied;
+    return $fail->(401, 'Authentication required: log in, or send Authorization: Bearer <token>', 'unauthorized');
+}
+
+# Controller-side wrapper: returns the identity, or sends the JSON error and detaches.
+sub _api_require_identity {
+    my ($self, $c, %opt) = @_;
+    my $id = _api_identity($c, %opt);
+    return $id if $id;
+    my $e = $c->stash->{api_identity_error} || { status => 401, error => 'Authentication required', code => 'unauthorized' };
+    $c->res->header('WWW-Authenticate' => 'Bearer') if $e->{status} == 401;
+    my $route = '/' . ($c->req->path // '');
+    $route =~ s/[^A-Za-z0-9_\/.\-]/?/g;
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_require_identity',
+        "API identity refused ($e->{status}) for $route from " . ($c->req->address // '?'));
+    $self->_json_error($c, $e->{status}, $e->{error}, $e->{code});
+}
+
+sub _api_log_name { my ($s) = @_; $s = '' unless defined $s; $s =~ s/[^A-Za-z0-9_.:\-]/?/g; return substr($s, 0, 64) }
+
+=head2 api_db_read
+
+GET /api/db/read?table=<name>&filter=<col>[__op]:<value>[,...]&columns=a,b&limit=&offset=&order=col[:desc]&total=1
+
+Read-only SELECT through DBIC with bind parameters. Auth: session user or Bearer token
+with a role of admin/developer/devops/editor (no LAN bypass). Table and column names are
+checked against the live schema, blocked tables are refused, secret-looking columns are
+returned as C<***masked***> and cannot be filtered or ordered on. Without C<table> it
+lists the readable tables. See Comserv::Util::ApiDbRead for the allow/deny lists.
+
+=cut
+
+sub api_db_read :Path('db/read') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    $c->res->header('Cache-Control' => 'no-store');
+
+    my $method = uc($c->req->method // '');
+    unless ($method eq 'GET' || $method eq 'HEAD') {
+        $c->res->header('Allow' => 'GET, HEAD');
+        $self->_json_error($c, 405, 'GET only', 'method_not_allowed');
+    }
+
+    my $id = $self->_api_require_identity($c);
+
+    my $q = $c->req->query_parameters || {};
+    my %p = map { $_ => $q->{$_} } qw(table filter columns limit offset order total);
+
+    my $schema = eval { $c->model('DBEncy')->schema };
+    $self->_json_error($c, 500, 'Database not available', 'db_unavailable') unless $schema;
+
+    my $res = eval { Comserv::Util::ApiDbRead->query($schema, \%p) };
+    my $err = $@;
+    my $who = _api_log_name($id->{username});
+    my $via = _api_log_name($id->{via});
+    my $tname = _api_log_name(ref $p{table} ? '' : $p{table});
+
+    if ($err) {
+        if (ref $err eq 'HASH') {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_db_read',
+                "api_db_read user=$who via=$via table=$tname refused status=$err->{status} code=$err->{code}");
+            $self->_json_error($c, $err->{status}, $err->{error}, $err->{code});
+        }
+        my $short = substr("$err", 0, 200);
+        $short =~ s/\s+/ /g;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_db_read',
+            "api_db_read user=$who via=$via table=$tname query failed: $short");
+        $self->_json_error($c, 500, 'Query failed', 'query_failed');
+    }
+
+    my $nrows = $res->{tables} ? scalar(@{ $res->{tables} }) : $res->{count};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_db_read',
+        sprintf("api_db_read user=%s via=%s table=%s columns_req=%d filter_cols=[%s] rows=%d",
+            $who, $via, ($res->{tables} ? '(list)' : $tname),
+            ($res->{columns_requested} // 0),
+            join(',', map { _api_log_name($_) } @{ $res->{filter_columns} || [] }),
+            $nrows));
+
+    $c->res->status(200);
+    $c->res->body(encode_json({ success => \1, %$res }));
+    $c->detach();
+}
+
+=head2 api_secrets_compare
+
+GET /api/secrets/compare?name=cloudflare
+
+Returns only C<{ name, source, length, same_as_file }> for the named secret (db|file|env|none).
+Never the value, a prefix, a suffix or a hash. Auth: session user or Bearer token whose user
+has role admin, developer or devops.
+
+=cut
+
+sub api_secrets_compare :Path('secrets/compare') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    $c->res->header('Cache-Control' => 'no-store');
+
+    my $method = uc($c->req->method // '');
+    unless ($method eq 'GET' || $method eq 'HEAD') {
+        $c->res->header('Allow' => 'GET, HEAD');
+        $self->_json_error($c, 405, 'GET only', 'method_not_allowed');
+    }
+
+    my $id = $self->_api_require_identity($c, allowed_roles => [qw(admin developer devops)]);
+
+    my $name = ($c->req->query_parameters || {})->{name};
+    unless (Comserv::Util::ApiSecretCompare->allowed_name($name)) {
+        $self->_json_error($c, 400, 'Unknown secret name (allowed: ' . join(', ', sort keys %Comserv::Util::ApiSecretCompare::NAMES) . ')', 'unknown_secret_name');
+    }
+
+    my $dbh = eval { $c->model('DBEncy')->schema->storage->dbh };
+    my $res = eval { Comserv::Util::ApiSecretCompare->compare($name, dbh => $dbh) };
+    unless ($res) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_secrets_compare',
+            "api_secrets_compare name=$name failed");
+        $self->_json_error($c, 500, 'Compare failed', 'compare_failed');
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_secrets_compare',
+        sprintf("api_secrets_compare user=%s via=%s name=%s source=%s length=%d",
+            _api_log_name($id->{username}), _api_log_name($id->{via}), $name, $res->{source}, $res->{length}));
+
+    $c->res->status(200);
+    $c->res->body(encode_json({ success => \1, %$res }));
+    $c->detach();
 }
 
 =head2 api_app_version

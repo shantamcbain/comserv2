@@ -5996,6 +5996,10 @@
         } else if (_inEditorPopup) {
             // Editor popup: no global floating chat widget (editor has its own)
             console.log('[local-chat] skipped inside AI2 editor popup');
+        } else if (!window.AI_WIDGET_POPUP && !/(^localhost$|^127\.0\.0\.1$|^\[?::1\]?$|\.local$|\.zero$)/i.test(window.location.hostname)) {
+            // Production / public hosts: the floating "Chat with AI" button is
+            // development-only. Only .local, .zero and localhost hosts get it.
+            console.log('[local-chat] floating widget skipped on non-dev host');
         } else {
             // Widget mode: create floating bubble + panel on every page
             createChatWidget();

@@ -701,14 +701,20 @@ sub daily :Path('/planning/daily') :Args {
                 @branch_pids = ();
             }
             %branch_scope = map { $_ => 1 } @branch_pids;
-            my $matched = scalar grep {
+            # Branch worktrees show ONLY this branch's todos (Shanta, Oct 24 2026).
+            # Only main ranks every branch. ?filter_project=all is the escape hatch.
+            my $before_branch = scalar @all_sorted;
+            @all_sorted = grep {
                 Comserv::Util::FocusRanking::todo_matches_branch($_, $cur_branch, \%branch_scope)
             } @all_sorted;
+            my $matched = scalar @all_sorted;
+            my $hidden_other = $before_branch - $matched;
             $c->stash->{branch_focus_filter} = {
                 branch      => $cur_branch,
                 root_id     => $branch_pids[0],
                 project_ids => \@branch_pids,
                 matched     => $matched,
+                hidden      => $hidden_other,
             };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
                 "Branch focus '$cur_branch': $matched todos match branch "
@@ -2450,8 +2456,10 @@ sub deploy :Path('deploy') :Args(0) {
             return;
         } elsif (defined $pid) {
             # child — run the real deploy
+            require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+            eval {
             require Comserv::Util::DockerDeploy;
-            open(my $log, '>>', '/tmp/comserv_deploy_4000.log') or exit 1;
+            open(my $log, '>>', '/tmp/comserv_deploy_4000.log') or Comserv::Util::ForkSafe::child_exit(1);
             my $deploy = Comserv::Util::DockerDeploy->new(
                            log_fh   => $log,
                            logging  => $self->logging,
@@ -2463,7 +2471,9 @@ sub deploy :Path('deploy') :Args(0) {
             my $ok = $deploy->deploy_to_target_safe();
             print $log "[${\Comserv::Util::AppTime->now_utc}] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
             close($log);
-            exit($ok ? 0 : 1);
+            Comserv::Util::ForkSafe::child_exit($ok ? 0 : 1);
+            };
+            Comserv::Util::ForkSafe::child_exit(1);
         } else {
             $c->response->body(encode_json({ success => JSON::false, error => 'fork failed' }));
         }
@@ -2598,11 +2608,15 @@ sub decision_rank :Path('/planning/decision_rank') :Args(0) {
     if ($pid == 0) {
         # Child: detach and exec immediately so no Perl destructors (DB
         # handles, session) from the parent run in this process.
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+        eval {
         POSIX::setsid();
         open STDIN,  '<', '/dev/null';
         open STDOUT, '>', $log or POSIX::_exit(1);
         open STDERR, '>&', \*STDOUT;
         exec @cmd or POSIX::_exit(127);
+        };
+        POSIX::_exit(127);
     }
 
     my $job = { pid => $pid, branch => $branch, model => $model, reason => $reason,
