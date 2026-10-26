@@ -90,7 +90,7 @@
 
                 <td>[% t.site_name %]</td>
 
-                <td>[% t.subject %]</td>
+                <td>[% t.subject | html %]</td>
 
                 <td>[% t.category || 'other' %]</td>
 

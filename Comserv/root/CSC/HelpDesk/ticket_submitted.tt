@@ -43,7 +43,7 @@
 
                     <th>Subject:</th>
 
-                    <td>[% ticket.subject %]</td>
+                    <td>[% ticket.subject | html %]</td>
 
                 </tr>
 
