@@ -216,6 +216,14 @@ sub classify_call {
     return 'other';
 }
 
+our $COOLDOWN_S = 1800;
+# pure: an OpenRouter money-cap trip while Hermes is on Super Grok (xai-oauth) only blocks paid models.
+sub paid_only_trip {
+    my ($kind, $cm) = @_;
+    return 0 unless ($kind // '') eq 'caps' && ref $cm eq 'HASH';
+    return (($cm->{provider} // '') =~ /^(?:xai-oauth|xai|supergrok)$/ && length($cm->{default} // '')) ? 1 : 0;
+}
+
 sub trip_kind {
     my ($reasons) = @_;
     my $rs = $reasons || [];
@@ -841,13 +849,15 @@ sub merge_live {
         && defined $live->{after} && $live->{after} == $or->{fetched_at}) {
         # Oct 22: fresh /auth/key reading already includes everything up to fetched_at;
         # add only the estimate for calls made after it (no double count).
-        my $add = $live->{after_usd} > 0 ? $live->{after_usd} : 0;
+        # Oct 23 (Shanta 6:57 AM PT): a fresh (<1 h) /auth/key reading is used as-is; the
+        # agent.log estimate is only a fallback when the live reading is missing or stale.
+        my $add = 0;
         $out{reported_day_usd} = $or->{day_usd};
         $out{day_usd} = ($or->{day_usd} // 0) + $add;
         $out{week_usd} += $add if defined $out{week_usd};
         $out{month_usd} += $add if defined $out{month_usd};
         $out{live_day_usd} = $live->{day_usd};
-        $out{live_after_usd} = $add;
+        $out{live_after_usd} = $live->{after_usd};
         $out{live_applied} = 1 if $add > 0;
         return \%out;
     }
@@ -1467,8 +1477,22 @@ sub run {
         return $d;
     }
 
+    # Oct 23: 30-minute cool-down between a trip and a restore.
+    if ($d->{action} eq 'restore' && $st->{since} && $t - $st->{since} < $COOLDOWN_S) {
+        $d->{action} = 'hold';
+        $d->{cooldown_left_s} = $COOLDOWN_S - ($t - $st->{since});
+    }
     if ($d->{action} eq 'trip') {
         my $plan   = build_trip_plan(%ctx, reasons => $d->{reasons});
+        # Oct 23 (Shanta 6:57 AM PT): on Super Grok, an OpenRouter cap trip only blocks the paid
+        # OpenRouter models (aliases/fallback/auxiliary); Hermes stays on xai-oauth.
+        my $cm0 = $ctx{current_model} || {};
+        if (paid_only_trip($plan->{kind}, $cm0)) {
+            my $keep = { %$cm0, name => alias_value($cm0) };
+            $plan = { %$plan, kind => 'caps_paid_only', target => $keep, paused => 0,
+                      model => { map { ($_ => $cm0->{$_}) } grep { defined $cm0->{$_} } @MODEL_KEYS },
+                      aliases => alias_rewrite_plan(aliases => $ctx{aliases}, safe => alias_value($cm0)) };
+        }
         my $target = $plan->{target};
         my $paused = $plan->{paused};
         my $cur    = $ctx{current_model};
@@ -1481,6 +1505,7 @@ sub run {
         my $xdone = eval { $s->set_auxiliary($plan->{auxiliary}) } || []; push @errs, $@ if $@;
         my $err = join ' ', @errs;
         delete @$st{qw(hold_reason hold_since hold_pt)};
+        if ($plan->{kind} eq 'caps_paid_only') { $st->{paid_block_only} = 1 } else { delete $st->{paid_block_only} }
         %$st = (%$st, tripped => 1, paused => $paused, since => $t, since_pt => pt($t),
                 reasons => $d->{reasons}, kind => $plan->{kind}, saved_model => $cur, saved_aliases => $aplan->{saved},
                 saved_fallback => $ctx{current_fallback}, saved_auxiliary => $ctx{auxiliary},
@@ -1552,6 +1577,7 @@ sub run {
                    ($err ? (error => $err) : ()) };
         _append($s->{events_file}, $J->encode($ev));
         $ev->{ledger} = $s->ledger($ev);
+        delete $st->{paid_block_only};
         %$st = (%$st, tripped => 0, paused => 0, restored_at => $t, restored_pt => pt($t),
                 restore_backup => $bak, restore_decision => $dec->{reason});
         delete @$st{qw(reasons target target_default set set_error aliases_set fallback_set auxiliary_set kind)};

@@ -1004,6 +1004,16 @@ sub auto :Private {
                 JSON::decode_json($json);
             };
             $c->stash->{app_version} = $app_version if $app_version && ref $app_version eq 'HASH';
+            # Footer shows the build time in Pacific (PDT/PST), not UTC.
+            if ($c->stash->{app_version} && ($c->stash->{app_version}{build_date} // '') =~ /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)Z$/) {
+                require POSIX; require Time::Local;
+                my $ep = eval { Time::Local::timegm($6, $5, $4, $3, $2 - 1, $1) };
+                if (defined $ep) {
+                    { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset();
+                      $c->stash->{app_version}{build_date_local} = POSIX::strftime('%Y-%m-%d %H:%M %Z', localtime $ep); }
+                    POSIX::tzset();
+                }
+            }
             # version.json is a build stamp (always "main" on a baked image).
             # Worktree servers must show the live checkout, not the bake label.
             if (IS_DEV_WORKTREE && $c->stash->{app_version} && $c->stash->{app_workflow}
@@ -1940,7 +1950,7 @@ sub track_application_start {
                 my $theme_id = $themes->{$theme_name}{id} || next;
                 next unless $theme_id;
                 my $css = $c->model('ThemeConfig')->generate_theme_css($c, $theme_id);
-                my $dir = $c->path_to('root', 'static', 'css', 'themes');
+                my $dir = $c->model('ThemeConfig')->get_theme_css_directory($c);
                 my $file = "$dir/$theme_name.css";
                 require File::Path;
                 unless (-d $dir) { File::Path::make_path($dir); }

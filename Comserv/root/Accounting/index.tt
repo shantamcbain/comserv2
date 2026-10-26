@@ -97,6 +97,9 @@
           </a>
         </li>
         <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/mail/invoice/sort">Invoice queue</a>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
           <a href="/Inventory/invoice/new">+ New Supplier Invoice</a>
         </li>
         <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">

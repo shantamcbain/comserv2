@@ -354,6 +354,8 @@ sub test_connection {
 
     if ($pid == 0) {
         # Child process: attempt DBI connect, exit 0 on success, exit 1 on failure.
+        require Comserv::Util::ForkSafe;
+        Comserv::Util::ForkSafe::child_prepare();
         eval {
             my %connect_attrs = (
                 RaiseError => 1,
@@ -368,7 +370,7 @@ sub test_connection {
             my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
             $dbh->disconnect() if $dbh;
         };
-        exit($@ ? 1 : 0);
+        Comserv::Util::ForkSafe::child_exit($@ ? 1 : 0);
     }
 
     # Parent: wait up to $timeout seconds, then kill the child.

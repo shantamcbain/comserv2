@@ -334,8 +334,11 @@ PYSCRIPT
     }
 
     if ($child == 0) {
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
         my $grandchild = fork();
         if (defined $grandchild && $grandchild == 0) {
+            require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+            eval {
             POSIX::setsid();
             open(STDIN,  '<', '/dev/null');
             open(STDOUT, '>', '/dev/null');
@@ -436,6 +439,8 @@ PYSCRIPT
             close $sf;
 
             POSIX::_exit(0);
+            };
+            POSIX::_exit(1);
         }
         POSIX::_exit(0);
     }

@@ -17,7 +17,7 @@
 
     var POLL_MS     = 4000;
     var SLOW_MS     = 45000;    // say "still sorting (model warming up)"
-    var MAX_WAIT_MS = 240000;   // stop polling; job keeps running server-side
+    var MAX_WAIT_MS = 900000;   // matches the 900s model timeout; job keeps running server-side
     var busy = false;
 
     function $(id) { return document.getElementById(id); }
@@ -122,7 +122,7 @@
                     return;
                 }
                 var secs = Math.round(waited / 1000);
-                setStatus((waited > SLOW_MS ? 'Still sorting — ' + (d.model || 'model') + ' warming up… '
+                setStatus((waited > SLOW_MS ? 'Still sorting — ' + (d.model || 'model') + ' is slow on this machine right now (can take several minutes)… '
                                             : 'Sorting with ' + (d.model || 'model') + '… ') + secs + 's', 'busy');
                 setTimeout(function () { poll(startedAt, t0); }, POLL_MS);
             })
