@@ -417,7 +417,7 @@ sub cb_for {
 
     my $cl = $G->can('classify_call');
     is $cl->({provider=>'xai-oauth', model=>'grok-build-0.1'}), 'supergrok', 'classify supergrok xai-oauth';
-    is $cl->({provider=>'xai', model=>'grok'}), 'supergrok', 'classify supergrok xai';
+    is $cl->({provider=>'xai', model=>'grok'}), 'xai_direct', 'classify x.ai API key = xai_direct (cash, not Super Grok)';
     is $cl->({provider=>'supergrok', model=>'grok'}), 'supergrok', 'classify supergrok';
     is $cl->({provider=>'openrouter', model=>'cohere/foo:free'}), 'openrouter_free', 'classify or free';
     is $cl->({provider=>'openrouter', model=>'deepseek/v4-pro'}), 'openrouter_paid', 'classify or paid';
