@@ -96,4 +96,45 @@ $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no 
     $g->trial_tick({ ok => 1, month_usd => 45.5, balance_usd => 10.5 });
     like $rd->()->{stopped}, qr/task limit/, 'stops after 20 sessions';
 }
+
+# ---- thrash: calls of an ACTIVE approved trial model are not thrash; a stopped trial counts again; other models always count ----
+{
+    require Comserv::Util::AI::HermesOverrunGuard; require File::Temp; require POSIX;
+    my $root = File::Temp::tempdir(CLEANUP => 1); mkdir "$root/data"; mkdir "$root/data/ai_trials"; mkdir "$root/.hermes"; mkdir "$root/.hermes/logs";
+    my $now = time; my $kimi = 'moonshotai/kimi-k2.7-code';
+    my $ts = sub { POSIX::strftime('%Y-%m-%d %H:%M:%S,000', gmtime($_[0])) };
+    open my $lf, '>', "$root/.hermes/logs/agent.log";
+    print $lf $ts->($now - 60 - $_) . " INFO [sK] agent.conversation_loop: API call #$_: model=$kimi provider=openrouter in=1000 out=50 total=1 latency=2s\n" for 1 .. 32;
+    print $lf $ts->($now - 30 - $_) . " INFO [sQ] agent.conversation_loop: API call #$_: model=qwen/qwen3-coder provider=openrouter in=1000 out=50 total=1 latency=2s\n" for 1 .. 3;
+    close $lf;
+    my $sf = "$root/data/ai_trials/kimi_k27_code.state.json";
+    my $write = sub { open my $fh, '>', $sf; print $fh encode_json({ name => 'kimi_k27_code', model => $kimi, baseline => { month_usd => 1 }, baseline_at => $now, %{ $_[0] || {} } }); close $fh };
+    my $mk = sub { my $g = Comserv::Util::AI::HermesOverrunGuard->new(app_root => $root, now => $now, base_urls => [], no_notify => 1); $g->{agent_log} = "$root/.hermes/logs/agent.log"; $g->{trial_models} = $g->trial_exclusions->{models}; $g };
+    $write->({});
+    my $c = $mk->()->thrash_by_class; is $c->{counts}{openrouter_paid}, 3, 'active trial: its 32 calls are not counted, qwen\'s 3 are';
+    $write->({ stopped => 'hard cap reached' });
+    $c = $mk->()->thrash_by_class; is $c->{counts}{openrouter_paid}, 35, 'stopped trial: its calls count again';
+    my $d = Comserv::Util::AI::HermesOverrunGuard::decide(thrash_by_class => $c, limits => { openrouter_paid => 30 }, openrouter => { ok => 1, day_usd => 0, week_usd => 0, month_usd => 1 }, state => {});
+    is $d->{action}, 'trip', 'stopped trial: 35 paid calls trip the thrash limit'; like "@{ $d->{reasons} }", qr/openrouter_paid/, 'thrash reason names the class';
+    $write->({});
+    $c = $mk->()->thrash_by_class;
+    $d = Comserv::Util::AI::HermesOverrunGuard::decide(thrash_by_class => $c, limits => { openrouter_paid => 30 }, openrouter => { ok => 1, day_usd => 0, week_usd => 0, month_usd => 1 }, state => {});
+    is $d->{action}, 'none', 'active trial: no thrash trip';
+}
+
+# thrash_count (state.db message count) leaves the active trial model out too
+{
+    require DBI; require File::Temp; require Comserv::Util::AI::HermesOverrunGuard;
+    my $root = File::Temp::tempdir(CLEANUP => 1); my $db = "$root/state.db"; my $now = time; my $kimi = 'moonshotai/kimi-k2.7-code';
+    my $dbh = DBI->connect("dbi:SQLite:dbname=$db", '', '', { RaiseError => 1 });
+    $dbh->do('CREATE TABLE sessions (id TEXT, model TEXT, billing_provider TEXT)'); $dbh->do('CREATE TABLE messages (session_id TEXT, role TEXT, timestamp REAL)');
+    $dbh->do('INSERT INTO sessions VALUES (?,?,?)', undef, @$_) for ['k', $kimi, 'openrouter'], ['q', 'qwen/qwen3-coder', 'openrouter'];
+    $dbh->do('INSERT INTO messages VALUES (?,?,?)', undef, 'k', 'assistant', $now - 10) for 1 .. 5;
+    $dbh->do('INSERT INTO messages VALUES (?,?,?)', undef, 'q', 'assistant', $now - 10) for 1 .. 2;
+    $dbh->disconnect;
+    my $g = Comserv::Util::AI::HermesOverrunGuard->new(app_root => $root, now => $now, base_urls => []); $g->{state_db} = $db;
+    is $g->thrash_count, 7, 'no trial: all 7 counted';
+    $g->{trial_models} = { $kimi => 1 };
+    is $g->thrash_count, 2, 'active trial model excluded, qwen still counted';
+}
 done_testing;
