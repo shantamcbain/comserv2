@@ -17,6 +17,7 @@ use POSIX qw(strftime);
 use Comserv::Util::AI::PaidBlock ();
 use Comserv::Util::AI::ModelChains ();
 use Comserv::Util::AI::ModelTrial ();
+use Comserv::Util::Logging ();
 use File::Copy ();
 use Time::Local qw(timegm timelocal);
 
@@ -281,6 +282,7 @@ sub paid_room_why {
 sub offender_reason {
     my ($provider, $model, %pol) = @_;
     $provider //= ''; $model //= '';
+    return "approved trial stopped: $pol{trial_stopped}{$model}" if ref $pol{trial_stopped} eq 'HASH' && $pol{trial_stopped}{$model};
     my $ch = billing_channel($provider, $model);
     if ($ch eq 'openrouter') {
         return 'OpenRouter grok is blocked (grok only through Super Grok)' if is_or_grok($provider, $model);
@@ -1605,10 +1607,67 @@ sub trial_exclusions {
         my $d = eval { local $/; $J->decode(<$fh>) }; close $fh;
         next unless ref $d eq 'HASH' && ref $d->{baseline} eq 'HASH' && $d->{model} && $d->{baseline_at};
         next unless strftime('%Y%m', localtime $d->{baseline_at}) eq $ym;
-        $out{models}{ $d->{model} } = 1;
+        $out{models}{ $d->{model} } = 1 unless $d->{stopped};   # a stopped trial is a normal paid model again (its sessions become offenders)
         $out{usd} += $d->{exclude_usd} // 0;
     }
     return \%out;
+}
+
+# Trial spend counter (Oct 26 2026, Shanta: the trial model is run by hand from Hermes, e.g. /model kimi). Every guard run, for each
+# approved trial in data/ai_trials/*.state.json: spend = OpenRouter live figures vs the baseline taken at begin; tasks = Hermes
+# sessions on the trial model since then. One-time alert at alert_at_usd; at the hard cap / task limit the trial is marked stopped,
+# alerted once, and its sessions become offenders (gate file) until Shanta moves them with /model code.
+sub trial_tick {
+    my ($s, $or) = @_;
+    return unless ref $or eq 'HASH' && $or->{ok};
+    my $dir = "$s->{app_root}/data/ai_trials";
+    return unless -d $dir;
+    my $ld = eval { Comserv::Util::AI::ModelChains->load(undef, path => "$s->{app_root}/data/ai_model_chains.json", logger => sub { }) };
+    for my $f (glob "$dir/*.state.json") {
+        eval {
+            open my $fh, '<', $f or die "open: $!";
+            my $d = do { local $/; $J->decode(<$fh>) }; close $fh;
+            return 1 unless ref $d eq 'HASH' && ref $d->{baseline} eq 'HASH' && $d->{name} && $d->{baseline_at};
+            my $trial = Comserv::Util::AI::ModelChains->trial($ld, $d->{name}) or return 1;
+            my $spent = Comserv::Util::AI::ModelTrial::spent($d->{baseline}, $or);
+            my $tasks = $s->trial_sessions($trial->{model}, $d->{baseline_at});
+            my $e = Comserv::Util::AI::ModelTrial::evaluate(trial => $trial, spent => $spent, tasks_done => (defined $tasks ? $tasks : $d->{tasks_done}),
+                                                            alerted => $d->{alerted}, live_ok => 1);
+            $d->{last_spent} = $spent; $d->{last_checked_at} = $s->_now;
+            $d->{tasks_done} = $tasks if defined $tasks;
+            $d->{exclude_usd} = $spent if $spent > ($d->{exclude_usd} // 0);
+            if ($e->{alert}) {
+                $d->{alerted} = 1;
+                $s->notify_change($d, 'trial', $d->{name}, "Model trial $d->{name}: spend check",
+                    sprintf('%s: $%.2f spent of $%s after %d tasks (OpenRouter live figures). Hard stop at $%s.', $trial->{model}, $spent, $trial->{hard_cap_usd}, $d->{tasks_done} // 0, $trial->{hard_cap_usd}), 'alert_at');
+            }
+            if ($e->{action} eq 'stop' && !$d->{stopped}) {
+                $d->{stopped} = $e->{reason};
+                $s->notify_change($d, 'trial_stop', $d->{name}, "Model trial $d->{name} STOPPED",
+                    "$e->{reason}. Spent \$" . sprintf('%.2f', $spent) . " after " . ($d->{tasks_done} // 0) . ' tasks. Move open sessions with /model code.', 'stop');
+                $s->log_line("trial $d->{name} stopped: $e->{reason}");
+            }
+            $s->{trial_stopped}{ $trial->{model} } = $d->{stopped} if $d->{stopped};
+            _atomic_write($f, $J->encode($d));
+            1;
+        } or do {
+            my $err = $@ || 'unknown';
+            eval { Comserv::Util::Logging->instance->log_with_details(undef, 'error', __FILE__, __LINE__, 'trial_tick', "trial state $f: $err") };
+        };
+    }
+}
+
+# Hermes sessions on a model since $since (state.db, read-only; same access as thrash_count). undef when unreadable.
+sub trial_sessions {
+    my ($s, $model, $since) = @_;
+    return undef unless -f $s->{state_db};
+    return eval {
+        require DBI;
+        my $dbh = DBI->connect("dbi:SQLite:dbname=$s->{state_db}", '', '', { RaiseError => 1, PrintError => 0, sqlite_open_flags => 1 });
+        my ($c) = $dbh->selectrow_array(q{SELECT COUNT(*) FROM sessions WHERE model = ? AND started_at >= ? AND COALESCE(api_call_count, 0) > 0}, undef, $model, $since);
+        $dbh->disconnect;
+        $c;
+    };
 }
 
 sub run {
@@ -1636,6 +1695,7 @@ sub run {
     $or = stale_guard($or, $t, $SNAPSHOT_MAX_AGE);
     # Oct 26 2026: an approved model trial (data/ai_trials/*.state.json) is paid from reserve: its spend is taken out of the
     # OpenRouter caps and its model out of the live estimate, so it neither trips the guard nor counts as an offender.
+    $s->trial_tick($or) unless $s->{dry_run};
     my $tx = $s->trial_exclusions;
     $s->{trial_models} = $tx->{models};
     $or = Comserv::Util::AI::ModelTrial::exclude_from_or($or, $tx->{usd}) if $tx->{usd};
@@ -1682,7 +1742,8 @@ sub run {
         tripped => (($st->{tripped} && !$shielded) || $d->{action} eq 'trip') ? 1 : 0,
         allowed_paid => $ctx{allowed_paid}, xai_direct_cap_day => (($ctx{channel_caps} || {})->{xai_direct} || {})->{day},
         or_over => (grep { /^OpenRouter .* over / } @{ $d->{reasons} }) ? 1 : 0,
-        sg_unavailable => supergrok_budget_left($ctx{supergrok}) ? 0 : 1);
+        sg_unavailable => supergrok_budget_left($ctx{supergrok}) ? 0 : 1,
+        trial_stopped => $s->{trial_stopped} || {});
     $d->{offenders} = $offs if @$offs;
     $d->{by_channel} = $live->{by_channel} if ref $live eq 'HASH' && $live->{ok};
     if ($s->{dry_run}) {

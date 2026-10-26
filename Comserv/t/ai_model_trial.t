@@ -60,4 +60,40 @@ $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no 
     my $x = $g->trial_exclusions;
     is $x->{usd}, 1.25, 'guard excludes this month\'s trial spend only'; ok $x->{models}{'moonshotai/kimi-k2.7-code'} && !$x->{models}{'old/model'}, 'trial model excluded from the live estimate; last month\'s is not';
 }
+
+# ---- trial_tick: the counter runs from the guard (Hermes sessions that use the model), alerts once, stops at the cap ----
+{
+    require Comserv::Util::AI::HermesOverrunGuard; require File::Temp; require DBI;
+    my $root = File::Temp::tempdir(CLEANUP => 1); mkdir "$root/data"; mkdir "$root/data/ai_trials"; mkdir "$root/.hermes";
+    system('cp', "$FindBin::Bin/../data/ai_model_chains.json", "$root/data/ai_model_chains.json");
+    my $now = time; my $model = 'moonshotai/kimi-k2.7-code';
+    my $db = "$root/state.db"; my $dbh = DBI->connect("dbi:SQLite:dbname=$db", '', '', { RaiseError => 1 });
+    $dbh->do('CREATE TABLE sessions (id TEXT, model TEXT, started_at REAL, api_call_count INTEGER)');
+    $dbh->do('INSERT INTO sessions VALUES (?,?,?,?)', undef, "s$_", $model, $now - 100 + $_, 5) for 1 .. 3;
+    $dbh->do('INSERT INTO sessions VALUES (?,?,?,?)', undef, 'other', 'grok-4.7', $now - 50, 5);
+    $dbh->do('INSERT INTO sessions VALUES (?,?,?,?)', undef, 'empty', $model, $now - 50, 0);
+    $dbh->disconnect;
+    my $sf = "$root/data/ai_trials/kimi_k27_code.state.json";
+    open my $fh, '>', $sf; print $fh encode_json({ name => 'kimi_k27_code', model => $model, baseline => { month_usd => 45, balance_usd => 11 }, baseline_at => $now - 3600, alerted => 0, tasks_done => 0 }); close $fh;
+    my $g = Comserv::Util::AI::HermesOverrunGuard->new(app_root => $root, now => $now, base_urls => [], no_notify => 1);
+    $g->{state_db} = $db;
+    my $rd = sub { open my $f, '<', $sf; local $/; decode_json(<$f>) };
+    $g->trial_tick({ ok => 1, month_usd => 45.4, balance_usd => 10.6 });
+    my $d = $rd->(); is $d->{tasks_done}, 3, 'tasks = Hermes sessions on the trial model with calls (not other models, not empty)'; is $d->{last_spent}, 0.4, 'spend from live figures'; ok !$d->{alerted} && !$d->{stopped}, 'no alert under $3';
+    $g->trial_tick({ ok => 1, month_usd => 48.2, balance_usd => 8.0 });
+    $d = $rd->(); is $d->{alerted}, 1, '$3 spend check posted'; ok !$d->{stopped}, 'still running'; ok $d->{exclude_usd} >= 3.2, 'spend excluded from the OpenRouter caps';
+    my $n = scalar @{ $g->{notified} || [] };
+    $g->trial_tick({ ok => 1, month_usd => 48.3, balance_usd => 7.9 });
+    is scalar @{ $g->{notified} || [] }, $n, 'spend check not posted twice';
+    $g->trial_tick({ ok => 1, month_usd => 51.9, balance_usd => 5.0 });
+    $d = $rd->(); like $d->{stopped}, qr/hard cap reached|could pass the cap/, 'stops at the cap'; is $g->{trial_stopped}{$model} ? 1 : 0, 1, 'stopped model is remembered for the offender check';
+    is $g->trial_exclusions->{models}{$model}, undef, 'a stopped trial model is no longer excluded from the live estimate';
+    my $off = Comserv::Util::AI::HermesOverrunGuard::offender_reason('openrouter', $model, trial_stopped => $g->{trial_stopped});
+    like $off, qr/approved trial stopped/, 'sessions still on a stopped trial model become offenders (gate)';
+    is Comserv::Util::AI::HermesOverrunGuard::offender_reason('openrouter', $model, trial_stopped => {}), undef, 'running trial: not an offender';
+    $dbh = DBI->connect("dbi:SQLite:dbname=$db", '', '', { RaiseError => 1 }); $dbh->do('INSERT INTO sessions VALUES (?,?,?,?)', undef, "t$_", $model, $now, 3) for 4 .. 25; $dbh->disconnect;
+    open $fh, '>', $sf; print $fh encode_json({ name => 'kimi_k27_code', model => $model, baseline => { month_usd => 45, balance_usd => 11 }, baseline_at => $now - 3600, alerted => 1 }); close $fh;
+    $g->trial_tick({ ok => 1, month_usd => 45.5, balance_usd => 10.5 });
+    like $rd->()->{stopped}, qr/task limit/, 'stops after 20 sessions';
+}
 done_testing;
