@@ -118,6 +118,18 @@ PROJECT = PLAN, PHASE = sub-project, STEP = todo. No abstract "Phase N".</p>
     <tr><td class="doc-td"><a href="/Documentation/doc_config_db_move_plan" class="doc-link">Permanent DB move for doc catalog</a> — finish <code>load_from_db</code> + indexer + <code>save_config</code>→table (kills the JSON rewrite)</td><td class="doc-td">Cures the recurring merge-blocker at the architecture level; makes catalog per-site</td><td class="doc-td">M (schema owner for table write)</td></tr>
 </table>
 
+<p class="doc-body"><strong>Completed (do not reopen):</strong></p>
+<table class="doc-table">
+    <tr><th class="doc-th">Todo</th><th class="doc-th">What was done</th></tr>
+    <tr>
+        <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=201" class="doc-link">#201 Plan documentation structure</a></td>
+        <td class="doc-td">Named the system <strong>Documentation System</strong> and defined it on
+        <a href="[% c.uri_for('/Documentation/STANDARD') %]" class="doc-link">STANDARD</a>
+        (one directory, .tt for human card/nav, AI reads the same files, SQL catalog, JSON abandoned).
+        Marked Done 2026-08-26. Remaining work (indexer, JSON delete, theming) is listed above — not part of #201.</td>
+    </tr>
+</table>
+
 <h2 id="principles">Principles</h2>
 <ul>
     <li><strong>One directory.</strong> <code>Comserv/root/Documentation/</code> is the only doc root. The repo-root <code>Documentation/</code> folder is a trap — do not use it.</li>

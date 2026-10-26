@@ -206,17 +206,17 @@ COMSERV_DB_ENCY_DATABASE=encydb
                         <td>Logging instance</td>
                         <td>Logging utility (singleton)</td>
                     </tr>
-                    <tr style="background-color: #f0f8ff;">
+                    <tr style="background-color: var(--card-bg, #f0f8ff);">
                         <td><code>configuration_status</code></td>
                         <td>String (ACTIVE|FALLBACK|MISSING|ERROR)</td>
                         <td><strong>NEW (v1.01):</strong> Indicates config source: ACTIVE=K8s Secrets, FALLBACK=db_config.json, MISSING=none found, ERROR=exception</td>
                     </tr>
-                    <tr style="background-color: #f0f8ff;">
+                    <tr style="background-color: var(--card-bg, #f0f8ff);">
                         <td><code>configuration_error</code></td>
                         <td>String</td>
                         <td><strong>NEW (v1.01):</strong> Human-readable error message if configuration status is not ACTIVE</td>
                     </tr>
-                    <tr style="background-color: #f0f8ff;">
+                    <tr style="background-color: var(--card-bg, #f0f8ff);">
                         <td><code>k8s_secrets_found</code></td>
                         <td>Boolean</td>
                         <td><strong>NEW (v1.01):</strong> Internal flag tracking whether K8s Secrets were successfully loaded</td>
