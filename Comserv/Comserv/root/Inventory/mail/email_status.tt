@@ -1,0 +1,806 @@
+[% PAGE_VERSION = 'mail/email_status.tt,v 0.01 2025/10/14 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PAGE_VERSION %][% END %]
+
+[% INCLUDE 'ApplicationTtTemplate' -
+   title = 'Email Processing Status'
+   description = 'Monitor and manage email invoice processing activities'
+   category = 'email_status'
+   roles = ['admin', 'user']
+   TemplateType = 'inventory'
+   last_updated = '2025-10-14'
+   page_version = '0.01'
+   site_specific = 1
+%]
+
+[% SET page_title = 'Email Processing Status' -%]
+[% SET current_page = 'email_status' -%]
+
+<div class="email-status-container">
+    <div class="page-header">
+        <h1>📊 Email Processing Status</h1>
+        <p class="subtitle">Real-time monitoring and management of email invoice processing for <%= $c.session.SiteName || 'CSC' %></p>
+    </div>
+
+    <div class="status-dashboard">
+        <div class="status-overview">
+            <div class="overview-card">
+                <div class="card-header">
+                    <h3>📧 Processing Overview</h3>
+                    <span class="status-indicator active">LIVE</span>
+                </div>
+                <div class="card-content">
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value">1,247</div>
+                            <div class="stat-label">Total Processed</div>
+                            <div class="stat-trend positive">+12%</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">0</div>
+                            <div class="stat-label">Currently Processing</div>
+                            <div class="stat-trend neutral">0%</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">98.6%</div>
+                            <div class="stat-label">Success Rate</div>
+                            <div class="stat-trend positive">+2%</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">2</div>
+                            <div class="stat-label">Errors (Today)</div>
+                            <div class="stat-trend negative">+1</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="overview-card">
+                <div class="card-header">
+                    <h3>📁 Email Directory Status</h3>
+                    <span class="status-indicator good">HEALTHY</span>
+                </div>
+                <div class="card-content">
+                    <div class="directory-info">
+                        <div class="dir-item">
+                            <span class="dir-name">Maildir:/var/mail/invoice</span>
+                            <span class="dir-size">2.3MB</span>
+                            <span class="dir-status">✅ Active</span>
+                        </div>
+                        <div class="dir-item">
+                            <span class="dir-name">Last Scan: 5 minutes ago</span>
+                            <span class="dir-status">🔄 Fresh</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="overview-card">
+                <div class="card-header">
+                    <h3>⚙️ Processing Configuration</h3>
+                    <span class="status-indicator">CONFIGURED</span>
+                </div>
+                <div class="card-content">
+                    <div class="config-info">
+                        <div class="config-item">
+                            <strong>Source:</strong> Maildir
+                        </div>
+                        <div class="config-item">
+                            <strong>Filters:</strong> Personal + Promotional + Receipts
+                        </div>
+                        <div class="config-item">
+                            <strong>Target Sites:</strong> All (including global)
+                        </div>
+                        <div class="config-item">
+                            <strong>Mode:</strong> Manual (on-demand)
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-panels">
+            <div class="status-panel">
+                <div class="panel-header">
+                    <h3>🔄 Recent Activity Log</h3>
+                    <button class="btn-primary" onclick="refreshActivityLog()">🔄 Refresh</button>
+                </div>
+                <div class="panel-content">
+                    <div class="activity-timeline" id="activity-timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-time">14:58</div>
+                            <div class="timeline-content">
+                                <span class="timeline-icon">📧</span>
+                                <span class="timeline-message">Processing completed successfully - 5 invoices processed</span>
+                                <span class="timeline-status success">SUCCESS</span>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-time">14:45</div>
+                            <div class="timeline-content">
+                                <span class="timeline-icon">⚠️</span>
+                                <span class="timeline-message">Email processing error: Database connection timeout</span>
+                                <span class="timeline-status error">ERROR</span>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-time">14:32</div>
+                            <div class="timeline-content">
+                                <span class="timeline-icon">📊</span>
+                                <span class="timeline-message">Daily summary report generated</span>
+                                <span class="timeline-status info">INFO</span>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-time">14:15</div>
+                            <div class="timeline-content">
+                                <span class="timeline-icon">⚙️</span>
+                                <span class="timeline-message">Configuration updated via web interface</span>
+                                <span class="timeline-status success">SUCCESS</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-panel">
+                <div class="panel-header">
+                    <h3>🎯 Quick Actions</h3>
+                </div>
+                <div class="panel-content">
+                    <div class="quick-actions-grid">
+                        <button class="action-btn" onclick="triggerManualProcessing()">
+                            <span class="action-icon">🔄</span>
+                            <span class="action-label">Manual Processing</span>
+                        </button>
+                        <button class="action-btn" onclick="showConfigEditor()">
+                            <span class="action-icon">⚙️</span>
+                            <span class="action-label">Edit Config</span>
+                        </button>
+                        <button class="action-btn" onclick="exportLogs()">
+                            <span class="action-icon">📄</span>
+                            <span class="action-label">Download Logs</span>
+                        </button>
+                        <button class="action-btn" onclick="showTestResults()">
+                            <span class="action-icon">🧪</span>
+                            <span class="action-label">Test Results</span>
+                        </button>
+                        <button class="action-btn" onclick="viewEmailHistory()">
+                            <span class="action-icon">📋</span>
+                            <span class="action-label">Email History</span>
+                        </button>
+                        <button class="action-btn" onclick="showSystemStatus()">
+                            <span class="action-icon">🖥️</span>
+                            <span class="action-label">System Status</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-panel">
+                <div class="panel-header">
+                    <h3>📊 Real-time Metrics</h3>
+                    <span class="refresh-indicator">Updating...</span>
+                </div>
+                <div class="panel-content">
+                    <div class="metrics-grid">
+                        <div class="metric-item">
+                            <div class="metric-header">
+                                <span class="metric-icon">📧</span>
+                                <span class="metric-title">Emails Processed</span>
+                            </div>
+                            <div class="metric-value">
+                                <span class="value-number">1,247</span>
+                                <span class="value-change positive">+12%</span>
+                            </div>
+                            <div class="metric-bar">
+                                <div class="bar-fill" style="width: 85%"></div>
+                            </div>
+                        </div>
+
+                        <div class="metric-item">
+                            <div class="metric-header">
+                                <span class="metric-icon">⏱️</span>
+                                <span class="metric-title">Average Processing Time</span>
+                            </div>
+                            <div class="metric-value">
+                                <span class="value-number">2.3s</span>
+                                <span class="value-change negative">+0.5s</span>
+                            </div>
+                            <div class="metric-bar">
+                                <div class="bar-fill" style="width: 45%"></div>
+                            </div>
+                        </div>
+
+                        <div class="metric-item">
+                            <div class="metric-header">
+                                <span class="metric-icon">🎯</span>
+                                <span class="metric-title">Accuracy Rate</span>
+                            </div>
+                            <div class="metric-value">
+                                <span class="value-number">98.6%</span>
+                                <span class="value-change positive">+1.2%</span>
+                            </div>
+                            <div class="metric-bar">
+                                <div class="bar-fill" style="width: 98%"></div>
+                            </div>
+                        </div>
+
+                        <div class="metric-item">
+                            <div class="metric-header">
+                                <span class="metric-icon">⚠️</span>
+                                <span class="metric-title">Error Rate</span>
+                            </div>
+                            <div class="metric-value">
+                                <span class="value-number">0.15%</span>
+                                <span class="value-change negative">+0.05%</span>
+                            </div>
+                            <div class="metric-bar">
+                                <div class="bar-fill" style="width: 15%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Panels (Hidden by default) -->
+    <div class="modal-panel" id="config-editor" style="display: none;">
+        <div class="modal-header">
+            <h3>⚙️ Email Configuration Editor</h3>
+            <button class="btn-close" onclick="hidePanel('config-editor')">×</button>
+        </div>
+        <div class="modal-content">
+            <p>Configuration editor would be implemented here...</p>
+        </div>
+    </div>
+
+    <div class="modal-panel" id="test-results" style="display: none;">
+        <div class="modal-header">
+            <h3>🧪 Test Results</h3>
+            <button class="btn-close" onclick="hidePanel('test-results')">×</button>
+        </div>
+        <div class="modal-content">
+            <p>Test results would be displayed here...</p>
+        </div>
+    </div>
+
+    <script>
+        // Status page functionality
+        const statusPage = {
+            init() {
+                this.setupEventListeners();
+                this.startRealTimeUpdates();
+            },
+            
+            setupEventListeners() {
+                // Action buttons
+                document.querySelectorAll('.action-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const action = e.currentTarget.getAttribute('onclick');
+                        if (action) {
+                            eval(action.replace('onclick="', '').replace('"', ''));
+                        }
+                    });
+                });
+            },
+            
+            startRealTimeUpdates() {
+                // Simulate real-time updates
+                setInterval(() => {
+                    this.updateMetrics();
+                }, 30000); // Update every 30 seconds
+            },
+            
+            updateMetrics() {
+                // Simulate metric updates
+                console.log('Updating metrics...');
+            },
+            
+            refreshActivityLog() {
+                console.log('Refreshing activity log...');
+                this.showNotification('Activity log refreshed', 'info');
+            },
+            
+            triggerManualProcessing() {
+                console.log('Starting manual processing...');
+                this.showNotification('Manual processing initiated', 'success');
+            },
+            
+            showConfigEditor() {
+                this.showPanel('config-editor');
+            },
+            
+            exportLogs() {
+                console.log('Exporting logs...');
+                this.showNotification('Logs exported successfully', 'success');
+            },
+            
+            showTestResults() {
+                this.showPanel('test-results');
+            },
+            
+            viewEmailHistory() {
+                console.log('Viewing email history...');
+                this.showNotification('Email history loaded', 'info');
+            },
+            
+            showSystemStatus() {
+                console.log('Showing system status...');
+                this.showNotification('System status displayed', 'info');
+            },
+            
+            showPanel(panelId) {
+                // Hide all panels
+                document.querySelectorAll('.modal-panel').forEach(panel => {
+                    panel.style.display = 'none';
+                });
+                // Show selected panel
+                document.getElementById(panelId).style.display = 'block';
+            },
+            
+            hidePanel(panelId) {
+                document.getElementById(panelId).style.display = 'none';
+            },
+            
+            showNotification(message, type = 'info') {
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.textContent = message;
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 15px 20px;
+                    background: ${type === 'success' ? '#d4edda' : '#d1ecf1'};
+                    color: ${type === 'success' ? '#155724' : '#0c5460'};
+                    border: 1px solid ${type === 'success' ? '#c3e6cb' : '#bee5eb'};
+                    border-radius: 6px;
+                    z-index: 2000;
+                    animation: slideIn 0.3s ease;
+                `;
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    notification.style.animation = 'slideOut 0.3s ease';
+                    setTimeout(() => {
+                        document.body.removeChild(notification);
+                    }, 300);
+                }, 3000);
+            }
+        };
+
+        // CSS animations
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); }
+                to { transform: translateX(0); }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); }
+                to { transform: translateX(100%); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            statusPage.init();
+            console.log('Email status page loaded');
+        });
+    </script>
+
+    <style>
+        .email-status-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+        }
+
+        .page-header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .status-dashboard {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .status-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .overview-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        .card-header h3 {
+            color: #2c3e50;
+            margin: 0;
+        }
+
+        .status-indicator {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .status-indicator.active {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-indicator.good {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status-indicator.configured {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .stat-trend {
+            font-size: 0.8em;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .stat-trend.positive {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .stat-trend.negative {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .stat-trend.neutral {
+            background: #e2e3f3;
+            color: #383d8b;
+        }
+
+        .directory-info {
+            display: grid;
+            gap: 10px;
+        }
+
+        .dir-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .dir-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .dir-status.active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .dir-status.good {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-panels {
+            display: grid;
+            gap: 30px;
+        }
+
+        .status-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .panel-header h3 {
+            color: #2c3e50;
+            margin: 0;
+        }
+
+        .btn-primary {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .activity-timeline {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .timeline-item {
+            display: flex;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .timeline-time {
+            font-weight: 600;
+            color: #6c757d;
+            margin-right: 15px;
+            min-width: 60px;
+        }
+
+        .timeline-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .timeline-icon {
+            font-size: 1.2em;
+        }
+
+        .timeline-message {
+            flex: 1;
+        }
+
+        .timeline-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .timeline-status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .timeline-status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .timeline-status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .quick-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .action-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding: 20px;
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            border-color: #667eea;
+            background: #e9ecef;
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .action-icon {
+            font-size: 2em;
+        }
+
+        .action-label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .metric-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .metric-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .metric-icon {
+            font-size: 1.5em;
+        }
+
+        .metric-title {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .metric-value {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .value-number {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .value-change {
+            font-size: 0.9em;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .metric-bar {
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.5s ease;
+        }
+
+        .modal-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            max-width: 600px;
+            width: 90%;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .btn-close {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            font-size: 1.2em;
+        }
+
+        @media (max-width: 1200px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .quick-actions-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</div>

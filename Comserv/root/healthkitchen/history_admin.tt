@@ -1,0 +1,24 @@
+[% META
+   title = "Shared health history (admin)"
+   description = "Entries a user chose to share with site admins"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "HealthKitchen"
+   page_version = "0.01"
+   last_updated = "2026-10-18"
+%]
+[% PageVersion = 'healthkitchen/history_admin.tt,v 0.01 2026/10/18 grok-bot Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+    [% INCLUDE 'healthkitchen/_disclaimer.tt' %]
+    <div class="page-header">
+        <h1>Shared health history — user [% hk_subject | html %]</h1>
+        <p class="doc-muted">Only entries this user shared with site admins are shown. This view has been recorded in the audit log.</p>
+    </div>
+    [% IF hk_history.size %]
+        <table class="table"><thead><tr><th>Type</th><th>Name</th><th>Status</th><th>Onset</th><th>Resolved</th><th>Notes</th></tr></thead><tbody>
+        [% FOREACH h IN hk_history %]<tr><td>[% h.entry_type %]</td><td>[% h.label | html %]</td><td>[% h.status %]</td><td>[% h.onset_date %]</td><td>[% h.resolved_date %]</td><td>[% h.notes | html %]</td></tr>[% END %]
+        </tbody></table>
+    [% ELSE %]<p>No shared entries (or the user has not opted in).</p>[% END %]
+</div>

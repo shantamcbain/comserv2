@@ -249,6 +249,10 @@
                         <i class="fas fa-file-invoice-dollar"></i>
                         <span>Mail Invoice Classification</span>
                     </a>
+                    <a href="[% c.uri_for('/Inventory/email-config') %]" class="admin-link">
+                        <i class="fas fa-envelope"></i>
+                        <span>Set Invoice Email Addresses</span>
+                    </a>
                     <a href="[% c.uri_for('/mail/invoice/sort') %]" class="admin-link">
                         <i class="fas fa-sort"></i>
                         <span>Sort Invoices by Site</span>

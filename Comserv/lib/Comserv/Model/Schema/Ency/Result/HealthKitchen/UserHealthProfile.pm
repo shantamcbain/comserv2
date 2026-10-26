@@ -41,6 +41,10 @@ __PACKAGE__->add_columns(
         data_type   => 'text',
         is_nullable => 1,
     },
+    # Sourcing preferences (20261018_healthkitchen_sourcing.sql); all nullable, defaults applied in code.
+    prefer_organic => { data_type => 'tinyint', is_nullable => 1 },
+    avoid_feedlot  => { data_type => 'tinyint', is_nullable => 1 },
+    ethics_weight  => { data_type => 'tinyint', is_nullable => 1 },   # 0-5, default 0
     created_at => {
         data_type     => 'datetime',
         is_nullable   => 1,

@@ -1922,7 +1922,40 @@ sub supergrok_meter {
     require Comserv::Util::AI::SuperGrokPacing;
     my $root = eval { $c->path_to('') . '' } // '.';
     $root =~ s{/$}{};
-    return Comserv::Util::AI::SuperGrokPacing::meter_status(readings => $self->_supergrok_readings($root), now => $a{now} // time);
+    return Comserv::Util::AI::SuperGrokPacing::meter_status(readings => $self->_supergrok_readings($root), now => $a{now} // time, last_seen => _grokcom_now($root));
+}
+
+# Live grok.com meter (add-on rewrites the file on every post; 'at' = last seen).
+sub _grokcom_now {
+    my ($root) = @_;
+    return eval {
+        require JSON::MaybeXS; open my $gfh, '<', "$root/root/static/ai/grokcom_usage.json" or die;
+        local $/; my $j = JSON::MaybeXS::decode_json(<$gfh>); close $gfh;
+        my $r = { value => $j->{build}, at => Comserv::Util::AI::HealthChecks::iso_epoch($j->{at}) };
+        # Oct 22 2026: when did this value first appear? 'at' is only last-seen.
+        my $ch = _grokcom_changed_at($root, $j->{build});
+        $r->{changed_at} = $ch if defined $ch;
+        $r;
+    };
+}
+
+# Epoch the add-on first saw $value: native_host's grokcom_build_seen.json ([[epoch, value]]), else the
+# last history row whose build equals it (history only gets a row on change).
+sub _grokcom_changed_at {
+    my ($root, $value) = @_;
+    return undef unless defined $value && $value =~ /^\d+(?:\.\d+)?$/;
+    my $ch;
+    if (open my $fh, '<', "$root/root/static/ai/grokcom_build_seen.json") {
+        local $/; my $s = eval { JSON::PP->new->decode(<$fh>) }; close $fh;
+        if (ref $s eq 'ARRAY' && ref $s->[-1] eq 'ARRAY' && defined $s->[-1][1] && $s->[-1][1] == $value) { $ch = $s->[-1][0] }
+    }
+    if (!defined $ch && open my $hf, '<', "$root/root/static/ai/grokcom_usage_history.jsonl") {
+        my $lastrow;
+        while (my $l = <$hf>) { my $d = eval { JSON::PP->new->decode($l) } or next; $lastrow = $d if defined $d->{build} }
+        close $hf;
+        $ch = Comserv::Util::AI::HealthChecks::iso_epoch($lastrow->{at}) if $lastrow && $lastrow->{build} == $value;
+    }
+    return $ch;
 }
 
 sub supergrok_pacing {
@@ -1958,11 +1991,14 @@ sub supergrok_pacing {
         return ($t + $ledger_tok->($from, $to)) / 1e6;
     };
     my $fit = $P->can('fit_rate')->(readings => \@rd, units => $units, now => $now, anchor => $anchor);
+    # Live meter: grok.com add-on rewrites this file on every post (history only on change).
+    my $gnow = _grokcom_now($root);
     my $p = $P->can('pacing')->(readings => \@rd, units => $units, rate => $fit->{rate}, now => $now, anchor => $anchor,
+        ($gnow ? (meter_now => $gnow) : ()),
         alert_cfg => (eval { $self->pacing_config($c)->{alerts} } || {}),
         daily_cfg => (eval { $self->pacing_config($c)->{daily} } || {}));
     $p->{calibration} = $fit;
-    $p->{meter} = $P->can('meter_status')->(readings => \@rd, now => $now);
+    $p->{meter} = $P->can('meter_status')->(readings => \@rd, now => $now, last_seen => $gnow);
     # Daily switch state written by ~/.hermes/scripts/supergrok_daily_guard.py (owner).
     if (open my $gfh, '<', "$root/root/static/ai/supergrok_guard.json") {
         local $/; my $g = eval { JSON::PP->new->decode(<$gfh>) } || {}; close $gfh;

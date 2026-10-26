@@ -68,6 +68,7 @@
         header. Action buttons live in the hover popup (todo-card-popup),
         which is not confined to the card window. %]
     <summary class="d-flex align-items-center p-1 todo-card-summary-cal">
+      <a href="/todo/details?record_id=[% tc.record_id %]" class="todo-card-id text-muted mr-1" title="Todo #[% tc.record_id %]" style="font-family:monospace;white-space:nowrap;">#[% tc.record_id %]</a>
       <a href="/todo/details?record_id=[% tc.record_id %]"
          class="todo-card-subject flex-grow-1 min-width-0">[% tc.subject || '(No subject)' | html %]</a>
       <span class="badge pri-[% tci_p %]">P[% tci_p %]</span>
@@ -115,6 +116,7 @@
         [% IF tc_is_overdue %]<span class="badge badge-danger">🔴 OVR</span>
         [% ELSIF tc_due_today %]<span class="badge badge-warning">⚡</span>[% END %]
         [% IF is_csc && tc.sitename && tc.sitename != 'CSC' %]<span class="badge badge-primary">[% tc.sitename | html %]</span>[% END %]
+        <a href="/todo/details?record_id=[% tc.record_id %]" class="todo-card-id text-muted ml-1" title="Todo #[% tc.record_id %]" style="font-family:monospace;white-space:nowrap;">#[% tc.record_id %]</a>
         <a href="/todo/details?record_id=[% tc.record_id %]" class="todo-card-subject ml-1">[% tc.subject || '(No subject)' | html %]</a>
       </div>
       <div class="d-flex align-items-center flex-shrink-0 todo-card-actions">

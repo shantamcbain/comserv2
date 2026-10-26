@@ -1,0 +1,90 @@
+[% META
+   title = "Health history"
+   description = "Private, opt-in health and disease history"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "HealthKitchen"
+   page_version = "0.01"
+   last_updated = "2026-10-18"
+%]
+[% PageVersion = 'healthkitchen/history.tt,v 0.01 2026/10/18 grok-bot Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+    [% INCLUDE 'healthkitchen/_disclaimer.tt' %]
+    <div class="page-header">
+        <h1>Health history</h1>
+        <p><a href="[% c.uri_for('/healthkitchen') %]">Health Kitchen</a> · <a href="[% c.uri_for('/healthkitchen/symptoms') %]">Symptoms</a></p>
+    </div>
+    [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+
+    [% IF !hk_hist_ready %]
+        <div class="alert alert-warning">Create tables <code>hk_health_consent</code>, <code>hk_health_history</code> and <code>hk_health_audit</code> via Schema Compare first.</div>
+    [% ELSIF !hk_consent %]
+        <div class="content-section">
+            <h2>Opt in</h2>
+            <p>You can keep a private record of past and current conditions, medications and allergies. Health Kitchen uses it only to skip herbs with matching cautions or interactions, add ENCY herbs linked to your conditions, and keep allergens out of meal plans and AI recipe ideas.</p>
+            <ul>
+                <li>Private by default. Site admins see an entry only if you share that entry, and every admin view is logged.</li>
+                <li>Names and notes are stored encrypted. Diagnoses are never sent to AI.</li>
+                <li>You can export or delete everything at any time, and revoke consent.</li>
+            </ul>
+            <form method="post" action="[% c.uri_for('/healthkitchen/history') %]">
+                <input type="hidden" name="hk_action" value="consent" />
+                <label><input type="checkbox" required /> I agree to store my health history as described.</label>
+                <button type="submit" class="btn btn-primary">Opt in</button>
+            </form>
+        </div>
+    [% ELSE %]
+        [% e = hk_edit %]
+        <div class="content-section">
+            <h2>[% IF e %]Edit entry[% ELSE %]Add entry[% END %]</h2>
+            <form method="post" action="[% c.uri_for('/healthkitchen/history') %]">
+                [% IF e %]<input type="hidden" name="id" value="[% e.id %]" />[% END %]
+                <label>Type <select name="entry_type">[% FOREACH t IN hk_types %]<option value="[% t %]"[% IF e.entry_type == t %] selected[% END %]>[% t %]</option>[% END %]</select></label>
+                <label>Name <input type="text" name="label" maxlength="255" value="[% e.label | html %]" /></label>
+                <label>ENCY disease id <input type="number" name="ency_disease_id" min="1" value="[% e.ency_disease_id %]" /></label>
+                <label>ENCY symptom id <input type="number" name="ency_symptom_id" min="1" value="[% e.ency_symptom_id %]" /></label>
+                <label>ENCY drug id <input type="number" name="ency_drug_id" min="1" value="[% e.ency_drug_id %]" /></label>
+                <label>Status <select name="status">[% FOREACH s IN hk_statuses %]<option value="[% s %]"[% IF e.status == s %] selected[% END %]>[% s %]</option>[% END %]</select></label>
+                <label>Onset <input type="date" name="onset_date" value="[% e.onset_date %]" /></label>
+                <label>Resolved <input type="date" name="resolved_date" value="[% e.resolved_date %]" /></label>
+                <label>Severity <select name="severity"><option value="">—</option>[% FOREACH s IN ['mild','moderate','severe'] %]<option value="[% s %]"[% IF e.severity == s %] selected[% END %]>[% s %]</option>[% END %]</select></label>
+                <label>Use for suggestions <select name="use_for_matching"><option value="1">yes</option><option value="0"[% IF e && !e.use_for_matching %] selected[% END %]>no</option></select></label>
+                <label>Visibility <select name="visibility"><option value="private">private (only me)</option><option value="site_admin"[% IF e.visibility == 'site_admin' %] selected[% END %]>share with site admins</option></select></label>
+                <label>Notes <textarea name="notes" rows="2" maxlength="5000">[% e.notes | html %]</textarea></label>
+                <button type="submit" class="btn btn-primary">Save</button>
+                [% IF e %]<a href="[% c.uri_for('/healthkitchen/history') %]">Cancel</a>[% END %]
+            </form>
+        </div>
+
+        <div class="content-section">
+            <h2>Your entries</h2>
+            [% IF hk_history.size %]
+            <table class="table"><thead><tr><th>Type</th><th>Name</th><th>Status</th><th>Onset</th><th>Resolved</th><th>Used</th><th>Visibility</th><th></th></tr></thead><tbody>
+            [% FOREACH h IN hk_history %]
+                <tr><td>[% h.entry_type %]</td><td>[% h.label | html %][% IF h.ency_disease_id %] <small>(ENCY disease [% h.ency_disease_id %])</small>[% END %][% IF h.ency_drug_id %] <small>(ENCY drug [% h.ency_drug_id %])</small>[% END %]</td>
+                    <td>[% h.status %]</td><td>[% h.onset_date %]</td><td>[% h.resolved_date %]</td><td>[% h.use_for_matching ? 'yes' : 'no' %]</td><td>[% h.visibility %]</td>
+                    <td><a href="[% c.uri_for('/healthkitchen/history', { edit => h.id }) %]">Edit</a>
+                        <form method="post" action="[% c.uri_for('/healthkitchen/history') %]" style="display:inline"><input type="hidden" name="hk_action" value="delete" /><input type="hidden" name="id" value="[% h.id %]" /><button type="submit" class="btn btn-secondary">Delete</button></form></td></tr>
+            [% END %]</tbody></table>
+            [% ELSE %]<p class="doc-muted">No entries yet.</p>[% END %]
+        </div>
+
+        <div class="content-section">
+            <h2>Your data</h2>
+            <p><a class="btn btn-secondary" href="[% c.uri_for('/healthkitchen/history_export', { format => 'json' }) %]">Export JSON</a>
+               <a class="btn btn-secondary" href="[% c.uri_for('/healthkitchen/history_export', { format => 'csv' }) %]">Export CSV</a></p>
+            <form method="post" action="[% c.uri_for('/healthkitchen/history') %]">
+                <input type="hidden" name="hk_action" value="revoke" />
+                <button type="submit" class="btn btn-secondary">Revoke consent</button>
+            </form>
+            <form method="post" action="[% c.uri_for('/healthkitchen/history') %]">
+                <input type="hidden" name="hk_action" value="delete_all" />
+                <label>Type <strong>DELETE</strong> to permanently remove all health history and consent <input type="text" name="confirm" required pattern="DELETE" /></label>
+                <button type="submit" class="btn btn-danger">Delete everything</button>
+            </form>
+        </div>
+    [% END %]
+</div>

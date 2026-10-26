@@ -1,0 +1,26 @@
+use strict; use warnings; use utf8;
+use Test::More;
+use lib 'lib';
+use Comserv::Util::MailInvoiceClassifier;
+my $m = bless { logging => undef }, 'Comserv::Util::MailInvoiceClassifier';
+sub slurp { local ( @ARGV, $/ ) = @_; my $s = <>; utf8::decode($s); $s }
+my $r = $m->parse_square_receipt( slurp('t/data/square_receipt_new.html') );
+is $r->{code}, 'AbC1', 'new layout code';
+is scalar @{ $r->{items} }, 3, 'three items';
+is_deeply [ map { $_->{name} } @{ $r->{items} } ], [ 'BLU Coconut Water Org', 'PRO Bananas Org (TILL)', 'RAIN Sardines Spring Water' ], 'names';
+is $r->{items}[0]{line_total}, 5.82, 'discounted total';
+is $r->{items}[0]{reg_price}, 6.85, 'reg price';
+is_deeply [ @{ $r->{items}[1] }{qw(qty uom unit_price)} ], [ 1.4, 'lb', 1.65 ], 'weighed item';
+is_deeply [ @{ $r->{items}[2] }{qw(qty unit_price line_total)} ], [ 2, 1.85, 3.7 ], 'multi-qty item';
+is_deeply [ @$r{qw(subtotal gst total)} ], [ 11.83, 0.29, 10.28 ], 'totals';
+ok $r->{sum_ok}, 'lines sum to subtotal';
+$r = $m->parse_square_receipt( slurp('t/data/square_receipt_old.html') );
+is $r->{code}, 'xY9z', 'old layout: code after totals';
+is scalar @{ $r->{items} }, 1, 'one item';
+is $r->{items}[0]{line_total}, 4.00, 'old line total';
+ok $r->{sum_ok}, 'old sum ok';
+is $m->parse_square_receipt('<p>You paid $5.00</p>'), undef, 'non-itemized -> undef';
+is_deeply $m->folder_list(''), ['INBOX'], 'default folder';
+is_deeply $m->folder_list(' INBOX , INBOX/coop '), [ 'INBOX', 'INBOX/coop' ], 'folder list';
+is $m->clean_folders('INBOX, INBOX/coop, bad;rm'), 'INBOX, INBOX/coop', 'folder sanitize';
+done_testing;

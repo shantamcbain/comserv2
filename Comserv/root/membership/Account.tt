@@ -143,9 +143,12 @@
 
       [% ELSE %]
       <div class="content-section">
-        <p class="empty-state">You have no active memberships.</p>
+        [%# CSC-20260831-3077: with no paid membership row every member is on the
+            implicit Free plan (the "My Personal Membership" table shows Free (active)). %]
+        <p class="empty-state"><strong>Free</strong> membership &mdash; active.</p>
+        <p class="text-muted">You have no paid membership on this site. Upgrade any time for more features.</p>
         <div class="form-actions">
-          <a href="[% c.uri_for('/membership') %]" class="btn btn-primary">View Plans</a>
+          <a href="[% c.uri_for('/membership') %]" class="btn btn-primary">View Plans / Upgrade</a>
         </div>
       </div>
       [% END %]

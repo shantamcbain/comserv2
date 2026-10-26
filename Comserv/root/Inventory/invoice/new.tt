@@ -1,7 +1,7 @@
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <h1>Enter Supplier Invoice</h1>
-<p><a href="/Inventory/invoice">← Invoices</a></p>
+<p><a href="/Inventory/invoice">← Invoices</a> | <a href="/Inventory/email-config">Set email addresses</a></p>
 
 [% IF error_msg %]<p style="color:red;font-weight:bold">[% error_msg %]</p>[% END %]
 

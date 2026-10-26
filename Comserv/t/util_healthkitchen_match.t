@@ -49,4 +49,15 @@ is( scalar @{ $got->{herbs} }, 0, 'empty pantry never invents stock' );
 $got = $hk->match_for_symptoms( undef, { dataset => $data } );
 is( ref $got->{herbs}, 'ARRAY', 'match_for_symptoms dataset passthrough' );
 
+{
+    my $r = $hk->match_candidates({
+        symptom_ids     => [7],
+        pantry_herb_ids => [1],
+        herb_symptoms   => [ { herb_id => 1, symptom_id => 7 }, { herb_id => 2, symptom_id => 7 } ],
+        herbs           => { 2 => { name => 'Missing herb' } },
+    });
+    is( scalar @{ $r->{herbs} }, 1, 'in-pantry herb matched' );
+    is( $r->{not_in_pantry}[0]{name}, 'Missing herb', 'ENCY herb outside pantry listed as not_in_pantry' );
+}
+
 done_testing;

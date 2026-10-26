@@ -1,0 +1,19 @@
+[% PageVersion = 'site/clone_site.tt,v 0.01 2026/10/18 Bmaster' %]
+<h1>Clone my existing website (URL)</h1>
+<p>Imports every page of a public website (same domain only) into the Page system for the chosen site.
+Images are filed in the File Manager (NFS <code>/data/nfs/&lt;site&gt;/media/site-import/</code>) and internal links point to <code>/page/&lt;code&gt;</code>.
+The front page becomes page <code>home</code>. Running it again updates pages instead of duplicating them.</p>
+[% IF error_msg %]<p class="error" style="color:#b00">[% error_msg | html %]</p>[% END %]
+<form method="POST" action="/site/clone_site">
+  <label>Website URL: <input type="url" name="source_url" size="50" placeholder="https://example.com/" required></label><br>
+  <label>Into site: <select name="site_id">[% FOREACH s IN sites %]<option value="[% s.id %]"[% IF s.name == SiteName %] selected[% END %]>[% s.name | html %]</option>[% END %]</select></label><br>
+  <label>Max pages: <input type="number" name="max_pages" value="100" min="1" max="500"></label><br>
+  <button type="submit">Clone website</button>
+</form>
+[% IF clone_result %]
+<h2>Imported into [% clone_site_name | html %]</h2>
+<p>[% clone_result.pages.size %] pages, [% clone_result.images %] images.</p>
+<ul>[% FOREACH pc IN clone_result.pages %]<li><a href="/page/[% pc %]?SiteName=[% clone_site_name | uri %]" target="_blank">[% pc %]</a></li>[% END %]</ul>
+<p><a href="/site/clone_review?site=[% clone_site_name | uri %]">Optional: Tidy up with AI &rarr;</a> (review proposals before anything changes)</p>
+[% IF clone_result.errors.size %]<h3>Problems</h3><ul>[% FOREACH e IN clone_result.errors %]<li>[% e | html %]</li>[% END %]</ul>[% END %]
+[% END %]

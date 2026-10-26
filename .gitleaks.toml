@@ -9,7 +9,8 @@ title = "Comserv2 Gitleaks Config"
 # Use the built-in default rules (AWS, GCP, Stripe, private keys, JWT, etc.)
 useDefault = true
 
-[whitelist]
+[allowlist]
+description = "Paths and harmless patterns"
 # Paths that should never be scanned
 paths = [
     '''.*/node_modules/.*''',
@@ -32,15 +33,94 @@ paths = [
     '''.*/root/Documentation/.*Audit.*\.json$''',
 ]
 
-# Allowlist specific harmless regexes that trip the default rules
-[allowlist]
-description = "Common false positives in this repo"
+# Harmless regexes that trip the default rules
 regexes = [
     # Example/placeholder keys in documentation
     '''your[-_][a-z]+[-_]?key''',
     '''example[-_][a-z]+[-_]?token''',
     # DBI DSN strings (contain host/db but no credential)
-    '''dbi:mysql:.*''',
+    # (only the DSN prefix itself; anything carrying user:pass@ is NOT allowlisted)
+    '''^dbi:(mysql|MariaDB|Pg|SQLite):[A-Za-z0-9_;=.\-/]*$''',
     # JWT-ish example in docs
     '''eyJ[A-Za-z0-9_-]{0,10}\.\.\.''',
 ]
+
+# ---------------------------------------------------------------------------
+# Path rules: flag key/secret FILES by name regardless of content
+# (random raw keys have no recognisable pattern). Mirrors secret_guard.sh.
+[[rules]]
+id = "secret-file-encryption-key"
+description = "Encryption key file committed (*_encryption_key)"
+path = '''(^|/)\.?[^/]*_encryption_key$'''
+
+[[rules]]
+id = "secret-file-key-material"
+description = "Private key / keystore file committed"
+path = '''(?i)(^|/)[^/]+\.(key|pem|p12|pfx|jks|kdbx)$'''
+
+[[rules]]
+id = "secret-file-ssh-key"
+description = "SSH private key file committed"
+path = '''(^|/)id_(rsa|ed25519|ecdsa|dsa)[^/]*$'''
+
+[[rules]]
+id = "secret-file-dotenv"
+description = ".env file committed"
+path = '''(^|/)\.env(\.[^/]*)?$'''
+[rules.allowlist]
+paths = ['''(^|/)\.env\.example$''']
+
+[[rules]]
+id = "secret-file-credentials-json"
+description = "Credentials JSON committed"
+path = '''(^|/)(db_config|credentials|auth)\.json$'''
+
+# ---------------------------------------------------------------------------
+# Content rules for Perl / Catalyst conf / YAML / .env style literals.
+# Values that are variables, env lookups, placeholders or very short are
+# allowlisted per rule so only real-looking literals fire.
+[[rules]]
+id = "comserv-conf-credential"
+description = "Credential literal in Catalyst/Apache-style conf (key<space>value)"
+regex = '''(?im)^[ \t]*(?:password|passwd|api_token|api_key|secret|secret_key|client_secret|token_value)[ \t]+([^\s#<>$"']{8,})[ \t]*(?:#.*)?$'''
+secretGroup = 1
+entropy = 2.5
+path = '''(?i)\.(conf|cfg|ini)$|(^|/)comserv\.conf$'''
+[rules.allowlist]
+stopwords = ["your","example","changeme","replace","placeholder","dummy","xxx","redacted","fake","sample","test","here","paste","insert","set_me","todo","secret_value"]
+
+
+[[rules]]
+id = "perl-fat-comma-credential"
+description = "Hard-coded credential in Perl hash (password => 'literal')"
+regex = '''(?i)['"]?(?:password|passwd|pass|api_token|api_key|apikey|secret|client_secret|access_token|auth_token|token)['"]?\s*=>\s*['"]([^'"\s$@%{}()]{8,})['"]'''
+secretGroup = 1
+entropy = 3.0
+[rules.allowlist]
+stopwords = ["your","example","changeme","replace","placeholder","dummy","xxx","redacted","fake","sample","test","here","paste","insert","set_me","todo","secret_value"]
+paths = ['''(^|/)Comserv/t/''', '''(^|/)t/.*\.t$''', '''(^|/)root/Documentation/.*\.tt$''']
+
+[[rules]]
+id = "assign-credential-literal"
+description = "Hard-coded credential assignment (KEY=literal / key: literal) in .env/YAML/shell/Perl"
+regex = '''(?i)(?:^|[\s$])(?:[A-Z0-9_]*_)?(?:password|passwd|api_token|api_key|secret|secret_key|client_secret|access_token)\s*(?:=|:)\s*['"]?([A-Za-z0-9+/_\-.!@#%^&*=]{12,})['"]?\s*(?:#.*)?$'''
+secretGroup = 1
+entropy = 3.3
+[rules.allowlist]
+stopwords = ["your","example","changeme","replace","placeholder","dummy","xxx","redacted","fake","sample","test","here","paste","insert","set_me","todo","secret_value"]
+regexes = ['''^(\$|<|\$\{)''']
+
+[[rules]]
+id = "dsn-embedded-password"
+description = "Connection URL/DSN with embedded user:password@"
+regex = '''(?i)\b(?:mysql|mariadb|postgres(?:ql)?|mongodb(?:\+srv)?|redis|amqp|smtps?|imaps?|ftp|sftp|https?)://[^:/\s'"@]+:([^@\s'"/]{4,})@[\w.\-]+'''
+secretGroup = 1
+[rules.allowlist]
+stopwords = ["your","example","changeme","replace","placeholder","dummy","xxx","redacted","fake","sample","test","here","paste","insert","set_me","todo","secret_value"]
+regexes = ['''(?i)^(password|pass|passwd|secret|pw|changeme|x+|\*+|<[^>]*>|\$\{?\w+\}?)$''']
+
+[[rules]]
+id = "dbi-dsn-password"
+description = "Perl DBI DSN with inline password=..."
+regex = '''(?i)dbi:[A-Za-z]+:[^'"\s]*;password=([^;'"\s$]{4,})'''
+secretGroup = 1

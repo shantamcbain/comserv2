@@ -20,6 +20,25 @@
   [% IF has_draft %]<span style="color:var(--success-color,#28a745);margin-left:0.5rem;">⤿ Draft resumed</span>[% END %]
 </form>
 
+<!-- Quick scan helper for count -->
+<div style="margin: 0.5rem 0;">
+  <label>Quick Scan / Lookup Barcode: 
+    <input type="text" id="count-barcode-scan" placeholder="Scan or type barcode" style="width:200px;">
+  </label>
+  <button type="button" onclick="scanCountBarcode()">Find &amp; Focus</button>
+  <small> (Enter barcode to highlight matching row)</small>
+</div>
+
+<!-- Camera section for count (reuse pattern) -->
+<div style="margin:0.5rem 0; padding:0.5rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.9em;">
+  <strong>Camera (optional visual for count evidence)</strong>
+  <button type="button" id="count-start-cam">📷 Cam</button>
+  <button type="button" id="count-capture">Capture</button>
+  <video id="count-video" style="display:none;max-width:200px;"></video>
+  <canvas id="count-canvas" style="display:none;"></canvas>
+  <img id="count-preview" style="display:none;max-width:100px;">
+</div>
+
 [% IF rows.size == 0 %]
   <p>No active items for this filter.</p>
 [% ELSE %]

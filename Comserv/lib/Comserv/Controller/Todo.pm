@@ -316,6 +316,28 @@ sub todo :Path('/todo') :Args(0) {
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
+    # Jump-by-number: "2447" / "#2447" opens that todo; a HelpDesk ticket
+    # number like CSC-20260928-9565 opens that ticket. Lookups use DBIC
+    # (placeholder-bound); nothing from the search box is interpolated into SQL.
+    (my $jump = $search_term) =~ s/^\s+|\s+$//g;
+    if ($jump =~ /^#?(\d{1,10})$/) {
+        my $rid = $1;
+        my $hit = eval { $schema->resultset('Todo')->find($rid) };
+        if ($hit) {
+            $c->res->redirect($c->uri_for('/todo/details', { record_id => $hit->record_id }));
+            $c->detach;
+        }
+        $c->stash(error_msg => "No todo #$rid found; searching text instead.");
+    } elsif ($jump =~ /^([A-Za-z0-9]{1,20}-\d{8}-\d{4})$/) {
+        my $tn = uc $1;
+        my $tk = eval { $schema->resultset('SupportTicket')->search({ ticket_number => $tn }, { rows => 1 })->single };
+        if ($tk) {
+            $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $tk->ticket_number));
+            $c->detach;
+        }
+        $c->stash(error_msg => "No HelpDesk ticket $tn found; searching todo text instead.");
+    }
+
     # Get a DBIx::Class::ResultSet object
     my $rs = $schema->resultset('Todo');
 

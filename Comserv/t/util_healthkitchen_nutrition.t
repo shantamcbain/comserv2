@@ -1,0 +1,12 @@
+use strict;
+use warnings;
+use Test::More;
+use Comserv::Util::HealthKitchen;
+my $hk = Comserv::Util::HealthKitchen->new;
+my $t = $hk->daily_totals( [ { calories => 150.5, protein_g => 5 }, { calories => 100, protein_g => 2.25, sodium_mg => 40 } ] );
+is( $t->{calories}, 250.5, 'calories summed' );
+is( $t->{protein_g}, 7.25, 'protein summed' );
+is( $t->{fat_g}, 0, 'missing nutrient totals 0' );
+is( $hk->_num('12.5'), 12.5, 'numeric parse' );
+ok( !defined $hk->_num('abc'), 'non-numeric rejected' );
+done_testing;

@@ -105,6 +105,21 @@ sub send_email {
         "Message built: From='$from_header' To='$to' Subject='$subject'" .
         ($leader_email ? " Reply-To='$leader_email'" : ''));
 
+    # Reject malformed recipients (e.g. a bare "abc" saved on a ticket) up front:
+    # this is bad user data, not an SMTP failure, so warn instead of logging ERROR.
+    {
+        my @bad = grep { !/^[^@\s<>]+\@[^@\s<>]+$/ }
+                  map  { s/^\s+|\s+$//gr }
+                  grep { length }
+                  split(/\s*[,;]\s*/, defined $to ? $to : '');
+        if (!length($to // '') || @bad) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_email',
+                "Not sending email: invalid recipient address(es) [" . join(', ', @bad ? @bad : ('(empty)')) . "]");
+            $c->stash->{debug_msg} = "Email not sent: invalid recipient address";
+            return;
+        }
+    }
+
     try {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
             "Connecting to SMTP: " . $smtp_config->{host} . ":" . $smtp_config->{port} .

@@ -51,6 +51,8 @@ sub _detect_provider {
     elsif ($bare =~ s/^([^|]+)\|//) {
         $prefix = lc($1);
     }
+    # 2026-10-15: deepseek-v4-pro is never used; map to the free north-mini.
+    return ('openrouter', 'cohere/north-mini-code:free') if $bare =~ /deepseek-v4-pro/i;
     if ($prefix eq 'supergrok' || $prefix eq 'grok-oauth') {
         $bare =~ s/^x-ai\///i;
         return ('supergrok', $bare);
@@ -370,7 +372,7 @@ sub _external_default_available {
     return 0 unless $prov && $prov->can('_resolve_api_key');
 
     # Key must resolve (k8s secret / env / DBEncy UserApiKeys).
-    my $key = try { $prov->_resolve_api_key($c) } catch { undef };
+    my $key = try { $prov->_resolve_api_key($c, undef, ($svc eq 'openrouter' ? (guest => 1) : ())) } catch { undef };
     return 0 unless $key;
 
     # Model must exist in the live catalog (skip the network check if the
@@ -413,34 +415,58 @@ sub select_model {
             $cl->{openrouter_over_daily} // 0, $cl->{supergrok_locked} // 0,
             ($cl->{quota_warning} || ''), substr($cl->{notes} // '', 0, 100)));
 
-    # 1) Explicit selection wins if the provider can serve it.
-    #    But for editor agents (analyze/programming/documentation), ignore
-    #    the old cheap free defaults (cohere/north-mini, gemma-4-31b etc.)
-    #    so the smart classification + Supergrok guard can run.
-    #    User explicit strong picks (or header) still honored.
-    my $is_editor_agent = $agent_id =~ /^(programming|coding|code|documentation|analyze)$/i;
-    my $is_cheap_default = $requested =~ /cohere\/north-mini|gemma-4-31b-it:free|nemotron-3\.5-lightning:free|north-mini-code:free/i;
-    # 2026-10-15: editor chain. analyze/plan/clarify -> north-mini-code:free
-    # (gemma-4-31b:free is the junk-retry fallback, sent explicitly by chat.js);
-    # implement -> Super Grok grok-4.7 when it has budget, else north-mini.
-    # An explicit cheap pick is honoured in analyze/plan (that is the retry path).
-    my $editor_read_phase = ($is_editor_agent && lc($phase) =~ /^(analyze|plan|clarify)$/) ? 1 : 0;
+    # 1) A real user pick wins unless we are being asked to route.
+    #    Grok-named models use SuperGrok (weekly prepaid) when that
+    #    credential exists — never OpenRouter Grok, never xAI pay-per-token first.
+    #    The editor cheap-pin is not a user pick. route=auto|escalate means
+    #    choose from the live SuperGrok / OpenRouter / Ollama lists.
+    #    Editor analyze/plan/clarify still honours an explicit cheap retry
+    #    (gemma-4-31b:free is sent by chat.js). Implement ignores cheap pins
+    #    so the SuperGrok guard below can run.
+    my $route_auto = ($ctx{route} || '') =~ /^(auto|escalate)$/;
+    my $auto_pin = 0;
+    if ($requested) {
+        require Comserv::Model::AI2::ModelPick;
+        $auto_pin = Comserv::Model::AI2::ModelPick->is_auto_pin($requested);
+    }
+    my $is_editor_agent = ($agent_id // '') =~ /^(programming|coding|code|documentation|analyze)$/i;
+    my $is_cheap_default = ($requested // '') =~ /cohere\/north-mini|gemma-4-31b-it:free|nemotron-3\.5-lightning:free|north-mini-code:free/i;
+    my $editor_read_phase = ($is_editor_agent && lc($phase // '') =~ /^(analyze|plan|clarify)$/) ? 1 : 0;
+    my $ignore_cheap = ($auto_pin && !$ctx{user_picked})
+        || ($is_editor_agent && $is_cheap_default && !$editor_read_phase);
     if ($requested && $requested !~ /^(auto|router|let.?router|'')$/i
-        && !($is_editor_agent && $is_cheap_default && !$editor_read_phase)) {
+        && !$route_auto && !$ignore_cheap) {
         my ($prov, $model) = $self->_detect_provider($requested);
         ($prov, $model) = $self->_prefer_supergrok($c, $prov, $model);
         return ($prov, $model);
     }
 
+    # 2026-10-15 editor chain before ModelPick, so a phase pin is not
+    # replaced by a live-list pick. analyze/plan/clarify -> north-mini-code:free.
+    # implement -> SuperGrok grok-4.7 when it has budget, else north-mini.
     if ($editor_read_phase) {
         return ('openrouter', 'cohere/north-mini-code:free');
     }
-    if ($is_editor_agent && lc($phase) eq 'implement') {
+    if ($is_editor_agent && lc($phase // '') eq 'implement') {
         my $g = $self->supergrok_guard($c);
         if (!$g->{locked} && $self->_external_default_available($c, 'supergrok|grok-4.7')) {
             return ('supergrok', 'grok-4.7');
         }
         return ('openrouter', 'cohere/north-mini-code:free');
+    }
+
+    # No explicit pick: choose from models that are actually up.
+    # Do not hardcode a Grok slug — prepaid budget and the live lists decide.
+    my $pick = eval {
+        require Comserv::Model::AI2::ModelPick;
+        Comserv::Model::AI2::ModelPick->new->pick($c, %ctx);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'select_model',
+            "ModelPick failed: $@");
+    }
+    elsif ($pick && $pick->{ok} && $pick->{provider} && $pick->{model}) {
+        return ($pick->{provider}, $pick->{model});
     }
 
     # 1.5) SuperGrok weekly/daily credits (per guard from 15min eval) BEFORE paid.
@@ -761,6 +787,7 @@ sub _chat_one {
             # Threaded from Chat.pm: the web-search toggle was set by the
             # widget but dropped here, so Grok's search_parameters never fired.
             ($opts{use_search} ? (use_search => 1) : ()),
+            ($opts{max_tokens} ? (max_tokens => 0 + $opts{max_tokens}) : ()),
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_chat_one',
@@ -1249,7 +1276,10 @@ sub chat_with_fallback {
                       path => Comserv::Util::AI::ModelHealth->default_path($c));
     my $signals = $opts{signals} || $self->health_signals($c, $k, $health);
     my $purpose = $opts{purpose} || 'chat';
-    my %pass    = ($opts{use_search} ? (use_search => 1) : ());
+    my %pass    = (
+        ($opts{use_search} ? (use_search => 1) : ()),
+        ($opts{max_tokens} ? (max_tokens => $opts{max_tokens}) : ()),
+    );
 
     my $guard   = $opts{guard} || $self->supergrok_guard($c);
     my %seen;
@@ -1348,7 +1378,24 @@ sub chat_with_fallback {
                 . ($hr && $hr->{opened} ? '; circuit OPEN' : '') . ': ' . ($att->{error} // ''));
         }
         $down{ $cand->{provider} } = 1 if $reason eq 'unreachable' && $cand->{provider} eq 'ollama';
+        # 2026-10-16: a missing/invalid key fails every model of that provider;
+        # don't burn attempts on its other models this turn.
+        $down{ $cand->{provider} } = 1 if $reason eq 'auth';
         push @failed, $att;
+        # Last resort (once): queue ran dry with no answer -> try Super Grok
+        # (xai-oauth, still subject to the guard via _skip_reason) and local Ollama
+        # before reporting all_exhausted. Never paid OpenRouter.
+        if (!@queue && !$opts{_tail_added}++ && !(defined $opts{failover} && !$opts{failover})) {
+            for my $t (['supergrok', 'grok-4.7', 'last_resort'], [undef, undef, 'ollama_auto']) {
+                if (!defined $t->[0]) {
+                    push @queue, { placeholder => 'ollama_auto', step => 99, source => 'last_resort', slug => 'ollama_auto' };
+                    next;
+                }
+                my $slug = Comserv::Util::AI::ModelHealth->normalize_slug($t->[0], $t->[1]);
+                next if $seen{$slug}++ || $down{ $t->[0] };
+                push @queue, { provider => $t->[0], model => $t->[1], slug => $slug, step => 99, source => $t->[2] };
+            }
+        }
     }
 
     # Grounded turn where every answer was stripped to nothing: the post-check
@@ -1632,8 +1679,9 @@ sub _default_free_catalog {
                 if $has_key;
         }
         else {
-            $has_key = try { $prov->_resolve_api_key($c) } catch { undef };
-            $listed  = try { $prov->list_models($c) } catch { undef } if $has_key;
+            # guest => 1 only takes effect on the guest-chat path (stash flag).
+            $has_key = try { $prov->_resolve_api_key($c, undef, ($svc eq 'openrouter' ? (guest => 1) : ())) } catch { undef };
+            $listed  = try { $prov->list_models($c, ($c->session->{user_id} ? undef : $has_key)) } catch { undef } if $has_key;
         }
 
         if ($has_key) {

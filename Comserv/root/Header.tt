@@ -86,10 +86,12 @@
         # First check if we have a site-specific theme in the session
         site_key = "theme_" _ SiteName.lower;
 
-        IF c.session.$site_key;
-            theme_name = c.session.$site_key;
-        ELSIF c.stash.theme_name;
+        # Stash (set per request by Root::auto from site mapping + user
+        # override) wins over stale session caches.
+        IF c.stash.theme_name;
             theme_name = c.stash.theme_name;
+        ELSIF c.session.$site_key;
+            theme_name = c.session.$site_key;
         ELSIF c.session.theme_name;
             theme_name = c.session.theme_name;
         ELSIF site && site.theme;
@@ -116,6 +118,12 @@
 
     <!-- Theme overrides to ensure proper application -->
     <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css?v=[% cv %]">
+
+    <!-- Per-site theme CSS from File Manager (theme-<site>.css), overrides static theme -->
+    [% site_css = c.controller('Media').site_theme_css(c, SiteName) %]
+    [% IF site_css %]
+    <link rel="stylesheet" type="text/css" href="/media/file/[% site_css.id %]/[% site_css.name | uri %]?v=[% site_css.v | uri %]">
+    [% END %]
 
     [% IF c.session.debug_mode == 1 %]
     <!-- Debug: Site name is [% SiteName %] -->

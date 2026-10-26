@@ -187,6 +187,12 @@ sub estimate {
     } elsif (defined $in{app_cycle}) {
         $norm = $in{app_cycle};
     }
+    # 2026-10-16: a fresh add-on reading (source auto, < 24 h) is the meter
+    # itself - it wins over any event-based extrapolation. % totals cap at 100.
+    my $fresh_auto = ($c->{id} eq 'grok_bot' && $latest && $latest_in_cycle && defined $lu
+                      && ($latest->{source} // '') eq 'auto' && ($now - ($latest->{at} // 0)) < 86400) ? 1 : 0;
+    $norm = $lu if $fresh_auto;
+    $norm = 100 if defined $norm && $c->{unit} eq '%' && $norm > 100;
     my $drift;
     if ($latest && defined $lu && $in{app_at_reading}) {
         my $a = $in{app_at_reading}->($latest->{at});
@@ -280,6 +286,7 @@ our %BOT_EVENT_LABEL = (turn => 'Grok Bot turns', routine_run => 'Routine runs (
                         wake => 'Teammate wakes', csc_helpdesk => 'CSC developer agent (HelpDesk ticket queue)');
 our %BOT_EVENT_WEIGHT = (turn => 1, routine_run => 1, wake => 1, csc_helpdesk => 1);
 our $BOT_DEFAULT_PCT_PER_EVENT = 0.5;
+our $BOT_MAX_PCT_PER_EVENT     = 5;    # 2026-10-16: one routine run was fitted at 290 %
 
 sub _bot_weighted {
     my ($events, $from, $to, $w) = @_;
@@ -325,6 +332,10 @@ sub bot_burn {
     if ($sn > 0) {
         $out->{method} = 'per_event';
         $out->{pct_per_event} = $sd / $sn;
+        if ($out->{pct_per_event} > $BOT_MAX_PCT_PER_EVENT) {
+            push @{ $out->{notes} }, sprintf('Fitted %.1f %%/event capped at %s %%/event.', $out->{pct_per_event}, $BOT_MAX_PCT_PER_EVENT);
+            $out->{pct_per_event} = $BOT_MAX_PCT_PER_EVENT;
+        }
     } elsif ($sh > 0 && $sd > 0) {
         $out->{method} = 'per_hour';
         $out->{pct_per_hour} = $sd / $sh;
@@ -360,6 +371,15 @@ sub bot_burn {
     $out->{hours_since}   = sprintf('%.1f', $hours_since);
     $out->{latest_used}   = $lu;
     $out->{estimate}      = $lu + $counted + $est;
+    # Fresh add-on reading (< 24 h, source auto) wins; total never above 100 %.
+    if (($latest->{source} // '') eq 'auto' && $hours_since < 24) {
+        $out->{estimate} = $lu; $out->{counted_pct} = 0; $out->{estimated_pct} = 0;
+        push @{ $out->{notes} }, 'Using the grok.com add-on reading (under 24 h old).';
+    }
+    if ($out->{estimate} > 100) {
+        push @{ $out->{notes} }, sprintf('Estimate %.0f %% capped at 100 %%.', $out->{estimate});
+        $out->{estimate} = 100;
+    }
     $out->{estimate_fmt}  = _fmt($out->{estimate}, '%');
     return $out;
 }

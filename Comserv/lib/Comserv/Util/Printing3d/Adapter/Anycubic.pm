@@ -56,15 +56,16 @@ sub ping {
 }
 
 sub fetch_info {
-    my ($self, $c, $host, $port) = @_;
+    my ($self, $c, $host, $port, $timeout) = @_;
     my $safe = $self->sanitize_host($host);
     return { ok => 0, error => 'Invalid host' } unless $safe;
     $port = 18910 unless $port && $port =~ /\A\d{2,5}\z/ && $port > 0 && $port < 65536;
+    $timeout = 4 unless defined $timeout && $timeout > 0 && $timeout <= 20;
     my $url = "http://$safe:$port/info";
     my $res;
     my $fail;
     try {
-        my $ua = HTTP::Tiny->new(timeout => 4, max_redirect => 0);
+        my $ua = HTTP::Tiny->new(timeout => $timeout, max_redirect => 0);
         $res = $ua->get($url);
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fetch_info',
@@ -74,14 +75,17 @@ sub fetch_info {
     return $fail if $fail;
     unless ($res && $res->{success}) {
         my $status = $res ? ($res->{status} || 0) : 0;
+        my $body = ($res && $res->{content}) ? $res->{content} : '';
+        my $timed_out = ($status == 599 && $body =~ /timed?\s*out/i) ? 1 : 0;
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fetch_info',
-            "host=$safe http=$status");
+            "host=$safe http=$status" . ($timed_out ? ' timeout' : ''));
         return {
             ok          => 0,
-            error       => 'HTTP ' . $status,
+            error       => $timed_out ? 'timeout' : ('HTTP ' . $status),
             url         => $url,
             host        => $safe,
             http_status => $status,
+            timeout     => $timed_out,
         };
     }
     my $raw = $res->{content} || '';
@@ -119,8 +123,8 @@ sub fetch_info {
 
 # Signed POST /ctrl. Caller must not stash password/cert.
 sub handshake {
-    my ($self, $c, $host, $port) = @_;
-    my $info = $self->fetch_info($c, $host, $port);
+    my ($self, $c, $host, $port, $timeout) = @_;
+    my $info = $self->fetch_info($c, $host, $port, $timeout);
     return $info unless $info->{ok};
     if (($info->{ctrl_type} || '') eq 'cloud') {
         return { ok => 0, error => 'Printer is in cloud mode — enable LAN Mode', %$info };
@@ -198,10 +202,11 @@ sub handshake {
 sub fetch_state {
     my ($self, $c, $host, $port, $opts) = @_;
     $opts ||= {};
-    my $hs = $self->handshake($c, $host, $port);
+    my $hs = $self->handshake($c, $host, $port, $opts->{timeout});
     my $out = {
         ok          => $hs->{ok} ? 1 : 0,
         error       => $hs->{error},
+        timeout     => $hs->{timeout} ? 1 : 0,
         host        => $hs->{host} || $host,
         model_name  => $hs->{model_name} || '',
         model_id    => $hs->{model_id} || '',
@@ -702,14 +707,26 @@ sub relocate {
     $serial =~ s/\s+//g;
 
     if ($host) {
-        my $info = $self->fetch_info($c, $host, 18910);
-        if ($info->{ok} && _serial_ok($serial, $info->{serial})) {
-            return {
-                ok     => 1,
-                host   => $info->{host},
-                serial => $info->{serial} || $serial,
-                moved  => 0,
-            };
+        my $info;
+        for my $try (1 .. 3) {
+            $info = $self->fetch_info($c, $host, 18910, $try == 1 ? 8 : 12);
+            if ($info->{ok} && _serial_ok($serial, $info->{serial})) {
+                return {
+                    ok     => 1,
+                    host   => $info->{host},
+                    serial => $info->{serial} || $serial,
+                    moved  => 0,
+                };
+            }
+            last unless $info->{timeout};
+        }
+        # A timeout is not proof the address moved. Scanning on a 0.15s sweep
+        # misses this printer and was marking it offline while it was still here.
+        if ($info && $info->{timeout}) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'relocate',
+                "stored host=$host timed out; not scanning and not treating it as gone");
+            return { ok => 0, timeout => 1, host => $host, serial => $serial,
+                     error => 'Printer slow to answer; address unchanged' };
         }
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'relocate',
             "stored host=$host failed; scanning for serial=" . ($serial || '(any Kobra 3)'));

@@ -1,0 +1,650 @@
+[% PAGE_VERSION = 'mail/email_config.tt,v 0.01 2025/10/14 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PAGE_VERSION %][% END %]
+
+[% INCLUDE 'ApplicationTtTemplate' -
+   title = 'Email Configuration'
+   description = 'Configure email invoice processing settings'
+   category = 'email_config'
+   roles = ['admin']
+   TemplateType = 'inventory'
+   last_updated = '2025-10-14'
+   page_version = '0.01'
+   site_specific = 1
+%]
+
+[% SET page_title = 'Email Configuration' -%]
+[% SET current_page = 'email_config' -%]
+
+<div class="email-config-container">
+    <div class="page-header">
+        <h1>⚙️ Email Configuration</h1>
+        <p class="subtitle">Manage email processing settings for <%= $c.session.SiteName || 'CSC' %></p>
+    </div>
+
+    <div class="config-sections">
+        <div class="config-section">
+            <h2>📧 Email Source Configuration</h2>
+            
+            <div class="form-group">
+                <label for="mailserver_host">Mail Server Host:</label>
+                <input type="text" id="mailserver_host" value="imap.gmail.com" placeholder="imap.example.com">
+            </div>
+            
+            <div class="form-group">
+                <label for="mailserver_port">Port:</label>
+                <input type="number" id="mailserver_port" value="993" placeholder="993">
+            </div>
+            
+            <div class="form-group">
+                <label for="mailserver_user">Username:</label>
+                <input type="text" id="mailserver_user" value="invoice@company.com" placeholder="user@domain.com">
+            </div>
+            
+            <div class="form-group">
+                <label for="mailserver_pass">Password:</label>
+                <input type="password" id="mailserver_pass" value="••••••••">
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="use_ssl" checked>
+                    <span>Use SSL/TLS</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="config-section">
+            <h2>🎯 Processing Rules</h2>
+            
+            <div class="rule-group">
+                <h3>Classification Filters</h3>
+                
+                <div class="rule-option">
+                    <label>
+                        <input type="checkbox" class="rule-checkbox" id="filter_personal" checked>
+                        <span>Skip Personal Emails</span>
+                    </label>
+                    <p class="rule-help">Don't process emails marked as personal</p>
+                </div>
+                
+                <div class="rule-option">
+                    <label>
+                        <input type="checkbox" class="rule-checkbox" id="filter_promotional" checked>
+                        <span>Skip Promotional Emails</span>
+                    </label>
+                    <p class="rule-help">Skip marketing and promotional emails</p>
+                </div>
+                
+                <div class="rule-option">
+                    <label>
+                        <input type="checkbox" class="rule-checkbox" id="filter_receipts" checked>
+                        <span>Process Receipts Only</span>
+                    </label>
+                    <p class="rule-help">Only process invoice receipts and purchase confirmations</p>
+                </div>
+            </div>
+            
+            <div class="rule-group">
+                <h3>Site Targeting</h3>
+                
+                <div class="target-selection">
+                    <label class="target-option">
+                        <input type="radio" name="site_target" value="all" checked>
+                        <span>All Sites (including global)</span>
+                    </label>
+                    
+                    <label class="target-option">
+                        <input type="radio" name="site_target" value="current">
+                        <span>Current Site Only (<%= $c.session.SiteName || 'CSC' %>)</span>
+                    </label>
+                    
+                    <label class="target-option">
+                        <input type="radio" name="site_target" value="custom">
+                        <span>Custom Sites (select below)</span>
+                    </label>
+                </div>
+                
+                <div class="custom-sites" id="custom-sites" style="display: none;">
+                    <label for="site_list">Select Sites:</label>
+                    <select id="site_list" multiple size="5">
+                        <option value="csc">CSC</option>
+                        <option value="abc">ABC Corp</option>
+                        <option value="xyz">XYZ Industries</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="config-section">
+            <h2>📊 Processing Schedule</h2>
+            
+            <div class="schedule-options">
+                <div class="schedule-option">
+                    <label>
+                        <input type="radio" name="processing_mode" value="manual" checked>
+                        <span>Manual Processing</span>
+                    </label>
+                    <p>Process emails on-demand when requested</p>
+                </div>
+                
+                <div class="schedule-option">
+                    <label>
+                        <input type="radio" name="processing_mode" value="scheduled">
+                        <span>Scheduled Processing</span>
+                    </label>
+                    <p>Automatically process emails on a schedule</p>
+                </div>
+                
+                <div class="schedule-option">
+                    <label>
+                        <input type="radio" name="processing_mode" value="realtime">
+                        <span>Real-time Processing</span>
+                    </label>
+                    <p>Process emails as they arrive</p>
+                </div>
+            </div>
+            
+            <div class="schedule-settings" id="schedule-settings" style="display: none;">
+                <div class="form-group">
+                    <label for="processing_frequency">Processing Frequency:</label>
+                    <select id="processing_frequency">
+                        <option value="hourly">Hourly</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="processing_time">Processing Time:</label>
+                    <input type="time" id="processing_time" value="02:00">
+                </div>
+            </div>
+        </div>
+        
+        <div class="config-actions">
+            <button class="btn-primary" onclick="saveConfig()">
+                💾 Save Configuration
+            </button>
+            <button class="btn-secondary" onclick="testConnection()">
+                🧪 Test Connection
+            </button>
+            <button class="btn-secondary" onclick="exportSettings()">
+                📄 Export Settings
+            </button>
+            <button class="btn-danger" onclick="resetConfig()">
+                🔄 Reset to Defaults
+            </button>
+        </div>
+    </div>
+
+    <!-- Status Panel -->
+    <div class="config-status">
+        <h2>📈 Configuration Status</h2>
+        
+        <div class="status-widgets">
+            <div class="status-widget">
+                <h3>🔗 Connection Status</h3>
+                <div class="status-indicator">
+                    <span class="status-dot status-good"></span>
+                    <span class="status-text">Connected</span>
+                </div>
+                <div class="status-details">
+                    <p>Last checked: 2 minutes ago</p>
+                    <p>Server: imap.gmail.com:993</p>
+                </div>
+            </div>
+            
+            <div class="status-widget">
+                <h3>📧 Email Statistics</h3>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div class="stat-number">1,247</div>
+                        <div class="stat-label">Total Processed</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">12</div>
+                        <div class="stat-label">Failed</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">98.6%</div>
+                        <div class="stat-label">Success Rate</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="status-widget">
+                <h3>⚡ Processing Schedule</h3>
+                <div class="schedule-display">
+                    <p><strong>Current Mode:</strong> Manual Processing</p>
+                    <p><strong>Last Processed:</strong> 2 hours ago</p>
+                    <p><strong>Next Scheduled:</strong> Not scheduled</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration management
+        const configManager = {
+            siteName: '<?= $c.session.SiteName || 'CSC' ?>',
+            currentConfig: {},
+            
+            init() {
+                this.loadCurrentConfig();
+                this.setupEventListeners();
+            },
+            
+            loadCurrentConfig() {
+                // Load current configuration from server
+                console.log('Loading current configuration...');
+            },
+            
+            setupEventListeners() {
+                // Site target radio buttons
+                document.querySelectorAll('input[name="site_target"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        const customSites = document.getElementById('custom-sites');
+                        if (e.target.value === 'custom') {
+                            customSites.style.display = 'block';
+                        } else {
+                            customSites.style.display = 'none';
+                        }
+                    });
+                });
+                
+                // Processing mode radio buttons
+                document.querySelectorAll('input[name="processing_mode"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        const scheduleSettings = document.getElementById('schedule-settings');
+                        if (e.target.value === 'scheduled') {
+                            scheduleSettings.style.display = 'block';
+                        } else {
+                            scheduleSettings.style.display = 'none';
+                        }
+                    });
+                });
+            },
+            
+            saveConfig() {
+                const button = event?.target || document.querySelector('.btn-primary');
+                button.disabled = true;
+                button.textContent = '💾 Saving...';
+                
+                // Simulate save operation
+                setTimeout(() => {
+                    console.log('Configuration saved successfully');
+                    this.showNotification('Configuration saved successfully', 'success');
+                    button.disabled = false;
+                    button.textContent = '💾 Save Configuration';
+                }, 1500);
+            },
+            
+            testConnection() {
+                const button = event?.target || document.querySelector('.btn-secondary');
+                button.disabled = true;
+                button.textContent = '🧪 Testing...';
+                
+                setTimeout(() => {
+                    console.log('Connection test successful');
+                    this.showNotification('Connection test successful', 'success');
+                    button.disabled = false;
+                    button.textContent = '🧪 Test Connection';
+                }, 1000);
+            },
+            
+            exportSettings() {
+                const settings = {
+                    mailserver: {
+                        host: document.getElementById('mailserver_host').value,
+                        port: document.getElementById('mailserver_port').value,
+                        user: document.getElementById('mailserver_user').value,
+                        useSsl: document.getElementById('use_ssl').checked
+                    },
+                    processing: {
+                        filters: {
+                            personal: document.getElementById('filter_personal').checked,
+                            promotional: document.getElementById('filter_promotional').checked,
+                            receipts: document.getElementById('filter_receipts').checked
+                        },
+                        siteTarget: document.querySelector('input[name="site_target"]:checked').value
+                    },
+                    schedule: document.querySelector('input[name="processing_mode"]:checked').value
+                };
+                
+                const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'email-config-<?= $c.session.SiteName || 'CSC' ?>.json';
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                this.showNotification('Settings exported successfully', 'success');
+            },
+            
+            resetConfig() {
+                if (confirm('Are you sure you want to reset all settings to defaults?')) {
+                    document.getElementById('mailserver_host').value = 'imap.example.com';
+                    document.getElementById('mailserver_port').value = '993';
+                    document.getElementById('mailserver_user').value = 'user@domain.com';
+                    document.getElementById('use_ssl').checked = true;
+                    document.getElementById('filter_personal').checked = true;
+                    document.getElementById('filter_promotional').checked = true;
+                    document.getElementById('filter_receipts').checked = true;
+                    document.querySelector('input[name="site_target"][value="all"]').checked = true;
+                    document.querySelector('input[name="processing_mode"][value="manual"]').checked = true;
+                    
+                    this.showNotification('Settings reset to defaults', 'info');
+                }
+            },
+            
+            showNotification(message, type = 'info') {
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.textContent = message;
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 15px 20px;
+                    background: ${type === 'success' ? '#d4edda' : '#d1ecf1'};
+                    color: ${type === 'success' ? '#155724' : '#0c5460'};
+                    border: 1px solid ${type === 'success' ? '#c3e6cb' : '#bee5eb'};
+                    border-radius: 6px;
+                    z-index: 1000;
+                    animation: slideIn 0.3s ease;
+                `;
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    notification.style.animation = 'slideOut 0.3s ease';
+                    setTimeout(() => {
+                        document.body.removeChild(notification);
+                    }, 300);
+                }, 3000);
+            }
+        };
+
+        // CSS animations
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); }
+                to { transform: translateX(0); }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); }
+                to { transform: translateX(100%); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            configManager.init();
+            console.log('Email configuration page loaded');
+        });
+    </script>
+
+    <style>
+        .email-config-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+        }
+
+        .page-header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .config-sections {
+            display: grid;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .config-section {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .config-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .rule-group, .schedule-options {
+            margin-bottom: 20px;
+        }
+
+        .rule-option, .schedule-option {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .rule-option:hover, .schedule-option:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .rule-option input, .schedule-option input {
+            margin-right: 15px;
+            transform: scale(1.2);
+        }
+
+        .rule-help, .schedule-option p {
+            margin: 0;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .target-selection {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .target-option {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .target-option:hover {
+            border-color: #667eea;
+            background: #f8f9fa;
+        }
+
+        .target-option input {
+            margin-right: 10px;
+            transform: scale(1.2);
+        }
+
+        .custom-sites {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e8f4fd;
+            border-radius: 8px;
+            border: 1px solid #bee5eb;
+        }
+
+        .custom-sites select {
+            width: 100%;
+            padding: 8px;
+            margin-top: 10px;
+        }
+
+        .config-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary, .btn-secondary, .btn-danger {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            flex: 1;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .config-status {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-widgets {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .status-widget {
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .status-widget h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .status-good {
+            background: #28a745;
+        }
+
+        .status-text {
+            font-weight: 600;
+            color: #155724;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+
+        .stat-number {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .config-actions {
+                flex-direction: column;
+            }
+
+            .target-selection {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</div>

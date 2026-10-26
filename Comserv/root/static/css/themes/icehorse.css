@@ -1,0 +1,53 @@
+/* Theme: icehorse  (Icehorse Ranch, from https://icehorse.ca styles.css)
+   The original CSS, scoped to body.theme-icehorse by SiteCloner, lives in the File Manager
+   (NFS /data/nfs/icehorse/media/site-import/theme-icehorse.css, files #36910). Header/footer
+   come from IceHorse page rows site_header / site_footer (rendered by pagetop.tt / layout.tt). */
+@import url(/media/file/36910/theme-icehorse.css);
+:root {
+  --accent-color: #201ccc;
+  --background-color: #000000;
+  --body-font: Verdana, Arial, Geneva, sans-serif;
+  --border-color: #cccccc;
+  --button-bg: #c1e86d;
+  --button-border: #333333;
+  --button-hover-bg: #6feafc;
+  --button-text: #000000;
+  --font-size-base: 16px;
+  --font-size-large: 20px;
+  --font-size-small: 13px;
+  --font-size-xlarge: 24px;
+  --header-font: teen, serif;
+  --link-color: #5364a2;
+  --link-hover-color: #000000;
+  --nav-bg: #000000;
+  --nav-hover-bg: #6feafc;
+  --nav-text: #ffffff;
+  --primary-color: #201ccc;
+  --secondary-color: #ffffff;
+  --success-color: #15d14e;
+  --table-header-bg: #e3fffc;
+  --text-color: #333333;
+  --warning-color: #ff0000;
+}
+/* Map the original layout boxes onto the app layout */
+body.theme-icehorse { background: #000 !important; background-image: none !important; color: #333; }
+body.theme-icehorse header.has-site-header { background: transparent !important; box-shadow: none; border: 0; position: relative; text-align: center; }
+body.theme-icehorse header.has-site-header > h1 { display: none; }            /* generic "Welcome" title */
+body.theme-icehorse .site-header #header { border-radius: 10px; }
+body.theme-icehorse .guest-join-bar { background: #000; color: #fff; font-size: 0.75em; }
+body.theme-icehorse .guest-join-bar a { background: transparent; color: #ccc; }
+body.theme-icehorse nav#main-menu { width: 960px; max-width: 100%; margin: 0 auto; background: #000 !important; font-size: 0.8em; }
+body.theme-icehorse nav#main-menu a { background: transparent; color: #ccc; }
+body.theme-icehorse .page-content,
+body.theme-icehorse .site-footer {
+  margin: 0 auto; padding: 10px; background: #fff; width: 940px; max-width: 100%;
+  color: #333; text-align: center; box-sizing: content-box;
+}
+body.theme-icehorse .page-content { border-radius: 10px 10px 0 0; }
+body.theme-icehorse .site-footer { border-radius: 0 0 10px 10px; margin-bottom: 20px; }
+body.theme-icehorse .page-view-actions { font-size: 12px; }
+body.theme-icehorse .page-content, body.theme-icehorse .site-footer { padding: 10px !important; width: 940px !important; max-width: 100% !important; }
+body.theme-icehorse .page-content img { max-width: none; }
+body.theme-icehorse .page-view-actions { position: absolute; right: 12px; }
+body.theme-icehorse .page-content { position: relative; }
+body.theme-icehorse nav#main-menu ul { justify-content: center; }

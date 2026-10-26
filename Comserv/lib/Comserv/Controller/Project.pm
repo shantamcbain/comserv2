@@ -895,7 +895,7 @@ sub _project_search_score {
         else {
             foreach my $t (@tokens) {
                 if ($t eq $qw) { $best = 3; last; }
-                if (index($t, $qw) == 0 && $best < 2) { $best = 2; }
+                if (CORE::index($t, $qw) == 0 && $best < 2) { $best = 2; }
             }
         }
         return 0 unless $best;

@@ -524,8 +524,15 @@ sub edit :Path('/mail/newsletter/edit') :Args(1) {
             my $nl_series  = $c->req->param('nl_series')  // $meta->{series};
             my $nl_version = $c->req->param('nl_version') // $meta->{version};
             my $custom     = $c->req->param('nl_custom_label') // $meta->{custom_label};
+            # Keep the issue attached to its publication on save/publish;
+            # without this the pub link was dropped and the issue vanished
+            # from /mail/newsletters.
+            my $keep_pub;
+            if ($meta->{pub_id}) {
+                $keep_pub = eval { $c->model('DBEncy')->resultset('Page')->find($meta->{pub_id}) };
+            }
             $meta = $self->_build_newsletter_meta_from_form(
-                $c, $page->sitename, $nl_series, $nl_version, $custom
+                $c, $page->sitename, $nl_series, $nl_version, $custom, $keep_pub
             );
             my %update = (
                 title       => $c->req->param('title')      // $page->title,

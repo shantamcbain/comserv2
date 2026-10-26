@@ -32,6 +32,8 @@
 [%# INCLUDE 'home.tt' %]
     [% TRY %][% INCLUDE 'mail/subscribe_banner.tt' %][% CATCH %][% END %]
     [% content %]
+    [% TRY %][% SET site_footer_page = c.model('DBEncy').resultset('Page').search({ sitename => (SiteName || c.stash.SiteName || c.session.SiteName), page_code => 'site_footer', status => 'active' }).first %][% CATCH %][% END %]
+    [% IF site_footer_page %]<div class="site-footer">[% site_footer_page.body %]</div>[% END %]
     [% INCLUDE 'AdminNotes.tt' %]
     
     [% TRY %]

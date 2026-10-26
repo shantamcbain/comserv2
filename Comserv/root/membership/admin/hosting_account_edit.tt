@@ -117,6 +117,7 @@
                     { key = 'helpdesk',    label = '🎫 HelpDesk' },
                     { key = 'foraging',    label = '🌿 Foraging' },
                     { key = 'ency',        label = '📖 ENCY' },
+                    { key = 'healthkitchen', label = '🥗 Health Kitchen' },
                     { key = 'ecommerce',   label = '🛒 Shop / Price List' },
                     { key = 'membership',  label = '👥 Membership Plans' },
                     { key = 'accounting',  label = '💰 Accounting / Bookkeeping' },

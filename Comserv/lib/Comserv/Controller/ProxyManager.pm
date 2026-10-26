@@ -1830,6 +1830,7 @@ DOCKER_INSTALL_SCRIPT
     my $pid = fork();
     if ($pid == 0) {
         # Child process
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
         # Close standard file handles to detach from the parent
         close STDIN;
         close STDOUT;
@@ -1839,7 +1840,7 @@ DOCKER_INSTALL_SCRIPT
         system($filename);
         
         # Exit the child process
-        exit(0);
+        Comserv::Util::ForkSafe::child_exit(0);
     }
     
     # Return the installation ID to the client
@@ -1990,6 +1991,7 @@ K8S_INSTALL_SCRIPT
     my $pid = fork();
     if ($pid == 0) {
         # Child process
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
         # Close standard file handles to detach from the parent
         close STDIN;
         close STDOUT;
@@ -1999,7 +2001,7 @@ K8S_INSTALL_SCRIPT
         system($filename);
         
         # Exit the child process
-        exit(0);
+        Comserv::Util::ForkSafe::child_exit(0);
     }
     
     # Return the installation ID to the client
@@ -2085,6 +2087,7 @@ sub install_npm :Local :Args(0) {
     my $pid = fork();
     if ($pid == 0) {
         # Child process
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
         # Close standard file handles to detach from the parent
         close STDIN;
         close STDOUT;
@@ -2194,11 +2197,11 @@ NPM_CONFIG
         };
         
         if ($@) {
-            $log_progress->("Error: NPM installation failed: $@");
+            eval { $log_progress->("Error: NPM installation failed: $@") };
         }
         
         # Exit the child process
-        exit(0);
+        Comserv::Util::ForkSafe::child_exit(0);
     }
     
     # Return the installation ID to the client

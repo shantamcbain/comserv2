@@ -100,6 +100,7 @@ sub log_labour :Path('/3d/labour/log') :Args(0) {
     my $traveler = Comserv::Util::Manufacturing::Traveler->new;
     my $r = $traveler->record_clean_labour($c, {
         item_id           => $item_id,
+        job_id            => $job_id,
         duration_seconds  => $secs,
         category          => $cat,
         notes             => sprintf('job #%s %s', $job_id, $notes),

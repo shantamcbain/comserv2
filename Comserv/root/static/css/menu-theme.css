@@ -63,8 +63,9 @@ nav {
     display: block;
 }
 
-/* ── Responsive / Mobile ─────────────────────────────────────── */
-@media (max-width: 768px) {
+/* ── Phone only. Desktop and tablet keep the wrapping row. ────
+   Keep this query identical to SMALL_SCREEN_QUERY in sub-menu.js. */
+@media (max-width: 640px) {
     /* Hide full menu by default; JS adds nav-open to show it */
     .horizontal-menu {
         display: none;
@@ -111,8 +112,48 @@ nav {
         display: block;
     }
 
-    .dropdown-content a {
+    .dropdown-content a,
+    .submenu a {
         padding: 10px 24px;
+        white-space: normal;
+    }
+
+    .dropbtn,
+    .submenu-header {
+        min-height: 44px;
+        box-sizing: border-box;
+    }
+
+    nav#main-menu {
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+
+    .submenu {
+        position: static;
+        left: auto;
+        box-shadow: none;
+        min-width: 0;
+        width: auto;
+        max-width: none;
+        border-left: 3px solid var(--accent-color);
+        margin-left: 12px;
+    }
+
+    .submenu-item:hover .submenu {
+        display: none;
+    }
+
+    .submenu-item.touch-open > .submenu {
+        display: block;
+    }
+
+    .nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+        min-height: 44px;
     }
 }
 
@@ -326,23 +367,7 @@ a.submenu-header-link:hover {
     display: block;
 }
 
-@media (max-width: 768px) {
-    .submenu {
-        position: static;
-        box-shadow: none;
-        min-width: 100%;
-        border-left: 3px solid var(--accent-color, #4a90d9);
-        margin-left: 12px;
-    }
 
-    .submenu-item:hover .submenu {
-        display: none;
-    }
-
-    .submenu-item.touch-open .submenu {
-        display: block;
-    }
-}
 
 /* Remove all theme-specific overrides - they're not needed with the new approach */
 
@@ -430,4 +455,170 @@ body.theme-apis .submenu a {
 body.theme-apis .dropdown-content,
 body.theme-apis .submenu {
     background-color: var(--dropdown-bg, var(--secondary-color, #f9f9f9));
+}
+
+/* Hamburger is hidden on a wide mouse desktop. The small-screen query shows it. */
+.nav-toggle {
+    display: none;
+    background: var(--button-bg);
+    color: var(--button-text);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 20px;
+    cursor: pointer;
+    line-height: 1;
+    margin: 4px 8px;
+}
+
+@media (max-width: 640px) {
+    .nav-toggle {
+        display: inline-flex;
+    }
+}
+
+/* Must come after the display:none above, or the button stays hidden on phones. */
+@media (max-width: 640px) {
+    .nav-toggle {
+        display: inline-flex;
+    }
+}
+
+header {
+    position: relative;
+}
+
+header nav#main-menu {
+    position: sticky;
+    top: 0;
+    z-index: 2000;
+    background-color: var(--nav-bg);
+    border-bottom: 2px solid var(--border-color);
+    margin: 0;
+}
+
+header h1 {
+    margin: 0;
+    padding: 10px;
+    font-size: clamp(1rem, 4vw, 1.5rem);
+    word-break: break-word;
+}
+
+header h1 .site-brand-icon,
+header h1 img.site-brand-icon {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 0.35em;
+    line-height: 1;
+}
+
+header h1 span.site-brand-icon {
+    font-size: 1.15em;
+}
+
+header h1 img.site-brand-icon {
+    height: 1.4em;
+    width: auto;
+    max-width: 4em;
+}
+
+.guest-join-bar {
+    background: var(--accent-color);
+    color: var(--button-text, var(--nav-text));
+    padding: 8px 16px;
+    text-align: right;
+    font-weight: 700;
+}
+
+.guest-join-bar a {
+    color: inherit;
+    text-decoration: none;
+    min-height: 44px;
+    display: inline-block;
+}
+
+/* Admin server-info bar. Query must match SERVER_INFO_QUERY in common/ui.js. */
+.server-info {
+    background-color: var(--nav-bg);
+    color: var(--nav-text);
+    border-bottom: 1px solid var(--border-color);
+    padding: 5px 10px;
+    font-size: 0.75rem;
+}
+
+.server-info-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+    text-align: right;
+}
+
+.server-info-build {
+    cursor: help;
+}
+
+.server-info-commit {
+    font-size: 0.85em;
+}
+
+#server-info-content {
+    min-width: 0;
+}
+
+#server-info-toggle,
+#css-edit-toggle {
+    background: var(--button-bg);
+    color: var(--button-text);
+    border: 1px solid var(--button-border, var(--border-color));
+    border-radius: 4px;
+    padding: 6px 10px;
+    min-height: 44px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    line-height: 1.2;
+}
+
+#css-edit-toggle:hover,
+#server-info-toggle:hover {
+    background: var(--button-hover-bg);
+}
+
+#css-edit-toggle.edit-mode {
+    background: var(--warning-color);
+    color: var(--button-text);
+    border-color: var(--warning-color);
+}
+
+body.css-edit-mode * {
+    outline: 2px solid var(--accent-color);
+    position: relative;
+}
+
+body.css-edit-mode *:hover {
+    outline: 2px solid var(--warning-color);
+    cursor: crosshair;
+}
+
+#server-info-bar.is-collapsed #server-info-content {
+    display: none;
+}
+
+@media (max-width: 640px) {
+    #server-info-bar:not(.server-info-ready) #server-info-content,
+    #server-info-bar.is-collapsed #server-info-content {
+        display: none;
+    }
+
+    .server-info-row {
+        justify-content: flex-start;
+        text-align: left;
+    }
+
+    #server-info-content {
+        white-space: normal;
+        word-break: break-word;
+        line-height: 1.6;
+    }
 }

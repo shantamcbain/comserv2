@@ -159,7 +159,7 @@ RUN chmod 644 /etc/logrotate.d/catalyst && \
 # Returns 503 if DB unreachable or session dir missing; logs reason to system_log.
 # /health (liveness) is fast; /health/detail (readiness) is used here.
 HEALTHCHECK --interval=30s --timeout=12s --start-period=120s --retries=5 \
-    CMD curl -sf http://localhost:${WEB_PORT:-3000}/health/detail | grep -q '"status":"ok"' || exit 1
+    CMD curl -fs --max-time 5 http://127.0.0.1:${WEB_PORT:-5000}/health || exit 1
 
 EXPOSE 3000 5000
 
@@ -169,6 +169,19 @@ RUN chmod +x /opt/comserv/docker-entrypoint.sh && chown comserv:comserv /opt/com
 
 # Don't switch to comserv user - entrypoint runs as root to configure supervisor,
 # then supervisord handles dropping privileges for app processes
+# Build stamp. ARGs declared before the first FROM are NOT visible inside a
+# stage unless re-declared, which is why image labels showed an empty revision.
+# version.json is no longer tracked in git: deploy.sh writes it into the build
+# context; if it is missing (plain `docker build`), generate it from the args.
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ARG BUILD_DATE=unknown
+ARG BUILD_HOST=unknown
+RUN if [ ! -s /opt/comserv/version.json ]; then \
+      printf '{"branch":"%s","commit":"%s","build_date":"%s","build_host":"%s"}\n' \
+        "$GIT_BRANCH" "$GIT_COMMIT" "$BUILD_DATE" "$BUILD_HOST" > /opt/comserv/version.json; \
+      chown comserv:comserv /opt/comserv/version.json; \
+    fi
 USER comserv
 ENTRYPOINT ["/opt/comserv/docker-entrypoint.sh"]
 CMD []

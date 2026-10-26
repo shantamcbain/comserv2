@@ -32,11 +32,11 @@ use Comserv::Util::Logging;
 our $CACHE_VERSION = 2;
 our $DEFAULT_MODEL = 'nimble:latest';
 our $DEFAULT_GATE  = 0.30;
-our $DEFAULT_WINDOW = 20;      # rows re-ranked; see per-question token cap above
+our $DEFAULT_WINDOW = 15;      # rows re-ranked; see per-question token cap above
 our $CACHE_TTL      = 6 * 3600;
 
 our %WEIGHTS = ( content => 0.7, fields => 0.3 );
-our $DESC_CHARS = 160;
+our $DESC_CHARS = 110;
 
 my $HERE = File::Basename::dirname(__FILE__);                       # .../lib/Comserv/Util/AI
 my $ROOT = File::Spec->catdir($HERE, '..', '..', '..', '..');       # app root

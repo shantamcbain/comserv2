@@ -1,0 +1,64 @@
+[% PageVersion = 'Inventory/invoice/unknown_lines.tt,v 0.01 2026/10/19 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% META title = 'Unknown invoice lines' %]
+
+<h1>Unknown invoice lines — [% sitename | html %]</h1>
+<p>
+  <a href="/Inventory/invoice">← Invoices for this site</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/suppliers">Suppliers</a>
+</p>
+<p>
+  Bank and purchase mail can all arrive at the same address.
+  That address does not choose the site. The supplier does.
+  This page only shows lines for <strong>[% sitename | html %]</strong>.
+  A line with no item is not added to stock until you say what it is.
+</p>
+[% IF note %]<p style="color:var(--text-color)"><strong>[% note | html %]</strong></p>[% END %]
+
+[% IF lines.size %]
+<table border="1" cellpadding="6" style="width:100%;border-collapse:collapse;">
+  <thead>
+    <tr>
+      <th>Invoice</th>
+      <th>Supplier</th>
+      <th>Description</th>
+      <th>Qty</th>
+      <th>Amount</th>
+      <th>What is this?</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH ln IN lines %]
+  <tr>
+    <td><a href="/Inventory/invoice/view/[% ln.invoice.id %]">[% ln.invoice.invoice_number || ln.invoice.id | html %]</a></td>
+    <td>
+      [% IF ln.invoice.supplier %]
+      <a href="/Inventory/supplier/view/[% ln.invoice.supplier.id %]">[% ln.invoice.supplier.name | html %]</a>
+      [% ELSE %]—[% END %]
+    </td>
+    <td>[% ln.description | html %]</td>
+    <td style="text-align:right">[% ln.quantity %]</td>
+    <td style="text-align:right">$[% ln.line_total %]</td>
+    <td>
+      <form method="post" action="/Inventory/unknown-lines">
+        <input type="hidden" name="line_id" value="[% ln.id %]">
+        <input type="text" name="item_name" list="site-items" value="[% ln.description | html %]"
+               style="width:16em;color:var(--text-color);background:var(--bg-color, transparent);">
+        <button type="submit" name="action" value="link">Link existing</button>
+        <button type="submit" name="action" value="create">Create item</button>
+        <button type="submit" name="action" value="dismiss">Not an item</button>
+      </form>
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+<datalist id="site-items">
+  [% FOREACH it IN items %]
+  <option value="[% it.name | html %]"></option>
+  [% END %]
+</datalist>
+[% ELSE %]
+<p>No unknown lines on [% sitename | html %]. Every line is linked to an item, or you already marked it as not an item.</p>
+[% END %]

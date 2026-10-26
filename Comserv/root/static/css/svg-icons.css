@@ -52,7 +52,8 @@
    .fas gets mask display properties so the specific .fas.fa-* overrides render correctly.
    background-color is NOT set here globally — only the specific override rules set it. */
 .icon,
-.fas {
+.fas,
+[class*="icon-"] {
   display: inline-block;
   width: 1em;
   height: 1em;
@@ -352,6 +353,13 @@
 .icon-helpdesk, .fas.fa-question-circle {
   -webkit-mask-image: url('/static/images/icons/helpdesk.svg');
   mask-image: url('/static/images/icons/helpdesk.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-ency, .fas.fa-herb {
+  -webkit-mask-image: url('/static/images/icons/herb.svg');
+  mask-image: url('/static/images/icons/herb.svg');
   background-color: currentColor;
   background-image: none;
 }

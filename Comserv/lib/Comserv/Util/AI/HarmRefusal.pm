@@ -14,7 +14,16 @@ use warnings;
 sub classify {
     my ($text) = @_;
     return undef unless defined $text && $text =~ /\S/;
-    my $t = lc $text;
+
+    # Strip large code blocks and [FILE:] attachments so that source code
+    # (e.g. "kill", "plan", "fix", "attack" in comments or todo logic) does
+    # not cause false positives on legitimate editor analysis requests.
+    my $clean = $text;
+    $clean =~ s/\[FILE:[^\n]+\n```[\s\S]*?```//gi;
+    $clean =~ s/```[\s\S]*?```//g;
+    $clean =~ s/\[FILE:[^\]]+\][\s\S]{0,2000}(?=\n\[FILE:|\z)/[FILE: omitted]/gi;
+
+    my $t = lc $clean;
     $t =~ s/\s+/ /g;
 
     return { category => 'child_exploitation' } if _child_exploitation($t);

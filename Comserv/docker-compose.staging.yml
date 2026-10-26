@@ -30,6 +30,7 @@ services:
     labels:
       - "description=Staging web server for pre-production testing and validation"
     environment:
+      COMSERV_KEY_DIR: /opt/comserv/keys
       CATALYST_ENV: staging
       CATALYST_DEBUG: 0
       WEB_PORT: 5000
@@ -52,6 +53,8 @@ services:
       - ./script:/opt/comserv/script:ro
       - ./root:/opt/comserv/root:ro
       - ./config:/opt/comserv/config:ro
+      - ${COMSERV_HOST_KEY_DIR:-${HOME}/.comserv/keys}:/opt/comserv/keys:ro
+      - ${COMSERV_HOST_SECRETS_DIR:-${HOME}/.comserv/secrets}:/home/comserv/.comserv/secrets:ro
       - ./t:/opt/comserv/t:ro
       # Config (read-only)
       - ./db_config.json:/opt/comserv/db_config.json:ro

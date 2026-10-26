@@ -1,0 +1,29 @@
+[% PageVersion = 'mail/mail.invoice_view.tt,v 0.01 2026/10/17 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% META title = 'Classified invoices' %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Classified invoices</h1>
+  </div>
+  [% IF classification_data && classification_data.metadata %]
+  <p>Scanned [% classification_data.metadata.total_messages_scanned %] messages. Source: [% classification_data.metadata.source | html %].</p>
+  [% IF classification_data.metadata.mailbox_logins.size %]
+  <ul>
+    [% FOREACH box IN classification_data.metadata.mailbox_logins %]
+    <li>[% box.email_address | html %] at [% box.imap_host | html %] — [% IF box.ok %]login worked, [% box.fetched %] messages[% ELSE %]login failed: [% box.error | html %][% END %]</li>
+    [% END %]
+  </ul>
+  [% ELSE %]
+  <p>No mail-server login was recorded for this file.</p>
+  [% END %]
+  <ul>
+    [% FOREACH cat IN classification_data.categories.keys %]
+    <li>[% classification_data.categories.$cat.label | html %]: [% classification_data.categories.$cat.count %]</li>
+    [% END %]
+  </ul>
+  [% ELSE %]
+  <p>No classification file yet. <a href="[% c.uri_for('/mail/classify_invoices') %]">Run classification</a>.</p>
+  [% END %]
+  <p><a href="[% c.uri_for('/Inventory/email-config') %]">Email addresses</a></p>
+</div>

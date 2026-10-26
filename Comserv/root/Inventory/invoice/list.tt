@@ -3,6 +3,8 @@
 <h1>Supplier Invoices</h1>
 <p>
   <a href="/Inventory/invoice/new" style="background: var(--primary-color, #007bff);color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">+ New Invoice</a>
+  <a href="/Inventory/email-config" style="margin-left:0.75em;">Set email addresses</a>
+  <a href="/Inventory/unknown-lines" style="margin-left:0.75em;">Unknown lines</a>
   <a href="/Inventory/stock/receive" style="margin-left:0.75em;background: var(--success-color, #28a745);color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">&#x2B07; Receive Stock</a>
   <a href="/Inventory/invoice/process_auto_pay" style="margin-left:1em;background:#fd7e14;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">&#x23F0; Auto-Pay Due</a>
   <a href="/Inventory" style="margin-left:1em;">← Inventory</a>
@@ -40,7 +42,7 @@
         <span style="color: var(--danger-color, #dc3545);font-size:0.8em;margin-left:4px;">&#9888; Overdue</span>
       [% END %]
     </td>
-    <td>[% inv.supplier.name | html %]</td>
+    <td>[% IF inv.supplier %]<a href="/Inventory/supplier/view/[% inv.supplier.id %]">[% inv.supplier.name | html %]</a>[% END %]</td>
     <td>[% inv.invoice_date %]</td>
     <td>[% inv.due_date || '' %]</td>
     <td style="text-align:right">$[% inv.total_amount %]</td>
