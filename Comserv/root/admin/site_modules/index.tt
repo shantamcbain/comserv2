@@ -33,8 +33,14 @@
     <span style="font-size:0.85em; color:var(--text-muted-color);">Site: [% c.stash.SiteName || c.session.SiteName || 'CSC' %]</span>
 </div>
 
+[% IF is_csc_admin && addon_approval_count %]
+<p class="error">[% addon_approval_count %] add-on request(s) are waiting. <a href="/admin/site_modules/approval_queue">Open the approval queue</a>.</p>
+[% END %]
 <div class="tab-bar">
     <a href="/admin/site_modules" class="active">Site Modules</a>
+    [% IF is_csc_admin %]
+    <a href="/admin/site_modules/approval_queue">Approval Queue[% IF addon_approval_count %] ([% addon_approval_count %])[% END %]</a>
+    [% END %]
     <a href="/admin/site_modules/user_overrides">User Overrides</a>
 </div>
 
