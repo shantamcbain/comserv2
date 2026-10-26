@@ -86,7 +86,7 @@
 
                                 <div class="form-group mb-3">
                                     <label for="token_value">API Token Value:</label>
-                                    <input type="password" id="token_value" name="token_value" class="form-control"
+                                    <input type="password" id="token_value" name="token_value" class="form-control" autocomplete="off"
                                            placeholder="Leave blank to keep current token">
                                     <div class="form-text">The API token value (UUID). Leave blank to keep the current token. This will be encrypted before storage.</div>
                                 </div>
