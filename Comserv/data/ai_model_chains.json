@@ -64,5 +64,13 @@
    "month": 0
   }
  },
- "_hermes_comment": "Oct 26 2026 (Shanta): when Super Grok is unavailable Hermes goes grok-4.7 -> paid qwen/qwen3-coder (only while OpenRouter day/week/month caps have room) -> free north-mini LAST. hermes_emergency_chain is used only if every step is unusable. channel_caps_usd = cash cap per billing channel (supergrok is a quota, not cash; xai_direct 0 = off until a number is set)."
+ "_hermes_comment": "Oct 26 2026 (Shanta): when Super Grok is unavailable Hermes goes grok-4.7 -> paid qwen/qwen3-coder (only while OpenRouter day/week/month caps have room) -> free north-mini LAST. hermes_emergency_chain is used only if every step is unusable. channel_caps_usd = cash cap per billing channel (supergrok is a quota, not cash; xai_direct 0 = off until a number is set).",
+ "hermes_daily_lock_cash": {
+  "enabled": false,
+  "steps": [
+   "xai_direct|grok-4.7",
+   "openrouter|x-ai/grok-4.7"
+  ],
+  "_comment": "OFF by default (Shanta's rule: grok only through Super Grok). Oct 26 2026 she asked for the option: when true, the Super Grok daily lock tries x.ai direct grok, then OpenRouter grok, BEFORE paid qwen/qwen3-coder, then north-mini LAST, each only inside its channel_caps_usd. Do not turn on without her go-ahead. The chains above still reject grok on OpenRouter."
+ }
 }

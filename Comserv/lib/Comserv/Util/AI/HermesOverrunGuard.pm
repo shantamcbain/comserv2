@@ -255,16 +255,24 @@ sub billing_label {
 # day/week/month use is still well inside the caps (day < 60 %, week and month < 90 %).
 sub paid_room {
     my ($or, $caps, $reasons) = @_;
-    return 0 if grep { /^OpenRouter/ } @{ $reasons || [] };
-    return 0 unless ref $or eq 'HASH' && $or->{ok};
+    return @{ [ paid_room_why($or, $caps, $reasons) ] } ? 0 : 1;
+}
+
+# pure: the reasons the paid step has no room right now (empty list = room). Plain words for notices, e.g.
+# 'OpenRouter month $45.82 of $50 over the 90% rule'.
+sub paid_room_why {
+    my ($or, $caps, $reasons) = @_;
+    my @w;
+    push @w, 'an OpenRouter money cap is already hit' if grep { /^OpenRouter/ } @{ $reasons || [] };
+    return (@w, 'OpenRouter usage unknown') unless ref $or eq 'HASH' && $or->{ok};
     $caps ||= \%CAPS;
     my %frac = (day => $NEAR_CAP_FRAC, week => 0.9, month => 0.9);
     for my $w (qw(day week month)) {
         my ($v, $cap) = ($or->{"${w}_usd"}, $caps->{$w});
         next unless defined $v && defined $cap;
-        return 0 if $v >= $frac{$w} * $cap;
+        push @w, sprintf('OpenRouter %s $%.2f of $%s over the %d%% rule', $w, $v, 0 + $cap, int($frac{$w} * 100 + 0.5)) if $v >= $frac{$w} * $cap;
     }
-    return 1;
+    return @w;
 }
 
 # pure: why a live call is not allowed right now (undef = allowed). %pol: tripped, allowed_paid {model=>1},
@@ -1872,6 +1880,19 @@ sub run {
     }
     # published for ~/.hermes/scripts/supergrok_daily_guard.py: may the chain's paid step be used right now?
     @$st{qw(paid_ok paid_ok_at)} = ($ctx{paid_ok} ? 1 : 0, $t);
+    # cash snapshot for the Super Grok daily guard (numbers only): why the paid step has / has no room, and the
+    # x.ai direct and OpenRouter spend against their channel caps
+    {
+        my $ccaps = $ctx{channel_caps} || {};
+        my @why = paid_room_why($or, $ccaps->{openrouter} || \%CAPS, $d->{reasons});
+        $st->{cash} = {
+            at => $t,
+            openrouter => { ok => ($or->{ok} ? 1 : 0), day_usd => $or->{day_usd}, week_usd => $or->{week_usd}, month_usd => $or->{month_usd},
+                            caps => $ccaps->{openrouter} || \%CAPS },
+            xai_direct => { usd => $xai_live->{usd} // 0, caps => $ccaps->{xai_direct} || { day => 0, week => 0, month => 0 } },
+            paid_why   => \@why,
+        };
+    }
     $s->write_state($st);
     $d->{state} = $st;
     return $d;

@@ -177,6 +177,31 @@ sub _validate_hermes {
         elsif ($t eq 'paid' && $seen_cheap) { push @e, "hermes_fallback_chain: paid step $s after a free step (paid models must come first)" }
     }
     push @e, 'hermes_fallback_chain: north-mini must be the last step' if defined $north_at && $north_at != $#$ch;
+    # Oct 26 2026: OPT-IN (default off) cash steps for the Super Grok daily lock. This is the ONLY place a grok
+    # model on x.ai direct / OpenRouter is allowed; the chains above keep rejecting it.
+    if (exists $d->{hermes_daily_lock_cash}) {
+        my $c = $d->{hermes_daily_lock_cash};
+        if (ref $c ne 'HASH') { push @e, 'hermes_daily_lock_cash must be an object' }
+        else {
+            push @e, 'hermes_daily_lock_cash.enabled must be true/false (or 0/1)'
+                if exists $c->{enabled}
+                   && ( (ref($c->{enabled}) && ref($c->{enabled}) !~ /Boolean/)
+                        || (!ref($c->{enabled}) && (!defined $c->{enabled} || $c->{enabled} !~ /^(?:|0|1|true|false)\z/)) );
+            if (exists $c->{steps}) {
+                if (ref $c->{steps} ne 'ARRAY' || !@{ $c->{steps} }) { push @e, 'hermes_daily_lock_cash.steps must be a non-empty list' }
+                else {
+                    my %seen;
+                    for my $s (@{ $c->{steps} }) {
+                        if (!defined $s || ref $s || $s !~ m{^(?:xai_direct|openrouter)\|[A-Za-z0-9._:/\-]+\z}) { push @e, 'hermes_daily_lock_cash.steps: bad step ' . (defined $s && !ref $s ? $s : '(non-string)'); next }
+                        push @e, "hermes_daily_lock_cash.steps: duplicate $s" if $seen{$s}++;
+                        my ($p, $m) = split /\|/, $s, 2;
+                        push @e, "hermes_daily_lock_cash.steps: $s is not a grok model (other paid models belong in hermes_fallback_chain)" unless $m =~ /grok/i;
+                        push @e, "hermes_daily_lock_cash.steps: $s is banned (v4-pro / glm)" if $m =~ /v4-pro|glm/i;
+                    }
+                }
+            }
+        }
+    }
     if (exists $d->{channel_caps_usd}) {
         if (ref $d->{channel_caps_usd} ne 'HASH') { push @e, 'channel_caps_usd must be an object' }
         else {
@@ -202,6 +227,17 @@ sub hermes_chain {
     my @src = @{ $d->{$key} || [ $o{emergency} ? @HERMES_EMERGENCY_DEFAULT : @HERMES_CHAIN_DEFAULT ] };
     return map { my ($p, $m) = split /\|/, $_, 2; { slug => $_, provider => $p, model => $m, tier => $class->slug_tier($_) } }
            grep { !$rm{$_} } @src;
+}
+
+# hermes_cash_steps($loaded) -> list of { slug, channel, provider, model }: the opt-in x.ai direct / OpenRouter grok
+# steps tried BEFORE the paid qwen step on the daily lock. Empty unless hermes_daily_lock_cash.enabled is true.
+sub hermes_cash_steps {
+    my ($class, $loaded) = @_;
+    my $d = ref $loaded eq 'HASH' && $loaded->{data} ? $loaded->{data} : $loaded;
+    my $c = ref $d eq 'HASH' ? $d->{hermes_daily_lock_cash} : undef;
+    return () unless ref $c eq 'HASH' && $c->{enabled} && $c->{enabled} !~ /^(?:false|0)\z/;
+    my @src = ref $c->{steps} eq 'ARRAY' ? @{ $c->{steps} } : ('xai_direct|grok-4.7', 'openrouter|x-ai/grok-4.7');
+    return map { my ($p, $m) = split /\|/, $_, 2; { slug => $_, channel => $p, provider => ($p eq 'xai_direct' ? 'xai' : $p), model => $m } } @src;
 }
 
 # channel_caps($loaded, 'openrouter') -> { day, week, month }

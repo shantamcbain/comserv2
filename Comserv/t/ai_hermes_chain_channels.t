@@ -144,5 +144,30 @@ is $G->can('decide')->(thrash => 0, openrouter => $ok, state => {}, xai_direct =
                   live => { ok => 1, day_usd => 0, calls => 0, recent => {}, by_channel => {} });
     is $r->{gate}, 'cleared', 'no offenders: gate cleared';
     is decode_json(do { local $/; open my $gf, '<', "$h/.hermes/overrun_gate.json"; <$gf> })->{active}, 0, 'gate inactive';
+    my $stf = decode_json(do { local $/; open my $sf, '<', "$h/.hermes/overrun_guard_state.json" or die; <$sf> });
+    ok ref $stf->{cash} eq 'HASH' && exists $stf->{cash}{openrouter}{month_usd} && ref $stf->{cash}{paid_why} eq 'ARRAY', 'run publishes the cash snapshot (numbers only) for the daily guard';
+}
+
+# ---- Oct 26 (2): opt-in cash steps for the daily lock (default OFF) ----
+{
+    my %d = %{ $MC->perl_default };
+    ok !$MC->hermes_cash_steps($ld) , 'cash steps: none by default (setting exists, enabled=false in the data file)';
+    is $ld->{data}{hermes_daily_lock_cash}{enabled} ? 1 : 0, 0, 'hermes_daily_lock_cash.enabled is false in data/ai_model_chains.json';
+    my @on = $MC->hermes_cash_steps({ %d, hermes_daily_lock_cash => { enabled => JSON::PP::true, steps => ['xai_direct|grok-4.7', 'openrouter|x-ai/grok-4.7'] } });
+    is_deeply [ map { "$_->{provider}/$_->{model}" } @on ], ['xai/grok-4.7', 'openrouter/x-ai/grok-4.7'], 'enabled: x.ai direct then OpenRouter grok';
+    ok !(() = $MC->hermes_cash_steps({ %d, hermes_daily_lock_cash => { enabled => JSON::PP::false } })), 'enabled=false: no steps';
+    my ($ok, $e) = $MC->validate_structure({ %d, hermes_daily_lock_cash => { enabled => 1, steps => ['xai_direct|grok-4.7', 'openrouter|x-ai/grok-4.7'] } });
+    ok $ok, 'cash setting accepts grok steps (the only place OpenRouter grok is allowed)';
+    ($ok, $e) = $MC->validate_structure({ %d, hermes_daily_lock_cash => { enabled => 1, steps => ['openrouter|qwen/qwen3-coder'] } });
+    ok !$ok && "@$e" =~ /not a grok model/, 'cash setting refuses non-grok steps';
+    ($ok, $e) = $MC->validate_structure({ %d, hermes_daily_lock_cash => { enabled => 1, steps => ['openrouter|deepseek/deepseek-v4-pro'] } });
+    ok !$ok, 'cash setting refuses v4-pro';
+    ($ok, $e) = $MC->validate_structure({ %d, hermes_daily_lock_cash => { enabled => 'maybe' } });
+    ok !$ok && "@$e" =~ /enabled must be/, 'cash enabled must be a boolean';
+    ($ok, $e) = $MC->validate_structure({ %d, hermes_fallback_chain => ['supergrok|grok-4.7', 'openrouter|x-ai/grok-4.7'] });
+    ok !$ok && "@$e" =~ /banned on openrouter/, 'the chain itself still bans OpenRouter grok';
+    my @why = $G->can('paid_room_why')->({ ok => 1, day_usd => 0, week_usd => 0, month_usd => 45.82 }, { day => 1.65, week => 11.5, month => 50 }, []);
+    is $why[0], 'OpenRouter month $45.82 of $50 over the 90% rule', 'paid_room_why wording';
+    is scalar(() = $G->can('paid_room_why')->({ ok => 1, day_usd => 0, week_usd => 0, month_usd => 4 }, { day => 1.65, week => 11.5, month => 50 }, [])), 0, 'paid_room_why: empty when there is room';
 }
 done_testing;
