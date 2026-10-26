@@ -1870,6 +1870,8 @@ sub run {
             $st->{last_notified} = { mode => 'enforce_clear', model => '', key => 'enforce_clear', at => $t, at_pt => pt($t), title => 'enforce cleared' };
         }
     }
+    # published for ~/.hermes/scripts/supergrok_daily_guard.py: may the chain's paid step be used right now?
+    @$st{qw(paid_ok paid_ok_at)} = ($ctx{paid_ok} ? 1 : 0, $t);
     $s->write_state($st);
     $d->{state} = $st;
     return $d;
