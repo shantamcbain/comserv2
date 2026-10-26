@@ -56,7 +56,7 @@ $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no 
     my $now = time;
     open my $fh, '>', "$root/data/ai_trials/x.state.json"; print $fh encode_json({ model => 'moonshotai/kimi-k2.7-code', baseline => { month_usd => 1 }, baseline_at => $now, exclude_usd => 1.25 }); close $fh;
     open $fh, '>', "$root/data/ai_trials/old.state.json"; print $fh encode_json({ model => 'old/model', baseline => { month_usd => 1 }, baseline_at => $now - 90 * 86400, exclude_usd => 9 }); close $fh;
-    my $g = Comserv::Util::AI::HermesOverrunGuard->new(app_root => $root, now => $now, base_urls => []);
+    my $g = Comserv::Util::AI::HermesOverrunGuard->new(home => $root, app_root => $root, now => $now, base_urls => []);
     my $x = $g->trial_exclusions;
     is $x->{usd}, 1.25, 'guard excludes this month\'s trial spend only'; ok $x->{models}{'moonshotai/kimi-k2.7-code'} && !$x->{models}{'old/model'}, 'trial model excluded from the live estimate; last month\'s is not';
 }
@@ -75,7 +75,7 @@ $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no 
     $dbh->disconnect;
     my $sf = "$root/data/ai_trials/kimi_k27_code.state.json";
     open my $fh, '>', $sf; print $fh encode_json({ name => 'kimi_k27_code', model => $model, baseline => { month_usd => 45, balance_usd => 11 }, baseline_at => $now - 3600, alerted => 0, tasks_done => 0 }); close $fh;
-    my $g = Comserv::Util::AI::HermesOverrunGuard->new(app_root => $root, now => $now, base_urls => [], no_notify => 1);
+    my $g = Comserv::Util::AI::HermesOverrunGuard->new(home => $root, app_root => $root, now => $now, base_urls => [], no_notify => 1);
     $g->{state_db} = $db;
     my $rd = sub { open my $f, '<', $sf; local $/; decode_json(<$f>) };
     $g->trial_tick({ ok => 1, month_usd => 45.4, balance_usd => 10.6 });
@@ -109,7 +109,7 @@ $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no 
     close $lf;
     my $sf = "$root/data/ai_trials/kimi_k27_code.state.json";
     my $write = sub { open my $fh, '>', $sf; print $fh encode_json({ name => 'kimi_k27_code', model => $kimi, baseline => { month_usd => 1 }, baseline_at => $now, %{ $_[0] || {} } }); close $fh };
-    my $mk = sub { my $g = Comserv::Util::AI::HermesOverrunGuard->new(app_root => $root, now => $now, base_urls => [], no_notify => 1); $g->{agent_log} = "$root/.hermes/logs/agent.log"; $g->{trial_models} = $g->trial_exclusions->{models}; $g };
+    my $mk = sub { my $g = Comserv::Util::AI::HermesOverrunGuard->new(home => $root, app_root => $root, now => $now, base_urls => [], no_notify => 1); $g->{agent_log} = "$root/.hermes/logs/agent.log"; $g->{trial_models} = $g->trial_exclusions->{models}; $g };
     $write->({});
     my $c = $mk->()->thrash_by_class; is $c->{counts}{openrouter_paid}, 3, 'active trial: its 32 calls are not counted, qwen\'s 3 are';
     $write->({ stopped => 'hard cap reached' });
@@ -132,7 +132,7 @@ $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no 
     $dbh->do('INSERT INTO messages VALUES (?,?,?)', undef, 'k', 'assistant', $now - 10) for 1 .. 5;
     $dbh->do('INSERT INTO messages VALUES (?,?,?)', undef, 'q', 'assistant', $now - 10) for 1 .. 2;
     $dbh->disconnect;
-    my $g = Comserv::Util::AI::HermesOverrunGuard->new(app_root => $root, now => $now, base_urls => []); $g->{state_db} = $db;
+    my $g = Comserv::Util::AI::HermesOverrunGuard->new(home => $root, app_root => $root, now => $now, base_urls => []); $g->{state_db} = $db;
     is $g->thrash_count, 7, 'no trial: all 7 counted';
     $g->{trial_models} = { $kimi => 1 };
     is $g->thrash_count, 2, 'active trial model excluded, qwen still counted';
