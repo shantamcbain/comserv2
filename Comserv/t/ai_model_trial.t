@@ -44,4 +44,20 @@ $e = $ev->({ tasks_done => 20 }); is $e->{action}, 'stop', 'stops after 20 tasks
 is $ev->({ tasks_done => 19 })->{action}, 'run', 'task 20 may run';
 $e = $ev->({ bot_pct => 96 }); is $e->{action}, 'stop', 'stops when Bot usage is over 95%'; is $ev->({ bot_pct => 95 })->{action}, 'run', '95% itself is allowed';
 $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no task'; 
+
+# ---- the overrun guard leaves an approved trial's spend out of the OpenRouter caps ----
+{
+    my $r = $T->can('exclude_from_or')->({ ok => 1, day_usd => 2.5, week_usd => 5, month_usd => 48, balance_usd => 7 }, 2.0);
+    is $r->{day_usd}, 0.5, 'day: trial spend removed'; is $r->{month_usd}, 46, 'month: trial spend removed'; is $r->{balance_usd}, 7, 'balance untouched';
+    is $T->can('exclude_from_or')->({ ok => 1, day_usd => 0.5 }, 2.0)->{day_usd}, 0, 'never below 0';
+    is $T->can('exclude_from_or')->({ ok => 0 }, 2.0)->{ok}, 0, 'unreadable reading passes through';
+    require Comserv::Util::AI::HermesOverrunGuard; require File::Temp;
+    my $root = File::Temp::tempdir(CLEANUP => 1); mkdir "$root/data"; mkdir "$root/data/ai_trials";
+    my $now = time;
+    open my $fh, '>', "$root/data/ai_trials/x.state.json"; print $fh encode_json({ model => 'moonshotai/kimi-k2.7-code', baseline => { month_usd => 1 }, baseline_at => $now, exclude_usd => 1.25 }); close $fh;
+    open $fh, '>', "$root/data/ai_trials/old.state.json"; print $fh encode_json({ model => 'old/model', baseline => { month_usd => 1 }, baseline_at => $now - 90 * 86400, exclude_usd => 9 }); close $fh;
+    my $g = Comserv::Util::AI::HermesOverrunGuard->new(app_root => $root, now => $now, base_urls => []);
+    my $x = $g->trial_exclusions;
+    is $x->{usd}, 1.25, 'guard excludes this month\'s trial spend only'; ok $x->{models}{'moonshotai/kimi-k2.7-code'} && !$x->{models}{'old/model'}, 'trial model excluded from the live estimate; last month\'s is not';
+}
 done_testing;

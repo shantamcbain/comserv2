@@ -16,6 +16,7 @@ use Fcntl qw(:flock);
 use POSIX qw(strftime);
 use Comserv::Util::AI::PaidBlock ();
 use Comserv::Util::AI::ModelChains ();
+use Comserv::Util::AI::ModelTrial ();
 use File::Copy ();
 use Time::Local qw(timegm timelocal);
 
@@ -949,6 +950,7 @@ sub live_spend {
     for my $c (@$calls) {
         my $m = $c->{model} // '';
         next unless $m;
+        next if $self->{trial_models} && $self->{trial_models}{$m};   # approved trial model: not part of the caps (see run)
         my $ch = billing_channel($c->{provider}, $m);
         if ($ch ne 'openrouter') {
             # not billed by OpenRouter: counted per channel (x.ai direct = flat unpriced estimate), never in the OpenRouter dollars
@@ -1591,6 +1593,24 @@ sub fix_cron_grok_jobs {
     return $ids;
 }
 
+# { models => {id=>1}, usd => N }: approved trials whose baseline is in the current month (PT). usd = spend recorded at their last check.
+sub trial_exclusions {
+    my ($s) = @_;
+    my %out = (models => {}, usd => 0);
+    my $dir = "$s->{app_root}/data/ai_trials";
+    return \%out unless -d $dir;
+    my $ym = strftime('%Y%m', localtime $s->_now);
+    for my $f (glob "$dir/*.state.json") {
+        open my $fh, '<', $f or next;
+        my $d = eval { local $/; $J->decode(<$fh>) }; close $fh;
+        next unless ref $d eq 'HASH' && ref $d->{baseline} eq 'HASH' && $d->{model} && $d->{baseline_at};
+        next unless strftime('%Y%m', localtime $d->{baseline_at}) eq $ym;
+        $out{models}{ $d->{model} } = 1;
+        $out{usd} += $d->{exclude_usd} // 0;
+    }
+    return \%out;
+}
+
 sub run {
     my ($s, %o) = @_;
     open my $lk, '>', $s->{lock_file} or return { action => 'error', error => "lock: $!" };
@@ -1614,6 +1634,11 @@ sub run {
         $or = exists $o{openrouter} ? $o{openrouter} : $s->openrouter_status;
     }
     $or = stale_guard($or, $t, $SNAPSHOT_MAX_AGE);
+    # Oct 26 2026: an approved model trial (data/ai_trials/*.state.json) is paid from reserve: its spend is taken out of the
+    # OpenRouter caps and its model out of the live estimate, so it neither trips the guard nor counts as an offender.
+    my $tx = $s->trial_exclusions;
+    $s->{trial_models} = $tx->{models};
+    $or = Comserv::Util::AI::ModelTrial::exclude_from_or($or, $tx->{usd}) if $tx->{usd};
     my $thrash = exists $o{thrash} ? $o{thrash} : $s->thrash_count;
     my $tbc = exists $o{thrash_by_class} ? $o{thrash_by_class} : $s->thrash_by_class;
     my $lims = $s->thrash_limits;

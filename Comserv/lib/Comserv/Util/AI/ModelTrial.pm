@@ -35,4 +35,19 @@ sub evaluate {
     return { action => 'run', reason => sprintf('$%.2f of $%s, task %d of %d', $spent, $cap + 0, ($in{tasks_done} // 0) + 1, $max), spent => $spent, alert => $alert };
 }
 
+# exclude_from_or($or, $usd) -> copy of an OpenRouter reading with an approved trial's spend taken out of day/week/month
+# so the overrun guard's caps do not trip (and switch Hermes) because of money Shanta approved from reserve.
+sub exclude_from_or {
+    my ($or, $usd) = @_;
+    return $or unless ref $or eq 'HASH' && $or->{ok} && $usd && $usd > 0;
+    my %o = %$or;
+    for my $k (qw(day_usd week_usd month_usd)) {
+        next unless defined $o{$k};
+        my $v = $o{$k} - $usd;
+        $o{$k} = $v > 0 ? $v : 0;
+    }
+    $o{trial_excluded_usd} = $usd;
+    return \%o;
+}
+
 1;

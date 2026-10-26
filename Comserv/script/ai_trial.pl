@@ -61,6 +61,7 @@ elsif ($cmd eq 'check' || $cmd eq 'status') {
                                                     alerted => $st->{alerted}, bot_pct => $bp, live_ok => $o ? 1 : 0);
     if ($cmd eq 'check') {
         $st->{last_spent} = $spent; $st->{last_checked_at} = time;
+        $st->{exclude_usd} = $spent if $spent > ($st->{exclude_usd} // 0);   # the overrun guard leaves this out of the OpenRouter caps
         if ($e->{alert}) {
             # same alert path as the overrun guard's state changes (notify_change dedupes on state)
             my $fired = $guard->notify_change($st, 'trial', $name, "Model trial $name: \$3 spend check",
@@ -85,7 +86,9 @@ elsif ($cmd eq 'record') {
     $rec->{spent_total_usd} = $o ? Comserv::Util::AI::ModelTrial::spent($st->{baseline}, $o) : $st->{last_spent};
     open my $lf, '>>', "$dir/$name.tasks.jsonl" or fail("cannot append log: $!");
     print $lf $J->encode($rec), "\n"; close $lf;
-    $st->{tasks_done}++; wr($sf, $st);
+    $st->{tasks_done}++;
+    $st->{exclude_usd} = $rec->{spent_total_usd} if ($rec->{spent_total_usd} // 0) > ($st->{exclude_usd} // 0);
+    wr($sf, $st);
     print $J->encode({ ok => 1, tasks_done => $st->{tasks_done}, spent_total_usd => $rec->{spent_total_usd} }), "\n";
 }
 else { fail("unknown command $cmd") }
