@@ -2410,6 +2410,150 @@ sub list_backups {
     return \@backups;
 }
 
+# ── Performance history (RRD) ────────────────────────────────────────────────
+# The graphs on the Proxmox web UI's node/VM summary come from the RRD history
+# endpoints:
+#   /nodes/{node}/rrddata?timeframe=hour|day|week|month|year&cf=AVERAGE
+#   /nodes/{node}/qemu/{vmid}/rrddata?timeframe=...&cf=AVERAGE
+# Each row is one time step. Useful keys:
+#   VM  : cpu (fraction 0..1), mem, maxmem, netin/netout (B/s),
+#         diskread/diskwrite (B/s), time (epoch)
+#   Node: cpu (fraction 0..1), memused, memtotal, loadavg, iowait, netin/netout,
+#         time; "temperature" only when the platform reports thermal sensors
+#         (PVE 9+ / hardware dependent). PVE 8.x has no per-VM temperature at all.
+#
+# These methods return raw row arrays; the controller serialises them for the
+# browser and the template does the maths/plotting.
+
+sub _valid_timeframe {
+    my ($tf) = @_;
+    return 'hour' unless defined $tf && length $tf;
+    return $tf =~ /\A(?:hour|day|week|month|year)\z/ ? $tf : 'hour';
+}
+
+sub _fetch_rrd {
+    my ($self, $url) = @_;
+
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return [] unless $self->{api_url_base};
+
+    my $logging     = Comserv::Util::Logging->instance;
+    my $ua          = $self->_make_ua(20);
+    my $auth_header = $self->_auth_header() or return [];
+
+    my $req = HTTP::Request->new(GET => $url);
+    $req->header(Authorization => $auth_header);
+    my $res = $ua->request($req);
+
+    unless ($res->is_success) {
+        $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_fetch_rrd',
+            'RRD request failed (' . $res->code . ') for ' . $url . ': '
+            . substr($res->decoded_content // '', 0, 200));
+        return [];
+    }
+
+    my $data = eval { decode_json($res->decoded_content) };
+    if ($@) {
+        $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_fetch_rrd',
+            'RRD JSON parse error for ' . $url . ': ' . $@);
+        return [];
+    }
+
+    return ($data && $data->{data} && ref $data->{data} eq 'ARRAY')
+        ? $data->{data}
+        : [];
+}
+
+# Find the node a VM actually lives on. In a cluster the configured default
+# node is not necessarily the VM's host, and RRD endpoints are node-scoped.
+sub _resolve_vm_node {
+    my ($self, $ua, $auth_header, $vmid) = @_;
+
+    my $req = HTTP::Request->new(GET => $self->{api_url_base} . '/cluster/resources?type=vm');
+    $req->header(Authorization => $auth_header);
+    my $res = $ua->request($req);
+
+    if ($res->is_success) {
+        my $d = eval { decode_json($res->decoded_content) };
+        if ($d && $d->{data} && ref $d->{data} eq 'ARRAY') {
+            for my $vm (@{ $d->{data} }) {
+                return $vm->{node}
+                    if defined $vm->{vmid} && $vm->{vmid} == $vmid && $vm->{node};
+            }
+        }
+    }
+
+    return $self->_resolve_node($ua, $auth_header);
+}
+
+sub get_vm_rrd_data {
+    my ($self, $vmid, $timeframe) = @_;
+
+    my $tf = _valid_timeframe($timeframe);
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return [] unless $self->{api_url_base} && defined $vmid;
+
+    my $ua          = $self->_make_ua(20);
+    my $auth_header = $self->_auth_header() or return [];
+    my $node        = $self->_resolve_vm_node($ua, $auth_header, $vmid);
+
+    return $self->_fetch_rrd(
+        $self->{api_url_base}
+        . "/nodes/$node/qemu/$vmid/rrddata?timeframe=$tf&cf=AVERAGE"
+    );
+}
+
+sub get_node_rrd_data {
+    my ($self, $timeframe, $node) = @_;
+
+    my $tf = _valid_timeframe($timeframe);
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return [] unless $self->{api_url_base};
+
+    my $ua          = $self->_make_ua(20);
+    my $auth_header = $self->_auth_header() or return [];
+    $node ||= $self->_resolve_node($ua, $auth_header);
+
+    return $self->_fetch_rrd(
+        $self->{api_url_base} . "/nodes/$node/rrddata?timeframe=$tf&cf=AVERAGE"
+    );
+}
+
+# One call for the VM detail page: VM history + host history + current status.
+sub get_vm_graph_data {
+    my ($self, $vmid, $timeframe) = @_;
+
+    my $tf = _valid_timeframe($timeframe);
+
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    my $ua          = $self->_make_ua(20);
+    my $auth_header = $self->_auth_header();
+    my $node        = $auth_header
+        ? $self->_resolve_vm_node($ua, $auth_header, $vmid)
+        : ($self->{node} || '');
+
+    my $vm_rows   = $self->get_vm_rrd_data($vmid, $tf);
+    my $node_rows = $self->get_node_rrd_data($tf, $node);
+    my $current   = $self->get_vm_status($vmid);
+
+    # Host temperature is only present when the platform exposes thermal
+    # sensors; tell the UI so it can hide the tile instead of plotting zeros.
+    my $has_temp = 0;
+    for my $row (@$node_rows) {
+        if (defined $row->{temperature}) { $has_temp = 1; last; }
+    }
+
+    return {
+        vmid            => 0 + $vmid,
+        node            => $node,
+        timeframe       => $tf,
+        vm              => $vm_rows,
+        node_history    => $node_rows,
+        current         => $current || {},
+        has_temperature => $has_temp ? 1 : 0,
+    };
+}
+
 sub restore_backup {
     my ($self, $vmid, $volid, $storage) = @_;
 
