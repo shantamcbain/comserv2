@@ -297,17 +297,30 @@ sub api_revoke_token :Local :Args(1) {
         $c->detach();
     }
     
-    my $api_token = $schema->resultset('ApiToken')->search({
-        id => $token_id,
-        user_id => $user->id
-    })->first;
-    
+    my $api_token = ($token_id && $token_id =~ /^\d+$/)
+        ? $schema->resultset('ApiToken')->find($token_id) : undef;
+
+    # Own token: always. Another user's token: only when that user is a bot-eligible
+    # (non-admin, developer/devops/editor-only) account; never another admin's token.
+    my $owner_name = $username;
+    if ($api_token && $api_token->user_id != $user->id) {
+        my $owner = eval { $api_token->user };
+        unless ($owner && _api_is_bot_user($owner)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_revoke_token',
+                "Refused: admin=$username tried to revoke token_id=$token_id owned by a non-bot account");
+            $api_token = undef;
+        }
+        else {
+            $owner_name = $owner->username;
+        }
+    }
+
     unless ($api_token) {
         $c->res->status(404);
         $c->res->content_type('application/json');
         $c->res->body(encode_json({
             success => 0,
-            error => 'Token not found or does not belong to you',
+            error => 'Token not found, or it belongs to an account that is not a bot account',
             code => 'token_not_found'
         }));
         $c->detach();
@@ -319,7 +332,7 @@ sub api_revoke_token :Local :Args(1) {
     });
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_revoke_token',
-        "API token revoked: user=$username, token_id=$token_id");
+        "API token revoked: by=$username, owner=$owner_name, token_id=$token_id");
     
     $c->res->status(200);
     $c->res->content_type('application/json');
@@ -462,28 +475,9 @@ sub api_todo_create :Path('todo/create') :Args(0) {
     my ($self, $c) = @_;
     
     # Check if request is from localhost or workstation.local
-    my $address = $c->req->address;
-    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
-    
-    my $api_user;
-    unless ($is_local) {
-        my $validation = Comserv::Util::ApiTokenValidator->validate_from_request($c);
-        unless ($validation->{valid}) {
-            $c->res->status($validation->{code} || 401);
-            $c->res->content_type('application/json');
-            $c->res->body(encode_json({
-                success => 0,
-                error => $validation->{error} || 'Authentication required',
-                code => $validation->{code} || 'unauthorized'
-            }));
-            $c->detach();
-        }
-        
-        my $schema = $c->model('DBEncy');
-        my $api_token = $schema->resultset('ApiToken')->find($validation->{api_token_id});
-        $api_user = $api_token->user if $api_token;
-    }
-    
+    # Identity first (session / Bearer token); LAN bypass only per _api_lan_bypass_mode().
+    my $gate = $self->_api_gate($c) or return;
+
     my $params;
     eval {
         # Using decode_json directly here
@@ -506,7 +500,7 @@ sub api_todo_create :Path('todo/create') :Args(0) {
     }
     
     my $schema = $c->model('DBEncy');
-    my $current_user = $api_user ? $api_user->username : ($c->session->{username} || 'system');
+    my $current_user = $gate->{lan} ? ($c->session->{username} || 'system') : $gate->{username};
     
     my @required = qw(subject start_date due_date priority status);
     my @missing = grep { !defined $params->{$_} || $params->{$_} eq '' } @required;
@@ -542,8 +536,8 @@ sub api_todo_create :Path('todo/create') :Args(0) {
     my $sitename = $self->_sitename_for_write($c, $params, $project);
 
     my $poster_user_id;
-    if ($api_user) {
-        $poster_user_id = $api_user->id;
+    if (!$gate->{lan} && $gate->{user_id}) {
+        $poster_user_id = $gate->{user_id};
     } else {
         my $poster_name = $params->{assigned_to} || $params->{developer} || $current_user;
         my $poster_row = $schema->resultset('User')->search(
@@ -620,7 +614,8 @@ sub api_todo_create :Path('todo/create') :Args(0) {
     my $todo = $schema->resultset('Todo')->create(\%create);
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_create',
-        "Todo created via API: ID=" . $todo->id . ", Subject=" . $params->{subject});
+        "Todo created via API: ID=" . $todo->id . ", Subject=" . $params->{subject}
+        . " by $current_user (" . _api_via_note($gate, $params->{actor} // $params->{username}) . ")");
     
     $c->res->status(200);
     $c->res->content_type('application/json');
@@ -1810,8 +1805,8 @@ Returns: { success, message, updated: [ field, ... ], todo: { ... } }
 sub api_todo_update :Path('todo/update') :Args(0) {
     my ($self, $c) = @_;
 
-    my $api_user = $self->_api_authenticate($c);
-    my $params   = $self->_parse_json_body($c);
+    my $gate   = $self->_api_gate($c) or return;
+    my $params = $self->_parse_json_body($c);
 
     my $todo_id = $params->{record_id} || $params->{todo_id} || $params->{id};
     unless ($todo_id) {
@@ -1854,7 +1849,7 @@ sub api_todo_update :Path('todo/update') :Args(0) {
     );
     my @nullable = qw(parent_id blocked_by_todo_id plan_id scheduled_date comments);
 
-    my $current_user = $api_user ? $api_user->username : ($c->session->{username} || 'system');
+    my $current_user = $gate->{lan} ? ($c->session->{username} || 'system') : $gate->{username};
 
     my @updated;
     eval {
@@ -1884,7 +1879,8 @@ sub api_todo_update :Path('todo/update') :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_update',
-        "Todo updated via API: ID=$todo_id, fields=" . join(',', @updated));
+        "Todo updated via API: ID=$todo_id, fields=" . join(',', @updated)
+        . " by $current_user (" . _api_via_note($gate, $params->{actor} // $params->{username}) . ")");
 
     $self->_json_ok($c, {
         message => 'Todo updated successfully',
@@ -1911,8 +1907,8 @@ Returns: { success, message, updated: [ field, ... ], project: { ... } }
 sub api_project_update :Path('project/update') :Args(0) {
     my ($self, $c) = @_;
 
-    my $api_user = $self->_api_authenticate($c);
-    my $params   = $self->_parse_json_body($c);
+    my $gate   = $self->_api_gate($c) or return;
+    my $params = $self->_parse_json_body($c);
 
     my $project_id = $params->{project_id} || $params->{id};
     unless ($project_id) {
@@ -1969,7 +1965,9 @@ sub api_project_update :Path('project/update') :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_project_update',
-        "Project updated via API: ID=$project_id, fields=" . join(',', @updated));
+        "Project updated via API: ID=$project_id, fields=" . join(',', @updated)
+        . " by " . ($gate->{lan} ? 'lan-caller' : $gate->{username})
+        . " (" . _api_via_note($gate, $params->{actor} // $params->{username}) . ")");
 
     $self->_json_ok($c, {
         message    => 'Project updated successfully',
@@ -2071,6 +2069,71 @@ sub _api_log_unauthorized {
     $c->detach();
 }
 
+# Refusal to send after _api_identity failed and the LAN bypass did not apply.
+# A local caller whose bypass is switched off (flag=off, non-GET) gets a 403 that says
+# how to authenticate; everyone else gets the identity error (401/403).
+sub _api_gate_refusal {
+    my ($c) = @_;
+    my $err  = $c->stash->{api_identity_error}
+            || { status => 401, error => 'Authentication required: log in, or send Authorization: Bearer <token>', code => 'unauthorized' };
+    my $auth = $c->req->header('Authorization') // '';
+    my $address = $c->req->address // '';
+    if ($auth !~ /^Bearer\s+\S/ && ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./)) {
+        $err = { status => 403, code => 'forbidden',
+                 error => 'LAN bypass is disabled for writes (COMSERV_API_LAN_BYPASS_WRITES=off): log in or send Authorization: Bearer <token>' };
+    }
+    return $err;
+}
+
+# Identity-first gate for the todo / write routes (todo API auth plan).
+#   1. _api_identity: session user, or Bearer token user, holding an allowed role.
+#   2. else, ONLY if no Bearer token was presented, the legacy LAN bypass via
+#      _api_local_ok (warn mode logs it, off mode refuses non-GET).
+# A Bearer token that was presented but is bad (revoked/expired/inactive/no role)
+# is refused and never falls through to the LAN bypass.
+# Returns { username, user_id, via, lan } or sends a JSON error and detaches.
+sub _api_gate {
+    my ($self, $c) = @_;
+    my $id = _api_identity($c);
+    return { username => $id->{username}, user_id => $id->{user_id}, via => $id->{via}, lan => 0 }
+        if $id;
+
+    my $auth = $c->req->header('Authorization') // '';
+    return { username => undef, user_id => undef, via => 'lan', lan => 1 }
+        if $auth !~ /^Bearer\s+\S/ && _api_local_ok($c);
+
+    my $err = _api_gate_refusal($c);
+    $c->res->header('WWW-Authenticate' => 'Bearer') if $err->{status} == 401;
+    my $route = '/' . ($c->req->path // '');
+    $route =~ s/[^A-Za-z0-9_\/.\-]/?/g;
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_gate',
+        "API write/todo access refused ($err->{status}) for $route from " . ($c->req->address // '?'));
+    $self->_json_error($c, $err->{status}, $err->{error}, $err->{code});
+    return undef;
+}
+
+# Actor for the log rows: the authenticated user; body actor/username only for the
+# legacy LAN bypass (unchanged behaviour there).
+sub _api_actor {
+    my ($gate, $body_actor) = @_;
+    return $gate->{username} unless $gate->{lan};
+    return $body_actor // 'api';
+}
+
+# Free-text audit note: how the caller authenticated, plus the body actor kept only
+# as "on behalf of" when it differs from the authenticated user.
+sub _api_via_note {
+    my ($gate, $body_actor) = @_;
+    my $note = 'via: ' . $gate->{via};
+    if (!$gate->{lan} && defined $body_actor && !ref($body_actor) && length $body_actor) {
+        my $ba = $body_actor;
+        $ba =~ s/[^A-Za-z0-9_.@ \-]/?/g;
+        $ba = substr($ba, 0, 64);
+        $note .= "; on behalf of: $ba" if lc($ba) ne lc($gate->{username} // '');
+    }
+    return $note;
+}
+
 =head2 api_todo_work_status
 
 GET /api/todo/work_status              — all todos currently being worked (status 5 / open log)
@@ -2084,7 +2147,7 @@ to recover a leftover open log. Same payload shape as open_log already_active.
 sub api_todo_work_status :Path('todo/work_status') :Args(0) {
     my ($self, $c) = @_;
     $c->res->content_type('application/json');
-    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+    my $gate = $self->_api_gate($c) or return;
 
     unless (($c->req->method || '') =~ /^(GET|HEAD)$/i) {
         $c->res->status(405);
@@ -2136,7 +2199,7 @@ site owner. Pass C<actor> explicitly; do not rely on the default for attributabl
 sub api_todo_open_log :Path('todo/open_log') :Args(0) {
     my ($self, $c) = @_;
     $c->res->content_type('application/json');
-    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+    my $gate = $self->_api_gate($c) or return;
 
     my $data = $self->_api_json_body($c);
     my $record_id = $data->{record_id};
@@ -2145,7 +2208,9 @@ sub api_todo_open_log :Path('todo/open_log') :Args(0) {
         $c->res->body(encode_json({ success => 0, error => 'Missing record_id' }));
         return;
     }
-    my $username = $data->{actor} // $data->{username} // 'api';
+    my $body_actor = $data->{actor} // $data->{username};
+    my $username   = _api_actor($gate, $body_actor);
+    my $via_note   = _api_via_note($gate, $body_actor);
 
     # Clock lives inside TodoLog (UTC HMS + viewer today).
     my $res = eval {
@@ -2153,6 +2218,7 @@ sub api_todo_open_log :Path('todo/open_log') :Args(0) {
             record_id => $record_id,
             username  => $username,
             summary   => ($data->{summary} // ''),
+            note      => $via_note,
         );
     };
     if ($@ || !$res || !$res->{success}) {
@@ -2178,7 +2244,7 @@ sub api_todo_open_log :Path('todo/open_log') :Args(0) {
         return;
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_open_log',
-        "Log opened for todo $record_id by $username (log_id=$res->{log_id})");
+        "Log opened for todo $record_id by $username ($via_note) (log_id=$res->{log_id})");
     $c->res->body(encode_json({ success => 1, log_id => ($res->{log_id} // 0),
                                 todo_status => ($res->{todo_status} // 5), already_active => 0 }));
 }
@@ -2194,7 +2260,7 @@ Mirrors Todo::close_log SQL.
 sub api_todo_close_log :Path('todo/close_log') :Args(0) {
     my ($self, $c) = @_;
     $c->res->content_type('application/json');
-    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+    my $gate = $self->_api_gate($c) or return;
 
     my $data = $self->_api_json_body($c);
     my $record_id = $data->{record_id};
@@ -2203,8 +2269,10 @@ sub api_todo_close_log :Path('todo/close_log') :Args(0) {
         $c->res->body(encode_json({ success => 0, error => 'Missing record_id' }));
         return;
     }
-    my $username = $data->{actor} // $data->{username} // 'api';
-    my $notes    = $data->{notes} // '';
+    my $body_actor = $data->{actor} // $data->{username};
+    my $username   = _api_actor($gate, $body_actor);
+    my $via_note   = _api_via_note($gate, $body_actor);
+    my $notes      = $data->{notes} // '';
 
     # Clock lives inside TodoLog (UTC HMS + viewer today).
     my $res = eval {
@@ -2212,6 +2280,7 @@ sub api_todo_close_log :Path('todo/close_log') :Args(0) {
             record_id => $record_id,
             username  => $username,
             summary   => ($notes // ''),
+            note      => $via_note,
         );
     };
     if ($@ || !$res || !$res->{success}) {
@@ -2232,7 +2301,7 @@ sub api_todo_close_log :Path('todo/close_log') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_close_log',
         $res->{recovered}
             ? "Recovered stuck status 5 -> 2 for todo $record_id (no open log)"
-            : "Closed log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
+            : "Closed log $res->{log_id} for todo $record_id ($res->{duration_mins} min) by $username ($via_note)");
     $c->res->body(encode_json({ success => 1, duration_mins => ($res->{duration_mins} // 0),
                                 todo_status => ($res->{todo_status} // 2),
                                 recovered => ($res->{recovered} ? 1 : 0) }));
@@ -2249,7 +2318,7 @@ Mirrors Todo::done_with_log SQL.
 sub api_todo_done_with_log :Path('todo/done_with_log') :Args(0) {
     my ($self, $c) = @_;
     $c->res->content_type('application/json');
-    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+    my $gate = $self->_api_gate($c) or return;
 
     my $data = $self->_api_json_body($c);
     my $record_id = $data->{record_id};
@@ -2258,8 +2327,10 @@ sub api_todo_done_with_log :Path('todo/done_with_log') :Args(0) {
         $c->res->body(encode_json({ success => 0, error => 'Missing record_id' }));
         return;
     }
-    my $username = $data->{actor} // $data->{username} // 'api';
-    my $notes    = $data->{notes} // '';
+    my $body_actor = $data->{actor} // $data->{username};
+    my $username   = _api_actor($gate, $body_actor);
+    my $via_note   = _api_via_note($gate, $body_actor);
+    my $notes      = $data->{notes} // '';
 
     # Clock lives inside TodoLog (UTC HMS + viewer today).
     my $res = eval {
@@ -2267,6 +2338,7 @@ sub api_todo_done_with_log :Path('todo/done_with_log') :Args(0) {
             record_id => $record_id,
             username  => $username,
             summary   => ($notes // ''),
+            note      => $via_note,
         );
     };
     if ($@ || !$res || !$res->{success}) {
@@ -2278,7 +2350,7 @@ sub api_todo_done_with_log :Path('todo/done_with_log') :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_done_with_log',
-        "Todo $record_id marked done (log closed if open)");
+        "Todo $record_id marked done by $username ($via_note) (log closed if open)");
     $c->res->body(encode_json({
         success => 1,
         log_closed => ($res->{log_closed} ? 1 : 0),
@@ -2573,10 +2645,16 @@ sub api_todo_duplicates :Path('todo/duplicates') :Args(0) {
 sub api_todo_rank :Path('todo/rank') :Args(0) {
     my ($self, $c) = @_;
     $c->res->content_type('application/json');
-    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+    my $gate = $self->_api_gate($c) or return;
 
     my $data = $self->_api_json_body($c);
     my $apply = ($data->{apply} && "$data->{apply}" eq '1') ? 1 : 0;
+    if ($apply) {
+        my $body_actor = $data->{actor} // $data->{username};
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_rank',
+            'todo/rank apply=1 requested by ' . _api_log_name(_api_actor($gate, $body_actor))
+            . ' (' . _api_via_note($gate, $body_actor) . ')');
+    }
 
     # Resolve target model(s): same contract as /api/focus/top5.
     my @targets;
@@ -3286,6 +3364,191 @@ sub api_app_version :Path('app/version') :Args(0) {
     $c->res->status(200);
     $c->res->content_type('application/json');
     $c->res->body($json);
+    $c->detach();
+}
+
+# ----------------------------------------------------------------------------
+# Bot API tokens (todo API auth plan, step 3). Admin SESSION only: no Bearer token,
+# no LAN bypass. Nothing here creates a user; it only mints/lists/revokes tokens for
+# an EXISTING non-admin bot user.
+# ----------------------------------------------------------------------------
+
+our @BOT_ALLOWED_ROLES = qw(developer devops editor);
+
+# A bot account: active, not admin, has at least one role and ONLY developer/devops/editor.
+sub _api_bot_user_problem {
+    my ($user) = @_;
+    return 'Bot user not found' unless $user;
+    return 'Bot user is not active' if lc($user->status // '') ne 'active';
+    my $roles = _api_roles_list($user->roles);
+    return 'Refusing to mint a token for an admin account' if grep { $_ eq 'admin' } @$roles;
+    return 'Bot user has no role; it needs developer, devops or editor' unless @$roles;
+    my %ok = map { $_ => 1 } @BOT_ALLOWED_ROLES;
+    my @bad = grep { !$ok{$_} } @$roles;
+    return 'Bot user holds roles that are not allowed for bot tokens (' . join(',', map { _api_log_name($_) } @bad)
+         . '); only developer, devops and editor are allowed' if @bad;
+    return undef;
+}
+sub _api_is_bot_user { return defined(_api_bot_user_problem($_[0])) ? 0 : 1 }
+
+# Admin session gate: returns { username, user_id } or sends the JSON error and detaches.
+sub _api_admin_session {
+    my ($self, $c) = @_;
+    my $has_session = $c->can('sessionid') ? ($c->sessionid ? 1 : 0) : 1;
+    my $s = $has_session ? ($c->session || {}) : {};
+    unless ($s->{username} && $s->{user_id}) {
+        $self->_json_error($c, 401, 'Admin login required (session only; API tokens and the LAN bypass are not accepted here)', 'not_authenticated');
+        return undef;
+    }
+    my $is_admin = $c->stash->{is_admin} || (grep { $_ eq 'admin' } @{ _api_roles_list($s->{roles}) });
+    unless ($is_admin) {
+        $self->_json_error($c, 403, 'Admin role required.', 'insufficient_permissions');
+        return undef;
+    }
+    return { username => $s->{username}, user_id => $s->{user_id} };
+}
+
+sub _api_dt_str {
+    my ($v) = @_;
+    return undef unless defined $v && "$v" ne '';
+    return ref($v) && $v->can('iso8601') ? $v->iso8601 : "$v";
+}
+
+# 256-bit random token from the kernel CSPRNG, URL-safe, with a recognisable prefix.
+sub _api_new_bot_token {
+    require MIME::Base64;
+    open my $r, '<:raw', '/dev/urandom' or die "no CSPRNG available\n";
+    my $got = read($r, my $buf, 32);
+    close $r;
+    die "short read from CSPRNG\n" unless $got && $got == 32;
+    my $b = MIME::Base64::encode_base64($buf, '');
+    $b =~ tr{+/}{-_}; $b =~ s/=+$//;
+    return 'cbt_' . $b;
+}
+
+=head2 api_admin_bot_token
+
+POST /api/admin/bot_token  { username, token_name?, expires_in_days? (default 90, max 365) }
+
+Admin SESSION only. Mints a Bearer token owned by an existing, active, non-admin bot user
+whose roles are only developer/devops/editor. The plaintext token is in the response ONCE,
+is never logged, and only its sha256 is stored. Who minted it for whom is logged.
+
+=cut
+
+sub api_admin_bot_token :Path('admin/bot_token') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    $c->res->header('Cache-Control' => 'no-store');
+    my $admin = $self->_api_admin_session($c) or return;
+
+    unless (uc($c->req->method // '') eq 'POST') {
+        return $self->_json_error($c, 405, 'POST only', 'method_not_allowed');
+    }
+    my $data = $self->_api_json_body($c);
+
+    my $uname = $data->{username};
+    unless (defined $uname && !ref($uname) && $uname =~ /^[A-Za-z0-9_.@\-]{1,100}$/) {
+        return $self->_json_error($c, 400, 'username (an existing bot user) is required', 'validation_error');
+    }
+    my $days = defined $data->{expires_in_days} && $data->{expires_in_days} ne '' ? $data->{expires_in_days} : 90;
+    unless (!ref($days) && $days =~ /^\d+$/ && $days >= 1 && $days <= 365) {
+        return $self->_json_error($c, 400, 'expires_in_days must be a whole number from 1 to 365', 'validation_error');
+    }
+    my $tname = defined $data->{token_name} && !ref($data->{token_name}) && length $data->{token_name}
+        ? $data->{token_name} : "bot token $uname " . Comserv::Util::AppTime->today_utc_ymd;
+    $tname =~ s/[^\w .:@\-]/_/g;
+    $tname = substr($tname, 0, 100);
+
+    my $schema = $c->model('DBEncy');
+    my $user   = $schema->resultset('User')->search({ username => $uname }, { rows => 1 })->single;
+    if (my $problem = _api_bot_user_problem($user)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_admin_bot_token',
+            "Bot token REFUSED for user=" . _api_log_name($uname) . " requested by admin=$admin->{username}: $problem");
+        return $self->_json_error($c, 403, $problem, 'forbidden');
+    }
+
+    my $token = eval { _api_new_bot_token() };
+    unless (defined $token) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_admin_bot_token', 'Could not generate a random token');
+        return $self->_json_error($c, 500, 'Could not generate a secure token', 'token_generation_failed');
+    }
+    my $expires_at = Comserv::Util::AppTime->now_dt->add(days => $days);
+    my $row = eval {
+        $schema->resultset('ApiToken')->create({
+            user_id    => $user->id,
+            token_hash => sha256_hex($token),
+            token_name => $tname,
+            is_active  => 1,
+            created_at => Comserv::Util::AppTime->now_dt,
+            expires_at => $expires_at,
+        });
+    };
+    unless ($row) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_admin_bot_token', 'Token insert failed');
+        return $self->_json_error($c, 500, 'Could not store the token', 'token_store_failed');
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_admin_bot_token',
+        'Bot API token minted: token_id=' . $row->id . ' for user=' . $user->username
+        . " by admin=$admin->{username}, expires_in_days=$days, name=" . _api_log_name($tname));
+
+    $c->res->status(200);
+    $c->res->body(encode_json({
+        success    => 1,
+        message    => 'Bot token created',
+        token      => $token,
+        token_id   => $row->id + 0,
+        username   => $user->username,
+        token_name => $tname,
+        expires_at => _api_dt_str($expires_at),
+        warning    => 'Store this token in the bot\'s own secret file now. It is shown once and cannot be retrieved later.',
+    }));
+    $c->detach();
+}
+
+=head2 api_admin_bot_tokens
+
+GET /api/admin/bot_tokens[?username=...]  Admin SESSION only. Metadata only (never the token or its hash)
+for tokens owned by non-admin accounts.
+
+=cut
+
+sub api_admin_bot_tokens :Path('admin/bot_tokens') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    $c->res->header('Cache-Control' => 'no-store');
+    my $admin = $self->_api_admin_session($c) or return;
+
+    unless (uc($c->req->method // '') =~ /^(GET|HEAD)$/) {
+        return $self->_json_error($c, 405, 'GET only', 'method_not_allowed');
+    }
+    my $only = $c->req->query_parameters->{username};
+    my @rows = $c->model('DBEncy')->resultset('ApiToken')->search({}, {
+        prefetch => 'user', order_by => { -desc => 'me.id' }, rows => 500,
+    })->all;
+    my @out;
+    for my $t (@rows) {
+        my $u = eval { $t->user } or next;
+        my $roles = _api_roles_list($u->roles);
+        next if grep { $_ eq 'admin' } @$roles;
+        next if defined $only && length $only && lc($u->username // '') ne lc($only);
+        push @out, {
+            id           => $t->id + 0,
+            username     => $u->username,
+            token_name   => $t->token_name,
+            created_at   => _api_dt_str($t->created_at),
+            expires_at   => _api_dt_str($t->expires_at),
+            revoked_at   => _api_dt_str($t->revoked_at),
+            last_used_at => _api_dt_str($t->last_used_at),
+            is_active    => $t->is_active ? 1 : 0,
+            bot_eligible => _api_is_bot_user($u) ? 1 : 0,
+        };
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_admin_bot_tokens',
+        "Bot token list read by admin=$admin->{username}, rows=" . scalar(@out));
+    $c->res->status(200);
+    $c->res->body(encode_json({ success => 1, count => scalar(@out), tokens => \@out }));
     $c->detach();
 }
 
