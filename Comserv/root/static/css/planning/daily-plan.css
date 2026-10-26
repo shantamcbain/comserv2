@@ -1519,3 +1519,221 @@
     background: var(--bg-color, #fff);
 }
 .daily-index-legacy a { color: var(--link-color, #007bff); }
+
+/* ── Attention Order Panel ─────────────────────────────── */
+.attention-panel-card {
+    background-color: var(--bg-secondary, #f8f9fa);
+    border: 1px solid var(--border-color, #ddd);
+    border-left: 4px solid var(--warning-color, #e6a700);
+    border-radius: var(--radius-md, 10px);
+    margin: 18px 0 0 0;
+    overflow: hidden;
+}
+.attention-panel-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+.attention-panel-summary::-webkit-details-marker { display: none; }
+.attention-panel-summary::before {
+    content: "▶";
+    display: inline-block;
+    margin-right: 8px;
+    color: var(--text-muted-color, #888);
+    font-size: 0.75em;
+    transition: transform 0.15s ease;
+}
+.attention-panel-card[open] > .attention-panel-summary::before {
+    transform: rotate(90deg);
+}
+.attention-panel-summary h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    color: var(--text-color);
+}
+.attention-summary-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: 1;
+}
+.attention-panel-body {
+    padding: 0 18px 16px 18px;
+}
+.attention-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: var(--font-size-small, 0.82rem);
+    font-weight: 600;
+    color: #fff;
+}
+.attention-badge--branch { background-color: var(--warning-color, #e6a700); }
+.attention-badge--project { background-color: var(--info-color, #0066cc); }
+.attention-badge--stale { background-color: var(--danger-color, #c0392b); }
+
+.attention-section { margin-top: 14px; }
+.attention-section h3 {
+    margin: 0 0 8px 0;
+    font-size: 0.98rem;
+    color: var(--text-color);
+    border-bottom: 1px solid var(--border-color, #ddd);
+    padding-bottom: 5px;
+}
+.attention-hint {
+    margin: 0 0 10px 0;
+    font-size: var(--font-size-small, 0.85rem);
+    color: var(--text-muted-color, #666);
+}
+.attention-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.attention-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm, 6px);
+    background: var(--bg-color, #fff);
+    margin-bottom: 6px;
+    border: 1px solid var(--border-color, #eee);
+}
+.attention-item a {
+    color: var(--link-color, #007bff);
+    text-decoration: none;
+}
+.attention-item a:hover { text-decoration: underline; }
+.attention-name {
+    font-weight: 600;
+    color: var(--text-color);
+    min-width: 160px;
+}
+.attention-meta {
+    flex: 1 1 240px;
+    font-size: var(--font-size-small, 0.85rem);
+    color: var(--text-muted-color, #666);
+}
+.attention-reason,
+.attention-class {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: var(--font-size-small, 0.75rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #fff;
+    background-color: var(--text-muted-color, #888);
+}
+.attention-actions {
+    display: flex;
+    gap: 6px;
+}
+.attention-action {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm, 6px);
+    font-size: var(--font-size-small, 0.78rem);
+    font-weight: 600;
+    border: 1px solid transparent;
+}
+.attention-action--close {
+    background-color: var(--danger-color, #c0392b);
+    color: #fff;
+}
+.attention-action--suspend {
+    background-color: var(--warning-color, #e6a700);
+    color: #000;
+}
+.attention-action--keep {
+    background-color: var(--bg-secondary, #eee);
+    color: var(--text-color);
+    border-color: var(--border-color, #ccc);
+}
+.attention-empty,
+.attention-error {
+    padding: 10px;
+    border-radius: var(--radius-sm, 6px);
+    font-size: var(--font-size-small, 0.9rem);
+}
+.attention-empty {
+    background: var(--bg-color, #fff);
+    color: var(--text-muted-color, #666);
+    border: 1px dashed var(--border-color, #ddd);
+}
+.attention-error {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffc107;
+}
+
+/* ── Collapsible cards inside the panel ───────────────── */
+.attention-card-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+}
+.attention-card {
+    background: var(--bg-color, #fff);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: var(--radius-sm, 8px);
+    overflow: hidden;
+}
+.attention-card-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-color);
+    list-style: none;
+    user-select: none;
+}
+.attention-card-summary::-webkit-details-marker { display: none; }
+.attention-card-summary::before {
+    content: "▶";
+    display: inline-block;
+    margin-right: 8px;
+    color: var(--text-muted-color, #888);
+    font-size: 0.75em;
+    transition: transform 0.15s ease;
+}
+.attention-card[open] > .attention-card-summary::before {
+    transform: rotate(90deg);
+}
+.attention-card-title {
+    flex: 1;
+}
+.attention-card-count {
+    display: inline-block;
+    min-width: 26px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--bg-secondary, #eee);
+    color: var(--text-color);
+    font-size: var(--font-size-small, 0.82rem);
+    text-align: center;
+}
+.attention-card-body {
+    padding: 10px 14px 14px 14px;
+    border-top: 1px solid var(--border-color, #eee);
+}
+.attention-more {
+    margin: 10px 0 0 0;
+    font-size: var(--font-size-small, 0.85rem);
+}
+.attention-more a {
+    color: var(--link-color, #007bff);
+    text-decoration: none;
+}
+.attention-more a:hover { text-decoration: underline; }
