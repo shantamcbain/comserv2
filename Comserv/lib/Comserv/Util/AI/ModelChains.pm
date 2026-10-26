@@ -177,6 +177,7 @@ sub _validate_hermes {
         elsif ($t eq 'paid' && $seen_cheap) { push @e, "hermes_fallback_chain: paid step $s after a free step (paid models must come first)" }
     }
     push @e, 'hermes_fallback_chain: north-mini must be the last step' if defined $north_at && $north_at != $#$ch;
+    push @e, $class->_validate_trials($d);
     # Oct 26 2026: OPT-IN (default off) cash steps for the Super Grok daily lock. This is the ONLY place a grok
     # model on x.ai direct / OpenRouter is allowed; the chains above keep rejecting it.
     if (exists $d->{hermes_daily_lock_cash}) {
@@ -216,6 +217,60 @@ sub _validate_hermes {
         }
     }
     return @e;
+}
+
+# ---- trials (Oct 26 2026): one-off, explicitly run model trials. NEVER part of any chain or fallback. ----
+our $TRIAL_BANNED_RE = qr/grok|glm|v4-pro|relace/i;
+
+# every slug/model string used anywhere in the chains (a trial model must not appear in any of them)
+sub _chain_models_in_use {
+    my ($class, $d) = @_;
+    my %used;
+    for my $k (grep { /^chain_|^hermes_(?:fallback|emergency)_chain$/ } keys %$d) {
+        next unless ref $d->{$k} eq 'ARRAY';
+        for my $s (@{ $d->{$k} }) { next if !defined $s || ref $s; my (undef, $m) = split /\|/, $s, 2; $used{$m} = 1 if defined $m }
+    }
+    if (ref $d->{hermes_daily_lock_cash} eq 'HASH' && ref $d->{hermes_daily_lock_cash}{steps} eq 'ARRAY') {
+        for my $s (@{ $d->{hermes_daily_lock_cash}{steps} }) { next if !defined $s || ref $s; my (undef, $m) = split /\|/, $s, 2; $used{$m} = 1 if defined $m }
+    }
+    return \%used;
+}
+
+sub _validate_trials {
+    my ($class, $d) = @_;
+    return () unless exists $d->{trials};
+    return ('trials must be an object') unless ref $d->{trials} eq 'HASH';
+    my @e; my $used = $class->_chain_models_in_use($d);
+    for my $name (sort keys %{ $d->{trials} }) {
+        next if $name =~ /^_/;
+        my $t = $d->{trials}{$name};
+        if (ref $t ne 'HASH') { push @e, "trials.$name must be an object"; next }
+        my $m = $t->{model};
+        push @e, "trials.$name: $m is banned (grok / glm / deepseek v4-pro / Relace)" if defined $m && !ref $m && $m =~ $TRIAL_BANNED_RE;
+        if (!defined $m || ref $m || $m !~ m{^[a-z0-9][a-z0-9._-]*/[A-Za-z0-9._:\-]+\z}) { push @e, "trials.$name.model must be an OpenRouter id like vendor/model"; next }
+        push @e, "trials.$name: $m is in a chain/fallback; a trial model must never be a fallback" if $used->{$m};
+        push @e, "trials.$name.provider must be openrouter" unless ($t->{provider} // '') eq 'openrouter';
+        push @e, "trials.$name.selectable_by must be explicit_trial_run" unless ($t->{selectable_by} // '') eq 'explicit_trial_run';
+        for my $k (qw(hard_cap_usd alert_at_usd)) {
+            push @e, "trials.$name.$k must be a number > 0" unless defined $t->{$k} && !ref $t->{$k} && $t->{$k} =~ /^\d+(?:\.\d+)?\z/ && $t->{$k} > 0;
+        }
+        push @e, "trials.$name.max_tasks must be a whole number 1..100"
+            unless defined $t->{max_tasks} && !ref $t->{max_tasks} && $t->{max_tasks} =~ /^\d+\z/ && $t->{max_tasks} >= 1 && $t->{max_tasks} <= 100;
+        push @e, "trials.$name.alert_at_usd must be below hard_cap_usd"
+            if defined $t->{alert_at_usd} && defined $t->{hard_cap_usd} && !ref $t->{alert_at_usd} && !ref $t->{hard_cap_usd}
+               && $t->{alert_at_usd} =~ /^[\d.]+\z/ && $t->{hard_cap_usd} =~ /^[\d.]+\z/ && $t->{alert_at_usd} >= $t->{hard_cap_usd};
+    }
+    return @e;
+}
+
+# trial($loaded, $name) -> the trial's settings hash, or undef if it is missing/invalid. Trials are read only by
+# explicit trial runs (script/ai_trial.pl); no router, fallback or chain function ever looks at them.
+sub trial {
+    my ($class, $loaded, $name) = @_;
+    my $d = ref $loaded eq 'HASH' && $loaded->{data} ? $loaded->{data} : $loaded;
+    return undef unless ref $d eq 'HASH' && ref $d->{trials} eq 'HASH' && ref $d->{trials}{$name} eq 'HASH';
+    return undef if $class->_validate_trials({ %$d, trials => { $name => $d->{trials}{$name} } });
+    return { %{ $d->{trials}{$name} }, name => $name };
 }
 
 # hermes_chain($loaded) -> list of { slug, provider, model, tier } with removals applied.
