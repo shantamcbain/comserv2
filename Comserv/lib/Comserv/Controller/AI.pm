@@ -918,27 +918,31 @@ sub _grok_home {
 
 sub _grok_cli_api_key {
     my ($self, $c) = @_;
-    return $ENV{XAI_API_KEY} if $ENV{XAI_API_KEY} && $ENV{XAI_API_KEY} =~ /\S/;
+    # Oct 26 2026: DB first, config next, environment LAST (only env value that must exist is DB access).
+    my $user_id = $c->session->{user_id} || 0;
+    if ($user_id) {
+        my $db_key = try {
+            my $schema = $c->model('DBEncy')->schema;
+            my $key_obj = $schema->resultset('UserApiKeys')->search(
+                { user_id => $user_id, service => 'grok', is_active => '1' },
+                { rows => 1 }
+            )->first;
+            $key_obj ||= $schema->resultset('UserApiKeys')->search(
+                { service => 'grok', is_active => '1' },
+                { rows => 1 }
+            )->first;
+            $key_obj ? ($key_obj->get_api_key() || '') : '';
+        } catch {
+            eval { Comserv::Util::Logging->instance->log_with_details($c, 'error', __FILE__, __LINE__, '_grok_cli_api_key',
+                "DB lookup of the grok key failed, falling back to config/env: $_") };
+            '';
+        };
+        return $db_key if $db_key && $db_key =~ /\S/;
+    }
     my $cfg_key = $c->config->{grok_cli_xai_api_key} || $c->config->{xai_api_key};
     return $cfg_key if $cfg_key && $cfg_key =~ /\S/;
-
-    my $user_id = $c->session->{user_id} || 0;
-    return '' unless $user_id;
-
-    try {
-        my $schema = $c->model('DBEncy')->schema;
-        my $key_obj = $schema->resultset('UserApiKeys')->search(
-            { user_id => $user_id, service => 'grok', is_active => '1' },
-            { rows => 1 }
-        )->first;
-        $key_obj ||= $schema->resultset('UserApiKeys')->search(
-            { service => 'grok', is_active => '1' },
-            { rows => 1 }
-        )->first;
-        return $key_obj ? ($key_obj->get_api_key() || '') : '';
-    } catch {
-        return '';
-    };
+    return $ENV{XAI_API_KEY} if $ENV{XAI_API_KEY} && $ENV{XAI_API_KEY} =~ /\S/;
+    return '';
 }
 
 sub _grok_cli_auth_error {
