@@ -1887,8 +1887,10 @@ sub write_gate {
     my $new = $J->encode($want);
     my $old = '';
     if (-f $f && open(my $oh, '<', $f)) { local $/; $old = <$oh> // ''; close $oh }
+    my $old_at = eval { $J->decode($old)->{at} } // 0;
     my $old_cmp = eval { $J->encode(do { my $o = $J->decode($old); delete $o->{at}; delete $o->{at_pt}; $o }) } // '';
-    return 'unchanged' if $old_cmp eq $new;
+    # an active gate is re-stamped hourly so the hook (which ignores gates older than 6 h) keeps enforcing
+    return 'unchanged' if $old_cmp eq $new && !(@$offs && $t - $old_at > 3600);
     return 'none' if !@$offs && (!-f $f);
     my $out = { %$want, at => $t, at_pt => pt($t) };
     my $tmp = "$f.tmp";
