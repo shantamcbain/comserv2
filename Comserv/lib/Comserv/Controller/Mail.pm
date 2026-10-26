@@ -2984,6 +2984,46 @@ sub invoice_sort_item :Path('/mail/invoice/sort/item') :Args(0) {
     $c->res->redirect($c->uri_for('/mail/invoice/sort'));
 }
 
+sub invoice_sort_line :Path('/mail/invoice/sort/line') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_invoice_queue_admin($c);
+    my $p = $c->req->body_parameters;
+    require Comserv::Util::Inventory::MailInvoiceStock;
+    my $r = Comserv::Util::Inventory::MailInvoiceStock->new->update_line(
+        $c,
+        line_id     => $p->{line_id},
+        description => $p->{description},
+        quantity    => $p->{quantity},
+        unit_cost   => $p->{unit_cost},
+    );
+    if ($r->{ok}) {
+        $c->flash->{success_msg} = 'Line saved. Stock was not changed.';
+    } else {
+        $c->flash->{error_msg} = $r->{error} || 'Could not save the line.';
+    }
+    $c->res->redirect($c->uri_for('/mail/invoice/sort'));
+}
+
+sub invoice_sort_accept :Path('/mail/invoice/sort/accept') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_invoice_queue_admin($c);
+    my $p = $c->req->body_parameters;
+    require Comserv::Util::Inventory::MailInvoiceStock;
+    my $r = Comserv::Util::Inventory::MailInvoiceStock->new->accept_invoice(
+        $c,
+        invoice_id => $p->{invoice_id},
+    );
+    if ($r->{ok}) {
+        $c->flash->{success_msg} = sprintf(
+            'Accepted. Created %d item(s). Received %d line(s). Already received %d. No general ledger post.',
+            $r->{created} || 0, $r->{received} || 0, $r->{already} || 0,
+        );
+    } else {
+        $c->flash->{error_msg} = $r->{error} || 'Could not accept the invoice.';
+    }
+    $c->res->redirect($c->uri_for('/mail/invoice/sort'));
+}
+
 # ============================================================
 sub classify_invoices_cron :Private {
     my ($self, $c) = @_;

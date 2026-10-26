@@ -245,6 +245,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
             }
             if ($pid == 0) {
                 # ── Child: detach from Catalyst and run the deploy ──
+                require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
                 eval {
                     require POSIX;
                     POSIX::setsid();
@@ -480,6 +481,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     }
 
     if ($pid == 0) {
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
         # CHILD – catch ALL fatal errors and write them to the log file
         local $SIG{__DIE__} = sub {
             my $err = shift || 'unknown error';
@@ -488,14 +490,14 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
                 close $lf;
             }
             unlink $pid_file;
-            exit(1);
+            Comserv::Util::ForkSafe::child_exit(1);
         };
 
         close_std_fds();
         open(my $log, '>>', $log_file) or do {
             warn "Cannot open $log_file: $!";
             unlink $pid_file;
-            exit(1);
+            Comserv::Util::ForkSafe::child_exit(1);
         };
         $| = 1;
         select((select($log), $|=1)[0]);
@@ -535,7 +537,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
             close $lf;
         }
         unlink($pid_file);
-        exit(0);
+        Comserv::Util::ForkSafe::child_exit(0);
     }
 
     sub close_std_fds {
@@ -1051,6 +1053,7 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
     }
 
     if ($pid == 0) {
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
         # CHILD — run the deploy asynchronously
         local $SIG{__DIE__} = sub {
             my $err = shift || 'unknown error';
@@ -1059,14 +1062,14 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
                 close $lf;
             }
             unlink $pid_file;
-            exit(1);
+            Comserv::Util::ForkSafe::child_exit(1);
         };
 
         close_std_fds();
         open(my $log, '>>', $log_file) or do {
             warn "Cannot open $log_file: $!";
             unlink $pid_file;
-            exit(1);
+            Comserv::Util::ForkSafe::child_exit(1);
         };
         $| = 1;
         select((select($log), $|=1)[0]);
@@ -1098,7 +1101,7 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
             $log->flush();
             close($log);
             unlink($pid_file);
-            exit(1);
+            Comserv::Util::ForkSafe::child_exit(1);
         }
 
         # Delegate to the SINGLE canonical pipeline (deploy.sh --deploy-to-node)
@@ -1161,7 +1164,7 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
             close $lf;
         }
         unlink($pid_file);
-        exit($rc ? 1 : 0);
+        Comserv::Util::ForkSafe::child_exit($rc ? 1 : 0);
     }
 
     # PARENT
@@ -1835,7 +1838,7 @@ sub _flow_exec {    # list-form exec: no shell, no interpolation of user input
     my ($self, @cmd) = @_;
     my $pid = open(my $fh, '-|');
     return ("could not fork: $!", 255) unless defined $pid;
-    if (!$pid) { open STDERR, '>&', \*STDOUT; exec @cmd; exit 127 }
+    if (!$pid) { require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare(); open STDERR, '>&', \*STDOUT; exec @cmd; Comserv::Util::ForkSafe::child_exit(127) }
     local $/; my $out = <$fh> // ''; close $fh;
     my $rc = $? >> 8;
     # Script output is UTF-8 bytes; decode so encode_json does not double-encode (mojibake arrows).
@@ -1897,7 +1900,7 @@ sub deploy_flow_run :Path('/admin/docker/flow/run') :Args(0) {
     my $pid = fork();
     if (!defined $pid) { return $self->_flow_bad($c, "fork failed: $!") }
     if (!$pid) {
-        require POSIX; POSIX::setsid();
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare(); require POSIX; POSIX::setsid();
         open STDIN, '<', '/dev/null'; open STDOUT, '>>', $log; open STDERR, '>&', \*STDOUT;
         $| = 1;
         print "\n[" . _pt_now() . "] deploy-flow: @cmd[1..$#cmd] (by " . ($c->session->{username} // '?') . ")\n";

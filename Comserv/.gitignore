@@ -81,3 +81,6 @@ Comserv/root/data/
 /data/ai_hermes_overrun*.json
 /root/static/ai/*usage*.json*
 /root/static/ai/*monitor*.json*
+
+# Cloudflare cache-rule exports (zone rulesets saved before apply/undo). Never commit.
+/data/cloudflare_exports/

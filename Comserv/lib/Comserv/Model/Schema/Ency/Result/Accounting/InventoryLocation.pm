@@ -109,8 +109,6 @@ __PACKAGE__->add_columns(
 
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint('sitename_name_unique', ['sitename', 'name']);
-__PACKAGE__->add_unique_constraint('idx_parent_location_id', ['parent_location_id']);
-__PACKAGE__->add_unique_constraint('idx_is_storage_box', ['is_storage_box']);
 
 __PACKAGE__->has_many(
     'stock_levels' => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryStockLevel',
@@ -129,12 +127,6 @@ __PACKAGE__->has_many(
     { 'foreign.parent_location_id' => 'self.id' },
     { cascade_delete => 0 }
 );
-
-# Custom methods for storage box operations
-sub is_storage_box {
-    my ($self) = @_;
-    return $self->is_storage_box;
-}
 
 sub get_parent_location {
     my ($self) = @_;
@@ -173,4 +165,3 @@ sub get_box_analysis {
 }
 
 1;
-

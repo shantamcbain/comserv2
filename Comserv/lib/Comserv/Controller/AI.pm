@@ -1066,7 +1066,9 @@ sub _run_grok_cli {
             return ('', "fork failed: $!", -1);
         }
         if ($pid == 0) {
-            $run_in_child->();
+            require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+            eval { $run_in_child->() };
+            Comserv::Util::ForkSafe::child_exit(127);
         }
         waitpid($pid, 0);
         $exit = $? >> 8;
@@ -2008,9 +2010,12 @@ sub generate :Local :Args(0) {
                     my $ping_payload = encode_json({ model => $use_model, keep_alive => '2h' });
                     my $ping_pid = fork();
                     if (defined $ping_pid && $ping_pid == 0) {
+                        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+                        eval {
                         my $child_ua = LWP::UserAgent->new(timeout => 15);
                         $child_ua->post($ping_url, 'Content-Type' => 'application/json', Content => $ping_payload);
-                        exit 0;
+                        };
+                        Comserv::Util::ForkSafe::child_exit(0);
                     }
                     push @trace, "🔁 keep_alive renewal dispatched async for '$use_model'";
                 }
@@ -3718,9 +3723,12 @@ sub chat :Local :Args(0) {
                     my $chat_ping_payload = encode_json({ model => $chat_use_model, keep_alive => '2h' });
                     my $chat_ping_pid = fork();
                     if (defined $chat_ping_pid && $chat_ping_pid == 0) {
+                        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+                        eval {
                         my $child_ua = LWP::UserAgent->new(timeout => 15);
                         $child_ua->post($chat_ping_url, 'Content-Type' => 'application/json', Content => $chat_ping_payload);
-                        exit 0;
+                        };
+                        Comserv::Util::ForkSafe::child_exit(0);
                     }
                     push @chat_trace, "🔁 keep_alive renewal dispatched async for '$chat_use_model'";
                 }
@@ -8868,9 +8876,12 @@ sub preload_model :Local :Args(0) {
                 my $payload = encode_json({ model => $model, keep_alive => '2h' });
                 my $pid = fork();
                 if (defined $pid && $pid == 0) {
+                    require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+                    eval {
                     my $child_ua = LWP::UserAgent->new(timeout => 180);
                     $child_ua->post($url, 'Content-Type' => 'application/json', Content => $payload);
-                    exit 0;
+                    };
+                    Comserv::Util::ForkSafe::child_exit(0);
                 }
                 $preload_msg = "loading:$model";
             }
@@ -12735,8 +12746,11 @@ PYSCRIPT
     }
 
     if ($child == 0) {
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
         my $grandchild = fork();
         if (defined $grandchild && $grandchild == 0) {
+            require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+            eval {
             POSIX::setsid();
             open(STDIN,  '<', '/dev/null');
             open(STDOUT, '>', '/dev/null');
@@ -12835,6 +12849,8 @@ PYSCRIPT
             close $sf;
 
             POSIX::_exit(0);
+            };
+            POSIX::_exit(1);
         }
         POSIX::_exit(0);
     }
