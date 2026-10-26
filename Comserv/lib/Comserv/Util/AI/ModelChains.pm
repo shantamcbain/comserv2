@@ -45,6 +45,20 @@ our %KNOB_DEFAULTS = (
     supergrok_locked_coding_model  => 'openrouter|cohere/north-mini-code:free',  # was deepseek-v4-pro until 2026-10-15
 );
 
+# Hermes fallback chain (2026-10-26, Shanta): when Super Grok is unavailable go to a good PAID coder
+# (within the OpenRouter caps) and only then to free north-mini, which is always the LAST step
+# (it is easily overwhelmed when it suddenly replaces a smarter model). The emergency list is used
+# only when every step of the chain is unusable. Both live in data/ai_model_chains.json.
+our @HERMES_CHAIN_DEFAULT     = ('supergrok|grok-4.7', 'openrouter|qwen/qwen3-coder', 'openrouter|cohere/north-mini-code:free');
+our @HERMES_EMERGENCY_DEFAULT = ('ollama|gemma4-64k:latest', 'openrouter|nvidia/nemotron-3.5-lightning:free');
+our $HERMES_NORTH_RE          = qr/north-mini-code/i;
+our $HERMES_BANNED_RE         = qr/grok|glm|v4-pro/i;     # never as an openrouter step (grok only via Super Grok)
+# Cash caps per billing channel. supergrok is a quota, not cash, so it has no entry.
+our %CHANNEL_CAPS_DEFAULT = (
+    openrouter => { day => 1.65, week => 11.50, month => 50 },
+    xai_direct => { day => 0,    week => 0,     month => 0  },   # x.ai API key: off until Shanta sets a number
+);
+
 my %CACHE;   # path => { mtime, size, data, source, errors }
 my %LOGGED;  # "path|reason" => 1 — log the Perl-default fallback once per state
 
@@ -74,6 +88,9 @@ sub perl_default {
         model_caps_usd_per_day => {},
         chain_caps_usd_per_day => {},
         tokens_unreported_providers => ['ollama'],
+        hermes_fallback_chain  => [ @HERMES_CHAIN_DEFAULT ],
+        hermes_emergency_chain => [ @HERMES_EMERGENCY_DEFAULT ],
+        channel_caps_usd       => { map { $_ => { %{ $CHANNEL_CAPS_DEFAULT{$_} } } } keys %CHANNEL_CAPS_DEFAULT },
         %KNOB_DEFAULTS,
     };
 }
@@ -110,12 +127,90 @@ sub validate_structure {
             push @e, "$k.$ck must be a number >= 0" unless defined $n && !ref $n && $n =~ /^\d+(?:\.\d+)?$/;
         }
     }
+    push @e, $class->_validate_hermes($d);
     for my $k (keys %KNOB_DEFAULTS) {
         next unless exists $d->{$k};
         my $n = $d->{$k};
+        if ($k eq 'supergrok_locked_coding_model') {   # a slug (or '' = off), not a number; perl_default used to fail validation on it
+            push @e, "$k: bad slug $n" unless defined $n && !ref $n && ($n eq '' || $n =~ $SLUG_RE);
+            next;
+        }
         push @e, "$k must be a number" unless defined $n && !ref $n && $n =~ /^\d+(?:\.\d+)?$/;
     }
     return (@e ? 0 : 1, \@e);
+}
+
+# tier of a provider|model slug: supergrok | paid | free | local
+sub slug_tier {
+    my ($class, $slug) = @_;
+    my ($p, $m) = split /\|/, ($slug // ''), 2;
+    return 'unknown' unless defined $p && defined $m;
+    return 'supergrok' if $p =~ /^(?:supergrok|grok)$/;
+    return 'local'     if $p eq 'ollama';
+    return ($m =~ /:free\z/ ? 'free' : 'paid') if $p eq 'openrouter';
+    return 'paid';
+}
+
+sub _validate_hermes {
+    my ($class, $d) = @_;
+    my @e;
+    for my $k (qw(hermes_fallback_chain hermes_emergency_chain)) {
+        next unless exists $d->{$k};
+        my $v = $d->{$k};
+        unless (ref $v eq 'ARRAY' && @$v) { push @e, "$k must be a non-empty list"; next }
+        my %seen;
+        for my $s (@$v) {
+            if (!defined $s || ref $s || $s !~ $SLUG_RE) { push @e, "$k: bad slug " . (defined $s && !ref $s ? $s : '(non-string)'); next }
+            push @e, "$k: duplicate slug $s" if $seen{$s}++;
+            my ($p, $m) = split /\|/, $s, 2;
+            push @e, "$k: $s is banned on openrouter (grok only through Super Grok; no glm / v4-pro)"
+                if $p eq 'openrouter' && $m =~ $HERMES_BANNED_RE;
+        }
+    }
+    my $ch = ref $d->{hermes_fallback_chain} eq 'ARRAY' ? $d->{hermes_fallback_chain} : [];
+    my ($seen_cheap, $north_at);
+    for my $i (0 .. $#$ch) {
+        my $s = $ch->[$i] // next;
+        my $t = $class->slug_tier($s);
+        $north_at = $i if $s =~ $HERMES_NORTH_RE;
+        if ($t eq 'free' || $t eq 'local') { $seen_cheap = 1 }
+        elsif ($t eq 'paid' && $seen_cheap) { push @e, "hermes_fallback_chain: paid step $s after a free step (paid models must come first)" }
+    }
+    push @e, 'hermes_fallback_chain: north-mini must be the last step' if defined $north_at && $north_at != $#$ch;
+    if (exists $d->{channel_caps_usd}) {
+        if (ref $d->{channel_caps_usd} ne 'HASH') { push @e, 'channel_caps_usd must be an object' }
+        else {
+            for my $ch2 (keys %{ $d->{channel_caps_usd} }) {
+                my $h = $d->{channel_caps_usd}{$ch2};
+                if (ref $h ne 'HASH') { push @e, "channel_caps_usd.$ch2 must be an object"; next }
+                for my $w (keys %$h) {
+                    push @e, "channel_caps_usd.$ch2.$w must be a number >= 0"
+                        unless defined $h->{$w} && !ref $h->{$w} && $h->{$w} =~ /^\d+(?:\.\d+)?$/;
+                }
+            }
+        }
+    }
+    return @e;
+}
+
+# hermes_chain($loaded) -> list of { slug, provider, model, tier } with removals applied.
+sub hermes_chain {
+    my ($class, $loaded, %o) = @_;
+    my $d = ref $loaded eq 'HASH' && $loaded->{data} ? $loaded->{data} : $loaded;
+    my $key = $o{emergency} ? 'hermes_emergency_chain' : 'hermes_fallback_chain';
+    my %rm = map { $_ => 1 } @{ $d->{removed} || [] };
+    my @src = @{ $d->{$key} || [ $o{emergency} ? @HERMES_EMERGENCY_DEFAULT : @HERMES_CHAIN_DEFAULT ] };
+    return map { my ($p, $m) = split /\|/, $_, 2; { slug => $_, provider => $p, model => $m, tier => $class->slug_tier($_) } }
+           grep { !$rm{$_} } @src;
+}
+
+# channel_caps($loaded, 'openrouter') -> { day, week, month }
+sub channel_caps {
+    my ($class, $loaded, $channel) = @_;
+    my $d = ref $loaded eq 'HASH' && $loaded->{data} ? $loaded->{data} : $loaded;
+    my %dflt = %{ $CHANNEL_CAPS_DEFAULT{$channel} || {} };
+    my $f = ref $d->{channel_caps_usd} eq 'HASH' && ref $d->{channel_caps_usd}{$channel} eq 'HASH' ? $d->{channel_caps_usd}{$channel} : {};
+    return { %dflt, %$f };
 }
 
 # load($c, %o) -> { data => {...}, source => 'file'|'perl_default', path, errors => [] }
