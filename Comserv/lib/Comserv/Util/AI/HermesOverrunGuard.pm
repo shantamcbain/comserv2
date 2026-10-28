@@ -1068,11 +1068,13 @@ sub thrash_count {
         my $dbh = DBI->connect("dbi:SQLite:dbname=$self->{state_db}", '', '',
             { RaiseError => 1, PrintError => 0, sqlite_open_flags => 1 }); # SQLITE_OPEN_READONLY
         my $since = $self->_now - $THRASH_WINDOW;
+        my @tm = sort keys %{ $self->{trial_models} || {} };   # Oct 26: active approved trial models are not thrash
+        my $not_trial = @tm ? ' AND COALESCE(s.model, \'\') NOT IN (' . join(',', ('?') x @tm) . ')' : '';
         my ($c) = $dbh->selectrow_array(
             q{SELECT COUNT(*) FROM messages m LEFT JOIN sessions s ON s.id = m.session_id
               WHERE m.role = 'assistant' AND m.timestamp > ?
                 AND COALESCE(s.billing_provider, '') NOT IN ('xai-oauth', 'xai', 'supergrok')
-                AND COALESCE(s.model, '') NOT LIKE 'grok-%'}, undef, $since);
+                AND COALESCE(s.model, '') NOT LIKE 'grok-%'} . $not_trial, undef, $since, @tm);
         $dbh->disconnect;
         $c;
     };
@@ -1093,6 +1095,8 @@ sub thrash_by_class {
     my $total = 0;
     for my $c (@$calls) {
         next unless defined $c->{t} && $c->{t} > $since && $c->{t} <= $now;
+        # Oct 26 2026: an ACTIVE approved trial model (see trial_exclusions; stopped trials count again) is not thrash
+        next if $self->{trial_models} && $self->{trial_models}{ $c->{model} // '' };
         my $cl = classify_call($c);
         $counts{$cl}++;
         $total++;
