@@ -48,6 +48,17 @@ sub _logging {
     return Comserv::Util::Logging->instance;
 }
 
+=head2 new
+
+Simple constructor so the module can be used as an object or via class methods.
+
+=cut
+
+sub new {
+    my ($class) = @_;
+    return bless {}, $class;
+}
+
 =head2 _worktree_config
 
 Read root/config/worktrees.json once, with mtime-based revalidation.
@@ -244,6 +255,12 @@ sub branch_attention {
 
         push @out, $row;
     }
+
+    @out = sort {
+        $b->{behind_main} <=> $a->{behind_main}
+        ||
+        ($a->{last_commit} || '9999-99-99') cmp ($b->{last_commit} || '9999-99-99')
+    } @out;
 
     return \@out;
 }

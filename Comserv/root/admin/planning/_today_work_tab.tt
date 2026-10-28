@@ -121,6 +121,9 @@
                 </div>
             </details>
 
+            [%# ── Attention Order (branches / projects / stale review) ── %]
+            [% INCLUDE 'admin/planning/_attention_panel.tt' %]
+
             [%# ── TODAY'S FOCUS QUEUE (top 20 actionable todos) ── %]
             <div class="mb-24">
                 <div class="FocusHeader">

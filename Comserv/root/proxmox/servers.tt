@@ -1,5 +1,5 @@
 [% META title = 'Proxmox Server Management' %]
-[% PageVersion = 'proxmox/servers.tt,v 1.0.0 2025/03/25 AI_Assistant Exp' %]
+[% PageVersion = 'proxmox/servers.tt,v 1.0.1 2026/10/25 shanta Exp shanta ' %]
 
 [% IF debug_mode == 1 %]
     [% PageVersion %]
@@ -66,8 +66,8 @@
                                         <td>
                                             <div class="btn-group btn-group-sm">
                                                 <a href="[% c.uri_for('/proxmox_servers/edit', server.id) %]" class="btn btn-primary">Edit</a>
-                                                <a href="#" class="btn btn-info" onclick="testConnection('[% server.id %]'); return false;">Test Connection</a>
-                                                <a href="[% c.uri_for('/proxmox_servers/test', server.id) %]" class="btn btn-secondary" target="_blank">Direct Test</a>
+                                                <a href="[% c.uri_for('/proxmox_servers/test', server.id) %]" class="btn btn-info" onclick="return testConnection('[% server.id %]');">Test Connection</a>
+                                                <a href="[% c.uri_for('/proxmox_servers/test', server.id) %]" class="btn btn-secondary">Direct Test</a>
                                                 <a href="[% c.uri_for('/proxmox', server.id) %]" class="btn btn-success">Manage VMs</a>
                                                 <a href="#" class="btn btn-danger" onclick="confirmDelete('[% server.id %]'); return false;">Delete</a>
                                             </div>
@@ -172,6 +172,9 @@
 <script>
     function testConnection(serverId) {
         console.log("Starting connection test for server ID: " + serverId);
+        if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+            return true;
+        }
 
         // Show the modal
         var modal = new bootstrap.Modal(document.getElementById('connectionTestModal'));
@@ -420,6 +423,7 @@
                     '</div>' +
                     errorLog;
             });
+        return false;
     }
 
     function confirmDelete(serverId) {

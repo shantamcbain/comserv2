@@ -91,7 +91,7 @@
     <input type="radio" name="payment_method" value="points"> Pay with Points (Balance: [% points_bal %] pts)
   </label>
   [% ELSE %]
-  <p style="font-size:var(--font-size-small);color:var(--text-muted-color)"><em><a href="/user/login" style="color:var(--primary-color)">Log in</a> to pay with points.</em></p>
+  <p style="font-size:var(--font-size-small);color:var(--text-muted-color)"><em><a href="/user/login?return_to=[% c.req.uri.path_query | uri %]" style="color:var(--primary-color)">Log in</a> to pay with points.</em></p>
   [% END %]
 </div>
 
