@@ -137,7 +137,8 @@
         .then(function (r) { return r.json(); })
         .then(function (data) {
             if (data.success) {
-                setStatus('Merged ' + branch + ' into main. Remember to Push GitHub.');
+                var extra = data.catch_up_summary ? ('\n' + data.catch_up_summary) : '';
+                setStatus('Merged ' + branch + ' into main.' + extra + ' Remember to Push GitHub.');
                 populateBranches();
             } else if (data.conflict) {
                 setStatus('CONFLICT: ' + (data.error || ''), true);
