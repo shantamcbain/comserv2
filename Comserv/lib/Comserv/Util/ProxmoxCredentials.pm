@@ -210,6 +210,11 @@ sub get_credentials {
         my $server_creds = $credentials->{$server_id};
         _strip_token_fields($server_creds);
         $server_creds->{token_value} = _load_token($server_id);
+        unless ($server_creds->{host}) {
+            my $url = $server_creds->{api_url_base} || '';
+            $server_creds->{host} = $1 if $url =~ m{https?://([^:/]+)};
+        }
+        $server_creds->{name} ||= $server_id;
 
         return $server_creds;
     }
