@@ -4,13 +4,13 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "plans"
-   page_version = "0.03"
-   last_updated = "Wed Sep 23 2026"
+   page_version = "0.04"
+   last_updated = "2026-10-21"
    site_specific = "false"
    project_id = "296"
    project_code = "HEALTHKITCHEN"
 %]
-[% PageVersion = 'Documentation/HealthKitchenPlan.tt,v 0.03 2026/09/23 hermes-agent Exp shanta ' %]
+[% PageVersion = 'Documentation/HealthKitchenPlan.tt,v 0.04 2026/10/21 hermes-agent Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -40,6 +40,7 @@
                 <a href="#first-drink" class="doc-navlink">First drink</a>
                 <a href="#schema" class="doc-navlink">Schema</a>
                 <a href="#safety" class="doc-navlink">Safety</a>
+                <a href="#chart" class="doc-navlink">Chart</a>
                 <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
                 <a href="#decisions" class="doc-navlink">Decisions</a>
                 <a href="#see-also" class="doc-navlink">See Also</a>
@@ -51,7 +52,7 @@
     <div class="row">
         <div class="col-100">
             <h1 class="doc-h1">Health Kitchen Plan</h1>
-            <p class="doc-muted">Last Updated | Version 0.02 | Status: DECISIONS LOCKED — tracking live on #296</p>
+            <p class="doc-muted">Last Updated | Version 0.04 | Status: planner match verified; chart form tracked</p>
             <p class="doc-body">
                 Working checklist (not served by Documentation):
                 <code class="doc-code">.hermes/plans/2026-09-23_100015-health-kitchen.md</code>
@@ -65,12 +66,15 @@
             <h2 id="now" class="doc-h2">Now</h2>
             <div class="doc-info">
                 <ul class="doc-body">
-                    <li><strong>Current.</strong> D1–D5 decided. Project
-                        <a href="[% c.uri_for('/project/details') %]?project_id=296" class="doc-link">#296 HEALTHKITCHEN</a>
-                        is live under #227. No Health Kitchen routes or tables yet.</li>
-                    <li><strong>Blocked by.</strong> Nothing on decisions. Next work is HK-ENABLE.0 ROLE EVAL
-                        <a href="[% c.uri_for('/todo/details') %]?record_id=2450" class="doc-link">todo #2450</a>.</li>
-                    <li><strong>Next.</strong> Start #2450, then catalog key + member self-serve grant.</li>
+                    <li><strong>Current.</strong> Enablement, pantry, and symptoms are done. Deterministic match
+                        <a href="[% c.uri_for('/todo/details') %]?record_id=2467" class="doc-link">todo #2467</a>
+                        is done (in pantry only, no LLM). Chart form is specified, not built.</li>
+                    <li><strong>Blocked by.</strong> Planner Result classes
+                        <a href="[% c.uri_for('/todo/details') %]?record_id=2466" class="doc-link">#2466</a>
+                        still need schema-compare. No animal or insect symptom-link source exists, so the matcher does not invent one.</li>
+                    <li><strong>Next.</strong> Chart form
+                        <a href="[% c.uri_for('/todo/details') %]?record_id=2596" class="doc-link">todo #2596</a>
+                        — standard history for the member, and for a practitioner only after that patient grants access.</li>
                     <li><strong>Do not confuse.</strong>
                         <a href="[% c.uri_for('/project/details') %]?project_id=199" class="doc-link">#199 HEALTH-PLAN</a>
                         is server/application monitoring, not human health.</li>
@@ -334,8 +338,8 @@ ENCY editors still own herb/formula truth; AI only stages suggestions.</pre></di
 
     <div class="row">
         <div class="col-100">
-            <h2 id="schema" class="doc-h2">7. Proposed Result classes (schema branch creates tables)</h2>
-            <p class="doc-body">Source of truth = Result files on ency; DDL only via in-app schema-compare on schema. Never hand SQL.</p>
+            <h2 id="schema" class="doc-h2">7. Result classes</h2>
+            <p class="doc-body">Source of truth = Result files on the ency schema. Tables are created from those files through schema-compare, on this branch, into the ency database. Never hand SQL. <code class="doc-code">MealPlan</code> is the inventory meal plan, not the generated health plan.</p>
             <table class="doc-table">
                 <tr>
                     <th class="doc-th">Class / table</th>
@@ -354,15 +358,15 @@ ENCY editors still own herb/formula truth; AI only stages suggestions.</pre></di
                     <td class="doc-td">user_id, symptom_id, severity, status active/resolved, started_at</td>
                 </tr>
                 <tr class="doc-tr-alt">
-                    <td class="doc-td"><code class="doc-code">UserHealthPlan</code></td>
+                    <td class="doc-td"><code class="doc-code">UserHealthPlan</code> — <code class="doc-code">hk_user_health_plan</code>, in ency</td>
                     <td class="doc-td">generated plan header, source (util/ai), trust summary, JSON body</td>
                 </tr>
                 <tr>
-                    <td class="doc-td"><code class="doc-code">UserMealSlot</code></td>
+                    <td class="doc-td"><code class="doc-code">UserMealSlot</code> — <code class="doc-code">hk_user_meal_slot</code>, in ency</td>
                     <td class="doc-td">plan_id, date, slot (breakfast/lunch/dinner/tea), formula_id or free text, inventory ids used</td>
                 </tr>
                 <tr class="doc-tr-alt">
-                    <td class="doc-td"><code class="doc-code">UserHealthActivity</code></td>
+                    <td class="doc-td"><code class="doc-code">UserHealthActivity</code> — <code class="doc-code">hk_user_health_activity</code>, in ency</td>
                     <td class="doc-td">plan_id, date, activity text, done flag</td>
                 </tr>
                 <tr>
@@ -391,7 +395,26 @@ ENCY editors still own herb/formula truth; AI only stages suggestions.</pre></di
 
     <div class="row">
         <div class="col-100">
-            <h2 id="project-tracking" class="doc-h2">9. Project Tracking</h2>
+            <h2 id="chart" class="doc-h2">9. Chart form (member and practitioner)</h2>
+            <p class="doc-body">Tracked as
+                <a href="[% c.uri_for('/todo/details') %]?record_id=2596" class="doc-link">todo #2596</a>.
+                Not built yet. The flat opt-in history list is not this form.</p>
+            <p class="doc-body">A member fills a standard new-patient chart: chief complaint, history of present illness, past medical history, past surgical or procedure history, medications, allergies, family history, social history, and review of systems. A practitioner adds a SOAP note (subjective, objective, assessment, plan) only for a patient who granted them access. The note is the practitioner's documentation. The application does not diagnose and never suggests stopping a prescribed drug.</p>
+            <ul class="doc-body">
+                <li>The patient is the subject. A practitioner sees that patient only after an explicit care-relationship grant. Revoke ends access.</li>
+                <li>Every practitioner read and write is audited. Chart text stays encrypted in the healthkitchen namespace. Private by default.</li>
+                <li><code class="doc-code">site_admin</code> visibility is not the practitioner path. That would expose every patient on the site.</li>
+                <li>The wellness matcher may use a row only when the patient left use-for-matching on. One patient's chart never enters another user's pantry match.</li>
+                <li>New tables, if the existing history rows cannot hold a care relationship, are created on the schema branch via schema-compare. No hand DDL.</li>
+            </ul>
+            <p class="doc-body"><strong>GATE:</strong> a second user cannot read the chart; after grant, practitioner P can add a SOAP note; after revoke, P cannot read it; an audit row exists for that read.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" class="doc-h2">10. Project Tracking</h2>
             <div class="doc-success">
                 <p class="doc-body">
                     Owning project:
@@ -429,13 +452,18 @@ ENCY editors still own herb/formula truth; AI only stages suggestions.</pre></di
                 </tr>
                 <tr class="doc-tr-alt">
                     <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=300" class="doc-link">#300 HK-PLANNER</a></td>
-                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2467" class="doc-link">#2467</a> Util; <a href="[% c.uri_for('/todo/details') %]?record_id=2468" class="doc-link">#2468</a> AI</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2467" class="doc-link">#2467</a> Util done; <a href="[% c.uri_for('/todo/details') %]?record_id=2468" class="doc-link">#2468</a> AI</td>
                     <td class="doc-td">Menu ⊆ pantry; no meds that interfere with health</td>
                 </tr>
                 <tr>
                     <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=301" class="doc-link">#301 HK-KNOWLEDGE</a></td>
                     <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2472" class="doc-link">#2472</a></td>
                     <td class="doc-td">Search does not mutate herb/animal/insect truth</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Chart form</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2596" class="doc-link">todo #2596</a></td>
+                    <td class="doc-td">Member chart private; practitioner only after grant; revoke ends access; read audited</td>
                 </tr>
                 <tr class="doc-tr-alt">
                     <td class="doc-td">ROUTINE re-audit (RULE P2)</td>
@@ -449,7 +477,7 @@ ENCY editors still own herb/formula truth; AI only stages suggestions.</pre></di
 
     <div class="row">
         <div class="col-100">
-            <h2 id="decisions" class="doc-h2">10. Decisions</h2>
+            <h2 id="decisions" class="doc-h2">11. Decisions</h2>
             <p class="doc-body">Locked 2026-09-23 from the user’s answers. Cost of each choice is named.</p>
             <table class="doc-table">
                 <tr>
@@ -487,6 +515,11 @@ ENCY editors still own herb/formula truth; AI only stages suggestions.</pre></di
                     <td class="doc-td">Accounting optional</td>
                     <td class="doc-td">DECIDED 2026-09-23 — Health Kitchen does not require the accounting package. Member-only: personal pantry + Health Kitchen need-buy list. Site with inventory enabled (Shanta test): Mark recipe as made deducts inventory_items (transaction_type use) so the inventory short list can reorder. Mail invoice classifier stays on InventoryAccounting and is never shown to pantry-only users. Reuse ency_recipe / ency_recipe_line (food_recipe), do not add a second recipe table.</td>
                 </tr>
+                <tr>
+                    <td class="doc-td">D7</td>
+                    <td class="doc-td">Chart access</td>
+                    <td class="doc-td">DECIDED 2026-10-21 — a standard history chart for the member, and for a practitioner only after that patient grants a care relationship. Revoke ends access. Encrypted, audited, private by default. site_admin is not the practitioner path. Cost: a grant table if history rows cannot express the relationship; schema-compare on the schema branch, not hand DDL. The app still does not diagnose.</td>
+                </tr>
             </table>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
@@ -495,7 +528,7 @@ ENCY editors still own herb/formula truth; AI only stages suggestions.</pre></di
     <div class="row">
         <div class="col-100">
             <div id="see-also" class="doc-success">
-                <h2 class="doc-h3">11. See Also</h2>
+                <h2 class="doc-h3">12. See Also</h2>
                 <ul class="doc-body">
                     <li><a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">MASTER_PLAN</a> — coordinator (index link to raise on Documentation branch)</li>
                     <li><a href="[% c.uri_for('/Documentation/PlanningLanguageStandard') %]" class="doc-link">Planning Language Standard</a></li>
@@ -516,4 +549,4 @@ ENCY editors still own herb/formula truth; AI only stages suggestions.</pre></di
         </div>
     </div>
 </div>
-[%# ai-plan-sync created todo_ids: 2450,2451,2452,2453,2454,2455,2456,2457,2458,2459,2460,2461,2462,2463,2464,2465,2466,2467,2468,2469,2470,2471,2472,2473,2474,2475 under project_id=296 %]
+[%# ai-plan-sync created todo_ids: 2450,2451,2452,2453,2454,2455,2456,2457,2458,2459,2460,2461,2462,2463,2464,2465,2466,2467,2468,2469,2470,2471,2472,2473,2474,2475,2596 under project_id=296 %]
