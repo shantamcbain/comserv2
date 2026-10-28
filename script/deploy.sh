@@ -3,6 +3,8 @@ set -e
 
 # Ensure standard system bin paths are included in PATH (critical for non-interactive SSH)
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+# Show every local time in Pacific (PDT/PST); ISO build stamps stay UTC (date -u).
+export TZ="${DEPLOY_TZ:-America/Vancouver}"
 
 # ── Sync changed host/cron scripts to the host (FIRST, before any build/pull) ──
 # The container carries the app code, but host-side cron scripts (hardware_monitor.pl)
@@ -145,6 +147,20 @@ case "${1:-}" in
     --push-only|push-only)
         DEPLOY_MODE_DETECTED="push-only"
         ;;
+    --run-image|run-image)
+        DEPLOY_MODE_DETECTED="run-image"
+        ;;
+    --local-test|local-test)
+        # Build on the workstation and run it ONLY as comserv2-web-test on :4000
+        # (tag <commit-time> + :test, never :latest, never pushed). :5000 untouched.
+        exec "$(dirname "$(readlink -f "$0")")/deploy-flow.sh" local-test "${@:2}"
+        ;;
+    --flow|flow)
+        # Image-first deploy flow (preview by default). Dispatched HERE, before any
+        # top-level side effects below (artifact sync, git checks, secrets setup),
+        # so a preview never touches anything.
+        exec "$(dirname "$(readlink -f "$0")")/deploy-flow.sh" "${@:2}"
+        ;;
 esac
 
 # If a mode flag was passed, export it so the rest of the script can see it
@@ -195,6 +211,15 @@ fi
 PROD_UP_SERVICES="web-prod"
 [ -z "$COMPOSE_FILE" ] && COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.prod.yml"
 IMAGE="shantamcsbain/comserv-web-prod:latest"
+# deploy-flow.sh passes a fixed tag (commit-time) so the SAME image is run/pulled
+# everywhere. Only this repository is accepted.
+if [ -n "${DEPLOY_IMAGE:-}" ]; then
+    case "$DEPLOY_IMAGE" in
+        shantamcsbain/comserv-web-prod:[A-Za-z0-9]*) IMAGE="$DEPLOY_IMAGE" ;;
+        *) echo "❌ DEPLOY_IMAGE must be shantamcsbain/comserv-web-prod:<tag>"; exit 1 ;;
+    esac
+    IMAGE="${IMAGE//[^A-Za-z0-9._:\/-]/}"
+fi
 # Standard container name is "comserv2-web-prod" (matches comserv2-config-db,
 # comserv2-redis, etc.). A legacy container may still exist under the old name
 # "comserv-web-prod" — detect it so the monitor/deploy manages it instead of
@@ -643,20 +668,12 @@ sync_host_app_lib() {
 if [ -n "${DEPLOY_MODE:-}" ]; then
     case "$DEPLOY_MODE" in
         "prod")
-            echo "=== PRODUCTION DEPLOY MODE ==="
-            echo "Full production deploy: clean build + push + pull + deploy"
-            # Route through the SINGLE canonical pipeline so every entry point
-            # produces the identical result (build -> push -> pull -> run --no-build).
-            # "prod" mode means production — default the target to prod1
-            # (192.168.1.126). This must BUILD+PUSH on the workstation first,
-            # then pull+run on prod (never build on prod itself). Route through
-            # canonical_deploy_to_nodes so the build happens locally and the
-            # remote node only pulls the pushed digest.
-            canonical_deploy_to_nodes "${PROD_TARGET_HOST:-192.168.1.126}"
-            exit $?
+            # canonical_deploy_to_nodes is defined further down. Calling it
+            # here is "command not found" (exit 127) and the deploy never
+            # starts. Late dispatch after the function definition runs it.
             ;;
 
-        "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild"|"push-only")
+        "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild"|"push-only"|"run-image")
             # Functions are defined below; late dispatch after canonical_deploy*.
             ;;
 
@@ -791,7 +808,7 @@ is_production_host() {
     local hn ip
     hn=$(hostname 2>/dev/null || true)
     ip=$(hostname -I 2>/dev/null || true)
-    echo "$hn $ip" | grep -Eqi 'comservproduction1|192\.168\.1\.126'
+    echo "$hn $ip" | grep -Eqi 'comservproduction1|comservproduction2|192\.168\.1\.126|192\.168\.1\.127'
 }
 
 # Workstation-only web services (same image as prod). A bare `compose up` on
@@ -920,7 +937,14 @@ start_prod_container_from_image() {
             secrets="/opt/comserv/secrets"
         fi
     fi
-    ident="${SYSTEM_IDENTIFIER:-production1}"
+    # Identifier follows the host this runs on unless the caller set it (prod1 vs prod2).
+    if [ -z "${SYSTEM_IDENTIFIER:-}" ]; then
+        case "$(hostname)" in
+            *production2*|*prod2*) SYSTEM_IDENTIFIER=production2 ;;
+            *) SYSTEM_IDENTIFIER=production1 ;;
+        esac
+    fi
+    ident="$SYSTEM_IDENTIFIER"
     echo "    secrets dir: ${secrets:-NONE}"
     purge_workstation_web_siblings
 
@@ -945,13 +969,42 @@ start_prod_container_from_image() {
         docker volume create "$v" >/dev/null 2>&1 || true
     done
 
-    # Seed override volumes FROM THE IMAGE if they are empty (volume-shadow trap).
-    docker run --rm --entrypoint sh \
-        -v comserv2_theme_css:/dest "$img" \
-        -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/css/themes/. /dest/ 2>/dev/null || true; fi'
-    docker run --rm --entrypoint sh \
-        -v comserv2_theme_config:/dest "$img" \
-        -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/config/. /dest/ 2>/dev/null || true; fi'
+    # Themes: THEMES_NFS=1 (default) = ONE shared, writable copy on NFS
+    # (192.168.1.175:/mnt/data/comserv_themes/{css_themes,config,themes}) used by
+    # every node. It is the single source of truth, so it is NEVER seeded or
+    # overwritten from the image. THEMES_NFS=0 = old per-node local volumes
+    # (rollback), seeded from the image only when empty.
+    local th_css th_cfg th_root tv tdir topts
+    if [ "${THEMES_NFS:-1}" = "1" ]; then
+        th_css=comserv2_theme_css_nfs; th_cfg=comserv2_theme_config_nfs; th_root=comserv2_themes_nfs
+        for tv in "$th_css:css_themes" "$th_cfg:config" "$th_root:themes"; do
+            tdir="${tv#*:}"; tv="${tv%%:*}"
+            if ! docker volume inspect "$tv" >/dev/null 2>&1; then
+                echo "    creating Docker NFS theme volume $tv"
+                docker volume create --driver local --opt type=nfs \
+                    --opt 'o=addr=192.168.1.175,rw,nfsvers=3,hard,timeo=600,retrans=2' \
+                    --opt "device=:/mnt/data/comserv_themes/$tdir" "$tv" >/dev/null || return 1
+            fi
+            topts=$(docker volume inspect "$tv" --format '{{index .Options "type"}}|{{index .Options "device"}}' 2>/dev/null || true)
+            if [ "$topts" != "nfs|:/mnt/data/comserv_themes/$tdir" ]; then
+                echo "❌ $tv is not the shared NFS theme volume: ${topts:-no options}"; return 1
+            fi
+        done
+        if ! docker run --rm --entrypoint sh -v "$th_cfg:/t:ro" "$img" -c 'test -s /t/theme_definitions.json'; then
+            echo "❌ shared NFS themes missing theme_definitions.json — refusing to start (set THEMES_NFS=0 to use local volumes)"; return 1
+        fi
+        echo "    themes: shared NFS ($th_css, $th_cfg, $th_root)"
+    else
+        th_css=comserv2_theme_css; th_cfg=comserv2_theme_config; th_root=comserv2_themes
+        # Seed override volumes FROM THE IMAGE if they are empty (volume-shadow trap).
+        docker run --rm --entrypoint sh \
+            -v comserv2_theme_css:/dest "$img" \
+            -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/css/themes/. /dest/ 2>/dev/null || true; fi'
+        docker run --rm --entrypoint sh \
+            -v comserv2_theme_config:/dest "$img" \
+            -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/config/. /dest/ 2>/dev/null || true; fi'
+        echo "    themes: LOCAL per-node volumes (THEMES_NFS=0)"
+    fi
 
     # Seed DB connection secrets (K8s-secret style) into the secrets volume so
     # RemoteDB.pm finds them. Source = the secure store on this host (same place
@@ -984,10 +1037,11 @@ start_prod_container_from_image() {
         --name "$name" \
         --restart unless-stopped \
         --network comserv_default \
-        -p 5000:5000 \
+        -p "${HOST_PORT:-5000}:5000" \
         --log-driver json-file --log-opt max-size=20m --log-opt max-file=5 \
         -e ENVIRONMENT=production \
         -e PORT=5000 \
+        -e COMSERV_JOBS="${COMSERV_JOBS:-1}" \
         -e CATALYST_ENV=production \
         -e CATALYST_DEBUG=0 \
         -e WEB_PORT=5000 \
@@ -1003,17 +1057,18 @@ start_prod_container_from_image() {
         -e COMSERV_SESSION_DIR=/tmp/comserv/session \
         -e COMSERV_SESSION_COOKIE=comserv_session \
         -e SYSTEM_IDENTIFIER="$ident" \
+        -e COMSERV_PUBLIC_PORT="${HOST_PORT:-5000}" \
         -e RUNNING_IN_DOCKER=docker \
         -v "$secrets:/home/comserv/.comserv/secrets:ro" \
         -v comserv2_cache:/cache \
         -v comserv2_logs:/opt/comserv/root/log \
         -v "$NFS_VOLUME_NAME:/data/nfs:rw" \
-        -v comserv2_sessions:/tmp/comserv/session \
+        -v "${SESSION_VOLUME:-comserv2_sessions}:/tmp/comserv/session" \
         -v comserv2_cache:/tmp/comserv/cache \
         -v comserv2_temp:/tmp/comserv/temp \
-        -v comserv2_themes:/opt/comserv/root/themes \
-        -v comserv2_theme_config:/opt/comserv/root/static/config \
-        -v comserv2_theme_css:/opt/comserv/root/static/css/themes \
+        -v "$th_root:/opt/comserv/root/themes" \
+        -v "$th_cfg:/opt/comserv/root/static/config" \
+        -v "$th_css:/opt/comserv/root/static/css/themes" \
         -v comserv2_whisper_venv:/opt/comserv/whisper_venv \
         -v comserv2_cpan_cache:/root/.cpan \
         "${extra[@]}" \
@@ -1027,7 +1082,16 @@ stamp_build_version() {
     branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
     commit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
     dirty=""
-    git diff --quiet --ignore-submodules HEAD -- 2>/dev/null || dirty="+local"
+    # +local = tracked files differ from HEAD. Name them so the label is explainable.
+    # version.json and data/ai_openrouter_prices.json are generated/runtime files and
+    # are no longer tracked (they used to make every build "+local").
+    local dirty_files
+    dirty_files=$(git diff --name-only --ignore-submodules HEAD -- 2>/dev/null)
+    if [ -n "$dirty_files" ]; then
+        dirty="+local"
+        echo "⚠ Build is +local: uncommitted changes in tracked files:"
+        printf '%s\n' "$dirty_files" | sed 's/^/    /'
+    fi
     build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     build_host=$(hostname -f 2>/dev/null || hostname)
     python3 - "$branch" "${commit}${dirty}" "$build_date" "$build_host" <<'PY'
@@ -1069,6 +1133,14 @@ PY
     return $rc
 }
 
+# Host keys are VERIFIED (was StrictHostKeyChecking=no). The target's key must
+# already be in known_hosts; an unknown/changed key fails the SSH call.
+_ssh_hostkey_opts() {
+    local kh="${COMSERV_SSH_KNOWN_HOSTS:-$HOME/.ssh/known_hosts}"
+    kh="${kh//[^A-Za-z0-9._\/-]/}"
+    echo "-o StrictHostKeyChecking=yes -o UserKnownHostsFile=$kh"
+}
+
 canonical_deploy() {
     local TARGET_HOST="${1:-local}"
     local SVC="web-prod"
@@ -1081,9 +1153,9 @@ canonical_deploy() {
         # back to the keyfile-based ssh so key auth still works. Build the
         # command as a function so both branches are used consistently.
         if [ -n "${SSHPASS:-}" ]; then
-            REMOTE_SSH="sshpass -e ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@${TARGET_HOST}"
+            REMOTE_SSH="sshpass -e ssh $(_ssh_hostkey_opts) -o ConnectTimeout=15 ubuntu@${TARGET_HOST}"
         else
-            REMOTE_SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i ${SSH_KEYFILE:-$HOME/.ssh/id_ed25519} ubuntu@${TARGET_HOST}"
+            REMOTE_SSH="ssh $(_ssh_hostkey_opts) -o ConnectTimeout=15 -i ${SSH_KEYFILE:-$HOME/.ssh/id_ed25519} ubuntu@${TARGET_HOST}"
         fi
         # When deploying to a remote we build+push locally first, then the
         # remote only pulls+runs (never rebuilds). Local build stays on this host.
@@ -1179,7 +1251,9 @@ EOF
         BK="bk-${CONTAINER}-${REMOTE_TS}"
         $REMOTE_SSH "date +%s > /tmp/comserv-deploy.lock"
         echo "--- [3/6] RENAME running $CONTAINER → $BK (keep serving during pull) ---"
-        $REMOTE_SSH "if docker inspect ${CONTAINER} >/dev/null 2>&1; then docker rename ${CONTAINER} ${BK}; echo renamed; else echo no-live-container; fi"
+        # The live container may be running under a bk-* name (left by an older
+        # rollback that did not rename back). Treat the running bk-* as live.
+        $REMOTE_SSH "if docker inspect ${CONTAINER} >/dev/null 2>&1; then docker rename ${CONTAINER} ${BK}; echo renamed; else LIVE=\$(docker ps --format '{{.Names}}' | grep -E '^bk-comserv2?-web-prod-' | head -1); if [ -n \"\$LIVE\" ]; then docker rename \"\$LIVE\" ${BK}; echo \"renamed running \$LIVE -> ${BK}\"; else echo no-live-container; fi; fi"
         echo "--- [4/6] PULL $IMAGE (no build, no host source) ---"
         if ! $REMOTE_SSH "docker pull ${IMAGE}"; then
             echo "❌ Remote pull failed. Restarting backup if we renamed."
@@ -1202,12 +1276,13 @@ EOF
         if ! $REMOTE_SSH bash -s <<EOF
 $(declare -f is_production_host purge_workstation_web_siblings ensure_nfs_volume start_prod_container_from_image)
 NFS_VOLUME_NAME=${NFS_VOLUME_NAME}
-export SYSTEM_IDENTIFIER=production1
+export SYSTEM_IDENTIFIER=$(_target_system_identifier "$TARGET_HOST")
+export THEMES_NFS=${THEMES_NFS:-1}
 start_prod_container_from_image ${IMAGE} ${CONTAINER}
 EOF
         then
             echo "❌ Remote start failed — restarting backup $BK"
-            $REMOTE_SSH "docker start ${BK} 2>/dev/null || true" || true
+            $REMOTE_SSH "docker rm -f ${CONTAINER} 2>/dev/null; docker start ${BK} 2>/dev/null && docker rename ${BK} ${CONTAINER} 2>/dev/null || true" || true
             $REMOTE_SSH "rm -f /tmp/comserv-deploy.lock" || true
             notify_admin_deploy \
                 "Production deploy start failed — backup ${BK} running" \
@@ -1216,20 +1291,27 @@ EOF
         fi
 
         echo "--- [6/6] HEALTH GATE ---"
-        local HEALTHY=0 i OK
-        for i in $(seq 1 45); do
-            OK=0
+        # Time-based: production startup can take minutes (Starman preload).
+        local HEALTHY=0 i=0 OK H_START H_EL
+        local H_TIMEOUT="${HEALTH_TIMEOUT_S:-600}" H_INT="${HEALTH_INTERVAL_S:-5}"
+        H_START=$(date +%s)
+        while :; do
+            i=$((i + 1)); OK=0
             $REMOTE_SSH "curl -fs --max-time 8 http://127.0.0.1:5000/health" >/dev/null 2>&1 && OK=1
-            if [ "$OK" = "1" ]; then HEALTHY=1; echo "✅ healthy (attempt $i)"; break; fi
-            echo "  health attempt $i failed, waiting 2s..."
-            sleep 2
+            H_EL=$(( $(date +%s) - H_START ))
+            if [ "$OK" = "1" ]; then HEALTHY=1; echo "✅ healthy (attempt $i, ${H_EL}s)"; break; fi
+            if [ "$H_EL" -ge "$H_TIMEOUT" ]; then break; fi
+            echo "  health attempt $i failed (${H_EL}s/${H_TIMEOUT}s), waiting ${H_INT}s..."
+            sleep "$H_INT"
         done
         if [ "$HEALTHY" != "1" ]; then
-            echo "❌ HEALTH FAILED. Stopping new container and restarting backup $BK"
-            $REMOTE_SSH "docker stop ${CONTAINER} 2>/dev/null || true; docker rename ${CONTAINER} failed-${CONTAINER}-${REMOTE_TS} 2>/dev/null || docker rm -f ${CONTAINER} 2>/dev/null || true; docker start ${BK} 2>/dev/null || true"
+            echo "❌ HEALTH FAILED after ${H_EL}s. Dumping new container before rollback."
+            $REMOTE_SSH "echo '--- curl ---'; curl -sv --max-time 8 http://127.0.0.1:5000/health; echo; echo '--- inspect ---'; docker inspect ${CONTAINER} --format 'status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}} oom={{.State.OOMKilled}} started={{.State.StartedAt}}' 2>&1; echo '--- logs ---'; docker logs --tail 80 ${CONTAINER} 2>&1" || true
+            echo "❌ Stopping new container and restarting backup $BK"
+            $REMOTE_SSH "docker stop ${CONTAINER} 2>/dev/null || true; docker rename ${CONTAINER} failed-${CONTAINER}-${REMOTE_TS} 2>/dev/null || docker rm -f ${CONTAINER} 2>/dev/null || true; docker start ${BK} 2>/dev/null && docker rename ${BK} ${CONTAINER} 2>/dev/null || true"
             $REMOTE_SSH "rm -f /tmp/comserv-deploy.lock" || true
             notify_admin_deploy \
-                "Production deploy unhealthy — backup ${BK} running" \
+                "Production deploy unhealthy — previous container restored as ${CONTAINER}" \
                 "Host: ${TARGET_HOST}\nBackup: ${BK}\nNew ${CONTAINER} failed /health. Freshly renamed backup container is now running. Investigate the failed deploy." || true
             return 1
         fi
@@ -1303,7 +1385,7 @@ recreate_local_web_prod() {
     local HEALTHY=0 i OK
     for i in $(seq 1 30); do
         OK=0
-        curl -fs --max-time 8 http://127.0.0.1:5000/health >/dev/null 2>&1 && OK=1
+        curl -fs --max-time 8 "http://127.0.0.1:${HOST_PORT:-5000}/health" >/dev/null 2>&1 && OK=1
         if [ "$OK" = "1" ]; then HEALTHY=1; echo "✅ healthy (attempt $i)"; break; fi
         echo "  health attempt $i failed, waiting 5s..."
         sleep 5
@@ -1361,7 +1443,17 @@ canonical_deploy_to_nodes() {
     return 0
 }
 
-# Late dispatch — canonical_deploy* exist now. Pull & Deploy must NEVER build.
+# Late dispatch — canonical_deploy* AND _normalize_deploy_node exist now.
+# --prod must be after _normalize_deploy_node: canonical_deploy_to_nodes calls it.
+# Map a deploy target (name or IP) to the SYSTEM_IDENTIFIER the container should carry.
+_target_system_identifier() {
+    case "${1:-}" in
+        production2|prod2|192.168.1.127) echo "production2" ;;
+        production1|prod1|192.168.1.126|172.30.50.206) echo "production1" ;;
+        *) echo "${SYSTEM_IDENTIFIER:-production1}" ;;
+    esac
+}
+
 _normalize_deploy_node() {
     case "${1:-}" in
         production1|prod1) echo "192.168.1.126" ;;
@@ -1370,6 +1462,14 @@ _normalize_deploy_node() {
         *) echo "$1" ;;
     esac
 }
+
+if [ "${DEPLOY_MODE:-}" = "prod" ]; then
+    echo "=== PRODUCTION DEPLOY MODE ==="
+    echo "Full production deploy: clean build + push + pull + deploy"
+    # Build+push on this workstation, then pull+run on prod. Never build on prod.
+    canonical_deploy_to_nodes "${PROD_TARGET_HOST:-192.168.1.126}"
+    exit $?
+fi
 
 if [ "${DEPLOY_MODE:-}" = "pull-deploy" ]; then
     _pd_node="$(_normalize_deploy_node "${CLI_ARG2:-192.168.1.126}")"
@@ -1399,22 +1499,42 @@ if [ "${DEPLOY_MODE:-}" = "build-push" ]; then
 fi
 
 if [ "${DEPLOY_MODE:-}" = "push-only" ]; then
-    echo "=== PUSH ONLY (no build, no container recreate) ==="
+    # Push Image button = SAFE PUSH. It used to re-tag WHATEVER image the local
+    # web-prod container ran as :latest and push it (could publish a weeks-old
+    # image and roll production back on the next Pull & Deploy). Now it pushes only
+    # the fixed <commit-time> tag running HEALTHY on workstation :5000, then moves :latest.
     if is_production_host; then
         echo "❌ REFUSING to push from production. Push from the workstation."
         exit 1
     fi
-    # Prefer the image currently used by the local web-prod container; fall back to :latest tag name.
-    local_img=$(docker inspect --format='{{.Image}}' comserv2-web-prod 2>/dev/null || docker inspect --format='{{.Image}}' comserv-web-prod 2>/dev/null || true)
-    if [ -n "$local_img" ]; then
-        echo "Tagging running container image $local_img as $IMAGE"
-        docker tag "$local_img" "$IMAGE" || { echo "❌ docker tag failed"; exit 1; }
-    else
-        echo "No local web-prod container — pushing existing $IMAGE if present"
+    exec "$(dirname "$(readlink -f "$0")")/deploy-flow.sh" safe-push --apply
+fi
+
+if [ "${DEPLOY_MODE:-}" = "run-image" ]; then
+    # deploy.sh --run-image <repo:tag> <container> <host-port>
+    # Used by deploy-flow.sh (stage :4000/:3000, promote to :5000, rollback).
+    # Same rename-to-backup -> start -> /health gate -> auto-restore as Rebuild.
+    if is_production_host; then
+        echo "❌ --run-image is for the workstation. production1 uses --pull-deploy."; exit 1
     fi
-    docker push "$IMAGE" || { echo "❌ docker push failed"; exit 1; }
-    echo "✅ Pushed $IMAGE (running container untouched)"
-    exit 0
+    RI_IMG="${CLI_ARG2:-}"; RI_NAME="${3:-}"; RI_PORT="${4:-}"
+    case "$RI_NAME:$RI_PORT" in
+        comserv2-web-prod:5000|comserv2-web-test:4000|comserv2-web-alt:3000) ;;
+        *) echo "❌ container/port must be comserv2-web-prod:5000, comserv2-web-test:4000 or comserv2-web-alt:3000"; exit 1 ;;
+    esac
+    case "$RI_IMG" in shantamcsbain/comserv-web-prod:[A-Za-z0-9]*) ;; *) echo "❌ bad image $RI_IMG"; exit 1 ;; esac
+    IMAGE="$RI_IMG"; CONTAINER="$RI_NAME"; export HOST_PORT="$RI_PORT"
+    [ "$RI_PORT" != "5000" ] && export SESSION_VOLUME="comserv2_sessions_$RI_PORT"
+    if [ "$RI_PORT" = "4000" ]; then
+        # Test slot: own identity, no background jobs (COMSERV_JOBS honoured once
+        # the jobs-switch branch is merged; harmless before).
+        # Line ~232 already defaults SYSTEM_IDENTIFIER to the hostname, so force the test identity here.
+        export SYSTEM_IDENTIFIER="${LOCAL_TEST_IDENTIFIER:-workstation-test}" COMSERV_JOBS="${COMSERV_JOBS:-0}"
+    fi
+    if docker image inspect "$IMAGE" >/dev/null 2>&1; then SKIP_PULL=1; fi
+    echo "=== RUN IMAGE $IMAGE as $CONTAINER on :$HOST_PORT (no build) ==="
+    SKIP_PULL="${SKIP_PULL:-0}" recreate_local_web_prod
+    exit $?
 fi
 
 if [ "${DEPLOY_MODE:-}" = "local-rebuild" ]; then
@@ -1426,6 +1546,7 @@ if [ "${DEPLOY_MODE:-}" = "local-rebuild" ]; then
         echo "❌ REFUSING to build on production. Build on the workstation."
         exit 1
     fi
+    stamp_build_version || { echo "❌ Could not generate version.json — aborting before build."; exit 1; }
     if ! BUILDKIT_PROGRESS=plain docker compose $COMPOSE_ARGS build --pull web-prod; then
         echo "❌ Local build failed — running container untouched."
         exit 1
@@ -1699,6 +1820,18 @@ for candidate in $NFS_MOUNT_CANDIDATES; do
         break
     fi
 done
+# Docker Compose mounts 192.168.1.175:/mnt/data as a named volume, not a host
+# bind at /home/ubuntu/nfs. That mount IS production NFS. Missing the host bind
+# made every monitor tick exit 1 before self-heal (2026-10-21).
+NFS_DOCKER_VOLUME=0
+if [ -z "$NFS_MOUNT_DIR" ]; then
+    DOCKER_NFS_MP=$(mount | awk '/type nfs/ && /192\.168\.1\.175/ { for (i=1; i<=NF; i++) if ($i=="on") { print $(i+1); exit } }')
+    if [ -n "$DOCKER_NFS_MP" ]; then
+        NFS_MOUNT_DIR="$DOCKER_NFS_MP"
+        NFS_DOCKER_VOLUME=1
+        echo "NFS detected via docker volume at $NFS_MOUNT_DIR (192.168.1.175:/mnt/data)"
+    fi
+fi
 NFS_LOCAL_DIR="$NFS_MOUNT_DIR"
 
 # Default paths (local fallback if NFS not mounted)
@@ -1708,7 +1841,17 @@ NFS_DATA_DIR=""
 WORKSHOP_LOCAL_DIR=""
 NFS_DEPLOY_LOG=""
 
-if [ -n "$NFS_MOUNT_DIR" ]; then
+if [ -n "$NFS_MOUNT_DIR" ] && [ "$NFS_DOCKER_VOLUME" = "1" ]; then
+    # Volume mountpoint is root-owned; do not mkdir/migrate/df-fail on it.
+    # The container already has this NFS at /data/nfs.
+    echo "NFS is the docker volume; host bind path is not required."
+    COMSERV_LOGS_DIR="$HOME/comserv-logs"
+    NFS_DATA_DIR="$NFS_MOUNT_DIR"
+    WORKSHOP_LOCAL_DIR="$NFS_MOUNT_DIR"
+    mkdir -p "$COMSERV_LOGS_DIR" 2>/dev/null || true
+    echo "   Container logs: $COMSERV_LOGS_DIR (local)"
+    echo "   Workshop/NFS storage stays on the docker volume (not a host bind)."
+elif [ -n "$NFS_MOUNT_DIR" ]; then
     echo "NFS detected at $NFS_MOUNT_DIR"
     # Keep application logs local to avoid NFS flock/getattr latency hangs!
     # The application itself (Logging.pm) asynchronously copies archived/rotated logs to NFS.
@@ -2042,6 +2185,30 @@ fi
 
 cd "$(dirname "$COMPOSE_FILE")"
 
+# Workers stuck in R (userspace) for >20 min are the Starman spin class.
+# /health can still return 200, so Docker health stays "healthy" and the
+# restart path never runs. Kill only those; the master keeps the accept pool.
+recycle_spun_starman_workers() {
+    local ctn="$1"
+    [ -n "$ctn" ] || return 0
+    docker inspect "$ctn" >/dev/null 2>&1 || return 0
+    local pids
+    pids=$(docker exec "$ctn" ps -eo pid,stat,etime,comm 2>/dev/null | awk '
+        $4 ~ /starman/ && $2 ~ /^R/ {
+            e=$3
+            spin=0
+            if (e ~ /-/) spin=1
+            else if (split(e, a, ":") == 3 && (a[1]+0 > 0 || a[2]+0 >= 20)) spin=1
+            else if (split(e, a, ":") == 2 && a[1]+0 >= 20) spin=1
+            if (spin) print $1
+        }
+    ' || true)
+    if [ -n "$pids" ]; then
+        echo "   Recycling Starman workers stuck in R for >20 min: $pids"
+        docker exec "$ctn" kill -TERM $pids || true
+    fi
+}
+
 # ── Container Viability & Auto-Recovery Check ─────────────────────────────────
 # If the container is dead or unhealthy during a routine check, we restart it.
 # If restarts fail, we roll back to backup-1. If rollback fails, we fall back to host Starman.
@@ -2371,6 +2538,7 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
             fi
         fi
     else
+        recycle_spun_starman_workers "$CONTAINER"
         echo "   ✓ Container $CONTAINER is running and healthy."
     fi
 fi

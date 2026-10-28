@@ -22,6 +22,14 @@
 
 The Comserv application integrates with Proxmox Virtual Environment (Proxmox VE) to provide VM management capabilities directly from the Comserv interface. This integration allows administrators to view, create, and manage virtual machines hosted on Proxmox servers.
 
+<h2 id="current-dashboard">Current dashboard (2026-10-27)</h2>
+
+<p><code>/proxmox</code> with no <code>server_id</code> is the pool page. Each configured server is a card (name, id, host, node, web UI, API user, token stored or missing). The card opens the in-app server console at <code>/proxmox?server_id=...</code>, not the Proxmox :8006 UI. Edit is <code>/proxmox_servers/edit/&lt;server_id&gt;</code>. Token values stay encrypted in <code>app_secrets</code> and are not shown.</p>
+
+<p>The Summary section signs in to every server that has a token and draws one chart per node metric (CPU, load, memory, IO delay, network, storage, swap, and temperature when the node reports it). Each chart spans the page width. The left axis is the value and its scale. The bottom axis is time for the selected window. The color key under the chart names the server for each line. The timeframe control is Hour, Day, Week, Month, or Year, shared with the VM history panel. A server with no stored token is listed as not signed in and has no line.</p>
+
+<p>VM detail keeps its own history panel on the same timeframe control, plus the power-task popup for start, stop, and reboot.</p>
+
 
 
 <h2>Command Reference Documentation</h2>

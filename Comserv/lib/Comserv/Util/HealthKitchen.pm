@@ -3,6 +3,29 @@ use Moose;
 use namespace::autoclean;
 use Try::Tiny;
 use POSIX qw(strftime);
+use JSON qw(encode_json decode_json);
+
+# Sourcing enums (see "Production / sourcing attributes" section).
+our %SOURCING_ENUM = (
+    food_category  => [qw(beef pork lamb chicken eggs dairy salmon fish_other leafy_greens berries apples
+                          stone_fruit grapes potatoes tomatoes peppers corn soy grains legumes nuts other)],
+    production     => [qw(organic_certified conventional transitional unknown)],
+    animal_raising => [qw(grass_fed pasture feedlot free_range caged na)],
+    catch_method   => [qw(wild farmed na)],
+    gmo            => [qw(non_gmo_verified gmo unknown)],
+);
+our @SOURCING_COLS = ( keys(%SOURCING_ENUM), qw(local_km certifier cert_verified) );
+# Columns stored in Accounting::InventoryItemAttributes (food_category is derived from food_category_id).
+our @ATTR_COLS     = qw(food_category_id production animal_raising catch_method gmo local_km certifier cert_verified);
+our $ATTR_SOURCE   = 'Accounting::InventoryItemAttributes';
+our @PREF_COLS     = qw(prefer_organic avoid_feedlot ethics_weight);
+our $LOCAL_KM      = 160;
+our %RISK_PTS      = ( low => 0, med => 1, high => 2 );
+our %BADGE = (
+    organic_certified => 'Organic', conventional => 'Conventional', transitional => 'Transitional',
+    grass_fed => 'Grass-fed', pasture => 'Pasture-raised', feedlot => 'Feedlot', free_range => 'Free-range',
+    caged => 'Caged', wild => 'Wild', farmed => 'Farmed', non_gmo_verified => 'Non-GMO', gmo => 'GMO',
+);
 use Comserv::Util::Logging;
 
 has 'logging' => (
@@ -406,18 +429,24 @@ sub save_profile {
     my ( $self, $c, $args ) = @_;
     return { ok => 0, error => 'Profile table is not created yet. Run schema-compare.' }
         unless $self->profile_ready($c);
+    my %data = (
+        diet_flags => $args->{diet_flags},
+        allergies  => $self->_enc( $args->{allergies} ),
+        goals      => $args->{goals},
+    );
+    my $prefs_ok = $self->prefs_cols_ready($c);
+    if ( $prefs_ok && grep { exists $args->{$_} } @PREF_COLS, 'prefs_submitted' ) {
+        my ( $p, $err ) = $self->validate_prefs($args);
+        return { ok => 0, error => $err } if $err;
+        %data = ( %data, %$p );
+    }
     my $row;
     try {
-        $row = $c->model('DBEncy')->resultset('HealthKitchen::UserHealthProfile')->update_or_create(
-            {
-                user_id    => $c->session->{user_id},
-                sitename   => $self->sitename($c),
-                diet_flags => $args->{diet_flags},
-                allergies  => $self->_enc( $args->{allergies} ),
-                goals      => $args->{goals},
-            },
-            { key => 'hk_profile_user_site' }
-        );
+        my $rs  = $c->model('DBEncy')->resultset('HealthKitchen::UserHealthProfile');
+        my %key = ( user_id => $c->session->{user_id}, sitename => $self->sitename($c) );
+        $row = $rs->search( \%key, ( $prefs_ok ? {} : { columns => $self->_base_cols( $c, 'HealthKitchen::UserHealthProfile', \@PREF_COLS ) } ) )->single;
+        if ($row) { $row->update( \%data ) }
+        else      { $row = $rs->create( { %key, %data } ) }
     }
     catch {
         $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'save_profile',
@@ -434,7 +463,8 @@ sub get_profile {
     my $h = {};
     try {
         my $row = $c->model('DBEncy')->resultset('HealthKitchen::UserHealthProfile')->search(
-            { user_id => $c->session->{user_id}, sitename => $self->sitename($c) }
+            { user_id => $c->session->{user_id}, sitename => $self->sitename($c) },
+            ( $self->prefs_cols_ready($c) ? {} : { columns => $self->_base_cols( $c, 'HealthKitchen::UserHealthProfile', \@PREF_COLS ) } )
         )->single;
         if ($row) {
             $h = {
@@ -442,6 +472,9 @@ sub get_profile {
                 allergies  => $self->_dec( $row->allergies ),
                 goals      => $row->goals,
             };
+            if ( $self->prefs_cols_ready($c) ) {
+                $h->{$_} = $row->get_column($_) for @PREF_COLS;
+            }
         }
     }
     catch {
@@ -1221,6 +1254,8 @@ sub plan_requirements {
                 $self->_ingredient_key( { name => $p->{name} } ) ) )
         {
             $stock{$key} ||= { qty => 0, unit => $p->{unit} // '' };
+            $stock{$key}{sourcing} ||= $p->{product}{badges} if $p->{product} && $p->{product}{badges} && @{ $p->{product}{badges} };
+            $stock{$key}{score} //= $p->{product}{score} if $p->{product};
             $stock{$key}{qty} += $p->{qty} || 0;
         }
     }
@@ -1230,6 +1265,8 @@ sub plan_requirements {
         my $st = $stock{$key} || ( $n->{name} ? $stock{ $self->_ingredient_key( { name => $n->{name} } ) // '' } : undef );
         my $on = $st ? $st->{qty} : 0;
         my $row = { %$n, need => 0 + sprintf( '%.2f', $n->{need} ), on_hand => 0 + $on };
+        $row->{sourcing} = $st->{sourcing} if $st && $st->{sourcing};
+        $row->{score}    = $st->{score}    if $st && defined $st->{score};
         if ( $st && length $n->{unit} && length $st->{unit} && lc $n->{unit} ne lc $st->{unit} ) {
             $row->{unit_mismatch} = $st->{unit};    # can't compare; list as have, flag for review
             push @have, $row;
@@ -1255,10 +1292,16 @@ sub rank_recipes_by_stock {
         my $req = $self->plan_requirements( [ { servings => $r->{yield_amount} || 1, recipe => $r } ], $pantry );
         my $total = @{ $req->{have} } + @{ $req->{buy} };
         next unless $total;
+        my @sc = map { $_->{score} } grep { defined $_->{score} } @{ $req->{have} }, @{ $req->{buy} };
+        my $score = @sc ? eval { my $t = 0; $t += $_ for @sc; $t / @sc } : 0;
         push @out, { id => $r->{id}, name => $r->{name}, in_stock => scalar @{ $req->{have} },
-                     total => $total, missing => [ map { $_->{name} } @{ $req->{buy} } ] };
+                     total => $total, missing => [ map { $_->{name} } @{ $req->{buy} } ],
+                     sourcing_score => 0 + sprintf( '%.2f', $score ),
+                     rank => ( scalar @{ $req->{have} } ) / $total + 0.1 * $score };
     }
-    return [ sort { ( $b->{in_stock} / $b->{total} ) <=> ( $a->{in_stock} / $a->{total} ) || $a->{name} cmp $b->{name} } @out ];
+    # Stock coverage first; sourcing score (prefs/ethics/contamination) nudges ties and near-ties.
+    # With no sourcing data and default prefs every score is 0, so order is unchanged.
+    return [ sort { $b->{rank} <=> $a->{rank} || $a->{name} cmp $b->{name} } @out ];
 }
 
 sub _plan_rs {
@@ -1379,17 +1422,24 @@ sub get_meal_plan {
         start_date => ( $plan->start_date ? $plan->start_date . '' : '' ),
         end_date   => ( $plan->end_date ? $plan->end_date . '' : '' ),
         entries    => \@entries,
-        requirements => $self->plan_requirements( \@entries, $self->list_pantry($c) ),
+        requirements => $self->plan_requirements( \@entries, $self->pantry_with_products($c) ),
         allergen_warnings => [ map { { name => $_->{name}, hits => $_->{allergen_hits} } }
             @{ ( $self->filter_recipes_by_allergens( [ map { $_->{recipe} } grep { $_->{recipe} } @entries ],
                     $self->user_matching_inputs($c)->{allergens} ) )[1] } ],
     };
 }
 
+sub pantry_with_products {
+    my ( $self, $c ) = @_;
+    my $rows = $self->list_pantry($c);
+    $self->attach_links_and_products( $c, $rows );
+    return $rows;
+}
+
 sub suggest_recipes_from_stock {
     my ( $self, $c ) = @_;
     my ($ok) = $self->filter_recipes_by_allergens( $self->list_recipes($c), $self->user_matching_inputs($c)->{allergens} );
-    return $self->rank_recipes_by_stock( $ok, $self->list_pantry($c) );
+    return $self->rank_recipes_by_stock( $ok, $self->pantry_with_products($c) );
 }
 
 # Recipes allowed for this user's meal plans (allergen-filtered) + the excluded ones.
@@ -1430,6 +1480,7 @@ sub daily_totals {
 sub list_foods {
     my ( $self, $c ) = @_;
     return [] unless $self->nutrition_ready($c);
+    my $prod = $self->_products_by_inventory($c);
     my @out;
     try {
         my $rs = $c->model('DBEncy')->resultset('HealthKitchen::FoodNutrient')->search(
@@ -1439,6 +1490,10 @@ sub list_foods {
             push @out, { id => $f->id, name => $f->name, brand => $f->brand, source => $f->source,
                          serving_size => 0 + $f->serving_size, serving_unit => $f->serving_unit,
                          map { $_ => $f->$_ } @NUTRIENTS };
+            if ( $f->inventory_item_id && ( my $p = $prod->{ $f->inventory_item_id } ) ) {
+                $out[-1]{sourcing} = { badges => $p->{badges}, summary => $p->{summary}, score => $p->{score} };
+                $out[-1]{adjusted} = $self->adjust_nutrients( $out[-1], $p->{factors} );
+            }
         }
     }
     catch {
@@ -1547,8 +1602,11 @@ sub ai_stock_foods {
     for my $r ( @{ $rows || [] } ) {
         next unless $r->{inventory_item_id} && ( $r->{qty} || 0 ) > 0;
         next if $seen{ $r->{inventory_item_id} }++;
+        my $pr = $r->{product} || {};
         push @out, { id => 0 + $r->{inventory_item_id}, name => $r->{name},
-                     qty => 0 + $r->{qty}, unit => $r->{unit} || 'each' };
+                     qty => 0 + $r->{qty}, unit => $r->{unit} || 'each',
+                     ( $pr->{badges} && @{ $pr->{badges} } ? ( sourcing => join( ', ', @{ $pr->{badges} } ) ) : () ),
+                     ( defined $pr->{score} ? ( score => $pr->{score} ) : () ) };
     }
     return \@out;
 }
@@ -1566,7 +1624,22 @@ sub ai_recipe_prompt {
     }
     my @avoid = grep { length } @{ $prefs->{avoid} || [] };
     $pref .= 'Exclude these ingredients entirely: ' . join( ', ', @avoid ) . ".\n" if @avoid;
-    my $list = join "\n", map { "- id=$_->{id}; name=$_->{name}; on_hand=$_->{qty} $_->{unit}" } @$foods;
+    my $use_src = grep { $prefs->{$_} } qw(prefer_organic avoid_feedlot ethics_weight);
+    if ($use_src) {
+        my @s;
+        push @s, 'certified organic items' if $prefs->{prefer_organic};
+        push @s, 'items with a higher sourcing score (better ethics, lower contamination risk)'
+            if $prefs->{ethics_weight};
+        $pref .= 'When choosing between in-stock items, prefer ' . join( ' and ', @s ) . ".\n" if @s;
+        $pref .= "Avoid items marked Feedlot unless nothing else fits.\n" if $prefs->{avoid_feedlot};
+    }
+    my $list = join "\n", map {
+        my $f = $_;
+        ( my $src = $f->{sourcing} // '' ) =~ s/[^\w ,:()\-]//g;
+        "- id=$f->{id}; name=$f->{name}; on_hand=$f->{qty} $f->{unit}"
+            . ( length $src ? "; sourcing=$src" : '' )
+            . ( $use_src && defined $f->{score} ? "; sourcing_score=$f->{score}" : '' )
+    } @$foods;
     return "Create $count simple, wholesome home recipes using ONLY the in-stock foods below.\n"
          . "Every ingredient must be one of these items, referenced by its id. Do not invent ingredients "
          . "(water is allowed and needs no id). Do not exceed on_hand quantities. Do not make health or medical claims.\n\n"
@@ -1629,12 +1702,14 @@ sub generate_ai_recipes {
     my $profile = $opts->{profile} || eval { $self->get_profile($c) } || {};
     my @avoid = @{ $inputs->{allergens} || [] };
     my $foods = [ grep { my $n = lc $_->{name}; !grep { index( $n, $_ ) >= 0 } @avoid }
-                  @{ $self->ai_stock_foods( $self->list_pantry($c) ) } ];
+                  @{ $self->ai_stock_foods( $self->pantry_with_products($c) ) } ];
     return { ok => 0, error => 'No in-stock inventory foods found to build recipes from.' }
         unless @$foods >= 2;
     splice( @$foods, 60 ) if @$foods > 60;
     my $prompt = $self->ai_recipe_prompt( $foods, $opts->{count} || 3,
-        { diet_flags => $profile->{diet_flags}, avoid => \@avoid } );
+        { diet_flags => $profile->{diet_flags}, avoid => \@avoid,
+          prefer_organic => $profile->{prefer_organic}, avoid_feedlot => $profile->{avoid_feedlot},
+          ethics_weight => $profile->{ethics_weight} } );
     my $system = 'You are a careful home-cooking assistant for a wellness kitchen. '
                . 'Use only provided stock items. Output strict JSON.';
     my $res = $opts->{ai_call}
@@ -1982,53 +2057,255 @@ sub find_symptom_dup {
     return undef;
 }
 
+sub pending_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, 'HealthKitchen::PendingEncyAddition' );
+}
+
+# Pure: strip HTML/control chars, normalise whitespace.
+sub clean_text {
+    my ( $self, $v ) = @_;
+    return '' unless defined $v;
+    $v =~ s/<!--.*?-->//gs;
+    $v =~ s/<[^>]*>//gs;
+    $v =~ s/[<>]//g;
+    $v =~ s/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]//g;
+    $v =~ s/[ \t]+/ /g;
+    $v =~ s/^\s+|\s+$//g;
+    return $v;
+}
+
+# Pure: returns ( \%clean, $error ).
+sub validate_symptom_submission {
+    my ( $self, $a ) = @_;
+    my $name = $self->normalize_symptom_name( $self->clean_text( $a->{name} ) );
+    return ( undef, 'Symptom name is required.' ) unless length $name;
+    return ( undef, 'Symptom name must be 2-120 characters.' ) if length($name) < 2 || length($name) > 120;
+    return ( undef, q{Symptom name may only contain letters, numbers, spaces and - ' ( ) , . /} )
+        unless $name =~ m{^[\p{L}\p{N}][\p{L}\p{N} \-'(),./]*$};
+    my $desc = $self->clean_text( $a->{description} );
+    return ( undef, 'Description must be 2000 characters or fewer.' ) if length($desc) > 2000;
+    my $sev = $self->clean_text( $a->{severity} );
+    return ( undef, 'Severity must be 40 characters or fewer.' ) if length($sev) > 40;
+    return ( { name => $name, description => ( length $desc ? $desc : undef ),
+               severity => ( length $sev ? $sev : undef ) }, undef );
+}
+
+sub _find_ency_symptom_id {
+    my ( $self, $c, $name ) = @_;
+    my $hit = $c->model('DBEncy')->resultset('Ency::Symptom')->search(
+        { -or => [ \[ 'LOWER(TRIM(name)) = ?', lc $name ], \[ 'LOWER(TRIM(common_name)) = ?', lc $name ] ] },
+        { rows => 1, columns => ['record_id'] }
+    )->single;
+    return $hit ? $hit->record_id : undef;
+}
+
+# Existing ENCY match -> activate now. Otherwise stage for review + notify staff via todo.
 sub add_user_symptom {
     my ( $self, $c, $args ) = @_;
-    return { ok => 0, error => 'Symptom table is not created yet. Run schema-compare.' }
-        unless $self->symptom_ready($c);
     return { ok => 0, error => 'Please log in.' } unless $c->session->{user_id};
-    my $name = $self->normalize_symptom_name( $args->{name} );
-    return { ok => 0, error => 'Symptom name is required.' } unless length $name;
-    return { ok => 0, error => 'Symptom name is too long.' } if length($name) > 255;
-    my $desc = $args->{description};
-    $desc = undef if defined $desc && $desc !~ /\S/;
-
-    my ( $sid, $created );
+    my ( $v, $err ) = $self->validate_symptom_submission($args);
+    return { ok => 0, error => $err } if $err;
+    my $sid = eval { $self->_find_ency_symptom_id( $c, $v->{name} ) };
+    if ($sid) {
+        my $r = $self->set_active_symptom( $c, { symptom_id => $sid, severity => $v->{severity} } );
+        $r->{existing} = 1;
+        return $r;
+    }
+    return { ok => 0, error => 'Review queue table is not created yet. Run schema-compare.' }
+        unless $self->pending_ready($c);
+    my ( $row, $dup );
     try {
-        my $rs = $c->model('DBEncy')->resultset('Ency::Symptom');
-        my $hit = $rs->search(
-            { -or => [ \[ 'LOWER(TRIM(name)) = ?', lc $name ], \[ 'LOWER(TRIM(common_name)) = ?', lc $name ] ] },
-            { rows => 1, columns => ['record_id'] }
-        )->single;
-        if ($hit) {
-            $sid = $hit->record_id;
+        my $rs = $c->model('DBEncy')->resultset('HealthKitchen::PendingEncyAddition');
+        for my $p ( $rs->search( { user_id => $c->session->{user_id}, sitename => $self->sitename($c),
+                                    entity_type => 'symptom', status => 'pending' } )->all ) {
+            my $d = eval { decode_json( $p->payload ) } || {};
+            if ( lc( $d->{name} // '' ) eq lc $v->{name} ) { $dup = $p; last }
         }
-        else {
-            my $row = $rs->create(
-                {
-                    name               => $name,
-                    description        => $desc,
-                    reference          => $USER_ADDED_REF,
-                    sitename           => $self->sitename($c),
-                    username_of_poster => $c->session->{username} || ( 'user#' . $c->session->{user_id} ),
-                    group_of_poster    => $USER_ADDED_GROUP,
-                    date_time_posted   => _now_str(),
-                    share              => 0,
-                }
-            );
-            $sid     = $row->record_id;
-            $created = 1;
-        }
+        $row = $dup || $rs->create( {
+            user_id     => $c->session->{user_id},
+            username    => $c->session->{username},
+            sitename    => $self->sitename($c),
+            entity_type => 'symptom',
+            payload     => encode_json($v),
+            status      => 'pending',
+        } );
     }
     catch {
         $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'add_user_symptom',
-            "add_user_symptom failed: $_" );
+            "stage failed: $_" );
     };
-    return { ok => 0, error => 'Could not add symptom to ENCY.' } unless $sid;
-    my $res = $self->set_active_symptom( $c, { symptom_id => $sid, severity => $args->{severity} } );
-    $res->{created}    = $created ? 1 : 0;
-    $res->{symptom_id} = $sid;
+    return { ok => 0, error => 'Could not submit symptom for review.' } unless $row;
+    $self->_notify_staff_pending( $c, $row, $v ) unless $dup || $row->todo_id;
+    return { ok => 1, pending => 1, pending_id => $row->id, duplicate => $dup ? 1 : 0 };
+}
+
+sub _notify_staff_pending {
+    my ( $self, $c, $row, $v ) = @_;
+    try {
+        my $today = strftime( '%Y-%m-%d', localtime );
+        my $due   = strftime( '%Y-%m-%d', localtime( time + 3 * 86400 ) );
+        my $todo  = $c->model('DBEncy')->resultset('Todo')->create( {
+            sitename            => $self->sitename($c),
+            start_date          => $today,
+            parent_todo         => '',
+            due_date            => $due,
+            subject             => 'Review ENCY symptom submission #' . $row->id,
+            description         => 'A user submitted a new ENCY symptom for review. '
+                . 'Open /healthkitchen/review to approve or reject. Name: ' . $v->{name},
+            estimated_man_hours => 0,
+            comments            => '',
+            reporter            => 'healthkitchen',
+            company_code        => 'default',
+            owner               => 'admin',
+            project_code        => '',
+            developer           => 'admin',
+            username_of_poster  => 'healthkitchen',
+            status              => 'NEW',
+            priority            => 3,
+            share               => 0,
+            last_mod_by         => 'healthkitchen',
+            last_mod_date       => $today,
+            user_id             => 0,
+            group_of_poster     => 'admin',
+            date_time_posted    => $today,
+        } );
+        $row->update( { todo_id => $todo->id } ) if $todo;
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, '_notify_staff_pending',
+            "todo create failed (submission still queued): $_" );
+    };
+}
+
+# Submitter's own pending symptom submissions, shown as 'pending review'.
+sub list_pending_symptoms_for_user {
+    my ( $self, $c ) = @_;
+    return [] unless $c->session->{user_id} && $self->pending_ready($c);
+    my @out;
+    try {
+        for my $p ( $c->model('DBEncy')->resultset('HealthKitchen::PendingEncyAddition')->search(
+                { user_id => $c->session->{user_id}, sitename => $self->sitename($c),
+                  entity_type => 'symptom', status => 'pending' }, { order_by => 'id' } )->all ) {
+            my $d = eval { decode_json( $p->payload ) } || {};
+            push @out, { pending_id => $p->id, name => $d->{name}, severity => $d->{severity},
+                         status => 'pending review' };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'list_pending_symptoms_for_user', "$_" );
+    };
+    return \@out;
+}
+
+sub list_pending_review {
+    my ( $self, $c, $status ) = @_;
+    return [] unless $self->pending_ready($c);
+    $status = 'pending' unless $status && $status =~ /^(pending|approved|rejected)$/;
+    my @out;
+    try {
+        for my $p ( $c->model('DBEncy')->resultset('HealthKitchen::PendingEncyAddition')->search(
+                { status => $status, sitename => $self->sitename($c) },
+                { order_by => { -desc => 'id' }, rows => 200 } )->all ) {
+            my $d = eval { decode_json( $p->payload ) } || {};
+            push @out, {
+                id => $p->id, entity_type => $p->entity_type, status => $p->status,
+                name => $d->{name}, description => $d->{description},
+                submitted_by => $p->username || ( 'user#' . $p->user_id ),
+                created_at => ( $p->get_column('created_at') // '' ),
+                reviewer => $p->reviewer_username, review_notes => $p->review_notes,
+                ency_record_id => $p->ency_record_id,
+                existing_match => eval { $self->_find_ency_symptom_id( $c, $d->{name} // '' ) },
+            };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'list_pending_review', "$_" );
+    };
+    return \@out;
+}
+
+# decision: approve|reject. Approve creates (or reuses) the ENCY symptom without
+# personal data, then activates it for the submitter.
+sub review_pending {
+    my ( $self, $c, $args ) = @_;
+    return { ok => 0, error => 'Review queue table is not created yet.' } unless $self->pending_ready($c);
+    my $id = $self->_opt_id( $args->{id} ) or return { ok => 0, error => 'Bad submission id.' };
+    my $decision = $args->{decision} // '';
+    return { ok => 0, error => 'Choose approve or reject.' } unless $decision =~ /^(approve|reject)$/;
+    my $notes = $self->clean_text( $args->{notes} );
+    $notes = substr( $notes, 0, 2000 );
+    my ( $res, $schema ) = ( undef, $c->model('DBEncy') );
+    try {
+        $schema->txn_do( sub {
+            my $p = $schema->resultset('HealthKitchen::PendingEncyAddition')->search(
+                { id => $id, sitename => $self->sitename($c), status => 'pending' },
+                { for => 'update' } )->single or die "not pending\n";
+            my %rev = (
+                reviewer_user_id  => $c->session->{user_id},
+                reviewer_username => $c->session->{username},
+                review_notes      => ( length $notes ? $notes : undef ),
+                reviewed_at       => strftime( '%Y-%m-%d %H:%M:%S', localtime ),
+            );
+            if ( $decision eq 'reject' ) {
+                $p->update( { %rev, status => 'rejected' } );
+                $res = { ok => 1, decision => 'rejected' };
+                return;
+            }
+            my $d = decode_json( $p->payload );
+            my ( $v, $err ) = $self->validate_symptom_submission($d);
+            die "invalid: $err\n" if $err;
+            my $sid = $self->_find_ency_symptom_id( $c, $v->{name} );
+            my $created = 0;
+            unless ($sid) {
+                my $s = $schema->resultset('Ency::Symptom')->create( {
+                    name               => $v->{name},
+                    description        => $v->{description},
+                    reference          => 'Submitted via HealthKitchen; approved by staff',
+                    sitename           => $p->sitename,
+                    username_of_poster => $c->session->{username} || 'hk-review',
+                    group_of_poster    => $USER_ADDED_GROUP,
+                    date_time_posted   => _now_str(),
+                    share              => 0,
+                } );
+                $sid = $s->record_id;
+                $created = 1;
+            }
+            $self->_activate_for( $c, $p->user_id, $p->sitename, $sid, $v->{severity} );
+            $p->update( { %rev, status => 'approved', ency_record_id => $sid } );
+            $res = { ok => 1, decision => 'approved', symptom_id => $sid, created => $created };
+        } );
+    }
+    catch {
+        my $e = "$_";
+        $res = { ok => 0, error => $e =~ /not pending/ ? 'Submission not found or already reviewed.'
+                                  : $e =~ /invalid: (.*)/ ? "Submission is invalid: $1" : 'Review failed.' };
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'review_pending', "review failed: $e" );
+    };
+    if ( $res && $res->{ok} ) {
+        try {
+            my $p = $schema->resultset('HealthKitchen::PendingEncyAddition')->find($id);
+            if ( $p && $p->todo_id ) {
+                my $t = $schema->resultset('Todo')->find( $p->todo_id );
+                $t->update( { status => 'COMPLETED', last_mod_by => $c->session->{username} || 'healthkitchen',
+                              last_mod_date => strftime( '%Y-%m-%d', localtime ) } ) if $t;
+            }
+        }
+        catch { };
+    }
     return $res;
+}
+
+sub _activate_for {
+    my ( $self, $c, $user_id, $site, $sid, $severity ) = @_;
+    return unless $self->symptom_ready($c);
+    my $rs  = $c->model('DBEncy')->resultset('HealthKitchen::UserActiveSymptom');
+    my $row = $rs->search( { user_id => $user_id, sitename => $site, symptom_id => $sid } )->single;
+    if ($row) { $row->update( { status => 'active', resolved_at => undef } ) }
+    else {
+        $rs->create( { user_id => $user_id, sitename => $site, symptom_id => $sid,
+                       severity => $severity, status => 'active' } );
+    }
 }
 
 sub _now_str {
@@ -2209,21 +2486,41 @@ sub save_item_product {
         if defined $args->{size} && $args->{size} =~ /\S/ && !defined $sv;
     my $brand = $args->{brand};
     $brand = undef if defined $brand && $brand !~ /\S/;
+    my $src_ok = $self->sourcing_cols_ready($c);
+    my $src;
+    if ( $src_ok && $args->{sourcing_submitted} && $kind eq 'inventory' ) {
+        ( $src, my $serr ) = $self->validate_sourcing($args);
+        return { ok => 0, error => $serr } if $serr;
+    }
     my ( $ok, $err ) = ( 0, 'Could not save product details.' );
     try {
         die "item not yours\n" unless $self->_item_owned( $c, $kind, $iid );
-        $c->model('DBEncy')->resultset('HealthKitchen::ItemProduct')->update_or_create(
-            {
-                sitename   => $self->sitename($c),
-                item_kind  => $kind,
-                item_id    => $iid,
-                brand      => $brand,
-                upc        => ( length $upc ? $upc : undef ),
-                size_value => $sv,
-                size_unit  => $su,
-            },
-            { key => 'hk_product_item' }
-        );
+        my $schema = $c->model('DBEncy');
+        my $site   = $self->sitename($c);
+        $schema->txn_do( sub {
+            my $rs  = $schema->resultset('HealthKitchen::ItemProduct');
+            my %key = ( sitename => $site, item_kind => $kind, item_id => $iid );
+            # Site items: barcode lives on inventory_items; hk_item_product.upc is pantry-only.
+            my %data = ( brand => $brand, size_value => $sv, size_unit => $su,
+                         upc => ( $kind eq 'pantry' && length $upc ? $upc : undef ) );
+            if ( $kind eq 'inventory' && length $upc ) {
+                my $item = $schema->resultset('Accounting::InventoryItem')->find($iid);
+                $item->update( { barcode => $upc, barcode_type => $self->barcode_type_for($upc) } ) if $item;
+            }
+            my $row = $rs->search( \%key )->single;
+            if ($row) { $row->update( \%data ) }
+            else      { $rs->create( { %key, %data } ) }
+            if ($src) {
+                my %attr = map { $_ => $src->{$_} } grep { $_ ne 'food_category' } @ATTR_COLS;
+                if ( !defined $attr{food_category_id} && defined $src->{food_category} ) {
+                    $attr{food_category_id} = $self->_category_id_for_key( $c, $src->{food_category} );
+                }
+                my $ars = $schema->resultset($ATTR_SOURCE);
+                my $arow = $ars->search( { item_id => $iid } )->single;
+                if ($arow) { $arow->update( \%attr ) }
+                else       { $ars->create( { item_id => $iid, sitename => $site, %attr } ) }
+            }
+        } );
         $ok = 1;
     }
     catch {
@@ -2285,7 +2582,7 @@ sub attach_links_and_products {
                 my $r = $by{ $p->item_kind . ':' . $p->item_id } or next;
                 $r->{product} = {
                     brand      => $p->brand,
-                    upc        => $p->upc // $r->{barcode},
+                    upc        => ( $p->item_kind eq 'pantry' ? $p->upc : undef ) // $r->{barcode},
                     size_value => $p->size_value,
                     size_unit  => $p->size_unit,
                 };
@@ -2296,7 +2593,430 @@ sub attach_links_and_products {
                 "products failed: $_" );
         };
     }
+    if ( $self->sourcing_cols_ready($c) ) {
+        my @inv = grep { $_->{item_kind} eq 'inventory' && $_->{item_key_id} } @$rows;
+        my $attrs   = $self->_attrs_by_item( $c, [ map { $_->{item_key_id} } @inv ] );
+        my $factors = %$attrs ? $self->list_sourcing_factors($c) : [];
+        my $prefs   = %$attrs ? $self->get_prefs($c) : {};
+        for my $r (@inv) {
+            my $a = $attrs->{ $r->{item_key_id} } or next;
+            $r->{product}{$_} = $a->{$_} for keys %$a;
+            $self->_enrich_product( $r->{product}, $factors, $prefs );
+        }
+    }
     return;
+}
+
+# ---------------------------------------------------------------------------
+# Production / sourcing attributes (hk_item_product columns + hk_sourcing_factor)
+# ---------------------------------------------------------------------------
+
+sub sourcing_enums { return \%SOURCING_ENUM }
+
+# Do these columns exist in the live DB? Cached per request in the stash.
+sub _cols_ready {
+    my ( $self, $c, $source, $cols ) = @_;
+    my $key = "hk_cols_ready:$source";
+    return $c->stash->{$key} if defined $c->stash->{$key};
+    my $ok = 0;
+    if ( $self->table_ready( $c, $source ) ) {
+        try {
+            $c->model('DBEncy')->resultset($source)->search( {}, { columns => $cols, rows => 1 } )->first;
+            $ok = 1;
+        }
+        catch { $ok = 0 };
+    }
+    return $c->stash->{$key} = $ok;
+}
+
+sub sourcing_cols_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, $ATTR_SOURCE );
+}
+
+sub prefs_cols_ready {
+    my ( $self, $c ) = @_;
+    return $self->_cols_ready( $c, 'HealthKitchen::UserHealthProfile', [@PREF_COLS] );
+}
+
+sub factor_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, 'HealthKitchen::SourcingFactor' );
+}
+
+# Columns of a source minus the given (not-yet-created) ones.
+sub _base_cols {
+    my ( $self, $c, $source, $exclude ) = @_;
+    my %x = map { $_ => 1 } @$exclude;
+    return [ grep { !$x{$_} } $c->model('DBEncy')->source($source)->columns ];
+}
+
+# Pure: inventory barcode_type from a normalized barcode's length.
+sub barcode_type_for {
+    my ( $self, $code ) = @_;
+    my $n = length( $code // '' );
+    return $n == 12 || $n == 8 ? 'upc' : $n == 13 ? 'ean' : $n ? 'other' : undef;
+}
+
+# item_id => { attribute cols, food_category (factor key), food_category_path } for this site.
+# $ids undef = all items on the site.
+sub _attrs_by_item {
+    my ( $self, $c, $ids ) = @_;
+    return {} if $ids && !@$ids;
+    my %out;
+    try {
+        require Comserv::Util::CategoryManager;
+        my $cm     = Comserv::Util::CategoryManager->new;
+        my $schema = $c->model('DBEncy');
+        my %path   = map { $_->{id} => $_->{path} }
+            @{ $cm->path_options( [ map { +{ $_->get_columns } }
+                $schema->resultset('Accounting::InventoryCategory')->search( { sitename => $self->sitename($c) } )->all ], { map { $_ => 1 } qw(brew 3d) } ) };
+        my %q = ( sitename => $self->sitename($c) );
+        $q{item_id} = { -in => $ids } if $ids;
+        for my $a ( $schema->resultset($ATTR_SOURCE)->search( \%q )->all ) {
+            my %h = map { $_ => $a->get_column($_) } @ATTR_COLS;
+            my $pth = defined $h{food_category_id} ? $path{ $h{food_category_id} } : undef;
+            $h{food_category_path} = $pth;
+            $h{food_category}      = $cm->food_key_for_path($pth);
+            $out{ $a->item_id } = \%h;
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, '_attrs_by_item', "$_" );
+    };
+    return \%out;
+}
+
+# Factor key (e.g. 'beef') -> inventory_categories.id on this site via the starter tree path.
+sub _category_id_for_key {
+    my ( $self, $c, $key ) = @_;
+    require Comserv::Util::CategoryManager;
+    my $cm   = Comserv::Util::CategoryManager->new;
+    my $want = $cm->path_for_food_key($key) or return undef;
+    my ($o) = grep { $_->{path} eq $want }
+        @{ $cm->options_for_site( $c->model('DBEncy'), $self->sitename($c), $c->stash->{enabled_modules} || {} ) };
+    return $o ? $o->{id} : undef;
+}
+
+# Pure: validate sourcing input against allowed values. Returns ( \%clean, $error ).
+# Empty/absent -> undef (cleared).
+sub validate_sourcing {
+    my ( $self, $a ) = @_;
+    my %out;
+    for my $f ( keys %SOURCING_ENUM ) {
+        my $v = $a->{$f};
+        if ( !defined $v || $v eq '' ) { $out{$f} = undef; next }
+        $v = lc $v;
+        return ( undef, "Invalid value for $f." ) unless grep { $_ eq $v } @{ $SOURCING_ENUM{$f} };
+        $out{$f} = $v;
+    }
+    my $fcid = $a->{food_category_id};
+    if ( defined $fcid && $fcid ne '' ) {
+        return ( undef, 'Invalid food category.' ) unless $fcid =~ /^\d{1,10}$/;
+        $out{food_category_id} = 0 + $fcid;
+    }
+    else { $out{food_category_id} = undef }
+    my $km = $a->{local_km};
+    if ( defined $km && $km ne '' ) {
+        return ( undef, 'Distance must be a whole number of km (0-20000).' )
+            unless $km =~ /^\s*\d{1,5}\s*$/ && $km <= 20000;
+        $out{local_km} = 0 + $km;
+    }
+    else { $out{local_km} = undef }
+    my $cert = $self->clean_text( $a->{certifier} );
+    return ( undef, 'Certifier must be 100 characters or fewer.' ) if length($cert) > 100;
+    return ( undef, q{Certifier may only contain letters, numbers, spaces and - ' & ( ) , . /} )
+        if length $cert && $cert !~ m{^[\p{L}\p{N}][\p{L}\p{N} \-'&(),./]*$};
+    $out{certifier}     = length $cert ? $cert : undef;
+    $out{cert_verified} = defined $a->{cert_verified} && $a->{cert_verified} =~ /^(1|on|yes)$/i ? 1
+                        : defined $a->{cert_verified} && $a->{cert_verified} =~ /^(0|no)$/i   ? 0 : undef;
+    return ( \%out, undef );
+}
+
+# Pure: validate user preferences.
+sub validate_prefs {
+    my ( $self, $a ) = @_;
+    my $w = $a->{ethics_weight};
+    $w = 0 if !defined $w || $w eq '';
+    return ( undef, 'Ethics weight must be 0-5.' ) unless $w =~ /^\d$/ && $w <= 5;
+    return ( {
+        prefer_organic => ( ( $a->{prefer_organic} // '' ) =~ /^(1|on|yes)$/i ? 1 : 0 ),
+        avoid_feedlot  => ( ( $a->{avoid_feedlot}  // '' ) =~ /^(1|on|yes)$/i ? 1 : 0 ),
+        ethics_weight  => 0 + $w,
+    }, undef );
+}
+
+# Pure: factor rows that apply to a product's attributes.
+sub match_factors {
+    my ( $self, $p, $factors ) = @_;
+    return [] unless $p;
+    my %have;
+    $have{$_} = $p->{$_} for grep { defined $p->{$_} } keys %SOURCING_ENUM;
+    $have{local} = 'local' if defined $p->{local_km} && $p->{local_km} <= $LOCAL_KM;
+    my $cat = $p->{food_category} // '';
+    return [ grep {
+        my $f = $_;
+        ( $f->{food_category} eq 'any' || ( length $cat && $f->{food_category} eq $cat ) )
+            && $f->{attribute} ne 'food_category'
+            && defined $have{ $f->{attribute} } && $have{ $f->{attribute} } eq $f->{attr_value}
+    } @{ $factors || [] } ];
+}
+
+# Pure: apply percent adjustments to a COPY of base nutrients. Base is never modified.
+sub adjust_nutrients {
+    my ( $self, $base, $factors ) = @_;
+    my %adj = map { $_ => $base->{$_} } @NUTRIENTS;
+    my ( %pct, @src );
+    for my $f ( @{ $factors || [] } ) {
+        my $j = $f->{nutrient_adj_json} or next;
+        my $h = ref $j ? $j : eval { decode_json($j) } or next;
+        my $used;
+        for my $k ( keys %$h ) {
+            next unless grep { $_ eq $k } @NUTRIENTS;
+            $pct{$k} += $h->{$k};
+            $used = 1;
+        }
+        push @src, $f->{citation} if $used;
+    }
+    return undef unless %pct;
+    for my $k ( keys %pct ) {
+        next unless defined $adj{$k};
+        $adj{$k} = 0 + sprintf( '%.2f', $adj{$k} * ( 1 + $pct{$k} / 100 ) );
+    }
+    return { %adj, estimate => 1, pct => \%pct, citations => \@src };
+}
+
+# Pure: contamination + ethics summary for matched factors.
+sub sourcing_summary {
+    my ( $self, $factors ) = @_;
+    my ( %risk, @eth );
+    for my $f ( @{ $factors || [] } ) {
+        for my $r (qw(pesticide antibiotic hormone heavy_metal)) {
+            my $lvl = $f->{"${r}_risk"} or next;
+            next unless exists $RISK_PTS{$lvl};
+            $risk{$r} = $lvl if !defined $risk{$r} || $RISK_PTS{$lvl} > $RISK_PTS{ $risk{$r} };
+        }
+        push @eth, $f->{ethics_score} if defined $f->{ethics_score};
+    }
+    my $pen = 0;
+    $pen += $RISK_PTS{$_} for values %risk;
+    my $eth = @eth ? 0 + sprintf( '%.1f', eval { my $s = 0; $s += $_ for @eth; $s / @eth } ) : undef;
+    return { risks => \%risk, contamination => $pen, ethics => $eth };
+}
+
+# Pure: preference-weighted sourcing score. 0 means neutral / no information.
+# ethics contributes only when the user sets ethics_weight > 0 (default 0).
+sub sourcing_score {
+    my ( $self, $p, $summary, $prefs ) = @_;
+    $p ||= {};
+    $summary ||= {};
+    $prefs ||= {};
+    my $s = 0;
+    my $w = $prefs->{ethics_weight} || 0;
+    $s += $w * ( ( $summary->{ethics} // 2.5 ) - 2.5 ) / 2.5 if $w && defined $summary->{ethics};
+    $s -= 0.5 * ( $summary->{contamination} || 0 );
+    if ( $prefs->{prefer_organic} ) {
+        my $pr = $p->{production} // '';
+        $s += 1 if $pr eq 'organic_certified';
+        $s -= 0.5 if $pr eq 'conventional';
+    }
+    $s -= 3 if $prefs->{avoid_feedlot} && ( $p->{animal_raising} // '' ) eq 'feedlot';
+    return 0 + sprintf( '%.2f', $s );
+}
+
+# Pure: short display labels.
+sub sourcing_badges {
+    my ( $self, $p ) = @_;
+    return [] unless $p;
+    my @b;
+    for my $f (qw(production animal_raising catch_method gmo)) {
+        my $v = $p->{$f} // next;
+        push @b, $BADGE{$v} if $BADGE{$v};
+    }
+    push @b, 'Local' if defined $p->{local_km} && $p->{local_km} <= $LOCAL_KM;
+    push @b, 'Cert: ' . $p->{certifier} . ( $p->{cert_verified} ? '' : ' (unverified)' ) if $p->{certifier};
+    return \@b;
+}
+
+sub list_sourcing_factors {
+    my ( $self, $c ) = @_;
+    return $c->stash->{hk_factors} if $c->stash->{hk_factors};
+    $self->ensure_sourcing_seed($c);
+    my @out;
+    if ( $self->factor_ready($c) ) {
+        try {
+            for my $f ( $c->model('DBEncy')->resultset('HealthKitchen::SourcingFactor')->search( {} )->all ) {
+                push @out, { $f->get_columns };
+            }
+        }
+        catch {
+            $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, 'list_sourcing_factors', "$_" );
+        };
+    }
+    return $c->stash->{hk_factors} = \@out;
+}
+
+sub get_prefs {
+    my ( $self, $c ) = @_;
+    my $p = $self->get_profile($c);
+    return { prefer_organic => $p->{prefer_organic} ? 1 : 0, avoid_feedlot => $p->{avoid_feedlot} ? 1 : 0,
+             ethics_weight => 0 + ( $p->{ethics_weight} || 0 ) };
+}
+
+# Enrich a product hash with badges, factor summary and score.
+sub _enrich_product {
+    my ( $self, $prod, $factors, $prefs ) = @_;
+    my $m = $self->match_factors( $prod, $factors );
+    $prod->{badges}   = $self->sourcing_badges($prod);
+    $prod->{summary}  = $self->sourcing_summary($m);
+    $prod->{score}    = $self->sourcing_score( $prod, $prod->{summary}, $prefs );
+    $prod->{factors}  = $m;
+    return $prod;
+}
+
+# inventory_item_id => enriched product (for nutrition foods linked to inventory).
+sub _products_by_inventory {
+    my ( $self, $c ) = @_;
+    return {} unless $self->sourcing_cols_ready($c);
+    my $attrs = $self->_attrs_by_item( $c, undef );
+    return {} unless %$attrs;
+    my $factors = $self->list_sourcing_factors($c);
+    my $prefs   = $self->get_prefs($c);
+    my %out = map { $_ => $self->_enrich_product( { %{ $attrs->{$_} } }, $factors, $prefs ) } keys %$attrs;
+    return \%out;
+}
+
+# ── hk_sourcing_factor auto-seed (no manual SQL) ────────────────────────────
+our $SOURCING_SEEDED = 0;    # per-process; reset on restart
+
+sub _factor_key { join '|', map { lc( $_[0]{$_} // '' ) } qw(food_category attribute attr_value) }
+
+# Pure: seed rows whose unique key is not in $existing (arrayref of rows/hashes).
+sub missing_seed_rows {
+    my ( $self, $existing, $seed ) = @_;
+    my %have = map { _factor_key($_) => 1 } @{ $existing || [] };
+    return [ grep { !$have{ _factor_key($_) } } @{ $seed || [] } ];
+}
+
+# Insert-if-missing by unique key once the table exists. Never updates existing rows.
+# Called on HealthKitchen requests; cheap after the first successful pass.
+sub ensure_sourcing_seed {
+    my ( $self, $c ) = @_;
+    return { ok => 1, inserted => 0, skipped => 'already seeded' } if $SOURCING_SEEDED;
+    return { ok => 0, inserted => 0, skipped => 'table missing' } unless $self->factor_ready($c);
+    require Comserv::Util::HealthKitchen::SourcingSeed;
+    my $seed = Comserv::Util::HealthKitchen::SourcingSeed::rows();
+    my $n    = 0;
+    my $ok   = 0;
+    try {
+        my $rs = $c->model('DBEncy')->resultset('HealthKitchen::SourcingFactor');
+        my @existing = map { { $_->get_columns } }
+            $rs->search( {}, { columns => [qw(food_category attribute attr_value)] } )->all;
+        for my $row ( @{ $self->missing_seed_rows( \@existing, $seed ) } ) {
+            $rs->find_or_create( $row, { key => 'hk_factor_key' } );
+            $n++;
+        }
+        $ok = 1;
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, 'ensure_sourcing_seed',
+            "sourcing seed failed (will retry next request): $_" );
+    };
+    if ($ok) {
+        $SOURCING_SEEDED = 1;
+        delete $c->stash->{hk_factors};
+        $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'ensure_sourcing_seed',
+            "hk_sourcing_factor seed: inserted $n missing row(s)" ) if $n;
+    }
+    return { ok => $ok, inserted => $n };
+}
+
+# ── Sourcing classifier (pure; used by script/hk_classify_sourcing.pl) ──────
+# Proposes sourcing attributes from item name/category/brand. Explicit label words
+# give 'explicit' confidence; species-based guesses are 'inferred'; anything unclear
+# stays undef. Never guesses production from brand alone.
+our @PROCESSED_RX = qw(bar chips? cookies? puffs snack soda pie mix nog sandwich churro samosa pakora fudge
+                       ice\s+cream crackers? cereal granola);
+our @CATEGORY_RULES = (
+    [ beef         => qr/\b(beef|hamburger|steak|ground\s+chuck)\b/i ],
+    [ pork         => qr/\b(pork|bacon|ham|prosciutto)\b/i ],
+    [ lamb         => qr/\b(lamb|mutton)\b/i ],
+    [ chicken      => qr/\bchicken\b/i ],
+    [ eggs         => qr/\beggs?\b/i, qr/\b(contains|with|noodles?|nog|bread|replacer)\b/i ],
+    [ salmon       => qr/\bsalmon\b/i ],
+    [ fish_other   => qr/\b(herring|sardines?|tuna|mackerel|cod|halibut|anchov(y|ies)|trout)\b/i ],
+    [ dairy        => qr/\b(cheese|yogh?urt|milk|butter|kefir|cream)\b/i, qr/\b(coconut|oat|almond|soy|peanut|cocoa)\b/i ],
+    [ leafy_greens => qr/\b(spinach|kale|lettuce|greens|chard|arugula|collards?)\b/i ],
+    [ berries      => qr/\b(\w*berr(y|ies)|raspberr\w*)\b/i ],
+    [ apples       => qr/\bapples?\b/i ],
+    [ potatoes     => qr/\bpotato(es)?\b/i, qr/\bsweet\b/i ],
+    [ tomatoes     => qr/\btomato(es)?\b/i ],
+    [ peppers      => qr/\bpeppers?\b/i ],
+    [ soy          => qr/\b(soy|tofu|edamame|tempeh)\b/i ],
+    [ corn         => qr/\b(corn|maize|polenta)\b/i ],
+    [ legumes      => qr/\b(lentils?|chickpeas?|beans?|peas)\b/i, qr/\b(vanilla|coffee|cocoa|cacao|jelly)\s+beans?\b/i ],
+    [ nuts         => qr/\b(cashews?|walnuts?|almonds?|pecans?|hazelnuts?|pistachios?|peanuts?)\b/i ],
+    [ grains       => qr/\b(oats?|rye|wheat|spelt|rice|quinoa|barley|millet|buckwheat)\b/i, qr/\b(alternative|nog|beverage|drink|creamer|milk)\b/i ],
+);
+our %WILD_SPECIES = map { $_ => 1 } qw(fish_other);
+
+sub classify_sourcing {
+    my ( $self, $item ) = @_;
+    my $name = $item->{name} // '';
+    my $text = join ' ', grep { defined } $name, $item->{brand}, $item->{category};
+    my ( %p, %why );
+    my $processed = grep { $name =~ /\b$_\b/i } @PROCESSED_RX;
+
+    unless ($processed) {
+        for my $r (@CATEGORY_RULES) {
+            my ( $cat, $rx, $not ) = @$r;
+            next unless $name =~ $rx;
+            next if $not && $name =~ $not;
+            $p{food_category} = $cat;
+            $why{food_category} = 'inferred';
+            last;
+        }
+    }
+    # Production: explicit label words only. "organic feed" describes feed, not certification.
+    if ( $text =~ /\borganic\s+feed\b/i ) {
+        $why{production_note} = 'organic feed (not product certification)';
+    }
+    elsif ( $text =~ /\b(org|organic|certified\s+organic)\b/i ) {
+        $p{production} = 'organic_certified';
+        $why{production} = 'explicit';
+    }
+    if    ( $text =~ /\bgrass[\s-]*(fed|finished)\b/i ) { @p{'animal_raising'} = ('grass_fed');  $why{animal_raising} = 'explicit' }
+    elsif ( $text =~ /\bpasture[sd]?([\s-]raised)?\b/i ) { $p{animal_raising} = 'pasture';    $why{animal_raising} = 'explicit' }
+    elsif ( $text =~ /\bfree[\s-]*range\b/i )           { $p{animal_raising} = 'free_range'; $why{animal_raising} = 'explicit' }
+    elsif ( $text =~ /\b(caged|battery)\b/i && $text !~ /\bcage[\s-]*free\b/i ) { $p{animal_raising} = 'caged'; $why{animal_raising} = 'explicit' }
+    elsif ( $text =~ /\bfeedlot|grain[\s-]*finished\b/i ) { $p{animal_raising} = 'feedlot'; $why{animal_raising} = 'explicit' }
+
+    if    ( $text =~ /\bwild([\s-]caught)?\b/i ) { $p{catch_method} = 'wild';   $why{catch_method} = 'explicit' }
+    elsif ( $text =~ /\bfarm(ed|[\s-]raised)\b/i && ( $p{food_category} // '' ) =~ /salmon|fish/ ) {
+        $p{catch_method} = 'farmed'; $why{catch_method} = 'explicit';
+    }
+    elsif ( $p{food_category} && $WILD_SPECIES{ $p{food_category} } && $name =~ /\b(herring|sardines?|mackerel|anchov)/i ) {
+        $p{catch_method} = 'wild'; $why{catch_method} = 'inferred';    # these species are not commercially farmed
+    }
+
+    if ( $text =~ /\bnon[\s-]*gmo\b/i ) {
+        $p{gmo} = 'non_gmo_verified';
+        $why{gmo} = $text =~ /\bnon[\s-]*gmo\s+feed\b/i ? 'inferred' : 'explicit';
+        $why{gmo_note} = 'non-GMO feed' if $why{gmo} eq 'inferred';
+    }
+    elsif ( ( $p{production} // '' ) eq 'organic_certified' ) {
+        $p{gmo} = 'non_gmo_verified';    # certified organic prohibits GMOs
+        $why{gmo} = 'inferred';
+    }
+    my $level = ( grep { $_ eq 'explicit' } values %why ) ? 'explicit'
+              : ( grep { $_ eq 'inferred' } values %why ) ? 'inferred' : 'unknown';
+    return { %p, confidence => $level, why => \%why, processed => $processed ? 1 : 0 };
+}
+
+# Pure: brand code from Co-op style names ("BLK Oats ..." -> "BLK").
+sub brand_code {
+    my ( $self, $name ) = @_;
+    return ( defined $name && $name =~ /^([A-Z]{2,5})\s+\S/ ) ? $1 : undef;
 }
 
 __PACKAGE__->meta->make_immutable;

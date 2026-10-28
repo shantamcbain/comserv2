@@ -1,0 +1,229 @@
+[% META
+  title = 'Cloudflare Cache Rules'
+  roles = 'admin'
+  TemplateType = 'Application'
+  category = 'admin,infrastructure'
+%]
+
+<style>
+.cfc-wrap { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.cfc-wrap .panel { border: 1px solid var(--border-color, #ddd); border-radius: 8px; margin-bottom: 20px;
+         background: var(--card-bg, #fff); box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+.cfc-wrap .panel-header { background: var(--header-bg, #f5f5f5); padding: 12px 18px; border-radius: 8px 8px 0 0;
+                border-bottom: 1px solid var(--border-color, #ddd); }
+.cfc-wrap .panel-header h3 { margin: 0; font-size: 1.1em; }
+.cfc-wrap .panel-body { padding: 18px; }
+.cfc-wrap .badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 0.82em; font-weight: bold; text-transform: uppercase; }
+.cfc-wrap .badge-ok  { background: #d4edda; color: #155724; }
+.cfc-wrap .badge-err { background: #f8d7da; color: #721c24; }
+.cfc-wrap .badge-warn{ background: #fff3cd; color: #856404; }
+.cfc-wrap .badge-na  { background: #eee; color: #666; }
+.cfc-wrap table.data-table { width: 100%; border-collapse: collapse; font-size: 0.92em; }
+.cfc-wrap table.data-table th { background: var(--header-bg, #f0f0f0); padding: 8px 10px; text-align: left; white-space: nowrap; }
+.cfc-wrap table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-color, #eee); vertical-align: top; }
+.cfc-wrap .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em; text-decoration: none; display: inline-block; }
+.cfc-wrap .btn-primary { background: #2196f3; color: #fff; }
+.cfc-wrap .btn-secondary { background: #757575; color: #fff; }
+.cfc-wrap .btn-success { background: #4caf50; color: #fff; }
+.cfc-wrap .btn-danger { background: #c62828; color: #fff; }
+.cfc-wrap form.inline { display: inline; }
+.cfc-wrap .error-banner { background: #ffebee; border: 1px solid #ef9a9a; padding: 12px 16px; border-radius: 4px; margin-bottom: 16px; color: #c62828; }
+.cfc-wrap .success-banner { background: #e8f5e9; border: 1px solid #a5d6a7; padding: 12px 16px; border-radius: 4px; margin-bottom: 16px; color: #1b5e20; }
+.cfc-wrap .setup-guide { background: #e3f2fd; border: 1px solid #90caf9; border-radius: 6px; padding: 14px 18px; margin-bottom: 16px; font-size: 0.92em; line-height: 1.5; }
+.cfc-wrap pre.cfc-pre { background: #263238; color: #eceff1; padding: 12px; border-radius: 6px; overflow: auto; max-height: 420px; font-size: 0.82em; }
+.cfc-wrap .cfc-warn { background: #fff3e0; border: 2px solid #ef6c00; padding: 12px 16px; border-radius: 6px; margin: 10px 0; color: #bf360c; font-weight: bold; }
+.cfc-wrap .hint { font-size: 0.85em; color: #666; }
+</style>
+
+<div class="cfc-wrap">
+  <h1><i class="fas fa-bolt"></i> Cloudflare Cache Rules</h1>
+  <p><a href="[% c.uri_for('/admin/dns') %]">&laquo; Cloudflare DNS</a> &middot;
+     <a href="[% c.uri_for('/admin') %]">Admin</a></p>
+
+  [% IF c.flash.success_msg %]<div class="success-banner">[% c.flash.success_msg | html %]</div>[% END %]
+  [% IF c.flash.error_msg %]<div class="error-banner"><strong>Action failed:</strong> [% c.flash.error_msg | html %]</div>[% END %]
+  [% IF c.flash.cfcache_results %]
+  <div class="panel"><div class="panel-header"><h3>Results</h3></div>
+    <div class="panel-body"><ul>[% FOREACH line IN c.flash.cfcache_results %]<li>[% line | html %]</li>[% END %]</ul></div></div>
+  [% END %]
+
+  <div class="panel">
+    <div class="panel-header"><h3>Connection</h3></div>
+    <div class="panel-body">
+      [% IF cf_token.ok %]
+        <span class="badge badge-ok">Token active</span>
+        [% IF cf_token.zones_error %]
+          <div class="error-banner" style="margin-top:10px;"><strong>Zone list failed:</strong> [% cf_token.zones_error | html %]</div>
+        [% ELSE %]
+          <span class="hint">[% cf_zones.size %] zone(s) reachable. The list is fetched live on every visit, so new domains appear automatically.</span>
+        [% END %]
+      [% ELSE %]
+        <span class="badge badge-err">Token not usable</span>
+        <div class="error-banner" style="margin-top:10px;">[% cf_token.error | html %]</div>
+        <div class="setup-guide">
+          <strong>How to fix:</strong> create a Cloudflare API token (My Profile &rarr; API Tokens &rarr; Create Token) with
+          <ul>
+            <li><strong>Zone &rarr; Zone &rarr; Read</strong> (list zones),</li>
+            <li><strong>Zone &rarr; Cache Rules &rarr; Edit</strong> (read, apply and undo the cache ruleset),</li>
+          </ul>
+          scoped to <em>All zones</em> (so new domains are included), then store it where the DNS page already reads it
+          (<code>cloudflare.json</code> in the shared secrets folder, or the Cloudflare credentials page). The token value is never shown on this page.
+        </div>
+        [% IF cf_known.size %]
+        <p class="hint"><strong>Domains listed in the app's Cloudflare config</strong> (labels only &mdash; not live, no actions until the token works):
+          [% FOREACH k IN cf_known %]<code>[% k.name | html %]</code> [% END %]</p>
+        [% END %]
+      [% END %]
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header"><h3>What gets applied (rules tagged <code>[% cf_tag | html %]</code>)</h3></div>
+    <div class="panel-body">
+      <ol>
+        <li><strong>Never cache private paths</strong> (every zone) &mdash; <code>/user /admin /api /todo /cgi-bin</code>, <em>and any request carrying a <code>comserv_session</code> cookie</em>, bypass the cache.</li>
+        <li><strong>Anonymous ENCY pages</strong> (only zones ticked &ldquo;serves /ENCY/&rdquo;) &mdash; GET <code>/ENCY/</code> with no <code>comserv_session</code> cookie: edge cache 4 h, no browser caching.
+            Never cached even then: paths or query strings containing <code>add edit delete remove create update save login logout</code>.</li>
+        <li><em>Phase 2 (optional, off by default)</em> &mdash; same anonymous-GET rule for
+            [% FOREACH p IN cf_phase2 %]<code>[% p | html %]</code> [% END %].</li>
+      </ol>
+      <p class="hint">Deliberately excluded and never cached: [% FOREACH p IN cf_excluded %]<code>[% p | html %]</code> [% END %].
+         Applying a zone <em>replaces</em> its comserv rules with exactly what is ticked, so un-ticking &ldquo;serves /ENCY/&rdquo; and applying removes rule 2 from that zone.
+         Only <code>[% cf_tag | html %]</code> rules are added, replaced or removed; every other rule in a zone is kept untouched.
+         Before any change the zone's current cache ruleset is exported to a timestamped file.</p>
+      <label><input type="checkbox" id="cfc-phase2"> Include phase 2 paths</label>
+      <button type="button" class="btn btn-secondary" onclick="cfcPreview('')">Preview rules (no write)</button>
+      <pre class="cfc-pre" id="cfc-preview" style="display:none;"></pre>
+    </div>
+  </div>
+
+  [% IF cf_zones.size %]
+  <div class="panel">
+    <div class="panel-header"><h3>Zones</h3></div>
+    <div class="panel-body">
+      <form id="cfc-form-all" method="POST" action="[% c.uri_for('/admin/cloudflare_cache/apply_all') %]" class="inline"
+            onsubmit="return cfcConfirm('Apply rule 1 to ALL [% cf_zones.size %] zones, and the ENCY rule only to zones ticked? A backup export is saved for each zone first.', this);">
+        <input type="hidden" name="csrf" value="[% cf_csrf %]">
+        <input type="hidden" name="phase2" value="" class="cfc-p2-field">
+        <button type="submit" class="btn btn-success">Apply to all zones</button>
+      </form>
+      <span class="hint">Rule 1 goes to every zone; the ENCY rule only to zones ticked below.</span>
+      <table class="data-table" style="margin-top:14px;">
+        <thead><tr><th>Zone</th><th>Cloudflare status</th><th>Serves /ENCY/?</th><th>Our rules</th><th>Actions</th></tr></thead>
+        <tbody>
+        [% FOREACH z IN cf_zones %]
+          <tr data-zone="[% z.id %]" data-name="[% z.name | html %]">
+            <td><strong>[% z.name | html %]</strong></td>
+            <td><span class="badge [% z.status == 'active' ? 'badge-ok' : 'badge-warn' %]">[% z.status | html %]</span>[% IF z.paused %] <span class="badge badge-warn">paused</span>[% END %]</td>
+            <td>
+              <label><input type="checkbox" class="cfc-ency" name="ency_zones" value="[% z.id %]" form="cfc-form-all"[% IF cf_ency_hint.${z.id} %] checked data-hint="1"[% END %]>
+                this site serves /ENCY/</label>
+              [% IF cf_ency_hint.${z.id} %]<span class="hint">(ENCY module enabled for a site on this zone)</span>[% END %]
+            </td>
+            <td class="cfc-state"><span class="badge badge-na">checking&hellip;</span></td>
+            <td>
+              <button type="button" class="btn btn-secondary" onclick="cfcPreview('[% z.id %]')">Preview</button>
+              <form method="POST" action="[% c.uri_for('/admin/cloudflare_cache/apply') %]" class="inline"
+                    onsubmit="return cfcConfirm('Apply comserv cache rules to [% z.name | html %]? Current rules are exported first.', this);">
+                <input type="hidden" name="csrf" value="[% cf_csrf %]"><input type="hidden" name="zone_id" value="[% z.id %]">
+                <input type="hidden" name="phase2" value="" class="cfc-p2-field">
+                <input type="hidden" name="ency" value="" class="cfc-ency-field">
+                <button type="submit" class="btn btn-primary">Apply</button>
+              </form>
+              <form method="POST" action="[% c.uri_for('/admin/cloudflare_cache/undo') %]" class="inline"
+                    onsubmit="return confirm('Remove comserv cache rules from [% z.name | html %]? A fresh export is saved first.');">
+                <input type="hidden" name="csrf" value="[% cf_csrf %]"><input type="hidden" name="zone_id" value="[% z.id %]">
+                <button type="submit" class="btn btn-danger">Undo / disable</button>
+              </form>
+              <button type="button" class="btn btn-secondary" onclick="cfcExports('[% z.id %]', '[% z.name | html %]')">Restore&hellip;</button>
+            </td>
+          </tr>
+        [% END %]
+        </tbody>
+      </table>
+      <div id="cfc-restore" style="display:none; margin-top:14px;"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header"><h3>Test a URL (fetches it twice, anonymously)</h3></div>
+    <div class="panel-body">
+      <input type="text" id="cfc-test-url" size="70" placeholder="https://example.com/ENCY/some-page">
+      <button type="button" class="btn btn-primary" onclick="cfcTest()">Test</button>
+      <p class="hint">Expect <code>cf-cache-status</code> MISS then HIT. Only http/https to hosts under the zones above is allowed.</p>
+      <div id="cfc-test-out"></div>
+    </div>
+  </div>
+  [% END %]
+</div>
+
+<script>
+(function () {
+  var CSRF = '[% cf_csrf %]';
+  var BASE = '[% c.uri_for('/admin/cloudflare_cache') %]';
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); }
+  function p2() { var e = document.getElementById('cfc-phase2'); return e && e.checked ? '1' : ''; }
+  function syncP2() { document.querySelectorAll('.cfc-p2-field').forEach(function (f) { f.value = p2(); }); }
+  document.querySelectorAll('.cfc-ency').forEach(function (b) { b.addEventListener('change', function () { b.dataset.touched = '1'; }); });
+  var box = document.getElementById('cfc-phase2'); if (box) box.addEventListener('change', syncP2); syncP2();
+
+  window.cfcConfirm = function (msg, form) {
+    syncP2();
+    var tr = form.closest('tr'); var ef = form.querySelector('.cfc-ency-field'); var ency = '';
+    if (tr && ef) { var cb = tr.querySelector('.cfc-ency'); ency = cb && cb.checked ? '1' : ''; ef.value = ency; }
+    var extra = (tr && ef) ? (ency ? '\n\nENCY rule INCLUDED for this zone.' : '\n\nENCY rule not included (zone not ticked).') : '';
+    return confirm(msg + (p2() ? '\n\nPhase 2 paths INCLUDED.' : '\n\nPhase 2 paths not included.') + extra);
+  };
+
+  window.cfcPreview = function (zoneId) {
+    var pre = document.getElementById('cfc-preview'); pre.style.display = 'block'; pre.textContent = 'Loading...';
+    var ency = '1';
+    if (zoneId) { var row = document.querySelector('tr[data-zone="' + zoneId + '"] .cfc-ency'); ency = row && row.checked ? '1' : ''; }
+    fetch(BASE + '/preview?phase2=' + p2() + '&ency=' + ency + (zoneId ? '&zone_id=' + encodeURIComponent(zoneId) : ''), {credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (j) { pre.textContent = JSON.stringify(j, null, 2); })
+      .catch(function (e) { pre.textContent = 'Preview failed: ' + e; });
+  };
+
+  function loadState(tr) {
+    var cell = tr.querySelector('.cfc-state');
+    return fetch(BASE + '/status/' + tr.dataset.zone, {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) { cell.innerHTML = '<span class="badge badge-err">error</span> <span class="hint">' + esc(j.error) + '</span>'; return; }
+      var cb = tr.querySelector('.cfc-ency'); if (cb && j.ency && !cb.dataset.touched) cb.checked = true;
+      var cls = j.state === 'applied' ? 'badge-ok' : (j.state === 'partial' ? 'badge-warn' : 'badge-na');
+      cell.innerHTML = '<span class="badge ' + cls + '">' + esc(j.state === 'none' ? 'not applied' : j.state) + '</span>' +
+        (j.ency ? ' <span class="badge badge-ok">+ENCY</span>' : '') + (j.phase2 ? ' <span class="badge badge-warn">+phase 2</span>' : '') +
+        ' <span class="hint">' + j.our_rules + ' ours / ' + j.other_rules + ' other</span>';
+    }).catch(function (e) { cell.innerHTML = '<span class="badge badge-err">error</span>'; });
+  }
+  var rows = Array.prototype.slice.call(document.querySelectorAll('tr[data-zone]'));
+  (function next() { var tr = rows.shift(); if (tr) loadState(tr).then(next, next); })();
+
+  window.cfcExports = function (zoneId, name) {
+    var d = document.getElementById('cfc-restore'); d.style.display = 'block'; d.innerHTML = 'Loading...';
+    fetch(BASE + '/exports/' + zoneId, {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok || !j.files.length) { d.innerHTML = '<span class="hint">No saved exports for ' + esc(name) + ' yet.</span>'; return; }
+      var opts = j.files.map(function (f) { return '<option value="' + esc(f) + '">' + esc(f) + '</option>'; }).join('');
+      d.innerHTML = '<form method="POST" action="' + BASE + '/restore" onsubmit="return confirm(\'Replace the WHOLE cache ruleset of ' + esc(name) + ' with this export? A fresh export is saved first.\');">' +
+        '<strong>Restore ' + esc(name) + ' from export:</strong> <input type="hidden" name="csrf" value="' + CSRF + '"><input type="hidden" name="zone_id" value="' + esc(zoneId) + '">' +
+        '<select name="export_file">' + opts + '</select> <button class="btn btn-danger" type="submit">Restore</button></form>';
+    });
+  };
+
+  window.cfcTest = function () {
+    var out = document.getElementById('cfc-test-out'); out.innerHTML = 'Fetching twice...';
+    var body = new URLSearchParams(); body.set('csrf', CSRF); body.set('url', document.getElementById('cfc-test-url').value);
+    fetch(BASE + '/test', {method: 'POST', credentials: 'same-origin', body: body}).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) { out.innerHTML = '<div class="error-banner">' + esc(j.error) + '</div>'; return; }
+      var h = '';
+      (j.warnings || []).forEach(function (w) { h += '<div class="cfc-warn">WARNING: ' + esc(w) + '</div>'; });
+      h += '<table class="data-table"><tr><th>Request</th><th>HTTP</th><th>cf-cache-status</th><th>Age</th><th>Cache-Control</th><th>Set-Cookie?</th></tr>';
+      j.runs.forEach(function (r, i) {
+        h += '<tr><td>' + (i + 1) + '</td><td>' + esc(r.status) + '</td><td>' + esc(r.cf_cache || '(none)') + '</td><td>' + esc(r.age || '-') + '</td><td>' + esc(r.cache_control || '-') + '</td><td>' + (r.set_cookie ? '<strong style="color:#c62828">YES (' + esc((r.cookie_names || []).join(', ')) + ')</strong>' : 'no') + '</td></tr>';
+      });
+      h += '</table><p class="hint">' + (j.miss_then_hit ? 'MISS then HIT as expected.' : 'Did not see MISS then HIT - rules may not be applied yet, the page may not match, or Cloudflare needs another request.') + '</p>';
+      out.innerHTML = h;
+    }).catch(function (e) { out.innerHTML = '<div class="error-banner">Test failed: ' + esc(e) + '</div>'; });
+  };
+})();
+</script>

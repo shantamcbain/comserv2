@@ -64,6 +64,46 @@ sub _init_proxmox {
     return $proxmox;
 }
 
+# The server list used to link to /proxmox/<server_id>. index only accepts
+# /proxmox with an optional server_id query param, so that URL 404'd.
+sub open_server :Path :Args(1) {
+    my ($self, $c, $server_id) = @_;
+    # /proxmox/<action> must not be stored as a server id. The graph feed
+    # used to land here and overwrite the session, so the connected host
+    # looked offline.
+    my $known = $self->_known_server_id($server_id);
+    unless ($known) {
+        $c->response->redirect($c->uri_for('/proxmox'));
+        return;
+    }
+    $c->session->{proxmox_server_id} = $known;
+    $c->request->parameters->{server_id} = $known;
+    $c->detach('index');
+}
+
+sub _known_server_id {
+    my ($self, $server_id) = @_;
+    return '' unless defined $server_id && length $server_id;
+    require Comserv::Util::ProxmoxCredentials;
+    my $all = Comserv::Util::ProxmoxCredentials::get_all_servers() || [];
+    for my $srv (@$all) {
+        my $id = $srv->{id} || $srv->{server_id} || next;
+        return $id if $id eq $server_id;
+    }
+    return '';
+}
+
+sub _default_server_id {
+    my ($self) = @_;
+    require Comserv::Util::ProxmoxCredentials;
+    my $all = Comserv::Util::ProxmoxCredentials::get_all_servers() || [];
+    for my $srv (@$all) {
+        my $id = $srv->{id} || $srv->{server_id} || next;
+        return $id if $srv->{token_value};
+    }
+    return ($all->[0] && ($all->[0]{id} || $all->[0]{server_id})) || '';
+}
+
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
@@ -74,6 +114,11 @@ sub index :Path :Args(0) {
         return;
     }
 
+    if ($c->req->param('graphs')) {
+        $c->detach('fleet_graphs');
+        return;
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
         "Accessing Proxmox controller");
 
@@ -81,15 +126,12 @@ sub index :Path :Args(0) {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
         "User roles: " . join(", ", @$roles));
 
-    # Use server_id from parameter or session; fall back to first saved server
-    my $server_id = $c->req->param('server_id') || $c->session->{proxmox_server_id};
-    unless ($server_id) {
-        my $all_servers = Comserv::Util::ProxmoxCredentials::get_all_servers();
-        if ($all_servers && @$all_servers) {
-            $server_id = $all_servers->[0]{id} || $all_servers->[0]{server_id};
-        }
-        $server_id ||= 'ProxmoxDevelopment';
-    }
+    # Ignore a session id that is not a configured server. A missing action
+    # used to be stored as the server id and then every page failed to connect.
+    my $requested = $c->req->param('server_id') || $c->session->{proxmox_server_id};
+    my $server_id = $self->_known_server_id($requested) || $self->_default_server_id();
+    $server_id ||= 'ProxmoxDevelopment';
+    $c->session->{proxmox_server_id} = $server_id if $self->_known_server_id($server_id);
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
         "Starting Proxmox VM management for server: $server_id");
@@ -332,7 +374,10 @@ sub index :Path :Args(0) {
         show_debug => 1,  # Set to 1 to show debug info in the UI
         proxmox_credentials_file => $creds_file,
         proxmox_credentials_exists => $creds_exists,
-        proxmox_credentials => $credentials,
+        proxmox_credentials => {
+            %{ $credentials || {} },
+            token_value => ($credentials->{token_value} ? 'set' : 'not set'),
+        },
         proxmox_api_response => $proxmox_debug_info
     };
 
@@ -967,6 +1012,46 @@ sub vm_power :Path('vm_power') :Args(0) {
     $c->forward('View::JSON');
 }
 
+# Polled by the power popup. Does not start or stop the VM.
+# GET /proxmox/vm_power_progress?vmid=110&upid=UPID:...
+sub vm_power_progress :Path('vm_power_progress') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSC admin required' };
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $vmid = $c->req->params->{vmid} || '';
+    my $upid = $c->req->params->{upid} || '';
+    unless ($vmid =~ /^\d+$/) {
+        $c->stash->{json} = { success => 0, error => 'vmid required' };
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $proxmox = $self->_init_proxmox($c);
+    unless ($proxmox->authenticate()) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'vm_power_progress',
+            "Proxmox authentication failed for VM $vmid");
+        $c->stash->{json} = { success => 0, error => 'Proxmox authentication failed' };
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $result = eval { $proxmox->get_power_progress($vmid, $upid) };
+    if ($@ || !$result) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'vm_power_progress',
+            "power progress failed for VM $vmid: " . ($@ || 'no result'));
+        $c->stash->{json} = { success => 0, error => ($@ ? "$@" : 'No progress data') };
+    } else {
+        $c->stash->{json} = $result;
+    }
+    $c->forward('View::JSON');
+}
+
 sub upload_iso :Path('upload_iso') :Args(0) {
     my ($self, $c) = @_;
 
@@ -1116,6 +1201,13 @@ sub vm_detail :Path('vm_detail') :Args(1) {
         ($proxmox_host = $creds->{api_url_base}) =~ s|/api2/json||;
     }
 
+    my $guest_vms = eval { $proxmox->get_vms($c->session->{proxmox_server_id}) } || [];
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'vm_detail',
+            "VM list for the tree failed: $@");
+        $guest_vms = [];
+    }
+
     $c->stash(
         template     => 'proxmox/vm_detail.tt',
         vmid         => $vmid,
@@ -1126,8 +1218,95 @@ sub vm_detail :Path('vm_detail') :Args(1) {
         next_vmid    => $next_id,
         storages     => $storages,
         proxmox_host => $proxmox_host,
+        vms          => $guest_vms,
     );
     $c->forward($c->view('TT'));
+}
+
+# JSON feed for the performance graphs on the VM detail page.
+# GET /proxmox/vm_graph_data/{vmid}?timeframe=hour|day|week|month|year
+sub vm_graph_data :Path('vm_graph_data') :Args(1) {
+    my ($self, $c, $vmid) = @_;
+
+    $c->res->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->res->status(403);
+        $c->res->body(encode_json({ error => 'Forbidden' }));
+        return;
+    }
+
+    my $timeframe = $c->req->param('timeframe') || 'hour';
+
+    my $proxmox = $self->_init_proxmox($c);
+    my $data    = eval { $proxmox->get_vm_graph_data($vmid, $timeframe) };
+
+    if ($@ || !$data) {
+        $c->res->status(500);
+        $c->res->body(encode_json({
+            error => 'Could not retrieve performance data',
+            detail => ($@ ? "$@" : 'no data'),
+        }));
+        return;
+    }
+
+    $c->res->body(encode_json($data));
+}
+
+# JSON feed for the all-servers page: node + every guest, every configured host.
+# GET /proxmox/fleet_graphs?timeframe=hour|day|week
+sub fleet_graphs :Path('fleet_graphs') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->res->content_type('application/json; charset=utf-8');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->res->status(403);
+        $c->res->body(encode_json({ error => 'Forbidden' }));
+        return;
+    }
+
+    my $timeframe = $c->req->param('timeframe') || 'hour';
+    require Comserv::Util::ProxmoxCredentials;
+    my $servers = Comserv::Util::ProxmoxCredentials::get_all_servers() || [];
+    my $proxmox = $c->model('Proxmox');
+    my $saved   = $c->session->{proxmox_server_id};
+    my @out;
+
+    for my $srv (@$servers) {
+        my $id = $srv->{id} || $srv->{server_id} || next;
+        my $name = $srv->{name} || $id;
+        my $host = $srv->{host} || '';
+        unless ($srv->{token_value}) {
+            push @out, {
+                id => $id, name => $name, host => $host,
+                ok => 0, error => 'No API token stored', vms => [],
+            };
+            next;
+        }
+        $proxmox->set_server_id($id);
+        my $history = $c->req->param('snapshot') ? 0 : 1;
+        my $guests  = $c->req->param('nodes') ? 0 : 1;
+        my $snap = eval { $proxmox->get_activity_snapshot($timeframe, $history, $guests) };
+        if ($@ || !$snap) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fleet_graphs',
+                "activity snapshot failed for $id");
+            push @out, {
+                id => $id, name => $name, host => $host,
+                ok => 0, error => 'Could not read stats', vms => [],
+            };
+            next;
+        }
+        $snap->{id}   = $id;
+        $snap->{name} = $name;
+        $snap->{host} = $host;
+        push @out, $snap;
+    }
+
+    $proxmox->set_server_id($saved) if $saved;
+    $c->res->body(encode_json({ timeframe => $timeframe, servers => \@out }));
 }
 
 sub clone_vm_form :Path('clone_vm') :Args(1) {

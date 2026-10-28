@@ -7,8 +7,9 @@ __PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp');
 __PACKAGE__->table('hk_item_product');
 
 # Product details for a pantry/inventory item (brand, UPC, package size).
-# For inventory items the UPC falls back to inventory_items.barcode on read;
-# inventory_items itself is not modified by HealthKitchen.
+# upc is only used for personal pantry rows; site inventory items keep their
+# barcode in inventory_items.barcode/barcode_type. Sourcing attributes live in
+# Accounting::InventoryItemAttributes (inventory_item_attributes).
 __PACKAGE__->add_columns(
     id         => { data_type => 'integer', is_auto_increment => 1, is_nullable => 0 },
     sitename   => { data_type => 'varchar', size => 255, is_nullable => 0 },

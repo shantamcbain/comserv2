@@ -329,7 +329,7 @@ sub fetch_openrouter_status {
     my $key;
     eval {
         my $prov = $c->model('AI2::Provider::OpenRouter');
-        $key = $prov->_resolve_api_key($c) if $prov && $prov->can('_resolve_api_key');
+        $key = $prov->_resolve_api_key($c, undef, system => 1) if $prov && $prov->can('_resolve_api_key');
     };
     unless ($key) {
         $out->{error} = 'No OpenRouter API key';

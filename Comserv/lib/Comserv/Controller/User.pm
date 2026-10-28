@@ -1,7 +1,10 @@
 package Comserv::Controller::User;
 use Moose;
 use namespace::autoclean;
-use Digest::SHA qw(sha256_hex);  # For hashing passwords
+use Digest::SHA qw(sha256_hex);  # For hashing verification codes; passwords use PBKDF2
+use Comserv::Util::PasswordHash;
+use Comserv::Util::LoginThrottle;
+use Comserv::Util::ClientIP;
 use Data::Dumper;
 use Email::Sender::Simple qw(sendmail);
 use Email::Simple;
@@ -72,22 +75,14 @@ sub login :Local {
     # NOTE: Only overwrite the session referer when we have an explicit value.
     # This ensures a controller that redirects to /user/login without return_to still
     # returns the user to the right place (the session referer set before the redirect).
-    my $is_local_url = sub {
-        my $url = shift || '';
-        return ($url =~ m{^/} && $url !~ m{^//} && $url !~ m{[<>"'\0]}) ? 1 : 0;
-    };
-
-    my $raw_return = $c->req->param('return_to')
-                  || $c->req->param('destination')
-                  || '';
-    my $http_referer = $c->req->referer || '';
-
-    my $explicit_return = '';
-    if ($raw_return && $is_local_url->($raw_return)) {
-        $explicit_return = $raw_return;
-    } elsif ($http_referer && $is_local_url->($http_referer)) {
-        $explicit_return = $http_referer;
-    }
+    # Absolute same-site URLs (Referer header, uri_for/req->uri values passed by
+    # controllers that redirect here) are reduced to their local path; anything
+    # external, protocol-relative or a login/logout page is rejected.
+    my $explicit_return = $self->_safe_return_path($c, scalar($c->req->param('return_to')))
+                       || $self->_safe_return_path($c, scalar($c->req->param('destination')))
+                       || $self->_safe_return_path($c, delete $c->session->{login_return_path})
+                       || $self->_safe_return_path($c, $c->req->referer)
+                       || '';
 
     my @login_patterns = (
         qr{/user/login}, qr{/login}, qr{/do_login},
@@ -99,17 +94,27 @@ sub login :Local {
         return grep { $url =~ $_ } @login_patterns;
     };
 
+    # Rate-limit failed login attempts per IP
+    unless ($self->_check_rate_limit($c, 'login')) {
+        $c->res->status(429);
+        $c->stash(error_msg => 'Too many login attempts. Please wait 15 minutes and try again.',
+                  template  => 'user/login.tt');
+        $c->forward($c->view('TT'));
+        return;
+    }
+
     if ($explicit_return && !$is_login_url->($explicit_return)) {
         $c->session->{referer} = $explicit_return;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login',
             "Stored explicit referer in session: $explicit_return");
-    } elsif ($c->session->{referer} && !$is_login_url->($c->session->{referer})) {
+    } elsif ($c->session->{referer}
+             && ($c->session->{referer} = $self->_safe_return_path($c, $c->session->{referer}))) {
         # Keep existing valid session referer (e.g. set by a controller that redirected to login)
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login',
             "Keeping existing session referer: " . $c->session->{referer});
     } else {
         # No usable referer anywhere — fall back to home page
-        $c->session->{referer} = $c->uri_for('/');
+        $c->session->{referer} = '/';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login',
             "No valid referer found, using home page");
     }
@@ -148,6 +153,41 @@ sub login :Local {
     $c->stash(template => 'user/login.tt');
     $c->forward($c->view('TT'));
 }
+# Return a safe same-site path (path + query) for post-login redirect, or ''.
+# Accepts "/path?q" or an absolute URL whose host matches this request's host.
+# Rejects external hosts, "//host", backslash/control-char tricks, and auth pages.
+sub _safe_return_path {
+    my ($self, $c, $url) = @_;
+    return '' unless defined $url;
+    $url = "$url";
+    # Reject control chars (CR/LF/TAB/NUL/DEL) BEFORE trimming so a leading or
+    # trailing newline can never be silently dropped and accepted.
+    return '' if $url =~ /[\x00-\x1f\x7f]/;
+    $url =~ s/^ +| +$//g;
+    return '' if $url eq '' || $url =~ /[<>"'\\]/;
+    if ($url =~ m{^[a-z][a-z0-9+.\-]*:}i) {
+        return '' unless $url =~ m{^https?://([^/?#]+)(.*)\z}i;
+        my ($host, $rest) = (lc $1, $2);
+        return '' if $host =~ /@/;
+        my $req_host = lc(eval { $c->req->uri->host_port } || '');
+        my $req_name = lc(eval { $c->req->uri->host } || '');
+        (my $bare = $host) =~ s/:\d+\z//;
+        return '' unless $host eq $req_host || $bare eq $req_name;
+        $url = $rest eq '' ? '/' : $rest;
+    }
+    return '' unless $url =~ m{^/} && $url !~ m{^//};
+    $url =~ s/#.*\z//;
+    my ($path) = $url =~ m{^([^?]*)};
+    # Percent-decoded view: encoded CR/LF/control/backslash or an encoded "//"
+    # prefix is refused, and encoded spellings of the login pages count as loops.
+    my $dpath = $path;
+    $dpath =~ s/%([0-9a-fA-F]{2})/chr(hex($1))/ge;
+    return '' if $dpath =~ /[\x00-\x1f\x7f\\]/ || $dpath =~ m{^//};
+    $path = $dpath;
+    return '' if $path =~ m{^/(?:user/(?:login|do_login|logout|register|do_create_account|verify_email|complete_profile)|login|logout|do_login)(?:/|\z)}i;
+    return $url;
+}
+
 sub do_login :Local {
     my ($self, $c) = @_;
 
@@ -189,10 +229,43 @@ sub do_login :Local {
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
+
     # Get user input — password field also accepts a 6-digit verification code
     my $username   = $c->req->body_parameters->{username} || $c->req->param('username') || '';
     my $credential = $c->req->body_parameters->{password} || $c->req->param('password') || '';
     $credential =~ s/\s+//g;
+
+    # Failed-login throttle: per client IP + account (block, max 15 min), per IP
+    # across accounts (block, max 15 min), per account across IPs (short delay
+    # only - never a block, so the owner/admin cannot be locked out).
+    # The IP comes from Comserv::Util::ClientIP: $c->req->address (already set by
+    # the psgi's trusted-proxy ReverseProxy), and CF-Connecting-IP / X-Forwarded-For
+    # only when that address is itself a trusted proxy - a client that reaches the
+    # port directly cannot pick its own throttle bucket with a header.
+    # The account is keyed by user id when the name/e-mail resolves to a user.
+    my $throttle    = $self->_login_throttle($c);
+    my $throttle_ip = Comserv::Util::ClientIP->from_c($c);
+    my $acct_id     = $self->_throttle_account($c, $username);
+    my $thr = $throttle->check_login($throttle_ip, $acct_id);
+    if ($thr->{store_error}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+            "Login throttle storage unavailable (failing open): " . substr($thr->{store_error}, 0, 200));
+    }
+    if ($thr->{action} eq 'block') {
+        my $mins = int(($thr->{retry_after} + 59) / 60);
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+            "AUDIT: Login throttled ip=$throttle_ip acct_key=" . $throttle->account_key($acct_id)
+            . " rule=$thr->{reason} retry_after=$thr->{retry_after}s");
+        $c->res->status(429);
+        $c->res->header('Retry-After' => $thr->{retry_after});
+        $c->stash(error_msg => "Too many failed login attempts. Please wait $mins minute" . ($mins == 1 ? '' : 's')
+                             . " and try again, or use a different network.",
+                  prefill_username => $username,
+                  template  => 'user/login.tt');
+        $c->forward($c->view('TT'));
+        return;
+    }
+    $throttle->apply_delay($thr) if $thr->{action} eq 'delay';
 
     # Determine whether the credential is a 6-digit verification code or a password
     my $password          = ($credential =~ /^\d{6}$/) ? '' : $credential;
@@ -209,23 +282,16 @@ sub do_login :Local {
     my $redirect_path;
     
     if ($return_to) {
-        # Validate return_to is a local path (no protocol/host) to prevent open redirect
-        if ($return_to =~ m{^/} && $return_to !~ m{^//} && $return_to !~ m{[<>"'\0]}) {
-            $redirect_path = $return_to;
-        } else {
-            $redirect_path = '/';
-        }
+        # Validate return_to is a same-site local path to prevent open redirect
+        $redirect_path = $self->_safe_return_path($c, $return_to)
+                      || $self->_safe_return_path($c, $c->session->{referer})
+                      || '/';
         $self->logging->log_with_details(
             $c, 'info', __FILE__, __LINE__, 'do_login',
             "Using return_to parameter for redirect: $redirect_path"
         );
     } else {
-        my $sess_ref = $c->session->{referer} || '';
-        if ($sess_ref =~ m{^/} && $sess_ref !~ m{^//} && $sess_ref !~ m{[<>"'\0]}) {
-            $redirect_path = $sess_ref;
-        } else {
-            $redirect_path = '/';
-        }
+        $redirect_path = $self->_safe_return_path($c, $c->session->{referer}) || '/';
         $self->logging->log_with_details(
             $c, 'info', __FILE__, __LINE__, 'do_login',
             "Using session referer for redirect: $redirect_path"
@@ -281,6 +347,7 @@ sub do_login :Local {
             "Verification code login attempt for '$username'");
 
         unless ($user) {
+            $throttle->record_failure($throttle_ip, $acct_id);
             $c->flash->{error_msg} = 'Invalid email or username.';
             $c->res->redirect($c->uri_for('/user/login'));
             return;
@@ -321,6 +388,7 @@ sub do_login :Local {
                 return;
             }
         } else {
+            $throttle->record_failure($throttle_ip, $acct_id);
             my $user_status = $user->status || '';
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                 "Invalid or expired verification code for '$username' (status=$user_status)");
@@ -343,9 +411,13 @@ sub do_login :Local {
 
     # Check if user exists and password is correct
     if ($user && $user->check_password($password)) {
+        # Successful authentication clears the rate-limit counter for this
+        # account / IP pair.
+        $self->_record_login_success($c, $username);
+
         # Check if account is suspended
         if ($user->status && $user->status eq 'suspended') {
-            my $susp_ip = $c->req->address || 'unknown';
+            my $susp_ip = $throttle_ip;
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                 "AUDIT: Login denied user_id=" . $user->id . " username='$username' ip=$susp_ip reason=account_suspended");
             $c->flash->{error_msg} = 'Your account has been suspended. Please contact an administrator.';
@@ -353,9 +425,25 @@ sub do_login :Local {
             return;
         }
         # Manual authentication successful
-        my $client_ip = $c->req->address || 'unknown';
+        my $client_ip = $throttle_ip;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
             "AUDIT: Login success user_id=" . $user->id . " username='$username' ip=$client_ip");
+
+        # Correct credentials: clear the failure counter for this IP + account.
+        $throttle->record_success($throttle_ip, $acct_id);
+
+        # Upgrade a legacy unsalted SHA-256 hash to PBKDF2 now that the plain
+        # password is known to be correct. PBKDF2 hashes are left untouched.
+        if (Comserv::Util::PasswordHash->needs_upgrade($user->password)) {
+            eval { $user->update({ password => $self->hash_password($password) }) };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                    "Password hash upgrade failed for user_id=" . $user->id);
+            } else {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                    "Password hash upgraded to PBKDF2 for user_id=" . $user->id);
+            }
+        }
 
         # Auto-activate pre-existing accounts that lack a status (created before the status column)
         # or accounts stuck in pending_verification that somehow still have a correct password
@@ -514,8 +602,11 @@ sub do_login :Local {
             "Final roles in session: $roles_debug"
         );
     } else {
-        # Authentication failed — determine the specific reason for better UX
-        my $fail_ip  = $c->req->address || 'unknown';
+        # Authentication failed — count it for the throttle (never log the password)
+        $throttle->record_failure($throttle_ip, $acct_id);
+
+        # Determine the specific reason for better UX
+        my $fail_ip  = $throttle_ip;
         my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
 
         my %fail_stash = (prefill_username => $username, template => 'user/login.tt');
@@ -578,12 +669,14 @@ sub do_login :Local {
                         "AUDIT: Login failed user_id=" . $user->id . " ip=$fail_ip reason=wrong_password sitename=$sitename");
                     $fail_stash{error_msg}              = 'Invalid password. If you have forgotten your password, you can reset it below.';
                     $fail_stash{show_forgot_password}   = 1;
+                    $self->_record_login_failure($c, $username);
                 }
             }
         } else {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                 "AUDIT: Login failed username='$username' ip=$fail_ip reason=user_not_found");
             $fail_stash{error_msg} = 'Invalid username or password.';
+            $self->_record_login_failure($c, $username);
         }
 
         $c->stash(%fail_stash);
@@ -617,11 +710,100 @@ sub do_login :Local {
     }
     return;
 }
+# All new/changed passwords are PBKDF2 (see Comserv::Util::PasswordHash).
+# Legacy SHA-256 hashes are only ever READ, never written.
 sub hash_password {
     my ($self, $password) = @_;
-    return sha256_hex($password);
+    return Comserv::Util::PasswordHash->hash($password);
 }
 
+# Rate-limit failed login attempts.
+# Policy (mirrors the PBKDF2 hardening spec):
+#   - 5 failures from one IP on one account block that IP for up to 15 minutes.
+#   - Failures across all IPs on one account add a 2-second delay per attempt
+#     (never a block).
+#   - 30 failures from one IP across accounts block that IP for up to 15 minutes.
+#   - Admins can always log in from an unblocked IP.
+#   - A successful login clears the counters for that account/IP pair.
+# Implementation stores counters in the session rather than the logging table,
+# because logging rows can be merged or disabled and would silently disable the
+# limit.
+sub _check_rate_limit {
+    my ($self, $c, $type) = @_;
+
+    my $ip       = $c->req->address || 'unknown';
+    my $username = '';
+    if ($type && $type eq 'login') {
+        $username = $c->req->param('username') // '';
+    }
+    my $now    = time();
+    my $window = 15 * 60; # 15 minutes
+
+    $c->session->{_login_failures} ||= [];
+    my @failures = grep { $now - ($_->{time} // 0) < $window }
+                   @{$c->session->{_login_failures}};
+
+    # IP-level block: 30 failures from this IP across all accounts
+    my $ip_failures = grep { ($_->{ip} // '') eq $ip } @failures;
+    if ($ip_failures >= 30) {
+        return 0;
+    }
+
+    # If we have a username, apply account-level rules
+    if ($username) {
+        # Admin bypass: admins may log in from an unblocked IP even if the
+        # account-level rules would otherwise apply.
+        my $is_admin_user = 0;
+        eval {
+            my $u = $c->model('DBEncy::User')->find({ username => $username });
+            if ($u && $u->roles) {
+                my $roles = $u->roles;
+                $is_admin_user = 1 if grep { lc($_) eq 'admin' || lc($_) eq 'site_admin' }
+                                      (ref $roles eq 'ARRAY' ? @$roles : split /,\s*/, $roles);
+            }
+        };
+
+        unless ($is_admin_user) {
+            # Account + IP block: 5 failures from this IP on this account
+            my $account_ip_failures = grep {
+                ($_->{ip} // '') eq $ip && ($_->{username} // '') eq $username
+            } @failures;
+            if ($account_ip_failures >= 5) {
+                return 0;
+            }
+
+            # Account-level delay: 2 seconds per recent failure across all IPs
+            # (never blocks, only slows down guesses).
+            my $account_failures = grep { ($_->{username} // '') eq $username } @failures;
+            if ($account_failures > 0) {
+                sleep(2 * $account_failures);
+            }
+        }
+    }
+
+    $c->session->{_login_failures} = \@failures;
+    return 1;
+}
+
+sub _record_login_failure {
+    my ($self, $c, $username) = @_;
+    my $ip = $c->req->address || 'unknown';
+    push @{$c->session->{_login_failures} ||= []}, {
+        ip       => $ip,
+        username => $username // '',
+        time     => time(),
+    };
+}
+
+sub _record_login_success {
+    my ($self, $c, $username) = @_;
+    return unless $username;
+    my $ip = $c->req->address || 'unknown';
+    my @remaining = grep {
+        !(($_->{ip} // '') eq $ip && ($_->{username} // '') eq $username)
+    } @{$c->session->{_login_failures} || []};
+    $c->session->{_login_failures} = \@remaining;
+}
 
 sub logout :Local {
     my ($self, $c) = @_;
@@ -1044,11 +1226,8 @@ sub do_change_password :Local {
         return;
     }
 
-    # Hash new password with SHA256
-    my $hashed_password = sha256_hex($new_password);
-
-    # Update user password in database
     eval {
+        my $hashed_password = $self->hash_password($new_password);
         $user->update({ password => $hashed_password });
     };
 
@@ -1094,7 +1273,7 @@ sub do_create_account :Local {
     my $submitted_token = $c->request->params->{csrf_token} // '';
     my $session_token   = $c->session->{csrf_token}         // '';
     my $honeypot        = $c->request->params->{website}    // '';
-    my $reg_ip          = $c->req->address || 'unknown';
+    my $reg_ip          = Comserv::Util::ClientIP->from_c($c);
 
     if ($honeypot ne '') {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
@@ -1149,6 +1328,14 @@ sub do_create_account :Local {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
         "Step 1 registration attempt for username: $username, email: $email");
 
+    # Rate-limit registrations per IP (5 per hour; the block expires on its own)
+    unless ($self->_login_throttle($c)->register_allowed($reg_ip)) {
+        $c->res->status(429);
+        $c->stash(error_msg => 'Too many registration attempts. Please wait an hour and try again.',
+                  template  => 'user/register.tt');
+        return;
+    }
+
     unless ($username && $email) {
         $c->stash(error_msg => 'Username and email are required', template => 'user/register.tt');
         return;
@@ -1161,6 +1348,14 @@ sub do_create_account :Local {
 
     unless ($email =~ /^[a-zA-Z0-9._%+\-]+\@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/ && length($email) <= 255) {
         $c->stash(error_msg => 'Please enter a valid email address.', template => 'user/register.tt');
+        return;
+    }
+
+    if ($self->_is_disposable_email($email)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Disposable email rejected: $email ip=" . ($c->req->address||'?'));
+        $c->stash(error_msg => 'Temporary or disposable email addresses are not allowed. Please use a permanent email address.',
+                  template  => 'user/register.tt');
         return;
     }
 
@@ -1569,12 +1764,9 @@ sub admin_send_password_reset :Local {
         $c->flash->{success_msg} = 'Password reset email sent to ' . $user->email . '.';
     }
 
-    my $return_to = $c->req->param('return_to') || '/user/edit_user/' . $user_id;
-    if ($return_to =~ m{^https?://}) {
-        $c->response->redirect($return_to);
-    } else {
-        $c->response->redirect($c->uri_for($return_to));
-    }
+    # Same-site local path only (no open redirect); anything else falls back to the default page.
+    my $return_to = $self->_safe_return_path($c, scalar $c->req->param('return_to')) || '/user/edit_user/' . $user_id;
+    $c->response->redirect($c->uri_for($return_to));
 }
 
 sub admin_resend_verification :Local {
@@ -1620,12 +1812,9 @@ sub admin_resend_verification :Local {
         $c->flash->{success_msg} = 'Verification code resent to ' . $user->email . '.';
     }
 
-    my $return_to = $c->req->param('return_to') || '/admin/users';
-    if ($return_to =~ m{^https?://}) {
-        $c->response->redirect($return_to);
-    } else {
-        $c->response->redirect($c->uri_for($return_to));
-    }
+    # Same-site local path only (no open redirect); anything else falls back to the default page.
+    my $return_to = $self->_safe_return_path($c, scalar $c->req->param('return_to')) || '/admin/users';
+    $c->response->redirect($c->uri_for($return_to));
 }
 
 sub complete_profile :Local {
@@ -1674,9 +1863,8 @@ sub complete_profile :Local {
             return;
         }
         
-        my $hashed_password = sha256_hex($password);
-        
         eval {
+            my $hashed_password = $self->hash_password($password);
             my $roles_to_assign = 'normal';
             my $session_return_to = $c->session->{return_to};
             
@@ -1740,7 +1928,7 @@ sub complete_profile :Local {
                 "Failed to send admin Step 3 notification: $@");
         }
 
-        my $final_redirect = $c->session->{return_to} || $c->uri_for('/user/login');
+        my $final_redirect = $self->_safe_return_path($c, $c->session->{return_to}) || $c->uri_for('/user/login');
         delete $c->session->{return_to};
         
         $c->flash->{success_msg} = "Registration complete! You can now log in.";
@@ -2041,7 +2229,7 @@ sub complete_username_setup :Local {
                 username => $username,
                 first_name => $first_name,
                 last_name => $last_name,
-                password => sha256_hex($password),
+                password => $self->hash_password($password),
                 status => 'active',
                 email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
             });
@@ -2138,7 +2326,7 @@ sub complete_password_setup :Local {
         
         eval {
             $user->update({
-                password => sha256_hex($password),
+                password => $self->hash_password($password),
                 status => 'active',
                 email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
             });
@@ -3239,7 +3427,7 @@ sub register :Local {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register',
         'Displaying registration form (Step 1)');
     
-    my $return_to = $c->req->param('return_to');
+    my $return_to = $self->_safe_return_path($c, scalar $c->req->param('return_to'));
     if ($return_to) {
         $c->session->{return_to} = $return_to;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register',
@@ -3453,7 +3641,7 @@ sub reset_password :Local {
     eval {
         my $now_str = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
         my $status  = $user->status || '';
-        my %updates = ( password => sha256_hex($new_password) );
+        my %updates = ( password => $self->hash_password($new_password) );
         unless ($status eq 'suspended') {
             $updates{status}           = 'active';
             $updates{email_verified_at} = $now_str unless $user->email_verified_at;
@@ -3932,6 +4120,58 @@ sub _public_reset_link {
         return 'https://' . $hostname . '/user/reset_password?token=' . $token;
     }
     return $c->uri_for('/user/reset_password', { token => $token });
+}
+
+# ── Security helpers ────────────────────────────────────────────────────────
+
+# Shared throttle backed by the existing system_log table (see
+# Comserv::Util::LoginThrottle for the exact rules). A test can inject a
+# different store/clock with $c->stash->{login_throttle}.
+# Account identity for the throttle: "uid:<id>" when the typed username or e-mail
+# resolves to a user (so 'bob', 'BOB ' and 'bob@x.com' share one counter), else the
+# trimmed, lower-cased text. A lookup error just falls back to the text.
+sub _throttle_account {
+    my ($self, $c, $typed) = @_;
+    $typed = '' unless defined $typed;
+    (my $t = $typed) =~ s/^\s+|\s+$//g;
+    my $u = eval {
+        my $col = $t =~ /@/ ? 'email' : 'username';
+        my $rs  = $c->model('DBEncy::User');
+        # exact text first, then lower-case (the DB collation is usually case-insensitive anyway)
+        $rs->find({ $col => $t }) || (lc($t) ne $t ? $rs->find({ $col => lc $t }) : undef);
+    };
+    return ($u && defined $u->id) ? 'uid:' . $u->id : lc $t;
+}
+
+sub _login_throttle {
+    my ($self, $c) = @_;
+    return $c->stash->{login_throttle} if $c->stash->{login_throttle};
+    my $store = Comserv::Util::LoginThrottle::DBStore->new(
+        $c->model('DBEncy')->resultset('SystemLog'));
+    return $c->stash->{login_throttle} = Comserv::Util::LoginThrottle->new(store => $store);
+}
+
+# Returns 1 if the email domain is on the disposable/throwaway list.
+my %DISPOSABLE_DOMAINS = map { $_ => 1 } qw(
+    mailinator.com guerrillamail.com guerrillamail.org guerrillamail.net
+    guerrillamail.biz guerrillamail.de guerrillamail.info trashmail.com
+    trashmail.at trashmail.io trashmail.me trashmail.net yopmail.com
+    yopmail.fr yopmail.net yopmail.org sharklasers.com spam4.me
+    dispostable.com throwam.com throwaway.email maildrop.cc
+    mailnull.com mailnull.net 33mail.com spamgourmet.com spamgourmet.net
+    spamgourmet.org discard.email mailnesia.com mailtemp.net
+    fakeinbox.com fakemail.net mytemp.email tempinbox.com
+    rambler.ru inbox.lv grr.la anonaddy.com
+    temp-mail.org tempmail.com 10minutemail.com 10minutemail.net
+    10minutemail.org guerrillam.com getairmail.com discard.email
+    spamhereplease.com emailsensei.com mailsac.com
+);
+
+sub _is_disposable_email {
+    my ($self, $email) = @_;
+    return 0 unless $email && $email =~ /\@(.+)$/;
+    my $domain = lc($1);
+    return $DISPOSABLE_DOMAINS{$domain} ? 1 : 0;
 }
 
 __PACKAGE__->meta->make_immutable;

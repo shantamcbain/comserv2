@@ -2919,31 +2919,109 @@ sub invoice_api_data :Path('/mail/invoice/api/data') :Args(0) {
     $c->res->body($json_text);
 }
 
-sub invoice_sort :Path('/mail/invoice/sort') :Args(0) {
+sub _invoice_queue_admin {
     my ($self, $c) = @_;
-    
     my $is_admin = grep { $_ eq 'admin' } @{$c->session->{roles} || []};
     unless ($is_admin) {
         $c->res->status(403);
         $c->response->body('Access denied');
-        return;
+        return 0;
     }
-    
-    my $schema = $c->model('DBEncy');
-    my $site_id = $self->_get_site_id($c);
-    
-    # Get all sites
-    my $sites_rs = $schema->resultset('Site')->search({}, { order_by => 'name' });
-    my @sites;
-    while (my $site = $sites_rs->next) {
-        push @sites, { id => $site->id, name => $site->name };
-    }
-    
+    return 1;
+}
+
+sub invoice_sort :Path('/mail/invoice/sort') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_invoice_queue_admin($c);
+
+    require Comserv::Util::Inventory::MailInvoiceStock;
+    my $queue = Comserv::Util::Inventory::MailInvoiceStock->new->queue_invoices($c);
     $c->stash(
-        sites => \@sites,
-        template => 'mail/mail.invoice_sort.tt',
+        invoices  => $queue->{invoices},
+        suppliers => $queue->{suppliers},
+        sites     => $queue->{sites},
+        queue_note => $queue->{note},
+        template  => 'mail/mail.invoice_sort.tt',
     );
     $c->forward($c->view('TT'));
+}
+
+sub invoice_sort_update :Path('/mail/invoice/sort/invoice') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_invoice_queue_admin($c);
+    my $p = $c->req->body_parameters;
+    require Comserv::Util::Inventory::MailInvoiceStock;
+    my $r = Comserv::Util::Inventory::MailInvoiceStock->new->update_invoice_assignment(
+        $c,
+        invoice_id  => $p->{invoice_id},
+        sitename    => $p->{sitename},
+        supplier_id => $p->{supplier_id},
+    );
+    if ($r->{ok}) {
+        $c->flash->{success_msg} = 'Invoice SiteName and supplier saved.';
+    } else {
+        $c->flash->{error_msg} = $r->{error} || 'Could not save the invoice.';
+    }
+    $c->res->redirect($c->uri_for('/mail/invoice/sort'));
+}
+
+sub invoice_sort_item :Path('/mail/invoice/sort/item') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_invoice_queue_admin($c);
+    my $p = $c->req->body_parameters;
+    require Comserv::Util::Inventory::MailInvoiceStock;
+    my $r = Comserv::Util::Inventory::MailInvoiceStock->new->update_item_site(
+        $c,
+        item_id  => $p->{item_id},
+        sitename => $p->{sitename},
+        barcode  => $p->{barcode},
+    );
+    if ($r->{ok}) {
+        $c->flash->{success_msg} = 'Item SiteName saved.';
+    } else {
+        $c->flash->{error_msg} = $r->{error} || 'Could not save the item.';
+    }
+    $c->res->redirect($c->uri_for('/mail/invoice/sort'));
+}
+
+sub invoice_sort_line :Path('/mail/invoice/sort/line') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_invoice_queue_admin($c);
+    my $p = $c->req->body_parameters;
+    require Comserv::Util::Inventory::MailInvoiceStock;
+    my $r = Comserv::Util::Inventory::MailInvoiceStock->new->update_line(
+        $c,
+        line_id     => $p->{line_id},
+        description => $p->{description},
+        quantity    => $p->{quantity},
+        unit_cost   => $p->{unit_cost},
+    );
+    if ($r->{ok}) {
+        $c->flash->{success_msg} = 'Line saved. Stock was not changed.';
+    } else {
+        $c->flash->{error_msg} = $r->{error} || 'Could not save the line.';
+    }
+    $c->res->redirect($c->uri_for('/mail/invoice/sort'));
+}
+
+sub invoice_sort_accept :Path('/mail/invoice/sort/accept') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_invoice_queue_admin($c);
+    my $p = $c->req->body_parameters;
+    require Comserv::Util::Inventory::MailInvoiceStock;
+    my $r = Comserv::Util::Inventory::MailInvoiceStock->new->accept_invoice(
+        $c,
+        invoice_id => $p->{invoice_id},
+    );
+    if ($r->{ok}) {
+        $c->flash->{success_msg} = sprintf(
+            'Accepted. Created %d item(s). Received %d line(s). Already received %d. No general ledger post.',
+            $r->{created} || 0, $r->{received} || 0, $r->{already} || 0,
+        );
+    } else {
+        $c->flash->{error_msg} = $r->{error} || 'Could not accept the invoice.';
+    }
+    $c->res->redirect($c->uri_for('/mail/invoice/sort'));
 }
 
 # ============================================================
@@ -2968,5 +3046,235 @@ sub classify_invoices_cron :Private {
         return undef;
     };
 }
+
+# ======================================================================
+# CSC-20260831-6017 — connect an EXISTING mailbox on /mail
+#   GET  /mail/connect          form + saved mailboxes + client settings
+#   POST /mail/connect          op=test (IMAP login + SMTP auth, no mail sent)
+#                               op=save (test, then store; password encrypted)
+#   POST /mail/connect/remove/N remove a saved mailbox (owner or site admin)
+# ======================================================================
+
+my %MC_DEFAULTS = (
+    imap_host => 'harper.whc.ca', imap_port => 993, imap_security => 'ssl',
+    smtp_host => 'harper.whc.ca', smtp_port => 465, smtp_security => 'ssl',
+    pop_host  => 'harper.whc.ca', pop_port  => 995,
+);
+
+sub _mc_is_site_admin {
+    my ($self, $c) = @_;
+    my $r = $c->session->{roles} || [];
+    $r = [ split /\s*,\s*/, $r ] unless ref $r;
+    return (grep { lc($_ // '') eq 'admin' } @$r) || $c->session->{is_admin} ? 1 : 0;
+}
+
+sub _mc_rs {
+    my ($self, $c) = @_;
+    my $rs = eval { $c->model('DBEncy')->resultset('UserMailbox') };
+    return undef unless $rs;
+    # table may not exist yet (pending schema_compare)
+    return eval { $rs->search({}, { rows => 1 })->count; 1 } ? $rs : undef;
+}
+
+sub _mc_params {
+    my ($self, $c) = @_;
+    my $p = $c->req->params;
+    my %m;
+    $m{email_address}  = lc(($p->{email_address} // '') =~ s/^\s+|\s+$//gr);
+    $m{login_username} = (($p->{login_username} // '') =~ s/^\s+|\s+$//gr) || $m{email_address};
+    for my $k (qw(imap_host smtp_host pop_host)) {
+        my $v = lc(($p->{$k} // '') =~ s/^\s+|\s+$//gr);
+        $m{$k} = ($v =~ /^[a-z0-9.\-]{3,253}$/) ? $v : $MC_DEFAULTS{$k};
+    }
+    for my $k (qw(imap_port smtp_port pop_port)) {
+        my $v = $p->{$k} // '';
+        $m{$k} = ($v =~ /^\d{1,5}$/ && $v > 0 && $v < 65536) ? $v + 0 : $MC_DEFAULTS{$k};
+    }
+    for my $k (qw(imap_security smtp_security)) {
+        my $v = lc($p->{$k} // '');
+        $m{$k} = ($v =~ /^(ssl|starttls|none)$/) ? $v : $MC_DEFAULTS{$k};
+    }
+    $m{site_managed} = ($p->{site_managed} && $self->_mc_is_site_admin($c)) ? 1 : 0;
+    return \%m;
+}
+
+# Pure-ish: returns { imap_ok, imap_msg, smtp_ok, smtp_msg, ok }
+sub _mc_test_connection {
+    my ($self, $m, $password) = @_;
+    my %r;
+    # IMAP login
+    eval {
+        require Mail::IMAPClient;
+        my %o = (Server => $m->{imap_host}, Port => $m->{imap_port}, Timeout => 12, Uid => 1);
+        if ($m->{imap_security} eq 'ssl') { $o{Ssl} = 1 }
+        elsif ($m->{imap_security} eq 'starttls') { $o{Starttls} = 1 }
+        my $imap = Mail::IMAPClient->new(%o);
+        die "could not connect to $m->{imap_host}:$m->{imap_port} (" . ($@ || 'no response') . ")\n" unless $imap && $imap->IsConnected;
+        $imap->User($m->{login_username}); $imap->Password($password);
+        if ($imap->login) { $r{imap_ok} = 1; $r{imap_msg} = 'IMAP login succeeded'; $imap->logout }
+        else {
+            my $e = $imap->LastError // 'login rejected'; $e =~ s/\s+/ /g;
+            $r{imap_ok} = 0; $r{imap_msg} = "IMAP server reached, login rejected: " . substr($e, 0, 160);
+        }
+        1;
+    } or do { $r{imap_ok} = 0; ($r{imap_msg} = "IMAP error: $@") =~ s/\s+\z//; };
+    # SMTP AUTH (no message sent)
+    eval {
+        require Net::SMTP;
+        my %o = (Host => $m->{smtp_host}, Port => $m->{smtp_port}, Timeout => 12, Hello => 'comserv.local');
+        $o{SSL} = 1 if $m->{smtp_security} eq 'ssl';
+        my $smtp = Net::SMTP->new(%o) or die "could not connect to $m->{smtp_host}:$m->{smtp_port}\n";
+        if ($m->{smtp_security} eq 'starttls') { $smtp->starttls or die "STARTTLS failed\n" }
+        require Authen::SASL;
+        if ($smtp->auth($m->{login_username}, $password)) { $r{smtp_ok} = 1; $r{smtp_msg} = 'SMTP authentication succeeded (no mail sent)' }
+        else { my $e = ($smtp->message // 'auth rejected'); $e =~ s/\s+/ /g; $r{smtp_ok} = 0; $r{smtp_msg} = "SMTP server reached, authentication rejected: " . substr($e, 0, 160) }
+        $smtp->quit;
+        1;
+    } or do { $r{smtp_ok} = 0; ($r{smtp_msg} = "SMTP error: $@") =~ s/\s+\z//; };
+    $r{ok} = ($r{imap_ok} && $r{smtp_ok}) ? 1 : 0;
+    # A server/library error text must never carry the password into the page, the
+    # log or the last_test_msg column.
+    if (defined $password && length $password) {
+        for my $k (qw(imap_msg smtp_msg)) {
+            next unless defined $r{$k};
+            $r{$k} =~ s/\Q$password\E/***/g;
+            $r{$k} = substr($r{$k}, 0, 300);
+        }
+    }
+    return \%r;
+}
+
+# True when a host is loopback / private / link-local (or does not resolve): the
+# connection test must not become a way to probe the server's own network.
+# Site admins may still test internal mail servers.
+sub _mc_host_is_internal {
+    my ($self, $host) = @_;
+    return 1 unless defined $host && length $host;
+    return 1 if lc($host) eq 'localhost' || $host =~ /\.(?:local|localdomain|internal|lan|home\.arpa)\z/i;
+    require Socket;
+    my ($err, @res) = Socket::getaddrinfo($host, undef, { socktype => Socket::SOCK_STREAM() });
+    return 1 if $err || !@res;
+    for my $ai (@res) {
+        my ($e, $ip) = Socket::getnameinfo($ai->{addr}, Socket::NI_NUMERICHOST(), Socket::NIx_NOSERV());
+        next if $e;
+        $ip = lc $ip; $ip =~ s/^::ffff://;
+        return 1 if $ip =~ /^(?:127\.|10\.|0\.|169\.254\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/
+                 || $ip =~ /^(?:::1?|f[cd][0-9a-f]{2}:|fe[89ab][0-9a-f]:)/;
+    }
+    return 0;
+}
+
+sub connect_mailbox :Path('/mail/connect') :Args(0) {
+    my ($self, $c) = @_;
+    unless ($c->session->{username}) {
+        $c->res->redirect($c->uri_for('/user/login', { return_to => '/mail/connect' }));
+        return;
+    }
+    my $site    = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $user_id = $c->session->{user_id};
+    my $rs      = $self->_mc_rs($c);
+    my $form    = { %MC_DEFAULTS, login_username => '', email_address => '' };
+    my ($result, $msg, $err);
+
+    if (uc($c->req->method) eq 'POST') {
+        my $m  = $self->_mc_params($c);
+        my $pw = $c->req->params->{password} // '';
+        $form  = { %$m };
+        my $op = $c->req->params->{op} // 'test';
+        if ($m->{email_address} !~ /^[^@\s]+@[a-z0-9.\-]+\.[a-z]{2,}$/) {
+            $err = 'Please enter a valid email address.';
+        } elsif ($pw eq '') {
+            $err = 'Please enter the mailbox password (it is only used for the test and stored encrypted).';
+        } elsif (!$self->_mc_is_site_admin($c)
+                 && (my ($bad_host) = grep { $self->_mc_host_is_internal($m->{$_}) } qw(imap_host smtp_host))) {
+            $err = 'The ' . ($bad_host eq 'imap_host' ? 'incoming (IMAP)' : 'outgoing (SMTP)')
+                 . ' server must be a public mail server host name. Ask a site admin to connect internal servers.';
+        } else {
+            $result = $self->_mc_test_connection($m, $pw);
+            # never log the password
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'connect_mailbox',
+                "Mailbox test $m->{email_address} imap=" . ($result->{imap_ok} ? 'ok' : 'fail')
+                . " smtp=" . ($result->{smtp_ok} ? 'ok' : 'fail'));
+            if ($op eq 'save') {
+                # One row per (address, site). A different user must never take over or overwrite
+                # someone else's saved mailbox (or a site-managed one unless the caller is a site admin).
+                my $owned = $rs ? eval { $rs->search({ email_address => $m->{email_address}, sitename => $site })->first } : undef;
+                my $may_write = !$owned
+                    || ($owned->user_id // -1) == ($user_id // -2)
+                    || ($owned->site_managed && $self->_mc_is_site_admin($c));
+                if (!$result->{ok} && !$c->req->params->{save_anyway}) {
+                    $err = 'Connection test failed, so the mailbox was not saved. Fix the settings or tick "save anyway".';
+                } elsif (!$rs) {
+                    $err = 'Saving is not available yet: the user_mailboxes table has not been created (admin: run Schema Compare). Your test result is shown below.';
+                } elsif (!$may_write) {
+                    $err = 'That mailbox address is already connected by another user on this site.';
+                } else {
+                    require Comserv::Util::Encryption;
+                    my $now = strftime('%Y-%m-%d %H:%M:%S', gmtime);
+                    my $row = eval {
+                        $rs->update_or_create({
+                            %$m,
+                            sitename      => $site,
+                            user_id       => ($m->{site_managed} ? undef : $user_id),
+                            password_enc  => Comserv::Util::Encryption->encrypt($pw, 'mail'),
+                            last_test_ok  => $result->{ok},
+                            last_test_at  => $now,
+                            last_test_msg => substr(join(' | ', $result->{imap_msg}, $result->{smtp_msg}), 0, 500),
+                            updated_at    => $now,
+                        }, { key => 'user_mailboxes_email_site' });
+                    };
+                    my $save_err = $@;
+                    if ($row) { $row->update({ created_at => $now }) unless $row->created_at; $msg = "Mailbox $m->{email_address} saved." }
+                    else {
+                        $err = 'Could not save the mailbox. Please try again.';
+                        # DBIC/DBD errors can append "ParamValues: ..." (the bound row values): cut that off,
+                        # and scrub the password in case it is quoted anywhere.
+                        $save_err = "$save_err"; $save_err =~ s/\s+/ /g;
+                        $save_err =~ s/\[for Statement.*\z//s; $save_err =~ s/ParamValues.*\z//s;
+                        $save_err =~ s/\Q$pw\E/***/g if length $pw;
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'connect_mailbox', 'save failed: ' . substr($save_err, 0, 200));
+                    }
+                }
+            }
+        }
+    }
+
+    my @boxes;
+    if ($rs) {
+        my $is_admin = $self->_mc_is_site_admin($c);
+        @boxes = $rs->search({ sitename => $site, -or => [ { user_id => $user_id },
+                                ($is_admin ? ({ site_managed => 1 }) : ()) ] },
+                             { order_by => 'email_address' })->all;
+    }
+    $c->stash(
+        template     => 'mail/connect_mailbox.tt',
+        title        => 'Connect an existing mailbox',
+        form         => $form,
+        result       => $result,
+        success_msg  => $msg,
+        error_msg    => $err,
+        boxes        => \@boxes,
+        table_ready  => $rs ? 1 : 0,
+        is_site_admin=> $self->_mc_is_site_admin($c),
+        client       => { %MC_DEFAULTS, %{ $form || {} } },
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub connect_mailbox_remove :Path('/mail/connect/remove') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $rs = $self->_mc_rs($c);
+    if ($rs && $c->session->{username} && uc($c->req->method) eq 'POST' && $id =~ /^\d+$/) {
+        my $row = $rs->find($id);
+        my $site = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        if ($row && $row->sitename eq $site
+                 && (($row->user_id // -1) == ($c->session->{user_id} // -2)
+                     || ($row->site_managed && $self->_mc_is_site_admin($c)))) {
+            $row->delete;   # removes only the app's saved connection; the real mailbox is untouched
+        }
+    }
+    $c->res->redirect($c->uri_for('/mail/connect'));
+}
+
 
 __PACKAGE__->meta->make_immutable;

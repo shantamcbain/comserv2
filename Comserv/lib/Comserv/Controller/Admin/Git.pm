@@ -350,13 +350,30 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
             # Secret guard (same script as the global pre-commit hook). Never --no-verify.
             my $guard = $self->git_service->secret_guard($c);
             unless ($guard->{ok}) {
-                $msg = "Commit refused by secret guard \x{2014} a staged file looks like a key or secret. "
-                     . "Unstage it (keys belong in ~/.comserv/keys) and retry.\n" . ($guard->{output} // q{});
+                my $where = join(', ', map {
+                    $_->{file} . ($_->{line} ? ":$_->{line}" : '')
+                } @{ $guard->{hits} || [] });
+                $msg = "Commit refused by secret guard. "
+                     . ($where ? "Location: $where. " : '')
+                     . "Only the primary DB key belongs in the env; other keys belong in the database. "
+                     . "Use the fix route below. Do not use --no-verify.";
+                if ($guard->{hits} && @{ $guard->{hits} }) {
+                    $c->flash->{guard_hits_json} = encode_json($guard->{hits});
+                } else {
+                    $msg .= "\n" . ($guard->{output} // q{});
+                }
                 goto COMMIT_DONE;
             }
+
+            # 2026-10-15: reviewer gate before the commit goes through.
+            my $g = $self->_dashboard_commit_gate($c, $message);
+            unless ($g->{proceed}) { $msg = $g->{msg}; $c->flash->{commit_message_keep} = $message; goto COMMIT_DONE; }
+
             my ($out, $code) = $self->_git_list($c, 'commit', '-m', $message);
             $ok = ($code == 0);
             $msg = $ok ? "Committed staged changes." : "Commit failed: $out";
+            $msg .= ' ' . $g->{note} if $ok && $g->{note};
+            $self->_save_user_gate($c, undef) if $ok;
         }
         COMMIT_DONE:
     }
@@ -452,15 +469,34 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         $msg ||= 'Nothing deleted.';
     }
     elsif ($op eq 'gitignore') {
-        # Only untracked files may be gitignored (tracked ones need git rm --cached first).
+        # Untracked files: add to .gitignore. Tracked files: also untrack them with
+        # 'git rm --cached' (file stays on disk) - .gitignore alone never stops git
+        # tracking a file it already tracks. .gitignore is staged afterwards.
         my @tracked = grep { !$validated->{untracked}{$_} } @{ $validated->{valid} };
-        my @ignore  = grep {  $validated->{untracked}{$_} } @{ $validated->{valid} };
-        $ok = $self->_append_gitignore($c, \@ignore);
-        $msg  = @ignore ? ($ok ? "Added to .gitignore: " . join(', ', @ignore) . "."
-                               : "Failed to update .gitignore.") : '';
-        $msg .= " Skipped (tracked — run 'git rm --cached' first): " . join(', ', @tracked) . "."
-            if @tracked;
-        $ok = 1 if @tracked && !@ignore;   # informational, not a failure
+        my @all     = @{ $validated->{valid} };
+        my (@untracked_done, @errors);
+        if (@tracked) {
+            my ($out, $code) = $self->_git_list($c, 'rm', '--cached', '-q', '--', @tracked);
+            if ($code == 0) { @untracked_done = @tracked; }
+            else            { push @errors, "git rm --cached failed: $out"; }
+        }
+        # Only ignore what is now untracked (skip tracked files whose rm failed).
+        my %rm_ok = map { $_ => 1 } @untracked_done;
+        my @ignore = grep { $validated->{untracked}{$_} || $rm_ok{$_} } @all;
+        my $gi_ok = $self->_append_gitignore($c, \@ignore);
+        push @errors, 'Failed to update .gitignore.' unless $gi_ok;
+        if ($gi_ok && @ignore) {
+            my ($out, $code) = $self->_git_list($c, 'add', '--', '.gitignore');
+            push @errors, "Could not stage .gitignore: $out" if $code != 0;
+        }
+        $ok  = (@ignore && !@errors) ? 1 : 0;
+        $msg = '';
+        $msg .= "Added to .gitignore: " . join(', ', @ignore) . ". " if @ignore && $gi_ok;
+        $msg .= "Stopped tracking (git rm --cached, files kept on disk): "
+              . join(', ', @untracked_done) . ". " if @untracked_done;
+        $msg .= ".gitignore and the removals are staged - commit to finish. " if $ok && @untracked_done;
+        $msg .= ".gitignore is staged - commit to finish. " if $ok && !@untracked_done;
+        $msg .= join(' ', @errors) if @errors;
     }
     elsif ($op eq 'stash') {
         my $message = $c->req->param('message') || '';
@@ -498,6 +534,38 @@ so no new AI plumbing is introduced. One-shot call — does NOT create a convers
 JSON: { success, message, model } or { success => 0, error }.
 
 =cut
+
+# 2026-10-15: AI Editor commit form (root/ai2/editor/right_dock_commit.tt).
+# step=review: review the staged diff with the in-app reviewer, return findings.
+# step=confirm: commit the reviewed diff; a blocked diff needs override_reason
+# ("commit anyway"). Cap hit / reviewer error -> warning, commit allowed.
+sub editor_commit :Path('/admin/git/editor_commit') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_commit');
+    unless ($c->req->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+    my $step = $c->req->param('step') // 'review';
+    my $out;
+    if ($step eq 'review') {
+        my $r = $self->_review_for_commit($c, $c->req->param('commit_message'), []);
+        my $gate = $c->stash->{commit_review} || {};
+        my $view = $self->_reviewer_for($c)->gate_view($gate->{review} || {});
+        $out = { success => ($r->{error_msg} && !$view->{blocking}) ? 0 : 1, step => 'review',
+                 message => $r->{success_msg} // $r->{error_msg} // '',
+                 error => ($view->{blocking} ? undef : $r->{error_msg}),
+                 paths => $gate->{paths} || [], %$view };
+    } elsif ($step eq 'confirm') {
+        my $r = $self->_confirm_reviewed_commit($c);
+        $out = { success => $r->{error_msg} ? 0 : 1, step => 'confirm',
+                 message => $r->{success_msg} // '', error => $r->{error_msg}, output => $r->{output} // '' };
+    } else {
+        $out = { success => 0, error => "unknown step $step" };
+    }
+    $c->response->body(encode_json($out));
+}
 
 sub suggest_commit_message :Path('/admin/git/suggest_message') :Args(0) {
     my ($self, $c) = @_;
@@ -643,10 +711,19 @@ PROMPT
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'suggest_commit_message',
         "Suggested commit message (" . length($message) . " chars) via $used_model");
 
+    # Warn about backup copies / runtime data in the change set (commit would be refused).
+    my @chg;
+    my ($cached_names) = $self->_git_list($c, 'diff', '--cached', '--name-only', '--diff-filter=ACMR');
+    my ($wt_names)     = $self->_git_list($c, 'diff', 'HEAD', '--name-only', '--diff-filter=ACMR');
+    push @chg, grep { length } split /\n/, ($cached_names // '') . "\n" . ($wt_names // '');
+    push @chg, @paths;
+    my $junk = eval { $self->git_service->junk_files($c, \@chg) } || [];
+
     $c->response->body(encode_json({
-        success => 1,
-        message => $message,
-        model   => $used_model,
+        success    => 1,
+        message    => $message,
+        model      => $used_model,
+        junk_files => $junk,
     }));
 }
 
@@ -718,6 +795,21 @@ sub index :Path('/admin/git') :Args(0) {
     my $target_key = $c->stash->{git_target} // '';
 
     my $status = $self->get_git_status($c);
+
+    # Junk warning: backup copies / app runtime data among the changed files.
+    my @changed = map { @{ $status->{$_} || [] } } qw(staged_files modified_files untracked_files);
+    my $junk = eval { $self->git_service->junk_files($c, \@changed) } || [];
+    $c->stash(junk_files => $junk) if @$junk;
+
+    if (my $raw = $c->flash->{guard_hits_json}) {
+        my $hits = eval { decode_json($raw) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+                "guard_hits_json decode failed: $@");
+        } elsif (ref $hits eq 'ARRAY') {
+            $c->stash(guard_hits => $hits);
+        }
+    }
 
     $c->stash(
         repo_path       => $self->repo_path($c),
@@ -1404,6 +1496,11 @@ sub git_stash_management :Path('/admin/git_stash') :Args(0) {
     # Get current git status
     my $git_status = $self->get_git_status($c);
     $c->stash(git_status => $git_status);
+    {
+        my @changed = map { @{ $git_status->{$_} || [] } } qw(staged_files modified_files untracked_files);
+        my $junk = eval { $self->git_service->junk_files($c, \@changed) } || [];
+        $c->stash(junk_files => $junk) if @$junk;
+    }
     
     if ($c->session->{debug_mode}) {
         push @{$c->stash->{debug_msg}}, "Git controller git_stash view - Template: admin/git_stash.tt";
@@ -1620,6 +1717,61 @@ sub _save_user_gate {
     if (defined $gate) { $all->{ $self->_gate_user($c) } = $gate }
     else { delete $all->{ $self->_gate_user($c) } }
     $self->_write_gates($c, $all);
+}
+
+# 2026-10-15: commit gate for the Git dashboard (the AI Editor's Git panel).
+# First click reviews the staged diff and shows findings. A clean review
+# commits at once; findings need a second click on the same diff; a
+# high-severity finding needs a "commit anyway" reason (8+ chars).
+# Reviewer off / cap hit / error -> warning, commit allowed.
+sub _format_findings {
+    my ($self, $view) = @_;
+    my @l = map { sprintf('[%s] %s%s %s', $_->{severity} || 'note', $_->{file},
+                          (length $_->{line} ? ":$_->{line}" : ''), $_->{issue}) } @{ $view->{findings} || [] };
+    return join(' | ', @l);
+}
+
+sub _dashboard_commit_gate {
+    my ($self, $c, $message) = @_;
+    my ($diff) = $self->_git_list($c, 'diff', '--cached');
+    $diff //= '';
+    require Digest::SHA;
+    my $sha = Digest::SHA::sha256_hex($diff);
+    my $rv = $self->_reviewer_for($c);
+    my $reason = $c->req->param('override_reason') // '';
+    $reason =~ s/^\s+|\s+$//g;
+    my $prev = eval { $self->_user_gate($c) };
+    if ($prev && ref $prev eq 'HASH' && ($prev->{diff_sha} // '') eq $sha && $prev->{dashboard}) {
+        my $view = $rv->gate_view($prev->{review});
+        if ($view->{blocking}) {
+            return { proceed => 0, msg => 'Still blocked by the reviewer: ' . $self->_format_findings($view)
+                     . ' To commit anyway, type a reason (8+ characters) in "Commit anyway reason" and click Commit again.' }
+                if length($reason) < 8;
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, '_dashboard_commit_gate',
+                'commit anyway by ' . $self->_gate_user($c) . ': ' . $reason);
+            eval { $rv->append_score({ at => time, source => 'commit_override', diff_sha => $sha, verdict => 'override',
+                                       override => 1, override_by => $self->_gate_user($c), override_reason => $reason }) };
+            return { proceed => 1, note => "Committed anyway over the reviewer's block (reason: $reason)." };
+        }
+        return { proceed => 1, note => 'Reviewed findings were confirmed.' };
+    }
+    my $res = eval { $rv->review($c, diff => $diff, files => [ $diff =~ /^diff --git a\/(.+?) b\//mg ],
+                                 diff_sha => $sha, task => $message, source => 'commit_gate') };
+    $res = { ok => 0, skipped => 1, reason => 'review call failed' . ($@ ? ": $@" : '') } if $@ || !$res;
+    my $view = $rv->gate_view($res);
+    $res->{blocking} = $view->{blocking};
+    $self->_save_user_gate($c, { at => time, diff_sha => $sha, message => $message, review => $res, dashboard => 1 });
+    return { proceed => 1, note => $view->{warning} } unless $view->{reviewed};
+    if ($view->{blocking}) {
+        return { proceed => 0, msg => 'Commit blocked by the reviewer (' . ($view->{model} || 'reviewer') . '): '
+                 . $self->_format_findings($view)
+                 . ' Fix it, or type a reason (8+ characters) in "Commit anyway reason" and click Commit again.' };
+    }
+    if (@{ $view->{findings} || [] }) {
+        return { proceed => 0, msg => 'Reviewer findings (not blocking): ' . $self->_format_findings($view)
+                 . ' Click Commit again to confirm. Nothing has been committed yet.' };
+    }
+    return { proceed => 1, note => 'Reviewer found no problems (' . ($view->{model} || 'reviewer') . ').' };
 }
 
 sub _reviewer_for {
@@ -2094,6 +2246,29 @@ sub test_gate :Path('/admin/git/test_gate') :Args(1) {
     }));
 }
 
+=head2 _catch_up_note
+
+After a successful land on main, fast-forward registered worktrees that have
+nothing of their own. A catch-up failure must not turn a successful merge into
+a failed response. Returns C<($output, $summary, $rows)>.
+
+=cut
+
+sub _catch_up_note {
+    my ($self, $c, $output) = @_;
+    my $cu = eval { $self->git_service->catch_up_registered_worktrees($c) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+            "catch_up after main land died: $@");
+        my $summary = "Branch catch-up failed: $@";
+        return (($output // '') . "\n\n" . $summary, $summary, []);
+    }
+    my $summary = $cu->{summary} // '';
+    my $out = $output // '';
+    $out .= "\n\n" . $summary if length $summary;
+    return ($out, $summary, $cu->{rows} || []);
+}
+
 =head2 merge_to_main
 
 POST /admin/git/merge_to_main
@@ -2174,9 +2349,12 @@ sub merge_to_main :Path('/admin/git/merge_to_main') :Args(0) {
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_merge',
         "merge_to_main: merged '$branch' into main (success)");
+    my ($out, $summary, $rows) = $self->_catch_up_note($c, $res->{output});
     $c->response->body(encode_json({
         success => 1,
-        output  => $res->{output},
+        output  => $out,
+        catch_up_summary => $summary,
+        catch_up => $rows,
         error   => undef,
     }));
 }
@@ -2278,17 +2456,12 @@ sub merge :Path('/admin/git/merge') :Args(0) {
             }));
             return;
         }
-        # Secret guard: refuse if merging main would bring in a key/secret file.
-        my $guard = $self->git_service->secret_guard($c, $dest, '--merge', 'main');
-        unless ($guard->{ok}) {
-            $c->response->body(encode_json({
-                success => 0,
-                reason  => 'secret_guard',
-                error   => "Merge refused by secret guard: main would bring a key/secret file into '$target'.\n"
-                         . ($guard->{output} // q{}),
-            }));
-            return;
-        }
+        # Do not pre-scan `main` with secret_guard --merge. That scan diffs the
+        # whole main range and gitleaks hangs, and it refuses files already on
+        # main (which blocks every worktree update). The pre-merge-commit hook
+        # still blocks a blob this branch newly adds or changes, and that refusal
+        # includes the file:line fix route. If the hook leaves MERGE_HEAD, the
+        # failure path below aborts it.
         my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $dest });
         # --autostash: the worktree routinely has uncommitted WIP; a plain merge
         # refuses ("Your local changes would be overwritten"). Autostash stashes
@@ -2325,6 +2498,14 @@ sub merge :Path('/admin/git/merge') :Args(0) {
                     ? "Merge conflict bringing main into '$target': " . join(', ', @files)
                     : "Merge conflict bringing main into '$target'.";
                 $fix_hint = "Resolve in the '$target' worktree, commit, or abort.";
+            }
+            elsif ($combined =~ /secret-guard:|pre-merge-commit:|BLOCKED:/) {
+                $reason = 'secret_guard';
+                # Hook refused the merge commit and left MERGE_HEAD. Abort so
+                # the worktree is not stuck mid-merge.
+                $self->git_service->_run($c, 'merge', '--abort', { repo => $dest });
+                $fail_msg = "Merge of main into '$target' refused by secret guard. The incomplete merge was aborted.";
+                $fix_hint = "See BLOCKED paths in detail. Do not retry until those files are removed from main or allow-listed.";
             }
             elsif ($combined =~ /Please commit or stash|local changes.*would be overwritten/i) {
                 $reason = 'uncommitted';
@@ -2415,7 +2596,8 @@ sub merge :Path('/admin/git/merge') :Args(0) {
     }
 
     if (!$res->{success}) {
-        my $level = ($res->{conflict} || $res->{uncommitted}) ? 'warn' : 'error';
+        my $level = ($res->{conflict} || $res->{uncommitted}
+                     || ($res->{reason} // '') eq 'secret_guard') ? 'warn' : 'error';
         $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_merge',
             "merge failed direction=$direction source=$source target=$target"
             . " reason=" . ($res->{reason} // 'unknown')
@@ -2455,6 +2637,16 @@ sub merge :Path('/admin/git/merge') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
         'git_merge', "direction=$direction source=$source target=$target success=1");
 
+    my $output = $res->{output};
+    my $summary = '';
+    my $rows = [];
+    # Only when main actually moved. main->branch is a manual freshen of one
+    # worktree; fanning out from there would hide a human merge inside an
+    # automatic one. Never merge those branches back to main.
+    if ($direction eq 'branch->main') {
+        ($output, $summary, $rows) = $self->_catch_up_note($c, $output);
+    }
+
     $c->response->body(encode_json({
         success   => 1,
         target    => $target,
@@ -2463,7 +2655,9 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         autostash => $res->{autostash} ? 1 : 0,
         autostash_conflict => $res->{autostash_conflict} ? 1 : 0,
         error     => undef,
-        output    => $res->{output},
+        output    => $output,
+        catch_up_summary => $summary,
+        catch_up  => $rows,
     }));
 }
 

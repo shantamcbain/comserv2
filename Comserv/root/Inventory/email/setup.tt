@@ -26,6 +26,7 @@
 
     <p style="margin-top:1rem;">
       <button type="submit">Save email addresses</button>
+      <a href="[% c.uri_for('/mail/invoice/sort') %]" style="margin-left:1rem;">Invoice queue</a>
       <a href="[% c.uri_for('/mail/classify_invoices') %]" style="margin-left:1rem;">Run classification</a>
       <a href="[% c.uri_for('/mail/invoice/api') %]" style="margin-left:1rem;">View classified invoices</a>
       <a href="[% c.uri_for('/Inventory') %]" style="margin-left:1rem;">Back to inventory</a>
@@ -62,6 +63,8 @@
         <option value="starttls">STARTTLS</option>
         <option value="none">None</option>
       </select></p>
+    <p><label for="imap_folders">Folders to read</label> (comma-separated; blank = INBOX, e.g. <code>INBOX, INBOX/coop</code>)<br>
+      <input id="imap_folders" name="imap_folders" maxlength="500" style="width:100%;max-width:28rem;"></p>
     <p><label for="login_username">Login name</label> (blank uses the mailbox address)<br>
       <input id="login_username" name="login_username" style="width:100%;max-width:28rem;"></p>
     <p><label for="mailbox_password">Password</label><br>

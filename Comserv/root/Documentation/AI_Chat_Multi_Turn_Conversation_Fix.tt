@@ -87,7 +87,7 @@ Q: What is machine learning? | A: Machine learning is a subset of...
 
         <h4>Backend Changes (/Comserv/lib/Comserv/Controller/AI.pm)</h4>
 
-        <div style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 10px 0;">
+        <div style="background: var(--card-bg, #f9f9f9); padding: 15px; border-radius: 4px; margin: 10px 0;">
             <p><strong>1. Accept conversation_id parameter:</strong></p>
             <pre><code>my $conversation_id = $json_data->{conversation_id} || 
                    $c->request->params->{conversation_id};</code></pre>
@@ -121,7 +121,7 @@ $schema->resultset('AiMessage')->create({
 
         <h4>Frontend Changes (/Comserv/root/ai/index.tt)</h4>
 
-        <div style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 10px 0;">
+        <div style="background: var(--card-bg, #f9f9f9); padding: 15px; border-radius: 4px; margin: 10px 0;">
             <p><strong>1. Track current conversation ID:</strong></p>
             <pre><code>let currentConversationId = null;</code></pre>
 
@@ -154,7 +154,7 @@ document.getElementById('conversation-info').style.display = 'block';</code></pr
 
         <p>Updated the <code>conversations</code> action to generate better preview text:</p>
 
-        <div style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 10px 0;">
+        <div style="background: var(--card-bg, #f9f9f9); padding: 15px; border-radius: 4px; margin: 10px 0;">
             <pre><code># Get all messages for conversation
 my @messages = $conv->ai_messages->all;
 
@@ -185,7 +185,7 @@ Q: What is the difference between AI and machine learning? | A: AI is the broade
 
         <h3>How It Works Now</h3>
 
-        <div style="background: #e8f5e9; padding: 15px; border-radius: 4px; margin: 10px 0;">
+        <div style="background: var(--card-bg, #e8f5e9); padding: 15px; border-radius: 4px; margin: 10px 0;">
             <p><strong>Step 1: First Message</strong></p>
             <ol>
                 <li>User types prompt and sends</li>
@@ -234,7 +234,7 @@ Q: What is the difference between AI and machine learning? | A: AI is the broade
                     - Updated conversations action preview generation
                 </td>
             </tr>
-            <tr style="background-color: #f9f9f9;">
+            <tr style="background-color: var(--card-bg, #f9f9f9);">
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);"><code>root/ai/index.tt</code></td>
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">
                     - Added currentConversationId state variable<br>
@@ -330,7 +330,7 @@ Q: What is the difference between AI and machine learning? | A: AI is the broade
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Notification shows conversation ID</td>
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">✅</td>
             </tr>
-            <tr style="background-color: #f9f9f9;">
+            <tr style="background-color: var(--card-bg, #f9f9f9);">
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Follow-up in same conversation</td>
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Same conversation ID, no new notification</td>
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">✅</td>
@@ -340,7 +340,7 @@ Q: What is the difference between AI and machine learning? | A: AI is the broade
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Shows Q &amp; A format, not just numbers</td>
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">✅</td>
             </tr>
-            <tr style="background-color: #f9f9f9;">
+            <tr style="background-color: var(--card-bg, #f9f9f9);">
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">View full conversation</td>
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Shows all message pairs in order</td>
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">✅</td>

@@ -181,7 +181,7 @@ sub index :Path('/Inventory') :Args(0) {
         $location_count = $schema->resultset('Accounting::InventoryLocation')->search({ sitename => $sitename, status => 'active' })->count;
 
         my @items = $schema->resultset('Accounting::InventoryItem')->search(
-            { sitename => $sitename, status => 'active' },
+            { "me.sitename" => $sitename, "me.status" => 'active' },
             { prefetch => 'stock_levels' }
         );
         $low_stock = 0;
@@ -232,9 +232,9 @@ sub items :Path('/Inventory/items') :Args(0) {
     my $status   = $c->req->params->{status} || 'active';
     my $category = $c->req->params->{category};
 
-    my %search = (sitename => $sitename);
-    $search{status}   = $status   if $status   && $status ne 'all';
-    $search{category} = $category if $category;
+    my %search = ("me.sitename" => $sitename);
+    $search{"me.status"}   = $status   if $status   && $status ne 'all';
+    $search{"me.category"} = $category if $category;
 
     my @items;
     eval {
@@ -242,7 +242,7 @@ sub items :Path('/Inventory/items') :Args(0) {
             \%search,
             {
                 prefetch => 'stock_levels',
-                order_by => ['category', 'name'],
+                order_by => ['me.category', 'me.name'],
             }
         );
     };
@@ -468,6 +468,35 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
     );
 }
 
+# Shared category tree (Util::CategoryManager). Returns visible path options.
+sub _category_options {
+    my ($self, $c) = @_;
+    require Comserv::Util::CategoryManager;
+    my $opts = eval {
+        Comserv::Util::CategoryManager->new->options_for_site(
+            $self->_schema($c), $self->_sitename($c), $c->stash->{enabled_modules} || {});
+    };
+    return $opts || [];
+}
+
+# If the form picked a tree category, return its path (and link it after save).
+sub _apply_category_id {
+    my ($self, $c, $params) = @_;
+    my $cid = $params->{category_id};
+    return unless defined $cid && $cid =~ /^\d+$/;
+    my ($opt) = grep { $_->{id} == $cid } @{ $self->_category_options($c) };
+    return unless $opt;
+    $params->{category} = $opt->{path};
+    return $opt;
+}
+
+sub _link_category {
+    my ($self, $c, $item_id, $opt) = @_;
+    return unless $opt && $item_id;
+    require Comserv::Util::CategoryManager;
+    eval { Comserv::Util::CategoryManager->new->set_item_categories($self->_schema($c), $item_id, [ $opt->{id} ]) };
+}
+
 sub item_add :Path('/Inventory/item/add') :Args(0) {
     my ($self, $c) = @_;
 
@@ -496,9 +525,11 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
             }
         }
 
+        my $cat_opt = $self->_apply_category_id($c, $params);
         my $new_item;
         eval {
             $new_item = $self->_create_item($c, $params);
+            $self->_link_category($c, $new_item->id, $cat_opt) if $new_item;
         };
         if ($@) {
             $c->stash->{error_msg} = "Failed to create item: $@";
@@ -529,6 +560,7 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
     $c->stash(
         sitename     => $sitename,
         coa_accounts => $self->_load_coa_accounts($c),
+        category_options => $self->_category_options($c),
         is_popup     => $c->req->params->{popup} ? 1 : 0,
         template     => 'Inventory/items/add.tt',
     );
@@ -749,6 +781,7 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
 
     if ($c->req->method eq 'POST') {
         my $params = $c->req->body_parameters;
+        my $cat_opt = $self->_apply_category_id($c, $params);
         eval {
             my $cat = $params->{category};
             my $consumable = $params->{is_consumable} ? 1 : 0;
@@ -777,6 +810,7 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
                 returns_accno_id   => $params->{returns_accno_id}   || undef,
                 updated_at         => $self->_now(),
             });
+            $self->_link_category($c, $item->id, $cat_opt);
         };
         if ($@) {
             $c->stash->{error_msg} = "Failed to update item: $@";
@@ -809,6 +843,9 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
         coa_accounts => $self->_load_coa_accounts($c),
         stock_levels => \@stock_levels,
         locations    => \@locations,
+        category_options => $self->_category_options($c),
+        current_category_ids => eval { require Comserv::Util::CategoryManager;
+            Comserv::Util::CategoryManager->new->item_category_ids($schema, $item->id) } || [],
         template     => 'Inventory/items/edit.tt',
     );
 }
@@ -2225,10 +2262,10 @@ sub inventory_count :Path('/Inventory/count') :Args(0) {
 
     my (@items, @categories, $draft);
     eval {
-        my %search = (sitename => $sitename, status => 'active');
-        $search{category} = $category if $category;
+        my %search = ("me.sitename" => $sitename, "me.status" => 'active');
+        $search{"me.category"} = $category if $category;
         @items = $schema->resultset('Accounting::InventoryItem')->search(
-            \%search, { prefetch => 'stock_levels', order_by => ['category','name'] }
+            \%search, { prefetch => 'stock_levels', order_by => ['me.category', 'me.name'] }
         )->all;
 
         @categories = $schema->resultset('Accounting::InventoryItem')->search(
@@ -4800,13 +4837,13 @@ sub print_stock_report :Path('/Inventory/print/stock') :Args(0) {
 
     my @items;
     eval {
-        my %search = (sitename => $sitename, status => 'active');
-        $search{category} = $category if $category;
+        my %search = ("me.sitename" => $sitename, "me.status" => 'active');
+        $search{"me.category"} = $category if $category;
         @items = $schema->resultset('Accounting::InventoryItem')->search(
             \%search,
             {
                 prefetch => 'stock_levels',
-                order_by => ['category', 'name'],
+                order_by => ['me.category', 'me.name'],
             }
         )->all;
     };

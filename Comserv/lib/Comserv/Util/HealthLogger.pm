@@ -36,6 +36,13 @@ my $_standalone_schema;
 # Early exit guard (used inside functions)
 sub _disabled { ($ENV{COMSERV_NO_HEALTH_LOG} // '') eq '1' }
 
+# Writes: also skipped unless this is the health-primary server on this host.
+sub _no_write {
+    return 1 if _disabled();
+    require Comserv::Util::HealthPrimary;
+    return Comserv::Util::HealthPrimary->is_primary ? 0 : 1;
+}
+
 sub _schema {
     my ($c) = @_;
 
@@ -68,7 +75,7 @@ sub _get_standalone_schema {
 
 sub log_health_event {
     my ($c, $level, $event_type, $message, $metadata) = @_;
-    return if _disabled();
+    return if _no_write();
 
     my $schema = _schema($c);
     return unless $schema;
@@ -101,8 +108,8 @@ sub evaluate_records {
     return [];
 }
 
-sub record_docker_health_snapshot { return if _disabled(); }
-sub sync_remote_docker_hosts    { return if _disabled(); }
+sub record_docker_health_snapshot { return if _no_write(); }
+sub sync_remote_docker_hosts    { return if _no_write(); }
 sub get_docker_health           { return {} if _disabled(); }
 sub get_docker_health_from_db   { return {} if _disabled(); }
 sub get_active_servers_from_db  { return [] if _disabled(); }

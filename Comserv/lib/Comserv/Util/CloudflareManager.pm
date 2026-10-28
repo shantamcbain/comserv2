@@ -114,6 +114,33 @@ has 'zone_id_cache' => (
     default => sub { {} },
 );
 
+# True for empty values and template/placeholder text (e.g. "[% ENV.X %]",
+# "<replace-with-...>", "YOUR_TOKEN", "changeme"). Placeholders must never
+# override a real value from a higher-priority source.
+sub _is_placeholder {
+    my ($v) = @_;
+    return 1 unless defined $v;
+    return 0 if ref $v;
+    return 1 if $v =~ /^\s*$/;
+    return 1 if $v =~ /^\s*(?:your|changeme|placeholder|<|xxx|\[%)/i;
+    return 1 if $v =~ /YOUR_/;
+    return 0;
+}
+
+# Merge the "cloudflare" section of $new into $base, skipping placeholder
+# scalars (non-scalar values such as the domains hash are copied as before).
+sub _merge_cloudflare_section {
+    my ($base, $new) = @_;
+    $base ||= {};
+    return $base unless ref $new eq 'HASH';
+    for my $k (keys %$new) {
+        my $v = $new->{$k};
+        next if !ref($v) && _is_placeholder($v);
+        $base->{$k} = $v;
+    }
+    return $base;
+}
+
 # Build the configuration from the JSON files
 sub _build_config {
     my ($self) = @_;
@@ -155,7 +182,7 @@ sub _build_config {
             my $shared = decode_json($json);
             $self->logger->info("Cloudflare credentials loaded from shared secrets: $shared_cf_path");
             if ($shared->{cloudflare}) {
-                $config->{cloudflare} = { %{ $config->{cloudflare} || {} }, %{ $shared->{cloudflare} } };
+                $config->{cloudflare} = _merge_cloudflare_section({ %{ $config->{cloudflare} || {} } }, $shared->{cloudflare});
             }
         }
     } catch {
@@ -176,8 +203,12 @@ sub _build_config {
             my $api_config = decode_json($json);
             $self->logger->info("API credentials loaded successfully");
             
-            # Merge into the config
+            # Merge into the config (cloudflare section merged key by key so a
+            # placeholder here cannot wipe a real token from a higher-priority source)
+            my $cf_prev = $config->{cloudflare};
             $config = { %$config, %$api_config };
+            $config->{cloudflare} = _merge_cloudflare_section({ %{ $cf_prev || {} } }, $api_config->{cloudflare})
+                if ref $cf_prev eq 'HASH' || ref $api_config->{cloudflare} eq 'HASH';
         }
     } catch {
         $self->logger->error("Failed to load API credentials: $_");
@@ -200,13 +231,10 @@ sub _build_config {
             my $cf_config = decode_json($json);
             $self->logger->info("Cloudflare config loaded successfully");
             
-            # Merge into the config, with special handling for the cloudflare section
-            if ($cf_config->{cloudflare} && $config->{cloudflare}) {
-                # Merge the cloudflare sections
-                $config->{cloudflare} = { %{$config->{cloudflare}}, %{$cf_config->{cloudflare}} };
-            } elsif ($cf_config->{cloudflare}) {
-                $config->{cloudflare} = $cf_config->{cloudflare};
-            }
+            # Merge into the config, with special handling for the cloudflare section.
+            # Placeholder values never override a real value already loaded.
+            $config->{cloudflare} = _merge_cloudflare_section({ %{ $config->{cloudflare} || {} } }, $cf_config->{cloudflare})
+                if $cf_config->{cloudflare};
             
             # Copy other sections
             foreach my $key (keys %$cf_config) {
@@ -263,23 +291,19 @@ sub _get_api_credentials {
         # Check for any non-printable characters that might cause issues
         if ($cloudflare->{api_token} =~ /[^\x20-\x7E]/) {
             $self->logger->warn("API token contains non-printable characters which may cause authentication issues");
-            # Replace non-printable characters with visible placeholders for logging
-            my $visible_token = $cloudflare->{api_token};
-            $visible_token =~ s/[^\x20-\x7E]/·/g;
-            $self->logger->warn("Token with placeholders: $visible_token");
+            # Never log token content (not even with placeholders); length only.
+            $self->logger->warn("Token length before cleaning: " . length($cloudflare->{api_token}));
             
             # Clean the token by removing non-printable characters
             $cloudflare->{api_token} =~ s/[^\x20-\x7E]//g;
             $self->logger->info("Cleaned token of non-printable characters");
         }
         
-        my $masked_token = substr($cloudflare->{api_token}, 0, 4) . '...' . substr($cloudflare->{api_token}, -4);
-        $debug_info .= "API Token: $masked_token, ";
+        # Log the token LENGTH only (never the token or any of its characters)
         $debug_info .= "Token Length: " . length($cloudflare->{api_token}) . ", ";
     }
     if ($cloudflare->{api_key}) {
-        my $masked_key = substr($cloudflare->{api_key}, 0, 4) . '...' . substr($cloudflare->{api_key}, -4);
-        $debug_info .= "API Key: $masked_key, ";
+        $debug_info .= "API Key Length: " . length($cloudflare->{api_key}) . ", ";
     }
     if ($cloudflare->{email}) {
         $debug_info .= "Email: $cloudflare->{email}, ";
@@ -340,13 +364,7 @@ sub _api_request {
         $req->header('Authorization' => 'Bearer ' . $token);
         $self->logger->debug("Using API token authentication");
         $self->logger->debug("Token length: " . length($token));
-        $self->logger->debug("Token first 4 chars: " . substr($token, 0, 4));
-        $self->logger->debug("Token last 4 chars: " . substr($token, -4));
-        
-        # Log the full token for debugging (only in development environments)
-        if ($ENV{COMSERV_DEV_MODE} || $ENV{CATALYST_DEBUG}) {
-            $self->logger->debug("Full token for debugging: '$token'");
-        }
+        # Token content is never logged (length only, above).
         
         # Do NOT add email header when using API token - this can cause authentication issues
         # Do NOT add application ID header when using API token
@@ -355,8 +373,7 @@ sub _api_request {
         $req->header('X-Auth-Email' => $credentials->{email});
         $req->header('X-Auth-Key' => $credentials->{api_key});
         $self->logger->debug("Using API key authentication");
-        $self->logger->debug("API Key first 4 chars: " . substr($credentials->{api_key}, 0, 4));
-        $self->logger->debug("API Key last 4 chars: " . substr($credentials->{api_key}, -4));
+        $self->logger->debug("API Key length: " . length($credentials->{api_key}));
         
         # Add application ID header only when using API key authentication
         if ($credentials->{application_id} && $credentials->{application_id} ne '<replace-with-cloudflare-application-id>') {
@@ -830,13 +847,10 @@ sub get_zone_id {
     my $application_id = $credentials->{application_id};
     my $api_token = $credentials->{api_token};
     
-    # Log masked token for debugging
-    my $masked_token = '';
-    if ($api_token) {
-        $masked_token = substr($api_token, 0, 4) . '...' . substr($api_token, -4);
-    }
+    # Log the token LENGTH only for debugging (never any of its characters)
+    my $token_len = $api_token ? length($api_token) : 0;
     
-    $self->logger->debug("Looking up zone ID for domain $domain using application ID: $application_id, API token: $masked_token");
+    $self->logger->debug("Looking up zone ID for domain $domain using application ID: " . ($application_id // '') . ", API token length: $token_len");
     
     # Check if zone ID is provided in the configuration
     if ($self->config->{cloudflare} && 

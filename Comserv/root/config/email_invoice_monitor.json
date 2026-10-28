@@ -3,7 +3,7 @@
       "3d" : {
          "category_filter" : [],
          "email_addresses" : [
-            "shanta@usbm.ca"
+            "shanta@forager.com"
          ],
          "monitored_suppliers" : []
       },
@@ -25,6 +25,13 @@
             "patrion@forager.com",
             "aica@forager.com"
          ]
+      },
+      "Shanta" : {
+         "category_filter" : [],
+         "email_addresses" : [
+            "shanta@forager.com"
+         ],
+         "monitored_suppliers" : []
       }
    }
 }

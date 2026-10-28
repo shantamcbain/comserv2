@@ -86,10 +86,12 @@
         # First check if we have a site-specific theme in the session
         site_key = "theme_" _ SiteName.lower;
 
-        IF c.session.$site_key;
-            theme_name = c.session.$site_key;
-        ELSIF c.stash.theme_name;
+        # Stash (set per request by Root::auto from site mapping + user
+        # override) wins over stale session caches.
+        IF c.stash.theme_name;
             theme_name = c.stash.theme_name;
+        ELSIF c.session.$site_key;
+            theme_name = c.session.$site_key;
         ELSIF c.session.theme_name;
             theme_name = c.session.theme_name;
         ELSIF site && site.theme;

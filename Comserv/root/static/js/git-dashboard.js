@@ -20,6 +20,24 @@
     }
 
     ready(function () {
+        document.addEventListener('click', function (e) {
+            var btn = e.target && e.target.closest ? e.target.closest('[data-guard-copy]') : null;
+            if (!btn) { return; }
+            var hit = btn.parentNode ? btn.parentNode.parentNode : null;
+            var box = hit ? hit.querySelector('[data-guard-prompt]') : null;
+            if (!box) { return; }
+            var text = box.value || '';
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function () {
+                    btn.textContent = 'Copied';
+                });
+            } else {
+                box.select();
+                document.execCommand('copy');
+                btn.textContent = 'Copied';
+            }
+        });
+
         // Shared branch + worktree creation used by both the Git dashboard and
         // the AI editor Git panel.  Both surfaces call the same admin endpoint.
         var createForms = document.querySelectorAll('[data-create-worktree-form]');
@@ -355,6 +373,61 @@
             }, 1500);
         }
 
+        function renderGuardHits(hits) {
+            var host = document.querySelector('[data-git-guard-hits]');
+            if (!host) { return; }
+            while (host.firstChild) { host.removeChild(host.firstChild); }
+            if (!hits || !hits.length) {
+                host.hidden = true;
+                return;
+            }
+            host.hidden = false;
+            host.className = 'admin-alert admin-alert-danger';
+            var heading = document.createElement('strong');
+            heading.textContent = 'Secret guard — how to fix';
+            host.appendChild(heading);
+            for (var i = 0; i < hits.length; i++) {
+                var h = hits[i] || {};
+                var block = document.createElement('div');
+                block.className = 'git-guard-hit';
+                var where = document.createElement('p');
+                var loc = h.file || '';
+                if (h.line) { loc += ':' + h.line; }
+                where.textContent = loc + ' — ' + (h.reason || '');
+                block.appendChild(where);
+                if (h.editor_note) {
+                    var note = document.createElement('p');
+                    note.textContent = h.editor_note;
+                    block.appendChild(note);
+                }
+                if (h.editor_url) {
+                    var actions = document.createElement('p');
+                    var link = document.createElement('a');
+                    link.className = 'admin-btn admin-btn-sm admin-btn-primary';
+                    link.href = h.editor_url;
+                    link.target = 'AI2Editor';
+                    link.rel = 'noopener';
+                    link.textContent = 'Open in AI editor';
+                    actions.appendChild(link);
+                    var copyBtn = document.createElement('button');
+                    copyBtn.type = 'button';
+                    copyBtn.className = 'admin-btn admin-btn-sm';
+                    copyBtn.setAttribute('data-guard-copy', '1');
+                    copyBtn.textContent = 'Copy fix prompt';
+                    actions.appendChild(copyBtn);
+                    block.appendChild(actions);
+                }
+                var box = document.createElement('textarea');
+                box.className = 'form-control';
+                box.rows = 8;
+                box.readOnly = true;
+                box.setAttribute('data-guard-prompt', '1');
+                box.value = h.prompt || '';
+                block.appendChild(box);
+                host.appendChild(block);
+            }
+        }
+
         function showMergeResult(success, conflict, title, output, autostashNote) {
             if (!mergeStatus) { return; }
             mergeStatus.innerHTML = '';
@@ -483,6 +556,9 @@
                       if (r.reason === 'merge_in_progress') {
                           return 'blocked \u2014 merge already in progress';
                       }
+                      if (r.reason === 'secret_guard') {
+                          return 'blocked \u2014 secret guard';
+                      }
                       if (r.reason === 'missing_ref') {
                           return 'failed \u2014 branch/ref not found';
                       }
@@ -504,6 +580,7 @@
                       reloadGitDashboardSoon();
                   } else {
                       showMergeResult(false, false, failTitle(res), buildFailBody(res), stashNote);
+                      renderGuardHits(res.hits);
                   }
               })
               .catch(function (err) {
@@ -623,6 +700,12 @@
                         if (status) {
                             status.textContent = 'Drafted with ' + (data.model || 'AI') +
                                 ' — review before committing.';
+                        }
+                        if (status && data.junk_files && data.junk_files.length) {
+                            status.textContent += ' Warning: backup/runtime file(s) in this change - ' +
+                                data.junk_files.join(', ') +
+                                '. The commit guard will refuse them; use "Untrack + gitignore"' +
+                                ' (reload the page if the button is not shown).';
                         }
                     } else {
                         if (status) {

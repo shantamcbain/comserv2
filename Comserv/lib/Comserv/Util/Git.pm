@@ -71,11 +71,15 @@ my %ALLOWED_FLAGS = (
     restore  => { map { $_ => 1 } qw(--staged) },
     rm       => { map { $_ => 1 } qw(--cached -r) },
     # Merge is human-gated (admin-only in the controller). Allowed flags keep it safe:
-    # --no-ff (always create a merge commit), --no-commit (review then commit),
-    # --abort (cancel a conflicted merge), --squash (optional single-commit merge),
-    # --autostash (stash uncommitted WIP before the merge and reapply it after —
-    # keeps the stash entry if reapplying conflicts, so WIP is never lost).
-    merge    => { map { $_ => 1 } qw(--no-ff --no-commit --abort --squash --autostash) },
+    # --no-ff (always create a merge commit when landing ON main), --no-commit
+    # (review then commit), --abort (cancel a conflicted merge), --squash
+    # (optional single-commit merge), --autostash (stash uncommitted WIP before
+    # the merge and reapply it after — keeps the stash entry if reapplying
+    # conflicts, so WIP is never lost).
+    # --ff-only is ONLY for catch_up_registered_worktrees (main into a branch
+    # that has no commits of its own). Never use it to land a branch on main,
+    # and never pair it with --no-ff — that pairing is the ping-pong loop.
+    merge    => { map { $_ => 1 } qw(--no-ff --no-commit --abort --squash --autostash --ff-only) },
     # Worktree is used by the isolation primitive (create_worktree / remove_worktree):
     # allow add, remove (with --force to clear a dirty checkout), list, prune.
     worktree => { map { $_ => 1 } qw(add remove list prune --porcelain --force) },
@@ -491,16 +495,31 @@ sub _run {
         && (grep { defined $_ && $_ eq '--show-current' } @argv)
         && $code == 128
         && (($result->{output} // '') =~ /^\s*$/);
+    # pre-merge-commit / secret_guard.sh refusal. Expected policy block, not a
+    # git failure. Logging it as ERROR spawned audit todos whose only text was
+    # "Created autostash" because the BLOCKED lines are on stderr.
+    my $secret_guard_block = $combined =~ /secret-guard:|junk-guard:|pre-merge-commit:|^\s*BLOCKED:/m;
+    # catch_up uses --ff-only and already records a refusal as a skipped/failed
+    # row. "Not possible to fast-forward" is that refusal, not a broken git.
+    my $ff_only_refused = ($subcmd eq 'merge')
+        && (grep { defined $_ && $_ eq '--ff-only' } @argv)
+        && $combined =~ /Not possible to fast-forward|unable to fast-forward/i;
     my $benign   = !$result->{success}
                 && ( $asks_upstream
                   || $checkout_collision
                   || $show_current_empty
+                  || $secret_guard_block
+                  || $ff_only_refused
                   || $combined =~ /no upstream configured|does not have an upstream|no such branch/i );
-    my $level    = $result->{success} ? 'info'
-                 : $benign            ? 'info'
-                 :                      'error';
+    my $level    = $result->{success}       ? 'info'
+                 : $secret_guard_block      ? 'warn'
+                 : $ff_only_refused         ? 'warn'
+                 : $benign                  ? 'info'
+                 :                            'error';
+    my $shown = ($result->{output} // '');
+    $shown .= "\n" . $result->{error} if length($result->{error} // '');
     $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_run',
-        "git " . join(' ', @argv) . " -> exit=$code out=" . substr($result->{output}, 0, 500));
+        "git " . join(' ', @argv) . " -> exit=$code out=" . substr($shown, 0, 500));
 
     return $result;
 }
@@ -907,7 +926,91 @@ sub secret_guard {
     my $out = '';
     IPC::Run3::run3([ 'bash', $script, @mode_args, $repo ], \undef, \$out, \$out);
     my $code = $? >> 8;
-    return $code == 0 ? { ok => 1, output => $out } : { ok => 0, output => $out };
+    my $res = $code == 0 ? { ok => 1, output => $out } : { ok => 0, output => $out };
+    if (!$res->{ok}) {
+        my $report_ok = eval {
+            require Comserv::Util::GitGuardReport;
+            $res->{hits} = Comserv::Util::GitGuardReport->enrich($out);
+            $res->{remediation} = Comserv::Util::GitGuardReport->text_for($res->{hits});
+            1;
+        };
+        if (!$report_ok) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'secret_guard',
+                "guard report failed: $@");
+            $res->{hits} = [];
+            $res->{remediation} = '';
+        }
+    }
+    return $res;
+}
+
+=head2 junk_patterns($repo)
+
+Read <repo>/.commit-junk-patterns (glob per line, "!" exempts, # comments).
+Returns ( \@block_globs, \@exempt_globs ). Falls back to backup-copy globs.
+
+=head2 junk_files($c, \@paths, $repo)
+
+Return the subset of @paths (repo-relative) that match the junk patterns:
+backup copies and app runtime data that must not be committed. Same rules as
+the junk guard in Comserv/script/git/secret_guard.sh ("*" also matches "/").
+
+=cut
+
+sub _glob_to_re {
+    my ($g) = @_;
+    my $re = join '', map { $_ eq '*' ? '.*' : $_ eq '?' ? '.' : quotemeta($_) }
+                      split /(\*|\?)/, $g;
+    return qr/\A$re\z/;
+}
+
+sub junk_patterns {
+    my ($self, $repo) = @_;
+    my (@pat, @not);
+    my $file = (defined $repo && length $repo) ? "$repo/.commit-junk-patterns" : '';
+    if ($file && -f $file && open(my $fh, '<', $file)) {
+        while (my $l = <$fh>) {
+            $l =~ s/#.*//; $l =~ s/^\s+|\s+$//g;
+            next unless length $l;
+            if ($l =~ s/^!//) { push @not, $l } else { push @pat, $l }
+        }
+        close $fh;
+    } else {
+        @pat = ('*.bak', '*.bak-*', '*~', '*.orig');
+    }
+    return ([ map { _glob_to_re($_) } @pat ], [ map { _glob_to_re($_) } @not ]);
+}
+
+sub junk_files {
+    my ($self, $c, $paths, $repo) = @_;
+    return [] unless $paths && @$paths;
+    unless (defined $repo && length $repo) {
+        my $req_target = ($c && $c->stash->{git_target})
+                      // ($c && $c->req ? $c->req->param('target') : undef);
+        my $t = $self->resolve_target($c, $req_target);
+        $repo = ($t->{mode} // '') eq 'local' ? $t->{repo} : $self->main_repo_path($c);
+    }
+    my ($pat, $not) = $self->junk_patterns($repo);
+    my %seen;
+    my @hits = grep {
+        my $p = $_;
+        defined $p && length $p && !$seen{$p}++
+            && (grep { $p =~ $_ } @$pat) && !(grep { $p =~ $_ } @$not)
+    } @$paths;
+    return \@hits;
+}
+
+=head2 staged_junk($c)
+
+Junk files (see junk_files) among the staged additions/modifications.
+
+=cut
+
+sub staged_junk {
+    my ($self, $c) = @_;
+    my $r = $self->_run($c, 'diff', '--cached', '--name-only', '--diff-filter=ACMR');
+    my @staged = grep { length } split /\n/, ($r->{output} // '');
+    return $self->junk_files($c, \@staged);
 }
 
 =head2 commit($c, $message)
@@ -920,11 +1023,23 @@ sub commit {
     my ($self, $c, $message) = @_;
     return { success => 0, error => 'Commit message required' }
         unless defined $message && length $message;
+    # Junk guard: refuse staged backup copies / app runtime data (same rules as the hook).
+    my $junk = eval { $self->staged_junk($c) } || [];
+    if (@$junk) {
+        return { success => 0, exit_code => 1, junk_files => $junk,
+                 error => "Commit refused: backup copies / app runtime data are staged: "
+                        . join(', ', @$junk) . ". Use 'Untrack + gitignore' on the Git page, or run: "
+                        . join(' && ', map { "git rm --cached -- '$_'" } @$junk)
+                        . " and add them to .gitignore." };
+    }
     # Secret guard: refuse key files / raw keys / gitleaks hits. Never --no-verify.
     my $guard = $self->secret_guard($c);
     return { success => 0, exit_code => 1, output => $guard->{output} // q{},
+             hits => $guard->{hits} || [],
              error => "Commit refused by secret guard (possible key/secret staged). "
-                    . "Unstage the flagged file(s) and retry." }
+                    . "Unstage the flagged file(s) and retry. "
+                    . "Only the primary DB key belongs in the env; other keys belong in the database.\n"
+                    . ($guard->{remediation} || $guard->{output} // q{}) }
         unless $guard->{ok};
     return $self->_run($c, 'commit', '-m', $message);
 }
@@ -974,6 +1089,48 @@ Push to origin. opts: branch (required), set_upstream => 0|1.
 sub push_to_origin {
     my ($self, $c, %opts) = @_;
     my $branch = $opts{branch} or return { success => 0, error => 'Branch required' };
+
+    # --- enforce HUMAN ADMIN only for publish to origin ---
+    my $primary = '/home/shanta/PycharmProjects/comserv2';
+    my $top = $self->repo_path($c) // '';
+    unless ($top && $top eq $primary) {
+        return {
+            success => 0,
+            error   => "Push refused: Only the primary checkout can publish to origin.",
+            output  => '',
+        };
+    }
+    unless ($branch eq 'main' || $branch eq 'master') {
+        return {
+            success => 0,
+            error   => "Push refused: Can only push 'main' or 'master' from origin.",
+            output  => '',
+        };
+    }
+    # Check for admin environment and server ancestry
+    unless (exists $ENV{COMSERV_ADMIN_PUSH} && $ENV{COMSERV_ADMIN_PUSH} == 1) {
+        return {
+            success => 0,
+            error   => "Push refused: GitHub publish must be approved via admin page (set COMSERV_ADMIN_PUSH=1).",
+            output  => '',
+        };
+    }
+    # verify parent process chain contains comserv_server.pl
+    my $pid = $$;
+    my $found = 0;
+    for (my $i = 0; $i < 12 && $pid > 1; $i++) {
+        my $cmd = `tr '\0' ' ' < /proc/$pid/cmdline 2>/dev/null`;
+        if ($cmd =~ /comserv_server.pl/) { $found = 1; last; }
+        $pid = `awk '/^PPid:/ { print $2 }' /proc/$pid/status 2>/dev/null`;
+    }
+    unless ($found) {
+        return {
+            success => 0,
+            error   => "Push refused: Admin server process not in the chain.",
+            output  => '',
+        };
+    }
+    # All checks passed — delegate to the real push
     my @argv = ('push');
     push @argv, '--set-upstream' if $opts{set_upstream};
     push @argv, 'origin', $branch;
@@ -1121,8 +1278,7 @@ sub create_branch {
     my $result = { success => 0, output => '', action => 'create_branch' };
 
     if (!$branch_name || $branch_name !~ m{^[a-zA-Z0-9_\-/]+$}) {
-        $result->{error_msg} = "Invalid branch name. Use only letters, numbers, "
-            . "underscores, hyphens, and forward slashes.";
+        $result->{error_msg} = "Invalid branch name. Use only letters, numbers, underscores, hyphens, and forward slashes.";
         return $result;
     }
     $source_branch ||= 'main';
@@ -1149,16 +1305,9 @@ sub create_branch {
         return $result;
     }
 
-    $result->{output} .= "Pushing new branch to remote...\n";
-    my $pu = $self->push_to_origin($c, branch => $branch_name, set_upstream => 1);
-    $result->{output} .= $pu->{output};
-    if (!$pu->{success}) {
-        $result->{error_msg} = "Failed to push branch '$branch_name' to remote";
-        return $result;
-    }
-
+    $result->{output} .= "Branch '$branch_name' created locally. Do not push to origin; worktree is for testing only.\n";
     $result->{success}     = 1;
-    $result->{success_msg} = "Branch '$branch_name' created successfully and pushed to remote.";
+    $result->{success_msg} = "Branch '$branch_name' created locally. Use 'hermes chat -w' to test, then switch to main to verify.";
     return $result;
 }
 
@@ -1497,10 +1646,7 @@ sub build_worktree_list {
         label => 'MAIN',
         url   => '/planning/daily',
         cmd   => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r',
-        # Hermes CLI for THIS checkout. cwd = checkout so Hermes loads .hermes.md.
-        # Do NOT pass -w: Comserv worktrees ARE the isolation. `hermes chat -w`
-        # creates a nested hermes/hermes-* branch (often from origin/main) and
-        # the agent then edits the wrong tree.
+        # Isolated dashboard for main. Do not use `hermes chat -w`.
         hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2 && hermes dashboard --isolated --host 0.0.0.0 --port 9119 --no-open --skip-build',
         hermes_port => 9119,
         hermes_cwd => '/home/shanta/PycharmProjects/comserv2',
@@ -1828,9 +1974,10 @@ sub merge_branch {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
             "merge_branch: secret guard refused merging '$branch' into $current");
         $result->{error_msg} = "Merge refused by secret guard: '$branch' would bring in a key/secret file. "
-                             . "Remove it from the branch (keys belong in ~/.comserv/keys), then retry.\n"
-                             . ($guard->{output} // q{});
+                             . "Only the primary DB key belongs in the env; other keys belong in the database.\n"
+                             . ($guard->{remediation} || $guard->{output} // q{});
         $result->{output}    = $guard->{output} // q{};
+        $result->{hits}      = $guard->{hits} || [];
         $result->{reason}    = 'secret_guard';
         return $result;
     }
@@ -2115,6 +2262,208 @@ sub push_main {
         $result->{error_msg} = "Push of '$branch' failed (see output).";
     }
     return $result;
+}
+
+=head2 catch_up_registered_worktrees($c, \%opts)
+
+After main moves, fast-forward every registered worktree that has nothing of
+its own. This is the only automatic main-into-branch update.
+
+Rules (do not relax these):
+
+=over
+
+=item * Only keys in C<worktrees.json>. Not historical branches, not C<-bk>, not C<hermes/*>.
+
+=item * C<git merge --ff-only main> inside that worktree. Never C<--no-ff>. A fast-forward moves the branch pointer and does not create a commit, so it cannot start the ping-pong loop.
+
+=item * Skip a dirty tree. Do not autostash. Uncommitted agent work stays put.
+
+=item * Skip a branch that is ahead of main. Those need a human freshen; a blind merge can conflict.
+
+=item * Never merge any of these branches back to main from here.
+
+=back
+
+C<$opts->{dry_run}> classifies without moving refs. Returns
+C<{ rows => [...], summary => $text }>. A row action is one of
+C<fast_forwarded>, C<would_ff>, C<uptodate>, C<skipped_dirty>,
+C<skipped_diverged>, C<missing>, C<failed>, C<skipped>.
+
+=cut
+
+sub catch_up_registered_worktrees {
+    my ($self, $c, $opts) = @_;
+    $opts //= {};
+    my $dry = $opts->{dry_run} ? 1 : 0;
+
+    my $cfg = eval { _worktree_config() } // {};
+    my $base = $cfg->{base_dir} // "$ENV{HOME}/.comserv/worktrees";
+    my $branches = $cfg->{branches} // {};
+    my @rows;
+
+    for my $key (sort keys %$branches) {
+        my $dir = "$base/$key/Comserv";
+        my $row = { key => $key, path => $dir, action => 'skipped' };
+
+        unless (-e "$dir/.git") {
+            $row->{action} = 'missing';
+            $row->{reason} = 'no checkout';
+            push @rows, $row;
+            next;
+        }
+
+        my $b = $self->_run($c, 'branch', '--show-current', { repo => $dir });
+        my $branch = $b->{output} // '';
+        $branch =~ s/\s+\z//;
+        $row->{branch} = $branch;
+        if (!$b->{success} || !length $branch
+                || $branch eq 'main' || $branch eq 'master') {
+            $row->{reason} = 'not a feature branch';
+            push @rows, $row;
+            next;
+        }
+
+        # A merge already in flight must not be touched. ff-only would fail
+        # and a later abort would be the wrong recovery. Read the worktree
+        # gitdir file — do not `rev-parse MERGE_HEAD`. A missing MERGE_HEAD
+        # exits non-zero and _run would file an error-audit todo per branch.
+        if (_worktree_merge_in_progress($dir)) {
+            $row->{action} = 'skipped';
+            $row->{reason} = 'merge already in progress';
+            push @rows, $row;
+            next;
+        }
+
+        my $st = $self->_run($c, 'status', '--porcelain', { repo => $dir });
+        unless ($st->{success}) {
+            $row->{action} = 'failed';
+            $row->{reason} = 'could not read worktree status';
+            push @rows, $row;
+            next;
+        }
+        my $dirty = $st->{output} // '';
+        $dirty =~ s/\s+\z//;
+        if (length $dirty) {
+            my @files;
+            for my $line (split /\n/, $dirty) {
+                next unless $line =~ /\S/;
+                my $path = $line;
+                $path =~ s/^\s*[0-9A-Za-z?!. ]{1,2}\s+//;
+                $path =~ s/^.* -> //;
+                $path =~ s/\s+\z//;
+                push @files, $path if length $path;
+                last if @files >= 8;
+            }
+            $row->{action} = 'skipped_dirty';
+            $row->{reason} = 'uncommitted changes';
+            $row->{files}  = \@files;
+            push @rows, $row;
+            next;
+        }
+
+        my $ahead_r  = $self->_run($c, 'rev-list', '--count', 'main..HEAD', { repo => $dir });
+        my $behind_r = $self->_run($c, 'rev-list', '--count', 'HEAD..main', { repo => $dir });
+        unless ($ahead_r->{success} && $behind_r->{success}) {
+            $row->{action} = 'failed';
+            $row->{reason} = 'could not compare to main';
+            push @rows, $row;
+            next;
+        }
+        my ($ahead, $behind) = ($ahead_r->{output} // '0', $behind_r->{output} // '0');
+        $ahead  =~ s/\D//g;
+        $behind =~ s/\D//g;
+        $row->{ahead}  = (length $ahead  ? $ahead  : 0) + 0;
+        $row->{behind} = (length $behind ? $behind : 0) + 0;
+
+        if ($row->{ahead} > 0) {
+            $row->{action} = 'skipped_diverged';
+            $row->{reason} = 'has commits not in main';
+            push @rows, $row;
+            next;
+        }
+        if ($row->{behind} == 0) {
+            $row->{action} = 'uptodate';
+            push @rows, $row;
+            next;
+        }
+        if ($dry) {
+            $row->{action} = 'would_ff';
+            push @rows, $row;
+            next;
+        }
+
+        my $m = $self->_run($c, 'merge', '--ff-only', 'main', { repo => $dir });
+        if ($m->{success}) {
+            $row->{action} = 'fast_forwarded';
+        }
+        else {
+            $row->{action} = 'failed';
+            $row->{reason} = join(' ', grep { defined && length }
+                $m->{error}, $m->{output});
+            $row->{reason} =~ s/\s+/ /g;
+            $row->{reason} = substr($row->{reason}, 0, 240);
+            if (_worktree_merge_in_progress($dir)) {
+                $self->_run($c, 'merge', '--abort', { repo => $dir });
+                $row->{reason} .= ' (aborted incomplete merge)';
+            }
+        }
+        push @rows, $row;
+    }
+
+    my %n;
+    $n{$_->{action}}++ for @rows;
+    my $summary = sprintf(
+        'Branch catch-up: %d fast-forwarded, %d already current, %d skipped (unique commits), %d skipped (uncommitted), %d missing, %d failed.',
+        $n{fast_forwarded} || 0,
+        $n{uptodate}       || 0,
+        $n{skipped_diverged} || 0,
+        $n{skipped_dirty}  || 0,
+        $n{missing}        || 0,
+        $n{failed}         || 0,
+    );
+    if ($dry) {
+        $summary .= sprintf(' Dry run: %d would fast-forward.', $n{would_ff} || 0);
+    }
+    my @detail;
+    for my $r (@rows) {
+        next if ($r->{action} // '') eq 'uptodate';
+        my $name = $r->{branch} || $r->{key};
+        my $bit = "$name: $r->{action}";
+        $bit .= " — $r->{reason}" if $r->{reason};
+        $bit .= " ($r->{behind} behind)" if $r->{behind};
+        if ($r->{files} && @{$r->{files}}) {
+            $bit .= ' [' . join(', ', @{$r->{files}}) . ']';
+        }
+        push @detail, $bit;
+    }
+    $summary .= "\n" . join("\n", @detail) if @detail;
+
+    my $level = ($n{failed} || 0) ? 'warn' : 'info';
+    $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_merge',
+        ($dry ? 'catch_up dry_run: ' : 'catch_up: ') . $summary);
+
+    return { rows => \@rows, summary => $summary };
+}
+
+# True when $dir (a worktree checkout) has MERGE_HEAD. A linked worktree's
+# .git is a file ("gitdir: <path>"), and MERGE_HEAD lives in that gitdir.
+sub _worktree_merge_in_progress {
+    my ($dir) = @_;
+    return 0 unless defined $dir && length $dir;
+    my $git = "$dir/.git";
+    return 0 unless -e $git;
+    my $gitdir = $git;
+    if (-f $git) {
+        open my $fh, '<', $git or return 0;
+        my $line = <$fh> // '';
+        close $fh;
+        if ($line =~ /^gitdir:\s*(.+?)\s*$/) {
+            $gitdir = $1;
+            $gitdir = "$dir/$gitdir" unless $gitdir =~ m{^/};
+        }
+    }
+    return -f "$gitdir/MERGE_HEAD" ? 1 : 0;
 }
 
 1;

@@ -7,7 +7,7 @@
    },
    "day_start_hour": 5,
    "week_off_at": 90,
-   "allow_overrun_date": "2026-10-15",
-   "_overrun_note": "Shanta 6:48 AM PT Oct 15: grok-4.7 may use the rest of Super Grok until the 10:31 reset; 98% hard cap still applies. Expires on its own (date only matches Oct 15). Shanta 6:49 AM PT: cap 100% for this window only (overrun_hard_cap; ignored on other days).",
-   "overrun_hard_cap": 100
+   "allow_overrun_date": "2026-10-21",
+   "_overrun_note": "Shanta 11:41 AM PT Oct 21 2026: grok-4.7 may run past the daily cap today up to 98% of the week, then switch to a good paid model. Week resets Thu Oct 22 10:31 PT.",
+   "overrun_hard_cap": 98
 }
