@@ -2987,6 +2987,19 @@ sub label_favicon :Path('/favicon/label') :Args(1) {
 sub end : ActionClass('RenderView') {
     my ($self, $c) = @_;
 
+    # Login-return: a protected page that bounced a GET to /user/login without
+    # return_to/destination → remember where the user was going.
+    eval {
+        my $loc = $c->res->location // '';
+        if ($loc =~ m{/user/login(?:\?|$)} && $loc !~ /[?&](?:return_to|destination)=/
+            && uc($c->req->method || 'GET') eq 'GET' && !$c->session->{username}) {
+            my $u = $c->controller('User');
+            my $p = $u && $u->can('_safe_return_path')
+                ? $u->_safe_return_path($c, $c->req->uri->path_query) : '';
+            $c->session->{login_return_path} = $p if $p;
+        }
+    };
+
     # Intercept unhandled Catalyst errors and render a friendly error page —
     # but only in production (CATALYST_DEBUG=0). In debug mode, let Catalyst
     # show its full error page so developers can see the real stack trace.

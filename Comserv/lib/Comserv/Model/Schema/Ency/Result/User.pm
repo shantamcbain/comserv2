@@ -1,5 +1,6 @@
 package Comserv::Model::Schema::Ency::Result::User;
 use base 'DBIx::Class::Core';
+use Crypt::PBKDF2;
 
 __PACKAGE__->table('users');
 __PACKAGE__->add_columns(
@@ -149,14 +150,13 @@ __PACKAGE__->has_many(
 );
 
 # Add method to check password (needed for authentication)
+# Accepts PBKDF2 hashes and legacy unsalted SHA-256 hashes (see
+# Comserv::Util::PasswordHash). A legacy match is upgraded to PBKDF2 by the
+# login controller; this method never writes.
 sub check_password {
     my ($self, $password) = @_;
-    
-    # Use SHA256 hashing to match the hashed password stored in the database
-    use Digest::SHA qw(sha256_hex);
-    my $hashed_input = sha256_hex($password);
-    
-    return $self->password eq $hashed_input;
+    require Comserv::Util::PasswordHash;
+    return Comserv::Util::PasswordHash->verify($self->password, $password);
 }
 
 # Add method to get display name

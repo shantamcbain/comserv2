@@ -1,0 +1,268 @@
+.pve-shell {
+    display: flex;
+    min-height: 32rem;
+    border: 1px solid var(--border-color, #ccc);
+    background: var(--bg-color, #fff);
+    color: var(--text-color, #222);
+    font-size: 0.92rem;
+}
+.pve-tree {
+    width: 16.5rem;
+    flex: 0 0 16.5rem;
+    border-right: 1px solid var(--border-color, #ccc);
+    background: var(--bg-secondary, #f4f4f4);
+    overflow: auto;
+}
+.pve-tree-dc a { display: block; padding: 0; color: inherit; text-decoration: none; font-weight: 600; }
+.pve-tree-dc,
+.pve-tree-node {
+    padding: 0.35rem 0.6rem;
+    font-weight: 600;
+}
+.pve-tree-node { padding-left: 1.1rem; font-weight: 500; }
+.pve-tree ul { list-style: none; margin: 0; padding: 0 0 0.5rem; }
+.pve-tree a {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    padding: 0.2rem 0.6rem 0.2rem 1.6rem;
+    color: inherit;
+    text-decoration: none;
+}
+.pve-tree a:hover { background: var(--hover-bg, rgba(0,0,0,0.06)); }
+.pve-tree li.is-selected a {
+    background: var(--primary-color, #1d4f91);
+    color: var(--primary-contrast, #fff);
+}
+.pve-dot {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 2px;
+    background: var(--muted-color, #888);
+    flex: 0 0 auto;
+}
+.pve-dot.running { background: var(--success-color, #3c3); border-radius: 0; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.pve-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pve-toolbar, .pve-tabs, .pve-logbar {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 0.35rem 0.6rem;
+    border-bottom: 1px solid var(--border-color, #ccc);
+}
+.pve-tabs button, .pve-toolbar a, .pve-toolbar button {
+    background: transparent;
+    border: 1px solid transparent;
+    color: inherit;
+    padding: 0.25rem 0.55rem;
+    cursor: pointer;
+    text-decoration: none;
+}
+.pve-tabs button.is-on {
+    border-bottom: 2px solid var(--primary-color, #1d4f91);
+    font-weight: 600;
+}
+.pve-body { padding: 0.8rem; flex: 1; }
+.pve-summary {
+    display: grid;
+    grid-template-columns: 1.4fr 0.8fr;
+    gap: 1rem;
+}
+.pve-status {
+    border: 1px solid var(--border-color, #ccc);
+    padding: 0.7rem 0.8rem;
+}
+.pve-status dt { color: var(--muted-color, #666); }
+.pve-status dd { margin: 0 0 0.45rem; }
+.pve-logbar { border-bottom: 0; border-top: 1px solid var(--border-color, #ccc); font-size: 0.85rem; }
+.pve-pending { color: var(--warning-color, #a60); font-weight: 600; }
+.pve-server-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.pve-server-card {
+    border: 1px solid var(--border-color, #ccc);
+    background: var(--bg-color, #fff);
+    color: var(--text-color, #222);
+}
+.pve-server-card.is-selected {
+    border-color: var(--primary-color, #007bff);
+    box-shadow: inset 3px 0 0 var(--primary-color, #007bff);
+}
+.pve-server-card header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.7rem;
+    border-bottom: 1px solid var(--border-color, #ccc);
+    background: var(--bg-secondary, #f4f4f4);
+    font-weight: 600;
+}
+.pve-server-card header .pve-managing {
+    margin-left: auto;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--primary-color, #007bff);
+}
+.pve-server-card dl { margin: 0; padding: 0.55rem 0.7rem 0.2rem; }
+.pve-server-card dt {
+    color: var(--text-muted-color, #6c757d);
+    font-size: 0.78rem;
+}
+.pve-server-card dd { margin: 0 0 0.4rem; word-break: break-all; }
+.pve-server-card .pve-card-actions {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.35rem 0.7rem 0.6rem;
+}
+.pve-server-card .pve-card-actions a { color: var(--link-color, var(--primary-color, #007bff)); }
+.pve-card-open {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+}
+.pve-card-open:hover { background: var(--hover-bg, transparent); }
+.pve-fleet-bar { margin-bottom: 0.75rem; }
+.pve-add-server,
+.pve-graphs-bar button {
+    display: inline-block;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--primary-color, #007bff);
+    background: var(--bg-color, #fff);
+    color: var(--primary-color, #007bff);
+    text-decoration: none;
+    cursor: pointer;
+}
+.pve-graphs-bar button.is-on {
+    background: var(--primary-color, #007bff);
+    color: var(--primary-contrast, #fff);
+}
+.pve-graphs {
+    border: 1px solid var(--border-color, #ccc);
+    background: var(--bg-color, #fff);
+    color: var(--text-color, #222);
+    margin-top: 1rem;
+}
+.pve-graphs-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.7rem;
+    border-bottom: 1px solid var(--border-color, #ccc);
+    background: var(--bg-secondary, #f4f4f4);
+}
+.pve-graphs-bar h2 { margin: 0 0.6rem 0 0; font-size: 1rem; }
+.pve-graphs-status { margin: 0.6rem 0.7rem; color: var(--text-muted-color, #6c757d); }
+.pve-graph-server,
+.pve-graph-vm {
+    border-top: 1px solid var(--border-color, #ccc);
+    padding: 0.55rem 0.7rem 0.7rem;
+}
+.pve-graph-server.is-spike,
+.pve-graph-vm.is-spike {
+    box-shadow: inset 3px 0 0 var(--warning-color, #a60);
+}
+.pve-graph-server h3,
+.pve-graph-vm h4 { margin: 0 0 0.35rem; font-size: 0.95rem; }
+.pve-spike {
+    color: var(--warning-color, #a60);
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+.pve-graph-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: 0.5rem;
+}
+.pve-spark { color: var(--primary-color, #007bff); }
+.pve-spark.is-spike { color: var(--warning-color, #a60); }
+.pve-spark figcaption {
+    font-size: 0.75rem;
+    color: var(--text-muted-color, #6c757d);
+}
+.pve-history-chart { margin: 0.4rem 0.7rem 0.8rem; color: var(--text-color, #222); }
+.pve-history-chart figcaption { font-size: 0.8rem; margin-bottom: 0.2rem; }
+.pve-history-chart svg { width: 100%; height: 4.5rem; display: block; color: var(--primary-color, #007bff); }
+.pve-graph-list { display: block; }
+.pve-dc-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
+}
+.pve-dc-card svg { width: 100%; height: 11rem; display: block; background: var(--bg-color, #fff); }
+.pve-dc-card {
+    min-width: 0;
+    border: 1px solid var(--border-color, #ccc);
+    background: var(--bg-color, #fff);
+    color: var(--text-color, #222);
+}
+.pve-snap-dl {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr;
+    gap: 0.2rem 0.6rem;
+    margin: 0;
+    padding: 0.55rem 0.7rem 0.7rem;
+    font-size: 0.85rem;
+}
+.pve-snap-dl dt { margin: 0; color: var(--text-muted-color, #6c757d); }
+.pve-snap-dl dd { margin: 0; font-weight: 600; }
+.pve-dc-card .pve-snap {
+    margin: 0;
+    padding: 0.45rem 0.7rem 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+.pve-dc-card header {
+    padding: 0.4rem 0.7rem;
+    border-bottom: 1px solid var(--border-color, #ccc);
+    background: var(--bg-secondary, #f4f4f4);
+    font-weight: 600;
+}
+.pve-tf-label {
+    margin-left: auto;
+    font-size: 0.85rem;
+    color: var(--text-color, #222);
+}
+.pve-tf-label select {
+    margin-left: 0.4rem;
+    padding: 0.2rem 0.4rem;
+    background: var(--bg-color, #fff);
+    color: var(--text-color, #222);
+    border: 1px solid var(--border-color, #ccc);
+}
+.pve-graphs { width: 100%; }
+.pve-dc-cards { width: 100%; }
+.pve-dc-card { width: 100%; }
+.pve-dc-card svg,
+.pve-history-chart svg { width: 100%; height: 16rem; display: block; }
+.pve-dc-legend { display: flex; flex-wrap: wrap; gap: 0.8rem 1.2rem; }
+.pve-line { fill: none; stroke-width: 1.75; }
+.pve-line-0 { stroke: var(--primary-color, #007bff); color: var(--primary-color, #007bff); }
+.pve-line-1 { stroke: var(--success-color, #198754); color: var(--success-color, #198754); }
+.pve-line-2 { stroke: var(--warning-color, #a60); color: var(--warning-color, #a60); }
+.pve-line-3 { stroke: var(--info-color, #0dcaf0); color: var(--info-color, #0dcaf0); }
+.pve-line-4 { stroke: var(--danger-color, #dc3545); color: var(--danger-color, #dc3545); }
+.pve-line-5 { stroke: var(--secondary-color, #6c757d); color: var(--secondary-color, #6c757d); }
+.pve-dc-legend { list-style: none; margin: 0; padding: 0.35rem 0.7rem 0.6rem; font-size: 0.8rem; }
+.pve-dc-legend li { display: flex; align-items: center; gap: 0.4rem; margin: 0.15rem 0; }
+.pve-swatch { width: 1rem; height: 0.2rem; background: currentColor; display: inline-block; }
+.pve-back { margin: 0.4rem 0; }
+.pve-token-ok { color: var(--success-color, #198754); }
+.pve-token-missing { color: var(--danger-color, #dc3545); }
+.pve-main[data-tab="summary"] [data-pve-panel="hardware"],
+.pve-main[data-tab="summary"] [data-pve-panel="backup"],
+.pve-main[data-tab="hardware"] [data-pve-panel="summary"],
+.pve-main[data-tab="hardware"] [data-pve-panel="backup"],
+.pve-main[data-tab="backup"] [data-pve-panel="summary"],
+.pve-main[data-tab="backup"] [data-pve-panel="hardware"] {
+    display: none;
+}
+@media (max-width: 800px) {
+    .pve-shell { flex-direction: column; }
+    .pve-tree { width: auto; flex-basis: auto; border-right: 0; border-bottom: 1px solid var(--border-color, #ccc); }
+    .pve-summary { grid-template-columns: 1fr; }
+}
