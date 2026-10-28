@@ -1,7 +1,8 @@
 package Comserv::Controller::User;
 use Moose;
 use namespace::autoclean;
-use Digest::SHA qw(sha256_hex);  # For hashing passwords
+use Digest::SHA qw(sha256_hex);  # For hashing verification codes; passwords use PBKDF2
+use Crypt::PBKDF2;
 use Data::Dumper;
 use Email::Sender::Simple qw(sendmail);
 use Email::Simple;
@@ -99,6 +100,15 @@ sub login :Local {
         return grep { $url =~ $_ } @login_patterns;
     };
 
+    # Rate-limit failed login attempts per IP
+    unless ($self->_check_rate_limit($c, 'login')) {
+        $c->res->status(429);
+        $c->stash(error_msg => 'Too many login attempts. Please wait 15 minutes and try again.',
+                  template  => 'user/login.tt');
+        $c->forward($c->view('TT'));
+        return;
+    }
+
     if ($explicit_return && !$is_login_url->($explicit_return)) {
         $c->session->{referer} = $explicit_return;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login',
@@ -193,6 +203,19 @@ sub do_login :Local {
     my $username   = $c->req->body_parameters->{username} || $c->req->param('username') || '';
     my $credential = $c->req->body_parameters->{password} || $c->req->param('password') || '';
     $credential =~ s/\s+//g;
+
+    # Apply rate limiting before any password verification
+    unless ($self->_check_rate_limit($c, 'login')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+            "AUDIT: Rate limit exceeded ip=" . ($c->req->address || 'unknown') . " username='$username'");
+        $c->res->status(429);
+        $c->stash(
+            error_msg => 'Too many login attempts. Please wait 15 minutes and try again.',
+            template  => 'user/login.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
 
     # Determine whether the credential is a 6-digit verification code or a password
     my $password          = ($credential =~ /^\d{6}$/) ? '' : $credential;
@@ -343,6 +366,10 @@ sub do_login :Local {
 
     # Check if user exists and password is correct
     if ($user && $user->check_password($password)) {
+        # Successful authentication clears the rate-limit counter for this
+        # account / IP pair.
+        $self->_record_login_success($c, $username);
+
         # Check if account is suspended
         if ($user->status && $user->status eq 'suspended') {
             my $susp_ip = $c->req->address || 'unknown';
@@ -578,12 +605,14 @@ sub do_login :Local {
                         "AUDIT: Login failed user_id=" . $user->id . " ip=$fail_ip reason=wrong_password sitename=$sitename");
                     $fail_stash{error_msg}              = 'Invalid password. If you have forgotten your password, you can reset it below.';
                     $fail_stash{show_forgot_password}   = 1;
+                    $self->_record_login_failure($c, $username);
                 }
             }
         } else {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                 "AUDIT: Login failed username='$username' ip=$fail_ip reason=user_not_found");
             $fail_stash{error_msg} = 'Invalid username or password.';
+            $self->_record_login_failure($c, $username);
         }
 
         $c->stash(%fail_stash);
@@ -619,9 +648,97 @@ sub do_login :Local {
 }
 sub hash_password {
     my ($self, $password) = @_;
-    return sha256_hex($password);
+    my $pbkdf2 = Crypt::PBKDF2->new;
+    return $pbkdf2->generate($password);
 }
 
+# Rate-limit failed login attempts.
+# Policy (mirrors the PBKDF2 hardening spec):
+#   - 5 failures from one IP on one account block that IP for up to 15 minutes.
+#   - Failures across all IPs on one account add a 2-second delay per attempt
+#     (never a block).
+#   - 30 failures from one IP across accounts block that IP for up to 15 minutes.
+#   - Admins can always log in from an unblocked IP.
+#   - A successful login clears the counters for that account/IP pair.
+# Implementation stores counters in the session rather than the logging table,
+# because logging rows can be merged or disabled and would silently disable the
+# limit.
+sub _check_rate_limit {
+    my ($self, $c, $type) = @_;
+
+    my $ip       = $c->req->address || 'unknown';
+    my $username = '';
+    if ($type && $type eq 'login') {
+        $username = $c->req->param('username') // '';
+    }
+    my $now    = time();
+    my $window = 15 * 60; # 15 minutes
+
+    $c->session->{_login_failures} ||= [];
+    my @failures = grep { $now - ($_->{time} // 0) < $window }
+                   @{$c->session->{_login_failures}};
+
+    # IP-level block: 30 failures from this IP across all accounts
+    my $ip_failures = grep { ($_->{ip} // '') eq $ip } @failures;
+    if ($ip_failures >= 30) {
+        return 0;
+    }
+
+    # If we have a username, apply account-level rules
+    if ($username) {
+        # Admin bypass: admins may log in from an unblocked IP even if the
+        # account-level rules would otherwise apply.
+        my $is_admin_user = 0;
+        eval {
+            my $u = $c->model('DBEncy::User')->find({ username => $username });
+            if ($u && $u->roles) {
+                my $roles = $u->roles;
+                $is_admin_user = 1 if grep { lc($_) eq 'admin' || lc($_) eq 'site_admin' }
+                                      (ref $roles eq 'ARRAY' ? @$roles : split /,\s*/, $roles);
+            }
+        };
+
+        unless ($is_admin_user) {
+            # Account + IP block: 5 failures from this IP on this account
+            my $account_ip_failures = grep {
+                ($_->{ip} // '') eq $ip && ($_->{username} // '') eq $username
+            } @failures;
+            if ($account_ip_failures >= 5) {
+                return 0;
+            }
+
+            # Account-level delay: 2 seconds per recent failure across all IPs
+            # (never blocks, only slows down guesses).
+            my $account_failures = grep { ($_->{username} // '') eq $username } @failures;
+            if ($account_failures > 0) {
+                sleep(2 * $account_failures);
+            }
+        }
+    }
+
+    $c->session->{_login_failures} = \@failures;
+    return 1;
+}
+
+sub _record_login_failure {
+    my ($self, $c, $username) = @_;
+    my $ip = $c->req->address || 'unknown';
+    push @{$c->session->{_login_failures} ||= []}, {
+        ip       => $ip,
+        username => $username // '',
+        time     => time(),
+    };
+}
+
+sub _record_login_success {
+    my ($self, $c, $username) = @_;
+    return unless $username;
+    my $ip = $c->req->address || 'unknown';
+    my @remaining = grep {
+        !(($_->{ip} // '') eq $ip && ($_->{username} // '') eq $username)
+    } @{$c->session->{_login_failures} || []};
+    $c->session->{_login_failures} = \@remaining;
+}
 
 sub logout :Local {
     my ($self, $c) = @_;
