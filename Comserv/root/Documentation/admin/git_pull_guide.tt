@@ -62,7 +62,7 @@ If you encounter issues:
 1. **Permission Errors**: Ensure the web server has write permissions to the repository
 2. **Merge Conflicts**: Use the backup files to restore or manually resolve conflicts
 3. **Application Errors**: Check the application logs for errors after pulling
-4. **Stash Issues**: Use `git stash list` and `git stash apply` to manage stashed changes manually
+4. **Divergent histories**: `/admin/git_pull` runs a bare `git pull origin <branch>`. If local and origin have both moved, and `pull.rebase` is unset, Git exits 128 and prints the reconcile hint on stderr. The page then says "Git pull failed" and does not show that hint. Do not treat that as a damaged repository. Reconcile on purpose (merge or fast-forward) from the toplevel checkout. The button will keep failing the same way until the pull code passes a strategy and includes stderr.
 
 ## Related Documentation
 

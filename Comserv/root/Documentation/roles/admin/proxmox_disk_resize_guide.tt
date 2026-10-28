@@ -15,7 +15,7 @@ Growing the virtual disk is only <strong>step one</strong> — you must also exp
 <strong>inside the guest OS</strong> before the VM can use the new space.
 </p>
 
-<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:12px 16px;margin:16px 0;">
+<div style="background:var(--warning-color, #fff3cd);border:1px solid var(--warning-color, #ffc107);border-radius:4px;padding:12px 16px;margin:16px 0;">
     <strong>Important:</strong> Proxmox can only <strong>increase</strong> disk size. Shrinking is not supported.
     Plan the new size carefully — you cannot undo it from the UI.
 </div>
@@ -125,12 +125,12 @@ Optional cleanup after resizing (sessions, old Docker images):
 
 <h2 id="production">6. Example: ComservProduction (VM 102)</h2>
 <table style="border-collapse:collapse;width:100%;max-width:640px;">
-    <tr><th style="text-align:left;padding:6px 10px;border:1px solid #ddd;">Item</th><th style="text-align:left;padding:6px 10px;border:1px solid #ddd;">Value</th></tr>
-    <tr><td style="padding:6px 10px;border:1px solid #ddd;">Proxmox VMID</td><td style="padding:6px 10px;border:1px solid #ddd;"><strong>102</strong></td></tr>
-    <tr><td style="padding:6px 10px;border:1px solid #ddd;">Hostname</td><td style="padding:6px 10px;border:1px solid #ddd;">comservproduction1</td></tr>
-    <tr><td style="padding:6px 10px;border:1px solid #ddd;">IP</td><td style="padding:6px 10px;border:1px solid #ddd;">192.168.1.126</td></tr>
-    <tr><td style="padding:6px 10px;border:1px solid #ddd;">Typical disk</td><td style="padding:6px 10px;border:1px solid #ddd;">scsi0, 30 GB → recommend <strong>60–80 GB</strong></td></tr>
-    <tr><td style="padding:6px 10px;border:1px solid #ddd;">Guest layout</td><td style="padding:6px 10px;border:1px solid #ddd;">LVM: <code>ubuntu-vg/ubuntu-lv</code></td></tr>
+    <tr><th style="text-align:left;padding:6px 10px;border:1px solid var(--bg-secondary, #ddd);">Item</th><th style="text-align:left;padding:6px 10px;border:1px solid var(--bg-secondary, #ddd);">Value</th></tr>
+    <tr><td style="padding:6px 10px;border:1px solid var(--bg-secondary, #ddd);">Proxmox VMID</td><td style="padding:6px 10px;border:1px solid var(--bg-secondary, #ddd);"><strong>102</strong></td></tr>
+    <tr><td style="padding:6px 10px;border:1px solid var(--bg-secondary, #ddd);">Hostname</td><td style="padding:6px 10px;border:1px solid var(--bg-secondary, #ddd);">comservproduction1</td></tr>
+    <tr><td style="padding:6px 10px;border:1px solid var(--bg-secondary, #ddd);">IP</td><td style="padding:6px 10px;border:1px solid var(--bg-secondary, #ddd);">192.168.1.126</td></tr>
+    <tr><td style="padding:6px 10px;border:1px solid var(--bg-secondary, #ddd);">Typical disk</td><td style="padding:6px 10px;border:1px solid var(--bg-secondary, #ddd);">scsi0, 30 GB → recommend <strong>60–80 GB</strong></td></tr>
+    <tr><td style="padding:6px 10px;border:1px solid var(--bg-secondary, #ddd);">Guest layout</td><td style="padding:6px 10px;border:1px solid var(--bg-secondary, #ddd);">LVM: <code>ubuntu-vg/ubuntu-lv</code></td></tr>
 </table>
 <p>
 <a href="/proxmox/edit_vm/102">Edit VM 102 in Comserv</a> (requires CSC admin and working Proxmox auth).

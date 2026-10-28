@@ -2246,6 +2246,29 @@ sub test_gate :Path('/admin/git/test_gate') :Args(1) {
     }));
 }
 
+=head2 _catch_up_note
+
+After a successful land on main, fast-forward registered worktrees that have
+nothing of their own. A catch-up failure must not turn a successful merge into
+a failed response. Returns C<($output, $summary, $rows)>.
+
+=cut
+
+sub _catch_up_note {
+    my ($self, $c, $output) = @_;
+    my $cu = eval { $self->git_service->catch_up_registered_worktrees($c) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+            "catch_up after main land died: $@");
+        my $summary = "Branch catch-up failed: $@";
+        return (($output // '') . "\n\n" . $summary, $summary, []);
+    }
+    my $summary = $cu->{summary} // '';
+    my $out = $output // '';
+    $out .= "\n\n" . $summary if length $summary;
+    return ($out, $summary, $cu->{rows} || []);
+}
+
 =head2 merge_to_main
 
 POST /admin/git/merge_to_main
@@ -2326,9 +2349,12 @@ sub merge_to_main :Path('/admin/git/merge_to_main') :Args(0) {
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_merge',
         "merge_to_main: merged '$branch' into main (success)");
+    my ($out, $summary, $rows) = $self->_catch_up_note($c, $res->{output});
     $c->response->body(encode_json({
         success => 1,
-        output  => $res->{output},
+        output  => $out,
+        catch_up_summary => $summary,
+        catch_up => $rows,
         error   => undef,
     }));
 }
@@ -2611,6 +2637,16 @@ sub merge :Path('/admin/git/merge') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
         'git_merge', "direction=$direction source=$source target=$target success=1");
 
+    my $output = $res->{output};
+    my $summary = '';
+    my $rows = [];
+    # Only when main actually moved. main->branch is a manual freshen of one
+    # worktree; fanning out from there would hide a human merge inside an
+    # automatic one. Never merge those branches back to main.
+    if ($direction eq 'branch->main') {
+        ($output, $summary, $rows) = $self->_catch_up_note($c, $output);
+    }
+
     $c->response->body(encode_json({
         success   => 1,
         target    => $target,
@@ -2619,7 +2655,9 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         autostash => $res->{autostash} ? 1 : 0,
         autostash_conflict => $res->{autostash_conflict} ? 1 : 0,
         error     => undef,
-        output    => $res->{output},
+        output    => $output,
+        catch_up_summary => $summary,
+        catch_up  => $rows,
     }));
 }
 
