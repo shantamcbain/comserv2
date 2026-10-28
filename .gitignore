@@ -244,3 +244,4 @@ Comserv/config/.*_encryption_key
 *_encryption_key
 >>>>>>> main
 .*_encryption_key
+Comserv/data/supergrok_pacing.json
