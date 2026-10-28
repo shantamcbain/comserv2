@@ -52,6 +52,15 @@ my $_DB_CONN_TTL            = 300;     # seconds between re-reads
 # blow past Cloudflare's origin timeout (HTTP 521). Keyed by SiteName; each
 # Starman worker keeps its own copy. Only the site-wide (non-user-specific)
 # portion is cached — per-user overrides/grants still run live below.
+# Canonical module key: lower-case, trimmed, spaces/dashes -> underscore.
+sub _module_key {
+    my ($k) = @_;
+    $k = '' unless defined $k;
+    $k = lc $k;
+    $k =~ s/^\s+|\s+$//g;
+    $k =~ s/[\s-]+/_/g;
+    return $k;
+}
 my %_site_modules_cache;              # sitename => { modules => {...}, at => epoch }
 my $_SITE_MODULES_TTL      = 120;     # seconds between re-checks
 my %_shop_flag_cache;                 # sitename => { val => 0|1, at => epoch }
@@ -196,6 +205,16 @@ sub _normalize_debug_msg {
 sub auto :Private {
     my ($self, $c) = @_;
 
+    # Cheap assets and probe URLs must not run site/DB auto (~1s+). One HTML
+    # page pulls many /static/js files; on a single worker that serializes into
+    # minutes when mixed with WAN scanners.
+    # cgi-bin/: old Perl CGI URLs hit by crawlers (Oct 19 2026 522 outage);
+    # answered by Controller::LegacyCgi with no site/session/DB/theme work.
+    my $path = $c->req->path // '';
+    if ($path =~ m{^(?:cgi-bin(?:/|$)|static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
+        return 1;
+    }
+
     # External monitoring trigger endpoints (hardware_monitor run/watchdog/
     # report_down/report_error/ingest) are called by the cron script on proxmox720
     # (and other nodes) WITHOUT a browser session, so they MUST skip the admin-role
@@ -213,8 +232,19 @@ sub auto :Private {
     }
 
     # LAYER 0: Require admin role for sensitive paths
-    if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site/(?:add|modify|delete)|file/admin)}) {
+    # site (full Site Management), themetest, Weather configuration (+ related write/test
+    # endpoints) — guests must never reach these (CSC-20260831-3242 / 6513 / 4599).
+    if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site(?:/|$)|themetest|file/admin|Weather/(?:configuration|test_config|save_configuration|poll|test_location|lookup_postal)(?:/|$))}) {
         unless ($c->user_exists && $c->check_user_roles('admin')) {
+            $c->response->redirect($c->uri_for('/user/login'));
+            return 0;
+        }
+    }
+
+    # LAYER 0b: Login required for staff/internal pages (any authenticated user)
+    # IT infra docs + hosted tenant inventory (CSC-20260831-2970 / 1151).
+    if ($c->req->path =~ m{^(?:it(?:/|$)|hosted(?:/|$))}i) {
+        unless ($c->user_exists) {
             $c->response->redirect($c->uri_for('/user/login'));
             return 0;
         }
@@ -246,6 +276,10 @@ sub auto :Private {
     eval { require Comserv::Util::DevPreview; Comserv::Util::DevPreview::maybe_apply_preview_session($c) };
 
     $c->stash->{is_dev_server} = IS_DEV_WORKTREE;
+    # Branch identity for worktree favicon (Header.tt renders /favicon/branch/<name>)
+    $c->stash->{git_branch} = IS_DEV_WORKTREE
+        ? Comserv::Util::SystemInfo->get_app_workflow($c->config->{home})
+        : '';
 
     # Cache-busting version for CSS/JS asset URLs (?v=... in js_load.tt).
     # Set on EVERY request here — previously it was only set inside the
@@ -255,6 +289,14 @@ sub auto :Private {
     # stable across requests (good for caching) but changes on every app
     # restart/deploy, which is exactly when assets change.
     $c->stash->{css_v} = ($Comserv::Controller::Root::ASSET_EPOCH ||= time());
+
+    # Canonical clock: UTC storage + viewer TZ for | user_time TT filter
+    # (Comserv::Util::AppTime). Fail-soft — never block the request.
+    eval {
+        require Comserv::Util::AppTime;
+        Comserv::Util::AppTime->inject_request($c);
+        1;
+    };
 
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
     eval {
@@ -266,15 +308,9 @@ sub auto :Private {
             my $now = time();
             if (!defined $_remotedb_status || ($now - $_remotedb_last_checked) > $_REMOTEDB_TTL) {
                 eval {
-                    my $remotedb_class = $c->model('RemoteDB');
-                    my $remotedb;
-                    if (!ref($remotedb_class)) {
-                        require Comserv::Model::RemoteDB;
-                        $remotedb = Comserv::Model::RemoteDB->new();
-                        $remotedb->_load_config();
-                    } else {
-                        $remotedb = $remotedb_class;
-                    }
+                    require Comserv::Model::RemoteDB;
+                    my $remotedb = Comserv::Model::RemoteDB->from_context($c);
+                    $remotedb->_load_config() if ref $remotedb;
                     $_remotedb_status = ($remotedb && ref($remotedb))
                         ? ($remotedb->{configuration_status} // 'ok')
                         : 'ok';
@@ -323,25 +359,11 @@ sub auto :Private {
             $c->stash->{debug} = $c->session->{debug_mode};
         }
         
-        # Set up site name with timeout protection
-        eval {
-            local $SIG{ALRM} = sub { die "Site name fetch timeout\n"; };
-            alarm(3);  # 3 second timeout for site name fetch
-            $self->fetch_and_set($c, 'SiteName');
-            alarm(0);
-        };
-        alarm(0);  # Make sure alarm is cancelled
-        if ($@) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
-                "Site name fetch timed out or failed: $@. Using default site name.");
-            $c->stash->{SiteName} = 'default';
-        }
-        
-        # Set up theme using canonical ThemeConfig model with timeout protection
-        my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+        # Set up site name for theme resolution
+            my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
 
-        # CSS cache-busting version (Unix timestamp, changes every request forcing fresh CSS)
-        $c->stash->{css_v} = time();
+        # css_v is set once per server start at the top of auto() (ASSET_EPOCH);
+        # do NOT reset it per-request or browsers cache stale JS/CSS.
 
         # Determine request domain (host without port) and non-standard port
         my $req_host = $c->req->uri->host;   # strips port already
@@ -357,6 +379,11 @@ sub auto :Private {
             my $domain_favicon = $c->model('ThemeConfig')->get_domain_favicon($c, $req_host);
             my $site_favicon   = $c->model('ThemeConfig')->get_site_favicon($c, $SiteName);
             $c->stash->{site_favicon} = $domain_favicon || $site_favicon || '';
+            # Page-area favicon from the theme system (theme_definitions.json
+            # -> "page_favicons" URL-regex map). Highest tab-icon priority in
+            # Header.tt; controllers may override via $c->stash->{page_favicon}.
+            my $page_favicon = $c->model('ThemeConfig')->get_page_favicon($c, $c->req->path);
+            $c->stash->{page_favicon} = $c->stash->{page_favicon} || $page_favicon || '';
             # Stash theme primary colour (stripped of #) for port-favicon background
             my $theme_data  = $c->model('ThemeConfig')->get_theme($c, $theme_name) || {};
             my $theme_vars  = $theme_data->{variables} || {};
@@ -697,6 +724,7 @@ sub auto :Private {
         eval {
             my $mod_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
             my %enabled;
+            my $hosting;
 
             # Site-wide module resolution (SiteModule + HostingAccount addons) is
             # identical for every visitor to a site and costs several DB round-trips,
@@ -717,11 +745,14 @@ sub auto :Private {
                     { columns  => [qw(module_name enabled)] }
                 )->all;
                 for my $row (@site_mods) {
-                    $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
+                    my $k = _module_key($row->module_name);
+                    next unless length $k;
+                    # Any enabled row for the key wins over a disabled duplicate.
+                    $enabled{$k} = ($enabled{$k} || ($row->enabled ? 1 : 0)) ? 1 : 0;
                 }
 
-                # Check hosting account for subscribed addons to enable them by default
-                my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                # Hosting requested_* column historically named "addons"; treat as site features.
+                $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
                     -or => [
                         { sitename => $mod_site },
                         { sitename => lc($mod_site) },
@@ -732,7 +763,15 @@ sub auto :Private {
                 if ($hosting && $hosting->requested_addons) {
                     my @addons = split(/\s*,\s*/, $hosting->requested_addons);
                     for my $a (@addons) {
-                        my $lc_addon = lc($a);
+                        my $lc_addon = _module_key($a);
+                        # Brew / Beekeeping: site_modules (or Brew/BMaster / brew.*)
+                        # only — never from hosting requested_addons. Skip BEFORE
+                        # the generic enable so a missing row cannot re-open them.
+                        if ($lc_addon eq 'brew' || $lc_addon eq 'brewhouse'
+                            || $lc_addon eq 'beekeeping' || $lc_addon eq 'apiary'
+                            || $lc_addon eq 'bmaster') {
+                            next;
+                        }
                         $enabled{$lc_addon} = 1 unless exists $enabled{$lc_addon};
                         if ($lc_addon eq 'printing_3d' || $lc_addon eq '3d') {
                             $enabled{'3d'} = 1 unless exists $enabled{'3d'};
@@ -742,13 +781,6 @@ sub auto :Private {
                             $enabled{'workshop'} = 1 unless exists $enabled{'workshop'};
                             $enabled{'workshops'} = 1 unless exists $enabled{'workshops'};
                         }
-                        if ($lc_addon eq 'brew' || $lc_addon eq 'brewhouse') {
-                            $enabled{'brew'} = 1 unless exists $enabled{'brew'};
-                        }
-                        if ($lc_addon eq 'beekeeping' || $lc_addon eq 'apiary' || $lc_addon eq 'bmaster') {
-                            $enabled{'beekeeping'} = 1 unless exists $enabled{'beekeeping'};
-                            $enabled{'apiary'}     = 1 unless exists $enabled{'apiary'};
-                        }
                     }
                 }
 
@@ -756,7 +788,9 @@ sub auto :Private {
                 $_site_modules_cache{$mod_site} = { modules => { %enabled }, at => $now_sm };
             }
 
-            # Brew site / brew.* hostnames / brew addon → nav + brew home
+            # Brew feature: brew.* host / Brew sitename, or site_modules.brew=1.
+            # Brew is a site FEATURE (not a paid "addon" gate). Hosting requested_addons
+            # must not auto-enable brew (see skip above) — that leaked Brew nav onto 3d.
             my $req_host = $c->req->uri->host || '';
             $req_host =~ s/^www\.//i;
             my $is_brew_host = ($req_host =~ /^brew\./i) ? 1 : 0;
@@ -767,27 +801,36 @@ sub auto :Private {
                 $enabled{accounting} = 1 unless exists $enabled{accounting};
             }
 
-            # Show Brew menu when site_modules or hosting lists the brew addon
+            # Nav/templates still read brew_addon_active (legacy stash key).
             if ($enabled{brew}) {
                 $c->stash->{brew_addon_active} = 1;
+                $c->stash->{brew_feature_active} = 1;
             }
 
-            # Apply per-user overrides from user_module_access
+            # Per-user grants from user_module_access. enabled_modules is the UNION
+            # of site modules and the user's own modules (CSC-20260909-2862), so a
+            # granted row adds a module; a granted=0 row no longer removes a
+            # module the site itself has turned on.
             if ($c->session->{username}) {
                 my @overrides = $c->model('DBEncy')->resultset('UserModuleAccess')->search({
                     username => $c->session->{username},
-                    sitename => $mod_site,
+                    -or => [ { sitename => $mod_site }, \[ 'LOWER(TRIM(sitename)) = ?', lc($mod_site) ] ],
                 })->all;
                 for my $ov (@overrides) {
-                    $enabled{ $ov->module_name } = $ov->granted ? 1 : 0;
+                    my $k = _module_key($ov->module_name);
+                    next unless length $k && $ov->granted;
+                    $enabled{$k} = 1;
                 }
             }
 
             # Apply per-user service grants from membership_service_access
             # (e.g. beekeeping access granted by purchasing a BMaster membership plan)
             if ($c->session->{user_id}) {
+                # Case/whitespace-insensitive: session SiteName casing and sites.name
+                # (e.g. 'SB ') do not always match exactly.
                 my $svc_site = $c->model('DBEncy')->resultset('Site')->search(
-                    { name => $mod_site }, { rows => 1 }
+                    { -or => [ { name => $mod_site }, \[ 'LOWER(TRIM(name)) = ?', lc($mod_site) ] ] },
+                    { rows => 1 }
                 )->single;
                 if ($svc_site) {
                     my @svc_grants = $c->model('DBEncy')->resultset('MembershipServiceAccess')->search({
@@ -797,9 +840,15 @@ sub auto :Private {
                     })->all;
                     for my $sg (@svc_grants) {
                         next if $sg->is_expired;
-                        $enabled{ $sg->service_name } = 1;
+                        my $k = _module_key($sg->service_name);
+                        $enabled{$k} = 1 if length $k;
                     }
                 }
+            }
+            # Keep alias pairs in sync so templates can use either key.
+            for my $pair (['3d', 'printing_3d'], ['workshop', 'workshops'], ['beekeeping', 'apiary']) {
+                my ($x, $y) = @$pair;
+                if ($enabled{$x} || $enabled{$y}) { $enabled{$x} = $enabled{$y} = 1 }
             }
             $c->stash->{enabled_modules} = \%enabled;
         };
@@ -826,6 +875,15 @@ sub auto :Private {
             }
         }
         $c->stash->{can_plan} = $can_plan;
+
+        # Planning menu (CSC-20260909-2862): developers, editors and admins on
+        # every site; other users only when planning is in enabled_modules.
+        # session->{roles} is an arrayref (normalized above from a comma list).
+        my $pr = $c->stash->{user_roles} || [];
+        $pr = [ split /\s*,\s*/, $pr ] unless ref $pr eq 'ARRAY';
+        my $planning_staff = $c->stash->{is_admin}
+            || (grep { my $r = lc($_ // ''); $r =~ s/^\s+|\s+$//g; $r =~ /^(developer|editor|admin)$/ } @$pr);
+        $c->stash->{planning_staff} = $planning_staff ? 1 : 0;
 
         # Beekeeping nav — site addon (hosting/site_modules), BMaster site, or per-user grant.
         # Admin role alone does not enable the menu (unlike the old TopDropListBeekeeping bypass).
@@ -881,6 +939,62 @@ sub auto :Private {
         # Expose the friendly system identifier (workstation / production) to all templates
         $c->stash->{system_identifier} = Comserv::Util::Logging->get_system_identifier();
 
+        # AI model guard banner for admin/developer — shows on every page when the
+        # user should switch away from a paid model.  Two triggers:
+        #   1. SuperGrok daily cap reached (fast file read)
+        #   2. OpenRouter spend exceeds soft caps (cached 60 s, DB read on miss)
+        {
+            my $guard_roles = [ 'admin', 'developer' ];
+            my $user_roles  = $c->session->{roles} || [];
+            $user_roles = [ split /,/, $user_roles ] unless ref $user_roles eq 'ARRAY';
+            if (grep { my $r = $_; grep { /^$r$/i } @$guard_roles } @$user_roles) {
+                my $locked = 0;
+                my $notice = '';
+                # --- SuperGrok guard (fast file read) ---
+                my $guard_file = $c->config->{home}
+                    . '/root/static/ai/supergrok_guard.json';
+                if (-f $guard_file) {
+                    my $g = eval {
+                        open my $fh, '<:raw', $guard_file or die;
+                        local $/; my $raw = <$fh>; close $fh;
+                        JSON::decode_json($raw);
+                    };
+                    if ($g && $g->{off_today}) {
+                        $locked = 1;
+                        $notice = sprintf(
+                            'Super Grok capped — coding on %s/%s until %s',
+                            $g->{switch_provider} || 'openrouter',
+                            $g->{switch_model}  || 'unknown',
+                            $g->{reset_at}      || 'next reset');
+                    }
+                }
+                # --- OpenRouter spend caps (cached 60 s by Router) ---
+                if (!$locked) {
+                    my $sp = eval {
+                        require Comserv::Model::AI2::Router;
+                        Comserv::Model::AI2::Router->new->openrouter_spend($c);
+                    };
+                    if ($sp && $sp->{ok}) {
+                        my @caps;
+                        push @caps, sprintf('day $%.2f/%s',
+                            $sp->{day}, '$1.65')   if ($sp->{day}   || 0) >= 1.65;
+                        push @caps, sprintf('week $%.2f/%s',
+                            $sp->{week}, '$11.50')  if ($sp->{week}  || 0) >= 11.50;
+                        push @caps, sprintf('month $%.2f/%s',
+                            $sp->{month}, '$50')    if ($sp->{month} || 0) >= 50;
+                        if (@caps) {
+                            $locked = 1;
+                            $notice = 'OpenRouter spend cap reached — '
+                                . join(' · ', @caps)
+                                . ' — switch to free models';
+                        }
+                    }
+                }
+                $c->stash->{supergrok_guard_locked} = $locked;
+                $c->stash->{supergrok_guard_notice} = $notice if $notice;
+            }
+        }
+
         # Read build version baked into the image (or generated by deploy)
         my $version_file = $c->config->{home} . '/version.json';
         if (-f $version_file) {
@@ -890,6 +1004,16 @@ sub auto :Private {
                 JSON::decode_json($json);
             };
             $c->stash->{app_version} = $app_version if $app_version && ref $app_version eq 'HASH';
+            # Footer shows the build time in Pacific (PDT/PST), not UTC.
+            if ($c->stash->{app_version} && ($c->stash->{app_version}{build_date} // '') =~ /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)Z$/) {
+                require POSIX; require Time::Local;
+                my $ep = eval { Time::Local::timegm($6, $5, $4, $3, $2 - 1, $1) };
+                if (defined $ep) {
+                    { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset();
+                      $c->stash->{app_version}{build_date_local} = POSIX::strftime('%Y-%m-%d %H:%M %Z', localtime $ep); }
+                    POSIX::tzset();
+                }
+            }
             # version.json is a build stamp (always "main" on a baked image).
             # Worktree servers must show the live checkout, not the bake label.
             if (IS_DEV_WORKTREE && $c->stash->{app_version} && $c->stash->{app_workflow}
@@ -906,11 +1030,28 @@ sub auto :Private {
         # are corrected. The "+local" suffix is preserved when the live short sha
         # differs from the baked one (or absent) so the "locally modified" signal
         # survives the overlay.
-        if ($c->stash->{app_version}) {
-            my $live = eval {
+        #
+        # SECURITY / NOISE: only run live git for staff who can see the debug bar
+        # (admin or debug_mode). Public pages (marketplace, bots, crawlers) must
+        # NEVER spawn `git branch --show-current` — that is not "bots accessing
+        # /admin/git"; it was a side effect of Root::auto on every request, which
+        # also flooded error-audit when prod images have no usable checkout.
+        # The Git: branch@sha line in pagetop.tt is already IF is_admin||debug.
+        if ($c->stash->{app_version}
+            && ($c->stash->{is_admin} || ($c->session->{debug_mode} // 0) == 1)
+        ) {
+            # Skip the live-git overlay when this tree has no .git (prod image).
+            # App home is Comserv/; the git root is usually one level up.
+            # Worktrees use a .git *file*. Without this guard every request
+            # spawned `git branch --show-current` → exit 128 → ERROR audit todo.
+            my $app_home = $c->config->{home} || '';
+            my $has_git  = $app_home && (
+                -e "$app_home/.git" || -e "$app_home/../.git"
+            );
+            my $live = ($has_git) ? eval {
                 Comserv::Util::Git->new(logging => $self->logging)
                     ->current_branch_and_commit($c);
-            };
+            } : undef;
             if ($live && $live->{branch}) {
                 my $av   = $c->stash->{app_version};
                 my $baked = $av->{commit} // '';
@@ -1179,6 +1320,17 @@ sub auto :Private {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
             "CRITICAL DEBUG: About to set server_ip='$display_ip' into stash");
         $c->stash->{server_ip} = $display_ip;
+
+        # ── ACTIVE DB USER (for the on-page admin banner) ──────────────────
+        # Show which MariaDB/MySQL user the app is actually connected as.
+        # DBEncy::COMPONENT resolves this at startup; surface it for admins.
+        my $db_user_info = eval { $c->model('DBEncy')->get_connection_info() } || {};
+        my $active_db_user = $db_user_info->{current_username} || 'unknown';
+        my $active_db_auth = $db_user_info->{startup_info}{auth_source} || 'unknown';
+        $c->stash->{active_db_user}      = $active_db_user;
+        $c->stash->{active_db_auth_source} = $active_db_auth;
+        $c->stash->{active_db_host}      = $db_user_info->{startup_info}{host} || '';
+        $c->stash->{active_db_name}      = $db_user_info->{startup_info}{database} || '';
         
         # Verify stash was actually set
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
@@ -1191,14 +1343,15 @@ sub auto :Private {
 
         # ── CANONICAL AI MODEL CATALOG ────────────────────────────────────
         # SINGLE SOURCE OF TRUTH: Comserv::Util::ModelCatalog owns the list for
-        # EVERY AI surface (floating widget, /ai/widget popup, /ai, /ai2, editor,
-        # git dashboard). It builds once per process from the v2 Router — the
-        # same source /ai2/providers uses — and caches with a TTL, so this adds
-        # no per-request provider round-trip. Stash both shapes: the decoded
-        # array for server-side .tt rendering (ai/model_select.tt, the reliable
-        # path) and the JSON string for window.ComservConfig.models.
-        $c->stash->{ai_model_catalog}      = Comserv::Util::ModelCatalog->catalog($c);
-        $c->stash->{ai_model_catalog_json} = Comserv::Util::ModelCatalog->catalog_json($c);
+        # EVERY AI surface. Ordinary page loads use the cheap default cache
+        # (built without probing Ollama). AI surfaces explicitly refresh once per
+        # session when opened, so Ollama is only probed when the user asks for it.
+        # Stash both shapes only when a controller has pre-populated them; the
+        # default is empty so js_load.tt falls back to a lazy /ai2/providers fetch.
+        unless (defined $c->stash->{ai_model_catalog}) {
+            $c->stash->{ai_model_catalog}      = [];
+            $c->stash->{ai_model_catalog_json} = '[]';
+        }
 
         # Role + page context used by the .tt to SORT/order the dropdown.
         my $roles = $c->session->{roles} || [];
@@ -1207,14 +1360,18 @@ sub auto :Private {
         $c->stash->{ai_role_tier} = Comserv::Util::ModelCatalog->_role_tier($c);
         $c->stash->{ai_is_guest} = Comserv::Util::ModelCatalog->is_guest_tier($c) ? 1 : 0;
         $c->stash->{ai_can_select_model} = $c->stash->{ai_is_priv};
-        $c->stash->{ai_chat_page} ||= $c->request->path;
+        my $ai_page = eval {
+            my $r = $c->model('AI2::Router');
+            $r && $r->can('infer_page') ? $r->infer_page($c->request->path) : 'chat';
+        } || 'chat';
+        $c->stash->{ai_chat_page} ||= $ai_page;
         # Pre-selected model. Guests/members get a FREE OpenRouter model (no cost,
         # and no load on the already-saturated workstation GPU); privileged users
         # on a coding surface get the pinned coding model. Without this the
         # browser just selects the first option alphabetically, which silently
         # sent every guest to a local Ollama model.
         $c->stash->{ai_default_model}
-            = Comserv::Util::ModelCatalog->default_for($c, page => 'chat');
+            = Comserv::Util::ModelCatalog->default_for($c, page => $ai_page);
 
         return 1; # Continue processing
     };
@@ -1222,6 +1379,8 @@ sub auto :Private {
     # Error handling for auto() method
     if ($@) {
         my $error = $@;
+        # $c->detach inside auto() is normal control flow, not an error; rethrow it.
+        die $error if !ref($error) && $error =~ /^catalyst_detach/;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', 
             "Exception in auto() method: $error");
         
@@ -1346,7 +1505,7 @@ sub index :Path('/') :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "View parameter detected: $view");
         }
 
-        # Brew addon or brew.* host → brewing dashboard as site home (/)
+        # Brew sitename or brew.* host → brewing dashboard as site home (/)
         my $brew_home = 0;
         eval {
             my $em = $c->stash->{enabled_modules};
@@ -1354,7 +1513,8 @@ sub index :Path('/') :Args(0) {
             my $site_lc = lc( $c->stash->{SiteName} || $c->session->{SiteName} || '' );
             my $host = $c->req->uri->host || '';
             $host =~ s/^www\.//i;
-            if ( $em->{brew} || $site_lc eq 'brew' || $host =~ /^brew\./i ) {
+            # em->{brew} alone must NOT steal / for other sitenames (e.g. 3d).
+            if ( $site_lc eq 'brew' || $host =~ /^brew\./i ) {
                 $brew_home = 1;
             }
         };
@@ -1790,7 +1950,7 @@ sub track_application_start {
                 my $theme_id = $themes->{$theme_name}{id} || next;
                 next unless $theme_id;
                 my $css = $c->model('ThemeConfig')->generate_theme_css($c, $theme_id);
-                my $dir = $c->path_to('root', 'static', 'css', 'themes');
+                my $dir = $c->model('ThemeConfig')->get_theme_css_directory($c);
                 my $file = "$dir/$theme_name.css";
                 require File::Path;
                 unless (-d $dir) { File::Path::make_path($dir); }
@@ -2476,6 +2636,9 @@ sub begin :Private {
     if ($c->req->path =~ m{^/?health(?:/|$)}) {
         return;
     }
+    if (($c->req->path // '') =~ m{^(?:cgi-bin(?:/|$)|static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
+        return;
+    }
 
     # Store request start time for timing analysis
     $c->stash->{_request_start_time} = time();
@@ -2572,38 +2735,51 @@ sub _track_nav_back_url {
 
 sub _port_label {
     my ($port) = @_;
+    # Prefer short known labels for worktree branch names (helpdesk was HD on
+    # legacy :4013; live helpdesk worktree is now :4009).
+    my %branch_labels = (
+        helpdesk             => 'HD',
+        Documentation        => 'Do',
+        aisystem             => "\x{1F916}",
+        schema               => 'Sc',
+        planning             => 'Pl',
+        git                  => 'Gi',
+        '3d'                 => '3D',
+        DockerHA             => 'HA',
+        InventoryAccounting  => 'IA',
+    );
     # Single source of truth first: worktrees.json maps each live branch to its
-    # port. Use the branch name as the label so favicons follow the registry
-    # instead of the stale zenflow-era static map below.
+    # port. Prefer %branch_labels, else first two letters of the branch name.
     my $cfg = eval { Comserv::Util::Git->_worktree_config };
     if ($cfg && $cfg->{branches}) {
         for my $name (sort keys %{$cfg->{branches}}) {
             my $b = $cfg->{branches}{$name};
-            return ucfirst(substr($name, 0, 2))
-                if $b && ($b->{port} || 0) == $port;
+            next unless $b && ($b->{port} || 0) == $port;
+            return $branch_labels{$name} if exists $branch_labels{$name};
+            return _branch_favicon_label($name);
         }
     }
     my %named = (
         3000 => 'PC',   # ProjectConfig
-        4001 => 'Pl',   # PlanningSystem
-        4002 => 'SM',   # SchemaManagement
-        4003 => 'HA',   # InfrastructureHA
-        4004 => 'WS',   # WorkShops
-        4005 => 'Us',   # Users
+        4001 => 'IA',   # InventoryAccounting worktree
+        4002 => 'HA',   # DockerHA
+        4003 => '3D',   # 3d worktree
+        4004 => 'Gi',   # git
+        4005 => 'Pl',   # planning
         # 4006 is the aisystem worktree (AI system use) — show the AI robot
         # glyph instead of the stale 'FM' FileManagement label.
         4006 => "\x{1F916}",   # aisystem — AI robot
-        4007 => 'Ma',   # UnifiedMail
-        4008 => 'Mb',   # Membership
-        4009 => 'Pt',   # PointSystem
+        4007 => 'Sc',   # schema
+        4008 => 'Do',   # Documentation
+        4009 => 'HD',   # helpdesk worktree (was zenflow :4013 HD)
         4010 => 'AI',   # AIChatSystem
         4011 => 'Cs',   # CssThemes
         4012 => 'En',   # ENCY
-        4013 => 'HD',   # HelpDesk
+        4013 => 'HD',   # HelpDesk (legacy zenflow port — keep HD)
         4014 => 'Hp',   # HealthPlanning
         4015 => 'SH',   # ProdServerHealth
         4016 => 'Sc',   # Security
-        4017 => 'Dc',   # Documentation
+        4017 => 'Dc',   # Documentation (legacy)
         4018 => 'AP',   # APISystem
         4019 => 'BM',   # BMaster
         4020 => 'Ch',   # AIChatPlanInt
@@ -2697,6 +2873,110 @@ sub site_favicon :Path('/favicon/site') :Args(1) {
     my $svg = qq{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="4" fill="$bg"/>
   <text x="16" y="23" text-anchor="middle" font-family="sans-serif" font-weight="bold" font-size="20" fill="$fg">$letter</text>
+</svg>};
+
+    $c->response->content_type('image/svg+xml');
+    $c->response->headers->header('Cache-Control' => 'public, max-age=86400');
+    $c->response->body($svg);
+}
+
+sub _branch_favicon_label {
+    my ($branch) = @_;
+    return 'HD' if defined $branch && $branch =~ /^helpdesk$/i;
+    # Split into words on separators AND camelCase boundaries:
+    #   InventoryAccounting -> Inventory, Accounting -> "IA"
+    #   comserv2-git-worktree -> c, g, w -> "CGW"
+    my @parts = $branch =~ /[A-Z]+(?![a-z])|[A-Z][a-z]*|[a-z0-9]+/g;
+    my $label = uc(join '', map { substr($_, 0, 1) } @parts);
+    # Single-word branches keep their first two letters (e.g. "git" -> "GI")
+    if (@parts == 1 && length($parts[0]) > 1) {
+        $label = uc(substr($parts[0], 0, 2));
+    }
+    $label = substr($label, 0, 3);
+    return $label || '?';
+}
+
+sub branch_favicon :Path('/favicon/branch') :Args(1) {
+    my ($self, $c, $branch) = @_;
+
+    $branch =~ s/[^A-Za-z0-9_-]//g;
+    unless (length $branch) {
+        $c->response->status(400);
+        $c->response->content_type('text/plain');
+        $c->response->body('Invalid branch');
+        return;
+    }
+
+    # Deterministic colour per branch name so a given branch always looks the same
+    my @palette = (
+        '#1565C0', '#2E7D32', '#E65100', '#6A1B9A',
+        '#B71C1C', '#00695C', '#4E342E', '#37474F',
+        '#AD1457', '#0277BD', '#558B2F', '#EF6C00',
+    );
+    my $sum = 0;
+    $sum += ord($_) for split //, $branch;
+    my $bg = $palette[$sum % scalar(@palette)];
+    my $fg = _svg_text_color($bg);
+
+    my $label = _branch_favicon_label($branch);
+    my $len = length($label);
+    my $fs  = $len == 1 ? 20 : $len == 2 ? 16 : 12;
+    my $y   = $len == 1 ? 24 : 22;
+
+    # Use short label (not full branch name) so the badge stays readable.
+    # helpdesk branch → HD (matches legacy :4013 / public HelpDesk domain).
+    if (lc($branch) eq 'helpdesk') {
+        $c->detach('helpdesk_favicon');
+        return;
+    }
+
+    my $svg = qq{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="4" fill="$bg"/>
+  <text x="16" y="$y" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="$fs" fill="$fg">$label</text>
+</svg>};
+
+    $c->response->content_type('image/svg+xml');
+    $c->response->headers->header('Cache-Control' => 'public, max-age=86400');
+    $c->response->body($svg);
+}
+
+sub label_favicon :Path('/favicon/label') :Args(1) {
+    my ($self, $c, $text) = @_;
+
+    $text =~ s/[^A-Za-z0-9_-]//g;
+    unless (length $text) {
+        $c->response->status(400);
+        $c->response->content_type('text/plain');
+        $c->response->body('Invalid label');
+        return;
+    }
+
+    # Optional ?bg=RRGGBB overrides the palette pick
+    my @palette = (
+        '#1565C0', '#2E7D32', '#E65100', '#6A1B9A',
+        '#B71C1C', '#00695C', '#4E342E', '#37474F',
+        '#AD1457', '#0277BD', '#558B2F', '#EF6C00',
+    );
+    my $bg_param = $c->req->param('bg') || '';
+    my $bg;
+    if ($bg_param =~ /^[0-9a-fA-F]{6}$/) {
+        $bg = '#' . lc($bg_param);
+    } else {
+        my $sum = 0;
+        $sum += ord($_) for split //, $text;
+        $bg = $palette[$sum % scalar(@palette)];
+    }
+    my $fg = _svg_text_color($bg);
+
+    # Uppercase for display; cap at 3 chars like the branch favicon
+    my $label = uc(substr($text, 0, 3));
+    my $len   = length($label);
+    my $fs    = $len == 1 ? 20 : $len == 2 ? 16 : 12;
+    my $y     = $len == 1 ? 24 : 22;
+
+    my $svg = qq{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="4" fill="$bg"/>
+  <text x="16" y="$y" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="$fs" fill="$fg">$label</text>
 </svg>};
 
     $c->response->content_type('image/svg+xml');
@@ -2821,6 +3101,58 @@ sub default :Path {
     my ($self, $c) = @_;
 
     my $requested_path = $c->req->path;
+
+    # Manufacturing Traveler (todo #2399): Catalyst -r Module::Refresh reloads
+    # method bodies but does NOT register NEW controller actions. Until the
+    # :4003 worker is fully restarted, serve these paths from Root default so
+    # /Accounting/manufacturing is reachable. Accounting.pm already has the
+    # permanent Path('/Accounting/manufacturing') actions for post-restart.
+    if ($requested_path =~ m{^Accounting/manufacturing(?:/(view|print)/([^/]+))?/?$}i) {
+        my ($mfg_action, $mfg_order) = ($1, $2);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'default',
+            "Manufacturing traveler bridge path=/$requested_path action="
+            . ($mfg_action // 'index') . " order=" . ($mfg_order // '-'));
+        eval {
+            require Comserv::Util::Manufacturing::Traveler;
+            my $traveler = Comserv::Util::Manufacturing::Traveler->new;
+            if (!$mfg_action) {
+                my $open_orders = eval { $traveler->get_open_manufacturing_orders($c) } || [];
+                $c->stash(
+                    template    => 'Accounting/Manufacturing/index.tt',
+                    open_orders => $open_orders,
+                    title       => 'Manufacturing Orders - Print Farm Traveler',
+                );
+            }
+            elsif ($mfg_action eq 'view') {
+                my $data = $traveler->get_traveler_data($c, $mfg_order);
+                $c->stash(
+                    template => 'Accounting/Manufacturing/traveler_view.tt',
+                    traveler => $data,
+                    title    => "Manufacturing Traveler #$mfg_order",
+                );
+            }
+            else {
+                my $data = $traveler->get_traveler_data($c, $mfg_order);
+                $c->stash(
+                    template => 'Accounting/Manufacturing/traveler_print.tt',
+                    traveler => $data,
+                    title    => "Print Traveler #$mfg_order",
+                );
+            }
+            $c->response->status(200);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'default',
+                "Manufacturing traveler bridge failed: $@");
+            $c->response->status(500);
+            $c->stash(
+                template    => 'error.tt',
+                error_title => 'Manufacturing Traveler Error',
+                error_msg   => "Could not load manufacturing traveler: $@",
+            );
+        }
+        return;
+    }
 
     # Classify the requester for logging context
     my %req_info = Comserv::Util::Logging::extract_request_info($c);

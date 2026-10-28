@@ -6,7 +6,7 @@
 [% META roles = 'admin developer editor' %]
 
 <h1>HelpDesk System</h1>
-<p><em>Last updated: April 28, 2026</em></p>
+<p><em>Last updated: 2026-09-05</em></p>
 
 <h2>Overview</h2>
 <p>
@@ -92,7 +92,29 @@ a direct link to view the ticket. The email explains that they can reply to reop
 
 <hr>
 
-<h2 id="reminders">5. Sending a Reminder</h2>
+<h2 id="internal-actions">5. Internal Staff Actions (Work On / Escalate)</h2>
+<p>
+From the ticket view, staff can use the <strong>Work On</strong> and <strong>Escalate</strong> buttons. These:
+</p>
+<ul>
+    <li>Create a linked Todo record (with a sensible project chosen by site if possible, falling back to PLANNING).</li>
+    <li>Add a system message to the ticket thread ("Todo created...").</li>
+    <li><strong>Do not</strong> send any email to the customer. These are strictly internal tracking actions.</li>
+</ul>
+<p>
+The full customer email address is shown to staff on the ticket view along with a direct <code>mailto:</code> link for manual contact when needed.
+</p>
+
+<hr>
+
+<h2 id="email-controls">6. Per-Ticket Email Controls</h2>
+<p>
+Staff can click <strong>Disable emails</strong> on a ticket (especially useful for spam or cases where further contact is undesirable). This prevents the system from sending any further emails to the ticket holder. The flag can be toggled back on with <strong>Enable emails</strong>. All customer email paths (replies, status notifications, reminders) respect this setting.
+</p>
+
+<hr>
+
+<h2 id="reminders">7. Sending a Reminder</h2>
 <p>
 If a customer has not responded to an on_hold ticket, staff can send a reminder email
 from the ticket view page by clicking <strong>Send Reminder</strong>.
@@ -133,6 +155,7 @@ This means customers never need to file a new ticket if their original issue ret
     <li>Ticket moved to <em>resolved</em> or <em>closed</em> (includes link to view/reopen)</li>
     <li>Staff sends a reminder</li>
 </ul>
+<p><strong>Per-ticket email suppression</strong>: Staff can disable all customer emails for a specific ticket (e.g. spam or no-contact cases) using the <strong>Disable emails</strong> button on the ticket view. This is stored in the ticket's <code>metadata</code> and respected by reply, status, and reminder code paths. Use the <strong>Enable emails</strong> button to restore normal behaviour. The customer's email address is always visible to staff on the ticket view (with a direct <code>mailto:</code> link) so they can still contact the user manually if needed.</p>
 <p>Email uses <code>Comserv::Util::EmailNotification</code>. Ensure the site's outgoing mail configuration is correct for notifications to work.</p>
 
 <hr>
@@ -171,6 +194,9 @@ so open tickets surface in the daily priorities even without manually opening th
         <tr><td><code>/HelpDesk/ticket/reply/&lt;num&gt;</code></td><td>Post a reply</td><td>Staff or ticket owner</td></tr>
         <tr><td><code>/HelpDesk/ticket/update_status/&lt;num&gt;</code></td><td>Change ticket status (POST)</td><td>Staff only</td></tr>
         <tr><td><code>/HelpDesk/ticket/remind/&lt;num&gt;</code></td><td>Send reminder email (POST)</td><td>Staff only</td></tr>
+        <tr><td><code>/HelpDesk/ticket/create_todo/&lt;num&gt;</code></td><td>Create internal todo ("Work On") (POST)</td><td>Staff only</td></tr>
+        <tr><td><code>/HelpDesk/ticket/escalate_ticket/&lt;num&gt;</code></td><td>Escalate with high-priority todo (POST)</td><td>Staff only</td></tr>
+        <tr><td><code>/HelpDesk/ticket/toggle_customer_emails/&lt;num&gt;</code></td><td>Enable/disable all customer emails for this ticket (POST)</td><td>Staff only</td></tr>
         <tr><td><code>/HelpDesk/ticket/list</code></td><td>Customer's own ticket list</td><td>Logged in</td></tr>
         <tr><td><code>/HelpDesk/admin</code></td><td>Admin overview</td><td>Admin</td></tr>
         <tr><td><code>/HelpDesk/admin/tickets</code></td><td>All tickets</td><td>Admin</td></tr>

@@ -464,11 +464,11 @@
     /* ── Todo card operations ───────────────────────────────────────────── */
 
     function _todoCardSetActive(btn, recordId) {
-        btn.textContent = '⏸ Active';
+        btn.textContent = '⏸ Stop';
         btn.style.border = '';
         btn.style.background = '#ffc107';
         btn.style.color = '#000';
-        btn.title = 'Session active — click to close session';
+        btn.title = 'Work session open — click to close the log (todo stays open for more work)';
         btn.disabled = false;
         btn.setAttribute('data-record-id', recordId);
         btn.setAttribute('data-is-active', '1');
@@ -500,8 +500,8 @@
     // NOTE: no _ensureSession pre-call. Server-side close_log / done_with_log
     // (Comserv::Util::TodoLog) are self-sufficient: close is graceful when no
     // log is open, and done inserts a completed log if none was open. Calling
-    // open_log first would now TOGGLE-stop an active session (open_log is a
-    // start/stop toggle), which is not what Close/Done mean.
+    // open_log first is wrong: Start now REPORTS already_active when status
+    // is 5 (being worked) instead of toggle-stopping. Stop = close_log only.
 
     function startWorkTodoCard(btn, recordId) {
         btn.disabled = true;
@@ -513,6 +513,8 @@
             body: JSON.stringify({ record_id: recordId })
         }).then(function(r) { return r.json(); }).then(function(d) {
             if (d.ok) {
+                // Fresh open OR stale page on an already-status-5 todo:
+                // sync the button to Stop without killing the running log.
                 _todoCardSetActive(btn, recordId);
             } else {
                 btn.disabled = false;
@@ -540,15 +542,17 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ record_id: recordId, notes: notes })
             }).then(function(r) { return r.json(); }).then(function(d) {
-                if (d.ok) {
+                // Treat graceful "no open log" as success for the UI (revert button).
+                // The server already logged a warn; we do not want a stuck "Active" label.
+                if (d.ok || d.graceful) {
                     _todoCardSetStart(btn, recordId);
                 } else {
                     btn.disabled = false;
-                    btn.textContent = '⏸ Active';
+                    btn.textContent = '⏸ Stop';
                 }
             }).catch(function() {
                 btn.disabled = false;
-                btn.textContent = '⏸ Active';
+                btn.textContent = '⏸ Stop';
             });
     }
 
@@ -906,6 +910,9 @@
                     if (ra !== rb) return ra - rb;
                     var la = !!a.local, lb = !!b.local;
                     if (la !== lb) return la ? -1 : 1;
+                    var fa = !!(a.free || /(^|:)(free)$/i.test(a.name || '') || (!a.local && costOf(a) === 0 && !a.price_tier));
+                    var fb = !!(b.free || /(^|:)(free)$/i.test(b.name || '') || (!b.local && costOf(b) === 0 && !b.price_tier));
+                    if (fa !== fb) return fa ? -1 : 1;
                     var ca = costOf(a), cb2 = costOf(b);
                     if (ca !== cb2) return ca - cb2;
                     return String(a.name).localeCompare(String(b.name));

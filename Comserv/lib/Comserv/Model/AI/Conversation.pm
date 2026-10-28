@@ -4,6 +4,9 @@ use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny s
 use Try::Tiny;
 use JSON;
 use Comserv::Util::Logging;
+use Comserv::Model::AI::ConversationScope qw(
+    is_guest_session ensure_guest_session_id guest_meta_ok
+);
 
 has 'logging' => (
     is      => 'ro',
@@ -39,10 +42,16 @@ Returns arrayref of conversation hashrefs for display or API.
 sub list {
     my ($self, $c, %args) = @_;
 
-    my $user_id         = $args{user_id}         // $c->session->{user_id} // 199;
-    my $guest_session_id = $args{guest_session_id} // $c->session->{guest_session_id};
-    my $view_all        = $args{view_all}        // 0;
-    my $is_guest        = $args{is_guest}        // (!$c->session->{username});
+    my $is_guest = $args{is_guest} // is_guest_session($c);
+    my $user_id  = $args{user_id} // $c->session->{user_id};
+    $user_id = 199 if $is_guest && !defined $user_id;
+    # Never list the shared guest bucket for a logged-in user without user_id.
+    return { conversations => [], total => 0 } if !$is_guest && !defined $user_id;
+
+    my $guest_session_id = $args{guest_session_id} // ensure_guest_session_id($c);
+    my $view_all        = $args{view_all} // 0;
+    # Guests never get view_all (even if somehow flagged admin).
+    $view_all = 0 if $is_guest;
 
     my @conversations;
     my $total = 0;
@@ -51,20 +60,14 @@ sub list {
         my $schema = $c->model('DBEncy')->schema;
         my $search = $view_all ? {} : { user_id => $user_id };
 
-        my $count_rs = $schema->resultset('AiConversation')->search($search);
-        $total = $count_rs->count;
-
         my $rs = $schema->resultset('AiConversation')->search(
             $search,
             { order_by => { -desc => 'created_at' } }
         );
 
         for my $conv ($rs->all) {
-            # Guest filtering
-            if ($is_guest && $guest_session_id) {
-                my $meta = {};
-                eval { $meta = decode_json($conv->metadata || '{}'); };
-                next unless ($meta->{guest_session_id} && $meta->{guest_session_id} eq $guest_session_id);
+            if ($is_guest) {
+                next unless guest_meta_ok($conv->metadata, $guest_session_id);
             }
 
             push @conversations, {
@@ -79,6 +82,7 @@ sub list {
                 message_count => $conv->ai_messages->count,
             };
         }
+        $total = scalar @conversations;
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list',
             "Failed to list conversations: $_");
@@ -103,9 +107,10 @@ sub get_messages {
 
     return { error => 'Conversation ID required' } unless $conversation_id;
 
-    my $user_id          = $c->session->{user_id} // 199;
-    my $guest_session_id = $c->session->{guest_session_id};
-    my $is_guest         = !$c->session->{username};
+    my $is_guest         = is_guest_session($c);
+    my $user_id          = $c->session->{user_id};
+    $user_id = 199 if $is_guest && !defined $user_id;
+    my $guest_session_id = ensure_guest_session_id($c);
 
     my $schema = eval { $c->model('DBEncy')->schema };
     return { error => 'Schema unavailable' } unless $schema;
@@ -113,16 +118,9 @@ sub get_messages {
     my $conv = $schema->resultset('AiConversation')->find($conversation_id);
     return { error => 'Conversation not found' } unless $conv;
 
-    if ($conv->user_id != $user_id) {
-        return { error => 'Access denied' };
-    }
-
-    if ($is_guest && $guest_session_id) {
-        my $meta = {};
-        eval { $meta = decode_json($conv->metadata || '{}'); };
-        return { error => 'Access denied' }
-            unless ($meta->{guest_session_id} && $meta->{guest_session_id} eq $guest_session_id);
-    }
+    require Comserv::Model::AI::ConversationScope;
+    return { error => 'Access denied' }
+        unless Comserv::Model::AI::ConversationScope::conversation_owned_by_session($c, $conv);
 
     my @messages;
     for my $msg ($conv->ai_messages->search({}, { order_by => { -asc => 'created_at' } })->all) {

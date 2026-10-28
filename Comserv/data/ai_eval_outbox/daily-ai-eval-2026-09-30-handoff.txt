@@ -1,0 +1,18 @@
+Daily AI Eval 2026-09-30 — short handoff for Shanta
+
+Improving: YES
+- App Chat last-24h: 2/2 ok (100%) vs yesterday 50%; $0.0037
+- Commit 898ce8ca5 applied gemma-26b chain removal + dead nano last-resort fix; open circuits=[]; no failover hops needed today
+- OpenRouter: ~$18.05 balance; day $0.015 / week $1.14 / month $41.87 vs caps $1.65/$11.50/$50 (under)
+- Super Grok: 13% remaining, unlocked (used_today 0, daily_cap 6%); reset ~2026-10-01 10:31 AM PT
+- Thrash: none
+- Failover: healthy (fallover_rate 0% in 1d; 7d still shows Sep 28 recovered 404)
+- Chat UX: Sep 29 north-mini + hy3 both succeeded; quiet this morning; grounding=shadow
+- HelpDesk: 0 AI calls; main HelpDesk TT still UU — leave :3001 alone
+- Hermes: ~$0.91 est Sep 29 on deepseek-v4-flash; overnight nemotron-3.5-lightning:free $0; config default still xai-oauth/grok-build-0.1 (risk at 13%)
+
+Recommendations:
+1. Archive ~20–41 stale Hermes open sessions
+2. Point Hermes default back to deepseek flash for idle; reserve Super Grok aliases for coding until Oct 1 reset
+3. Scrub gemma-4-26b from ModelCatalog @FREE_PREFERENCE (chains already cleaned)
+4. Ingest: ok_200 (inbox at /home/shanta/.comserv/worktrees/aisystem/Comserv/Comserv/data/ai_eval_inbox/2026-09-30-ai-usage-monitor.json)

@@ -62,7 +62,7 @@ sub terminal_status :Local :Args(0) {
             ? ($interactive_ws
                 ? 'Interactive PTY shell — run grok, ollama, git, prove, etc.'
                 : 'HTTP CLI tab — Grok, Ollama, and shell via /ai endpoints (works on :3000 Docker).')
-            : 'Coding CLI requires Shanta on workstation.local, workstation.zero, or 172.30.131.126',
+            : 'Coding CLI requires Shanta on workstation.local (preferred; resolve to current ZT IP) or workstation.zero or the ZT IP',
     }));
 }
 
@@ -77,7 +77,7 @@ sub run_command :Local :Args(0) {
     $c->response->content_type('application/json');
 
     unless ($self->_coding_workstation_allowed($c)) {
-        $self->_deny_json($c, 403, 'Coding commands require Shanta on http://172.30.131.126:PORT/');
+        $self->_deny_json($c, 403, 'Coding commands require Shanta on http://workstation.local:PORT/ (hostname required; resolve to ZT IP on box)');
         return;
     }
 
@@ -170,6 +170,8 @@ sub _spawn_coding_shell {
     die "fork failed: $!" unless defined $pid;
 
     if ($pid == 0) {
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+        eval {
         $pty->make_slave_controlling_terminal();
         my $slave = $pty->slave();
 
@@ -201,6 +203,8 @@ sub _spawn_coding_shell {
             exec($shell, '--noprofile', '--norc', '-i') or exec($shell, '-i') or exec($shell) or die "Can't exec shell: $!";
         }
         exec($shell) or die "Can't exec shell: $!";
+        };
+        Comserv::Util::ForkSafe::child_exit(1);
     }
 
     return $pid;
@@ -321,7 +325,7 @@ sub terminal_ws :Path('/coding/terminal_ws') :Args(0) {
             'terminal_ws', "Coding terminal denied for host=$req_host user="
                 . ($c->session->{username} || ''));
         $c->response->status(403);
-        $c->response->body('Access denied: Shanta on 172.30.131.126 only');
+        $c->response->body('Access denied: Shanta on workstation.local (ZT IP) only');
         return;
     }
 

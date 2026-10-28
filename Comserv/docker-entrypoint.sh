@@ -22,7 +22,28 @@ if [ "$ENVIRONMENT" = "production" ] || [ "$ENVIRONMENT" = "staging" ]; then
     for dir in /tmp/comserv /tmp/comserv/session /tmp/comserv/temp /tmp/comserv/cache; do
         if [ -d "$dir" ]; then chown comserv:comserv "$dir" 2>&1 || true; fi
     done
-    chmod -R 755 /cache /tmp/comserv /opt/comserv/root/themes /tmp/comserv/temp 2>/dev/null || true
+    # NOT recursive on /tmp/comserv: the session dir can hold >1M files and a
+    # recursive walk delayed startup by ~4.5 min (2026-10-18 failed deploy).
+    chmod -R 755 /cache /opt/comserv/root/themes 2>/dev/null || true
+    chmod 755 /tmp/comserv /tmp/comserv/temp /tmp/comserv/cache 2>/dev/null || true
+    chmod 777 /tmp/comserv/session 2>/dev/null || true
+
+    # Expired file-session cleanup (background, low priority). Sessions expire
+    # after SESSION_EXPIRES_S (Plugin::Session expires / file fallback = 86400);
+    # every write refreshes mtime, so a file untouched for expiry + 1h is dead.
+    if [ "${SESSION_CLEANUP:-1}" = "1" ]; then
+        (
+            SESS_DIR="${COMSERV_SESSION_DIR:-/tmp/comserv/session}"
+            AGE_MIN=$(( ${SESSION_EXPIRES_S:-86400} / 60 + 60 ))
+            sleep 600
+            while :; do
+                if [ -d "$SESS_DIR" ]; then
+                    nice -n 19 ionice -c3 find "$SESS_DIR" -maxdepth 1 -type f -mmin +"$AGE_MIN" -delete 2>/dev/null || true
+                fi
+                sleep "${SESSION_CLEANUP_INTERVAL_S:-3600}"
+            done
+        ) &
+    fi
 
     # Use the canonical production PSGI (has Static middleware for menu CSS/JS)
     PSGI_FILE="script/comserv_server.psgi"

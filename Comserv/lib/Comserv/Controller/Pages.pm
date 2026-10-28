@@ -1099,8 +1099,8 @@ sub pages :Path('/admin/pages') :Args(0) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'pages', "Error fetching site roles: $@");
     }
     
-    my %seen_roles = map { $_ => 1 } qw(public normal member editor developer admin WorkshopLeader);
-    my @available_roles = qw(public normal member editor developer admin WorkshopLeader);
+    my %seen_roles = map { $_ => 1 } qw(public normal member editor developer helpdesk admin WorkshopLeader);
+    my @available_roles = qw(public normal member editor developer helpdesk admin WorkshopLeader);
     
     foreach my $r (@site_roles_db) {
         my $name = $r->role_name;

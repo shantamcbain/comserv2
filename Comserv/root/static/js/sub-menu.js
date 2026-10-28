@@ -29,100 +29,77 @@ function getSessionDebugMode() {
     return debugMode ? parseInt(debugMode) : (sessionStorage.getItem('debug_mode') ? parseInt(sessionStorage.getItem('debug_mode')) : 0);
 }
 
+/* Must match the @media query in menu-theme.css. CSS owns layout.
+   This file only toggles nav-open / touch-open. Never set element.style.display
+   on menu nodes — inline display beats the hamburger stylesheet. */
+var SMALL_SCREEN_QUERY = '(max-width: 640px)';
+
+function isSmallScreen() {
+    return window.matchMedia(SMALL_SCREEN_QUERY).matches;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Menu initialization starting...');
+    var menuList = document.getElementById('main-menu-list');
+    var navToggle = document.querySelector('.nav-toggle');
 
-    var horizontalMenus = document.querySelectorAll('.horizontal-menu');
-    horizontalMenus.forEach(function(menu) {
-        menu.style.display = 'flex';
-        menu.style.flexDirection = 'row';
-        menu.style.listStyleType = 'none';
-        menu.style.margin = '0';
-        menu.style.padding = '0';
-        menu.style.width = '100%';
-    });
-
-    var dropdowns = document.querySelectorAll('.horizontal-dropdown');
-    dropdowns.forEach(function(dropdown) {
-        dropdown.style.position = 'relative';
-        dropdown.style.display = 'inline-block';
-        dropdown.style.marginRight = '5px';
-
-        dropdown.addEventListener('mouseenter', function() {
-            var content = this.querySelector('.dropdown-content');
-            if (content) {
-                content.style.display = 'block';
-                content.style.opacity = '1';
-                content.style.visibility = 'visible';
-                console.log('Dropdown shown');
-            }
+    if (navToggle && menuList) {
+        navToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var open = menuList.classList.toggle('nav-open');
+            navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            navToggle.textContent = open ? '\u2715' : '\u2630';
         });
+    }
 
-        dropdown.addEventListener('mouseleave', function() {
-            var content = this.querySelector('.dropdown-content');
-            if (content) {
-                content.style.display = 'none';
-                content.style.opacity = '0';
-                content.style.visibility = 'hidden';
-                console.log('Dropdown hidden');
-            }
-        });
-    });
+    document.addEventListener('click', function(e) {
+        if (!isSmallScreen()) return;
+        if (e.target.closest('.nav-toggle')) return;
 
-    var submenus = document.querySelectorAll('.submenu-item');
-    submenus.forEach(function(submenu) {
-        submenu.addEventListener('mouseenter', function() {
-            var submenuContent = this.querySelector('.submenu');
-            if (submenuContent) {
-                submenuContent.style.display = 'block';
-                submenuContent.style.opacity = '1';
-                submenuContent.style.visibility = 'visible';
-                console.log('Submenu shown');
-            }
-        });
-
-        submenu.addEventListener('mouseleave', function() {
-            var submenuContent = this.querySelector('.submenu');
-            if (submenuContent) {
-                submenuContent.style.display = 'none';
-                submenuContent.style.opacity = '0';
-                submenuContent.style.visibility = 'hidden';
-                console.log('Submenu hidden');
-            }
-        });
-    });
-
-    var dropbtns = document.querySelectorAll('.dropbtn');
-    dropbtns.forEach(function(dropbtn) {
-        dropbtn.addEventListener('click', function(e) {
-            var href = this.getAttribute('href');
-            
-            if (!href || href === '#') {
+        var header = e.target.closest('.submenu-header');
+        if (header) {
+            var item = header.closest('.submenu-item');
+            if (item && item.querySelector('.submenu')) {
                 e.preventDefault();
-                
-                var dropdown = this.closest('.horizontal-dropdown');
-                var content = dropdown.querySelector('.dropdown-content');
-                
-                if (content.style.display === 'block') {
-                    content.style.display = 'none';
-                    content.style.opacity = '0';
-                    content.style.visibility = 'hidden';
-                } else {
-                    document.querySelectorAll('.dropdown-content').forEach(function(dc) {
-                        dc.style.display = 'none';
-                        dc.style.opacity = '0';
-                        dc.style.visibility = 'hidden';
-                    });
-                    content.style.display = 'block';
-                    content.style.opacity = '1';
-                    content.style.visibility = 'visible';
+                var wasOpen = item.classList.contains('touch-open');
+                var parent = item.parentElement;
+                if (parent) {
+                    var kids = parent.children;
+                    for (var i = 0; i < kids.length; i++) {
+                        if (kids[i] !== item && kids[i].classList && kids[i].classList.contains('submenu-item')) {
+                            kids[i].classList.remove('touch-open');
+                        }
+                    }
                 }
-                console.log('Dropdown toggled');
-            } else {
-                console.log('Navigating to: ' + href);
+                if (wasOpen) item.classList.remove('touch-open');
+                else item.classList.add('touch-open');
             }
-        });
+            return;
+        }
+
+        var btn = e.target.closest('.dropbtn');
+        if (btn) {
+            var li = btn.closest('.horizontal-dropdown');
+            if (!li || !li.querySelector('.dropdown-content')) return;
+            e.preventDefault();
+            var wasDrop = li.classList.contains('touch-open');
+            var drops = document.querySelectorAll('.horizontal-dropdown.touch-open');
+            for (var j = 0; j < drops.length; j++) {
+                drops[j].classList.remove('touch-open');
+            }
+            if (!wasDrop) li.classList.add('touch-open');
+        }
     });
 
-    console.log('Menu dropdown functionality initialized');
+    window.addEventListener('resize', function() {
+        if (!isSmallScreen()) {
+            var open = document.querySelectorAll('.horizontal-dropdown.touch-open, .submenu-item.touch-open');
+            for (var k = 0; k < open.length; k++) open[k].classList.remove('touch-open');
+            if (menuList) menuList.classList.remove('nav-open');
+            if (navToggle) {
+                navToggle.setAttribute('aria-expanded', 'false');
+                navToggle.textContent = '\u2630';
+            }
+        }
+    });
 });

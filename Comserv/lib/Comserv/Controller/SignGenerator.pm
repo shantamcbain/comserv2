@@ -4,6 +4,7 @@ use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use Try::Tiny;
 use JSON qw(encode_json decode_json);
+use File::Spec;
 use Comserv::Util::Logging;
 use Comserv::Util::SignGenerator;
 
@@ -243,12 +244,27 @@ sub _short_color {
     return uc(substr($1, 0, 3));
 }
 
+sub _is_admin {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    return scalar grep { $_ eq 'admin' } @{$roles};
+}
+
+sub _can_manage_sign {
+    my ($self, $c, $model) = @_;
+    return 0 unless $model && $c->session->{username};
+    return 1 if $self->_is_admin($c);
+    my $by = $model->added_by || '';
+    return $by eq $c->session->{username};
+}
+
 # ------------------------------------------------------------------
 # GET /signgenerator/download/<model_id>[/<part>] — stream the 3D file
 #   <part> can be:
 #     (none)        -> single solid STL (one object / one filament)
 #     base | text   -> split STL part (legacy two-colour workaround)
 #     3mf           -> multi-object 3MF (two filaments, colour-tagged)
+#   Optional ?job_id=  -> order-time 3MF built from that job's filament picks
 # ------------------------------------------------------------------
 sub download :Path('/signgenerator/download') :Args() {
     my ($self, $c, $model_id, $part) = @_;
@@ -265,16 +281,21 @@ sub download :Path('/signgenerator/download') :Args() {
 
     my ($file, $mime);
     if ($part && $part eq '3mf') {
-        # Multi-object 3MF — recorded in the sidecar metadata.
-        my $meta = $self->generator->load_metadata($model);
-        my $m3 = $meta->{threemf_file};
-        unless ($m3) {
-            $c->response->status(404);
-            $c->response->body('This sign has no 3MF (regenerate the sign to create one).');
-            $c->detach;
-        }
-        $file = File::Spec->catfile($self->generator->signs_dir($c), $m3);
         $mime = 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml';
+        my $job_id = $c->request->params->{job_id} || '';
+        if ($job_id) {
+            $file = $self->_order_3mf_path($c, $model, $job_id);
+        }
+        else {
+            my $meta = $self->generator->load_metadata($model);
+            my $m3 = $meta->{threemf_file};
+            unless ($m3) {
+                $c->response->status(404);
+                $c->response->body('This sign has no 3MF (regenerate the sign to create one).');
+                $c->detach;
+            }
+            $file = File::Spec->catfile($self->generator->signs_dir($c), $m3);
+        }
     }
     else {
         # Optional part suffix (base|text) for two-colour prints
@@ -286,7 +307,7 @@ sub download :Path('/signgenerator/download') :Args() {
         $mime = 'model/stl';
     }
 
-    unless (-f $file) {
+    unless ($file && -f $file) {
         $c->response->status(404);
         $c->response->body('Sign file missing on disk.');
         $c->detach;
@@ -294,6 +315,8 @@ sub download :Path('/signgenerator/download') :Args() {
 
     my ($fname) = $file =~ m{([^/]+)$};
     open my $fh, '<:raw', $file or do {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'download', "Cannot read $file: $!");
         $c->response->status(500);
         $c->response->body('Cannot read sign file.');
         $c->detach;
@@ -309,6 +332,179 @@ sub download :Path('/signgenerator/download') :Args() {
     $c->response->header('Pragma' => 'no-cache');
     $c->response->header('Content-Disposition' => qq{attachment; filename="$fname"});
     $c->response->body($data);
+}
+
+# Resolve (or rebuild) the order-time two-colour 3MF for a print job.
+sub _order_3mf_path {
+    my ($self, $c, $model, $job_id) = @_;
+    my $job = try {
+        $c->model('DBEncy')->resultset('Printing3dJob')->find($job_id);
+    };
+    unless ($job && $job->model_id && $job->model_id == $model->id) {
+        $c->response->status(404);
+        $c->response->body('Print job not found for this sign.');
+        $c->detach;
+    }
+    my $uid = $c->session->{user_id} || 0;
+    unless ($self->_is_admin($c) || ($job->user_id && $job->user_id == $uid)) {
+        $c->response->status(403);
+        $c->response->body('Not your print job.');
+        $c->detach;
+    }
+    my $parsed = $self->generator->parse_order_notes($job->notes);
+    my $dir = $self->generator->signs_dir($c);
+    if ($parsed->{order_3mf}) {
+        my $existing = File::Spec->catfile($dir, $parsed->{order_3mf});
+        return $existing if -f $existing;
+    }
+    my $schema = $c->model('DBEncy');
+    my $body_id = $parsed->{body_id} || $job->filament_item_id;
+    my $text_id = $parsed->{text_id};
+    my $body_fil = $body_id ? try { $schema->resultset('Accounting::InventoryItem')->find($body_id) } : undef;
+    my $text_fil = $text_id ? try { $schema->resultset('Accounting::InventoryItem')->find($text_id) } : undef;
+    unless ($body_fil && $text_fil) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_order_3mf_path', "Missing filament rows body=$body_id text=$text_id job=$job_id");
+        $c->response->status(409);
+        $c->response->body('This job has no body/text filament ids — re-order the sign.');
+        $c->detach;
+    }
+    my $built = $self->generator->render_for_order($c,
+        model    => $model,
+        body_fil => $body_fil,
+        text_fil => $text_fil,
+        job      => $job,
+    );
+    if ($built->{error} || !$built->{path}) {
+        $c->response->status(502);
+        $c->response->body($built->{error} || '3MF render failed.');
+        $c->detach;
+    }
+    if ($built->{filename}) {
+        my $notes = $job->notes || '';
+        $notes =~ s/\s*\|\s*order_3mf=\S+//g;
+        $notes = join(' | ', grep { $_ } ($notes, 'order_3mf='.$built->{filename}));
+        try {
+            $job->update({ notes => $notes });
+        } catch {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                '_order_3mf_path', "could not stamp order_3mf on job $job_id: $_");
+        };
+    }
+    return $built->{path};
+}
+
+# ------------------------------------------------------------------
+# GET /signgenerator/ordered/<job_id> — print-ready page after order
+# ------------------------------------------------------------------
+sub ordered :Path('/signgenerator/ordered') :Args(1) {
+    my ($self, $c, $job_id) = @_;
+    $self->_require_login($c);
+
+    my $job = try {
+        $c->model('DBEncy')->resultset('Printing3dJob')->find($job_id);
+    };
+    unless ($job) {
+        $c->flash->{error_msg} = 'Print job not found.';
+        $c->response->redirect($c->uri_for('/3d/my_orders'));
+        $c->detach;
+    }
+    my $uid = $c->session->{user_id} || 0;
+    unless ($self->_is_admin($c) || ($job->user_id && $job->user_id == $uid)) {
+        $c->flash->{error_msg} = 'Not your print job.';
+        $c->response->redirect($c->uri_for('/3d/my_orders'));
+        $c->detach;
+    }
+    my $model = try {
+        $c->model('DBEncy')->resultset('Printing3dModel')->find($job->model_id);
+    };
+    my $parsed = $self->generator->parse_order_notes($job->notes);
+    my $has_file = 0;
+    if ($parsed->{order_3mf}) {
+        my $p = File::Spec->catfile($self->generator->signs_dir($c), $parsed->{order_3mf});
+        $has_file = 1 if -f $p;
+    }
+    $c->stash(
+        job       => $job,
+        model     => $model,
+        parsed    => $parsed,
+        has_file  => $has_file,
+        template  => 'signgenerator/ordered.tt',
+    );
+}
+
+# ------------------------------------------------------------------
+# GET+POST /signgenerator/delete/<model_id> — remove extra sign builds
+# ------------------------------------------------------------------
+sub delete_sign :Path('/signgenerator/delete') :Args(1) {
+    my ($self, $c, $model_id) = @_;
+    $self->_require_login($c);
+
+    my $model = try {
+        $c->model('DBEncy')->resultset('Printing3dModel')->find($model_id);
+    };
+    unless ($model && ( ($model->source || "") eq "sign_generator" || $self->_is_admin($c) )) {
+        $c->flash->{error_msg} = 'Sign not found.';
+        $c->response->redirect($c->uri_for('/3d/browse', { q => 'sign', kind => 'sign' }));
+        $c->detach;
+    }
+    unless ($self->_can_manage_sign($c, $model)) {
+        $c->flash->{error_msg} = 'You can only delete signs you created (or as admin).';
+        $c->response->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my @jobs = try {
+        $schema->resultset('Printing3dJob')->search({ model_id => $model->id })->all;
+    };
+    my @active = grep {
+        my $st = $_->status || '';
+        $st eq 'queued' || $st eq 'assigned' || $st eq 'printing'
+    } @jobs;
+
+    if ($c->request->method eq 'POST') {
+        if (@active) {
+            $c->flash->{error_msg} = 'Cancel job #'
+              . join(', #', map { $_->id } @active)
+              . ' first — it is still in the print queue.';
+            $c->response->redirect($c->uri_for('/signgenerator/delete', [$model->id]));
+            $c->detach;
+        }
+        my @extra;
+        for my $j (@jobs) {
+            my $p = $self->generator->parse_order_notes($j->notes);
+            push @extra, $p->{order_3mf} if $p->{order_3mf};
+        }
+        my $gone = $self->generator->unlink_sign_files($c, $model, \@extra);
+        if ($gone->{error}) {
+            $c->flash->{error_msg} = $gone->{error};
+            $c->response->redirect($c->uri_for('/3d/model', [$model->id]));
+            $c->detach;
+        }
+        try {
+            $model->delete;
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'delete_sign', "model delete failed id=$model_id: $_");
+            $c->flash->{error_msg} = "Could not delete the sign record: $_";
+            $c->response->redirect($c->uri_for('/3d/browse', { q => 'sign' }));
+            $c->detach;
+        };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'delete_sign',
+            "Deleted sign model $model_id files=".join(',', @{ $gone->{unlinked} || [] }));
+        $c->flash->{success_msg} = 'Sign removed.';
+        $c->response->redirect($c->uri_for('/3d/browse', { q => 'sign', kind => 'sign' }));
+        $c->detach;
+    }
+
+    $c->stash(
+        model    => $model,
+        jobs     => \@jobs,
+        active   => \@active,
+        template => 'signgenerator/confirm_delete.tt',
+    );
 }
 
 # ------------------------------------------------------------------

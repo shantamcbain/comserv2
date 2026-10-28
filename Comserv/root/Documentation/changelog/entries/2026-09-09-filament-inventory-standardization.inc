@@ -1,0 +1,6 @@
+<div id="2026-09-09-filament-inventory-standardization" class="cl-entry">
+<h3>2026-09-09 — Filament inventory standardization</h3>
+<p class="doc-body"><strong>What.</strong> Fixed the filament inventory system so all filament items use per-gram unit_cost with unit_of_measure='g', standardize category='3d_filament', populate filament_type/filament_color columns, set reorder_point/reorder_quantity, and add a grams input to the order forms.</p>
+<p class="doc-body"><strong>Why.</strong> The existing 25+ filament items had inconsistent unit_cost values (some per-kg like 17.00, some per-g like 0.02) and unit_of_measure values ('spool' vs 'g'), causing the filament_cost calculation in 3d.pm (~line 1250) to compute $17/g ($17,000/kg) instead of $0.02/g ($20/kg). The seed_filaments action also never set unit_cost, filament_type, filament_color, reorder_point, or reorder_quantity, leaving the inventory unusable for accurate costing.</p>
+<p class="doc-body"><strong>Files.</strong> <code>lib/Comserv/Controller/Inventory.pm</code> (seed_filaments action — fixed row creation with unit_cost per-gram, category, filament_type/color, reorder_point/reorder_quantity; added UPDATE path for existing items), <code>root/3d/order.tt</code> (added filament_quantity grams input), <code>root/3d/model_detail.tt</code> (added filament_quantity grams input).</p>
+</div>

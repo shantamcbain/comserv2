@@ -1,0 +1,149 @@
+/* Watch grok.com Settings -> Usage. Read visible %. Never touch cookies.
+ * 1.4.6 (Oct 15 2026): settled Super Grok value only (see superGrokPct).
+ * 1.4.4 (Oct 14 2026): Super Grok overall % from the aria-label (e.g. "93%") under
+ * "Weekly SuperGrok Limit"; Grok Bot % from aria-valuenow on the "Grok Bot usage"
+ * bar; reset dates from the "Resets <date> at <time>" lines. Build/Voice sub-bars are extras. */
+(function () {
+    var timer = null;
+    var RESET_RE = /Resets\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s+at\s+\d{1,2}:\d{2}\s*[AP]M)/i;
+
+    function pct(v) {
+        var m = String(v == null ? '' : v).match(/(\d{1,3}(?:\.\d+)?)\s*%?/);
+        if (!m) return null;
+        var n = Number(m[1]);
+        return n >= 0 && n <= 100 ? n : null;
+    }
+
+    function labelEl(root, phrase) {
+        var found = null;
+        root.querySelectorAll('*').forEach(function (n) {
+            var tc = n.textContent || '';
+            if (!found && tc.length < 200 && tc.indexOf(phrase) >= 0) found = n;
+        });
+        return found;
+    }
+
+    function resetIso(txt) {
+        var m = String(txt || '').match(RESET_RE);
+        if (!m) return null;
+        var d = new Date(m[1].replace(/\s+at\s+/i, ' '));
+        return isNaN(d.getTime()) ? m[1] : d.toISOString();
+    }
+
+    function sectionText(text, phrase, stopPhrase) {
+        var i = text.indexOf(phrase);
+        if (i < 0) return '';
+        var seg = text.slice(i, i + 400);
+        if (stopPhrase) { var j = seg.indexOf(stopPhrase, phrase.length); if (j > 0) seg = seg.slice(0, j); }
+        return seg;
+    }
+
+    // 1.4.6 (Oct 15 2026): the Super Grok reading flipped 93 <-> 100. Read ONLY the
+    // aria-label of number elements inside the "Weekly SuperGrok Limit" section
+    // (after its label, before "Weekly Grok Bot Limit"), never sub-bars, and only
+    // report a value once two reads >= 1s apart agree (number-flow animates its
+    // digits; transient values are dropped). If the section's own progress bar
+    // disagrees with the label, report nothing this round.
+    var sgLast = { v: null, at: 0 };
+    function inSgSection(el, sgLab, botLab) {
+        var F = Node.DOCUMENT_POSITION_FOLLOWING;
+        if (!(sgLab.compareDocumentPosition(el) & F)) return false;
+        if (botLab && !(el.compareDocumentPosition(botLab) & F)) return false;
+        return true;
+    }
+    function superGrokRaw(root) {
+        var sgLab = labelEl(root, 'Weekly SuperGrok Limit');
+        if (!sgLab) return null;
+        var botLab = labelEl(root, 'Weekly Grok Bot Limit');
+        var label = null;
+        var nums = root.querySelectorAll('number-flow-react[aria-label], [role="img"][aria-label$="%"]');
+        for (var i = 0; i < nums.length && label == null; i++) {
+            var a = nums[i].getAttribute('aria-label') || '';
+            if (!/^\s*\d{1,3}(?:\.\d+)?\s*%\s*$/.test(a)) continue;   // "93%" only
+            if (inSgSection(nums[i], sgLab, botLab)) label = pct(a);
+        }
+        var bar = null;
+        var bars = root.querySelectorAll('[role="progressbar"][aria-valuenow]');
+        for (var k = 0; k < bars.length && bar == null; k++) {
+            var bl = bars[k].getAttribute('aria-label') || '';
+            if (/grok\s*bot|build|voice|chat|imagine/i.test(bl)) continue;
+            if (inSgSection(bars[k], sgLab, botLab)) bar = pct(bars[k].getAttribute('aria-valuenow'));
+        }
+        if (label != null && bar != null && Math.abs(label - bar) > 1) return null;
+        return label != null ? label : bar;
+    }
+    function superGrokPct(root) {
+        var v = superGrokRaw(root);
+        var now = Date.now();
+        if (v == null) { sgLast = { v: null, at: 0 }; return null; }
+        if (sgLast.v === v && now - sgLast.at >= 1000) return v;
+        if (sgLast.v !== v) sgLast = { v: v, at: now };
+        setTimeout(send, 1500);           // confirm with a second read
+        return null;
+    }
+
+    function botPct(root) {
+        var els = root.querySelectorAll('[aria-valuenow], [role="progressbar"]');
+        for (var i = 0; i < els.length; i++) {
+            var lab = els[i].getAttribute('aria-label') || '';
+            if (/grok\s*bot/i.test(lab)) {
+                var v = pct(els[i].getAttribute('aria-valuenow'));
+                if (v == null) v = pct((lab.match(/\d{1,3}(?:\.\d+)?\s*%/) || [])[0]);
+                if (v != null) return v;
+            }
+        }
+        return null;
+    }
+
+    function subPct(text, name) {
+        var m = text.match(new RegExp('\\b' + name + '\\b\\s*(\\d{1,3}(?:\\.\\d+)?)\\s*%', 'i'));
+        return m ? pct(m[1]) : null;
+    }
+
+    function scrape() {
+        var root = document.querySelector('[role="dialog"]') || document.body;
+        if (!root) return null;
+        var text = String(root.innerText || '').replace(/\s+/g, ' ');
+        if (text.indexOf('Weekly SuperGrok Limit') < 0 && text.indexOf('Weekly Grok Bot Limit') < 0) return null;
+        var sg = superGrokPct(root);
+        var bot = botPct(root);
+        var sgReset = resetIso(sectionText(text, 'Weekly SuperGrok Limit', 'Weekly Grok Bot Limit'));
+        var botReset = resetIso(sectionText(text, 'Weekly Grok Bot Limit', 'Extra Usage'));
+        var buildSub = subPct(text, 'Grok Build');
+        var voice = subPct(text, 'Voice');
+        if (sg == null && bot == null) return null;
+        return {
+            build: sg,            // Super Grok overall weekly % (field name kept for the app)
+            chat: null,
+            bot: bot,
+            bot_reset: bot != null ? botReset : null,
+            supergrok_reset: sgReset,
+            build_sub: buildSub,
+            voice: voice,
+            href: location.href,
+            title: document.title || '',
+            at: new Date().toISOString()
+        };
+    }
+
+    function send() {
+        var row = scrape();
+        if (!row) return;
+        try { browser.runtime.sendMessage({ type: 'grokcom_usage', payload: row }); } catch (e) {}
+    }
+
+    function schedule() {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(send, 800);
+    }
+
+    send();
+    window.setInterval(send, 15000);
+    window.addEventListener('popstate', schedule);
+    window.addEventListener('hashchange', schedule);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) send(); });
+    var obs = new MutationObserver(schedule);
+    if (document.body) {
+        obs.observe(document.body, { childList: true, subtree: true, characterData: true });
+    }
+}());

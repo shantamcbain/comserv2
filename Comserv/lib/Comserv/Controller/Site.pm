@@ -14,6 +14,14 @@ has 'logging' => (
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
 
+    # CSC-20260906-6513: Site Management is admin-only (not guest-browsable)
+    my $root = $c->controller('Root');
+    unless ($root && $root->user_exists($c) && $root->check_user_roles($c, 'admin')) {
+        $c->flash->{error_msg} = 'Administrator access required for Site Management.';
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        $c->detach;
+    }
+
     # Log entry into the index method
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Enter in index');
 
@@ -156,6 +164,77 @@ sub add_site :Local {
 
     # Redirect to the add_site_form action
     $c->res->redirect($c->uri_for($self->action_for('add_site_form')));
+}
+# Clone my existing website (URL): import a public website's pages and images
+# into the Page system for a site (Comserv::Util::SiteCloner). Idempotent.
+sub _clone_auth {
+    my ($self, $c, $action) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @r = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    return 1 if Comserv::Util::AdminAuth->new->check_admin_access($c, $action) || grep { $_ eq 'site_owner' || $_ eq 'owner' } @r;
+    $c->flash->{error_msg} = 'You must be an administrator or site owner to do that.';
+    $c->response->redirect($c->uri_for('/user/login'));
+    return 0;
+}
+
+# Optional "Tidy up with AI" after a clone: proposals only (Comserv::Util::SiteTidy), reviewed here.
+sub clone_review :Local {
+    my ($self, $c) = @_;
+    return unless $self->_clone_auth($c, 'clone_review');
+    require Comserv::Util::SiteTidy;
+    my $tidy = Comserv::Util::SiteTidy->new;
+    my $site = $c->req->params->{site} // '';
+    $site =~ s/[^A-Za-z0-9._-]//g;
+    my ($msg, $err);
+    if ($site && $c->req->method eq 'POST') {
+        my $p = $c->req->body_parameters;
+        my $act = $p->{action} // '';
+        if ($act eq 'run') {
+            my $only = $p->{page_code} ? [ $p->{page_code} ] : undef;
+            my $r = eval { $tidy->run($c, $site, ($only ? (only => $only) : ())) };
+            if ($@) { $err = "AI tidy failed: $@" }
+            else {
+                $msg = "AI tidy made $r->{proposals} proposal(s) using " . (join(', ', keys %{$r->{models}}) || 'no model');
+                $err = join('; ', @{$r->{errors}}) if @{$r->{errors}};
+            }
+        } elsif ($act eq 'accept' || $act eq 'reject') {
+            my ($ok, $m) = $tidy->decide($c, $site, $p->{page_code} // '', $act,
+                with_title => $p->{with_title} ? 1 : 0, force => $p->{force} ? 1 : 0,
+                user => $c->session->{username} // '');
+            $ok ? ($msg = $m) : ($err = $m);
+        }
+    }
+    my $data = $site ? $tidy->load($site) : { pages => {} };
+    $c->stash(template => 'site/clone_review.tt', review_site => $site, tidy => $data,
+              success_msg => $msg, error_msg => $err);
+}
+
+sub clone_site :Local {
+    my ($self, $c) = @_;
+    return unless $self->_clone_auth($c, 'clone_site');
+    my $schema = $c->model('DBEncy');
+    my @sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all;
+    $c->stash(template => 'site/clone_site.tt', sites => \@sites);
+    return unless $c->req->method eq 'POST';
+    my $p = $c->req->body_parameters;
+    my $url = $p->{source_url} // '';
+    my $site = $schema->resultset('Site')->find($p->{site_id} || 0);
+    unless ($url =~ m{^https?://[^/\s]+} && $site) {
+        $c->stash(error_msg => 'A valid http(s) URL and a site are required.'); return;
+    }
+    require Comserv::Util::SiteCloner;
+    my @log;
+    my $cl = Comserv::Util::SiteCloner->new(
+        schema => $schema, sitename => $site->name, site_id => $site->id,
+        user_id => $c->session->{user_id} // 0, created_by => $c->session->{username} // 'site_cloner',
+        max_pages => ($p->{max_pages} && $p->{max_pages} =~ /^\d+$/ ? $p->{max_pages} : 100),
+        log => sub { push @log, $_[0] },
+    );
+    my $res = eval { $cl->clone($url) };
+    if ($@) { $c->stash(error_msg => "Clone failed: $@", clone_log => \@log); return; }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'clone_site',
+        "Cloned $url into " . $site->name . ": " . scalar(@{$res->{pages}}) . " pages, $res->{images} images");
+    $c->stash(clone_result => $res, clone_site_name => $site->name, clone_log => \@log);
 }
 sub add_site_form :Local {
     my ($self, $c) = @_;

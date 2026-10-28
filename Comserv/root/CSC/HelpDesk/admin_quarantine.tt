@@ -1,0 +1,32 @@
+[% META title = 'HelpDesk Quarantine' %]
+<div class="helpdesk-container">
+    <h1>HelpDesk Quarantine</h1>
+    <p>Tickets held by the spam filter. They were not emailed to staff or customers. Nothing here is ever deleted.
+       <a href="[% c.uri_for('/HelpDesk/admin/tickets/open') %]">Open queue</a></p>
+    [% IF success_msg %]<div class="alert alert-success">[% success_msg | html %]</div>[% END %]
+    [% IF error_msg %]<div class="alert alert-danger">[% error_msg | html %]</div>[% END %]
+    [% IF rows.size %]
+    <table class="table">
+        <thead><tr><th>Ticket</th><th>Created</th><th>Site</th><th>From</th><th>Subject</th><th>Score / reasons</th><th>IP / entry</th><th>Actions</th></tr></thead>
+        <tbody>
+        [% FOREACH r IN rows; t = r.ticket; m = r.meta %]
+        <tr>
+            <td>[% t.ticket_number | html %]</td>
+            <td>[% t.created_at | html %]</td>
+            <td>[% t.site_name | html %]</td>
+            <td>[% (t.email || t.username) | html %]</td>
+            <td><details><summary>[% t.subject | html %]</summary><pre style="white-space:pre-wrap">[% t.description | html %]</pre></details></td>
+            <td>[% m.spam_score | html %]<br><small>[% m.spam_reasons.join(', ') | html %]</small></td>
+            <td><small>[% m.client_ip | html %]<br>[% m.entry_path | html %]<br>[% m.user_agent.substr(0,60) | html %]</small></td>
+            <td>
+                <form method="post" action="[% c.uri_for('/HelpDesk/admin/quarantine/release', t.id) %]" style="display:inline"><button type="submit">Release</button></form>
+                <form method="post" action="[% c.uri_for('/HelpDesk/admin/quarantine/spam', t.id) %]" style="display:inline"><button type="submit">Mark spam</button></form>
+            </td>
+        </tr>
+        [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <p>No tickets in quarantine.</p>
+    [% END %]
+</div>

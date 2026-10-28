@@ -1,0 +1,91 @@
+{
+ "_comment": "AI2 Router model failover chains (AISYSTEM plan 5e). Not public (data/). Change via /ai/eval allow-listed keys (approve, apply, revert). Perl lists in Util/ModelCatalog.pm are only the last-resort default when this file is missing or invalid. Seeded 2026-09-28 from @FREE_PREFERENCE minus slugs that are 404/absent on openrouter.ai/api/v1/models.",
+ "version": 1,
+ "chain_chat": [
+  "openrouter|cohere/north-mini-code:free",
+  "openrouter|nvidia/nemotron-3.5-lightning:free",
+  "ollama|auto"
+ ],
+ "chain_docs": [
+  "openrouter|nvidia/nemotron-3.5-lightning:free",
+  "openrouter|cohere/north-mini-code:free",
+  "ollama|auto"
+ ],
+ "chain_coding": [
+  "openrouter|cohere/north-mini-code:free",
+  "openrouter|nvidia/nemotron-3.5-lightning:free",
+  "ollama|qwen2.5-coder:14b"
+ ],
+ "chain_title": [
+  "openrouter|nvidia/nemotron-3.5-lightning:free",
+  "openrouter|cohere/north-mini-code:free",
+  "ollama|auto"
+ ],
+ "removed": [
+  "openrouter|nvidia/nemotron-3-nano-30b-a3b:free",
+  "openrouter|nvidia/nemotron-nano-9b-v2:free",
+  "openrouter|stealth/ox-alpha",
+  "openrouter|google/gemma-3-27b-it:free",
+  "openrouter|google/gemma-4-26b-a4b-it:free",
+  "openrouter|google/gemma-4-31b-it:free"
+ ],
+ "model_caps_usd_per_day": {},
+ "chain_caps_usd_per_day": {},
+ "circuit_failure_threshold": 3,
+ "circuit_cooldown_minutes": 15,
+ "circuit_dead_cooldown_hours": 24,
+ "openrouter_soft_cap_day_usd": 1.65,
+ "openrouter_soft_cap_week_usd": 11.5,
+ "openrouter_soft_cap_month_usd": 50,
+ "supergrok_respect_guard": 1,
+ "exclude_replace_verdict": 1,
+ "demote_watch_verdict": 1,
+ "tokens_unreported_providers": [
+  "ollama"
+ ],
+ "hermes_fallback_chain": [
+  "supergrok|grok-4.7",
+  "openrouter|qwen/qwen3-coder",
+  "openrouter|cohere/north-mini-code:free"
+ ],
+ "hermes_emergency_chain": [
+  "ollama|gemma4-64k:latest",
+  "openrouter|nvidia/nemotron-3.5-lightning:free"
+ ],
+ "channel_caps_usd": {
+  "openrouter": {
+   "day": 1.65,
+   "week": 11.5,
+   "month": 50
+  },
+  "xai_direct": {
+   "day": 0,
+   "week": 0,
+   "month": 0
+  }
+ },
+ "_hermes_comment": "Oct 26 2026 (Shanta): when Super Grok is unavailable Hermes goes grok-4.7 -> paid qwen/qwen3-coder (only while OpenRouter day/week/month caps have room) -> free north-mini LAST. hermes_emergency_chain is used only if every step is unusable. channel_caps_usd = cash cap per billing channel (supergrok is a quota, not cash; xai_direct 0 = off until a number is set).",
+ "hermes_daily_lock_cash": {
+  "enabled": false,
+  "steps": [
+   "xai_direct|grok-4.7",
+   "openrouter|x-ai/grok-4.7"
+  ],
+  "_comment": "OFF by default (Shanta's rule: grok only through Super Grok). Oct 26 2026 she asked for the option: when true, the Super Grok daily lock tries x.ai direct grok, then OpenRouter grok, BEFORE paid qwen/qwen3-coder, then north-mini LAST, each only inside its channel_caps_usd. Do not turn on without her go-ahead. The chains above still reject grok on OpenRouter."
+ },
+ "trials": {
+  "_comment": "One-off model trials. NEVER a fallback: only script/ai_trial.pl (explicit trial runs) reads this. The model must not appear in any chain; grok, glm, deepseek v4-pro and Relace are rejected by the validator.",
+  "kimi_k27_code": {
+   "model": "moonshotai/kimi-k2.7-code",
+   "provider": "openrouter",
+   "selectable_by": "explicit_trial_run",
+   "hard_cap_usd": 6,
+   "alert_at_usd": 3,
+   "max_tasks": 20,
+   "reserve_per_task_usd": 0.5,
+   "bot_usage_stop_pct": 95,
+   "approved_by": "Shanta 2026-10-26 9:28 AM PT (answer to a card; from reserve, may go past the $50 OpenRouter month figure for this trial only)",
+   "note": "Spend is counted from the OpenRouter live figures (/ai/usage_live month_usd and balance_usd) against a baseline recorded before task 1."
+  }
+ }
+}

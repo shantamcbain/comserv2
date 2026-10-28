@@ -1,0 +1,14 @@
+<div id="2026-09-02-apptime-duration-authority" class="cl-entry">
+<h3>2026-09-02 — AppTime gains duration authority; queue page stops doing JS time math</h3>
+<p class="doc-body"><strong>Why.</strong> User requirement: one place for all time calculation in the app, able to handle elapsed time spanning days, so no subsystem invents its own clock. The queue page was computing elapsed time in browser JS via <code>new Date(startedAt.replace(' ','T'))</code> — that parses a stored <b>UTC</b> stamp as browser-<b>local</b> time, which is what produced bogus multi-day runtimes (the ~95h bug). It also buried the measured value behind a BOM estimate.</p>
+<p class="doc-body"><strong>What.</strong> Extended <code>Comserv::Util::AppTime</code> (already the canonical clock) with a duration section, and made <code>Controller::3d</code> compute elapsed server-side so templates only render values:</p>
+<p class="doc-body">
+<code>duration_parts($start,$end)</code> &rarr; { days, hours, minutes, total_minutes, total_hours, total_seconds, negative } — handles spans over many days and negative spans.<br>
+<code>elapsed_since($start)</code> &rarr; same shape, end = now.<br>
+<code>duration_human($start,$end)</code> &rarr; <code>"2h 35m"</code> or <code>"3d 4h 10m"</code> when it crosses days.<br>
+<code>duration_hm($start,$end)</code> &rarr; { h, m } for hour/minute form inputs.
+</p>
+<p class="doc-body"><strong>Template change.</strong> <code>root/3d/queue.tt</code> now renders <code>value="[% job.elapsed_h %]"</code> / <code>value="[% job.elapsed_m %]"</code> from the controller. The JS block was rewritten to <b>never</b> do Date math — it only fills the BOM estimate when the server left both boxes empty (no <code>started_at</code>), and never overwrites a measured value. A comment warns against reintroducing client-side time arithmetic. The Active table's Started column now shows <code>2h 35m elapsed</code> under the timestamp.</p>
+<p class="doc-body"><strong>Verified.</strong> Duration helpers tested against known spans: 2h35m, zero, 1 day, 3d4h10m, the 95h case (correctly renders <code>3d 23h 0m</code>), negative spans, and bad input (returns undef rather than dying). Template renders the right <code>value</code>/<code>title</code> in both the elapsed and BOM-fallback branches.</p>
+<p class="doc-body"><strong>Rule going forward.</strong> Store UTC via <code>AppTime-&gt;now_utc</code>; display via <code>AppTime-&gt;display</code> or the <code>user_time</code> TT filter; measure spans via <code>AppTime-&gt;duration_*</code>. No <code>localtime</code>/<code>strftime(localtime)</code> for persisted stamps, and no <code>new Date()</code> arithmetic in templates. A scan found 574 ad-hoc time calls across the codebase (AI.pm 74, Planning.pm 38, Documentation.pm 35, Admin/Docker.pm 32 …) — these are pre-existing and out of scope here; migrating them is follow-up work, ideally owned per branch.</p>
+</div>

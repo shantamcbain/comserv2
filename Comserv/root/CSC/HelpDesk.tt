@@ -18,7 +18,7 @@
 <div class="helpdesk-container">
     <!-- HelpDesk View -->
     [% IF c.session.username %]
-        <h2>Hello [% c.session.firstname %] [% c.session.lastname %]! Welcome to [% site_display_name %] HelpDesk</h2>
+        <h2>Hello [% c.session.firstname || c.session.username %] [% c.session.lastname %]! Welcome to [% site_display_name %] HelpDesk</h2>
     [% ELSE %]
         <h2>Welcome to [% site_display_name %] HelpDesk</h2>
     [% END %]
@@ -54,11 +54,12 @@
             <a href="[% c.uri_for('/ai') %]" class="btn btn-success">Chat with AI</a>
         </div>
 
-        [% IF c.check_user_roles('admin') %]
-        <div class="option-card option-card-admin">
-            <h3>HelpDesk Admin</h3>
-            <p>Manage tickets, view open requests, and administer the support system.</p>
-            <a href="[% c.uri_for('/HelpDesk/admin') %]" class="btn btn-warning">Admin Panel</a>
+        [% IF is_staff %]
+        <div class="option-card option-card-staff">
+            <h3>Staff Tools</h3>
+            <p>View all tickets for the site, manage queue, work on or escalate tickets.</p>
+            <a href="[% c.uri_for('/HelpDesk/admin/tickets/open') %]" class="btn btn-warning">Open Queue</a>
+            <a href="[% c.uri_for('/HelpDesk/admin/tickets') %]" class="btn btn-secondary" style="margin-left:4px;">All Tickets</a>
         </div>
         [% END %]
     </div>
@@ -66,6 +67,21 @@
     <!-- Include the original HelpDesk contents -->
     [% INCLUDE 'CSC/HelpdeskContents.tt' %]
 </div>
+
+<script>
+/* Expose staff status to client JS (for chat widgets, roleTier etc.) */
+(function() {
+    var cfg = window.AI_CHAT_USER_CONFIG || (window.AI_CHAT_USER_CONFIG = {});
+    cfg.isAdmin = !! [% is_staff ? 1 : 0 %];
+    cfg.isStaff = !! [% is_staff ? 1 : 0 %];
+    cfg.roleTier = [% is_staff ? "'staff'" : "'member'" %];
+    if (window.HELP_DESK_USER) {
+        window.HELP_DESK_USER.isStaff = !! [% is_staff ? 1 : 0 %];
+    } else {
+        window.HELP_DESK_USER = { isStaff: !! [% is_staff ? 1 : 0 %] };
+    }
+})();
+</script>
 
 <style>
     .helpdesk-container {

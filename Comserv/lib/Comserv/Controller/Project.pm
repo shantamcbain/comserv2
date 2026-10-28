@@ -608,7 +608,7 @@ sub details :Path('details') :Args(0) {
 
     # Fetch recent AI conversations linked to this project
     my @ai_conversations;
-    my $schema = $c->model('DBEncy');
+    $schema = $c->model('DBEncy');
     eval {
         @ai_conversations = $schema->resultset('AiConversation')->search(
             { project_id => $project_id },
@@ -889,7 +889,7 @@ sub _project_search_score {
         if ($id ne '' && lc($id) eq $qw) {
             $best = 4;
         }
-        elsif ($id ne '' && CORE::index(lc($id), $qw) == 0) {
+        elsif ($id ne '' && index(lc($id), $qw) == 0) {
             $best = 3;
         }
         else {

@@ -13,13 +13,6 @@
 
 <!-- Theme-aware stylesheet -->
 <style>
-.server-info {
-    background-color: rgba(255,255,255,0.12);
-    border-bottom: 1px solid var(--border-color);
-    padding: 5px 10px;
-    font-size: 12px;
-    color: var(--text-color);
-}
 
 .db-env-indicator {
     display: inline-block;
@@ -55,7 +48,7 @@
 
 .k8s-migration-banner a {
     background-color: var(--accent-color);
-    color: white;
+    color: var(--button-text, var(--nav-text));
     padding: 8px 12px;
     text-decoration: none;
     border-radius: 4px;
@@ -64,41 +57,6 @@
     display: inline-block;
 }
 
-#css-edit-toggle {
-    background: var(--button-bg);
-    color: var(--button-text);
-    border: 1px solid var(--button-border);
-    border-radius: 3px;
-    padding: 2px 10px;
-    margin-left: 10px;
-    cursor: pointer;
-    font-size: 12px;
-}
-
-#css-edit-toggle:hover {
-    background: var(--button-hover-bg);
-}
-
-#css-edit-toggle.edit-mode {
-    background: var(--warning-color);
-    color: white;
-    border: 1px solid var(--warning-color);
-}
-
-#css-edit-toggle.edit-mode:hover {
-    opacity: 0.9;
-}
-
-
-.css-edit-mode * {
-    outline: 2px solid rgba(52, 152, 219, 0.3) !important;
-    position: relative;
-}
-
-.css-edit-mode *:hover {
-    outline: 2px solid var(--warning-color) !important;
-    cursor: crosshair;
-}
 
 .membership-status-bar {
     display: flex;
@@ -138,54 +96,6 @@
 @media (max-width: 768px) {
     .membership-status-bar { font-size: 11px; padding: 2px 8px; }
 }
-
-/* Sticky/Floating Main Navigation Menu - Only the nav, not the header */
-header {
-    position: relative !important;
-}
-
-header nav#main-menu {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 2000 !important;
-    background-color: var(--nav-bg, white) !important;
-    border-bottom: 2px solid var(--border-color, #ddd) !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
-    margin: 0 !important;
-}
-
-header h1 {
-    margin: 0 !important;
-    padding: 10px !important;
-    font-size: clamp(1rem, 4vw, 1.5rem) !important;
-    word-break: break-word !important;
-}
-
-/* ---- Mobile nav toggle button ---- */
-.nav-toggle {
-    display: none;
-    background: var(--button-bg, #f0f0f0);
-    color: var(--button-text, #333);
-    border: 1px solid var(--border-color, #ccc);
-    border-radius: 4px;
-    padding: 6px 12px;
-    font-size: 20px;
-    cursor: pointer;
-    line-height: 1;
-    margin: 4px 8px;
-}
-
-@media (max-width: 768px) {
-    .nav-toggle { display: inline-block; }
-    .server-info { font-size: 11px; }
-    .server-info > div {
-        text-align: left !important;
-        white-space: normal !important;
-        word-break: break-word;
-        line-height: 1.6;
-    }
-    #css-edit-toggle { display: block; margin: 4px 0 0 0; }
-}
 </style>
 
 <!-- CRITICAL: Debug Bar UI - DO NOT REMOVE (lines 7-22)
@@ -194,49 +104,28 @@ header h1 {
      and admin page rendering capability. See Root.pm auto() method and SystemInfo.pm. -->
 [% IF is_admin || c.session.debug_mode == 1 %]
 <div class="server-info" id="server-info-bar">
-    [% IF is_admin || c.session.debug_mode == 1 %]
-    <div style="text-align: right; display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap;">
+    <div class="server-info-row">
         <span id="server-info-content">
-        Domain: <strong>[% c.req.uri.host %]</strong> | 
-        Client IP: <strong>[% c.req.address %]</strong> | 
+        Domain: <strong>[% c.req.uri.host %]</strong> |
+        Client IP: <strong>[% c.req.address %]</strong> |
         Server: <strong>[% system_identifier || app_workflow %]</strong> | Workflow: [% app_workflow %] ([% c.forward('/get_server_ip') %]) |
-        [% IF app_version %]Build: <strong title="Commit: [% app_version.commit %] | Branch: [% app_version.branch %] | Host: [% app_version.build_host %]" style="cursor:help;">[% app_version.build_date | replace('T',' ') | replace(':\d\dZ','') %] UTC</strong> | Git: <strong>[% app_version.branch %]</strong>@<code style="font-size:0.85em;">[% app_version.commit %]</code> | [% END %]
+        [% IF app_version %]Build: <strong class="server-info-build" title="Commit: [% app_version.commit %] | Branch: [% app_version.branch %] | Host: [% app_version.build_host %]">[% IF app_version.build_date_local %][% app_version.build_date_local %][% ELSE %][% app_version.build_date | replace('T',' ') | replace(':\d\dZ','') %] UTC[% END %]</strong> | Git: <strong>[% app_version.branch %]</strong>@<code class="server-info-commit">[% app_version.commit %]</code> | [% END %]
         Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %] |
-        DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% SET env = active_db_environment || 'production' %][% env.upper %]</span>
+        DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% SET env = active_db_environment || 'production' %][% env.upper %]</span> |
+        DB User: <strong>[% active_db_user || 'unknown' | html %]</strong>
         [% IF c.session.debug_mode == 1 %] | [% END %]
         </span>
         [% IF is_admin %]
-        <button id="css-edit-toggle"
+        <button type="button" id="css-edit-toggle"
                 data-theme-name="[% theme_name || 'default' %]"
+                aria-pressed="false"
                 title="Click any page element to edit its styles and save to the [% theme_name || 'default' %] theme">
-            <i class="fas fa-paint-brush"></i> Theme Editor
+            <i class="fas fa-paint-brush" aria-hidden="true"></i> <span class="css-edit-label">Theme Editor</span>
         </button>
         [% END %]
-        <button id="server-info-toggle" title="Show/hide server info"
-                style="padding:1px 7px;font-size:.75em;background:rgba(255,255,255,.15);color:inherit;border:1px solid rgba(255,255,255,.3);border-radius:3px;cursor:pointer;">▲ Hide</button>
+        <button type="button" id="server-info-toggle" aria-controls="server-info-content" aria-expanded="true" title="Show/hide server info">&#9650; Hide</button>
     </div>
-    [% END %]
 </div>
-<script>
-(function(){
-    var btn = document.getElementById('server-info-toggle');
-    var content = document.getElementById('server-info-content');
-    var bar = document.getElementById('server-info-bar');
-    if (!btn || !content || !bar) return;
-    var hidden = localStorage.getItem('serverInfoHidden') === '1';
-    function applyState() {
-        content.style.display = hidden ? 'none' : '';
-        btn.textContent = hidden ? '▼ Info' : '▲ Hide';
-        if (window._fitLayout) window._fitLayout();
-    }
-    applyState();
-    btn.addEventListener('click', function() {
-        hidden = !hidden;
-        localStorage.setItem('serverInfoHidden', hidden ? '1' : '0');
-        applyState();
-    });
-})();
-</script>
 [% END %]
 
 <!-- K8s Migration Warning Banner (Phase 0 - Production Readiness) -->
@@ -258,80 +147,39 @@ header h1 {
 </div>
 [% END %]
 
+<!-- AI model guard banner: shown to admin/developer on every page when a
+     paid model should be switched away from (SuperGrok cap, OpenRouter spend
+     cap, or credits exhausted).  Checked in Root::auto. -->
+[% IF supergrok_guard_locked && is_admin && supergrok_guard_notice %]
+<div class="ai-guard-banner" role="alert" style="margin:0;padding:10px 16px;border-bottom:2px solid var(--warning-color,#d97706);background:var(--schema-alert-warning-bg,#fff3cd);color:var(--text-color);font-size:14px;text-align:center;">
+  <strong>⚠ [% supergrok_guard_notice | html %]</strong>
+  <span style="margin-left:12px;font-size:12px;opacity:0.8;">Start a new Hermes session or run <code style="font-size:12px;">hermes config set model.default openrouter/cohere/north-mini-code:free</code> to match.</span>
+  <a href="/ai/usage#ai-health" style="margin-left:12px;font-size:12px;">Details</a>
+</div>
+[% END %]
+
 <!-- Include Debug Template - shows session/stash when debug_mode=1 -->
 [% IF c.session.debug_mode == 1 %]
 [% INCLUDE 'debug.tt' %]
 [% END %]
 
-<!-- Include Theme Editor JavaScript -->
-[% IF is_admin %]
-<script src="[% c.uri_for('/static/js/theme-editor.js') %]"></script>
-[% END %]
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // --- Hamburger nav toggle ---
-    const navToggle = document.querySelector('.nav-toggle');
-    const menuList  = document.getElementById('main-menu-list');
-    if (navToggle && menuList) {
-        navToggle.addEventListener('click', function() {
-            const open = menuList.classList.toggle('nav-open');
-            navToggle.setAttribute('aria-expanded', open);
-            navToggle.textContent = open ? '\u2715' : '\u2630';
-        });
-        // Touch-friendly dropdown: tap dropbtn to open, tap outside to close
-        document.querySelectorAll('.dropbtn').forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-                if (window.innerWidth > 768) return;
-                const li = btn.closest('.horizontal-dropdown');
-                const wasOpen = li.classList.contains('touch-open');
-                document.querySelectorAll('.horizontal-dropdown.touch-open').forEach(function(el) {
-                    el.classList.remove('touch-open');
-                });
-                if (!wasOpen) { li.classList.add('touch-open'); e.preventDefault(); }
-            });
-        });
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('#main-menu')) {
-                document.querySelectorAll('.horizontal-dropdown.touch-open').forEach(function(el) {
-                    el.classList.remove('touch-open');
-                });
-            }
-        });
-    }
-
-    // --- Theme editor toggle ---
-    const toggleBtn = document.getElementById('css-edit-toggle');
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-
-            if (typeof ThemeEditor === 'undefined') {
-                alert('Theme Editor script failed to load. Please reload the page.');
-                return;
-            }
-
-            if (!window.themeEditor) {
-                window.themeEditor = new ThemeEditor();
-                window.themeEditor.init();
-            }
-
-            window.themeEditor.toggleInspector();
-
-            const isActive = window.themeEditor.isInspectorActive;
-            document.body.classList.toggle('css-edit-mode', isActive);
-            this.innerHTML = isActive
-                ? '<i class="fas fa-times"></i> Close Editor'
-                : '<i class="fas fa-paint-brush"></i> Theme Editor';
-            this.classList.toggle('edit-mode', isActive);
-        });
-    }
-});
-</script>
-
-<header>
+[%# Site theme header/footer from the page table (page_code site_header / site_footer), e.g. cloned sites %]
+[% SET theme_site = SiteName || c.stash.SiteName || c.session.SiteName %]
+[% TRY %][% SET site_header_page = c.model('DBEncy').resultset('Page').search({ sitename => theme_site, page_code => 'site_header', status => 'active' }).first %][% CATCH %][% END %]
+[%# Per-SiteName brand mark. sites.app_logo: image path/URL, a glyph, or empty (no icon). %]
+[% TRY %][% SET site_brand = c.model('DBEncy').resultset('Site').search({ name => theme_site }).first %][% CATCH %][% END %]
+[% SET app_logo = '' %]
+[% IF site_brand %][% SET app_logo = site_brand.app_logo || '' %][% END %]
+<header class="site-[% theme_site | html %][% IF site_header_page %] has-site-header[% END %]">
+    [% IF site_header_page %]<div class="site-header">[% site_header_page.body %]</div>[% END %]
     <h1>
+        [% IF app_logo %]
+        [% IF app_logo.match('^https?://') OR app_logo.match('^/') %]
+        <img class="site-brand-icon" src="[% app_logo | html %]" alt="[% (site_brand.app_logo_alt || theme_site) | html %]"[% IF site_brand.app_logo_width %] width="[% site_brand.app_logo_width %]"[% END %][% IF site_brand.app_logo_height %] height="[% site_brand.app_logo_height %]"[% END %]>
+        [% ELSE %]
+        <span class="site-brand-icon" role="img" aria-label="[% (site_brand.app_logo_alt || theme_site) | html %]">[% app_logo | html %]</span>
+        [% END %]
+        [% END %]
         Welcome [% IF c.session.username %]
 [% c.session.first_name || c.session.username %] [% c.session.last_name %][% IF is_admin %] Administrator[% END %]
 [% ELSE %]
@@ -342,13 +190,10 @@ document.addEventListener('DOMContentLoaded', function() {
 [%# LEGACY MENU MODE: Membership / Subscriptions bar disabled %]
 
 [% IF !c.session.user_id %]
-<div style="background:#e65c00;color:#fff;padding:5px 18px;font-size:0.92em;text-align:right;font-weight:bold;">
-    <a href="/mail/subscribe"
-       style="color:#fff;text-decoration:none;">
-        &#9993; Join Our Mailing List
-    </a>
+<div class="guest-join-bar">
+    <a href="/mail/subscribe">&#9993; Join Our Mailing List</a>
     &nbsp;&middot;&nbsp;
-    <a href="/user/login" style="color:rgba(255,255,255,0.85);text-decoration:none;font-weight:normal;">Sign In</a>
+    <a href="/user/login">Sign In</a>
 </div>
 [% END %]
 

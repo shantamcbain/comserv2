@@ -47,12 +47,19 @@
                         <div class="form-group">
                             <label for="api_key">API Key *</label>
                             <input type="password" class="form-input" id="api_key" name="api_key" 
-                                   value="[% current_config.api_key %]" required
+                                   value="" 
                                    placeholder="Enter your weather service API key">
+                            [% IF has_api_key %]
+                            <small class="form-help" style="color: #2e7d32;">
+                                <i class="fas fa-check-circle"></i> 
+                                An API key is currently configured. Leave blank to keep existing key, or enter a new one to replace it.
+                            </small>
+                            [% ELSE %]
                             <small class="form-help">
                                 <i class="fas fa-info-circle"></i> 
                                 Get your API key from your weather service provider's dashboard
                             </small>
+                            [% END %]
                         </div>
                     </div>
                 </div>

@@ -1,0 +1,58 @@
+[% PageVersion = 'Accounting/Manufacturing/customer_orders.tt,v 0.01 2026/09/03 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% META
+    title = 'Manufacturing orders for customer'
+    roles = 'admin,accounting'
+    TemplateType = 'ApplicationTtTemplate'
+%]
+
+<div class="content-card" style="max-width: 1100px; margin: 1.5rem auto; padding: 1.25rem;">
+  <h1 style="color: var(--text-color, #222); margin-top: 0;">Orders — [% customer | html %]</h1>
+  <p class="doc-body" style="color: var(--text-color, #444);">
+    Open orders for this customer that need picking / manufacturing. Open the traveler for the full BOM.
+  </p>
+
+  [% IF open_orders && open_orders.size %]
+  <table class="table" style="width: 100%; border-collapse: collapse; color: var(--text-color, #222);">
+    <thead>
+      <tr style="border-bottom: 2px solid var(--border-color, #ccc); text-align: left;">
+        <th style="padding: 0.5rem;">Order</th>
+        <th style="padding: 0.5rem;">Date</th>
+        <th style="padding: 0.5rem;">Status</th>
+        <th style="padding: 0.5rem;">Items</th>
+        <th style="padding: 0.5rem;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      [% FOREACH o IN open_orders %]
+      <tr style="border-bottom: 1px solid var(--border-color, #ddd);">
+        <td style="padding: 0.6rem;">#[% o.order_id | html %]</td>
+        <td style="padding: 0.6rem;">[% o.order_date | html %]</td>
+        <td style="padding: 0.6rem;">[% o.status | html %]</td>
+        <td style="padding: 0.6rem;">
+          [% o.items | html %]
+          [% IF o.scope_note %]
+            <br><span style="color: var(--text-color, #666); font-size: 0.9em;">[% o.scope_note | html %]</span>
+          [% END %]
+        </td>
+        <td style="padding: 0.6rem; white-space: nowrap;">
+          <a class="btn btn-primary" href="[% o.link %]" style="margin-right: 0.4rem;">Open Traveler</a>
+          <a class="btn btn-secondary" href="[% o.print_link %]">Print Form</a>
+          [% UNLESS o.status.match('cancel|void') %]
+          <form method="post" action="[% c.uri_for('/Accounting/manufacturing/cancel', o.order_id) %]" style="display:inline;">
+            <button type="submit" class="btn btn-danger" style="padding:2px 6px;" onclick="return confirm('Cancel this order and release its jobs/reservations globally?');">Cancel</button>
+          </form>
+          [% END %]
+        </td>
+      </tr>
+      [% END %]
+    </tbody>
+  </table>
+  [% ELSE %]
+  <p style="color: var(--text-color, #666);">No open orders for this customer.</p>
+  [% END %]
+
+  <p style="margin-top: 1.5rem;">
+    <a href="[% c.uri_for('/Accounting/manufacturing') %]">← All customers</a>
+  </p>
+</div>

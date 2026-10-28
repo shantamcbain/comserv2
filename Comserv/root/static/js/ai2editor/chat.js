@@ -18,6 +18,10 @@
 (function () {
     'use strict';
 
+    // Mark this page as AI Editor so Chat-with-AI Apply Fix / coding paths stay off elsewhere.
+    try { window.AI2_EDITOR = true; } catch (e) { /* ignore */ }
+
+
     const NS = 'AI2EditorChat';
     let _activeFile = '';
 
@@ -43,9 +47,38 @@
         return '';
     }
 
+    // Returns context distinguishing the *open editable file* from the *current page / endpoint*.
+    // Important: the file clicked to open AI Editor is often the page itself, but not always
+    // (e.g. error on page X, open editor from page Y to fix X; error message usually provided).
+    function getEditorContext() {
+        const openFile = currentFilePath();
+        let currentPage = '';
+        try {
+            currentPage = window.location.pathname || '';
+            // If opened from a different surface, try referer as hint
+            if (!currentPage || currentPage.includes('/ai2/')) {
+                const ref = document.referrer ? new URL(document.referrer).pathname : '';
+                if (ref && !ref.includes('/ai2/')) currentPage = ref;
+            }
+        } catch (e) {}
+        return { openFile, currentPage, pageVsFileDiffer: !!(openFile && currentPage && openFile.toLowerCase() !== currentPage.toLowerCase()) };
+    }
+
     function setActiveFile(path) {
         _activeFile = path || '';
         if (path) window.AI2_FILE_TO_LOAD = path;
+    }
+
+    // Stub for early preload called from core openFile.
+    // Beefs up auto-pipeline: pre-fetches related controller(s) so they are ready when chat starts.
+    // Uses the strengthened infer that handles open-file vs page and errors.
+    async function preloadRelatedPipeline(path, extraHint = '') {
+        try {
+            const paths = await inferRelatedPipelineFiles(path, extraHint);
+            // Fire the loads so cache / network is warm; chat will re-use via filesP later
+            await Promise.all(paths.map(p => fetchLoadFile(p).catch(() => null)));
+            console.log('[AI2Chat] preloaded pipeline for', path, paths);
+        } catch (e) { /* non-fatal */ }
     }
 
     function escapeHtml(s) {
@@ -120,19 +153,124 @@
     //     panel is attached to the editor or detached into its own window.
     //     We keep the messages in memory and re-render whichever view is active,
     //     so detaching/reattaching never loses context. ---
-    let chatLog = [];   // [{who:'You'|'AI', html:'...'}]
+    let chatLog = [];   // [{who:'You'|'AI'|'Think', html?, summary?, steps?, open?, done?}]
+
+        function ensureEditorChatContrast(doc) {
+        doc = doc || document;
+        if (!doc || !doc.head) return;
+        if (doc.getElementById('ai2-editor-chat-contrast-css')) {
+            // Allow upgrades after deploy: replace contents
+            var existing = doc.getElementById('ai2-editor-chat-contrast-css');
+            if (existing && existing.getAttribute('data-v') === '2') return;
+            if (existing) existing.remove();
+        }
+        const style = doc.createElement('style');
+        style.id = 'ai2-editor-chat-contrast-css';
+        style.setAttribute('data-v', '2');
+        style.textContent = [
+            '#ai-chat-sidebar{background:#1e1f22!important;color:#f2f2f2!important;display:flex!important;flex-direction:column!important;min-height:0!important;}',
+            '#ai-chat-sidebar .chat-messages,#ai-chat-sidebar #chat-messages{flex:1 1 auto!important;min-height:0!important;background:#1a1b1e!important;color:#f2f2f2!important;font-size:13px!important;line-height:1.45!important;}',
+            '#ai-chat-sidebar .chat-msg{margin-bottom:10px;padding:8px 10px;border-radius:6px;border:1px solid #3a3f4a;color:#f2f2f2!important;word-break:break-word;overflow-wrap:anywhere;}',
+            '#ai-chat-sidebar .chat-msg-you{background:#243044!important;border-color:#3d5a80;}',
+            '#ai-chat-sidebar .chat-msg-ai{background:#252830!important;border-color:#4a5568;}',
+            '#ai-chat-sidebar .chat-msg strong{color:#9ecbff!important;}',
+            '#ai-chat-sidebar .chat-msg-you strong{color:#ffd27a!important;}',
+            '#ai-chat-sidebar .chat-msg pre,#ai-chat-sidebar .chat-msg code{background:#0f1115!important;color:#e6edf3!important;border:1px solid #333;border-radius:4px;padding:6px 8px;display:block;white-space:pre-wrap;font-size:12px!important;max-height:280px;overflow:auto;}',
+            '#ai-chat-sidebar .ai2-chat-input-row{flex:0 0 auto!important;display:flex!important;flex-direction:row!important;align-items:flex-end!important;gap:6px!important;padding:8px!important;border-top:1px solid #555!important;background:#1e1f22!important;width:100%!important;box-sizing:border-box!important;}',
+            '#ai-chat-sidebar #ai-chat-input{flex:1 1 auto!important;min-width:0!important;min-height:36px!important;max-height:120px!important;background:#0f1115!important;color:#f2f2f2!important;border:1px solid #555!important;border-radius:3px!important;padding:8px!important;font-size:13px!important;box-sizing:border-box!important;}',
+            '#ai-chat-sidebar #ai-chat-input::placeholder{color:#9aa3b2!important;opacity:1!important;}',
+            /* neutralize leaked widget class if still present */
+            '#ai-chat-sidebar .chat-input{flex:0 0 auto!important;display:flex!important;flex-direction:row!important;align-items:flex-end!important;background:#1e1f22!important;}'
+        ].join('');
+        doc.head.appendChild(style);
+    }
+
+function ensureThinkingStyles(doc) {
+        doc = doc || document;
+        if (!doc || !doc.head) return;
+        if (doc.getElementById('ai2-editor-thinking-css')) return;
+        const style = doc.createElement('style');
+        style.id = 'ai2-editor-thinking-css';
+        style.textContent = [
+            '.ai-thinking{margin:8px 0;border:1px solid #4a5568;border-radius:6px;background:#252830;color:#c8d0dc;font-size:12px;}',
+            '.ai-thinking summary{cursor:pointer;padding:6px 10px;list-style:none;font-weight:600;color:#9ecbff;}',
+            '.ai-thinking summary::-webkit-details-marker{display:none;}',
+            '.ai-thinking summary::before{content:"▸ ";display:inline-block;transition:transform .1s;}',
+            '.ai-thinking[open] summary::before{transform:rotate(90deg);}',
+            '.ai-thinking-body{padding:4px 10px 8px;border-top:1px solid #3a4150;}',
+            '.ai-thinking-step{padding:4px 0;border-bottom:1px solid #333842;white-space:pre-wrap;line-height:1.35;}',
+            '.ai-thinking-step:last-child{border-bottom:none;}',
+            '.ai-thinking-live{border-color:#0e639c;box-shadow:0 0 0 1px rgba(14,99,156,.35);}',
+            '.ai-thinking-live summary{color:#7ec8ff;}'
+        ].join('');
+        doc.head.appendChild(style);
+    }
+
+    function autosizePrompt(el) {
+        if (!el || !el.style) return;
+        el.style.height = 'auto';
+        const max = 200;
+        const next = Math.min(Math.max(el.scrollHeight, 32), max);
+        el.style.height = next + 'px';
+        el.style.overflowY = (el.scrollHeight > max) ? 'auto' : 'hidden';
+    }
+
+    function wirePromptBox(el, onSend) {
+        if (!el || el._ai2PromptWired) return;
+        el._ai2PromptWired = true;
+        autosizePrompt(el);
+        el.addEventListener('input', function () { autosizePrompt(el); });
+        el.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (typeof onSend === 'function') onSend();
+            }
+        });
+    }
+
+    function refreshChatViews() {
+        const attachedBox = document.getElementById('chat-messages');
+        if (attachedBox && sidebarAttached()) renderChatLog(attachedBox);
+        const w = window._aiChatWin;
+        if (w && !w.closed) {
+            const dBox = w.document.getElementById('chat-messages');
+            if (dBox) renderChatLog(dBox);
+        }
+    }
 
     function renderChatLog(box) {
         if (!box) return;
+        ensureThinkingStyles(box.ownerDocument || document);
+        ensureEditorChatContrast(box.ownerDocument || document);
         box.innerHTML = '';
         if (!chatLog.length) {
-            box.innerHTML = '<div><strong>AI:</strong> How can I help with this file?</div>';
+            box.innerHTML = '<div class="chat-msg chat-msg-ai"><strong>AI:</strong> How can I help with this file?</div>';
             return;
         }
         for (let i = 0; i < chatLog.length; i++) {
             const e = chatLog[i];
+            if (e.who === 'Think') {
+                const details = document.createElement('details');
+                details.className = 'ai-thinking' + (e.done ? '' : ' ai-thinking-live');
+                details.open = e.open !== false;
+                if (e.id) details.dataset.thinkId = e.id;
+                const summary = document.createElement('summary');
+                summary.textContent = e.summary || 'AI thinking…';
+                const body = document.createElement('div');
+                body.className = 'ai-thinking-body';
+                (e.steps || []).forEach(function (step) {
+                    const stepEl = document.createElement('div');
+                    stepEl.className = 'ai-thinking-step';
+                    stepEl.textContent = step;
+                    body.appendChild(stepEl);
+                });
+                details.appendChild(summary);
+                details.appendChild(body);
+                box.appendChild(details);
+                continue;
+            }
             const div = document.createElement('div');
-            div.style.marginBottom = '8px';
+            div.className = 'chat-msg ' + (e.who === 'AI' ? 'chat-msg-ai' : 'chat-msg-you');
             div.innerHTML = '<strong>' + (e.who === 'AI' ? 'AI:' : 'You:') + '</strong> ' + e.html;
             box.appendChild(div);
         }
@@ -142,13 +280,111 @@
     // The single place a message is recorded + shown in whichever view is live.
     function recordMessage(who, html) {
         chatLog.push({ who: who, html: html });
-        const attachedBox = document.getElementById('chat-messages');
-        if (attachedBox && sidebarAttached()) renderChatLog(attachedBox);
-        const w = window._aiChatWin;
-        if (w && !w.closed) {
-            const dBox = w.document.getElementById('chat-messages');
-            if (dBox) renderChatLog(dBox);
+        refreshChatViews();
+    }
+
+    // Build conversation history for the model — strips HTML to plain text
+    // and returns [{role:'user'|'assistant', content}] for the last N exchanges.
+    // This lets the AI editor maintain context across turns (like Hermes).
+    // Skipped thinking entries (client-only), keeps only user+assistant.
+    var _lastConversationId = '';
+    function buildConversationHistory(maxExchanges) {
+        maxExchanges = maxExchanges || 8;
+        var history = [];
+        var count = 0;
+        for (var i = chatLog.length - 1; i >= 0 && count < maxExchanges; i--) {
+            var entry = chatLog[i];
+            if (!entry || entry.who === 'Think') continue;
+            var role = (entry.who === 'You') ? 'user' : 'assistant';
+            // Strip HTML tags for clean history
+            var content = String(entry.html || '');
+            content = content.replace(/<[^>]+>/g, ' ');
+            content = content.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+            content = content.replace(/\s+/g, ' ').trim();
+            if (!content) continue;
+            history.unshift({ role: role, content: content });
+            count++;
         }
+        return history;
+    }
+
+    // Live thinking trail in chat (visible + kept for daily agent analysis).
+    function startLiveThinking(meta) {
+        ensureThinkingStyles(document);
+        try {
+            const w = window._aiChatWin;
+            if (w && !w.closed) ensureThinkingStyles(w.document);
+        } catch (e0) { /* ignore */ }
+        const id = 'think-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+        const startedAt = Date.now();
+        const entry = {
+            who: 'Think',
+            id: id,
+            open: true,
+            done: false,
+            summary: '⏳ AI thinking…',
+            steps: []
+        };
+        chatLog.push(entry);
+
+        function find() {
+            for (let i = chatLog.length - 1; i >= 0; i--) {
+                if (chatLog[i].id === id) return chatLog[i];
+            }
+            return entry;
+        }
+        function addStep(text) {
+            const e = find();
+            e.steps.push(String(text));
+            refreshChatViews();
+        }
+        function setSummary(text) {
+            const e = find();
+            e.summary = String(text);
+            refreshChatViews();
+        }
+        if (meta && meta.agent) addStep('Agent: ' + meta.agent);
+        if (meta && meta.phase) addStep('Phase: ' + meta.phase);
+        if (meta && meta.model) addStep('Model: ' + meta.model);
+        if (meta && meta.file) addStep('Open file: ' + meta.file);
+        addStep('Preparing request…');
+        setSummary('⏳ Thinking — ' + (meta && meta.phase ? meta.phase + ' / ' : '') + (meta && meta.model ? meta.model : 'model') + ' (0s)');
+
+        const heartbeat = setInterval(function () {
+            const secs = Math.round((Date.now() - startedAt) / 1000);
+            const e = find();
+            if (e.done) return;
+            e.summary = '⏳ Still thinking — ' + (meta && meta.phase ? meta.phase + ' / ' : '')
+                + (meta && meta.model ? meta.model : 'model') + ' (' + secs + 's)';
+            // Refresh last wait step or append tick every 5s for the record
+            if (secs > 0 && secs % 5 === 0) {
+                const waitLabel = 'Waiting on model… ' + secs + 's elapsed';
+                if (!e.steps.length || e.steps[e.steps.length - 1].indexOf('Waiting on model') !== 0) {
+                    e.steps.push(waitLabel);
+                } else {
+                    e.steps[e.steps.length - 1] = waitLabel;
+                }
+            }
+            refreshChatViews();
+            if (typeof setStatus === 'function') {
+                setStatus('AI thinking… ' + secs + 's (' + ((meta && meta.model) || '') + ')');
+            }
+        }, 1000);
+
+        function finalize(ok, extraSteps) {
+            clearInterval(heartbeat);
+            const e = find();
+            e.done = true;
+            const secs = Math.round((Date.now() - startedAt) / 1000);
+            (extraSteps || []).forEach(function (s) { e.steps.push(String(s)); });
+            e.steps.push(ok ? ('Done in ' + secs + 's') : ('Failed after ' + secs + 's'));
+            e.summary = (ok ? '🔍 AI thinking' : '⚠️ AI thinking (failed)')
+                + ' (' + e.steps.length + ' steps, ' + secs + 's)';
+            refreshChatViews();
+            return e.steps.slice();
+        }
+
+        return { id: id, addStep: addStep, setSummary: setSummary, finalize: finalize, startedAt: startedAt };
     }
 
     // --- Attach/Detach is a VIEW TOGGLE of one chat, not two chats. ---
@@ -175,6 +411,11 @@
             if (sidebar) sidebar.style.display = (_closed || _detached) ? 'none' : 'flex';
             if (reopen) reopen.style.display = _closed ? 'block' : 'none';
             if (btn) btn.textContent = _detached ? '⊞ Attach' : '⤢ Detach';
+            try {
+                document.dispatchEvent(new CustomEvent('ai2:chat-view', {
+                    detail: { closed: _closed, detached: _detached }
+                }));
+            } catch (evErr) { /* ignore */ }
             if (window.AI2EditorCore && typeof window.AI2EditorCore.resizeEditor === 'function') {
                 window.AI2EditorCore.resizeEditor();
             }
@@ -256,37 +497,54 @@
                 '<title>AI Chat — editor</title>' +
                 '<style>body{margin:0;font-family:system-ui,sans-serif;background:#1e1f22;color:#ddd;height:100vh;display:flex;flex-direction:column;}' +
                 '#chat-messages{flex:1;overflow:auto;padding:8px;font-size:0.9em;}' +
-                '#chat-input{flex:1;padding:6px;border:1px solid #555;border-radius:3px;background:#1e1f22;color:#ddd;}' +
-                '#send{background:#0e639c;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;}' +
-                '.bar{display:flex;gap:6px;padding:6px;border-top:1px solid #555;}' +
+                '#chat-input{flex:1;min-height:32px;max-height:200px;resize:none;overflow-y:hidden;padding:6px;border:1px solid #555;border-radius:3px;background:#1e1f22;color:#ddd;font:inherit;line-height:1.35;}' +
+                '#send{background:#0e639c;color:#fff;border:none;padding:6px 12px;border-radius:3px;cursor:pointer;align-self:flex-end;}' +
+                '.bar{display:flex;gap:6px;padding:6px;border-top:1px solid #555;align-items:flex-end;}' +
+                '#chat-status{padding:4px 8px;font-size:11px;color:#9ecbff;border-top:1px solid #333;min-height:16px;}' +
+                '#chat-status.err{color:#f88;}' +
                 'h3{margin:0;padding:8px;background:#2b2b2b;font-size:13px;display:flex;justify-content:space-between;align-items:center;}' +
                 '#attach{background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;}</style>' +
                 '</head><body>' +
-                '<h3>AI Chat (Hy3) — detached <button id="attach">⊞ Attach</button></h3>' +
+                '<h3>AI Chat — detached <button id="attach">⊞ Attach</button></h3>' +
                 '<div id="chat-messages"></div>' +
-                '<div class="bar"><input id="chat-input" placeholder="Ask AI about the open file...">' +
+                '<div id="chat-status">Ready</div>' +
+                '<div class="bar"><textarea id="chat-input" rows="1" placeholder="Describe the bug… vague asks get Clarify first. Enter send, Shift+Enter newline"></textarea>' +
                 '<button id="send">Send</button></div>' +
                 '</body></html>'
             );
             w.document.close();
+            ensureThinkingStyles(w.document);
             renderChatLog(w.document.getElementById('chat-messages'));
 
             const dInput = w.document.getElementById('chat-input');
             const dSend = w.document.getElementById('send');
             const dMsgs = w.document.getElementById('chat-messages');
+            const dStatus = w.document.getElementById('chat-status');
             const target = {
                 messages: dMsgs,
                 input: dInput,
                 sendBtn: dSend,
-                status: function () { /* detached window has no status bar */ }
+                status: function (msg, isError) {
+                    if (!dStatus) return;
+                    dStatus.textContent = msg || '';
+                    dStatus.className = isError ? 'err' : '';
+                }
             };
             function fire() {
-                const v = dInput.value;
+                const v = (dInput.value || '').trim();
+                if (!v) return;
                 dInput.value = '';
-                sendPrompt(v, target);
+                autosizePrompt(dInput);
+                try {
+                    sendPrompt(v, target);
+                } catch (err) {
+                    console.error('[AI2EditorChat] send failed', err);
+                    target.status('Send failed: ' + (err && err.message ? err.message : err), true);
+                    recordMessage('AI', '<span style="color:#f66">Send failed: ' + escapeHtml(String(err && err.message ? err.message : err)) + '</span>');
+                }
             }
             dSend.addEventListener('click', fire);
-            dInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') fire(); });
+            wirePromptBox(dInput, fire);
 
             // "Attach" inside the detached window re-attaches into the editor.
             const attachBtn = w.document.getElementById('attach');
@@ -355,6 +613,9 @@
     }
 
     function loadCurrentFileContent() {
+        if (window.AI2Wysiwyg && typeof window.AI2Wysiwyg.flushToAce === 'function') {
+            window.AI2Wysiwyg.flushToAce();
+        }
         const ed = getEditor();
         if (ed) {
             try {
@@ -378,6 +639,92 @@
         'lib/Comserv/Model/AI2/Router.pm'
     ];
 
+    // Infer related controller / pipeline files from an opened template or page path.
+    // Beefed up: uses getEditorContext() to handle cases where the *open file* (the one being edited)
+    // differs from the *analyzed page/endpoint* (e.g. fix a failing page by opening editor elsewhere;
+    // error message usually provided in prompt).
+    // Also extracts file paths from error messages/stack traces.
+    // Prefers AI2 paths during legacy->AI2 refactor. Tries legacy resolve_route for accuracy if available.
+    // Enables earlier auto-knowledge of the "background pipeline" (controller action, stash population,
+    // models, includes, date logic, action bars, etc.).
+    async function inferRelatedPipelineFiles(openPath, promptHint = '') {
+        const related = [];
+        const ctx = getEditorContext();
+        const primary = openPath || ctx.openFile || '';
+        if (!primary && !ctx.currentPage) return related;
+
+        const candidates = new Set();
+        if (primary) candidates.add(primary);
+        if (ctx.currentPage) candidates.add(ctx.currentPage);
+        if (ctx.pageVsFileDiffer) {
+            // When they differ, still try to resolve the "real" page
+            candidates.add(ctx.currentPage);
+        }
+
+        // Error message / stack trace extraction (common when fixing load failures)
+        if (promptHint) {
+            const errPaths = promptHint.match(/(?:lib|root|script|Comserv)\/[\w\/.-]+\.(?:pm|tt|js|pl)/gi) || [];
+            errPaths.forEach(p => candidates.add(p.replace(/^Comserv\//, '')));
+            // Also look for common error indicators pointing at Planning etc.
+            if (/planning|daily|DailyPlan/i.test(promptHint)) {
+                candidates.add('lib/Comserv/Controller/Planning.pm');
+            }
+        }
+
+        for (let cand of candidates) {
+            if (!cand) continue;
+            const p = cand.toLowerCase();
+
+            // Try to get better mapping via legacy resolve_route (still useful during AI2 refactor;
+            // returns controller + template). Non-blocking.
+            try {
+                const url = '/ai/resolve_route?path=' + encodeURIComponent(cand);
+                const r = await fetch(url, { credentials: 'include' }).then(res => res.ok ? res.json() : null).catch(() => null);
+                if (r && r.controller) {
+                    const ctrlPath = r.controller.replace(/\./g, '/').replace('Comserv::Controller::', 'lib/Comserv/Controller/') + '.pm';
+                    if (ctrlPath && !related.includes(ctrlPath)) related.push(ctrlPath);
+                }
+                if (r && r.template) {
+                    if (!related.includes(r.template)) related.push(r.template);
+                }
+            } catch (e) { /* ignore, fall back to heuristics */ }
+
+            // Template -> controller heuristics (Catalyst / TT conventions)
+            if (p.endsWith('.tt') || p.includes('/root/')) {
+                if (p.includes('dailyplan') || p.includes('planning/daily')) {
+                    related.push('lib/Comserv/Controller/Planning.pm');
+                }
+                const match = p.match(/root\/(?:admin\/)?([^\/]+)\/.*\.tt$/);
+                if (match) {
+                    let ctrl = 'lib/Comserv/Controller/' + match[1].charAt(0).toUpperCase() + match[1].slice(1) + '.pm';
+                    if (!related.includes(ctrl)) related.push(ctrl);
+                }
+                if (p.includes('/admin/')) {
+                    const adminMatch = p.match(/root\/admin\/([^\/]+)\//);
+                    if (adminMatch) {
+                        const ctrl = 'lib/Comserv/Controller/Admin/' + adminMatch[1].charAt(0).toUpperCase() + adminMatch[1].slice(1) + '.pm';
+                        if (!related.includes(ctrl)) related.push(ctrl);
+                    }
+                }
+            } else if (p.endsWith('.pm')) {
+                // If a controller is primary, pull its likely template too for context
+                if (!related.includes(cand)) related.push(cand);
+                // crude reverse
+                const ctrlName = cand.split('/').pop().replace('.pm', '');
+                const possibleTpl = 'root/' + ctrlName.toLowerCase() + '/' + ctrlName.toLowerCase() + '.tt'; // rough
+                // better: we already have the open file
+            }
+
+            // Always consider core AI/editor files (prefer AI2 during refactor)
+            DEFAULT_APP_PATHS.forEach(f => {
+                if (!related.includes(f)) related.push(f);
+            });
+        }
+
+        // Dedup
+        return [...new Set(related)];
+    }
+
     function isEvaluatePrompt(text) {
         const p = String(text || '').toLowerCase();
         if (/\bevaluat/.test(p)) return true;
@@ -396,23 +743,57 @@
             .catch(function () { return null; });
     }
 
-    function loadFilesForEval(openPath, openContent) {
-        const paths = DEFAULT_APP_PATHS.slice();
+    // eval #31: only attach the AI2 chat/router sources when the ask is about
+    // the AI editor/chat itself. Before, every "review/evaluate" ask about any
+    // page got ~190K chars of AI2 code, so free models answered about AI2.
+    function isAboutAiEditor(text, openPath) {
+        const p = String(text || '').toLowerCase() + ' ' + String(openPath || '').toLowerCase();
+        return /\bai2\b|ai editor|ai-editor|chat with ai|\bchat\.pm\b|\brouter\.pm\b|coderead|\/ai2\//.test(p);
+    }
+
+    function loadFilesForEval(openPath, openContent, promptText) {
+        const paths = isAboutAiEditor(promptText, openPath) ? DEFAULT_APP_PATHS.slice() : [];
+        if (openPath && openContent && String(openContent).length
+            && paths.indexOf(openPath) === -1 && !/^(lib|root\/static|sql|script|t)\//.test(openPath)) {
+            // Open .tt or other buffer: send what is in the editor, then the rest.
+            return Promise.all(paths.map(fetchLoadFile)).then(function (rows) {
+                return [{ path: openPath, content: openContent }].concat(rows.filter(Boolean));
+            });
+        }
         if (openPath && /^(lib|root\/static|sql|script|t)\//.test(openPath)
             && paths.indexOf(openPath) === -1) {
             paths.unshift(openPath);
         }
         return Promise.all(paths.map(fetchLoadFile)).then(function (rows) {
-            return rows.filter(Boolean);
+            const got = rows.filter(Boolean);
+            if (!got.length && openPath && openContent && String(openContent).length) {
+                return [{ path: openPath, content: openContent }];
+            }
+            return got;
         });
     }
 
+    // Total cap so a turn never ships 200K+ chars to a free model (eval #31).
+    const MAX_PROMPT_FILE_CHARS = 90000;
     function filesToPromptBlob(files) {
         if (!files || !files.length) return '';
-        return files.map(function (f) {
-            const body = String(f.content || '').slice(0, 48000);
-            return '[FILE: ' + f.path + '] (live /ai2/load_file)\n```\n' + body + '\n```';
-        }).join('\n\n');
+        let left = MAX_PROMPT_FILE_CHARS;
+        const out = [];
+        files.forEach(function (f) {
+            if (left <= 2000) {
+                out.push('[FILE: ' + f.path + '] (not attached: size limit; ask with [READ_FILE: ' + f.path + ':START-END])');
+                return;
+            }
+            const full = String(f.content || '');
+            const cap = Math.min(48000, left);
+            let body = full.slice(0, cap);
+            if (full.length > cap) {
+                body += '\n... [cut at ' + cap + ' of ' + full.length + ' chars; ask with [READ_FILE: ' + f.path + ':START-END]]';
+            }
+            left -= body.length;
+            out.push('[FILE: ' + f.path + '] (live /ai2/load_file)\n```\n' + body + '\n```');
+        });
+        return out.join('\n\n');
     }
 
     function isDiskCapabilityPrompt(text) {
@@ -468,7 +849,307 @@
             });
     }
 
-    function sendPrompt(prompt, target) {
+
+    // --- Agent + phase (clarify → analyze → plan → verify → implement) ---
+    // Planning local hints (nimble/tev1) for DailyPlan work when the user
+    // actually picks them. Header select wins only after a change event.
+    // Otherwise send empty so the server Router classifies
+    // (SuperGrok if allotment OK, else paid, else free).
+    const CLARIFY_MODEL = 'ollama|tev1:0.8b';
+    const ANALYZE_MODEL = 'ollama|nimble';
+    const PLAN_MODEL    = 'ollama|nimble';
+    const IMPLEMENT_MODEL = 'openrouter|cohere/north-mini-code:free';
+    let _userPickedModel = false;
+    let _escalatedThisSend = false;
+    let _editorPhase = 'analyze'; // clarify | analyze | plan | implement
+    let _planApproved = false;
+    // Pending clarify session: original vague ask + gap questions awaiting answers.
+    let _clarifySession = null; // { original, gaps, askedAt }
+    // 2026-10-15: one conversation per open file. Server only knows history we
+    // send, so keep a short raw-text history (no file blobs) and the first ask.
+    let _editorConv = { id: null, file: null, firstAsk: '', history: [] };
+    const EDITOR_RETRY_MODEL = 'openrouter|google/gemma-4-31b-it:free';
+    function editorConvFor(filePath) {
+        const f = filePath || '';
+        if (_editorConv.file !== f) {
+            _editorConv = { id: null, file: f, firstAsk: '', history: [] };
+        }
+        return _editorConv;
+    }
+
+    function currentEditorAgentId() {
+        const sel = document.getElementById('ai-editor-agent');
+        const v = sel && sel.value ? sel.value : 'programming';
+        return v || 'programming';
+    }
+
+    function currentEditorPhase() {
+        const sel = document.getElementById('ai-editor-phase');
+        if (sel && sel.value) _editorPhase = sel.value;
+        return _editorPhase || 'analyze';
+    }
+
+    function setEditorPhase(phase) {
+        _editorPhase = phase || 'analyze';
+        const sel = document.getElementById('ai-editor-phase');
+        if (sel) sel.value = _editorPhase;
+        const badge = document.getElementById('ai-editor-phase-badge');
+        if (badge) {
+            badge.textContent = 'Phase: ' + _editorPhase + (_planApproved ? ' (plan approved)' : '');
+        }
+    }
+
+    function resolveEditorModel(phase) {
+        const filePath = currentFilePath() || '';
+        const isPlanningContext = /dailyplan|planning|todo.*sort|focus.*queue/i.test(filePath) ||
+                                  /daily.*plan|planning.*page/i.test(document.title || '');
+
+        // Header model select usually wins, but for planning/DailyPlan analysis we bias
+        // hard toward local nimble (the model actually used for todo/daily planning sort).
+        const picked = (window.ComservChat && ComservChat.modelSelect)
+            ? ComservChat.modelSelect.getSelectedValue()
+            : '';
+        // Header pick wins only after the user changes the dropdown.
+        // Otherwise return empty so the server Router classifies.
+        if (_userPickedModel && picked) {
+            if (isPlanningContext && (phase === 'plan' || phase === 'analyze')) {
+                return picked || PLAN_MODEL;
+            }
+            if (phase === 'clarify') return picked || CLARIFY_MODEL;
+            if (phase === 'implement') return picked || IMPLEMENT_MODEL;
+            if (phase === 'plan') return picked || PLAN_MODEL;
+            return picked || ANALYZE_MODEL;
+        }
+        return '';
+    }
+
+    // Local gap detection — no tokens. Used before any clarify/analyze model call.
+    function promptGaps(prompt, filePath) {
+        const p = String(prompt || '').trim();
+        const lower = p.toLowerCase();
+        const gaps = [];
+        if (p.length < 40) {
+            gaps.push('What exactly is broken or missing? (one sentence symptom)');
+        }
+        const hasSite = /\b(sitename|site\s*name|3d|bmaster|csc|forager|brew)\b/i.test(p);
+        if (!hasSite && /\b(site|nav|menu|feature|addon|module)\b/i.test(lower)) {
+            gaps.push('Which sitename / host is this on? (e.g. 3d, CSC, BMaster)');
+        }
+        const hasPath = /(?:^|\s)(?:lib\/|root\/|Comserv\/|[\w.-]+\.(?:pm|tt|js|sql))\b/.test(p)
+            || (filePath && filePath.length > 0);
+        if (!hasPath && /\b(bug|broken|fix|error|fail|not work|missing|gate|nav)\b/i.test(lower)) {
+            gaps.push('Any file/module path you already suspect, or should we search from Root/nav?');
+        }
+        if (/\b(not work|broken|fail|wrong|missing|no .+ feature)\b/i.test(lower)
+            && !/\b(expected|should|want|instead)\b/i.test(lower)) {
+            gaps.push('What should happen instead? (expected behavior)');
+        }
+        if (!/\b(repro|steps|when i|after i|click|login|guest)\b/i.test(lower) && p.length < 200) {
+            gaps.push('How do you reproduce it? (short steps)');
+        }
+        if (/\b(addon|feature)\b/i.test(lower) && !/\b(site_modules|enabled_modules|hosting|nav)\b/i.test(lower)) {
+            gaps.push('Is this a site *feature* (nav/module enablement) or something else?');
+        }
+                if (/SQL_[A-Z_]+\s*=>/.test(p) || /Address already in use/i.test(p) || /failed to listen to port/i.test(p)) {
+            gaps.push('That looks like a server log paste. What do you want fixed — the bug behind it, or help reading the log?');
+        }
+        // Dedup, max 4
+        const out = [];
+        gaps.forEach(function (g) { if (out.indexOf(g) === -1) out.push(g); });
+        return out.slice(0, 4);
+    }
+
+    function looksLikeLogNoise(prompt) {
+        const p = String(prompt || '');
+        let hits = 0;
+        if (/SQL_[A-Z_]+\s*=>/.test(p)) hits++;
+        if (/Address already in use/i.test(p)) hits++;
+        if (/Exiting eval via next/i.test(p)) hits++;
+        if (/failed to listen to port/i.test(p)) hits++;
+        if (/_initialize_ai_chat_schema/i.test(p)) hits++;
+        if (/HTTP\/Server\/PSGI/i.test(p)) hits++;
+        if (/\[workstation \(Standalone\):\d+\]/.test(p)) hits++;
+        if (/SQL_QUOTED_IDENTIFIER_CASE/i.test(p)) hits++;
+        if (/shanta@workstation:/i.test(p)) hits++;
+        return hits >= 2;
+    }
+
+    // Free code models often invent tool calls or echo shell noise instead of analyzing.
+    function looksLikeJunkAnalyzeReply(text, phase) {
+        const t = String(text || '').trim();
+        if (!t) return true;
+        if (looksLikeLogNoise(t)) return true;
+        if (/^\{\s*"source"\s*:/.test(t)) return true;
+        if (/^[\[{]/.test(t) && /[\]}]$/.test(t)) {
+            try { JSON.parse(t); return true; } catch (e) { /* not pure JSON */ }
+        }
+        if (/\[ACTION:\s*\{/i.test(t) && t.length < 800) return true;
+        if (/^\s*\[ACTION:/i.test(t)) return true;
+        if ((phase === 'analyze' || phase === 'plan' || phase === 'clarify')
+            && (/list_files|read_file|run_terminal|\[run,\s*cwd=/i.test(t))
+            && !/root cause|enabled_modules|SiteModule|can_beekeep/i.test(t)) {
+            return true;
+        }
+        if ((t.match(/\[run,\s*cwd=/gi) || []).length >= 3) return true;
+        return false;
+    }
+
+    function looksVague(prompt, filePath) {
+        const p = String(prompt || '').trim();
+        if (/^(skip\s+clarify|analyze\s+now|looks\s+good)\b/i.test(p)) return false;
+        if (/^## Refined engineering task/.test(p)) return false; // already fabricated
+        if (looksLikeLogNoise(p)) return true;
+        const gaps = promptGaps(p, filePath);
+        // One missing fact is enough — do not burn an analyze turn on a thin ask.
+        if (gaps.length >= 1) return true;
+        if (p.length < 100) return true;
+        if (/\b(fix|help|broken|not working|whats wrong|what'?s wrong|happening)\b/i.test(p)) {
+            return true;
+        }
+        return false;
+    }
+
+    function isSkipClarify(prompt) {
+        return /^\s*(skip\s+clarify|analyze\s+now|looks\s+good|just\s+analyze)\b/i.test(String(prompt || ''));
+    }
+
+    function synthesizePrompt(original, answers, filePath) {
+        const conv = editorConvFor(filePath);
+        const first = String(conv.firstAsk || '').trim();
+        const orig = String(original || '').trim();
+        const lines = [
+            '## Refined engineering task (fabricated from clarify)',
+            ''
+        ];
+        if (first && first !== orig) {
+            lines.push('### First ask in this conversation (still required)', first, '');
+        }
+        lines.push('### Latest ask', orig, '');
+        lines.push(
+            '### Clarifications from user',
+            String(answers || '').trim() || '(none — user skipped; infer carefully from code)',
+            '',
+            '### Editor context',
+            'Open file: ' + (filePath || '(none)'),
+            '',
+            '### Required output',
+            // eval #32: was hard-wired to an old brew/beekeeping "addon gate" bug,
+            // which pushed every refined ask toward that topic.
+            '1. Answer every ask above (first ask and latest ask) about the open file and its controller.',
+            '2. Use evidence from the loaded files (file and sub/line names). If a needed file is missing, request it with [READ_FILE: path].',
+            '3. If something is broken: root cause, then the smallest safe fix.',
+            '4. How to check it on aisystem :4006 (no prod deploy).',
+            'Do not invent infrastructure or tool calls. Do not switch to another topic.'
+        );
+        return lines.join('\n');
+    }
+
+    function beginClarifySession(original, gaps, target, sendBtn) {
+        _clarifySession = {
+            original: original,
+            gaps: gaps.slice(),
+            askedAt: Date.now()
+        };
+        setEditorPhase('clarify');
+        const qHtml = gaps.map(function (g, i) {
+            return (i + 1) + '. ' + escapeHtml(g);
+        }).join('<br>');
+        recordMessage('AI',
+            '<span style="color:#ffd27a;font-size:0.9em;">[clarify · free]</span> '
+            + 'Your ask is a bit thin for a good analysis. Please answer:<br><br>'
+            + qHtml
+            + '<br><br><span style="opacity:0.85;">Reply with answers in one message, or say '
+            + '<code>skip clarify</code> / <code>analyze now</code> to proceed anyway.</span>');
+        if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+        if (target && target.status) target.status('Clarify — waiting for your answers');
+    }
+
+    function phaseContract(phase, agentId, promptText) {
+        const navRelevant = /\b(nav|menu|feature|module|addon|enabled_modules|site_modules)\b/i.test(String(promptText || ''));
+        const lines = [
+            '[AI Editor agent=' + agentId + ' phase=' + phase + ']',
+            'Contract:',
+            '0) clarify — ask only for missing facts; do not analyze code deeply yet.',
+            'A) analyze — cost-effective analysis; no ## FIX / large rewrites.',
+            'B) plan — short plan for user verify; docs/changelog notes only as text; do not create todos; end by asking for "approve plan".',
+            'C) implement — code suggestion only after plan approval (or explicit implement request).'
+        ];
+        // Note on open file vs analyzed page (key during refactoring and error fixing)
+        lines.push('CONTEXT NOTE: Primary open file (buffer) is usually the clicked page, but can differ (e.g. open editor from stable page to fix a broken one). Error messages are often supplied — use them + auto-attached pipeline controllers.');
+
+        if (agentId === 'analyze') {
+            lines.push('You are the Analyze worker: read open buffers and named paths; explain root cause and a short plan only. Never emit ## FIX, never rewrite files, never ask the user to paste files already loaded via /ai2/load_file. Use auto-attached controller for pipeline understanding.');
+        } else if (agentId === 'documentation') {
+            lines.push('You are in documentation mode: prefer docs/changelog/planning guidance; do not emit code file rewrites unless asked.');
+        } else {
+            lines.push('You are in programming mode: do NOT divert to FocusTune; never create todos or emit [ACTION: create_todo]; stay on code/docs/plan for this file.');
+        }
+        if (phase === 'clarify') {
+            lines.push('Current phase CLARIFY: ask 2–4 short questions about missing context only. No root-cause essay.');
+        } else if (phase === 'analyze') {
+            lines.push('Current phase ANALYZE: respond with analysis only. Prefer evidence from loaded files'
+                + (navRelevant ? ' and Comserv patterns (features/modules/nav).' : ' (template, controller, settings).'));
+        } else if (phase === 'plan') {
+            lines.push('Current phase PLAN: propose the plan; wait for user "approve plan" / Verify before code. Reference background pipeline from auto-loaded files.');
+        } else {
+            lines.push('Current phase IMPLEMENT: provide concrete code suggestion for Approve/Reject.');
+        }
+        return lines.join('\n');
+    }
+
+    function todoStartReminder() {
+        let todoId = '';
+        try {
+            const q = new URLSearchParams(window.location.search);
+            todoId = q.get('todo_id') || q.get('record_id') || '';
+        } catch (e) { /* ignore */ }
+        if (!todoId && window.AI2_TODO_ID) todoId = String(window.AI2_TODO_ID);
+        if (!todoId) {
+            // Look for todo #NNNN in recent chat
+            try {
+                const blob = chatLog.map(function (e) { return e.html || ''; }).join(' ');
+                const m = blob.match(/todo\s*#?\s*(\d{3,})/i) || blob.match(/record_id[=: ]+(\d{3,})/i);
+                if (m) todoId = m[1];
+            } catch (e2) { /* ignore */ }
+        }
+        if (!todoId) return '';
+        return '\n[TODO CONTEXT] Existing todo #' + todoId
+            + ' — remind user to Start it first (POST /todo/open_log) before coding if not already started. '
+            + 'Link: /todo/details?record_id=' + todoId + '\n';
+    }
+
+    function maybeAdvancePhaseFromUser(prompt) {
+        const p = String(prompt || '').toLowerCase();
+        // Analyze worker never auto-advances to implement from chat text.
+        if (currentEditorAgentId() === 'analyze') {
+            if (/\b(make\s+a\s+)?plan\b|\bpropose\b/.test(p) && currentEditorPhase() === 'analyze') {
+                setEditorPhase('plan');
+            }
+            return;
+        }
+        // Waiting/negative wording must not advance (e.g. "wait for Verify before implementing").
+        const waitingOrNegative = /\b(wait\s+for|do\s+not|don't|dont|never|before)\b/.test(p)
+            && /\b(verify|implement)/.test(p);
+        if (!waitingOrNegative && (
+            /\bapprove\s+plan\b/.test(p)
+            || /\bplan\s+approved\b/.test(p)
+            || /\bverified\b/.test(p)
+            || /\bgo\s+ahead\b/.test(p)
+            || /\bwrite\s+the\s+code\b/.test(p)
+            || /\bplease\s+implement\b/.test(p)
+            || /\bimplement\s+now\b/.test(p)
+        )) {
+            _planApproved = true;
+            setEditorPhase('implement');
+            return;
+        }
+        if (/\b(make\s+a\s+)?plan\b|\bpropose\b/.test(p) && currentEditorPhase() === 'analyze') {
+            setEditorPhase('plan');
+        }
+    }
+
+    function sendPrompt(prompt, target, opts) {
+        opts = opts || {};
         target = target || {
             messages: document.getElementById('chat-messages'),
             input: document.getElementById('ai-chat-input'),
@@ -479,8 +1160,10 @@
         const sendBtn = target.sendBtn;
         if (!prompt || !prompt.trim()) return;
 
+        if (target.status) target.status('Starting…');
         // Record to the shared chat log (survives attach/detach).
-        recordMessage('You', escapeHtml(prompt));
+        if (!opts.retry) recordMessage('You', escapeHtml(prompt));
+        const rawAsk = prompt;
 
         if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '...'; }
 
@@ -491,55 +1174,159 @@
             return;
         }
 
-        if (target.status) target.status('Asking AI...');
+        const filePathEarly = currentFilePath();
 
-        // The editor is a coding context. The model is chosen from the shared
-        // #model-select (populated by ai-chat/model-select.js), defaulting to
-        // hy3 — the same code path the general "Chat with AI" widget uses, so
-        // the two chat UIs can never diverge on model selection again.
-        const model = (window.ComservChat && ComservChat.modelSelect)
-            ? ComservChat.modelSelect.getSelectedValue()
-            : 'tencent/hy3';
-        const filePath = currentFilePath();
+        const conv = editorConvFor(filePathEarly);
+        if (!opts.retry && !conv.firstAsk && !_clarifySession) conv.firstAsk = String(prompt).trim();
+
+        // Answer an open clarify session → fabricate analyze prompt (no extra clarify model $).
+        if (opts.retry) {
+            // junk-reply retry: same prompt, fixed model, no clarify/phase changes
+        } else if (_clarifySession) {
+            const original = _clarifySession.original;
+            const answers = isSkipClarify(prompt) ? '' : prompt;
+            _clarifySession = null;
+            const fabricated = synthesizePrompt(original, answers, filePathEarly);
+            recordMessage('AI',
+                '<span style="color:#7fb7ff;font-size:0.9em;">[fabricated prompt → analyze · free]</span><br>'
+                + '<pre style="white-space:pre-wrap;margin:6px 0;font-size:0.85em;opacity:0.95;">'
+                + escapeHtml(fabricated) + '</pre>');
+            setEditorPhase('analyze');
+            prompt = fabricated;
+            if (target.status) target.status('Fabricated prompt — starting analyze…');
+        } else {
+            // Auto-clarify when ask is thin (or phase is Clarify).
+            maybeAdvancePhaseFromUser(prompt);
+            let phasePeek = currentEditorPhase();
+            const wantClarify = (phasePeek === 'clarify')
+                || ((phasePeek === 'analyze' || phasePeek === 'plan') && looksVague(prompt, filePathEarly));
+            if (wantClarify && !isSkipClarify(prompt)) {
+                const gaps = promptGaps(prompt, filePathEarly);
+                if (gaps.length) {
+                    beginClarifySession(prompt, gaps, target, sendBtn);
+                    return;
+                }
+                if (phasePeek === 'clarify') setEditorPhase('analyze');
+            }
+        }
+
+        // Agent + phase first so thinking UI can name model/phase immediately.
+        if (!opts.retry) maybeAdvancePhaseFromUser(prompt);
+        const agentId = currentEditorAgentId();
+        const phase = currentEditorPhase() === 'clarify' ? 'analyze' : currentEditorPhase();
+        if (currentEditorPhase() === 'clarify') setEditorPhase('analyze');
+        const model = opts.model || resolveEditorModel(phase);
+        // Retry (opts.model) is an explicit next-model. A header pin is not a
+        // user choice — leave model empty so the server picks.
+        const sendModel = opts.model || ((_userPickedModel && model) ? model : '');
+        const route = _escalatedThisSend ? 'escalate' : (sendModel ? 'explicit' : 'auto');
+        const filePath = filePathEarly;
+
+        if (target.status) target.status('AI thinking…');
+        const liveThink = startLiveThinking({
+            agent: agentId,
+            phase: phase,
+            model: model,
+            file: filePath || '(none)'
+        });
 
         loadCurrentFileContent().then(function (fileContent) {
+            liveThink.addStep('Loaded editor buffer' + (fileContent && fileContent.length
+                ? ' (' + fileContent.length + ' chars)' : ' (empty)'));
             const wantEval = isEvaluatePrompt(prompt);
-            const filesP = wantEval
-                ? loadFilesForEval(filePath, fileContent)
+            let filesP = wantEval
+                ? loadFilesForEval(filePath, fileContent, prompt)
                 : Promise.resolve(fileContent && fileContent.length
                     ? [{ path: filePath, content: fileContent }] : []);
+
+            // NEW: Auto-load related pipeline files (controller etc.) early for .tt / page analysis.
+            // This gives the AI direct knowledge of the background pipeline (stash population,
+            // models, includes, date logic, etc.) before clarify/analyze/plan. Greatly improves
+            // self-direction and planning accuracy.
+            if (!wantEval && filePath) {
+                // Beefed up inference is async (tries resolve_route + error extraction)
+                filesP = filesP.then(async function (baseFiles) {
+                    const promptForHint = prompt || '';
+                    const pipelinePaths = await inferRelatedPipelineFiles(filePath, promptForHint);
+                    const extra = await Promise.all(pipelinePaths.map(function (rp) {
+                        if (rp === filePath) return null;
+                        return fetchLoadFile(rp);
+                    })).then(function (extras) { return extras.filter(Boolean); });
+
+                    const seen = new Set(baseFiles.map(function (f) { return f.path; }));
+                    extra.forEach(function (ef) {
+                        if (!seen.has(ef.path)) {
+                            baseFiles.push(ef);
+                            seen.add(ef.path);
+                        }
+                    });
+                    return baseFiles;
+                });
+            }
+
             return filesP.then(function (files) {
                 const blob = filesToPromptBlob(files);
-                const fullPrompt = blob
-                    ? (prompt + '\n\n---\nThese files were loaded live from this app via GET /ai2/load_file. They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n' + blob)
-                    : prompt;
-                if (target.status && files.length) {
-                    target.status('Loaded ' + files.map(function (f) { return f.path; }).join(', '));
+                const contract = phaseContract(phase, agentId, prompt) + todoStartReminder();
+                const ctx = getEditorContext();
+                let contextNote = '';
+                if (ctx.pageVsFileDiffer) {
+                    contextNote = '\n[EDITOR CONTEXT] Open file for editing: ' + (ctx.openFile || 'none') +
+                        ' | Analyzed / current page: ' + (ctx.currentPage || 'unknown') +
+                        ' (may differ when fixing errors from another surface; error details usually in prompt)';
                 }
+                const fullPrompt = blob
+                    ? (contract + contextNote + '\n\n' + prompt + '\n\n---\nThese files were loaded live from this app via GET /ai2/load_file (including auto pipeline controllers). They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n' + blob)
+                    : (contract + contextNote + '\n\n' + prompt);
+                if (files.length) {
+                    liveThink.addStep('Attached files: ' + files.map(function (f) { return f.path; }).join(', '));
+                    if (target.status) target.status('Loaded ' + files.map(function (f) { return f.path; }).join(', '));
+                }
+                liveThink.addStep('Calling /ai2/chat (waiting on provider)…');
+                if (target.status) target.status('Asking AI…');
+                const history = buildConversationHistory(8);
+
                 return fetch('/ai2/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         prompt: fullPrompt,
-                        model: model,
-                        agent_id: 'code',
+                        ...(sendModel ? { model: sendModel } : {}),
+                        route: route,
+                        user_picked: _userPickedModel ? 1 : 0,
+                        agent_id: agentId,
+                        phase: phase,
                         page_path: filePath || (files[0] && files[0].path) || '',
                         page_title: filePath ? filePath.split('/').pop() : '',
-                        page_content: (files[0] && files[0].content) || fileContent || ''
+                        page_content: (files[0] && files[0].content) || fileContent || '',
+                        history: (conv.history && conv.history.length) ? conv.history.slice(-6) : history,
+                        ...((conv.id || _lastConversationId) ? { conversation_id: conv.id || _lastConversationId } : {})
                     })
                 });
             });
         }).then(function (res) { return res.json(); })
           .then(function (data) {
               if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+              // Remember conversation_id for next turn
+              if (data && data.conversation_id) {
+                  _lastConversationId = String(data.conversation_id);
+              }
               if (!data || data.success === 0 || data.error) {
                   const err = (data && data.error) ? data.error : 'No response';
+                  const serverSteps = (data && data.thinking && data.thinking.length) ? data.thinking : [];
+                  liveThink.finalize(false, serverSteps.concat(['Error: ' + err]));
                   recordMessage('AI', '<span style="color:#f66">' + escapeHtml(err) + '</span>');
                   if (target.status) target.status('AI error: ' + err, true);
                   return;
               }
+              if (data.conversation_id && conv.file === (filePath || '')) conv.id = data.conversation_id;
               const usedModel = (data.model ? data.model + (data.provider ? ' (' + data.provider + ')' : '') : EDITOR_MODEL);
               const resp = data.response || '';
+              const serverSteps = (data.thinking && data.thinking.length) ? data.thinking : [];
+              const extra = serverSteps.slice();
+              if (data.provider) extra.push('Provider: ' + data.provider);
+              if (data.model) extra.push('Model used: ' + data.model);
+              if (data.fallback) extra.push('Fallback used' + (data.fallback_from ? ' from ' + data.fallback_from : ''));
+              liveThink.finalize(true, extra);
               if (data.files_read && data.files_read.length) {
                   recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[read ' + escapeHtml(data.files_read.join(', ')) + ']</span>');
                   if (target.status) target.status('Read ' + data.files_read.join(', '));
@@ -549,9 +1336,81 @@
                   : { cleanText: resp, actions: [] };
               const display = extracted.cleanText || resp;
               // Prefix the reply with the model actually used, for transparency.
-              recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + escapeHtml(display).replace(/\n/g, '<br>'));
+              if (looksLikeJunkAnalyzeReply(display, phase) && !opts.retry) {
+                  // 2026-10-15: retry once on the next model in the chain before giving up.
+                  const nextModel = /gemma-4-31b/i.test(String(data.model || model || ''))
+                      ? 'openrouter|cohere/north-mini-code:free' : EDITOR_RETRY_MODEL;
+                  liveThink.finalize(false, ['Rejected junk reply from ' + (data.model || 'model') + '; retrying on ' + nextModel]);
+                  recordMessage('AI', '<span style="color:#f88;font-size:0.85em;">[rejected junk reply from '
+                      + escapeHtml(data.model || 'model') + ' — retrying once on ' + escapeHtml(nextModel) + ']</span>');
+                  sendPrompt(prompt, target, { retry: true, model: nextModel });
+                  return;
+              }
+              if (looksLikeJunkAnalyzeReply(display, phase)) {
+                  if (!_escalatedThisSend) {
+                      _escalatedThisSend = true;
+                      liveThink.addStep('Reply was junk — asking the router to pick another available model');
+                      recordMessage('AI',
+                          '<span style="color:#ffd27a;">[switch]</span> That reply was not usable. '
+                          + 'Asking the router to pick from the models that are actually available.');
+                      if (target.status) target.status('Switching model…');
+                      return fetch('/ai2/chat', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                              prompt: fullPrompt,
+                              model: '',
+                              route: 'escalate',
+                              user_picked: 0,
+                              agent_id: agentId,
+                              phase: phase,
+                              page_path: filePath || '',
+                              page_title: filePath ? filePath.split('/').pop() : '',
+                              page_content: fileContent || '',
+                              history: history,
+                              conversation_id: _lastConversationId || ''
+                          })
+                      }).then(function (res2) { return res2.json(); }).then(function (data2) {
+                          if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+                          if (data2 && data2.conversation_id) _lastConversationId = String(data2.conversation_id);
+                          const used2 = (data2 && data2.model) ? data2.model : 'router';
+                          const text2 = (data2 && data2.response) || (data2 && data2.error) || '';
+                          if (!data2 || data2.success === 0 || looksLikeJunkAnalyzeReply(text2, phase)) {
+                              recordMessage('AI',
+                                  '<span style="color:#f88;">[rejected reply]</span> '
+                                  + 'The router retry also failed'
+                                  + (used2 ? ' (' + escapeHtml(used2) + ')' : '') + '.');
+                              if (target.status) target.status('Model switch did not produce a usable reply', true);
+                              return;
+                          }
+                          recordMessage('AI',
+                              '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(used2) + ']</span> '
+                              + escapeHtml(text2).replace(/\n/g, '<br>'));
+                          if (target.status) target.status('Reply from ' + used2);
+                      });
+                  }
+                  liveThink.finalize(false, ['Rejected junk/log-like model reply']);
+                  recordMessage('AI',
+                      '<span style="color:#f88;">[rejected reply]</span> '
+                      + 'That model response was not an analysis of the task.');
+                  if (target.status) target.status('Rejected junk model reply', true);
+                  // Re-open clarify on the last real user ask (not fabricated blob) when possible.
+                  if (!_clarifySession) {
+                      beginClarifySession(conv.firstAsk || rawAsk, [
+                          'Confirm what should change, in one sentence.',
+                          'Name any file, setting or URL you already know is involved.'
+                      ], target, sendBtn);
+                  }
+                  return;
+              }
+              conv.history.push({ role: 'user', content: String(rawAsk).slice(0, 4000) });
+              conv.history.push({ role: 'assistant', content: String(display).slice(0, 4000) });
+              var bodyHtml = escapeHtml(display).replace(/\n/g, '<br>');
+              recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + bodyHtml);
 
-              if (data.todo_action && window.ComservChat && ComservChat.featureTodo
+              // Belt-and-suspenders: programming/docs agents must not create todos from chat.
+              const skipTodoCreate = /^(programming|coding|code|documentation|analyze)$/i.test(agentId);
+              if (!skipTodoCreate && data.todo_action && window.ComservChat && ComservChat.featureTodo
                   && typeof ComservChat.featureTodo.handleServerResult === 'function') {
                   ComservChat.featureTodo.handleServerResult(data.todo_action, {
                       host: document.getElementById('chat-messages'),
@@ -559,8 +1418,7 @@
                       pagePath: currentFilePath() || window.location.pathname
                   });
               }
-
-              if (extracted.actions && extracted.actions.length && window.ComservChat.featureTodo.handleAction) {
+              if (!skipTodoCreate && extracted.actions && extracted.actions.length && window.ComservChat.featureTodo.handleAction) {
                   extracted.actions.forEach(function (a) {
                       if (a.action === 'create_todo' || a.action === 'create_project') {
                           ComservChat.featureTodo.handleAction(a, {
@@ -573,17 +1431,27 @@
               }
 
               const block = (data.provider === 'ai2-coderead') ? null : extractCodeBlock(display);
-              if (block) {
+              const allowSuggest = (currentEditorAgentId() !== 'documentation')
+                  && (currentEditorAgentId() !== 'analyze')
+                  && (currentEditorPhase() === 'implement' || _planApproved
+                      || /\b(implement|apply|write code|fix now)\b/i.test(prompt));
+              if (block && allowSuggest) {
                   // A suggestion is always applied to the MAIN editor window,
                   // even when chat is detached into its own window.
                   showSuggestion(block.code);
                   if (target.status) target.status('Suggestion ready (' + usedModel + ')');
               } else {
-                  if (target.status) target.status('Replied (no code suggestion)');
+                  if (target.status) {
+                      target.status(block && !allowSuggest
+                          ? 'Plan/analyze reply (code suggestion held until implement/Verify)'
+                          : 'Replied (no code suggestion)');
+                  }
               }
           })
+          
           .catch(function (err) {
               if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+              try { liveThink.finalize(false, ['Request failed: ' + (err && err.message ? err.message : err)]); } catch (e2) { /* ignore */ }
               recordMessage('AI', '<span style="color:#f66">Request failed: ' + escapeHtml(err.message) + '</span>');
               if (target.status) target.status('Request failed: ' + err.message, true);
           });
@@ -605,6 +1473,9 @@
         // Apply the suggestion to the editor.
         editor.setValue(pendingSuggestion, -1);
         editor.clearSelection();
+        if (window.AI2Wysiwyg && typeof window.AI2Wysiwyg.refreshFromAce === 'function') {
+            window.AI2Wysiwyg.refreshFromAce();
+        }
         clearSuggestion();
         setStatus('Applying & saving...');
 
@@ -622,6 +1493,11 @@
             if (data && data.success) {
                 if (saveBtn) { saveBtn.style.display = 'none'; }
                 setStatus('Saved');
+                // Success hook for learning: a good analysis + approved change was applied.
+                // Future: POST to a learning endpoint or log compact record (original prompt + files + outcome)
+                // so future sessions can retrieve "[SUCCESSFUL PIPELINE ANALYSIS]" patterns.
+                // Ties into comserv2-ai-learning-system (DB for app, skills for agent-side).
+                console.log('[AI Editor Success] Approved & saved for', filePath);
             } else {
                 const msg = 'Save failed: ' + ((data && (data.error || data.detail)) || 'unknown error');
                 setStatus(msg, true);
@@ -643,6 +1519,8 @@
     //     the admin's in-progress edits. Updates the status-bar timestamp. ---
     let _dirty = false;
     let _autoTimer = null;
+    let _checksumInFlight = false;
+    let _changeWired = false;
 
     function markDirty() { _dirty = true; }
     function markClean() { _dirty = false; }
@@ -651,6 +1529,10 @@
         const filePath = currentFilePath();
         const lastModEl = document.getElementById('last-modified');
         const statusEl = document.getElementById('auto-refresh-status');
+        if (_autoTimer) {
+            clearInterval(_autoTimer);
+            _autoTimer = null;
+        }
         if (statusEl) statusEl.textContent = 'Auto-refresh: ON (4s)';
         if (!filePath) {
             if (statusEl) statusEl.textContent = 'Auto-refresh: off (no file)';
@@ -658,35 +1540,91 @@
         }
 
         const editor = getEditor();
-        if (editor) {
+        if (editor && !_changeWired) {
+            _changeWired = true;
             editor.session.on('change', function () { _dirty = true; });
         }
 
         _autoTimer = setInterval(function () {
-            if (_dirty) return;   // don't overwrite unsaved work
+            if (_dirty) return;
+            if (_checksumInFlight) return;
+            if (typeof document.hidden === 'boolean' && document.hidden) return;
+            if (!window.AI2EditorCore || typeof window.AI2EditorCore.getFileMtime !== 'function') return;
+            _checksumInFlight = true;
             window.AI2EditorCore.getFileMtime(filePath).then(function (mtime) {
                 if (!mtime) return;
                 const last = initAutoRefresh._lastMtime || 0;
                 initAutoRefresh._lastMtime = mtime;
                 if (last && mtime !== last) {
-                    // File changed on disk — reload it
-                    window.AI2EditorCore.loadFileContent(filePath).then(function (data) {
+                    return window.AI2EditorCore.loadFileContent(filePath).then(function (data) {
                         if (data && data.content !== undefined) {
                             const ed = getEditor();
                             if (ed) { ed.setValue(data.content, -1); ed.clearSelection(); }
+                            if (window.AI2Wysiwyg && typeof window.AI2Wysiwyg.refreshFromAce === 'function') {
+                                window.AI2Wysiwyg.refreshFromAce();
+                            }
                             if (lastModEl) lastModEl.textContent = 'updated ' + new Date().toLocaleTimeString();
                             setStatus('Reloaded (external change)');
                         }
-                    }).catch(function () {});
-                } else if (!last) {
+                    });
+                }
+                if (!last) {
                     initAutoRefresh._lastMtime = mtime;
                     if (lastModEl) lastModEl.textContent = 'loaded ' + new Date().toLocaleTimeString();
                 }
-            }).catch(function () {});
+            }).catch(function () {
+            }).then(function () {
+                _checksumInFlight = false;
+            });
         }, 4000);
     }
 
+
+    function initModelSelect() {
+        const modelSel = document.getElementById('model-select');
+        if (!modelSel) return;
+        function go() {
+            if (!(window.ComservChat && ComservChat.modelSelect)) return false;
+            ComservChat.modelSelect.init({
+                selectEl: modelSel,
+                context: 'code',
+                pinModel: 'cohere/north-mini-code:free',
+                onReady: function () {
+                    console.log('[AI2EditorChat] model-select populated by shared module');
+                    if (!modelSel._userPickWired) {
+                        modelSel._userPickWired = true;
+                        modelSel.addEventListener('change', function () {
+                            _userPickedModel = true;
+                        });
+                    }
+                },
+                onError: function (e) {
+                    console.error('[AI2EditorChat] model-select failed', e);
+                    try {
+                        modelSel.innerHTML = '';
+                        const opt = document.createElement('option');
+                        opt.disabled = true;
+                        opt.selected = true;
+                        opt.textContent = 'Model list unavailable';
+                        modelSel.appendChild(opt);
+                    } catch (err) { /* ignore */ }
+                }
+            });
+            return true;
+        }
+        if (go()) return;
+        // Defer script order race: retry briefly
+        let n = 0;
+        const t = setInterval(function () {
+            n++;
+            if (go() || n >= 40) clearInterval(t);
+        }, 100);
+    }
+
     function wire() {
+        // Models first so a later throw cannot leave "Loading models…" forever.
+        initModelSelect();
+
         const sendBtn = document.getElementById('ai-chat-send');
         const input = document.getElementById('ai-chat-input');
         const approve = document.getElementById('ai-approve-btn');
@@ -694,22 +1632,26 @@
         const clear = document.getElementById('ai-chat-clear');
 
         if (sendBtn && input) {
-            sendBtn.addEventListener('click', function () {
-                const v = input.value;
+            function fireAttached() {
+                const v = (input.value || '').trim();
+                if (!v) return;
                 input.value = '';
-                sendPrompt(v);
-            });
-            input.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter') {
-                    const v = input.value;
-                    input.value = '';
+                autosizePrompt(input);
+                try {
                     sendPrompt(v);
+                } catch (err) {
+                    console.error('[AI2EditorChat] send failed', err);
+                    setStatus('Send failed: ' + (err && err.message ? err.message : err), true);
+                    recordMessage('AI', '<span style="color:#f66">Send failed: ' + escapeHtml(String(err && err.message ? err.message : err)) + '</span>');
                 }
-            });
+            }
+            sendBtn.addEventListener('click', fireAttached);
+            wirePromptBox(input, fireAttached);
         }
         if (approve) approve.addEventListener('click', approveSuggestion);
         if (reject) reject.addEventListener('click', rejectSuggestion);
         if (clear && input) clear.addEventListener('click', function () {
+            _clarifySession = null;
             chatLog = [];   // reset the shared log (both views re-render empty)
             renderChatLog(document.getElementById('chat-messages'));
             const w = window._aiChatWin;
@@ -721,22 +1663,8 @@
         initDetach();
         initClose();
         applyViewState();   // ensure correct initial view (attached by default)
-        applyClosedState();
 
-        // Populate the editor's #model-select from the SHARED model-selection
-        // module (same catalog + hy3 default the general widget uses).
-        const modelSel = document.getElementById('model-select');
-        if (modelSel && window.ComservChat && ComservChat.modelSelect) {
-            ComservChat.modelSelect.init({
-                selectEl: modelSel,
-                context: 'code',
-                pinModel: 'tencent/hy3',
-                onReady: function () {
-                    console.log('[AI2EditorChat] model-select populated by shared module');
-                },
-                onError: function (e) { console.error('[AI2EditorChat] model-select failed', e); }
-            });
-        }
+        // model-select: see initModelSelect() at top of wire()
 
         // "Add Todo" chat feature (shared module) — attaches to the current page's project.
         const todoBtn = document.getElementById('ai-chat-todo');
@@ -759,7 +1687,62 @@
         // Apply shared tooltip map to this widget's buttons.
         if (window.ComservChat && ComservChat.tooltips) ComservChat.tooltips.apply(document);
 
+
+        // Agent + phase controls (minimal analyze → plan → verify → implement UI)
+        const agentSel = document.getElementById('ai-editor-agent');
+        const phaseSel = document.getElementById('ai-editor-phase');
+        const verifyBtn = document.getElementById('ai-editor-verify');
+        if (agentSel && !agentSel._wired) {
+            agentSel._wired = true;
+            agentSel.addEventListener('change', function () {
+                _planApproved = false;
+                setEditorPhase((agentSel.value === 'documentation' || agentSel.value === 'analyze') ? 'analyze' : currentEditorPhase());
+                recordMessage('AI', '<em>Switched agent to ' + escapeHtml(agentSel.value) + '. Flow: analyze → plan → Verify → implement.</em>');
+            });
+        }
+        if (phaseSel && !phaseSel._wired) {
+            phaseSel._wired = true;
+            phaseSel.addEventListener('change', function () {
+                setEditorPhase(phaseSel.value);
+            });
+            setEditorPhase(phaseSel.value || 'analyze');
+        }
+        if (verifyBtn && !verifyBtn._wired) {
+            verifyBtn._wired = true;
+            verifyBtn.addEventListener('click', function () {
+                _planApproved = true;
+                setEditorPhase('implement');
+                recordMessage('You', escapeHtml('approve plan'));
+                recordMessage('AI', '<em>Plan verified. Phase → implement. Ask for the code change (or Send again).</em>');
+                if (typeof setStatus === 'function') setStatus('Plan approved — implement phase');
+            });
+        }
+
         console.log('[AI2EditorChat] chat + suggestion wiring ready');
+        seedGuardPrompt();
+    }
+
+    function seedGuardPrompt() {
+        var params;
+        try { params = new URLSearchParams(window.location.search); } catch (e) { return; }
+        var prompt = params.get('prompt');
+        var line = parseInt(params.get('line') || '0', 10);
+        var input = document.getElementById('ai-chat-input');
+        if (prompt && input && !input.value) {
+            input.value = prompt;
+        }
+        if (!(line > 0)) { return; }
+        var tries = 0;
+        var timer = setInterval(function () {
+            tries += 1;
+            var ed = getEditor();
+            if (ed && ed.session && ed.getValue()) {
+                ed.gotoLine(line, 0, true);
+                clearInterval(timer);
+            } else if (tries > 20) {
+                clearInterval(timer);
+            }
+        }, 300);
     }
 
     if (document.readyState === 'loading') {
@@ -770,6 +1753,21 @@
     }
 
     console.log('%c[AI2] chat module ready', 'color:#0a0');
-    window.AI2Chat = { setActiveFile: setActiveFile };
+    window.AI2Chat = {
+        setActiveFile: setActiveFile,
+        setClosed: function (v) { _closed = !!v; applyViewState(); },
+        isClosed: function () { return !!_closed; },
+        isDetached: function () { return !!_detached; },
+        reattach: function () {
+            _detached = false;
+            if (window._aiChatWin && !window._aiChatWin.closed) {
+                try { window._aiChatWin.close(); } catch (e) {}
+                window._aiChatWin = null;
+            }
+            applyViewState();
+        },
+        // Exposed for core.js early preload and external use during AI2 refactor / testing.
+        preloadRelatedPipeline: preloadRelatedPipeline
+    };
     window[NS] = window.AI2Chat;
 })();

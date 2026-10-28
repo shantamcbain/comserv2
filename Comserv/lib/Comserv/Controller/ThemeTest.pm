@@ -17,9 +17,21 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
-# Simple test page that doesn't require authentication
+# CSC-20260831-4599: themetest is staff/admin only (Root LAYER 0 also gates)
+sub _require_theme_admin {
+    my ($self, $c) = @_;
+    my $root = $c->controller('Root');
+    unless ($root && $root->user_exists($c) && $root->check_user_roles($c, 'admin')) {
+        $c->flash->{error_msg} = 'Administrator access required for theme testing.';
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        $c->detach;
+    }
+    return 1;
+}
+
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
+    $self->_require_theme_admin($c);
 
     # Log that we've entered the index method
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "***** THEMETEST INDEX METHOD CALLED *****");
@@ -48,22 +60,22 @@ sub index :Path :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "***** RENDERING TEMPLATE: themetest.tt *****");
 }
 
-# Test CSS editor that doesn't require authentication
 sub edit_css :Path('edit_css') :Args(1) {
     my ($self, $c, $theme_name) = @_;
+    $self->_require_theme_admin($c);
     
     # Log that we've entered the edit_css method
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', "***** THEMETEST EDIT_CSS METHOD CALLED FOR $theme_name *****");
 
     # Get the theme CSS file path
-    my $theme_css_path = $c->path_to('root', 'static', 'css', 'themes', "$theme_name.css");
+    my $theme_css_path = $c->model('ThemeConfig')->get_theme_css_directory($c) . "/$theme_name.css";
     
     # Check if the theme CSS file exists
     unless (-f $theme_css_path) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', "Theme CSS file not found: $theme_css_path");
 
         # Create the directory if it doesn't exist
-        my $themes_dir = $c->path_to('root', 'static', 'css', 'themes');
+        my $themes_dir = $c->model('ThemeConfig')->get_theme_css_directory($c);
         unless (-d $themes_dir) {
             make_path($themes_dir) or do {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_css', "Cannot create themes directory: $!");
@@ -123,7 +135,7 @@ sub edit_css :Path('edit_css') :Args(1) {
                         };
                         
                         # Save the updated theme definitions
-                        my $theme_defs_path = $c->path_to('root', 'static', 'config', 'theme_definitions.json');
+                        my $theme_defs_path = $c->model('ThemeConfig')->get_theme_definitions_path($c);
                         require JSON;
                         my $json = JSON::encode_json($themes);
                         write_file($theme_defs_path, $json);
@@ -154,6 +166,7 @@ sub edit_css :Path('edit_css') :Args(1) {
 # Help page
 sub help :Path('help') :Args(0) {
     my ($self, $c) = @_;
+    $self->_require_theme_admin($c);
     
     # Log that we've entered the help method
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'help', 

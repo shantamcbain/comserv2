@@ -151,61 +151,117 @@
     var SYSTEM = customSystem || DEFAULT_SYSTEM;
 
     // ── Load model options ───────────────────────────────────────────────────
+    // Uses the SAME canonical source as every other AI surface: /ai2/providers
+    // (Router::get_available_models, already role-filtered once). Falls back to
+    // the v1 /ai/get_user_providers if that is unavailable.
+    // Hard rule: never invent a model tag. A hardcoded "stock" list
+    // (mistral:latest / phi4:latest / gemma3:4b) is not installed on most hosts
+    // and every request then 404s at Ollama.
+    var NON_CHAT = /embed|rerank|imagine|video|whisper|tts|clip|bge|nomic|:cloud$/i;
+
+    function optsFromProviders(providers) {
+        var opts = [];
+        (providers || []).forEach(function(p) {
+            (p.models || []).forEach(function(m) {
+                if (!m || !m.id) return;
+                if (NON_CHAT.test(m.id)) return;
+                if (m.disabled || m.unreachable || m.needs_key) return;
+                // Canonical (/ai2/providers) ids are already "provider|model".
+                // v1 (/ai/get_user_providers) ids are bare model names.
+                var val = m.id.indexOf('|') !== -1 ? m.id : (m.id + '|' + p.service);
+                opts.push({ val: val, label: m.label || (m.id + ' (' + p.service + ')') });
+            });
+        });
+        return opts;
+    }
+
+    // Ordering rule (matches the rest of the app): Ollama → SuperGrok → xAI
+    // Grok → OpenRouter; free first within a group. The canonical catalog is
+    // 400+ entries, so cap the dropdown — an uncapped list is unusable.
+    var FREE_ONLY = /:free$/i;
+    function sortOpts(opts) {
+        function rank(o) {
+            var p = (o.val.split('|')[1] || '').toLowerCase();
+            var group = p === 'ollama' ? 0 : (p === 'supergrok' ? 1
+                      : (p === 'grok' ? 2 : 3));
+            var free = FREE_ONLY.test(o.val) ? 0 : 1;
+            return group * 10 + free;
+        }
+        return opts.slice().sort(function(a, b) {
+            var d = rank(a) - rank(b);
+            return d !== 0 ? d : a.label.localeCompare(b.label);
+        });
+    }
+
+    var MAX_OPTS = 40;
+    function renderOpts(opts) {
+        var sel = document.getElementById('ai-form-model-sel');
+        if (!sel) return;
+        if (!opts.length) {
+            sel.innerHTML = '';
+            var none = document.createElement('option');
+            none.value = '';
+            none.textContent = '⚠ No models available — check AI provider config';
+            sel.appendChild(none);
+            return;
+        }
+        sel.innerHTML = '';
+        var sorted = sortOpts(opts);
+        var shown = sorted.slice(0, MAX_OPTS);
+        shown.forEach(function(o, i) {
+            var opt = document.createElement('option');
+            opt.value = o.val;
+            opt.textContent = o.label;
+            if (i === 0) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        if (sorted.length > shown.length) {
+            var more = document.createElement('option');
+            more.disabled = true;
+            more.textContent = '… +' + (sorted.length - shown.length)
+                + ' more (showing first ' + MAX_OPTS + ')';
+            sel.appendChild(more);
+        }
+    }
+
     function loadModelOptions() {
         var sel = document.getElementById('ai-form-model-sel');
         if (!sel) return;
         sel.innerHTML = '<option value="">Loading models…</option>';
         var ctl = new AbortController();
         var tid = setTimeout(function() { ctl.abort(); }, 8000);
-        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include', signal: ctl.signal })
+        fetch('/ai2/providers', { method: 'GET', credentials: 'include', signal: ctl.signal })
             .then(function(r) { clearTimeout(tid); return r.json(); })
             .then(function(data) {
-                if (!data.success || !data.providers) return;
-                var opts = [];
-                data.providers.forEach(function(p) {
-                    if (p.service === 'ollama' && p.models) {
-                        p.models.filter(function(m) {
-                            return m.id && !m.id.match(/embed|rerank|:cloud$/i);
-                        }).forEach(function(m) {
-                            opts.push({ val: m.id + '|ollama', label: m.id + ' (Ollama)' });
-                        });
-                    }
-                    if (p.service === 'grok' && p.models) {
-                        p.models.filter(function(m) {
-                            return m.id && !m.id.match(/imagine|video/i);
-                        }).forEach(function(m) {
-                            var lbl = m.id.replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
-                            opts.push({ val: m.id + '|grok', label: lbl + ' (Grok/xAI)' });
-                        });
-                    }
-                });
-                if (!opts.length) {
-                    opts = [{ val: 'mistral:latest|ollama', label: 'mistral:latest (Ollama)' }];
-                }
-                sel.innerHTML = '';
-                opts.forEach(function(o, i) {
-                    var opt = document.createElement('option');
-                    opt.value = o.val;
-                    opt.textContent = o.label;
-                    if (i === 0) opt.selected = true;
-                    sel.appendChild(opt);
-                });
+                var opts = optsFromProviders(data && data.providers);
+                if (opts.length) { renderOpts(opts); return true; }
+                return fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
+                    .then(function(r2) { return r2.json(); })
+                    .then(function(d2) {
+                        renderOpts(optsFromProviders(d2 && d2.providers));
+                        return true;
+                    });
             })
             .catch(function(err) {
                 clearTimeout(tid);
                 var sel = document.getElementById('ai-form-model-sel');
                 if (!sel) return;
                 var isTimeout = err && err.name === 'AbortError';
-                sel.innerHTML = ''
-                    + '<option value="mistral:latest|ollama">mistral:latest (Ollama)</option>'
-                    + '<option value="phi4:latest|ollama">phi4:latest (Ollama)</option>'
-                    + '<option value="gemma3:4b|ollama">gemma3:4b (Ollama)</option>';
-                if (isTimeout) {
-                    var warn = document.createElement('option');
-                    warn.disabled = true;
-                    warn.textContent = '⚠ Timed out — enter model name manually or retry';
-                    sel.insertBefore(warn, sel.firstChild);
-                    sel.selectedIndex = 1;
+                // Same rule as the success path: no invented model tags. Show the
+                // real failure and let the user retry rather than offering a
+                // model that will 404 at Ollama.
+                sel.innerHTML = '';
+                var errOpt = document.createElement('option');
+                errOpt.value = '';
+                errOpt.textContent = isTimeout
+                    ? '⚠ Timed out loading models — retry the page'
+                    : '⚠ Could not load models — retry the page';
+                sel.appendChild(errOpt);
+                var statusEl2 = document.getElementById('ai-form-status');
+                if (statusEl2) {
+                    statusEl2.textContent = isTimeout
+                        ? 'Model list timed out. Reload the page to retry.'
+                        : 'Could not load the AI model list. Reload the page to retry.';
                 }
             });
     }
@@ -246,7 +302,9 @@
             var provider = /grok/i.test(val) ? 'grok' : 'ollama';
             return { model: val, provider: provider };
         }
-        return { model: 'mistral:latest', provider: 'ollama' };
+        // No selection / empty value: surface it rather than silently sending a
+        // hardcoded tag that is very likely not installed.
+        return { model: '', provider: '' };
     }
 
     // ── Ask AI to fill ───────────────────────────────────────────────────────
@@ -264,6 +322,10 @@
             : [];
 
         var mp = getModelAndProvider();
+        if (!mp.model || !mp.provider) {
+            statusEl.textContent = 'No AI model selected — pick one from the list (or reload the page if it is empty).';
+            return;
+        }
         var allFormFields = [];
         document.querySelectorAll('input[name]:not([type=hidden]):not([type=submit]):not([type=button]), textarea[name], select[name]')
             .forEach(function(el) { if (el.name) allFormFields.push(el.name); });
@@ -412,6 +474,11 @@
             + 'If nothing is wrong return {"corrections":[]}.';
 
         var mp  = getModelAndProvider();
+        if (!mp.model || !mp.provider) {
+            btn.disabled = false;
+            statusEl.textContent = 'No AI model selected — pick one from the list (or reload the page if it is empty).';
+            return;
+        }
         var ctl = new AbortController();
         setTimeout(function() { ctl.abort(); }, 60000);
 

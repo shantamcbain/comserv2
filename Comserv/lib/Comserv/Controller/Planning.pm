@@ -7,12 +7,14 @@ use Comserv::Util::AdminAuth;
 use Comserv::Util::ProjectDependencies;
 use Comserv::Util::TodoRanking;
 use Comserv::Util::FocusRanking;
+use Comserv::Util::AttentionOrder;
 use Comserv::Util::TodoTypes qw(recurring_matches_date is_calendar_fixture);
 use Comserv::Util::ErrorAudit;
 use Comserv::Model::Ollama;
 use JSON qw(encode_json);
 use Time::Piece;
 use DateTime;
+use Comserv::Util::AppTime;
 use DateTime::Format::ISO8601;
 use POSIX ();
 
@@ -65,8 +67,8 @@ sub daily :Path('/planning/daily') :Args {
     }
 
     # Current date
-    my $now              = Time::Piece->new();
-    my $current_date_str = $now->strftime('%Y-%m-%d');
+    my $current_date_str = Comserv::Util::AppTime->today_ymd_for($c);
+    my $now = eval { Time::Piece->strptime($current_date_str, '%Y-%m-%d') } || Time::Piece->new();
     my $current_display  = $now->strftime('%A, %B %d, %Y');
 
     # Selected date (from URL or today)
@@ -212,23 +214,17 @@ sub daily :Path('/planning/daily') :Args {
                             push @{ $week_todos_by_date{$d_str} }, $todo unless $already;
                         }
                     } elsif ($start && $start eq $selected_date) {
-                        # Has scheduled start_date matching today — show it
+                        # Has scheduled start_date matching the day — show it
                         push @$todos_for_today, $todo;
                     } elsif (!$start && $due && $due eq $selected_date) {
-                        # No scheduled date, but due today — show it
+                        # No scheduled date, but due that day — show it
                         push @$todos_for_today, $todo;
-                    } elsif (!$is_done && !$start && !$due && $selected_date eq $current_date_str) {
-                        push @$todos_for_today, $todo;
-                    } elsif (!$is_done && !$is_recurr) {
-                        # Overdue: scheduled date in the past, OR (no scheduled date AND due date in past)
-                        if ($start && $start lt $selected_date) {
-                            push @$overdue_todos, $todo;
-                            push @$todos_for_today, $todo if $selected_date eq $current_date_str;
-                        } elsif (!$start && $due && $due lt $selected_date) {
-                            push @$overdue_todos, $todo;
-                            push @$todos_for_today, $todo if $selected_date eq $current_date_str;
-                        }
                     }
+                    # NOTE: undated open todos and overdue items are intentionally
+                    # NOT dumped into the day view. The day schedule shows only what
+                    # is actually scheduled for that date (start_date == date, or
+                    # due == date when no start). Overdue belongs in the backlog /
+                    # todos views, not the day schedule.
 
                     unless ($is_recurr) {
                         # Use start_date as calendar anchor; fall back to due_date only when no start_date
@@ -328,6 +324,43 @@ sub daily :Path('/planning/daily') :Args {
             }
         }
     };
+
+    # Branch awareness for the day view: on a worktree server (app_workflow !=
+    # main) keep ONLY todos that belong to the current branch's project tree.
+    # This is the same branch scope used by the Focus Queue, applied to the day
+    # schedule so the day view never shows another branch's scheduled work.
+    my $day_branch = $c->stash->{app_workflow} // 'main';
+    if ($day_branch ne 'main') {
+        my $day_hint = '';
+        my $day_list = eval { _build_worktree_list($c) } || [];
+        my ($day_wt) = grep { ($_->{name} || '') eq $day_branch } @$day_list;
+        $day_hint = $day_wt->{project_id} if $day_wt;
+        my @day_pids = eval {
+            Comserv::Util::ProjectDependencies::resolve_branch_project_ids(
+                $c, $day_branch, $day_hint
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'daily',
+                "Day-view branch scope resolve failed for '$day_branch': $@");
+            @day_pids = ();
+        }
+        if (@day_pids) {
+            my %day_scope = map { $_ => 1 } @day_pids;
+            my @day_filtered;
+            for my $todo (@$todos_for_today) {
+                my %h = $todo->get_columns;
+                push @day_filtered, $todo
+                    if Comserv::Util::FocusRanking::todo_matches_branch(
+                        \%h, $day_branch, \%day_scope
+                    );
+            }
+            $todos_for_today = \@day_filtered;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
+                "Day view branch-scoped to '$day_branch': "
+                . scalar(@day_filtered) . " of scheduled todos kept");
+        }
+    }
 
     # Convert todos_for_today to plain hashrefs with precomputed display fields.
     # Using get_columns() avoids TT2 relying on DBIx::Class method calls for basic
@@ -495,6 +528,17 @@ sub daily :Path('/planning/daily') :Args {
     my @active_priorities;
     eval {
         my $roles    = $c->stash->{user_roles} || [];
+        # Determine ai_role_tier for client-side JavaScript consistency
+        my $is_admin = $c->stash->{is_admin} || 0;
+        my $is_staff = 0;
+        if ($c->session->{user_id}) {
+            my $user_roles = $c->stash->{user_roles} || [];
+            $is_staff = grep { $_ eq 'helpdesksupport' || $_ eq 'staff' } @$user_roles;
+        }
+        my $ai_role_tier = $is_admin ? 'priv' : 
+                           $is_staff ? 'staff' : 
+                           $c->session->{user_id} ? 'member' : 'guest';
+        $c->stash->{ai_role_tier} = $ai_role_tier;
 
         my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
         my %ap_cond = (status => { -not_in => \@done_statuses });
@@ -658,14 +702,20 @@ sub daily :Path('/planning/daily') :Args {
                 @branch_pids = ();
             }
             %branch_scope = map { $_ => 1 } @branch_pids;
-            my $matched = scalar grep {
+            # Branch worktrees show ONLY this branch's todos (Shanta, Oct 24 2026).
+            # Only main ranks every branch. ?filter_project=all is the escape hatch.
+            my $before_branch = scalar @all_sorted;
+            @all_sorted = grep {
                 Comserv::Util::FocusRanking::todo_matches_branch($_, $cur_branch, \%branch_scope)
             } @all_sorted;
+            my $matched = scalar @all_sorted;
+            my $hidden_other = $before_branch - $matched;
             $c->stash->{branch_focus_filter} = {
                 branch      => $cur_branch,
                 root_id     => $branch_pids[0],
                 project_ids => \@branch_pids,
                 matched     => $matched,
+                hidden      => $hidden_other,
             };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
                 "Branch focus '$cur_branch': $matched todos match branch "
@@ -676,6 +726,68 @@ sub daily :Path('/planning/daily') :Args {
                     branch_project_ids => \%branch_scope,
                 })
             } @all_sorted;
+
+            # ── Decision-model ordering (AISYSTEMPlan 5f) ─────────────────────
+            # ON LOAD we only READ the cached order. The local decision model is
+            # never called during a render (nimble cold is ~133s; the Focus Queue
+            # must not block on it). The cache is written by
+            # script/compute_decision_rank.pl. Rows whose confidence clears the
+            # gate are ordered by model score; everything else keeps the
+            # hardcoded ap_score order, and reordering happens only inside a row's
+            # own Active/branch group so cmp_branch_focus semantics survive.
+            my $dec_cache = eval {
+                require Comserv::Util::AI::DecisionRank;
+                Comserv::Util::AI::DecisionRank->read_cache($cur_branch);
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'daily', "DecisionRank cache read failed: $@");
+            }
+            elsif (!$dec_cache) {
+                # Silent-failure guard: without this line a missing/expired cache
+                # and a hook that never ran look identical in the log.
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                    'daily', "DecisionRank: no usable cache for '$cur_branch' "
+                    . "(file=" . Comserv::Util::AI::DecisionRank->cache_file
+                    . " exists=" . (-s Comserv::Util::AI::DecisionRank->cache_file ? 1 : 0)
+                    . ") - hardcoded score order in force");
+            }
+            else {
+                my $reordered = eval {
+                    Comserv::Util::AI::DecisionRank->apply_order(
+                        \@all_sorted, $dec_cache,
+                        { branch => $cur_branch, branch_project_ids => \%branch_scope },
+                    );
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'daily', "DecisionRank apply_order failed: $@");
+                }
+                elsif ($reordered) {
+                    @all_sorted = @$reordered;
+                    my $used  = grep { $_->{decision_used} } @all_sorted;
+                    my $scored = scalar(keys %{ $dec_cache->{rows} || {} });
+                    $c->stash->{decision_order} = {
+                        active      => 1,
+                        model       => $dec_cache->{model},
+                        computed_at => $dec_cache->{computed_at},
+                        gate        => $dec_cache->{gate},
+                        weights     => $dec_cache->{weights},
+                        used        => $used,
+                        scored      => $scored,
+                    };
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'daily', "Decision ordering applied for '$cur_branch': "
+                        . "model=" . ($dec_cache->{model} // '?')
+                        . " gate=" . ($dec_cache->{gate} // '?')
+                        . " applied_rows=$used scored=$scored");
+                }
+                else {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'daily', "DecisionRank: cache found for '$cur_branch' but "
+                        . "apply_order returned nothing (rows=" . scalar(@all_sorted) . ")");
+                }
+            }
         }
         elsif ($filter_project && !$show_all_projects) {
             @all_sorted = grep {
@@ -832,6 +944,36 @@ sub daily :Path('/planning/daily') :Args {
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
         "Could not fetch/process project dependencies: $@") if $@;
 
+    # Attention Order panel: branches/projects/todos that need attention before
+    # they are lost in the backlog. Computed after dependencies so the panel can
+    # reuse the same sitename/role scope. Errors are logged but never block the
+    # rest of the daily view.
+    my $attention_order;
+    eval {
+        my $ao = Comserv::Util::AttentionOrder->new;
+        $attention_order = {
+            branch_attention  => $ao->branch_attention($c),
+            project_attention => $ao->project_attention($c),
+            stale_review      => $ao->stale_review_queue($c),
+        };
+        # Counts for the panel header.
+        my $b_attn = scalar grep { $_->{needs_attention} } @{ $attention_order->{branch_attention} // [] };
+        my $p_attn = scalar @{ $attention_order->{project_attention} // [] };
+        my $stale  = scalar @{ $attention_order->{stale_review} // [] };
+        $attention_order->{counts} = {
+            branches => $b_attn,
+            projects => $p_attn,
+            stale    => $stale,
+        };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
+            "AttentionOrder: $b_attn branches, $p_attn projects, $stale stale todos");
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
+            "AttentionOrder computation failed: $@");
+        $attention_order = { branch_attention => [], project_attention => [], stale_review => [], counts => {}, error => 1 };
+    }
+
     $c->stash(
         is_csc            => $is_csc,
         plan_sitename     => $sitename,
@@ -856,6 +998,8 @@ sub daily :Path('/planning/daily') :Args {
         display_date      => $display_date,
         prev_date         => $prev_date,
         next_date         => $next_date,
+
+        attention_order   => $attention_order,
 
         week_todos_by_date => \%week_todos_by_date,
         week_overdue_todos => \@week_overdue_todos,
@@ -1152,8 +1296,8 @@ sub daily_impl :Private {
     }
 
     # Current date
-    my $now              = Time::Piece->new();
-    my $current_date_str = $now->strftime('%Y-%m-%d');
+    my $current_date_str = Comserv::Util::AppTime->today_ymd_for($c);
+    my $now = eval { Time::Piece->strptime($current_date_str, '%Y-%m-%d') } || Time::Piece->new();
     my $current_display  = $now->strftime('%A, %B %d, %Y');
 
     # Selected date (from URL or today)
@@ -1599,7 +1743,7 @@ sub refresh_audit :Path('/planning/refresh_audit') :Args(0) {
     my $username = $c->session->{username} || 'user';
     my $user_id  = $c->session->{user_id}  || 0;
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
 
     my $schema;
     eval { $schema = $c->model('DBEncy')->schema };
@@ -1709,8 +1853,8 @@ sub _daily_log_action {
     $user_id  //= $c->session->{user_id}  || 0;
 
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
-    my $now_time = do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
+    my $now_time = Comserv::Util::AppTime->now_hms_utc;
 
     my $schema;
     eval { $schema = $c->model('DBEncy')->schema };
@@ -1765,11 +1909,17 @@ sub _daily_log_action {
         my @audit_todo_subjects  = @{ $audit->{subjects} };
 
         # ── Check for open HelpDesk support tickets ──
+        # Link each ticket to /HelpDesk/ticket/view/<number> (not /HelpDesk public index).
         my $helpdesk_count = 0;
+        my @open_helpdesk_tickets;
         eval {
-            $helpdesk_count = $schema->resultset('SupportTicket')->count(
-                { status => 'open' }
-            ) || 0;
+            my %hd_search = ( status => 'open' );
+            $hd_search{site_name} = $sitename unless lc($sitename || '') eq 'csc';
+            @open_helpdesk_tickets = $schema->resultset('SupportTicket')->search(
+                \%hd_search,
+                { order_by => [{ -asc => 'priority' }, { -desc => 'created_at' }], rows => 20 }
+            )->all;
+            $helpdesk_count = scalar @open_helpdesk_tickets;
         };
 
         # ── Build daily log details ──
@@ -1782,7 +1932,14 @@ sub _daily_log_action {
             $details .= "\n";
         }
         if ($helpdesk_count) {
-            $details .= "\x{1F3AB} OPEN HELPDESK TICKETS: $helpdesk_count ticket(s) awaiting response — see <a href='/HelpDesk'>/HelpDesk</a>\n\n";
+            $details .= "\x{1F3AB} OPEN HELPDESK TICKETS: $helpdesk_count ticket(s) awaiting response:\n";
+            for my $ht (@open_helpdesk_tickets) {
+                my $num = eval { $ht->ticket_number } || '';
+                next unless $num;
+                my $subj = substr(eval { $ht->subject } || '', 0, 80);
+                $details .= "  \x{2022} <a href='/HelpDesk/ticket/view/$num'>$num</a> — $subj\n";
+            }
+            $details .= "  All open: <a href='/HelpDesk/admin/tickets/open'>/HelpDesk/admin/tickets/open</a>\n\n";
         }
         if (@top_todos) {
             $details .= "\x{1F4CB} TOP PRIORITIES FOR TODAY:\n";
@@ -1841,7 +1998,23 @@ sub _daily_log_action {
         $self->_schedule_day($c, $schema, $sitename, $today);
 
         my $stale_msg    = @stale_logs      ? " \x{26A0}\x{FE0F} <a href='/log?status=open' style='color:inherit;'>" . scalar(@stale_logs) . " unclosed log(s) from previous days</a>." : '';
-        my $helpdesk_msg = $helpdesk_count  ? " \x{1F3AB} $helpdesk_count open HelpDesk ticket(s) — <a href='/HelpDesk'>view tickets</a>." : '';
+        my $helpdesk_msg = '';
+        if ($helpdesk_count) {
+            if ($helpdesk_count == 1) {
+                my $num = eval { $open_helpdesk_tickets[0]->ticket_number } || '';
+                $helpdesk_msg = $num
+                    ? " \x{1F3AB} 1 open HelpDesk ticket — <a href='/HelpDesk/ticket/view/$num'>view $num</a>."
+                    : " \x{1F3AB} 1 open HelpDesk ticket — <a href='/HelpDesk/admin/tickets/open'>view ticket</a>.";
+            }
+            else {
+                # Toast stays short: first ticket deep-link + admin open list for the rest
+                my $first = eval { $open_helpdesk_tickets[0]->ticket_number } || '';
+                my $first_link = $first
+                    ? "<a href='/HelpDesk/ticket/view/$first'>$first</a>"
+                    : 'tickets';
+                $helpdesk_msg = " \x{1F3AB} $helpdesk_count open HelpDesk tickets — $first_link + <a href='/HelpDesk/admin/tickets/open'>all open</a>.";
+            }
+        }
         my $deploy_since = $audit->{last_deploy_dt} ? " since last deploy ($audit->{last_deploy_dt})" : " in last 24h";
         my $error_msg    = $error_count     ? " \x{1F6A8} $error_count error area(s) found$deploy_since — " . scalar(@audit_todo_subjects) . " AI-assisted todo(s) created — <a href='/todo'>view todos</a>." : '';
         my $priority_msg = @top_todos       ? " Top priority: " . substr($top_todos[0]->subject || '', 0, 60) . "." : '';
@@ -1872,7 +2045,7 @@ sub _daily_log_action {
                 error    => 'No open log entry for today',
             };
         }
-        my $now_end = do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
+        my $now_end = Comserv::Util::AppTime->now_hms_utc;
         eval { $open_entry->update({ status => 3, end_time => $now_end }) };
         return { success => JSON::false, error => "Could not close log entry: $@" } if $@;
 
@@ -2051,7 +2224,7 @@ sub schedule_day :Path('/planning/schedule_day') :Args(0) {
     }
     my $sitename = $c->session->{SiteName} || $c->stash->{SiteName} || 'CSC';
     my $username = $c->session->{username} || '';
-    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
     my $schema;
     eval { $schema = $c->model('DBEncy')->schema };
     if ($@ || !$schema) {
@@ -2316,8 +2489,10 @@ sub deploy :Path('deploy') :Args(0) {
             return;
         } elsif (defined $pid) {
             # child — run the real deploy
+            require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+            eval {
             require Comserv::Util::DockerDeploy;
-            open(my $log, '>>', '/tmp/comserv_deploy_4000.log') or exit 1;
+            open(my $log, '>>', '/tmp/comserv_deploy_4000.log') or Comserv::Util::ForkSafe::child_exit(1);
             my $deploy = Comserv::Util::DockerDeploy->new(
                            log_fh   => $log,
                            logging  => $self->logging,
@@ -2327,9 +2502,11 @@ sub deploy :Path('deploy') :Args(0) {
                            no_cache => $c->req->body_params->{no_cache} // 0,
                        );
             my $ok = $deploy->deploy_to_target_safe();
-            print $log "[${\scalar localtime}] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
+            print $log "[${\Comserv::Util::AppTime->now_utc}] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
             close($log);
-            exit($ok ? 0 : 1);
+            Comserv::Util::ForkSafe::child_exit($ok ? 0 : 1);
+            };
+            Comserv::Util::ForkSafe::child_exit(1);
         } else {
             $c->response->body(encode_json({ success => JSON::false, error => 'fork failed' }));
         }
@@ -2341,6 +2518,179 @@ sub deploy :Path('deploy') :Args(0) {
             message => "Deploy request accepted for $target"
         }));
     }
+}
+
+# ----------------------------------------------------------------------------
+# Decision-model resort (Today's Focus). Runs the LOCAL Ollama decision model
+# (DecisionRank default nimble:latest, systemone — never a chat model, never
+# OpenRouter) in a DETACHED process so the page never waits on a ~30-130s cold
+# start. The page auto-starts one on load and the Resort button starts one on
+# demand; the browser polls decision_rank_status and reorders the cards when
+# the cache's computed_at moves past the job's started_at.
+#
+#   POST /planning/decision_rank          {"model":"nimble:latest","reason":"load|resort"}
+#   GET  /planning/decision_rank_status
+#
+# Dedupe: one job per branch (lock file with a live pid). On reason=load a cache
+# computed in the last 120 s is treated as fresh and no job is spawned.
+# ----------------------------------------------------------------------------
+our %DECISION_RESORT_MODELS = map { $_ => 1 } qw(nimble:latest tev1:0.8b tev1:latest clef-flash:latest);
+our $DECISION_LOAD_FRESH_S  = 120;
+
+sub _decision_job_dir {
+    my ($c) = @_;
+    my $dir = $c->path_to('data', 'ai_rank_jobs') . '';
+    unless (-d $dir) { require File::Path; File::Path::make_path($dir); }
+    return $dir;
+}
+
+sub _decision_read_json {
+    my ($file) = @_;
+    return undef unless -s $file;
+    open my $fh, '<:raw', $file or return undef;
+    local $/; my $t = <$fh>; close $fh;
+    my $d = eval { JSON::decode_json($t) };
+    return ref $d eq 'HASH' ? $d : undef;
+}
+
+sub _decision_job_state {
+    my ($c, $branch) = @_;
+    my $dir  = _decision_job_dir($c);
+    my $lock = _decision_read_json("$dir/$branch.json") || {};
+    my $running = 0;
+    if ($lock->{pid} && !$lock->{finished_at}) {
+        $running = kill(0, $lock->{pid}) ? 1 : 0;
+        # Reap a finished child so kill(0) stops seeing a zombie as alive.
+        if ($running) {
+            my $w = waitpid($lock->{pid}, POSIX::WNOHANG());
+            $running = 0 if $w == $lock->{pid};
+        }
+    }
+    my $cache = eval {
+        require Comserv::Util::AI::DecisionRank;
+        Comserv::Util::AI::DecisionRank->read_cache($branch, ignore_ttl => 1);
+    };
+    my $log_tail = '';
+    if (!$running && $lock->{log} && -s $lock->{log}) {
+        if (open my $fh, '<', $lock->{log}) {
+            my @l = <$fh>; close $fh;
+            $log_tail = join '', @l[ ($#l > 5 ? $#l - 5 : 0) .. $#l ];
+        }
+    }
+    return ($lock, $running, $cache, $log_tail);
+}
+
+sub _decision_auth {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    unless ($c->session->{user_id}) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return 0;
+    }
+    my $branch = $c->stash->{app_workflow} || 'main';
+    if ($branch eq 'main' || $branch !~ /^[A-Za-z0-9._-]+$/) {
+        $c->response->body(encode_json({ success => JSON::false, branch => $branch,
+            error => 'Decision resort runs on branch worktrees only (this server is main).' }));
+        return 0;
+    }
+    return $branch;
+}
+
+sub decision_rank :Path('/planning/decision_rank') :Args(0) {
+    my ($self, $c) = @_;
+    my $branch = $self->_decision_auth($c) or return;
+    my $data = eval { $c->req->body_data } || {};
+    $data = {} unless ref $data eq 'HASH';
+    my $reason = ($data->{reason} // 'resort') eq 'load' ? 'load' : 'resort';
+    require Comserv::Util::AI::DecisionRank;
+    my $model  = $data->{model} // '';
+    $model = $Comserv::Util::AI::DecisionRank::DEFAULT_MODEL || 'nimble:latest'
+        unless $DECISION_RESORT_MODELS{$model};
+
+    my ($lock, $running, $cache) = _decision_job_state($c, $branch);
+    if ($running) {
+        $c->response->body(encode_json({ success => JSON::true, started => JSON::false,
+            running => JSON::true, branch => $branch, model => $lock->{model},
+            started_at => $lock->{started_at}, message => 'A sort is already running' }));
+        return;
+    }
+    if ($reason eq 'load' && $cache && (time - ($cache->{computed_at} // 0)) < $DECISION_LOAD_FRESH_S) {
+        $c->response->body(encode_json({ success => JSON::true, started => JSON::false,
+            running => JSON::false, fresh => JSON::true, branch => $branch,
+            model => $cache->{model}, computed_at => $cache->{computed_at},
+            message => 'Order is fresh' }));
+        return;
+    }
+
+    my $dir    = _decision_job_dir($c);
+    my $log    = "$dir/$branch.log";
+    my $home   = $c->path_to('') . '';
+    $home =~ s{/$}{};
+    my $port   = eval { $c->req->uri->port } || 4006;
+    my $script = "$home/script/compute_decision_rank.pl";
+    my @cmd = ($^X, "-I$home/lib", $script, '--branch', $branch, '--model', $model,
+               '--api', "http://127.0.0.1:$port");
+    my $started_at = time;
+
+    my $pid = fork();
+    unless (defined $pid) {
+        $c->response->body(encode_json({ success => JSON::false, error => "fork failed: $!" }));
+        return;
+    }
+    if ($pid == 0) {
+        # Child: detach and exec immediately so no Perl destructors (DB
+        # handles, session) from the parent run in this process.
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+        eval {
+        POSIX::setsid();
+        open STDIN,  '<', '/dev/null';
+        open STDOUT, '>', $log or POSIX::_exit(1);
+        open STDERR, '>&', \*STDOUT;
+        exec @cmd or POSIX::_exit(127);
+        };
+        POSIX::_exit(127);
+    }
+
+    my $job = { pid => $pid, branch => $branch, model => $model, reason => $reason,
+                started_at => $started_at, log => $log,
+                user => ($c->session->{username} // '') };
+    if (open my $fh, '>:raw', "$dir/$branch.json.tmp") {
+        print {$fh} encode_json($job); close $fh;
+        rename "$dir/$branch.json.tmp", "$dir/$branch.json";
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'decision_rank',
+        "Decision resort started: branch=$branch model=$model reason=$reason pid=$pid");
+    $c->response->body(encode_json({ success => JSON::true, started => JSON::true,
+        running => JSON::true, branch => $branch, model => $model,
+        started_at => $started_at, reason => $reason }));
+}
+
+sub decision_rank_status :Path('/planning/decision_rank_status') :Args(0) {
+    my ($self, $c) = @_;
+    my $branch = $self->_decision_auth($c) or return;
+    my ($lock, $running, $cache, $log_tail) = _decision_job_state($c, $branch);
+    my $done = (!$running && $cache && $lock->{started_at}
+                && ($cache->{computed_at} // 0) >= $lock->{started_at}) ? 1 : 0;
+    my $failed = (!$running && $lock->{started_at} && !$done) ? 1 : 0;
+    $c->response->body(encode_json({
+        success     => JSON::true,
+        branch      => $branch,
+        running     => $running ? JSON::true : JSON::false,
+        done        => $done    ? JSON::true : JSON::false,
+        failed      => $failed  ? JSON::true : JSON::false,
+        model       => $lock->{model} // ($cache ? $cache->{model} : ''),
+        started_at  => $lock->{started_at},
+        elapsed_s   => $lock->{started_at} ? time - $lock->{started_at} : undef,
+        error       => $failed ? ($log_tail || 'sort process ended without writing the cache') : undef,
+        cache       => $cache ? {
+            model       => $cache->{model},
+            computed_at => $cache->{computed_at},
+            gate        => $cache->{gate},
+            answered    => $cache->{answered},
+            rows        => $cache->{rows},
+        } : undef,
+    }));
 }
 
 # Build the worktree registry list for the planning tab from

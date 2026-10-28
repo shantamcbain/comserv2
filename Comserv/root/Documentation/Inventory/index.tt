@@ -15,7 +15,7 @@
     <h1 style="color:var(--text-color);font-family:var(--header-font)">Inventory System — Administrator Guide</h1>
 
     <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">
-        Last Updated: 2026-04-17 | Version: 1.00 | Audience: Site Administrators &amp; Accounting
+        Last Updated: 2026-09-12 | Version: 1.02 | Audience: Site Administrators &amp; Accounting
     </div>
 
     <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--card-bg, rgba(255,255,255,0.15));padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
@@ -72,6 +72,7 @@
             <ul style="color:var(--text-color);font-family:var(--body-font)">
                 <li><strong><a href="/Documentation/Inventory/items" style="color:var(--link-color)">Items</a></strong> — SKUs, descriptions, categories, cost, shop visibility</li>
                 <li><strong><a href="/Documentation/Inventory/stock" style="color:var(--link-color)">Stock Levels</a></strong> — locations, receive, use, adjust, low-stock alerts</li>
+                <li><strong><a href="/Inventory/count" style="color:var(--link-color)">Physical Count (stock-take)</a></strong> — filter by SiteName + category, enter found qty (g/kg/each), submit merges stock + logs a physical_count transaction</li>
                 <li><strong><a href="/Documentation/Inventory/suppliers" style="color:var(--link-color)">Suppliers &amp; AP Invoices</a></strong> — supplier records, purchase invoices, GL posting</li>
                 <li><strong><a href="/Documentation/Inventory/bom" style="color:var(--link-color)">Bill of Materials (BOM)</a></strong> — assemblies, component costs, print wizard</li>
                 <li><strong><a href="/Documentation/Inventory/consignment" style="color:var(--link-color)">Consignment</a></strong> — items sent to partner stores, settlement, GL</li>
@@ -99,10 +100,10 @@
 
             <h3 style="color:var(--text-color);font-family:var(--header-font);font-size:var(--font-size-large)">4.2 Buying Stock (Purchasing)</h3>
             <ol style="color:var(--text-color);font-family:var(--body-font)">
-                <li>Receive goods from a supplier.</li>
-                <li>Go to <strong>Inventory → Supplier Invoices → New Invoice</strong>.</li>
-                <li>Select supplier, add line items (item, qty, unit cost). Add tax and shipping if applicable.</li>
-                <li>Save — stock levels are updated automatically and a GL double-entry is posted (DR Inventory/Expense, CR Accounts Payable).</li>
+                <li><strong>Need list (2026-08-26):</strong> GET <code>/api/inventory/need?sitename=&amp;parent_sku=</code> splits BOM shortfall into buy vs print and groups buy lines by preferred supplier. Raw BOM: GET <code>/api/inventory/bom</code>. Low-stock at <code>/Inventory</code> is warehouse min, not a job BOM.</li>
+                <li><strong>Find a supplier:</strong> <code>/Inventory/suppliers</code> and item↔supplier (preferred, supplier SKU, cost). Ordering still happens on the vendor’s own channel until a PO is sent.</li>
+                <li><strong>Receive (built):</strong> after goods/bill, <strong>Inventory → Supplier Invoices → New Invoice</strong>. Select supplier, add lines, save — stock + AP GL.</li>
+                <li><strong>#2310 in progress:</strong> Result classes for purchase orders (apply via schema-compare), then POST <code>/api/inventory/po/create</code>. Receive-from-PO not built yet.</li>
             </ol>
 
             <h3 style="color:var(--text-color);font-family:var(--header-font);font-size:var(--font-size-large)">4.3 Selling (Shop / Cart)</h3>

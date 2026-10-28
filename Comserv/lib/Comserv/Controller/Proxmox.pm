@@ -64,6 +64,15 @@ sub _init_proxmox {
     return $proxmox;
 }
 
+# The server list used to link to /proxmox/<server_id>. index only accepts
+# /proxmox with an optional server_id query param, so that URL 404'd.
+sub open_server :Path :Args(1) {
+    my ($self, $c, $server_id) = @_;
+    $c->session->{proxmox_server_id} = $server_id;
+    $c->request->parameters->{server_id} = $server_id;
+    $c->detach('index');
+}
+
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
@@ -332,7 +341,10 @@ sub index :Path :Args(0) {
         show_debug => 1,  # Set to 1 to show debug info in the UI
         proxmox_credentials_file => $creds_file,
         proxmox_credentials_exists => $creds_exists,
-        proxmox_credentials => $credentials,
+        proxmox_credentials => {
+            %{ $credentials || {} },
+            token_value => ($credentials->{token_value} ? 'set' : 'not set'),
+        },
         proxmox_api_response => $proxmox_debug_info
     };
 
@@ -1128,6 +1140,37 @@ sub vm_detail :Path('vm_detail') :Args(1) {
         proxmox_host => $proxmox_host,
     );
     $c->forward($c->view('TT'));
+}
+
+# JSON feed for the performance graphs on the VM detail page.
+# GET /proxmox/vm_graph_data/{vmid}?timeframe=hour|day|week|month|year
+sub vm_graph_data :Path('vm_graph_data') :Args(1) {
+    my ($self, $c, $vmid) = @_;
+
+    $c->res->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->res->status(403);
+        $c->res->body(encode_json({ error => 'Forbidden' }));
+        return;
+    }
+
+    my $timeframe = $c->req->param('timeframe') || 'hour';
+
+    my $proxmox = $self->_init_proxmox($c);
+    my $data    = eval { $proxmox->get_vm_graph_data($vmid, $timeframe) };
+
+    if ($@ || !$data) {
+        $c->res->status(500);
+        $c->res->body(encode_json({
+            error => 'Could not retrieve performance data',
+            detail => ($@ ? "$@" : 'no data'),
+        }));
+        return;
+    }
+
+    $c->res->body(encode_json($data));
 }
 
 sub clone_vm_form :Path('clone_vm') :Args(1) {

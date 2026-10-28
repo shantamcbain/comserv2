@@ -166,6 +166,53 @@
 <li>Regularly rotate database passwords</li>
 </ul>
 
+<h2>Role-Based Database Users (comserv_app / comserv_admin / shanta_forager)</h2>
+<p>As of 2026-08-28 the runtime database user is selected by <strong>priority</strong> from the
+<code>~/.comserv/secrets/dbi/*.json</code> (K8s Secrets) files, not hardcoded. For the <code>ency</code> database
+the canonical file <code>db_production_mysql.json</code> declares three connections:</p>
+
+<table style="width: 100%; border-collapse: collapse; margin: 12px 0; font-size: var(--font-size-small);">
+  <tr style="background-color: rgba(255,255,255,0.15);">
+    <th style="text-align: left; padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);">Connection</th>
+    <th style="text-align: center; padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);">Priority</th>
+    <th style="text-align: left; padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);">Role</th>
+    <th style="text-align: left; padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);">Purpose</th>
+  </tr>
+  <tr>
+    <td style="padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);"><code>comserv_app</code></td>
+    <td style="text-align: center; padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);">1</td>
+    <td style="padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);">App runtime</td>
+    <td style="padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);">Limited DML (SELECT/INSERT/UPDATE/DELETE) on <code>ency</code>. The preferred normal user.</td>
+  </tr>
+  <tr>
+    <td style="padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);"><code>comserv_admin</code></td>
+    <td style="text-align: center; padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);">2</td>
+    <td style="padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);">Schema / DDL</td>
+    <td style="padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);">Full rights used only by SchemaComparison for CREATE/DROP/ALTER.</td>
+  </tr>
+  <tr>
+    <td style="padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);"><code>shanta_forager</code></td>
+    <td style="text-align: center; padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);">3</td>
+    <td style="padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);">Fallback</td>
+    <td style="padding: 6px; border: 1px solid var(--border-color); color: var(--text-color);">Safe backup; used automatically if the higher-priority users fail to authenticate.</td>
+  </tr>
+</table>
+
+<p><strong>Only <code>comserv_app</code> belongs in the deployable secret files</strong> (copied by the Docker deploy script).
+<code>comserv_admin</code> and any full-access or customer DB users must be stored elsewhere (DB-backed), never in
+git-tracked files. <code>shanta_forager</code> remains on the workstation as a fallback backup.</p>
+
+<p><strong>Switching the active user:</strong> Admins use the DB-user dropdown inside the <em>Database Management</em> card on
+<code>/admin</code>. It preselects the currently connected user and, if a different user is chosen, calls
+<code>POST /api/db/switch_user</code>. The password is read from the secret JSON when the box is left blank; if a
+password is typed and validates, it is stored in that user's credential location. The currently connected DB user
+is also shown in the page footer (<code>DB User: &lt;user&gt;</code>) and in the admin nav indicator.</p>
+
+<p><strong>Gotcha:</strong> <code>comserv_app</code> is only selected once its MariaDB account exists with host
+<code>%</code> (Any) and the matching password. Until then RemoteDB falls through to <code>shanta_forager</code> and
+<code>DBEncy</code> logs an <code>error</code>-level warning (which surfaces as a GUI alert). The Docker/K8s deploy
+script copies these JSON files, so the role split travels with the build without touching <code>.env</code> or git.</p>
+
 <h2>Related Files</h2>
 <ul>
 <li><code>Comserv/lib/Comserv/Model/DBEncy.pm</code> - ENCY database model</li>

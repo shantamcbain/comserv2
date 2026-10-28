@@ -1,0 +1,283 @@
+{
+  "report_date": "2026-10-05",
+  "source": "AI usage monitor",
+  "created_by": "AI usage monitor",
+  "created_at": "2026-10-05T06:50:00-07:00",
+  "summary": "SLIGHTLY BETTER on cost, NO DATA on reliability. OpenRouter new week $0.48/$11.50, day $0.48/$1.65, month $19.74/$50, balance $17.28. Hermes est now matches bill (~$1.46 est vs $1.35 billed; yesterday $1.28 vs $4.68). Overrun guard auto-restored on week reset and caught a thrash window, but can't stop a live session and its restore overwrote a manual default change. 0 real app AI calls since Oct 3; raw 7d ok_rate 58.3% only because guard events log as errors (73.7% excluding them). Super Grok 22% used, 78% idle until Thu Oct 8 10:31 PT. Bot est ~35% now, ~50-55% at ~Tue Oct 6 reset.",
+  "markdown": "# Daily AI Eval \u2014 2026-10-05 (~6:50 AM PT)\n\n**Core question: is the code making AI usage better or worse?**\n**Answer: SLIGHTLY BETTER on cost, NO DATA on reliability.** OpenRouter's new week opened Sun 5 PM PT and spend is back under every cap, Hermes' cost estimate now matches the real bill (est ~$1.46 vs billed $1.35 since yesterday, versus $1.28 est vs $4.68 billed the day before), and the overrun guard auto-restored and caught a thrash window on its own. But the app made **0 real AI calls** since Sat Oct 3 1:07 PM PT, so ok_rate can't move, and the guard still can't stop a session that's already running.\n\n## Budget\n- **OpenRouter** (live auth_key, 6:44 AM PT): UTC day (since Sun 5 PM PT) **$0.48 / $1.65**; new week **$0.48 / $11.50**; month **$19.74 / $50**; balance **$17.28** (credits 280). Billed since yesterday's report **$1.35** (usage 259.77 \u2192 261.12). Last week closed at about **$21.4 / $11.50 (~186%)** (derived: $20.56 at yesterday's report + ~$0.87 before the UTC rollover). Fallover spend week $0.\n- **Hermes overrun guard**: tripped Sat Oct 3 8:13 AM PT (week over) \u2192 **auto-restored Sun Oct 4 5:00 PM PT** when the OpenRouter week reset \u2192 tripped again **6:45 PM PT on thrash** (20 Hermes calls in 15 min) \u2192 restored 6:50 PM PT. Not tripped now.\n- **Grok Bot** (estimate from Shanta's readings, no new reading today): new cycle started ~Sat Oct 3; 1% at Oct 3 8:07 AM PT, **18% at Sun Oct 4 6:48 AM PT** with 2 days to reset \u2192 burn ~17\u201318%/day; projected **~35% now** and **~50\u201355% at the ~Tue Oct 6 reset**. Soft daily max from the last reading \u2248 41%/day. On track; no early warning.\n- **Super Grok**: meter fresh (6:44 AM PT) **22% used / 78% left**, reset **Thu Oct 8 10:31 AM PT**, guard daily cap 19%, used today 0. No Hermes xai-oauth calls this week, so ~78% is sitting idle while coding is paid on OpenRouter.\n\n## Code changes since 2026-10-04 ~6:40 AM PT\n- **aisystem** (worktree branch `aisystem`, HEAD 88d7b88f8): **no new commits**. Uncommitted: `ai_openrouter_prices.json` (price refresh), 3D/inventory files, `Model/AI2/ModelSiteSearch.pm` + `SearchString.pm` \u2192 **too little data** (no AI calls).\n- **main** (HEAD 55c37cc28): `0b2cd7a13` Merge planning (Oct 4 4:00 PM PT) brings 3D external model search (`ModelSiteSearch.pm`, `SearchString.pm`), inventory categories, schema compare \u2192 **too little data** for AI (0 app calls). `55c37cc28` gitignore 3D uploads \u2192 **no effect**.\n- **Config/ops, not code**: Hermes default was manually set to `deepseek-v4-flash-0731` during the trip (seen in the 5:00 PM backup); the guard's restore put it back to `north-mini-code:free`, overwriting that choice \u2192 **regressed** (restore clobbers manual changes). Guard thrash trip worked as designed but couldn't affect the live session (config is read at session start) \u2192 **no effect** on spend.\n- Carry-over `1406d007b` (guard/UsageEstimator): restore-on-reset now verified working \u2192 **improved**.\n\n## Scorecard trend\n- **App ok_rate 7d**: raw 62.2% (28/45) \u2192 **58.3% (28/48)**. The drop is only the guard's 3 trip/restore rows logged as Hermes \"errors\" (0 tokens); real calls unchanged. Excluding all 10 guard rows: **28/38 = 73.7%**.\n- **App 1d**: 0 real calls (3 guard rows). Chat last call Sat Oct 3 1:07 PM PT; AI Editor last call Sep 11.\n- **cost_per_ok** 7d $0.0052; cost_wasted \u2248 $0 (failed calls were free 429/404).\n- **Zero-token \"success\"**: 4 rows on Oct 1 marked ok with 0 tokens (carry-over); none new.\n- **404/429/402/timeouts** 7d: 429 \u00d75 (gemma-31b), 404 \u00d71 (nemotron-nano), 402 0. None in 24h.\n- **Grounding**: no new app calls, grounded_rate / flagged_per_call **n/a**.\n- **Hermes** since report: 3 sessions, **329 API calls, est $1.46**, all `deepseek-v4-flash-0731`; **$0.49/session**; model hops 0; 10 open sessions (1 live) unarchived. Biggest: \"Add UART motor support via BESST tool\" (cli) **257 calls, est $1.28, 62M cache-read tokens**, 8:55 AM\u20137:12 PM PT \u2014 paid coding on flash.\n- **Hermes billing accuracy**: est/billed \u2248 1.08 today vs 0.27 yesterday \u2192 **improved** (flash-0731 isn't routed to Relace's full-price cache billing).\n- **Hermes 7d**: 35 sessions, 2588 API calls, est $6.42 (v4-pro 763 calls, flash-0731 552, flash 295, grok-build 328, grok-4.7 261).\n\n### Thrash (\u226520 calls / 15 min, same user+provider+model)\n- **App detector**: none (1d and 7d anomalies list only error_spike gemma-31b 7/7, already removed from chains).\n- **Hermes (assistant turns)**: 5 windows since report \u2014 BESST session 33 (9:45 AM), 21 (10:00), 20 (10:30), 20 (6:30 PM PT, tripped the guard); \"Fix unsafe SVG path\" 21 (7:00 AM). One long agent loop, not model ping-pong.\n\n### Effectiveness (\u226510 calls)\n- No app model reached 10 calls in 1d or 7d \u2192 too little data. north-mini-code:free 9/9 ok (keep-trend), gemma-31b 0/7 (already removed), all_exhausted 6 (Sep 30 title runs).\n- Hermes per-call ok/flagged isn't recorded \u2192 n/a.\n\n## Failover health\n- 7d fallover rate **11.8%**; first-choice answered 15, answered after failover **2** (both succeeded on free models), failed attempts 6, all_exhausted 6 (Sep 30, failover=0 title runs). Last 24h: **0 turns**.\n- Open circuits: `gemma-4-31b-it:free` only (already in removed[]). No free\u2192paid failover past caps; fallover spend week $0.\n- Chains: coding/chat north-mini \u2192 nemotron-3.5-lightning \u2192 Ollama; docs/title nemotron first.\n\n## Chat UX\n- No Chat traffic since Sat 1:07 PM PT, so no new sample. Chat 7d (fallover rates) 22/32 = 68.8%.\n\n## HelpDesk\n- CSC mailbox watch still paused; no HelpDesk AI calls in the ledger.\n\n## Proposals (review first)\n1. **Stop counting guard trip/restore rows as failed AI calls** (code, UsageMonitor/usage_live): they drag ok_rate down with 0-token \"errors\".\n2. **Guard restore should not clobber a manual default change** (workstation, overrun guard): restore to the model in place right before restore when it was changed during the trip, or ask.\n3. **Use the idle Super Grok** (workstation, Hermes config): ~78% left until Thu 10:31 AM PT; route hard coding (aliases `code`/`editor`/`xai`) to grok-build-0.1 / grok-4.6 until the reset instead of paid flash-0731/v4-pro. Keep north-mini as idle default.\n4. **Cap runaway single sessions** (workstation, Hermes): BESST session ran 257 calls / ~$1.28 in one context; turn on `tool_loop_guardrails.hard_stop_enabled` and have the thrash trip post a notice into live sessions.\n5. Carry-over: archive the 10 stale open Hermes sessions.\n",
+  "metrics": {
+    "bot": {
+      "last_reading": "18% used Sun 2026-10-04 06:48 PT, 2 days to reset",
+      "cycle_start": "~2026-10-03",
+      "burn_pct_per_day": 17.5,
+      "estimated_now_pct": 35,
+      "projected_at_reset_pct": "50-55",
+      "reset_estimate": "~Tue 2026-10-06",
+      "soft_daily_max_pct": 41,
+      "estimated": true
+    },
+    "openrouter": {
+      "day_usd": 0.4846,
+      "week_usd": 0.4846,
+      "month_usd": 19.7432,
+      "balance_usd": 17.2822,
+      "total_credits": 280,
+      "billed_since_prev_report_usd": 1.3505,
+      "prev_week_close_usd_derived": 21.4,
+      "caps": {
+        "day_usd": 1.65,
+        "week_usd": 11.5,
+        "month_usd": 50
+      },
+      "over_caps": []
+    },
+    "supergrok": {
+      "build_used_pct": 22,
+      "remaining_pct": 78,
+      "meter_fresh_at_pt": "2026-10-05 06:44",
+      "reset_at": "2026-10-08T10:31:00-07:00",
+      "daily_cap": 19,
+      "used_today": 0,
+      "mode": "grok",
+      "hermes_xai_calls_this_week": 0
+    },
+    "hermes": {
+      "sessions_since_prev": 3,
+      "api_calls_since_prev": 329,
+      "est_cost_since_prev_usd": 1.46,
+      "cost_per_session_usd": 0.49,
+      "est_to_billed_ratio": 1.08,
+      "prev_est_to_billed_ratio": 0.27,
+      "model_hops": 0,
+      "open_sessions": 10,
+      "live_sessions": 1,
+      "biggest_session": {
+        "id": "20261004_085448_1a4377",
+        "title": "Add UART motor support via BESST tool",
+        "model": "deepseek/deepseek-v4-flash-0731",
+        "api_calls": 257,
+        "est_usd": 1.28,
+        "cache_read_tokens": 62117869
+      },
+      "default_model": "openrouter/cohere/north-mini-code:free",
+      "guard_events": [
+        {
+          "action": "restore",
+          "at_pt": "Sun Oct 04 17:00 PT",
+          "reason": "week reset"
+        },
+        {
+          "action": "trip",
+          "at_pt": "Sun Oct 04 18:45 PT",
+          "reason": "thrash: 20 Hermes calls in 15 min"
+        },
+        {
+          "action": "restore",
+          "at_pt": "Sun Oct 04 18:50 PT"
+        }
+      ],
+      "tool_loop_hard_stop": false,
+      "week7d": {
+        "sessions": 35,
+        "api_calls": 2588,
+        "est_usd": 6.42
+      }
+    },
+    "chat": {
+      "calls_1d": 0,
+      "last_call": "2026-10-03 13:07",
+      "chat_ok_7d": "22/32 (68.8%)"
+    },
+    "helpdesk": {
+      "mailbox_watch": "paused",
+      "ai_calls": 0
+    },
+    "anomalies": [
+      {
+        "kind": "error_spike",
+        "model": "google/gemma-4-31b-it:free",
+        "text": "7/7 errors 7d, already removed from chains"
+      },
+      {
+        "kind": "hermes_thrash",
+        "session": "20261004_085448_1a4377",
+        "windows": [
+          33,
+          21,
+          20,
+          20
+        ]
+      },
+      {
+        "kind": "hermes_thrash",
+        "session": "20261004_135709_0f6eb4",
+        "windows": [
+          21
+        ]
+      },
+      {
+        "kind": "measurement",
+        "text": "guard trip/restore rows logged as hermes errors (3 in 1d, 10 in 7d)"
+      }
+    ],
+    "effectiveness": [
+      {
+        "agent": "chat",
+        "provider": "openrouter",
+        "model": "cohere/north-mini-code:free",
+        "calls": 9,
+        "ok": 9,
+        "cost": 0.0188,
+        "verdict": "too little data"
+      },
+      {
+        "agent": "chat",
+        "provider": "openrouter",
+        "model": "google/gemma-4-31b-it:free",
+        "calls": 7,
+        "ok": 0,
+        "verdict": "too little data (removed)"
+      },
+      {
+        "agent": "chat",
+        "provider": "supergrok",
+        "model": "grok-build-0.1",
+        "calls": 6,
+        "ok": 6,
+        "cost": 0.0645,
+        "verdict": "too little data"
+      }
+    ],
+    "failover": {
+      "rate_7d_pct": 11.8,
+      "answered_first_7d": 15,
+      "answered_after_failover_7d": 2,
+      "failed_attempts_7d": 6,
+      "all_exhausted_7d": 6,
+      "turns_1d": 0,
+      "open_circuits": [
+        "openrouter|google/gemma-4-31b-it:free"
+      ],
+      "free_to_paid_past_caps": 0,
+      "spend_week_usd": 0
+    },
+    "changes": [
+      {
+        "commit": "(none)",
+        "branch": "aisystem",
+        "files": [],
+        "verdict": "no effect",
+        "evidence": "No commits since Oct 4 report; HEAD 88d7b88f8"
+      },
+      {
+        "commit": "0b2cd7a13",
+        "branch": "main",
+        "files": [
+          "Model/AI2/ModelSiteSearch.pm",
+          "Model/AI2/SearchString.pm",
+          "Controller/3d.pm",
+          "Controller/Inventory/Categories.pm"
+        ],
+        "verdict": "too little data",
+        "evidence": "0 app AI calls since merge"
+      },
+      {
+        "commit": "55c37cc28",
+        "branch": "main",
+        "files": [
+          ".gitignore"
+        ],
+        "verdict": "no effect",
+        "evidence": "not AI"
+      },
+      {
+        "commit": "1406d007b",
+        "branch": "aisystem",
+        "files": [
+          "HermesOverrunGuard",
+          "UsageEstimator"
+        ],
+        "verdict": "improved",
+        "evidence": "auto-restore on OpenRouter week reset Sun 17:00 PT and thrash trip 18:45 PT both fired"
+      },
+      {
+        "commit": "config (~/.hermes/config.yaml)",
+        "branch": "workstation",
+        "files": [
+          "config.yaml"
+        ],
+        "verdict": "regressed",
+        "evidence": "restore at 17:00 PT set default back to north-mini, overwriting manual flash-0731 default seen in backup; thrash trip had no effect on live session"
+      }
+    ],
+    "trend": {
+      "app_ok_rate_7d_raw": {
+        "prev": 62.2,
+        "now": 58.3
+      },
+      "app_ok_rate_7d_excl_guard_rows": 73.7,
+      "openrouter_week_usd": {
+        "prev": 20.56,
+        "now": 0.48,
+        "note": "new week"
+      },
+      "hermes_est_to_billed": {
+        "prev": 0.27,
+        "now": 1.08
+      },
+      "thrash_windows_hermes": 5,
+      "open_circuits": 1
+    }
+  },
+  "proposals": [
+    {
+      "title": "Exclude overrun-guard trip/restore rows from ok_rate and error counts",
+      "change_type": "code",
+      "target": "UsageMonitor / usage_live",
+      "rationale": "Guard events log as hermes rows with 0 tokens and count as errors: 3/3 errors today, 10 in 7d, dragging app ok_rate 73.7% to 58.3%.",
+      "payload": {
+        "filter": "status in (trip, restore) -> events, not calls"
+      }
+    },
+    {
+      "title": "Guard restore must not overwrite a manual default change made during a trip",
+      "change_type": "workstation",
+      "target": "Hermes overrun guard",
+      "rationale": "Default was manually set to deepseek-v4-flash-0731 during the trip; Sun 17:00 PT restore put north-mini back from the Oct 3 saved_model.",
+      "payload": {
+        "rule": "if config default != trip 'to' model at restore time, keep it or ask"
+      }
+    },
+    {
+      "title": "Route hard coding to idle Super Grok until Thu Oct 8 10:31 PT reset",
+      "change_type": "workstation",
+      "target": "~/.hermes/config.yaml aliases code/editor/xai",
+      "rationale": "Super Grok 78% left, 0 xai calls this week, while a 257-call coding session ran on paid flash-0731 (~$1.28).",
+      "payload": {
+        "aliases": {
+          "code": "xai-oauth/grok-build-0.1",
+          "editor": "xai-oauth/grok-4.6",
+          "xai": "xai-oauth/grok-build-0.1"
+        },
+        "keep_default": "openrouter/cohere/north-mini-code:free"
+      }
+    },
+    {
+      "title": "Cap runaway single Hermes sessions",
+      "change_type": "workstation",
+      "target": "~/.hermes/config.yaml tool_loop_guardrails + guard notice",
+      "rationale": "BESST session: 257 API calls, 62M cache-read tokens, 4 thrash windows; guard trip can't affect a live session.",
+      "payload": {
+        "tool_loop_guardrails.hard_stop_enabled": true,
+        "guard": "post notice into live sessions on thrash trip"
+      }
+    },
+    {
+      "title": "Archive 10 stale open Hermes sessions",
+      "change_type": "workstation",
+      "target": "~/.hermes/state.db sessions",
+      "rationale": "10 open unarchived (1 live) inflate open-session counts.",
+      "payload": {}
+    }
+  ]
+}

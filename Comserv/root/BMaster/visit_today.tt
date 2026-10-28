@@ -1,0 +1,157 @@
+[% META title = "Beemaster visit - Lumby BC" %]
+[% PageVersion = 'BMaster/visit_today.tt,v 0.03 2026/09/22 cscdeveloper Exp' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<style>
+.visit-proto { max-width: 980px; }
+.visit-proto .season-pill {
+  display:inline-block; padding:4px 10px; border-radius:999px;
+  background:#2e7d32; color:#fff; font-size:0.85rem; font-weight:600;
+}
+.visit-proto .weather-strip {
+  background:#eef5ee; border:1px solid #c5d9c6; border-radius:6px;
+  padding:10px 12px; margin:12px 0;
+}
+.visit-proto .hive-card {
+  border:1px solid #ccc; border-radius:8px; padding:14px 16px; margin:12px 0;
+  background:#fff;
+}
+.visit-proto .hive-card h3 { margin-top:0; color:#1b5e20; }
+.visit-proto .hive-card .label { font-weight:700; color:#333; }
+.visit-proto .hive-card .do-not { color:#b71c1c; }
+.visit-proto .tier-stack {
+  border-left:4px solid #1565c0; padding:10px 14px; margin:10px 0;
+  background:#f5f9fc;
+}
+.visit-proto .tier-stack.active { border-left-color:#2e7d32; background:#f1f8f2; }
+.visit-proto .agenda-print {
+  border:1px dashed #888; padding:14px; margin:16px 0; background:#fafafa;
+}
+.visit-proto .agenda-print table { width:100%; border-collapse:collapse; }
+.visit-proto .agenda-print th, .visit-proto .agenda-print td {
+  text-align:left; padding:6px 8px; border-bottom:1px solid #ddd; vertical-align:top;
+}
+@media print {
+  .no-print { display:none !important; }
+  .visit-proto .agenda-print { border-style:solid; }
+}
+</style>
+
+<div class="app-container visit-proto">
+
+  <div class="page-header">
+    <h1>[% visit_title | html %]</h1>
+    <p class="page-subtitle">
+      [% visit_date | html %] - [% visit_location | html %]
+      - visit <code>[% visit_id | html %]</code>
+    </p>
+    <p><span class="season-pill">[% season_label | html %]</span>
+       <span style="margin-left:8px;color:#666;font-size:0.9rem;">[% hemisphere | html %] - zone [% zone | html %]</span>
+    </p>
+    [% IF workshop_url %]
+    <p class="no-print" style="margin-top:8px;">
+      <a href="[% workshop_url | html %]" class="btn btn-primary">Workshop home</a>
+      <span style="font-size:0.85rem;color:#666;margin-left:8px;">Official workshop record (registration, files, agenda home).</span>
+    </p>
+    [% END %]
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="app-section">
+        <p><strong>Bee-first:</strong> [% bee_first_note | html %]</p>
+      </div>
+
+      <div class="weather-strip">
+        <strong>Weather</strong>
+        [% IF weather_strip %]
+          - [% weather_strip.summary | html %]
+          <div style="font-size:0.85rem;color:#666;margin-top:4px;">[% weather_strip.note | html %]</div>
+        [% ELSE %]
+          - Check at the gate.
+        [% END %]
+      </div>
+
+      <div class="app-section">
+        <p style="font-size:0.95rem;color:#333;">
+          <strong>Inspection TODAY</strong> is your decision as keeper.
+          These cards and stacks are optional teaching aids - not an app mandate.
+        </p>
+        <h2>Hive cards - expect / goal / do-not</h2>
+        [% FOREACH hive IN hives %]
+          <div class="hive-card" id="hive-[% hive.id | html %]">
+            <h3>[% hive.label | html %]</h3>
+            <p><span class="label">Expect:</span> [% hive.expect | html %]</p>
+            <p><span class="label">Goal:</span> [% hive.goal | html %]</p>
+            <p class="do-not"><span class="label">Do not:</span> [% hive.do_not | html %]</p>
+            <p style="font-size:0.9rem;color:#555;"><span class="label">Teaching:</span> [% hive.teach_for | html %]</p>
+          </div>
+        [% END %]
+      </div>
+
+      <div class="app-section">
+        <h2>Teaching stacks by experience</h2>
+        <p class="no-print" style="font-size:0.9rem;color:#555;">
+          Your view highlight:
+          <strong>[% viewer_tier | html %]</strong>
+          (guests see <em>potential</em>; logged-in accounts get a soft tier for this pilot).
+          Mentor stacks use <code>mentor_*</code>; student tiers use <code>expect_*</code>; every stack also links shared <code>core_*</code> pages.
+        </p>
+
+        [% FOREACH stack IN stack_list %]
+            <div class="tier-stack[% IF viewer_tier == stack.key %] active[% END %]">
+              <h3 style="margin:0 0 6px 0;">[% stack.label | html %]</h3>
+              <p style="margin:0 0 8px 0;">[% stack.blurb | html %]</p>
+              <ul>
+                [% FOREACH pc IN stack.pages %]
+                  <li><a href="/page/[% pc | html %]">[% pc | html %]</a></li>
+                [% END %]
+              </ul>
+            </div>
+        [% END %]
+
+        <p style="font-size:0.85rem;color:#666;">
+          Shared cores and mentor process cards (open when useful):
+          [% FOREACH p IN page_catalog %]
+            <a href="/page/[% p.code | html %]">[% p.title | html %]</a>[% UNLESS loop.last %] - [% END %]
+          [% END %]
+        </p>
+      </div>
+
+      <div class="app-section agenda-print" id="agenda">
+        <h2>Agenda (printable / shareable)</h2>
+        <p class="no-print">
+          <button type="button" class="btn btn-secondary" onclick="window.print()">Print agenda</button>
+        </p>
+        <table>
+          <thead>
+            <tr><th>When</th><th>What</th></tr>
+          </thead>
+          <tbody>
+            [% FOREACH row IN agenda %]
+              <tr>
+                <td style="white-space:nowrap;font-weight:600;">[% row.when | html %]</td>
+                <td>[% row.what | html %]</td>
+              </tr>
+            [% END %]
+          </tbody>
+        </table>
+      </div>
+
+      <div class="page-footer no-print">
+        <div class="footer-actions">
+          <a href="/BMaster" class="btn btn-secondary">Back to BMaster</a>
+          <a href="/BMaster/education" class="btn btn-secondary">Education</a>
+          [% IF workshop_url %]
+          <a href="[% workshop_url | html %]" class="btn btn-primary">Workshop home</a>
+          [% END %]
+          <a href="/Apiary/inspections" class="btn btn-secondary">Inspections</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

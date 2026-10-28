@@ -1,0 +1,60 @@
+[% META
+   title = "Sign ready to print"
+   description = "Download the two-colour 3MF built from the order filament picks"
+   roles = "admin,developer,editor,normal"
+   TemplateType = "Application"
+   category = "SignGenerator"
+   page_version = "0.01"
+%]
+
+<div class="app-page">
+    <nav class="breadcrumb">
+        <a href="/3d">3D Printing</a> &raquo;
+        <a href="/3d/browse">Browse</a> &raquo;
+        <strong>Print this sign</strong>
+        &nbsp;|&nbsp; <a href="/3d/my_orders">My orders</a>
+        &nbsp;|&nbsp; <a href="/Documentation/SignGenerator">Help</a>
+    </nav>
+
+    <h1>Sign ready to print</h1>
+
+    [% IF c.flash.success_msg %]
+    <p class="alert alert-success">[% c.flash.success_msg | html %]</p>
+    [% END %]
+    [% IF c.flash.error_msg %]
+    <p class="alert alert-error">[% c.flash.error_msg | html %]</p>
+    [% END %]
+
+    <div class="app-section">
+        <p>
+            Job <strong>#[% job.id %]</strong>
+            [% IF model %] &mdash; [% model.name | html %][% END %]
+            &mdash; status <strong>[% job.status | html %]</strong>.
+        </p>
+        <p>
+            Filaments from the order:
+            <strong>[% job.filament_type | html %]</strong>
+            &bull; [% job.filament_color | html %]
+        </p>
+        <p>
+            Load the <strong>3MF</strong> in Anycubic Slicer Next. It is two objects
+            (base plate + text/QR). Object names include filament <em>type</em> and
+            <em>colour</em> so each slot is labelled. Assign those two spools and slice.
+        </p>
+        [% IF model %]
+        <p>
+            <a class="btn btn-primary"
+               href="/signgenerator/download/[% model.id %]/3mf?job_id=[% job.id %]">Download 3MF (two colours)</a>
+            <a class="btn btn-secondary" href="/signgenerator/pdf/[% model.id %]" target="_blank">Layout PDF</a>
+            <a class="btn btn-secondary" href="/3d/queue">Print queue</a>
+            <a class="btn btn-secondary" href="/3d/model/[% model.id %]">Back to sign</a>
+        </p>
+        [% END %]
+        [% IF parsed.order_3mf %]
+        <p>File: <code>[% parsed.order_3mf | html %]</code>
+           [% IF !has_file %](will be rebuilt on download)[% END %]</p>
+        [% ELSE %]
+        <p>The two-colour file will be built when you click Download (uses the body/text filaments on this job).</p>
+        [% END %]
+    </div>
+</div>

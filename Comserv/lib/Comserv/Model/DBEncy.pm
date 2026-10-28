@@ -73,7 +73,25 @@ sub COMPONENT {
     my $conn = $connection_info->{config};
     my $connection_name = $connection_info->{connection_name};
     my $db_type = $conn->{db_type} || 'mysql';
-    
+    my $auth_source = 'dbi_json';
+
+    # RemoteDB has already selected the highest-priority working connection for
+    # 'ency' from the dbi/*.json secrets. With the new role-based entries, that
+    # will be comserv_app (priority 1), comserv_admin (priority 2), or
+    # shanta_forager (priority 3). We trust its choice but log loudly when the
+    # primary app user is not in use.
+    my $selected_user     = $conn->{username};
+    my $selected_password = $conn->{password};
+
+    if ($db_type ne 'sqlite') {
+        if ($selected_user ne 'comserv_app') {
+            $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
+                "DBEncy WARNING: primary app user 'comserv_app' was not used; "
+              . "RemoteDB selected '$selected_user' for $conn->{host}:$conn->{port}/$conn->{database}. "
+              . "Review comserv_app credentials or MariaDB host permissions.");
+        }
+    }
+
     # Enhanced startup logging to show which connection is being used
     $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
         "============================================");
@@ -92,7 +110,7 @@ sub COMPONENT {
         $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
             "Database: " . $conn->{database});
         $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
-            "Username: " . $conn->{username});
+            "Username: " . $conn->{username} . " (auth_source=$auth_source)");
     }
     $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
         "Description: " . ($conn->{description} || 'No description'));
@@ -109,6 +127,7 @@ sub COMPONENT {
         port => $conn->{port},
         database => $conn->{database} || $conn->{database_path},
         username => $conn->{username},
+        auth_source => $auth_source,
         description => $conn->{description} || 'No description',
         priority => $conn->{priority} || 'Not set',
         timestamp => scalar(localtime())
@@ -328,4 +347,55 @@ sub create_table_from_result {
 
     return 0;   # Indicate table was not created (but no exception raised)
 }
+# Reconnect the live schema as a different DB user (in-process, no restart).
+# Verifies the new credentials with a throwaway connection first. Returns 1 on
+# success, 0 on failure (original connection untouched).
+sub reconnect_as {
+    my ($self, $c, $user, $pass) = @_;
+    return 0 unless $user && $pass;
+
+    my $storage = eval { $self->schema->storage };
+    return 0 unless $storage;
+
+    my $connect_info = $storage->connect_info;
+    my $dsn;
+    if (ref($connect_info) eq 'ARRAY' && @$connect_info) {
+        if (ref($connect_info->[0]) eq 'HASH') {
+            $dsn = $connect_info->[0]{dsn};
+        } elsif (defined $connect_info->[0] && $connect_info->[0] ne '') {
+            $dsn = $connect_info->[0];
+        }
+    }
+    return 0 unless $dsn;
+
+    # Verify the new credentials with a fresh connection.
+    my $test_dbh = eval {
+        DBI->connect($dsn, $user, $pass, { RaiseError => 0, PrintError => 0, AutoCommit => 1 });
+    };
+    return 0 unless $test_dbh;
+    $test_dbh->disconnect;
+
+    # Replace the connect_info and force a reconnect on next use.
+    if (ref($connect_info) eq 'ARRAY' && @$connect_info && ref($connect_info->[0]) eq 'HASH') {
+        $connect_info->[0]{user}     = $user;
+        $connect_info->[0]{password} = $pass;
+    } else {
+        $connect_info->[0] = $dsn;
+        $connect_info->[1] = $user;
+        $connect_info->[2] = $pass;
+    }
+
+    # Force disconnect so the next query re-opens with the new credentials.
+    eval { $storage->disconnect; };
+
+    # Update the startup snapshot so get_connection_info reports the new user.
+    if ($startup_connection_info) {
+        $startup_connection_info->{username}     = $user;
+        $startup_connection_info->{auth_source}  = 'switched_via_admin';
+    }
+
+    return 1;
+}
+
+
 1;

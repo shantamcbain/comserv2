@@ -60,7 +60,8 @@ sub execute_query {
     }
     else {
         # Use the RemoteDB model for other databases
-        my $remote_db = $c->model('RemoteDB');
+        require Comserv::Model::RemoteDB;
+        my $remote_db = Comserv::Model::RemoteDB->from_context($c);
         return $remote_db->execute_query($c, $database, $query, $params);
     }
 }
@@ -118,7 +119,8 @@ sub list_tables {
     }
     else {
         # Use the RemoteDB model for other databases
-        my $remote_db = $c->model('RemoteDB');
+        require Comserv::Model::RemoteDB;
+        my $remote_db = Comserv::Model::RemoteDB->from_context($c);
         return $remote_db->list_tables($c, $database);
     }
 }
@@ -135,7 +137,8 @@ sub list_databases {
     my @databases = ('ency', 'forager');
     
     # Add remote databases
-    my $remote_db = $c->model('RemoteDB');
+    require Comserv::Model::RemoteDB;
+    my $remote_db = Comserv::Model::RemoteDB->from_context($c);
     push @databases, keys %{$remote_db->connections};
     
     return \@databases;

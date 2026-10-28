@@ -1012,14 +1012,20 @@ sub index :Path :Args(0) {
 
     my $site_name_idx = $c->stash->{SiteName} || $c->session->{SiteName} || '';
     my $is_csc        = (lc($site_name_idx) eq 'csc') ? 1 : 0;
-    my $has_accounting = $is_csc ? 1 : 0;
-    unless ($is_csc) {
-        eval {
-            $has_accounting = $c->model('DBEncy')->resultset('SiteModule')->search({
-                sitename    => $site_name_idx,
-                module_name => 'accounting',
-            })->count ? 1 : 0;
-        };
+    my $db_user_info  = $self->_db_user_info($c);
+    # Opt-in only: CSC must enable the accounting site module like every other
+    # SiteName. A row that exists but is disabled is not opted in.
+    my $has_accounting = 0;
+    eval {
+        $has_accounting = $c->model('DBEncy')->resultset('SiteModule')->search({
+            sitename    => $site_name_idx,
+            module_name => { -in => [qw(accounting Accounting)] },
+            enabled     => 1,
+        })->count ? 1 : 0;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
+            "has_accounting site_modules lookup failed: $@");
     }
 
     $c->stash(
@@ -1036,6 +1042,7 @@ sub index :Path :Args(0) {
         software_status        => $software_status,
         is_csc                 => $is_csc,
         has_accounting         => $has_accounting,
+        db_user_info           => $db_user_info,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
@@ -1570,7 +1577,18 @@ sub get_recent_activity {
 # Get system notifications for the admin dashboard
 sub get_system_notifications {
     my ($self, $c) = @_;
-    
+    # #2197: one brain — AdminDashboard already builds this list. Duplicate
+    # inline copy here drifted from the dashboard util and the stash was never
+    # rendered on admin/index.tt.
+    my $from_dash = eval {
+        Comserv::Util::AdminDashboard->new->system_notifications($c);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'get_system_notifications', "AdminDashboard notifications failed: $@");
+    }
+    return $from_dash if $from_dash && ref($from_dash) eq 'ARRAY';
+
     my @notifications = ();
     
     # Check for pending user registrations
@@ -1684,6 +1702,56 @@ sub get_system_notifications {
 }
 
 # Admin users management
+# Build the data needed by the database-card DB-user switcher on /admin.
+sub _db_user_info {
+    my ($self, $c) = @_;
+
+    my $info = eval {
+        my $schema = $c->model('DBEncy');
+        $schema && $schema->can('get_startup_connection_info')
+            ? $schema->get_startup_connection_info()
+            : undef;
+    };
+    $info ||= {};
+
+    my $current = $info->{current_username} || 'unknown';
+
+    my @known;
+    my %seen;
+    $seen{$current} = 1;
+
+    # Known users come from the active dbi/*.json secret files.
+    eval {
+        require JSON;
+        my $home = $ENV{HOME} || '/home/shanta';
+        my $sec_dir = "$home/.comserv/secrets/dbi";
+        if (-d $sec_dir && opendir(my $dh, $sec_dir)) {
+            while (my $f = readdir $dh) {
+                next if $f =~ /^\./ || $f =~ /\.backup/ || $f !~ /\.json$/;
+                my $fp = "$sec_dir/$f";
+                next unless -f $fp;
+                open my $fh, '<', $fp or next;
+                local $/; my $raw = <$fh>; close $fh;
+                my $data = JSON::decode_json($raw);
+                for my $k (keys %$data) {
+                    my $u = $data->{$k}{username};
+                    push @known, $u if $u && !$seen{$u}++;
+                }
+            }
+            closedir $dh;
+        }
+    };
+    return {
+        current_user    => $current,
+        auth_source     => $info->{auth_source} || '',
+        host            => $info->{host} || '',
+        port            => $info->{port} || '',
+        database        => $info->{database} || '',
+        connection_name => $info->{connection_name} || '',
+        known_users     => \@known,
+    };
+}
+
 sub users :Path('/admin/users') :Args(0) {
     my ($self, $c) = @_;
     
@@ -2838,7 +2906,9 @@ sub security_scan_start :Path('/admin/security-scan-start') :Args(0) {
     }
 
     if ($pid == 0) {
-        open(STDOUT, '>', $out_file) or exit 1;
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+        eval {
+        open(STDOUT, '>', $out_file) or Comserv::Util::ForkSafe::child_exit(1);
         open(STDERR, '>&STDOUT');
         my @cmd = ('perl', $script,
             '--url',    $target_url,
@@ -2848,7 +2918,8 @@ sub security_scan_start :Path('/admin/security-scan-start') :Args(0) {
         );
         push @cmd, '--auth-cookie', $auth_cookie if $auth_cookie;
         exec(@cmd);
-        exit 1;
+        };
+        Comserv::Util::ForkSafe::child_exit(1);
     }
 
     # Reap child automatically so it doesn't become a zombie
@@ -4077,14 +4148,35 @@ sub find_orphaned_result_files_v2 {
                 $result_schema = $self->parse_result_file_schema($c, $result_info->{result_path});
             };
             
+            my $columns = $result_schema->{columns} || {};
+            my @pks = @{ $result_schema->{primary_keys} || [] };
+            my %pk_lookup = map { $_ => 1 } @pks;
+            my @fields;
+            foreach my $cname (sort keys %$columns) {
+                my $cinfo = $columns->{$cname} || {};
+                $cinfo->{is_primary_key} = 1 if $pk_lookup{$cname};
+                push @fields, {
+                    name => $cname,
+                    data_type => $cinfo->{data_type} // '',
+                    size => $cinfo->{size},
+                    is_nullable => defined $cinfo->{is_nullable} ? $cinfo->{is_nullable} : 1,
+                    is_auto_increment => $cinfo->{is_auto_increment} ? 1 : 0,
+                    is_primary_key => $cinfo->{is_primary_key} ? 1 : 0,
+                    default_value => $cinfo->{default_value},
+                    docs => $cinfo->{docs} // $cinfo->{documentation} // $cinfo->{comment} // '',
+                };
+                $columns->{$cname} = $cinfo;
+            }
             push @orphaned_results, {
                 result_name => $result_info->{result_name},
                 result_path => $result_info->{result_path},
                 expected_table_name => $table_name,
                 actual_table_name => $table_name,
                 last_modified => $result_info->{last_modified},
-                columns => $result_schema->{columns},
-                primary_keys => $result_schema->{primary_keys} || [],
+                columns => $columns,
+                fields => [ @fields ],
+                field_count => scalar(@fields),
+                primary_keys => [ @pks ],
                 relationships => $result_schema->{relationships} || {},
                 raw_package_calls => $result_schema->{raw_package_calls} || []
             };
@@ -6980,6 +7072,8 @@ sub docker_ssh_terminal :Path('/admin/docker-ssh-terminal') :Args(0) {
     
     if ($pid == 0) {
         # Child process
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+        eval {
         $pty->make_slave_controlling_terminal();
         my $slave = $pty->slave();
         
@@ -6992,6 +7086,8 @@ sub docker_ssh_terminal :Path('/admin/docker-ssh-terminal') :Args(0) {
         open STDERR, '>&', $slave->fileno() or die "Can't redirect STDERR: $!";
         
         exec(@$ssh_cmd) or die "Can't exec SSH: $!";
+        };
+        Comserv::Util::ForkSafe::child_exit(1);
     }
     
     # Parent process - proxy between WebSocket and PTY
@@ -7816,6 +7912,25 @@ sub branch_server_action :Path('/admin/branch_server_action') :Args(0) {
         my $res = $ctrl->open_or_start($branch, $port);
         $c->response->body(encode_json($res));
     }
+    elsif ($action eq 'hermes') {
+        my $res = eval { $ctrl->open_or_start_hermes($branch, $port) };
+        if ($@ || !$res) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'branch_server_action', "hermes start failed branch=$branch: $@");
+            $c->response->body(encode_json({ ok => 0, error => "$@"}));
+            return;
+        }
+        if (!$res->{ok}) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'branch_server_action', "hermes start refused branch=$branch: " . ($res->{error} // ''));
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'branch_server_action',
+                "hermes branch=$branch port=" . ($res->{hermes_port} // '') .
+                " started=" . ($res->{started} // 0) . " cwd=" . ($res->{cwd} // ''));
+        }
+        $c->response->body(encode_json($res));
+    }
     else {
         $c->response->body(encode_json({ok=>0, error=>'Unknown action'}));
     }
@@ -7833,11 +7948,16 @@ sub branch_server_log :Path('/admin/branch_server_log') :Args(0) {
 
     my $file = $c->req->param('file') || '';
     my $branch = $c->req->param('branch') || '';
+    my $kind = $c->req->param('kind') || '';
 
-    # Resolve to /tmp/branch-<branch>.log. Prefer the branch param; if a full file
-    # path was supplied, only honor it when it matches the locked pattern.
+    # Resolve to /tmp/branch-<branch>.log (or hermes-dash when kind=hermes).
+    # Prefer the branch param; if a full file path was supplied, only honor it
+    # when it matches the locked pattern.
     my $path;
-    if ($branch =~ m{^[A-Za-z0-9._/-]+$} && $branch !~ m{\.\./} && $branch !~ m{^/}) {
+    if ($kind eq 'hermes' && $branch =~ m{^[A-Za-z0-9._-]+$}) {
+        $path = "/tmp/hermes-dash-$branch.log";
+    }
+    elsif ($branch =~ m{^[A-Za-z0-9._/-]+$} && $branch !~ m{\.\./} && $branch !~ m{^/}) {
         $path = "/tmp/branch-$branch.log";
     }
     elsif ($file =~ m{^/tmp/branch-[A-Za-z0-9._-]+\.log$}) {
@@ -7850,7 +7970,8 @@ sub branch_server_log :Path('/admin/branch_server_log') :Args(0) {
 
     if (-f $path) {
         my $raw = do { local $/; open my $fh, '<', $path or die $!; <$fh> };
-        $c->response->body($raw // '');
+        # Empty body would let RenderView look for a non-existent branch_server_log.tt.
+        $c->response->body(defined $raw && length $raw ? $raw : "(log is empty)");
     }
     else {
         $c->response->body('(server not started yet — no log)');

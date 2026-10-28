@@ -5,6 +5,8 @@ use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny s
 
 use Try::Tiny;
 use JSON qw(encode_json decode_json);
+use Time::HiRes qw(gettimeofday tv_interval);
+use Comserv::Model::AI::ConversationScope qw(is_guest_session ensure_guest_session_id conversation_owned_by_session);
 
 use Comserv::Util::Logging;
 use Comserv::Util::ModelCatalog;
@@ -25,6 +27,21 @@ has 'logging' => (
 # Router, and calls the provider through v1 Model::AI::Provider (reused, not
 # duplicated). Keeps Catalyst MVC discipline: this is business logic only.
 # ===================================================================
+
+# pure (2026-10-18). Should this turn run the app's own web search / page fetch?
+# Members+ (can_enrich) with a successful answer, when the answer looks weak or
+# the prompt is a lookup/audit - OR when the user ticked "web search" but the
+# model that answered has no native search (only grok does). Before this, a
+# ticked box with a free/OpenRouter/Ollama answer got no web data at all, so
+# members stayed confined to the in-app answer.
+sub enrich_needed {
+    my (%a) = @_;
+    return 0 unless $a{can_enrich} && $a{success};
+    my $native = (($a{provider} // '') =~ /^(?:grok|xai)$/i) ? 1 : 0;
+    return 1 if $a{use_search} && !$native;
+    return 0 if $a{use_search};
+    return (($a{quality} // '') eq 'poor' || $a{site_audit} || $a{lookup_intent}) ? 1 : 0;
+}
 
 # Role-based system prompt. $roles is an arrayref; admin/dev get the
 # "you may use tools / internal data" flavor. Mirrors v1 _build_role_system_prompt.
@@ -53,6 +70,7 @@ sub build_agent_prompt {
     return $existing if $existing;
 
     my $aid = lc($agent_id // '');
+    $aid = 'planning' if $aid eq 'todo' || $aid eq 'projects' || $aid eq 'project';
 
     # BMaster gets the full beekeeping-aware prompt (apiary schema, voice
     # inspection workflow, ACTION contract) — ported from v1 (2026-07-24).
@@ -65,10 +83,14 @@ sub build_agent_prompt {
         helpdesk => "You are a helpful support agent for the Comserv system. Be concise and practical.",
         ency     => "You are an encyclopedia assistant. Provide clear, factual answers.",
         bmaster  => "You are a business master / project assistant. Be professional and concise.",
-        planning => "You are a planning assistant. Focus on daily logs, tasks, and clear next steps.",
-        todo     => "You are the Comserv todo agent. When the user wants a todo created, the server already performs that job — confirm the result, do not invent a form.",
+        planning => "You are the Comserv Planning Assistant (also covers Project Manager and Task Assistant). Use LIVE TODO/PROJECT data when injected. The TODO ACTION contract is already in the system prompt — after a provider retry never say you have no todo tool. Confirm server-created todos; do not invent a form. Local Ollama models (nimble for decision/todosort, tev1) may be available and are good for planning analysis.",
+        todo     => "You are the Comserv Task Assistant (agent id=todo). The system prompt already contains the TODO ACTION contract and live project catalog. After a provider retry or fallback you MUST keep using that contract — never say you have no todo tool. When the user wants a todo created, the server may already have done it; confirm the result, do not invent a form.",
         code     => "You are a coding assistant for the Comserv2 Catalyst app. The server already loads source into [FILE:] blocks. NEVER say you lack filesystem access or ask the user to paste files. Load other sources with [READ_FILE: lib/...] (optional :START-END). Prefer concise examples and one fenced code block so Approve can apply it.",
+        programming => "You are the AI Editor programming agent for Comserv2. Use loaded [FILE:] buffers (including any auto-attached related pipeline files such as the controller for an opened .tt template). Never claim no filesystem access. Understand the background pipeline: the controller action populates the stash (e.g. todos, dates, open_log_entry, audit data) which the template and its includes consume. Plan then code only when phase is implement. Never create todos, never emit [ACTION: create_todo], never file HelpDesk tickets or invoices.",
+        documentation => "You are the AI Editor documentation agent. Prefer docs/changelog/planning guidance; avoid code file rewrites unless asked.",
+        analyze => "You are the AI Editor Analyze worker. Read loaded [FILE:] buffers and auto-attached pipeline files (the controller and related sources for the page/template). Return root cause + short plan. Use the controller source to understand exactly how data reaches the template. Never rewrite files, never emit ## FIX / full-file patches, never ask the user to paste files already provided.",
         nav      => "You are a navigation assistant. Help the user find the right page or feature in Comserv.",
+        investigator => "You are a cost-effective investigator using only cheap or free models. Your job is to search logs, code, git history, usage data, and reports to answer questions about what happened. Be efficient and produce a clear report with findings, relevant paths, commits if possible, and direct quotes. Use [READ_FILE: path] if you need more. For git describe what to look up (recent commits, diffs on current branch, etc.).",
     );
     return $agent{$aid} if exists $agent{$aid};
     return undef;
@@ -87,9 +109,26 @@ sub build_system_prompt {
     push @parts, $args{page_context}        if $args{page_context};
     push @parts, $args{navigation_hint}     if $args{navigation_hint};
 
-    # Logged-in users can create todos from this same chat (widget + editor).
+    # Logged-in Chat-with-AI users get the todo ACTION contract (#2295).
+    # AI Editor agents must not: the open buffer + phase contract mention
+    # "todo" and the intercept would create real rows (#2423).
     my $uname = eval { $c->session->{username} } || '';
-    if ($uname && lc($uname) ne 'guest') {
+    require Comserv::Model::AI2::ChatIntent;
+    my $editor_agent = Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id})
+        || $args{skip_app_writes};
+    if ($uname && lc($uname) ne 'guest' && !$editor_agent) {
+        my $hd_contract = eval {
+            require Comserv::Model::AI2::HelpDeskTicketCreate;
+            my $hbrain = eval { $c->model('AI2::HelpDeskTicketCreate') };
+            $hbrain = Comserv::Model::AI2::HelpDeskTicketCreate->new if !$hbrain || !ref $hbrain;
+            $hbrain->chat_contract($c);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                'build_system_prompt', "HelpDeskTicketCreate chat_contract failed: $@");
+        }
+        push @parts, $hd_contract if $hd_contract;
+
         my $contract = eval {
             require Comserv::Model::AI2::TodoCreate;
             my $brain = eval { $c->model('AI2::TodoCreate') };
@@ -113,6 +152,18 @@ sub build_system_prompt {
                 'build_system_prompt', "InvoiceCreate chat_contract failed: $@");
         }
         push @parts, $inv_contract if $inv_contract;
+
+        my $sched_contract = eval {
+            require Comserv::Model::AI2::Scheduler;
+            my $sbrain = eval { $c->model('AI2::Scheduler') };
+            $sbrain = Comserv::Model::AI2::Scheduler->new if !$sbrain || !ref $sbrain;
+            $sbrain->chat_contract($c);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                'build_system_prompt', "Scheduler chat_contract failed: $@");
+        }
+        push @parts, $sched_contract if $sched_contract;
     }
 
     # Positive-learning retrieval (proj #288): reuse what the app already knows
@@ -178,51 +229,153 @@ sub build_messages {
 }
 
 # Select provider+model via the v2 Router (role/context-aware, local-first).
+# Forward prompt/phase/agent so classify_prompt_for_routing can map the question
+# (using local Ollama eval model if available) to Supergrok/paid/free.
 sub select_provider_and_model {
     my ($self, $c, $requested_model, $can_select, %ctx) = @_;
     my $router = $c->model('AI2::Router');
-    return $router->select_model($c,
+    my ($prov, $model) = $router->select_model($c,
         requested_model => $requested_model,
         can_select      => $can_select,
+        prompt          => $ctx{prompt} || $ctx{user_prompt},
+        phase           => $ctx{phase},
+        agent_id        => $ctx{agent_id},
         %ctx,
     );
+    # Also run classify to surface quota warning for system message
+    my $cl = $router->classify_prompt_for_routing($c, $ctx{prompt} || $ctx{user_prompt},
+        agent_id => $ctx{agent_id}, phase => $ctx{phase}, %ctx);
+    return ($prov, $model, $cl);
 }
 
 # Main entry: run a chat turn. Returns { success, response, model, usage? }.
+# AIMPS #2030 extras for ai_usage_logs (duration_ms + metadata surface/role).
+sub _aimps_elapsed_ms {
+    my ($t0) = @_;
+    return undef unless $t0 && ref($t0) eq 'ARRAY';
+    return int(tv_interval($t0) * 1000);
+}
+
+sub _aimps_meta {
+    my ($self, $c, $args, $extra) = @_;
+    $args  ||= {};
+    $extra ||= {};
+    my $roles = $c->session->{roles} || [];
+    $roles = [ split(/,/, $roles) ] unless ref $roles;
+    my $surface = $args->{surface}
+        || (($args->{skip_app_writes} || $args->{phase}) ? 'editor' : 'chat');
+    return {
+        surface  => $surface,
+        role     => join(',', @$roles) || 'guest',
+        agent_id => $args->{agent_id} // '',
+        %$extra,
+    };
+}
+
 sub process {
     my ($self, $c, %args) = @_;
 
     my $prompt = $args{prompt} // '';
     return { success => 0, error => 'Prompt is required' } unless $prompt && length $prompt;
 
-    # Todo-create AGENT (in-chat job). Deterministic — does NOT use the
-    # picker model. Free models invent a fake "Add" box; this runs first.
-    my $todo_hit = eval {
-        require Comserv::Model::AI2::TodoCreate;
-        Comserv::Model::AI2::TodoCreate->new->try_chat_create($c,
+    # Before agents, logs, and the provider. Do not log the body.
+    my $harm = eval {
+        require Comserv::Util::AI::HarmRefusal;
+        Comserv::Util::AI::HarmRefusal::classify_turn($prompt, $args{history});
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+            "HarmRefusal failed closed: $@");
+        return { success => 0, refused => 1, error => 'Chat safety check failed. The question was not sent.' };
+    }
+    if ($harm) {
+        my $uid = eval { $c->session->{user_id} };
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'process',
+            Comserv::Util::AI::HarmRefusal::log_line($harm, $uid));
+        my $reply = Comserv::Util::AI::HarmRefusal::reply_hash($harm);
+        $reply->{thinking} = ['Local harm refusal; prompt was not sent to a provider'];
+        return $reply;
+    }
+
+    my $t0 = [gettimeofday];
+
+    my @thinking;
+    push @thinking, 'Received prompt (' . length($prompt) . ' chars)';
+    push @thinking, 'agent_id=' . ($args{agent_id} // '(none)');
+
+    require Comserv::Model::AI2::ChatIntent;
+    my $editor_todo_skip = Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id})
+        || $args{skip_app_writes};
+
+    # Declare early so visible for both enrich skipping and the later editor
+    # process trace append (the latter was causing the "Global symbol" compile error).
+    my $surface   = $args{surface} || '';
+    my $is_editor = ($surface eq 'editor')
+        || Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id});
+
+    # HelpDesk-ticket AGENT first — must beat TodoCreate when the prompt
+    # mentions both "ticket" and "todo" (3180 / 6510 hijack).
+    # Skip for AI Editor: loaded files mention tickets/todos (#2423).
+    my $hd_hit = (!$editor_todo_skip) && eval {
+        require Comserv::Model::AI2::HelpDeskTicketCreate;
+        my $hbrain = eval { $c->model('AI2::HelpDeskTicketCreate') };
+        $hbrain = Comserv::Model::AI2::HelpDeskTicketCreate->new if !$hbrain || !ref $hbrain;
+        $hbrain->try_chat_create($c,
             prompt    => $prompt,
             page_path => $args{page_path} || '',
         );
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
-            "TodoCreate try_chat_create threw: $@");
+            "HelpDeskTicketCreate try_chat_create threw: $@");
     }
-    if ($todo_hit && $todo_hit->{handled}) {
+    if ($hd_hit && $hd_hit->{handled}) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
-            'Todo-create agent handled chat (no LLM)');
+            'HelpDesk-ticket agent handled chat (no LLM)');
+        push @thinking, 'Handled by HelpDesk-ticket agent (no LLM)';
         return {
-            success     => 1,
-            response    => $todo_hit->{response} // '',
-            model       => $todo_hit->{model} // '(todo-create)',
-            provider    => $todo_hit->{provider} // 'ai2-todo',
-            todo_action => $todo_hit->{todo_action},
-            thinking    => [],
+            success       => 1,
+            response      => $hd_hit->{response} // '',
+            model         => $hd_hit->{model} // '(helpdesk-ticket-create)',
+            provider      => $hd_hit->{provider} // 'ai2-helpdesk',
+            ticket_action => $hd_hit->{ticket_action},
+            thinking      => \@thinking,
         };
     }
 
+    # Todo-create AGENT (in-chat job). Deterministic — does NOT use the
+    # picker model. Free models invent a fake "Add" box; this runs next.
+    # Skip for AI Editor agents (programming/coding/code/documentation).
+    my $todo_hit;
+    if (!$editor_todo_skip) {
+        $todo_hit = eval {
+            require Comserv::Model::AI2::TodoCreate;
+            Comserv::Model::AI2::TodoCreate->new->try_chat_create($c,
+                prompt    => $prompt,
+                page_path => $args{page_path} || '',
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+                "TodoCreate try_chat_create threw: $@");
+        }
+        if ($todo_hit && $todo_hit->{handled}) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+                'Todo-create agent handled chat (no LLM)');
+            push @thinking, 'Handled by Todo-create agent (no LLM)';
+            return {
+                success     => 1,
+                response    => $todo_hit->{response} // '',
+                model       => $todo_hit->{model} // '(todo-create)',
+                provider    => $todo_hit->{provider} // 'ai2-todo',
+                todo_action => $todo_hit->{todo_action},
+                thinking    => \@thinking,
+            };
+        }
+    }
+
     # Invoice-create AGENT. Same intercept as todos — draft only, never posts GL.
-    my $inv_hit = eval {
+    my $inv_hit = (!$editor_todo_skip) && eval {
         require Comserv::Model::AI2::InvoiceCreate;
         my $ibrain = eval { $c->model('AI2::InvoiceCreate') };
         $ibrain = Comserv::Model::AI2::InvoiceCreate->new if !$ibrain || !ref $ibrain;
@@ -235,13 +388,14 @@ sub process {
     if ($inv_hit && $inv_hit->{handled}) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
             'Invoice-create agent handled chat (no LLM)');
+        push @thinking, 'Handled by Invoice-create agent (no LLM)';
         return {
             success        => 1,
             response       => $inv_hit->{response} // '',
             model          => $inv_hit->{model} // '(invoice-create)',
             provider       => $inv_hit->{provider} // 'ai2-invoice',
             invoice_action => $inv_hit->{invoice_action},
-            thinking       => [],
+            thinking       => \@thinking,
         };
     }
 
@@ -262,13 +416,16 @@ sub process {
             "CodeRead try_chat_read threw: $@");
     }
     if ($read_hit && $read_hit->{handled}) {
+        push @thinking, 'Handled by Code-read agent (no LLM)';
+        push @thinking, 'files_read=' . join(', ', @{ $read_hit->{files_read} || [] })
+            if $read_hit->{files_read} && @{ $read_hit->{files_read} };
         return {
             success    => 1,
             response   => $read_hit->{response} // '',
             model      => $read_hit->{model} // '(code-read)',
             provider   => $read_hit->{provider} // 'ai2-coderead',
             files_read => $read_hit->{files_read} || [],
-            thinking   => [],
+            thinking   => \@thinking,
         };
     }
 
@@ -292,7 +449,10 @@ sub process {
     my $code_read;
     my $code_skip;
     my $uname = $c->session->{username} || '';
-    my $code_ok = (lc($args{agent_id} // '') eq 'code')
+    # AI Editor sends agent_id=programming/analyze; they need [READ_FILE:] too
+    # (eval #30: they were left out, so models asked users to paste code or
+    # printed fake tool calls that nobody ran).
+    my $code_ok = (lc($args{agent_id} // '') =~ /^(code|programming|analyze)$/)
         && $uname && lc($uname) ne 'guest';
     if ($code_ok) {
         $code_read = eval {
@@ -307,13 +467,21 @@ sub process {
             $code_read = undef;
         }
         if ($code_read) {
-            my $prep = eval {
-                $code_read->prepare_turn($c,
-                    prompt       => $prompt,
-                    page_path    => $args{page_path} || '',
-                    page_content => $args{page_content} || '',
-                );
-            };
+            # Editor JS already pasted files as [FILE: path] blocks. Then do not
+            # run prepare_turn (it would re-add the open file and also load every
+            # path mentioned inside the pasted code). Only enable [READ_FILE:]
+            # follow-ups, skipping the files already in the message.
+            my %have;
+            while ($prompt =~ /\[FILE:\s*([^\]\s]+)/g) { $have{lc $1} = 1; }
+            my $prep = %have
+                ? { page_context => $code_read->editor_contract, files_read => [], skip => \%have }
+                : eval {
+                    $code_read->prepare_turn($c,
+                        prompt       => $prompt,
+                        page_path    => $args{page_path} || '',
+                        page_content => $args{page_content} || '',
+                    );
+                };
             if ($@) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
                     "CodeRead prepare_turn threw: $@");
@@ -322,6 +490,22 @@ sub process {
                 $args{page_context} = $prep->{page_context} if $prep->{page_context};
                 push @files_read, @{ $prep->{files_read} || [] };
                 $code_skip = $prep->{skip};
+                # 2026-10-15: add the code that shows how the open page works
+                # (rendering controller sub, Site.pm, chat route), 90K total cap.
+                my $rel = eval {
+                    $code_read->related_context($c,
+                        prompt => $prompt,
+                        open   => $args{page_path} || '',
+                        skip   => { %{ $prep->{skip} || {} }, %have },
+                        budget => 90000 - length($prompt),
+                    );
+                };
+                if ($rel && $rel->{blocks}) {
+                    $prompt .= "\n\n---\nRelated code the server loaded so you can see how this page works "
+                        . "(controller that renders it, settings, routes):\n\n" . $rel->{blocks};
+                    push @files_read, @{ $rel->{files_read} || [] };
+                    push @thinking, 'related code loaded: ' . join(', ', @{ $rel->{files_read} || [] });
+                }
                 if ($prep->{user_files} && length $prep->{user_files}) {
                     $prompt .= "\n\n---\nThe server already loaded these files from disk. "
                         . "They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n"
@@ -336,6 +520,7 @@ sub process {
     my $system_prompt = $self->build_system_prompt($c,
         roles          => $roles,
         agent_id       => $args{agent_id},
+        skip_app_writes => $args{skip_app_writes},
         agent_system   => $args{system},
         model          => $args{model},
         module_data    => $args{module_data},
@@ -346,31 +531,117 @@ sub process {
     unshift @$messages, { role => 'system', content => $system_prompt }
         if $system_prompt;
 
-    # Select provider+model (v2 Router)
-    my ($provider_name, $use_model) = $self->select_provider_and_model($c,
-        $args{model}, $can_select,
-        agent_id => $args{agent_id},
+    # ── Golden Data / Anti-Hallucination hook (Model::AI2::Grounding) ──────
+    # Default 'shadow' (root/config/ai_grounding.json): this turn is unchanged
+    # and the Ledger records grounded=0. 'enforce' (config, or request
+    # {"grounding":"enforce"}) on a factual question: payload = glossary +
+    # policy + labelled GROUNDING; auto_enrich skipped (retrieval already ran);
+    # empty Grounding Context returns the fixed fallback with no model call.
+    my $grounding = eval { require Comserv::Model::AI2::Grounding; Comserv::Model::AI2::Grounding->new };
+    my $gturn = $grounding
+        ? eval { $grounding->prepare_turn($c, prompt => $prompt, args => \%args, thinking => \@thinking) }
+        : undef;
+    if ($gturn && $gturn->{enforce}) {
+        return $grounding->miss_reply($c, $gturn, args => \%args,
+            duration_ms => _aimps_elapsed_ms($t0), thinking => \@thinking) if $gturn->{miss};
+        $messages = $gturn->{messages} if $gturn->{messages};
+        $args{_auto_enrich_done} = 1;
+        delete $args{use_search};   # no unlabelled provider-side search in a grounded turn
+    }
+
+    # Select provider+model (v2 Router). The editor cheap-pin is not a user
+    # choice — leave it unset so ModelPick sees SuperGrok, OpenRouter, Ollama.
+    # Pass prompt + phase + agent so classification can choose Supergrok
+    # (allotment OK?), paid, or free, and return $cl for the quota warning.
+    my $requested_model = $args{model};
+    my $user_picked = $args{user_picked} ? 1 : 0;
+    if (!$user_picked && $requested_model) {
+        require Comserv::Model::AI2::ModelPick;
+        $requested_model = undef
+            if Comserv::Model::AI2::ModelPick->is_auto_pin($requested_model);
+    }
+    my ($provider_name, $use_model, $cl) = $self->select_provider_and_model($c,
+        $requested_model, $can_select,
+        agent_id    => $args{agent_id},
+        prompt      => $prompt,
+        phase       => $args{phase},
+        route       => $args{route},
+        user_picked => $user_picked,
+        surface     => $args{surface},
     );
+    $cl ||= {};
+    my $quota_msg = '';
+    if ($cl->{quota_warning}) {
+        my $next = $cl->{suggested_next_model} || 'a free/cheap model (e.g. openrouter/cohere/north-mini-code:free or local ollama)';
+        # Plain message for web users (eval #31). Config steps stay in the log only.
+        $quota_msg = "Today's allowance for the main AI model is used up, so this answer came from a free backup model. "
+            . "It may be less detailed. The main model comes back after the daily reset (5:00 AM PT).";
+        push @thinking, 'QUOTA: ' . $cl->{quota_warning} . " (using $next)";
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'process',
+            'Daily quota hit in classify: ' . $cl->{quota_warning} . ' suggested=' . $next . ' (or_over=' . ($cl->{openrouter_over_daily}||0) . ', sg_locked=' . ($cl->{supergrok_locked}||0) . ')'
+            . '. Admin: check Hermes default/editor/director/git aliases are not pinned to grok-build-0.1 / xai-oauth.');
+    }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
         "AI2 chat dispatch: user=$username provider=$provider_name model="
         . ($use_model // '(router-default)') . " can_select=$can_select");
+    push @thinking, "Dispatch: provider=$provider_name model="
+        . ($use_model // '(router-default)') . " can_select=$can_select";
 
     # One dispatch+fallback path (chat widget and FocusTune share Router).
     # SuperGrok / OpenRouter (no auto-fill) fall back to :free then Ollama.
     # xAI grok auto-fills — not the same provider as SuperGrok.
     my $router = $c->model('AI2::Router');
+    push @thinking, 'Calling provider (chat_with_fallback)...';
+    # Model failover (AISYSTEM plan §5e): purpose picks the chain in
+    # data/ai_model_chains.json; failed attempts are written to the Ledger by
+    # the Router (metadata.fallover); an enforce-mode grounding strip that
+    # leaves nothing fails over to the next chain step.
+    my $purpose = ($gturn && $gturn->{enforce}) ? 'docs'
+                : ($code_read || $args{skip_app_writes} || $args{phase}) ? 'coding'
+                : 'chat';
+    my $postcheck = ($gturn && $gturn->{enforce}) ? sub {
+        my ($text) = @_;
+        my $out = $grounding->finish_turn($c, $gturn, $text // '', \@thinking);
+        return ($out, $gturn->{postcheck_emptied});
+    } : undef;
     my $resp = try {
-        $router->chat_with_fallback($c, $provider_name, $use_model, $messages);
+        # use_search must be threaded to the provider: it is set by the widget
+        # (local-chat.js) and parsed in AI2.pm, but was never forwarded past
+        # this point, so Grok's search_parameters (Grok.pm) never fired.
+        $router->chat_with_fallback($c, $provider_name, $use_model, $messages,
+            ($args{use_search} ? (use_search => 1) : ()),
+            (($args{phase} || '') eq 'implement' || ($args{route} || '') eq 'escalate')
+                ? (max_tokens => 8192) : (),
+            purpose      => $purpose,
+            request_type => 'chat',
+            ledger_meta  => $self->_aimps_meta($c, \%args),
+            ($postcheck ? (postcheck => $postcheck) : ()));
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
             "Provider $provider_name threw: $_");
+        push @thinking, "Provider threw: $_";
         undef;
     };
+
+    if ($resp && $resp->{refused}) {
+        push @thinking, 'Local harm refusal; not sent to a provider';
+        return {
+            success  => $resp->{success} ? 1 : 0,
+            refused  => 1,
+            response => $resp->{response} // '',
+            error    => $resp->{error},
+            provider => 'local-refusal',
+            model    => 'harm-refusal',
+            thinking => \@thinking,
+        };
+    }
 
     unless ($resp && $resp->{success}) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
             "Provider $provider_name failed: " . ($resp->{error} // 'AI provider error')
             . " (model=" . ($use_model // '?') . ", user=$username)");
+        # The Router already wrote one Ledger row per failed attempt plus a
+        # router/all_exhausted row (§5e); only log here when it did not.
         eval {
             $c->model('AI')->log_usage($c,
                 provider          => $provider_name,
@@ -378,15 +649,31 @@ sub process {
                 status            => 'error',
                 error_message     => $resp->{error} // 'AI provider error',
                 request_type      => 'chat',
+                duration_ms       => _aimps_elapsed_ms($t0),
+                metadata          => $self->_aimps_meta($c, \%args),
+                grounding         => ($gturn ? $gturn->{ledger} : undef),   # Ledger grounding fields
             );
-        };
-        return { success => 0, error => $resp->{error} // 'AI provider error' };
+        } unless $resp && $resp->{attempts_logged};
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+                "Failed to record AI usage (error path): $@");
+        }
+        my $public = eval { $c->model('AI2::Router')->_user_facing_error($resp->{error}) }
+                  || 'The AI provider did not complete this turn. Try again or pick another model.';
+        push @thinking, 'Provider failed: ' . ($resp->{error} // $public);
+        return { success => 0, error => $public, thinking => \@thinking };
     }
 
+    push @thinking, 'Provider responded'
+        . ($resp->{provider} ? (" via " . $resp->{provider}) : '')
+        . ($resp->{model} ? (" / " . $resp->{model}) : '');
     if ($resp->{fallback}) {
+        push @thinking, 'Fell back from ' . ($resp->{fallback_from} // '?')
+            . ' to ' . ($resp->{provider} // '') . '/' . ($resp->{model} // '');
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'process',
             "Fell back from $resp->{fallback_from} ($resp->{original_error}) to "
             . ($resp->{provider} // '') . '/' . ($resp->{model} // ''));
+        # Failed attempts are already in the Ledger (Router, metadata.fallover).
         eval {
             $c->model('AI')->log_usage($c,
                 provider          => $resp->{fallback_from} || $provider_name,
@@ -394,9 +681,16 @@ sub process {
                 status            => 'error',
                 error_message     => $resp->{original_error} || 'credits exhausted, fell back',
                 request_type      => 'chat',
-                metadata          => { fallback_to => $resp->{provider} },
+                duration_ms       => _aimps_elapsed_ms($t0),
+                metadata          => $self->_aimps_meta($c, \%args, {
+                    fallback_to => $resp->{provider},
+                }),
             );
-        };
+        } unless $resp->{attempts_logged};
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+                "Failed to record AI usage (fallback path): $@");
+        }
         $provider_name = $resp->{provider} if $resp->{provider};
         $use_model     = $resp->{model}     if $resp->{model};
     }
@@ -434,6 +728,260 @@ sub process {
         }
     }
 
+    # Grounding post-check (enforce only): cite-or-strip + Candidate Data label.
+    # Skipped when the Router already ran it as the failover post-check.
+    if ($gturn && $gturn->{enforce} && $resp && $resp->{success} && !$resp->{postchecked}) {
+        $resp->{response} = $grounding->finish_turn($c, $gturn, $resp->{response} // '', \@thinking);
+    }
+
+    # ── Auto-enrich when in-app context is insufficient (Shanta 2026-09-14) ──
+    # Public web search AND/OR same-origin linked pages (site nav audit).
+    # Runs once per turn before persist. Controllers may not reload under -r;
+    # this lives in the Model so a :4006 restart picks it up reliably.
+    my $citations = [];
+    if (!$args{_auto_enrich_done}) {
+        my $roles_e = $c->session->{roles} || [];
+        $roles_e = [ split(/\s*,\s*/, $roles_e) ] unless ref $roles_e;
+        my $can_enrich = (grep { $_ =~ /^(admin|developer|editor|member)$/i } @$roles_e) ? 1 : 0;
+        my $ai_ctrl = eval { $c->controller('AI') };
+        my $quality = 'unknown';
+        if ($ai_ctrl && $ai_ctrl->can('_assess_response_quality')) {
+            $quality = $ai_ctrl->_assess_response_quality($resp->{response} // '', $prompt);
+        }
+        my $site_audit = ($prompt =~ /\b(navigate|navigation|crawl|audit|failed\s+links?|each\s+page|readable|theme|look and content|site and report|broken\s+links?)\b/i) ? 1 : 0;
+        my $lookup_intent = ($prompt =~ /\b(find|look\s*up|search\s+for|what\s+is|who\s+is|tell\s+me\s+about|tell\s+me\s+what|information\s+on|info\s+on|used\s+for)\b/i) ? 1 : 0;
+        my $need = enrich_needed(
+            can_enrich => $can_enrich, success => ($resp && $resp->{success}),
+            quality => $quality, site_audit => $site_audit, lookup_intent => $lookup_intent,
+            use_search => $args{use_search}, provider => ($resp ? $resp->{provider} : undef));
+        # Editor (surface or agent) already has the raw buffer + CodeRead.
+        $need = 0 if $is_editor;
+        # 2026-10-15: AI Editor agents never auto web-search; the re-answer
+        # overwrote code analysis with junk (helpdesk contact.tt session).
+        $need = 0 if Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id});
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+            "auto_enrich check: can=$can_enrich quality=$quality site_audit=$site_audit lookup_intent=$lookup_intent need=$need");
+        push @thinking, "auto_enrich: quality=$quality site_audit=$site_audit lookup_intent=$lookup_intent need=$need";
+        if ($need) {
+            my $extra = '';
+            my $origin_host_early = eval { $c->req->uri->host } || 'workstation.local';
+            my $prior_hits = eval { $self->_format_prior_web_search_hits($c, $prompt, $origin_host_early) } || '';
+            if ($prior_hits) {
+                $extra .= $prior_hits;
+                push @thinking, 'prior learned search/audit hits injected';
+            }
+            # Same-origin linked pages (see beyond current page)
+            my @hrefs;
+            my $links = $args{page_links} || [];
+            if (ref $links eq 'ARRAY') {
+                for my $sec (@$links) {
+                    next unless defined $sec;
+                    while ($sec =~ m{(https?://[^\s]+|/[\w./\-]+)}g) {
+                        push @hrefs, $1;
+                    }
+                }
+            }
+            my $pc = $args{page_content} || '';
+            while ($pc =~ m{href=["']([^"']+)["']}gi) { push @hrefs, $1; }
+            my %seen; my @fetch;
+            my $origin_host = eval { $c->req->uri->host } || 'workstation.local';
+            my $base = eval { $c->req->base->as_string } || "http://$origin_host/";
+            $base =~ s{/$}{};
+            for my $h (@hrefs) {
+                next if $seen{$h}++;
+                # Skip links that still hold unrendered template code, e.g.
+                # /todo/details?record_id=[% p.todo_id | uri %] (always 500s).
+                next if $h =~ /\[%|%\]|%5B%25|%25%5D|\{\{|\}\}/i;
+                my $url = $h;
+                $url = $base . $h if $h =~ m{^/};
+                next unless $url =~ m{^https?://}i;
+                # same host only
+                next unless $url =~ m{https?://\Q$origin_host\E(?::\d+)?/}i
+                         || $url =~ m{https?://(?:127\.0\.0\.1|localhost)(?::\d+)?/}i;
+                next if $url =~ m{/ai/widget}i;
+                push @fetch, $url;
+                last if @fetch >= 6;
+            }
+            if (@fetch) {
+                push @thinking, 'Fetching ' . scalar(@fetch) . ' same-origin pages for site context…';
+                require LWP::UserAgent;
+                require HTTP::Request;
+                my $ua = LWP::UserAgent->new(timeout => 8, max_size => 400_000, max_redirect => 3);
+                $ua->agent('Comserv-AI-SiteAudit/1.0');
+                my $cookie = $c->req->header('Cookie') || '';
+                my $bundle = "--- Same-origin pages (auto-fetched for site audit) ---\n"
+                    . "NOTE: Shared header/nav/footer is normal. Judge each page by its MAIN content only.\n"
+                    . "Do NOT claim all pages are identical just because chrome matches.\n";
+                my %finger;
+                for my $url (@fetch) {
+                    # Skip literal TT template fragments that came from raw .tt buffer in editor
+                    next if $url =~ /\[\s*\%|%]/ || $url =~ /selected_date|prev_date|next_date|current_date_str/;
+                    my $req = HTTP::Request->new(GET => $url);
+                    $req->header('Host' => $origin_host . ( ($c->req->uri->port && $c->req->uri->port !~ /^(80|443)$/) ? (':' . $c->req->uri->port) : '' ));
+                    $req->header('Cookie' => $cookie) if length $cookie;
+                    $req->header('Accept' => 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8');
+                    my $res = eval { $ua->request($req) };
+                    if ($res && $res->is_success) {
+                        my $html = $res->decoded_content // '';
+                        my $ctype = $res->header('Content-Type') || '';
+                        my $text = '';
+                        if ($ctype =~ m{json}i || $html =~ /^\s*[\[{]/) {
+                            $text = substr($html, 0, 4000);
+                        } else {
+                            $html =~ s{<script\b[^>]*>.*?</script>}{}gsi;
+                            $html =~ s{<style\b[^>]*>.*?</style>}{}gsi;
+                            # Drop shared chrome so pages are distinguishable
+                            $html =~ s{<nav\b[^>]*>.*?</nav>}{}gsi;
+                            $html =~ s{<header\b[^>]*>.*?</header>}{}gsi;
+                            $html =~ s{<footer\b[^>]*>.*?</footer>}{}gsi;
+                            my $main = '';
+                            if ($html =~ m{<main\b[^>]*>(.*?)</main>}si) {
+                                $main = $1;
+                            } elsif ($html =~ m{id=["']content["'][^>]*>(.*)}si) {
+                                $main = substr($1, 0, 20000);
+                            } elsif ($html =~ m{class=["'][^"']*(?:main-content|page-content|content-area)[^"']*["'][^>]*>(.*)}si) {
+                                $main = substr($1, 0, 20000);
+                            } else {
+                                $main = $html;
+                            }
+                            $main =~ s{<[^>]+>}{ }g;
+                            $main =~ s{\s+}{ }g;
+                            $main =~ s{^\s+|\s+$}{}g;
+                            $text = substr($main, 0, 3500);
+                        }
+                        my $fp = substr($text, 0, 120);
+                        $finger{$fp}++;
+                        my $title = '';
+                        if (($res->decoded_content // '') =~ m{<title[^>]*>(.*?)</title>}si) {
+                            $title = $1;
+                            $title =~ s{\s+}{ }g;
+                            $title = substr($title, 0, 80);
+                        }
+                        $bundle .= "\n## $url\nHTTP " . $res->code
+                            . (length $title ? " | title: $title" : '')
+                            . " | main_chars=" . length($text) . "\n$text\n";
+                        push @$citations, { url => $url, title => ($title || $url) };
+                        push @thinking, "fetched OK $url main=" . length($text);
+                        {
+                            my $path_snip = eval { $c->req->uri->path } || '';
+                            my $prompt_snip = $prompt // '';
+                            $prompt_snip =~ s/\s+/ /g;
+                            $prompt_snip = substr($prompt_snip, 0, 80);
+                            my $aq = 'site_audit:' . (length($path_snip) ? $path_snip : $prompt_snip);
+                            $self->_persist_web_search_hit($c,
+                                query          => $aq,
+                                result_title   => ($title || $url),
+                                result_url     => $url,
+                                result_snippet => substr($text, 0, 500),
+                                full_content   => $text,
+                                source_type    => 'web',
+                            );
+                        }
+                    } else {
+                        my $code = $res ? $res->code : 'err';
+                        $bundle .= "\n## $url\nFAILED HTTP $code\n";
+                        push @thinking, "fetch FAIL $url ($code)";
+                        push @$citations, { url => $url, title => "FAILED $code" };
+                        {
+                            my $path_snip = eval { $c->req->uri->path } || '';
+                            my $prompt_snip = $prompt // '';
+                            $prompt_snip =~ s/\s+/ /g;
+                            $prompt_snip = substr($prompt_snip, 0, 80);
+                            my $aq = 'site_audit:' . (length($path_snip) ? $path_snip : $prompt_snip);
+                            $self->_persist_web_search_hit($c,
+                                query          => $aq,
+                                result_title   => "FAILED $code",
+                                result_url     => $url,
+                                result_snippet => "FAILED HTTP $code",
+                                source_type    => 'web',
+                            );
+                        }
+                    }
+                }
+                my $unique = scalar keys %finger;
+                $bundle .= "\n[fingerprint] unique main-content samples among successes: $unique / "
+                    . scalar(@fetch) . "\n";
+                push @thinking, "unique main fingerprints=$unique";
+                $extra .= $bundle . "\n";
+            }
+            # Public web search
+            if ($ai_ctrl && $ai_ctrl->can('_do_web_search')) {
+                push @thinking, 'In-app answer incomplete or site-audit — auto web-search…';
+                my ($search_ctx, $sp) = ('', '');
+                eval { ($search_ctx, $sp) = $ai_ctrl->_do_web_search($c, $prompt, $args{agent_id} || 'general', \@thinking); };
+                if ($@) {
+                    push @thinking, "web-search threw: $@";
+                } elsif ($search_ctx && length $search_ctx) {
+                    push @thinking, "web-search via $sp";
+                    $extra .= "\n--- Web search (auto) ---\n$search_ctx\n";
+                    my $prompt_q = $prompt // '';
+                    $prompt_q =~ s/\s+/ /g;
+                    $prompt_q = substr($prompt_q, 0, 200);
+                    my $parsed = 0;
+                    while ($search_ctx =~ /^##\s*(.+?)\nURL:\s*(\S+)\n(.*?)(?=\n## |\nUse the above|\z)/msg) {
+                        my ($wt, $wu, $ws) = ($1, $2, $3);
+                        $ws =~ s/^\s+|\s+$//g;
+                        $ws = substr($ws, 0, 500);
+                        push @$citations, { url => $wu, title => ($wt || $wu) };
+                        $self->_persist_web_search_hit($c,
+                            query          => $prompt_q,
+                            result_title   => ($wt || $wu),
+                            result_url     => $wu,
+                            result_snippet => (length($ws) ? $ws : ($wt || $wu)),
+                            source_type    => 'web',
+                        );
+                        $parsed++;
+                    }
+                    if (!$parsed) {
+                        while ($search_ctx =~ /^URL:\s*(\S+)/mg) {
+                            my $wu = $1;
+                            push @$citations, { url => $wu, title => $wu };
+                            $self->_persist_web_search_hit($c,
+                                query          => $prompt_q,
+                                result_title   => $wu,
+                                result_url     => $wu,
+                                result_snippet => $wu,
+                                source_type    => 'web',
+                            );
+                        }
+                    }
+                } else {
+                    push @thinking, 'web-search returned no results';
+                }
+            }
+            if (length $extra) {
+                push @$messages, {
+                    role => 'user',
+                    content => "Additional context gathered automatically:\n$extra\n"
+                        . "Answer the ORIGINAL user question first (what they asked — e.g. whether Chat-with-AI/Grok can audit the site, and how).
+"
+                        . "If this is a site audit: for EACH fetched URL, describe its MAIN content separately. "
+                        . "Shared nav/header is normal — never conclude 'all pages are the homepage' from shared chrome. "
+                        . "Use title + main_chars + body text. Report failed fetches (non-2xx) as failed links. "
+                        . "Comment on readability and theme only from main content. Cite URLs.",
+                };
+                my $again = try {
+                    $router->chat_with_fallback($c, $provider_name, $use_model, $messages,
+                        ($args{use_search} ? (use_search => 1) : ()));
+                } catch {
+                    push @thinking, "enrich re-ask threw: $_";
+                    undef;
+                };
+                if ($again && $again->{success} && length($again->{response} // '')) {
+                    $resp = $again;
+                    $provider_name = $again->{provider} if $again->{provider};
+                    $use_model = $again->{model} if $again->{model};
+                    push @thinking, 'Provider re-answered after auto_enrich';
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+                        'auto_enrich re-answer ok len=' . length($resp->{response} // ''));
+                } else {
+                    push @thinking, 'enrich re-ask failed — keeping first answer';
+                }
+            }
+        }
+    }
+
+
     # ── Persist conversation + messages (v2 parity with v1 /ai/chat) ──
     # Without this, no conversation_id is ever created, so the widget can
     # never "start a new conversation" and nothing is saved to history.
@@ -442,13 +990,21 @@ sub process {
     my $created_at = '';
     try {
         my $schema = $c->model('DBEncy')->schema;
-        my $uid    = $c->session->{user_id} // 199;
+        my $is_guest = is_guest_session($c);
+        my $uid = $c->session->{user_id};
+        if ($is_guest) {
+            $uid = 199 unless defined $uid;
+        }
+        die "No user_id for conversation persist\n" unless defined $uid;
         my $agent  = $args{agent_id} // 'general';
+        my $gid = $is_guest ? ensure_guest_session_id($c) : '';
 
         # Create a new conversation only when none was supplied (first turn)
         unless ($conversation_id && $conversation_id =~ /^\d+$/) {
             $saved_title = $prompt ? substr($prompt, 0, 80) : 'Chat Conversation';
             $saved_title =~ s/\n/ /g;
+            my %meta = (agent_id => $agent);
+            $meta{guest_session_id} = $gid if $is_guest && length $gid;
             my $conv = $schema->resultset('AiConversation')->create({
                 user_id    => $uid,
                 title      => $saved_title,
@@ -456,9 +1012,18 @@ sub process {
                 task_id    => $args{task_id},
                 model      => $resp->{model} // $use_model // '',
                 status     => 'active',
-                metadata   => encode_json({ agent_id => $agent }),
+                metadata   => encode_json(\%meta),
             });
             $conversation_id = $conv ? $conv->id : undef;
+        } else {
+            my $existing = $schema->resultset('AiConversation')->find($conversation_id);
+            if ($existing) {
+                unless (conversation_owned_by_session($c, $existing)) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+                        "Blocked persist into foreign conversation_id=$conversation_id");
+                    $conversation_id = undef;
+                }
+            }
         }
 
         if ($conversation_id) {
@@ -493,8 +1058,9 @@ sub process {
                 content         => $resp->{response} // '',
                 agent_type      => $agent,
                 model_used      => $model_used,
+                metadata        => encode_json({ thinking_trace => \@thinking }),
             });
-            $created_at = scalar(localtime);
+            $created_at = eval { require Comserv::Util::AppTime; Comserv::Util::AppTime->now_utc } || scalar(localtime);
         }
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
@@ -504,22 +1070,42 @@ sub process {
 
     eval {
         my $usage_info = $resp->{usage} || {};
+        my $used = $resp->{model} || $use_model || 'unknown';
+        my $req_agent = $args{agent_id} // '';
+        my $req_phase = $args{phase} // '';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+            "AIMPS model_used provider=$provider_name model=$used "
+            . "prompt_tokens=" . ($usage_info->{prompt_tokens} || 0)
+            . " completion_tokens=" . ($usage_info->{completion_tokens} || 0)
+            . " total_tokens=" . ($usage_info->{total_tokens} || 0)
+            . " user=$username duration_ms=" . (_aimps_elapsed_ms($t0) // '?')
+            . " requested_agent=$req_agent requested_phase=$req_phase");
         $c->model('AI')->log_usage($c,
             provider          => $provider_name,
-            model             => $resp->{model} || $use_model || 'unknown',
+            model             => $used,
             prompt_tokens     => $usage_info->{prompt_tokens} || 0,
             completion_tokens => $usage_info->{completion_tokens} || 0,
             total_tokens      => $usage_info->{total_tokens} || 0,
             request_type      => 'chat',
             conversation_id   => $conversation_id,
             status            => 'success',
-            metadata          => {
-                agent_id      => $args{agent_id},
+            duration_ms       => _aimps_elapsed_ms($t0),
+            # Ledger grounding fields. Shadow turns: grounded=0 (Ungrounded
+            # Generation); candidate_hit_count = unlabelled auto_enrich citations.
+            grounding         => ($gturn && $gturn->{ledger} ? {
+                %{ $gturn->{ledger} },
+                ($gturn->{enforce} ? () : (candidate_hit_count => scalar(@{ $citations || [] }))),
+            } : undef),
+            metadata          => $self->_aimps_meta($c, \%args, {
+                thinking_steps => scalar(@thinking),
                 ($resp->{fallback} ? (
                     fallback      => 1,
                     fallback_from => $resp->{fallback_from},
                 ) : ()),
-            },
+            }),
+            # §5e: attempt_no / fallback_from / fallback_reason / final model.
+            (ref $resp->{fallover} eq 'HASH' ? (fallover => $resp->{fallover}) : ()),
+            response_text     => $resp->{response} // '',
         );
         # SuperGrok ≠ xAI grok. Only SuperGrok (prepaid, no auto-fill) trips the 80% alert.
         my $from = $resp->{fallback_from} || $provider_name || '';
@@ -532,18 +1118,168 @@ sub process {
             "Failed to record AI usage: $@");
     }
 
+    my $final_response = $resp->{response} // '';
+
+    # For AI Editor (programming/analyze/etc. agents or surface=editor): append a short
+    # transparent process trace so the user sees exactly what model/agent/enrich path
+    # produced the answer. This addresses "the visible reply does not contain the
+    # background process".
+    if ($is_editor || $surface eq 'editor') {
+        my $proc = "\n\n---\n[process] agent=" . ($args{agent_id} // 'general')
+                 . " phase=" . ($args{phase} // 'n/a')
+                 . " model=" . ($resp->{model} || $use_model || 'unknown')
+                 . " provider=" . ($resp->{provider} || $provider_name || 'unknown');
+        if (@thinking) {
+            my @key = grep { /enrich|fetch|search|files_read|CodeRead|model|Dispatch/i } @thinking;
+            $proc .= "\n" . join("\n", @key[0..4]) if @key;
+        }
+        if ($citations && @$citations) {
+            $proc .= "\n citations=" . scalar(@$citations);
+        }
+        $final_response .= $proc;
+    }
+
     return {
         success         => 1,
-        response        => $resp->{response} // '',
+        response        => $final_response,
         model           => $resp->{model} || $use_model,
-        provider        => $provider_name,
+        provider        => $resp->{provider} || $provider_name,
         usage           => $resp->{usage} || {},
         conversation_id => $conversation_id,
         title           => $saved_title,
         created_at      => $created_at,
-        thinking        => [],
+        thinking        => \@thinking,
         files_read      => \@files_read,
+        citations       => $citations || [],
+        grounding       => ($grounding && $gturn ? $grounding->summary($gturn) : undef),
+        fallover        => $resp->{fallover},
+        fallback        => $resp->{fallback},
+        fallback_from   => $resp->{fallback_from},
+        original_model  => $resp->{original_model},
+        original_error  => $resp->{original_error},
+        all_exhausted   => $resp->{all_exhausted},
+        ($quota_msg ? (system_warning => $quota_msg, quota_switched => 1) : ()),
     };
+}
+
+
+# ── WebSearchResult learn/persist helpers (aisystem 2026-09-14) ─────────────
+# Non-fatal: never break chat if DB write/read fails.
+sub _session_uid_for_wsr {
+    my ($self, $c) = @_;
+    my $uid = $c->session->{user_id};
+    if (eval { is_guest_session($c) }) {
+        $uid = 199 unless defined $uid;
+    }
+    return defined $uid ? $uid : 199;
+}
+
+sub _persist_web_search_hit {
+    my ($self, $c, %h) = @_;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my $query  = substr($h{query} // '', 0, 500);
+        my $url    = substr($h{result_url} // '', 0, 1000);
+        return 0 unless length $query && length $url;
+        my $title  = substr(($h{result_title} // $url), 0, 512);
+        $title = $url unless length $title;
+        my $snippet = $h{result_snippet} // '';
+        $snippet = substr($snippet, 0, 65000);
+        $snippet = '(empty)' unless length $snippet;
+
+        # Light dedup: skip if same query+url already stored
+        my $existing = $schema->resultset('WebSearchResult')->search(
+            { result_url => $url, query => $query },
+            { rows => 1, order_by => { -desc => 'id' } }
+        )->single;
+        return 0 if $existing;
+
+        my %row = (
+            query            => $query,
+            result_title     => $title,
+            result_url       => $url,
+            result_snippet   => $snippet,
+            source_type      => ($h{source_type} || 'web'),
+            found_by_user_id => ($h{found_by_user_id} // $self->_session_uid_for_wsr($c)),
+            is_verified      => 0,
+        );
+        if (defined $h{full_content} && length $h{full_content}) {
+            $row{full_content} = substr($h{full_content}, 0, 100_000);
+        }
+        $schema->resultset('WebSearchResult')->create(\%row);
+        1;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+            "WebSearchResult persist failed: $@");
+    }
+}
+
+sub _format_prior_web_search_hits {
+    my ($self, $c, $prompt, $origin_host) = @_;
+    my $out = '';
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my @keywords;
+        my %stop = map { $_ => 1 } qw(
+            that this with from have what when where which about page site link
+            http https navigate navigation audit report each content look theme
+            failed links broken crawl readable whether
+        );
+        for my $w (split /\W+/, lc($prompt // '')) {
+            next if length($w) < 4;
+            next if $stop{$w};
+            push @keywords, $w;
+            last if @keywords >= 5;
+        }
+        my @or;
+        for my $kw (@keywords) {
+            my $like = '%' . $kw . '%';
+            push @or,
+                { query => { -like => $like } },
+                { result_title => { -like => $like } },
+                { result_url => { -like => $like } },
+                { result_snippet => { -like => $like } };
+        }
+        if ($origin_host && length $origin_host) {
+            push @or, {
+                query      => { -like => 'site_audit:%' },
+                result_url => { -like => '%' . $origin_host . '%' },
+            };
+        }
+        return unless @or;
+        my @rows = $schema->resultset('WebSearchResult')->search(
+            { -or => \@or },
+            { order_by => { -desc => 'created_at' }, rows => 8 }
+        )->all;
+        return unless @rows;
+        $out = "--- Prior learned search/audit hits ---\n"
+             . "NOTE: prior/learned findings from websearchresult. Reuse when relevant; "
+             . "prefer live fetch when available.\n";
+        for my $r (@rows) {
+            my $created = $r->created_at;
+            if (ref $created && $created->can('strftime')) {
+                $created = $created->strftime('%Y-%m-%d %H:%M');
+            }
+            my $snip = $r->result_snippet // '';
+            $snip = substr($snip, 0, 300);
+            $out .= sprintf(
+                "[prior] %s | %s\n  url: %s\n  query: %s\n  %s\n",
+                $created // '',
+                $r->result_title // '',
+                $r->result_url // '',
+                $r->query // '',
+                $snip
+            );
+        }
+        $out .= "\n";
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+            "WebSearchResult prior load failed: $@");
+        return '';
+    }
+    return $out;
 }
 
 sub _can_select_model {
@@ -562,7 +1298,9 @@ sub _can_select_model {
 sub _bare_model {
     my ($self, $model) = @_;
     return $model unless defined $model;
-    $model =~ s/^[^|]+\|//;   # drop leading "provider|"
+    # Mirror Router::_bare_model (CSC-20260914-4380 slash form).
+    $model =~ s/^(?:supergrok|grok-oauth|grok|ollama|openrouter|external)[|\/]//i;
+    $model =~ s/^[^|]+\|//;   # drop any other leading "provider|"
     return $model;
 }
 

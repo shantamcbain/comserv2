@@ -1367,6 +1367,89 @@ sub _db_mark_orphan {
     };
 }
 
+# ----------------------------------------------------------------------------
+# Editor image picker (pages + newsletter). Uploads go THROUGH the File
+# Manager (upload_and_record) so every image gets a File row that can be
+# filed, found and shared. Images are then shown publicly via
+# /media/file/<id>/<name> (Controller::Media).
+# ----------------------------------------------------------------------------
+sub _json_out {
+    my ($self, $c, $data, $status) = @_;
+    require JSON::MaybeXS;
+    $c->res->status($status) if $status;
+    $c->res->content_type('application/json; charset=utf-8');
+    $c->res->body(JSON::MaybeXS->new(utf8 => 1)->encode($data));
+}
+
+sub _image_url_for {
+    my ($self, $row) = @_;
+    my $name = $row->file_name // 'image';
+    $name =~ s/[^A-Za-z0-9._-]+/_/g;
+    return '/media/file/' . $row->id . '/' . $name;
+}
+
+# GET /file/images_json?q=term  -> images this admin's site can use
+sub images_json :Path('/file/images_json') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+    return $self->_json_out($c, { error => 'Admin login required' }, 403) unless $is_admin;
+    my $q = $c->req->param('q') // '';
+    my %where = (
+        file_status => 'active',
+        file_format => { -like => 'image/%' },
+    );
+    $where{sitename} = $sitename unless $is_csc;
+    $where{-or} = [ file_name => { -like => "%$q%" }, description => { -like => "%$q%" } ] if length $q;
+    my @rows = eval { $c->model('DBEncy')->resultset('File')->search(\%where,
+        { order_by => { -desc => 'id' }, rows => 200 })->all };
+    my @out = map { { id => $_->id, name => $_->file_name, description => ($_->description // ''),
+                      sitename => ($_->sitename // ''), url => $self->_image_url_for($_) } } @rows;
+    return $self->_json_out($c, { images => \@out });
+}
+
+# POST /file/upload_image_json  (multipart: file, description?)
+sub upload_image_json :Path('/file/upload_image_json') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+    return $self->_json_out($c, { error => 'Admin login required' }, 403) unless $is_admin;
+    return $self->_json_out($c, { error => 'POST required' }, 405) unless $c->req->method eq 'POST';
+    my $upload = $c->req->upload('file');
+    return $self->_json_out($c, { error => 'No file selected' }, 400) unless $upload;
+    my ($ext) = (($upload->filename // '') =~ /\.([^.]+)$/);
+    return $self->_json_out($c, { error => 'Only jpg, png, gif or webp images' }, 400)
+        unless $ext && lc($ext) =~ /^(jpe?g|png|gif|webp)$/;
+
+    my $schema = $c->model('DBEncy');
+    # Prefer the site's allocated NFS directory named .../media; else the
+    # site's default media/uploads folder on shared NFS.
+    my $target;
+    eval {
+        my ($alloc) = $schema->resultset('NfsDirectory')->search(
+            { sitename => $sitename, is_active => 1, nfs_path => { -like => '%/media%' } },
+            { order_by => 'id', rows => 1 })->all;
+        $target = $alloc->id if $alloc && -d $alloc->nfs_path;
+    };
+    unless ($target) {
+        my $root = $self->nfs_path->get_nfs_root();
+        my $dir  = lc($sitename || 'csc');
+        $dir =~ s/[^a-z0-9_-]//g;
+        my $path = "$root/$dir/media/uploads";
+        require File::Path;
+        File::Path::make_path($path) unless -d $path;
+        return $self->_json_out($c, { error => "Cannot create $path" }, 500) unless -d $path;
+        $target = "path:$path";
+    }
+    my ($row, $err) = $c->model('File')->upload_and_record($c, $upload, $target);
+    return $self->_json_out($c, { error => "Upload failed: $err" }, 500) if $err || !$row;
+    my $desc = $c->req->param('description') // '';
+    eval { $row->update({ description => $desc, sitename => ($row->sitename || $sitename) }) } if length $desc || !$row->sitename;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'upload_image_json',
+        "Editor image uploaded id=" . $row->id . " name=" . $row->file_name);
+    return $self->_json_out($c, { id => $row->id, name => $row->file_name,
+        url => $self->_image_url_for($row), description => $desc });
+}
+
+
 sub _resolve_roles {
     my ($self, $c) = @_;
     

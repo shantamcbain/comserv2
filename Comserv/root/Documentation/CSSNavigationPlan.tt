@@ -1,0 +1,194 @@
+[% META
+   title = "Small-screen navigation and theme chrome"
+   description = "Phone and tablet menu contract for the CSSNavigation branch. Linked to project CSSNAV."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "development"
+   page_version = "0.01"
+   last_updated = "2026-10-21"
+   site_specific = "false"
+   project_id = "305"
+   project_code = "CSSNAV"
+%]
+[% PageVersion = 'Documentation/CSSNavigationPlan.tt,v 0.01 2026/10/16 hermes-agent Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+[% PageVersion %]
+[% END %]
+
+<div class="container">
+[% INCLUDE 'admin/documentation/_doc_header.tt'
+    page_title = 'Small-screen navigation and theme chrome'
+    last_updated = '2026-10-21'
+    doc_project_id = 305
+    doc_project_code = 'CSSNAV'
+%]
+
+<div class="doc-info" id="now">
+<p class="doc-body"><strong>Now.</strong> <a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2585">#2585</a> is done. Under 640px the hamburger toggles <code>nav-open</code> and taps open accordions. Wider than that the menu wraps and hover still works. JavaScript does not write inline <code>display</code> on menu nodes. Verified on port 4012, not 3001.</p>
+<p class="doc-body"><strong>Blocked by.</strong> Nothing for the menu. The admin info-bar collapse (<a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2586">#2586</a>) is not started. Missing <code>sunfire.css</code> is owned by Theme Management, todo <a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2588">#2588</a> on project #77 — not absorbed here.</p>
+<p class="doc-body"><strong>Next.</strong> Hard-refresh a page on port 4012 and narrow the window below 640px. Then <a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2586">#2586</a>.</p>
+</div>
+
+<div id="toc" class="row">
+<div class="col-100">
+<h2 class="doc-h2">Quick navigation</h2>
+<div class="doc-navrow">
+<a class="doc-navlink" href="#tracking">Project tracking</a>
+<a class="doc-navlink" href="#broken">What is broken</a>
+<a class="doc-navlink" href="#contract">Small-screen contract</a>
+<a class="doc-navlink" href="#work">Work items</a>
+<a class="doc-navlink" href="#decisions">Decisions</a>
+</div>
+</div>
+</div>
+
+<div class="row" id="tracking">
+<div class="col-100">
+<h2 class="doc-h2">Project tracking</h2>
+<p class="doc-body">Parent audit: <a class="doc-link" href="[% c.uri_for('/project/details') %]?project_id=221">#221 THEME-AUDIT</a>. Earlier menu colour audit: <a class="doc-link" href="[% c.uri_for('/project/details') %]?project_id=224">#224 THEME-AUDIT-P3</a> (todos #820–#822, done — they did not cover this bug). Theme files: <a class="doc-link" href="[% c.uri_for('/project/details') %]?project_id=77">#77</a>.</p>
+<table class="doc-table">
+<thead>
+<tr><th class="doc-th">Work</th><th class="doc-th">Todo</th><th class="doc-th">Gate</th></tr>
+</thead>
+<tbody>
+<tr>
+<td class="doc-td">ROLE EVAL — measured inline-style override</td>
+<td class="doc-td"><a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2583">#2583</a></td>
+<td class="doc-td">Done when the cause is a file and a rule, not a guess</td>
+</tr>
+<tr class="doc-tr-alt">
+<td class="doc-td">DEP CHECK — chrome files only, no schema</td>
+<td class="doc-td"><a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2584">#2584</a></td>
+<td class="doc-td">Done when the file list is closed</td>
+</tr>
+<tr>
+<td class="doc-td">Class-only phone and tablet menu</td>
+<td class="doc-td"><a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2585">#2585</a></td>
+<td class="doc-td">Hamburger shows the menu; Main does not navigate away; submenus accordion; desktop hover still works</td>
+</tr>
+<tr class="doc-tr-alt">
+<td class="doc-td">Admin server-info bar on a small screen</td>
+<td class="doc-td"><a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2586">#2586</a></td>
+<td class="doc-td">Not started. Collapsed by default only under the small-screen query</td>
+</tr>
+<tr>
+<td class="doc-td">ROUTINE re-audit</td>
+<td class="doc-td"><a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2587">#2587</a></td>
+<td class="doc-td">Quarterly. META, todos, and class-only menu still true</td>
+</tr>
+<tr class="doc-tr-alt">
+<td class="doc-td">sunfire.css missing (owned by #77)</td>
+<td class="doc-td"><a class="doc-link" href="[% c.uri_for('/todo/details') %]?record_id=2588">#2588</a></td>
+<td class="doc-td">Raised, not absorbed. Sheet returns HTTP 200</td>
+</tr>
+</tbody>
+</table>
+<p class="doc-body"><a class="doc-link" href="[% c.uri_for('/todo') %]?project_id=305">All todos on #305</a> · <a class="doc-link" href="[% c.uri_for('/project') %]">All projects</a> · <a class="doc-link" href="[% c.uri_for('/Documentation/CssThemes') %]">CSS theme admin guide</a> · <a class="doc-link" href="[% c.uri_for('/Documentation/MASTER_PLAN') %]">Master plan</a></p>
+<p><a class="doc-backtop" href="#toc">↑ Back to Top</a></p>
+</div>
+</div>
+
+<div class="row" id="broken">
+<div class="col-100">
+<h2 class="doc-h2">What is broken</h2>
+<p class="doc-body">The live menu is <code>layout.tt</code> → <code>pagetop.tt</code> → <code>Navigation/Menu.tt</code>. <code>Navigation/navigation.tt</code> is not on that path.</p>
+<ul>
+<li class="doc-body"><code>menu-theme.css</code> hides <code>.horizontal-menu</code> under 768px until the list has <code>nav-open</code>. The hamburger in <code>pagetop.tt</code> toggles that class.</li>
+<li class="doc-body"><code>sub-menu.js</code> is loaded on every page from <code>js_load.tt</code>. On load it sets inline <code>display:flex</code> and <code>flex-direction:row</code> on every <code>.horizontal-menu</code>. Inline style beats the stylesheet, so the hamburger never wins.</li>
+<li class="doc-body">Submenus fly out with <code>left: 100%</code>. <code>menu-position.js</code> is not loaded. Touch never opens <code>.submenu-item</code>.</li>
+<li class="doc-body">A <code>.dropbtn</code> with a real href (Main → <code>/</code>) navigates instead of opening the panel.</li>
+<li class="doc-body">768px misses tablet landscape and many phone-landscape widths.</li>
+<li class="doc-body"><code>menu.js</code> looks for <code>#mobile-menu-toggle</code>. That node does not exist. Do not extend it.</li>
+</ul>
+<p><a class="doc-backtop" href="#toc">↑ Back to Top</a></p>
+</div>
+</div>
+
+<div class="row" id="contract">
+<div class="col-100">
+<h2 class="doc-h2">Small-screen contract</h2>
+<p class="doc-body">Layout is CSS. JavaScript toggles classes only: <code>nav-open</code> on <code>#main-menu-list</code>, <code>touch-open</code> on <code>.horizontal-dropdown</code> and <code>.submenu-item</code>. JavaScript must not set <code>element.style.display</code> on menu nodes.</p>
+<p class="doc-body">The query, identical in <code>menu-theme.css</code> and <code>sub-menu.js</code>:</p>
+<div class="doc-codebox"><pre>(max-width: 640px)</pre></div>
+<ul>
+<li class="doc-body">Under that query (a phone) the top menu is hidden until the hamburger is used. Submenus are accordions. Links wrap. Targets are at least 44px.</li>
+<li class="doc-body">Above 640px the menu stays a wrapping row. A narrowed desktop or a tablet does not switch to the vertical list. Hover still opens dropdowns there.</li>
+<li class="doc-body">No new CSS or JS file. No inline script added to a template that loads <code>js_load.tt</code>.</li>
+<li class="doc-body">Colours come from tokens in <code>static/config/theme_definitions.json</code>. Do not edit the stale copy under <code>static/css/themes/theme_definitions.json</code>.</li>
+</ul>
+<p><a class="doc-backtop" href="#toc">↑ Back to Top</a></p>
+</div>
+</div>
+
+<div class="row" id="work">
+<div class="col-100">
+<h2 class="doc-h2">Work items</h2>
+<table class="doc-table">
+<thead>
+<tr><th class="doc-th">Item</th><th class="doc-th">Files</th><th class="doc-th">Status</th></tr>
+</thead>
+<tbody>
+<tr>
+<td class="doc-td">Stop inline display overrides; tap opens panels</td>
+<td class="doc-td"><code>root/static/js/sub-menu.js</code></td>
+<td class="doc-td">Done. Class toggles only. Served on :4012.</td>
+</tr>
+<tr class="doc-tr-alt">
+<td class="doc-td">One small-screen query, accordion submenus</td>
+<td class="doc-td"><code>root/static/css/menu-theme.css</code></td>
+<td class="doc-td">Done. 640px query, 44px targets, accordion.</td>
+</tr>
+<tr>
+<td class="doc-td">Move hamburger CSS and script out of the template</td>
+<td class="doc-td"><code>root/pagetop.tt</code></td>
+<td class="doc-td">Done. Hamburger markup only. Guest bar uses <code>var(--accent-color)</code>.</td>
+</tr>
+<tr class="doc-tr-alt">
+<td class="doc-td">Admin info bar</td>
+<td class="doc-td"><code>root/pagetop.tt</code></td>
+<td class="doc-td">#2586 not started</td>
+</tr>
+<tr>
+<td class="doc-td">sunfire theme sheet</td>
+<td class="doc-td"><code>root/static/css/themes/sunfire.css</code></td>
+<td class="doc-td">#2588 on #77</td>
+</tr>
+</tbody>
+</table>
+<p class="doc-body">Out of scope: restyling every module page, rewriting <code>base.css</code>, loading <code>menu-position.js</code>, deleting <code>menu.js</code> or <code>Navigation/navigation.tt</code>, schema, server restarts.</p>
+<p><a class="doc-backtop" href="#toc">↑ Back to Top</a></p>
+</div>
+</div>
+
+<div class="row" id="decisions">
+<div class="col-100">
+<h2 class="doc-h2">Decisions</h2>
+<table class="doc-table">
+<thead>
+<tr><th class="doc-th">#</th><th class="doc-th">Decision</th><th class="doc-th">Resolution</th></tr>
+</thead>
+<tbody>
+<tr>
+<td class="doc-td">D1</td>
+<td class="doc-td">Where the plan lives</td>
+<td class="doc-td">DECIDED 2026-10-16 — in the app, project #305, this page. A private markdown file is not the plan.</td>
+</tr>
+<tr class="doc-tr-alt">
+<td class="doc-td">D2</td>
+<td class="doc-td">First code slice</td>
+<td class="doc-td">DECIDED 2026-10-16 — menu only (#2585). Admin info bar waits.</td>
+</tr>
+<tr>
+<td class="doc-td">D3</td>
+<td class="doc-td">Next page after the menu works</td>
+<td class="doc-td">Open. Planning daily, HelpDesk, or Inventory — whichever is actually used on a phone.</td>
+</tr>
+</tbody>
+</table>
+<p class="doc-footer">Support: project #305 CSSNAV, parent #221. Re-audit todo #2587.</p>
+<p><a class="doc-backtop" href="#toc">↑ Back to Top</a></p>
+</div>
+</div>
+</div>
+
+[%# ai-plan-sync created todo_ids: 2583,2584,2585,2586,2587 under project_id=305 %]
