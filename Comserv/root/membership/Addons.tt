@@ -63,6 +63,9 @@
               </a>
             [% END %]
           [% END %]
+          [% IF site_is_csc && (is_admin OR _is_global_admin) %]
+            <a href="[% c.uri_for('/admin/site_modules/approval_queue') %]" class="btn btn-sm btn-primary">Approval queue</a>
+          [% END %]
           [% IF _is_global_admin %]
             <a href="[% c.uri_for('/admin/site_modules') %]" class="btn btn-sm" style="background: #007bff; color: white; font-weight: bold; padding: 6px 14px; border-radius: 4px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
               &#9881; Module Access Control
@@ -70,7 +73,7 @@
           [% END %]
         </div>
       </div>
-      <p class="text-muted">These modules are offered by the parent network and individual partner sites (e.g. beekeeping is owned by BMaster, ENCY by ENCY, 3D printing by 3D). <strong>Click any row</strong> for full details.</p>
+      <p class="text-muted">Subscribed is a request. It does not turn the add-on on. Only a CSC admin enables a named site from the approval queue.</p>
 
       <style>
       .addon-row { cursor: pointer; }
@@ -104,10 +107,6 @@
       .addon-dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-color, #eee); }
       </style>
       
-      [% IF is_admin %]
-      <form action="[% c.uri_for('/membership/addons') %]" method="POST" id="addons-form">
-      [% END %]
-
       <div class="table-container">
         <table class="data-table" id="addons-table" data-site="[% site_name | html %]" data-is-admin="[% IF is_admin %]1[% ELSE %]0[% END %]">
           <thead>
@@ -144,22 +143,14 @@
               </td>
               <td class="addon-desc-cell">[% module.description | html %]</td>
               <td class="addon-no-popup">
-                [% IF is_admin %]
-                  [% IF module.key == 'membership' %]
-                    <span class="text-success" style="font-weight:bold;">Required Core</span>
-                    <input type="hidden" name="enabled_[% module.key %]" value="1" />
-                  [% ELSE %]
-                    <label class="switch addon-no-popup" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
-                      <input type="checkbox" class="addon-no-popup" name="enabled_[% module.key %]" value="1" [% IF module.site_enabled %]checked[% END %] style="cursor:pointer;" />
-                      [% IF module.site_enabled %]Enabled[% ELSE %]<span style="color:#aaa;">Disabled</span>[% END %]
-                    </label>
-                  [% END %]
+                [% IF module.key == 'membership' %]
+                  <span class="text-success" style="font-weight:bold;">Required Core</span>
+                [% ELSIF module.site_enabled %]
+                  <span class="text-success" style="font-weight:bold;">&#10004; Enabled</span>
+                [% ELSIF module.subscribed %]
+                  <span class="badge" style="background-color:#e65c00;color:white;font-size:0.8em;padding:2px 6px;border-radius:10px;font-weight:bold;">Requested</span>
                 [% ELSE %]
-                  [% IF module.site_enabled OR module.key == 'membership' %]
-                    <span class="text-success" style="font-weight:bold;">&#10004; Enabled</span>
-                  [% ELSE %]
-                    <span class="text-muted">Disabled</span>
-                  [% END %]
+                  <span class="text-muted">Not enabled</span>
                 [% END %]
               </td>
               <td>
@@ -212,13 +203,6 @@
           </tbody>
         </table>
       </div>
-
-      [% IF is_admin %]
-      <div class="form-actions" id="addons-save" style="margin-top:1.5rem; text-align:right;">
-        <button type="submit" class="btn btn-primary" style="padding:10px 24px;font-size:1rem;font-weight:bold;">Save Add-on Configurations</button>
-      </div>
-      </form>
-      [% END %]
 
     </div>
 

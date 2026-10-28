@@ -1,7 +1,7 @@
 # Documentation Maintenance Plan — Comserv2
 
 Owned by: the Documentation expert (`.hermes.md` role).
-Status: active. Last refreshed: 2026-10-05 (aisystem: fixed /ai/usage TT parse errors).
+Status: active. Last refreshed: 2026-10-27 (Proxmox: pool summary graphs; session stopped, not done).
 
 Purpose: keep every documentation surface accurate, consistent, and in sync with the
 code — and to give a repeatable process so the docs don't drift again.
@@ -156,3 +156,9 @@ branch. P3 needs a quick owner sign-off.
 - No controller/model change is undocumented (sync hook green).
 - No dead path/reference in the top-level docs.
 - This plan's audit section is no more than one week stale.
+
+---
+
+## 7. Recent session — Proxmox pool summary (2026-10-27)
+
+`/proxmox` on :4016 now lists each configured server as a card and, under Summary, draws one history chart per node metric. Each chart uses the page width, labels the value axis and the time axis for the selected Hour/Day/Week/Month/Year window, and shows a color key for each signed-in server. Only servers with a stored API token get a line. ProxmoxDevelopment and workstation still have no token. Handoff: `.hermes/plans/proxmox-pool-summary-graphs.md`. Tracking row is under project #79; left In Progress, clock stopped.

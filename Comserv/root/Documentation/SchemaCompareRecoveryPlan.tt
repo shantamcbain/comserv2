@@ -25,7 +25,7 @@
     </div>
 
     <!-- TABLE OF CONTENTS -->
-    <div id="toc" style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-large) 0;">
+    <div id="toc" style="background: var(--card-bg, rgba(255,255,255,0.15)); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-large) 0;">
         <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Navigation</h3>
         <ul style="color: var(--text-color); font-family: var(--body-font);">
             <li><a href="#executive-summary">Executive Summary</a></li>
@@ -48,25 +48,25 @@
             </p>
             
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-large) 0;">
-                <tr style="background: rgba(255,255,255,0.15);">
-                    <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Metric</th>
-                    <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Value</th>
+                <tr style="background: var(--card-bg, rgba(255,255,255,0.15));">
+                    <th style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: left; color: var(--text-color);">Metric</th>
+                    <th style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: left; color: var(--text-color);">Value</th>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Total Functions</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">9 (3 core + 6 helpers)</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Total Functions</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">9 (3 core + 6 helpers)</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">New Module</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Comserv/lib/Comserv/Controller/Admin/SchemaComparison.pm</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">New Module</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Comserv/lib/Comserv/Controller/Admin/SchemaComparison.pm</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Routes</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">/schema-comparison/*</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Routes</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">/schema-comparison/*</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Estimated Prompts</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">5-7 (block-by-block)</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Estimated Prompts</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">5-7 (block-by-block)</td>
                 </tr>
             </table>
         </div>
@@ -78,35 +78,35 @@
             <h2 id="architecture-decisions" style="color: var(--text-color); font-family: var(--header-font);">Architecture Decisions (Approved)</h2>
             
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-large) 0;">
-                <tr style="background: rgba(255,255,255,0.15);">
-                    <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Decision</th>
-                    <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Choice</th>
-                    <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Rationale</th>
+                <tr style="background: var(--card-bg, rgba(255,255,255,0.15));">
+                    <th style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: left; color: var(--text-color);">Decision</th>
+                    <th style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: left; color: var(--text-color);">Choice</th>
+                    <th style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: left; color: var(--text-color);">Rationale</th>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);"><strong>New Module</strong></td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Admin/SchemaComparison.pm subcontroller</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Avoid Admin.pm bloat (currently >3100 lines)</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);"><strong>New Module</strong></td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Admin/SchemaComparison.pm subcontroller</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Avoid Admin.pm bloat (currently >3100 lines)</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);"><strong>Routing</strong></td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">/schema-comparison/* paths</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Clean routing, new canonical paths</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);"><strong>Routing</strong></td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">/schema-comparison/* paths</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Clean routing, new canonical paths</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);"><strong>Template</strong></td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Use schema branch schema_compare.tt (tables)</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Works; can refactor UI later</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);"><strong>Template</strong></td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Use schema branch schema_compare.tt (tables)</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Works; can refactor UI later</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);"><strong>DBI Pattern</strong></td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Keep main branch db_config lazy builder</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Supports multi-site isolation</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);"><strong>DBI Pattern</strong></td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Keep main branch db_config lazy builder</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Supports multi-site isolation</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);"><strong>Testing</strong></td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Syntax checks + manual endpoint tests</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Verify functionality without full suite</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);"><strong>Testing</strong></td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Syntax checks + manual endpoint tests</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Verify functionality without full suite</td>
                 </tr>
             </table>
         </div>
@@ -135,7 +135,7 @@
             </p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Functions to Extract:</strong></p>
             
-            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 3px; margin: var(--spacing-medium) 0;">
+            <div style="background: var(--card-bg, rgba(255,255,255,0.15)); padding: var(--spacing-medium); border-radius: 3px; margin: var(--spacing-medium) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>Core Functions (3):</strong></p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>sync_table_to_result()</strong> [schema:3316-3383] - Sync DB table fields to Result file</li>
@@ -144,7 +144,7 @@
                 </ul>
             </div>
 
-            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 3px; margin: var(--spacing-medium) 0;">
+            <div style="background: var(--card-bg, rgba(255,255,255,0.15)); padding: var(--spacing-medium); border-radius: 3px; margin: var(--spacing-medium) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>Helper Functions (6):</strong></p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>get_table_field_info()</strong> [schema:3452-3567] - Get DB field definitions</li>
@@ -193,7 +193,7 @@
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Dependency Chain</h3>
-            <pre style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 3px; color: var(--text-color); font-family: monospace; overflow-x: auto;">
+            <pre style="background: var(--card-bg, rgba(255,255,255,0.15)); padding: var(--spacing-medium); border-radius: 3px; color: var(--text-color); font-family: monospace; overflow-x: auto;">
 create_result_from_table()
   ├─ generate_result_file()
   │  └─ generate_result_file_content()
@@ -230,33 +230,33 @@ sync_result_to_table()
             <h2 id="execution-checklist" style="color: var(--text-color); font-family: var(--header-font);">Execution Checklist</h2>
             
             <table style="width: 100%; border-collapse: collapse;">
-                <tr style="background: rgba(255,255,255,0.15);">
-                    <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Phase</th>
-                    <th style="border: 1px solid #ccc; padding: 10px; text-align: center; color: var(--text-color);">Status</th>
+                <tr style="background: var(--card-bg, rgba(255,255,255,0.15));">
+                    <th style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: left; color: var(--text-color);">Phase</th>
+                    <th style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: center; color: var(--text-color);">Status</th>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Phase 1: Planning complete, decisions approved, audit logged</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; text-align: center; color: var(--text-color);">✅ COMPLETE</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Phase 1: Planning complete, decisions approved, audit logged</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: center; color: var(--text-color);">✅ COMPLETE</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Phase 2: Extract functions from schema branch, show code blocks</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; text-align: center; color: var(--text-color);">⏳ READY</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Phase 2: Extract functions from schema branch, show code blocks</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: center; color: var(--text-color);">⏳ READY</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Phase 3: Create Admin/SchemaComparison.pm controller</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; text-align: center; color: var(--text-color);">⏹️ PENDING</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Phase 3: Create Admin/SchemaComparison.pm controller</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: center; color: var(--text-color);">⏹️ PENDING</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Phase 4: Update schema_compare.tt template</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; text-align: center; color: var(--text-color);">⏹️ PENDING</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Phase 4: Update schema_compare.tt template</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: center; color: var(--text-color);">⏹️ PENDING</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Phase 5: Run syntax checks + manual endpoint tests</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; text-align: center; color: var(--text-color);">⏹️ PENDING</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Phase 5: Run syntax checks + manual endpoint tests</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: center; color: var(--text-color);">⏹️ PENDING</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Phase 6: Log completion, update session history</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; text-align: center; color: var(--text-color);">⏹️ PENDING</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Phase 6: Log completion, update session history</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: center; color: var(--text-color);">⏹️ PENDING</td>
                 </tr>
             </table>
         </div>
@@ -268,47 +268,47 @@ sync_result_to_table()
             <h2 id="files-involved" style="color: var(--text-color); font-family: var(--header-font);">Files Involved</h2>
             
             <table style="width: 100%; border-collapse: collapse;">
-                <tr style="background: rgba(255,255,255,0.15);">
-                    <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">File</th>
-                    <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Action</th>
-                    <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Status</th>
+                <tr style="background: var(--card-bg, rgba(255,255,255,0.15));">
+                    <th style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: left; color: var(--text-color);">File</th>
+                    <th style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: left; color: var(--text-color);">Action</th>
+                    <th style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; text-align: left; color: var(--text-color);">Status</th>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Comserv/lib/Comserv/Controller/Admin/SchemaComparison.pm</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Create new</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Pending Phase 3</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Comserv/lib/Comserv/Controller/Admin/SchemaComparison.pm</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Create new</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Pending Phase 3</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Comserv/root/admin/schema_compare.tt</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Update/Replace</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Pending Phase 4</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Comserv/root/admin/schema_compare.tt</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Update/Replace</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Pending Phase 4</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Comserv/lib/Comserv/Controller/Admin.pm</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">No change</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Keep as-is</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Comserv/lib/Comserv/Controller/Admin.pm</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">No change</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Keep as-is</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Comserv/lib/Comserv/Model/DBSchemaManager.pm</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">No change</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Keep evolved version</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Comserv/lib/Comserv/Model/DBSchemaManager.pm</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">No change</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Keep evolved version</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">prompts_log.yaml</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Append entries</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Ongoing (Phase 1-6)</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">prompts_log.yaml</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Append entries</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Ongoing (Phase 1-6)</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">current_session.md.archivenotused</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Update Chat 40</td>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Pending Phase 6</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">current_session.md.archivenotused</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Update Chat 40</td>
+                    <td style="border: 1px solid var(--bg-secondary, #ccc); padding: 10px; color: var(--text-color);">Pending Phase 6</td>
                 </tr>
             </table>
         </div>
     </div>
 
     <!-- FOOTER -->
-    <div class="row" style="margin-top: var(--spacing-large); border-top: 1px solid #ccc; padding-top: var(--spacing-large);">
+    <div class="row" style="margin-top: var(--spacing-large); border-top: 1px solid var(--bg-secondary, #ccc); padding-top: var(--spacing-large);">
         <div class="col-100">
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">
                 <strong>Next Action:</strong> Phase 2 - Extract functions from schema branch with user approval.<br>

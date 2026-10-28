@@ -18,7 +18,8 @@ has 'logging' => (
 # Canonical: read from static/config/theme_definitions.json
 sub get_theme_definitions_path {
     my ($self, $c) = @_;
-    return $c->path_to('root', 'static', 'config', 'theme_definitions.json');
+    require Comserv::Util::ThemePaths;
+    return Comserv::Util::ThemePaths->definitions_file($c);
 }
 
 sub get_theme_mappings_path {
@@ -29,7 +30,8 @@ sub get_theme_mappings_path {
 
 sub get_theme_css_directory {
     my ($self, $c) = @_;
-    return $c->path_to('root', 'static', 'css', 'themes');
+    require Comserv::Util::ThemePaths;
+    return Comserv::Util::ThemePaths->css_dir($c);
 }
 
 sub get_theme_definitions {
@@ -81,12 +83,10 @@ sub get_site_theme {
     
     $self->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_theme', "Getting theme for site: $site_name");
     
-    # Check if there's a theme preference in session
-    if ($c->session && $c->session->{"theme_$site_name"}) {
-        my $session_theme = $c->session->{"theme_$site_name"};
-        $self->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_theme', "Using theme from session for $site_name: $session_theme");
-        return $session_theme;
-    }
+    # NOTE: the site mapping in theme_definitions.json is checked first; a
+    # session-cached theme is only used when the site has no mapping. Otherwise
+    # sessions created before a mapping existed stay stuck on 'default'.
+    my $session_theme = ($c->session && $c->session->{"theme_$site_name"}) || '';
     
     # Load theme definitions and site mappings
     my $file = $self->get_theme_definitions_path($c);
@@ -128,6 +128,8 @@ sub get_site_theme {
         }
     }
     
+    return $session_theme if $session_theme;
+
     # Return default theme if no match found
     my $default_theme = 'default';
     $self->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_theme', "No mapping found for site $site_name, using default theme: $default_theme");
@@ -326,7 +328,7 @@ sub save_theme {
     
     try {
         # Load current theme definitions
-        my $config_file = $c->path_to('root', 'static', 'config', 'theme_definitions.json');
+        my $config_file = $self->get_theme_definitions_path($c);
         
         my $config_data = {};
         if (-f $config_file) {

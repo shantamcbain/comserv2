@@ -491,16 +491,24 @@ sub _run {
         && (grep { defined $_ && $_ eq '--show-current' } @argv)
         && $code == 128
         && (($result->{output} // '') =~ /^\s*$/);
+    # pre-merge-commit / secret_guard.sh refusal. Expected policy block, not a
+    # git failure. Logging it as ERROR spawned audit todos whose only text was
+    # "Created autostash" because the BLOCKED lines are on stderr.
+    my $secret_guard_block = $combined =~ /secret-guard:|junk-guard:|pre-merge-commit:|^\s*BLOCKED:/m;
     my $benign   = !$result->{success}
                 && ( $asks_upstream
                   || $checkout_collision
                   || $show_current_empty
+                  || $secret_guard_block
                   || $combined =~ /no upstream configured|does not have an upstream|no such branch/i );
-    my $level    = $result->{success} ? 'info'
-                 : $benign            ? 'info'
-                 :                      'error';
+    my $level    = $result->{success}       ? 'info'
+                 : $secret_guard_block      ? 'warn'
+                 : $benign                  ? 'info'
+                 :                            'error';
+    my $shown = ($result->{output} // '');
+    $shown .= "\n" . $result->{error} if length($result->{error} // '');
     $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_run',
-        "git " . join(' ', @argv) . " -> exit=$code out=" . substr($result->{output}, 0, 500));
+        "git " . join(' ', @argv) . " -> exit=$code out=" . substr($shown, 0, 500));
 
     return $result;
 }
@@ -874,6 +882,126 @@ sub unstage {
     return $self->_run($c, 'restore', '--staged', '--', @$paths);
 }
 
+=head2 secret_guard($c, $repo, @mode_args)
+
+Run the shared secret guard (Comserv/script/git/secret_guard.sh, falling back to
+~/.git-hooks/secret-guard.sh) against the staged index of $repo (default: the
+request's resolved local repo). Optional @mode_args are passed to the script,
+e.g. ('--merge', $branch) to scan what a merge would bring in. Returns C<{ ok => 1 }> when clean or when the
+target is remote (the remote host's own hooks apply), else
+C<{ ok => 0, output => $redacted_report }>. Never prints secret values — the
+script reports file names / rule ids only.
+
+=cut
+
+sub secret_guard {
+    my ($self, $c, $repo, @mode_args) = @_;
+    unless ($repo) {
+        my $req_target = ($c && $c->stash->{git_target})
+                      // ($c && $c->req ? $c->req->param('target') : undef);
+        my $t = $self->resolve_target($c, $req_target);
+        return { ok => 1, skipped => 'remote' } if ($t->{mode} // '') ne 'local';
+        $repo = $t->{repo};
+    }
+    return { ok => 0, output => 'secret guard: no repository resolved' }
+        unless defined $repo && length $repo;
+    my @cand = ("$repo/Comserv/script/git/secret_guard.sh",
+                ($ENV{HOME} ? "$ENV{HOME}/.git-hooks/secret-guard.sh" : ()));
+    my ($script) = grep { -x $_ } @cand;
+    return { ok => 0, output => 'secret guard script not found; refusing to commit '
+                              . '(expected Comserv/script/git/secret_guard.sh)' }
+        unless $script;
+    require IPC::Run3;
+    my $out = '';
+    IPC::Run3::run3([ 'bash', $script, @mode_args, $repo ], \undef, \$out, \$out);
+    my $code = $? >> 8;
+    my $res = $code == 0 ? { ok => 1, output => $out } : { ok => 0, output => $out };
+    if (!$res->{ok}) {
+        my $report_ok = eval {
+            require Comserv::Util::GitGuardReport;
+            $res->{hits} = Comserv::Util::GitGuardReport->enrich($out);
+            $res->{remediation} = Comserv::Util::GitGuardReport->text_for($res->{hits});
+            1;
+        };
+        if (!$report_ok) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'secret_guard',
+                "guard report failed: $@");
+            $res->{hits} = [];
+            $res->{remediation} = '';
+        }
+    }
+    return $res;
+}
+
+=head2 junk_patterns($repo)
+
+Read <repo>/.commit-junk-patterns (glob per line, "!" exempts, # comments).
+Returns ( \@block_globs, \@exempt_globs ). Falls back to backup-copy globs.
+
+=head2 junk_files($c, \@paths, $repo)
+
+Return the subset of @paths (repo-relative) that match the junk patterns:
+backup copies and app runtime data that must not be committed. Same rules as
+the junk guard in Comserv/script/git/secret_guard.sh ("*" also matches "/").
+
+=cut
+
+sub _glob_to_re {
+    my ($g) = @_;
+    my $re = join '', map { $_ eq '*' ? '.*' : $_ eq '?' ? '.' : quotemeta($_) }
+                      split /(\*|\?)/, $g;
+    return qr/\A$re\z/;
+}
+
+sub junk_patterns {
+    my ($self, $repo) = @_;
+    my (@pat, @not);
+    my $file = (defined $repo && length $repo) ? "$repo/.commit-junk-patterns" : '';
+    if ($file && -f $file && open(my $fh, '<', $file)) {
+        while (my $l = <$fh>) {
+            $l =~ s/#.*//; $l =~ s/^\s+|\s+$//g;
+            next unless length $l;
+            if ($l =~ s/^!//) { push @not, $l } else { push @pat, $l }
+        }
+        close $fh;
+    } else {
+        @pat = ('*.bak', '*.bak-*', '*~', '*.orig');
+    }
+    return ([ map { _glob_to_re($_) } @pat ], [ map { _glob_to_re($_) } @not ]);
+}
+
+sub junk_files {
+    my ($self, $c, $paths, $repo) = @_;
+    return [] unless $paths && @$paths;
+    unless (defined $repo && length $repo) {
+        my $req_target = ($c && $c->stash->{git_target})
+                      // ($c && $c->req ? $c->req->param('target') : undef);
+        my $t = $self->resolve_target($c, $req_target);
+        $repo = ($t->{mode} // '') eq 'local' ? $t->{repo} : $self->main_repo_path($c);
+    }
+    my ($pat, $not) = $self->junk_patterns($repo);
+    my %seen;
+    my @hits = grep {
+        my $p = $_;
+        defined $p && length $p && !$seen{$p}++
+            && (grep { $p =~ $_ } @$pat) && !(grep { $p =~ $_ } @$not)
+    } @$paths;
+    return \@hits;
+}
+
+=head2 staged_junk($c)
+
+Junk files (see junk_files) among the staged additions/modifications.
+
+=cut
+
+sub staged_junk {
+    my ($self, $c) = @_;
+    my $r = $self->_run($c, 'diff', '--cached', '--name-only', '--diff-filter=ACMR');
+    my @staged = grep { length } split /\n/, ($r->{output} // '');
+    return $self->junk_files($c, \@staged);
+}
+
 =head2 commit($c, $message)
 
 Commit staged changes with $message. Returns the uniform hash.
@@ -884,6 +1012,24 @@ sub commit {
     my ($self, $c, $message) = @_;
     return { success => 0, error => 'Commit message required' }
         unless defined $message && length $message;
+    # Junk guard: refuse staged backup copies / app runtime data (same rules as the hook).
+    my $junk = eval { $self->staged_junk($c) } || [];
+    if (@$junk) {
+        return { success => 0, exit_code => 1, junk_files => $junk,
+                 error => "Commit refused: backup copies / app runtime data are staged: "
+                        . join(', ', @$junk) . ". Use 'Untrack + gitignore' on the Git page, or run: "
+                        . join(' && ', map { "git rm --cached -- '$_'" } @$junk)
+                        . " and add them to .gitignore." };
+    }
+    # Secret guard: refuse key files / raw keys / gitleaks hits. Never --no-verify.
+    my $guard = $self->secret_guard($c);
+    return { success => 0, exit_code => 1, output => $guard->{output} // q{},
+             hits => $guard->{hits} || [],
+             error => "Commit refused by secret guard (possible key/secret staged). "
+                    . "Unstage the flagged file(s) and retry. "
+                    . "Only the primary DB key belongs in the env; other keys belong in the database.\n"
+                    . ($guard->{remediation} || $guard->{output} // q{}) }
+        unless $guard->{ok};
     return $self->_run($c, 'commit', '-m', $message);
 }
 
@@ -932,6 +1078,48 @@ Push to origin. opts: branch (required), set_upstream => 0|1.
 sub push_to_origin {
     my ($self, $c, %opts) = @_;
     my $branch = $opts{branch} or return { success => 0, error => 'Branch required' };
+
+    # --- enforce HUMAN ADMIN only for publish to origin ---
+    my $primary = '/home/shanta/PycharmProjects/comserv2';
+    my $top = $self->repo_path($c) // '';
+    unless ($top && $top eq $primary) {
+        return {
+            success => 0,
+            error   => "Push refused: Only the primary checkout can publish to origin.",
+            output  => '',
+        };
+    }
+    unless ($branch eq 'main' || $branch eq 'master') {
+        return {
+            success => 0,
+            error   => "Push refused: Can only push 'main' or 'master' from origin.",
+            output  => '',
+        };
+    }
+    # Check for admin environment and server ancestry
+    unless (exists $ENV{COMSERV_ADMIN_PUSH} && $ENV{COMSERV_ADMIN_PUSH} == 1) {
+        return {
+            success => 0,
+            error   => "Push refused: GitHub publish must be approved via admin page (set COMSERV_ADMIN_PUSH=1).",
+            output  => '',
+        };
+    }
+    # verify parent process chain contains comserv_server.pl
+    my $pid = $$;
+    my $found = 0;
+    for (my $i = 0; $i < 12 && $pid > 1; $i++) {
+        my $cmd = `tr '\0' ' ' < /proc/$pid/cmdline 2>/dev/null`;
+        if ($cmd =~ /comserv_server.pl/) { $found = 1; last; }
+        $pid = `awk '/^PPid:/ { print $2 }' /proc/$pid/status 2>/dev/null`;
+    }
+    unless ($found) {
+        return {
+            success => 0,
+            error   => "Push refused: Admin server process not in the chain.",
+            output  => '',
+        };
+    }
+    # All checks passed — delegate to the real push
     my @argv = ('push');
     push @argv, '--set-upstream' if $opts{set_upstream};
     push @argv, 'origin', $branch;
@@ -1079,8 +1267,7 @@ sub create_branch {
     my $result = { success => 0, output => '', action => 'create_branch' };
 
     if (!$branch_name || $branch_name !~ m{^[a-zA-Z0-9_\-/]+$}) {
-        $result->{error_msg} = "Invalid branch name. Use only letters, numbers, "
-            . "underscores, hyphens, and forward slashes.";
+        $result->{error_msg} = "Invalid branch name. Use only letters, numbers, underscores, hyphens, and forward slashes.";
         return $result;
     }
     $source_branch ||= 'main';
@@ -1107,16 +1294,9 @@ sub create_branch {
         return $result;
     }
 
-    $result->{output} .= "Pushing new branch to remote...\n";
-    my $pu = $self->push_to_origin($c, branch => $branch_name, set_upstream => 1);
-    $result->{output} .= $pu->{output};
-    if (!$pu->{success}) {
-        $result->{error_msg} = "Failed to push branch '$branch_name' to remote";
-        return $result;
-    }
-
+    $result->{output} .= "Branch '$branch_name' created locally. Do not push to origin; worktree is for testing only.\n";
     $result->{success}     = 1;
-    $result->{success_msg} = "Branch '$branch_name' created successfully and pushed to remote.";
+    $result->{success_msg} = "Branch '$branch_name' created locally. Use 'hermes chat -w' to test, then switch to main to verify.";
     return $result;
 }
 
@@ -1779,6 +1959,20 @@ sub merge_branch {
     }
     my %seen_d; @dirty = grep { !$seen_d{$_}++ } @dirty;
     $result->{uncommitted_files} = \@dirty if @dirty;
+
+    # Secret guard on the incoming merge diff (merge-base..branch). Refuse on a hit.
+    my $guard = $self->secret_guard($c, $repo, '--merge', $branch);
+    unless ($guard->{ok}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "merge_branch: secret guard refused merging '$branch' into $current");
+        $result->{error_msg} = "Merge refused by secret guard: '$branch' would bring in a key/secret file. "
+                             . "Only the primary DB key belongs in the env; other keys belong in the database.\n"
+                             . ($guard->{remediation} || $guard->{output} // q{});
+        $result->{output}    = $guard->{output} // q{};
+        $result->{hits}      = $guard->{hits} || [];
+        $result->{reason}    = 'secret_guard';
+        return $result;
+    }
 
     my $r = $self->_run($c, 'merge', '--no-ff', $branch, $run_opts);
     # CRITICAL: git prints almost all merge failures on stderr. _run keeps

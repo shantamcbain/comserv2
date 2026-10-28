@@ -18,6 +18,8 @@ __PACKAGE__->add_columns(
     imap_host     => { data_type => 'varchar', size => 255, is_nullable => 0, default_value => '' },
     imap_port     => { data_type => 'integer', is_nullable => 0, default_value => 993 },
     imap_security => { data_type => 'varchar', size => 10,  is_nullable => 0, default_value => 'ssl' },
+    # Comma-separated IMAP folders to read (e.g. "INBOX, INBOX/coop"). NULL/blank = INBOX.
+    imap_folders  => { data_type => 'varchar', size => 500, is_nullable => 1 },
     smtp_host     => { data_type => 'varchar', size => 255, is_nullable => 0, default_value => '' },
     smtp_port     => { data_type => 'integer', is_nullable => 0, default_value => 465 },
     smtp_security => { data_type => 'varchar', size => 10,  is_nullable => 0, default_value => 'ssl' },

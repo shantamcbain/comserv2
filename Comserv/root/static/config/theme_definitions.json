@@ -24,6 +24,20 @@
   "brew": "/static/images/favicons/brew.svg"
  },
  "themes": {
+  "icehorse": {
+   "description": "Icehorse Ranch (cloned from icehorse.ca): black background, white 940px page, Verdana",
+   "variables": {
+    "background-color": "#000000",
+    "text-color": "#333333",
+    "link-color": "#5364a2",
+    "body-font": "Verdana, Arial, Geneva, sans-serif",
+    "header-font": "teen, serif",
+    "nav-bg": "#000000",
+    "nav-text": "#ffffff",
+    "primary-color": "#201ccc",
+    "accent-color": "#201ccc"
+   }
+  },
   "mcoop": {
    "name": "MCoop Theme",
    "variables": {
@@ -308,16 +322,38 @@
     "font-size-base": "16px",
     "link-hover-color": "#000099"
    }
+  },
+  "forager": {
+   "description": "Forager: earthy greens from the Forager home-page hero",
+   "variables": {
+    "background-color": "#f8fdf4",
+    "text-color": "#2b2b2b",
+    "link-color": "#2d5a27",
+    "link-hover-color": "#4a8c3f",
+    "nav-bg": "#2d5a27",
+    "nav-text": "#ffffff",
+    "nav-hover-bg": "#4a8c3f",
+    "primary-color": "#2d5a27",
+    "secondary-color": "#f8fdf4",
+    "accent-color": "#7ab648",
+    "button-bg": "#4a8c3f",
+    "button-hover-bg": "#2d5a27",
+    "button-text": "#ffffff",
+    "border-color": "#c8e6c9",
+    "table-header-bg": "#e8f3e0",
+    "success-color": "#4a8c3f"
+   }
   }
  },
  "site_themes": {
   "apis": "apis",
   "csc": "csc",
   "mcoop": "mcoop",
-  "icehorse": "default",
+  "icehorse": "icehorse",
   "bmaster": "apis",
   "usbm": "usbm",
   "default": "default",
-  "sunfire": "sunfire"
+  "sunfire": "sunfire",
+  "forager": "forager"
  }
 }

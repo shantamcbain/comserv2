@@ -21,21 +21,21 @@
     Last Updated: 2026-02-26 | Version: 1.0 | Status: Active
 </div>
 
-<div id="toc" style="margin: 20px 0; background-color: rgba(255,255,255,0.15); padding: 15px; border-left: 4px solid var(--primary-color); border-radius: 4px;">
+<div id="toc" style="margin: 20px 0; background-color: var(--card-bg, rgba(255,255,255,0.15)); padding: 15px; border-left: 4px solid var(--primary-color); border-radius: 4px;">
     <h2 style="margin-top: 0;">Contents</h2>
     <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-        <a href="#overview" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12);">Overview</a>
-        <a href="#accessing" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12);">Accessing the UI</a>
-        <a href="#viewing" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12);">Viewing Variables</a>
-        <a href="#creating" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12);">Creating Variables</a>
-        <a href="#editing" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12);">Editing Variables</a>
-        <a href="#deleting" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12);">Deleting Variables</a>
-        <a href="#secrets" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12);">Secret Variables</a>
-        <a href="#catalyst-server-ip" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12);">CATALYST_SERVER_IP</a>
-        <a href="#docker" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12);">Docker Usage</a>
-        <a href="#exporting" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12);">Exporting .env</a>
-        <a href="#restart" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12);">When to Restart</a>
-        <a href="#security" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12);">Security Notes</a>
+        <a href="#overview" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--card-bg, rgba(255,255,255,0.12));">Overview</a>
+        <a href="#accessing" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--card-bg, rgba(255,255,255,0.12));">Accessing the UI</a>
+        <a href="#viewing" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--card-bg, rgba(255,255,255,0.12));">Viewing Variables</a>
+        <a href="#creating" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--card-bg, rgba(255,255,255,0.12));">Creating Variables</a>
+        <a href="#editing" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--card-bg, rgba(255,255,255,0.12));">Editing Variables</a>
+        <a href="#deleting" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--card-bg, rgba(255,255,255,0.12));">Deleting Variables</a>
+        <a href="#secrets" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--card-bg, rgba(255,255,255,0.12));">Secret Variables</a>
+        <a href="#catalyst-server-ip" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--card-bg, rgba(255,255,255,0.12));">CATALYST_SERVER_IP</a>
+        <a href="#docker" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--card-bg, rgba(255,255,255,0.12));">Docker Usage</a>
+        <a href="#exporting" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--card-bg, rgba(255,255,255,0.12));">Exporting .env</a>
+        <a href="#restart" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--card-bg, rgba(255,255,255,0.12));">When to Restart</a>
+        <a href="#security" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--card-bg, rgba(255,255,255,0.12));">Security Notes</a>
     </div>
 </div>
 
@@ -145,7 +145,7 @@ needing SSH or direct file system access.</p>
     <li>Click <strong>"Save"</strong></li>
 </ol>
 
-<div style="background: #d4edda; border: 1px solid var(--success-color, #28a745); border-radius: 4px; padding: 10px; margin-top: 10px;">
+<div style="background: var(--bg-secondary, #d4edda); border: 1px solid var(--success-color, #28a745); border-radius: 4px; padding: 10px; margin-top: 10px;">
     <strong>✅ Naming convention:</strong> Use ALL_CAPS_WITH_UNDERSCORES for environment variable keys.
     This is the standard Unix convention and ensures compatibility.
 </div>
@@ -193,7 +193,7 @@ blank, it will save as blank. The system does not retain and re-use the previous
     <li>The variable is immediately removed from the <code>.env</code> file</li>
 </ol>
 
-<div style="background: #f8d7da; border: 1px solid var(--danger-color, #dc3545); border-radius: 4px; padding: 10px; margin-top: 10px;">
+<div style="background: var(--bg-secondary, #f8d7da); border: 1px solid var(--danger-color, #dc3545); border-radius: 4px; padding: 10px; margin-top: 10px;">
     <strong>⚠️ Warning:</strong> Deletion is immediate and not reversible through the UI.
     If you need to recover a deleted variable, use the exported backup <code>.env</code> file
     (see <a href="#exporting">Exporting</a> below) or check the server's backup directory.
@@ -252,7 +252,7 @@ LAN IP. This makes it difficult for admins to know which physical server is runn
 <p>The <code>CATALYST_SERVER_IP</code> environment variable overrides the auto-detected IP with
 whatever value you set. This is displayed in the admin debug bar at the top of all pages:</p>
 
-<pre style="background: rgba(255,255,255,0.15); padding: 10px; border-radius: 4px; overflow-x: auto;">
+<pre style="background: var(--card-bg, rgba(255,255,255,0.15)); padding: 10px; border-radius: 4px; overflow-x: auto;">
 Domain: workstation.local | Client IP: 127.0.0.1 | Server: workshops-7d21 (192.168.1.199) | ...
                                                                              ↑
                                                                  CATALYST_SERVER_IP value shown here
@@ -276,7 +276,7 @@ Domain: workstation.local | Client IP: 127.0.0.1 | Server: workshops-7d21 (192.1
     <li><strong>Running directly (not in Docker):</strong> Not needed — auto-detection works correctly</li>
 </ul>
 
-<div style="background: #d4edda; border: 1px solid var(--success-color, #28a745); border-radius: 4px; padding: 10px; margin-top: 10px;">
+<div style="background: var(--bg-secondary, #d4edda); border: 1px solid var(--success-color, #28a745); border-radius: 4px; padding: 10px; margin-top: 10px;">
     <strong>✅ Tip:</strong> Both <code>docker-compose.dev.yml</code> and <code>docker-compose.prod.yml</code>
     are configured to pass <code>CATALYST_SERVER_IP</code> from the host's <code>.env</code> file into
     the container automatically. You only need to set it once in the <code>.env</code> file on each host.
@@ -337,7 +337,7 @@ container at startup.</p>
     </tbody>
 </table>
 
-<div style="background: #cce5ff; border: 1px solid var(--primary-color, #007bff); border-radius: 4px; padding: 10px; margin-top: 10px;">
+<div style="background: var(--info-color, #cce5ff); border: 1px solid var(--primary-color, #007bff); border-radius: 4px; padding: 10px; margin-top: 10px;">
     <strong>ℹ️ Note:</strong> Container names differ between servers. On the workstation the running
     container may be named <code>comserv2-web-1</code>, while on production it is
     <code>comserv2-web-prod</code>. Container names are set in the docker-compose file and do not
@@ -382,14 +382,14 @@ alongside the <code>.env</code> file.</p>
 through the admin UI (or directly to the <code>.env</code> file) requires a restart to take effect.</p>
 
 <h4>Development server (command line)</h4>
-<pre style="background: rgba(255,255,255,0.15); padding: 10px; border-radius: 4px;">
+<pre style="background: var(--card-bg, rgba(255,255,255,0.15)); padding: 10px; border-radius: 4px;">
 # Stop the current server (Ctrl+C), then restart:
 cd Comserv
 perl script/comserv_server.pl -p 4004 -r
 </pre>
 
 <h4>Docker container</h4>
-<pre style="background: rgba(255,255,255,0.15); padding: 10px; border-radius: 4px;">
+<pre style="background: var(--card-bg, rgba(255,255,255,0.15)); padding: 10px; border-radius: 4px;">
 # Restart the web container:
 docker compose restart web
 
@@ -398,7 +398,7 @@ docker compose up -d --force-recreate web
 </pre>
 
 <h4>Production with supervisord</h4>
-<pre style="background: rgba(255,255,255,0.15); padding: 10px; border-radius: 4px;">
+<pre style="background: var(--card-bg, rgba(255,255,255,0.15)); padding: 10px; border-radius: 4px;">
 # Inside the container or on the host:
 supervisorctl restart comserv-server
 </pre>
@@ -428,7 +428,7 @@ supervisorctl restart comserv-server
         application log at INFO level with the acting administrator's identity.</li>
 </ul>
 
-<div style="background: #f8d7da; border: 1px solid var(--danger-color, #dc3545); border-radius: 4px; padding: 10px; margin-top: 10px;">
+<div style="background: var(--bg-secondary, #f8d7da); border: 1px solid var(--danger-color, #dc3545); border-radius: 4px; padding: 10px; margin-top: 10px;">
     <strong>⚠️ Production warning:</strong> Editing environment variables on a live production server
     requires a container or service restart, which causes a brief outage. Plan changes during
     maintenance windows when possible.

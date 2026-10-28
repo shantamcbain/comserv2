@@ -42,5 +42,50 @@
  "demote_watch_verdict": 1,
  "tokens_unreported_providers": [
   "ollama"
- ]
+ ],
+ "hermes_fallback_chain": [
+  "supergrok|grok-4.7",
+  "openrouter|qwen/qwen3-coder",
+  "openrouter|cohere/north-mini-code:free"
+ ],
+ "hermes_emergency_chain": [
+  "ollama|gemma4-64k:latest",
+  "openrouter|nvidia/nemotron-3.5-lightning:free"
+ ],
+ "channel_caps_usd": {
+  "openrouter": {
+   "day": 1.65,
+   "week": 11.5,
+   "month": 50
+  },
+  "xai_direct": {
+   "day": 0,
+   "week": 0,
+   "month": 0
+  }
+ },
+ "_hermes_comment": "Oct 26 2026 (Shanta): when Super Grok is unavailable Hermes goes grok-4.7 -> paid qwen/qwen3-coder (only while OpenRouter day/week/month caps have room) -> free north-mini LAST. hermes_emergency_chain is used only if every step is unusable. channel_caps_usd = cash cap per billing channel (supergrok is a quota, not cash; xai_direct 0 = off until a number is set).",
+ "hermes_daily_lock_cash": {
+  "enabled": false,
+  "steps": [
+   "xai_direct|grok-4.7",
+   "openrouter|x-ai/grok-4.7"
+  ],
+  "_comment": "OFF by default (Shanta's rule: grok only through Super Grok). Oct 26 2026 she asked for the option: when true, the Super Grok daily lock tries x.ai direct grok, then OpenRouter grok, BEFORE paid qwen/qwen3-coder, then north-mini LAST, each only inside its channel_caps_usd. Do not turn on without her go-ahead. The chains above still reject grok on OpenRouter."
+ },
+ "trials": {
+  "_comment": "One-off model trials. NEVER a fallback: only script/ai_trial.pl (explicit trial runs) reads this. The model must not appear in any chain; grok, glm, deepseek v4-pro and Relace are rejected by the validator.",
+  "kimi_k27_code": {
+   "model": "moonshotai/kimi-k2.7-code",
+   "provider": "openrouter",
+   "selectable_by": "explicit_trial_run",
+   "hard_cap_usd": 6,
+   "alert_at_usd": 3,
+   "max_tasks": 20,
+   "reserve_per_task_usd": 0.5,
+   "bot_usage_stop_pct": 95,
+   "approved_by": "Shanta 2026-10-26 9:28 AM PT (answer to a card; from reserve, may go past the $50 OpenRouter month figure for this trial only)",
+   "note": "Spend is counted from the OpenRouter live figures (/ai/usage_live month_usd and balance_usd) against a baseline recorded before task 1."
+  }
+ }
 }

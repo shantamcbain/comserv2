@@ -35,7 +35,7 @@
 
     <h2>2. The gates we already have (baseline)</h2>
     <table style="width:100%; border-collapse:collapse;">
-        <tr style="background-color: rgba(255,255,255,0.15);">
+        <tr style="background-color: var(--card-bg, rgba(255,255,255,0.15));">
             <th style="text-align:left; padding:8px; border:1px solid var(--border-color);">Gate</th>
             <th style="text-align:left; padding:8px; border:1px solid var(--border-color);">What it catches</th>
             <th style="text-align:left; padding:8px; border:1px solid var(--border-color);">File</th>

@@ -1,0 +1,35 @@
+[% PageVersion = 'site/clone_review.tt,v 0.01 2026/10/18 Bmaster' %]
+<h1>Tidy up with AI &mdash; review [% review_site | html %]</h1>
+<p>The app's AI proposes cleaner HTML, unique titles where titles repeat, and layout warnings for each cloned page.
+Nothing changes until you press <strong>Accept</strong>. Your text must stay word-for-word; proposals that change it are flagged.</p>
+<form method="GET" action="/site/clone_review">Site: <input name="site" value="[% review_site | html %]"> <button>Open</button></form>
+[% IF review_site %]
+<form method="POST" action="/site/clone_review?site=[% review_site | uri %]" style="margin:10px 0">
+  <input type="hidden" name="site" value="[% review_site | html %]"><input type="hidden" name="action" value="run">
+  <button type="submit">Run AI tidy on all pages</button> <small>(re-running replaces pending proposals)</small>
+</form>
+[% SET codes = tidy.pages.keys.sort %]
+[% IF !codes.size %]<p>No proposals yet.</p>[% END %]
+[% FOREACH code IN codes %][% SET pr = tidy.pages.$code %]
+<div style="border:1px solid #ccc;margin:14px 0;padding:8px">
+  <h2 style="margin:0">[% code %] <small>[% pr.status %] &middot; [% pr.model | html %] &middot; [% pr.created %]</small></h2>
+  [% IF !pr.text_verbatim %]<p style="color:#b00"><strong>Warning:</strong> the AI changed the visible text. Check carefully.</p>[% END %]
+  [% IF pr.new_title %]<p>Title: <em>[% pr.old_title | html %]</em> &rarr; <strong>[% pr.new_title | html %]</strong></p>[% END %]
+  [% IF pr.issues.size %]<p>Layout notes:</p><ul>[% FOREACH i IN pr.issues %]<li>[% i | html %]</li>[% END %]</ul>[% END %]
+  <div style="display:flex;gap:10px">
+    <div style="flex:1;min-width:0"><h3>Before</h3><div style="border:1px dashed #999;max-height:500px;overflow:auto">[% pr.old_body %]</div>
+      <details><summary>HTML</summary><pre style="white-space:pre-wrap;font-size:11px">[% pr.old_body | html %]</pre></details></div>
+    <div style="flex:1;min-width:0"><h3>After</h3><div style="border:1px dashed #090;max-height:500px;overflow:auto">[% pr.new_body %]</div>
+      <details><summary>HTML</summary><pre style="white-space:pre-wrap;font-size:11px">[% pr.new_body | html %]</pre></details></div>
+  </div>
+  [% IF pr.status == 'pending' %]
+  <form method="POST" action="/site/clone_review?site=[% review_site | uri %]">
+    <input type="hidden" name="site" value="[% review_site | html %]"><input type="hidden" name="page_code" value="[% code %]">
+    [% IF pr.new_title %]<label><input type="checkbox" name="with_title" value="1" checked> also use the new title</label>[% END %]
+    [% IF !pr.text_verbatim %]<label><input type="checkbox" name="force" value="1"> accept anyway</label>[% END %]
+    <button name="action" value="accept">Accept</button> <button name="action" value="reject">Reject</button>
+  </form>
+  [% END %]
+</div>
+[% END %]
+[% END %]

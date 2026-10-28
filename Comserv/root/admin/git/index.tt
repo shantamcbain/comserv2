@@ -7,7 +7,7 @@
     Styles: /static/css/git-dashboard.css (loaded via Header.tt on this route).
     JS: /static/js/git-dashboard.js (js_load.tt). No inline <script>/<style>.
 %]
-[% PageVersion = 'admin/git/index.tt,v 0.02 2026/07/31 shanta Exp shanta ' %]
+[% PageVersion = 'admin/git/index.tt,v 0.03 2026/10/21 shanta Exp shanta ' %]
 
 [%# Absolute-URL building for branch links (RELATIVE-URL TRAP: a relative path
     resolves against the current page origin, so the Open button would reopen
@@ -64,6 +64,25 @@
             [% IF c.flash.error_msg %]
                 <div class="admin-alert admin-alert-danger">
                     <strong>Error:</strong> [% c.flash.error_msg | html %]
+                </div>
+            [% END %]
+            [% IF guard_hits && guard_hits.size %]
+                <div class="admin-alert admin-alert-danger" id="git-guard-hits">
+                    <strong>Secret guard — how to fix</strong>
+                    <p>Only one encryption key belongs in the env (the primary key for the initial DB password). Other keys belong in the database, not in git. Secret values are not shown.</p>
+                    [% FOREACH h IN guard_hits %]
+                    <div class="git-guard-hit">
+                        <p><code class="code-inline">[% h.file | html %][% IF h.line %]:[% h.line %][% END %]</code> — [% h.reason | html %]</p>
+                        [% IF h.editor_note %]<p>[% h.editor_note | html %]</p>[% END %]
+                        [% IF h.editor_url %]
+                        <p>
+                            <a class="admin-btn admin-btn-sm admin-btn-primary" href="[% h.editor_url | html %]" target="AI2Editor" rel="noopener">Open in AI editor</a>
+                            <button type="button" class="admin-btn admin-btn-sm" data-guard-copy="1">Copy fix prompt</button>
+                        </p>
+                        [% END %]
+                        <textarea class="form-control" rows="8" readonly data-guard-prompt="1">[% h.prompt | html %]</textarea>
+                    </div>
+                    [% END %]
                 </div>
             [% END %]
             [% IF c.flash.success_msg %]
@@ -200,6 +219,7 @@
                 <div class="admin-panel-header"><h3>Working Tree</h3></div>
                 <div class="admin-panel-body">
                     [% IF git_status.has_changes %]
+                    [% INCLUDE admin/git/junk_warning.tt %]
                     <form method="post" action="[% c.uri_for('/admin/git/action') %]"
                           id="git-file-form" data-git-file-form="1">
                         <input type="hidden" name="confirm" value="1">
@@ -255,7 +275,8 @@
 
                         <p>
                             <textarea name="message" placeholder="Commit / stash message"
-                                      class="form-control" rows="2" data-git-message="1"></textarea>
+                                      class="form-control" rows="2" data-git-message="1">[% c.flash.commit_message_keep | html %]</textarea>
+                            <input type="text" name="override_reason" placeholder="Commit anyway reason (only if the reviewer blocked the commit)" style="width:100%;margin-top:4px;">
                         </p>
                         <p>
                             <label for="git-commit-ai-model">AI model for commit message:</label>
@@ -289,7 +310,7 @@
                                 <i class="fas fa-box"></i> Stash
                             </button>
                             <button type="button" class="admin-btn admin-btn-sm"
-                                    data-git-action="gitignore" data-git-confirm="Add the selected untracked file(s) to .gitignore?">
+                                    data-git-action="gitignore" data-git-confirm="Add the selected file(s) to .gitignore? Tracked files are also untracked with git rm --cached (kept on disk), and .gitignore is staged.">
                                 <i class="fas fa-eye-slash"></i> .gitignore
                             </button>
                             <button type="button" class="admin-btn admin-btn-sm admin-btn-danger"
@@ -464,6 +485,7 @@
 
                     <div data-git-merge-status="1" class="git-merge-status"></div>
                     <pre data-git-merge-output="1" class="git-merge-output" style="display:none;"></pre>
+                    <div data-git-guard-hits="1" hidden></div>
                 </div>
             </details>
 

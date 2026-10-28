@@ -23,22 +23,22 @@
         <p><strong>🎯 Best Time</strong>: First thing in the morning, after checking for overnight updates</p>
     </div>
 
-    <div style="background-color: #d4edda; border-left: 4px solid var(--success-color, #28a745); padding: 15px; margin: 15px 0;">
-        <h3 style="margin-top: 0; color: #155724;">✅ Update: Jan 2, 2026 - Agent Lockup Prevention</h3>
-        <p style="margin: 5px 0; color: #155724;"><strong>Multi-File Operations Safety:</strong> Cleanup Agent and other agents now have lockup prevention protocols when updating multiple files. Pattern: /updateprompt BEFORE each file edit (not before all files). This prevents token exhaustion during infrastructure updates.</p>
-        <p style="margin: 5px 0; color: #155724;"><strong>Agent Compliance Improvements:</strong> Main Agent spec updated with mandatory /updateprompt enforcement and PATH A/B/C workflow pattern. Ensures consistent behavior across all prompts.</p>
-        <p style="margin: 5px 0; color: #155724;"><strong>Impact on Tutorial:</strong> When agents report multi-file operations (like updating 3+ documentation files), they now follow safe checkpoint pattern automatically.</p>
+    <div style="background-color: var(--bg-secondary, #d4edda); border-left: 4px solid var(--success-color, #28a745); padding: 15px; margin: 15px 0;">
+        <h3 style="margin-top: 0; color: var(--success-color, #155724);">✅ Update: Jan 2, 2026 - Agent Lockup Prevention</h3>
+        <p style="margin: 5px 0; color: var(--success-color, #155724);"><strong>Multi-File Operations Safety:</strong> Cleanup Agent and other agents now have lockup prevention protocols when updating multiple files. Pattern: /updateprompt BEFORE each file edit (not before all files). This prevents token exhaustion during infrastructure updates.</p>
+        <p style="margin: 5px 0; color: var(--success-color, #155724);"><strong>Agent Compliance Improvements:</strong> Main Agent spec updated with mandatory /updateprompt enforcement and PATH A/B/C workflow pattern. Ensures consistent behavior across all prompts.</p>
+        <p style="margin: 5px 0; color: var(--success-color, #155724);"><strong>Impact on Tutorial:</strong> When agents report multi-file operations (like updating 3+ documentation files), they now follow safe checkpoint pattern automatically.</p>
     </div>
 
     <h2 id="overview">1. The 4-Agent Workflow Overview</h2>
     
-    <div style="background: #f0f7ff; padding: 20px; border-radius: 5px; margin: 20px 0;">
+    <div style="background: var(--card-bg, #f0f7ff); padding: 20px; border-radius: 5px; margin: 20px 0;">
         <h3>How It Works (In Order)</h3>
         <ol style="font-size: 1.1em; line-height: 1.8;">
-            <li><strong style="color: #d9534f;">🔴 Daily Audit Agent</strong> - Reads yesterday's work and creates an audit report</li>
-            <li><strong style="color: #f0ad4e;">🟠 DocumentationSync Agent</strong> - Updates documentation based on code changes</li>
-            <li><strong style="color: #5cb85c;">🟢 Master Plan Updater Agent</strong> - Updates the master coordination document</li>
-            <li><strong style="color: #0275d8;">🔵 Daily Plans Generator Agent</strong> - Creates 7-day plans for team execution</li>
+            <li><strong style="color: var(--danger-color, #d9534f);">🔴 Daily Audit Agent</strong> - Reads yesterday's work and creates an audit report</li>
+            <li><strong style="color: var(--warning-color, #f0ad4e);">🟠 DocumentationSync Agent</strong> - Updates documentation based on code changes</li>
+            <li><strong style="color: var(--success-color, #5cb85c);">🟢 Master Plan Updater Agent</strong> - Updates the master coordination document</li>
+            <li><strong style="color: var(--info-color, #0275d8);">🔵 Daily Plans Generator Agent</strong> - Creates 7-day plans for team execution</li>
         </ol>
         <p style="margin-top: 20px;"><strong>⏱️ Why Multiple Chats?</strong> Zencoder performance degrades with each prompt, so agents run in separate chats with /chathandoff checkpoints between them. This prevents token exhaustion and maintains accuracy.</p>
     </div>
@@ -76,7 +76,7 @@
             <td style="padding: 10px;"><strong>Open New Chat</strong></td>
             <td style="padding: 10px;">Start a fresh chat conversation (don't use old chats)</td>
         </tr>
-        <tr style="background: #f9f9f9;">
+        <tr style="background: var(--card-bg, #f9f9f9);">
             <td style="padding: 10px;"><strong>Copy Prompt Below</strong></td>
             <td style="padding: 10px;">Use the prompt template (customize placeholders in [BRACKETS])</td>
         </tr>
@@ -84,7 +84,7 @@
             <td style="padding: 10px;"><strong>Paste & Send</strong></td>
             <td style="padding: 10px;">Send to Zencoder - agent will respond with work summary</td>
         </tr>
-        <tr style="background: #f9f9f9;">
+        <tr style="background: var(--card-bg, #f9f9f9);">
             <td style="padding: 10px;"><strong>Review Output</strong></td>
             <td style="padding: 10px;">Check the audit files created in Documentation/session_history/audit_logs/</td>
         </tr>
@@ -95,7 +95,7 @@
     </table>
 
     <h4>Agent 1 Prompt Template (COPY & PASTE)</h4>
-    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-left: 4px solid #d9534f; overflow-x: auto;"><code>I need you to run the Daily Audit Agent to document yesterday's work.
+    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-left: 4px solid var(--danger-color, #d9534f); overflow-x: auto;"><code>I need you to run the Daily Audit Agent to document yesterday's work.
 
 Here are the details:
 - Yesterday's date: [YESTERDAY-DATE, e.g., 2026-01-02]
@@ -143,7 +143,7 @@ Note: Output goes to /Comserv/root/Documentation/session_history/audit_logs/</co
             <td style="padding: 10px;"><strong>Open New Chat</strong></td>
             <td style="padding: 10px;">Start a fresh chat (previous chat with Agent 1 is done)</td>
         </tr>
-        <tr style="background: #f9f9f9;">
+        <tr style="background: var(--card-bg, #f9f9f9);">
             <td style="padding: 10px;"><strong>Copy Prompt Below</strong></td>
             <td style="padding: 10px;">Use the template with yesterday's date</td>
         </tr>
@@ -151,7 +151,7 @@ Note: Output goes to /Comserv/root/Documentation/session_history/audit_logs/</co
             <td style="padding: 10px;"><strong>Paste & Send</strong></td>
             <td style="padding: 10px;">Agent will sync documentation to code changes</td>
         </tr>
-        <tr style="background: #f9f9f9;">
+        <tr style="background: var(--card-bg, #f9f9f9);">
             <td style="padding: 10px;"><strong>Review Changes</strong></td>
             <td style="padding: 10px;">Agent will list which .tt files were updated</td>
         </tr>
@@ -162,7 +162,7 @@ Note: Output goes to /Comserv/root/Documentation/session_history/audit_logs/</co
     </table>
 
     <h4>Agent 2 Prompt Template (COPY & PASTE)</h4>
-    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-left: 4px solid #f0ad4e; overflow-x: auto;"><code>I need you to run the DocumentationSync Agent to update documentation based on yesterday's code changes.
+    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-left: 4px solid var(--warning-color, #f0ad4e); overflow-x: auto;"><code>I need you to run the DocumentationSync Agent to update documentation based on yesterday's code changes.
 
 Details:
 - Audit date: [YESTERDAY-DATE, e.g., 2026-01-02]
@@ -211,7 +211,7 @@ Do NOT create new files; update ONLY existing documentation files.</code></pre>
             <td style="padding: 10px;"><strong>Open New Chat</strong></td>
             <td style="padding: 10px;">Fresh chat (independent from previous agents)</td>
         </tr>
-        <tr style="background: #f9f9f9;">
+        <tr style="background: var(--card-bg, #f9f9f9);">
             <td style="padding: 10px;"><strong>Copy Prompt Below</strong></td>
             <td style="padding: 10px;">Update plan status and next steps</td>
         </tr>
@@ -219,7 +219,7 @@ Do NOT create new files; update ONLY existing documentation files.</code></pre>
             <td style="padding: 10px;"><strong>Paste & Send</strong></td>
             <td style="padding: 10px;">Agent updates master plan file</td>
         </tr>
-        <tr style="background: #f9f9f9;">
+        <tr style="background: var(--card-bg, #f9f9f9);">
             <td style="padding: 10px;"><strong>Verify Update</strong></td>
             <td style="padding: 10px;">Check <a href="/Documentation/MASTER_PLAN_COORDINATION">/Documentation/MasterPlanCoordination.tt</a></td>
         </tr>
@@ -230,7 +230,7 @@ Do NOT create new files; update ONLY existing documentation files.</code></pre>
     </table>
 
     <h4>Agent 3 Prompt Template (COPY & PASTE)</h4>
-    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-left: 4px solid #5cb85c; overflow-x: auto;"><code>I need you to run the Master Plan Updater Agent to update the master plan with yesterday's progress.
+    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-left: 4px solid var(--success-color, #5cb85c); overflow-x: auto;"><code>I need you to run the Master Plan Updater Agent to update the master plan with yesterday's progress.
 
 Details:
 - Audit date: [YESTERDAY-DATE, e.g., 2026-01-02]
@@ -283,7 +283,7 @@ File location: /Comserv/root/Documentation/MasterPlanCoordination.tt</code></pre
             <td style="padding: 10px;"><strong>Open New Chat</strong></td>
             <td style="padding: 10px;">Final chat for daily planning</td>
         </tr>
-        <tr style="background: #f9f9f9;">
+        <tr style="background: var(--card-bg, #f9f9f9);">
             <td style="padding: 10px;"><strong>Copy Prompt Below</strong></td>
             <td style="padding: 10px;">Specify date range for next 7 days</td>
         </tr>
@@ -291,7 +291,7 @@ File location: /Comserv/root/Documentation/MasterPlanCoordination.tt</code></pre
             <td style="padding: 10px;"><strong>Paste & Send</strong></td>
             <td style="padding: 10px;">Agent creates 7 daily plan files</td>
         </tr>
-        <tr style="background: #f9f9f9;">
+        <tr style="background: var(--card-bg, #f9f9f9);">
             <td style="padding: 10px;"><strong>Review Daily Plans</strong></td>
             <td style="padding: 10px;">Check daily plans directory (each plan has navigation)</td>
         </tr>
@@ -302,7 +302,7 @@ File location: /Comserv/root/Documentation/MasterPlanCoordination.tt</code></pre
     </table>
 
     <h4>Agent 4 Prompt Template (COPY & PASTE)</h4>
-    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-left: 4px solid #0275d8; overflow-x: auto;"><code>I need you to run the Daily Plans Generator Agent to create 7-day plans for the team.
+    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-left: 4px solid var(--info-color, #0275d8); overflow-x: auto;"><code>I need you to run the Daily Plans Generator Agent to create 7-day plans for the team.
 
 Details:
 - Today's date: [TODAY-DATE, e.g., 2026-01-03]
@@ -334,10 +334,10 @@ Output: 7 new files in /Comserv/root/Documentation/DailyPlans/</code></pre>
 
     <h2 id="team-roles">4. Team Roles & Responsibilities</h2>
     
-    <div style="background: #d4edda; padding: 20px; border-radius: 5px; margin: 20px 0;">
+    <div style="background: var(--bg-secondary, #d4edda); padding: 20px; border-radius: 5px; margin: 20px 0;">
         <h3>Who Runs What?</h3>
         <table border="1" style="width: 100%;">
-            <tr style="background: #5cb85c; color: white;">
+            <tr style="background: var(--success-color, #5cb85c); color: white;">
                 <th style="padding: 10px;">Role</th>
                 <th style="padding: 10px;">Responsibility</th>
                 <th style="padding: 10px;">Which Agents?</th>
@@ -347,7 +347,7 @@ Output: 7 new files in /Comserv/root/Documentation/DailyPlans/</code></pre>
                 <td style="padding: 10px;">Initiates all 4 agents in sequence each morning</td>
                 <td style="padding: 10px;">Agents 1, 2, 3, 4 (all)</td>
             </tr>
-            <tr style="background: #f9f9f9;">
+            <tr style="background: var(--card-bg, #f9f9f9);">
                 <td style="padding: 10px;"><strong>Team Members</strong></td>
                 <td style="padding: 10px;">Read generated daily plans; execute tasks for their day</td>
                 <td style="padding: 10px;">Daily plans (output from Agent 4)</td>
@@ -357,7 +357,7 @@ Output: 7 new files in /Comserv/root/Documentation/DailyPlans/</code></pre>
                 <td style="padding: 10px;">Monitor agent execution; troubleshoot issues; update master plan manually if needed</td>
                 <td style="padding: 10px;">Can run any agent independently</td>
             </tr>
-            <tr style="background: #f9f9f9;">
+            <tr style="background: var(--card-bg, #f9f9f9);">
                 <td style="padding: 10px;"><strong>DevOps / Infrastructure</strong></td>
                 <td style="padding: 10px;">Execute infrastructure tasks from daily plans (K8s, deployments, etc.)</td>
                 <td style="padding: 10px;">Reads daily plans for assigned tasks</td>
@@ -378,7 +378,7 @@ Output: 7 new files in /Comserv/root/Documentation/DailyPlans/</code></pre>
             <td style="padding: 10px;">Start Daily Workflow</td>
             <td style="padding: 10px;">Team lead opens Zencoder, reads today's daily plan</td>
         </tr>
-        <tr style="background: #f9f9f9;">
+        <tr style="background: var(--card-bg, #f9f9f9);">
             <td style="padding: 10px;"><strong>8:05 AM</strong></td>
             <td style="padding: 10px;">Agent 1 Chat</td>
             <td style="padding: 10px;">Send Daily Audit prompt (15-20 min), wait for /chathandoff</td>
@@ -388,7 +388,7 @@ Output: 7 new files in /Comserv/root/Documentation/DailyPlans/</code></pre>
             <td style="padding: 10px;">Agent 2 Chat</td>
             <td style="padding: 10px;">Send DocumentationSync prompt (10-15 min), wait for /chathandoff</td>
         </tr>
-        <tr style="background: #f9f9f9;">
+        <tr style="background: var(--card-bg, #f9f9f9);">
             <td style="padding: 10px;"><strong>8:40 AM</strong></td>
             <td style="padding: 10px;">Agent 3 Chat</td>
             <td style="padding: 10px;">Send Master Plan Update prompt (10-15 min), wait for /chathandoff</td>
@@ -398,7 +398,7 @@ Output: 7 new files in /Comserv/root/Documentation/DailyPlans/</code></pre>
             <td style="padding: 10px;">Agent 4 Chat</td>
             <td style="padding: 10px;">Send Daily Plans Generator prompt (15-20 min), wait for /chathandoff</td>
         </tr>
-        <tr style="background: #f9f9f9;">
+        <tr style="background: var(--card-bg, #f9f9f9);">
             <td style="padding: 10px;"><strong>9:15 AM</strong></td>
             <td style="padding: 10px;">Workflow Complete</td>
             <td style="padding: 10px;">Review generated daily plans; distribute to team</td>
@@ -414,7 +414,7 @@ Output: 7 new files in /Comserv/root/Documentation/DailyPlans/</code></pre>
     
     <h3>Common Issues & Solutions</h3>
 
-    <div style="background: var(--caution-bg, #fff3cd); padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #f0ad4e;">
+    <div style="background: var(--caution-bg, #fff3cd); padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid var(--warning-color, #f0ad4e);">
         <h4>❌ Agent Doesn't Respond or Takes Too Long</h4>
         <p><strong>Cause:</strong> Zencoder experiencing lag or overload</p>
         <p><strong>Solution:</strong></p>
@@ -427,7 +427,7 @@ Output: 7 new files in /Comserv/root/Documentation/DailyPlans/</code></pre>
         </ol>
     </div>
 
-    <div style="background: #f8d7da; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid var(--danger-color, #dc3545);">
+    <div style="background: var(--bg-secondary, #f8d7da); padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid var(--danger-color, #dc3545);">
         <h4>❌ Agent Says "Cannot Find File"</h4>
         <p><strong>Cause:</strong> File path is incorrect or file doesn't exist yet</p>
         <p><strong>Solution:</strong></p>
@@ -439,7 +439,7 @@ Output: 7 new files in /Comserv/root/Documentation/DailyPlans/</code></pre>
         </ol>
     </div>
 
-    <div style="background: #d1ecf1; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #17a2b8;">
+    <div style="background: var(--bg-secondary, #d1ecf1); padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid var(--info-color, #17a2b8);">
         <h4>❌ /chathandoff Didn't Execute (Agent Didn't Move to Next Step)</h4>
         <p><strong>Cause:</strong> Agent completed work but forgot final checkpoint</p>
         <p><strong>Solution:</strong></p>
@@ -451,7 +451,7 @@ Output: 7 new files in /Comserv/root/Documentation/DailyPlans/</code></pre>
         </ol>
     </div>
 
-    <div style="background: #d4edda; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid var(--success-color, #28a745);">
+    <div style="background: var(--bg-secondary, #d4edda); padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid var(--success-color, #28a745);">
         <h4>⚠️ Agent Made Unexpected Changes to Files</h4>
         <p><strong>Cause:</strong> Agent interpreted prompt incorrectly or had stale data</p>
         <p><strong>Solution:</strong></p>
@@ -465,7 +465,7 @@ Output: 7 new files in /Comserv/root/Documentation/DailyPlans/</code></pre>
 
     <h2 id="best-practices">7. Best Practices & Tips</h2>
     
-    <div style="background: #e8f4f8; padding: 20px; border-radius: 5px;">
+    <div style="background: var(--card-bg, #e8f4f8); padding: 20px; border-radius: 5px;">
         <h4>✅ Do This</h4>
         <ul style="line-height: 1.8;">
             <li><strong>Run workflow consistently:</strong> Same time each morning ensures predictable behavior</li>
@@ -493,11 +493,11 @@ Output: 7 new files in /Comserv/root/Documentation/DailyPlans/</code></pre>
 
     <h2 id="examples">8. Complete Example: Morning Workflow (Jan 3, 2026)</h2>
     
-    <div style="background: #f0f7ff; padding: 20px; border-radius: 5px; margin: 20px 0;">
+    <div style="background: var(--card-bg, #f0f7ff); padding: 20px; border-radius: 5px; margin: 20px 0;">
         <h3>Scenario: Team Lead Running Daily Workflow</h3>
         
         <h4>8:05 AM - Agent 1 Chat</h4>
-        <pre style="background: rgba(255,255,255,0.88); padding: 10px; border: 1px solid #ccc;"><code>I need you to run the Daily Audit Agent to document yesterday's work.
+        <pre style="background: var(--card-bg, rgba(255,255,255,0.88)); padding: 10px; border: 1px solid var(--bg-secondary, #ccc);"><code>I need you to run the Daily Audit Agent to document yesterday's work.
 
 Here are the details:
 - Yesterday's date: 2026-01-02
@@ -512,7 +512,7 @@ Run the Daily Audit Agent workflow...
         <p style="margin-top: 15px;"><strong>Agent Response:</strong> "Audit complete. audit_2026-01-02.md and audit_2026-01-02.json created. Executing /chathandoff..."</p>
 
         <h4>8:25 AM - Agent 2 Chat (New Chat Window)</h4>
-        <pre style="background: rgba(255,255,255,0.88); padding: 10px; border: 1px solid #ccc;"><code>I need you to run the DocumentationSync Agent to update documentation based on yesterday's code changes.
+        <pre style="background: var(--card-bg, rgba(255,255,255,0.88)); padding: 10px; border: 1px solid var(--bg-secondary, #ccc);"><code>I need you to run the DocumentationSync Agent to update documentation based on yesterday's code changes.
 
 Details:
 - Audit date: 2026-01-02
@@ -525,7 +525,7 @@ Run the DocumentationSync Agent workflow...
         <p style="margin-top: 15px;"><strong>Agent Response:</strong> "Documentation sync complete. Updated 2 .tt files (230 lines). Executing /chathandoff..."</p>
 
         <h4>8:40 AM - Agent 3 Chat (New Chat Window)</h4>
-        <pre style="background: rgba(255,255,255,0.88); padding: 10px; border: 1px solid #ccc;"><code>I need you to run the Master Plan Updater Agent to update the master plan with yesterday's progress.
+        <pre style="background: var(--card-bg, rgba(255,255,255,0.88)); padding: 10px; border: 1px solid var(--bg-secondary, #ccc);"><code>I need you to run the Master Plan Updater Agent to update the master plan with yesterday's progress.
 
 Details:
 - Audit date: 2026-01-02
@@ -540,7 +540,7 @@ Run the Master Plan Updater Agent workflow...
         <p style="margin-top: 15px;"><strong>Agent Response:</strong> "Master plan updated to v0.14. Version incremented, timestamp refreshed, status updated. Executing /chathandoff..."</p>
 
         <h4>8:55 AM - Agent 4 Chat (New Chat Window)</h4>
-        <pre style="background: rgba(255,255,255,0.88); padding: 10px; border: 1px solid #ccc;"><code>I need you to run the Daily Plans Generator Agent to create 7-day plans for the team.
+        <pre style="background: var(--card-bg, rgba(255,255,255,0.88)); padding: 10px; border: 1px solid var(--bg-secondary, #ccc);"><code>I need you to run the Daily Plans Generator Agent to create 7-day plans for the team.
 
 Details:
 - Today's date: 2026-01-03
@@ -568,7 +568,7 @@ Run the Daily Plans Generator Agent workflow...
     <h2 id="resources">9. Quick Reference & Resources</h2>
     
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
-        <div style="background: #e8f4f8; padding: 15px; border-radius: 5px;">
+        <div style="background: var(--card-bg, #e8f4f8); padding: 15px; border-radius: 5px;">
             <h4>📍 Important File Locations</h4>
             <ul style="font-size: 0.95em;">
                 <li><strong>Audit logs:</strong> /Documentation/session_history/audit_logs/</li>
@@ -579,7 +579,7 @@ Run the Daily Plans Generator Agent workflow...
             </ul>
         </div>
 
-        <div style="background: #f0f7ff; padding: 15px; border-radius: 5px;">
+        <div style="background: var(--card-bg, #f0f7ff); padding: 15px; border-radius: 5px;">
             <h4>⏱️ Time Estimates</h4>
             <ul style="font-size: 0.95em;">
                 <li>Agent 1 (Audit): 15-20 min</li>

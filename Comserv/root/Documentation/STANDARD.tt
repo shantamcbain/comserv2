@@ -311,7 +311,21 @@ HTTP:  GET /Documentation                 category home from SQL
                 ·
                 <a href="[% c.uri_for('/project') %]" class="doc-link">All projects</a>.</p>
             </div>
-            <p class="doc-muted">Todos for the work items above are created after this page is approved (sync tool / <code>/api/todo/create</code> on the Documentation worktree origin). Do not invent ids here.</p>
+            <p class="doc-body">Name of the system (todo
+            <a href="[% c.uri_for('/todo/details') %]?record_id=201" class="doc-link">#201 Plan documentation structure</a>,
+            project 92, status 3 / Done 2026-08-26):
+            <strong>Documentation System</strong>. That is distinct from the
+            <strong>Planning / Todo system</strong> (projects + todos) and from the
+            <strong>Pages CMS</strong> (<code>/page/&lt;code&gt;</code>, member/site HTML).
+            Do not invent a fourth name. This page is the definition.</p>
+            <table class="doc-table">
+                <tr><th class="doc-th">Todo</th><th class="doc-th">What was done</th><th class="doc-th">Status</th></tr>
+                <tr>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=201" class="doc-link">#201</a></td>
+                    <td class="doc-td">Named and defined the Documentation System: one served directory, .tt for browser cards/nav, AI helpdesk reads the same files (no parallel .md tree), SQL catalog, JSON abandoned. Pages CMS stays for member how-tos.</td>
+                    <td class="doc-td">Done</td>
+                </tr>
+            </table>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
@@ -322,6 +336,11 @@ HTTP:  GET /Documentation                 category home from SQL
             <table class="doc-table">
                 <tr><th class="doc-th">#</th><th class="doc-th">Decision</th><th class="doc-th">Resolution</th></tr>
                 <tr>
+                    <td class="doc-td">D0</td>
+                    <td class="doc-td">What is this system called? (todo #201)</td>
+                    <td class="doc-td">DECIDED 2026-08-26 — <strong>Documentation System</strong>. Not “todo system”, not Pages CMS. Todo #201 closed Done.</td>
+                </tr>
+                <tr class="doc-tr-alt">
                     <td class="doc-td">D1</td>
                     <td class="doc-td">Keep a JSON seed after SQL works?</td>
                     <td class="doc-td">DECIDED 2026-08-26 — No. User asked to abandon the JSON file altogether. Seed is deleted at cutover step 5.</td>

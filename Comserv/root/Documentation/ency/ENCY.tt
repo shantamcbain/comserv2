@@ -7,7 +7,7 @@
 
 <!-- Debug: Role Information -->
 [% IF c.session.debug_mode == 1 %]
-<div style="background: #ffeb3b; padding: 10px; margin: 10px 0; border: 2px solid #f57c00;">
+<div style="background: var(--warning-color, #ffeb3b); padding: 10px; margin: 10px 0; border: 2px solid var(--danger-color, #f57c00);">
     <strong>DEBUG MODE - Role Information:</strong><br>
     Username: [% c.session.username || 'Not set' %]<br>
     Roles (raw): [% c.session.roles %]<br>

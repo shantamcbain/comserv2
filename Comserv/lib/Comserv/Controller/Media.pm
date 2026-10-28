@@ -40,15 +40,39 @@ sub _serve_file_row {
     my $row = eval { $c->model('DBEncy')->resultset('File')->find($id) };
     return $self->_nf($c) unless $row && ($row->file_status // '') eq 'active';
     my $type = $row->file_format // '';
-    return $self->_nf($c) unless $type =~ m{^(image/(jpeg|png|gif|webp)|video/mp4)$};
+    # Per-site theme CSS (theme-<site>.css) is also allowed, served as text/css.
+    $type = 'text/css'
+        if ($row->file_name // '') =~ /^theme-[A-Za-z0-9_-]+\.css$/i;
+    return $self->_nf($c) unless $type =~ m{^(image/(jpeg|png|gif|webp)|video/mp4|text/css)$};
     require Comserv::Util::NfsPath;
     my $path = Comserv::Util::NfsPath->new->resolve_path($row->nfs_path // $row->file_path // '');
     return $self->_nf($c) unless length $path && -f $path;
     open(my $fh, '<:raw', $path) or return $self->_nf($c);
-    $c->res->content_type($type);
+    $c->res->content_type($type eq 'text/css' ? 'text/css; charset=utf-8' : $type);
     $c->res->content_length(-s $path);
-    $c->res->header('Cache-Control' => 'public, max-age=86400');
+    $c->res->header('X-Content-Type-Options' => 'nosniff');
+    $c->res->header('Cache-Control' => $type eq 'text/css' ? 'public, max-age=300' : 'public, max-age=86400');
     $c->res->body($fh);
+}
+
+# Template helper: active File Manager row 'theme-<site>.css' for this site,
+# looked up once per request. Returns { id, name, v } or undef.
+sub site_theme_css {
+    my ($self, $c, $site) = @_;
+    $site //= $c->stash->{SiteName} // $c->session->{SiteName} // '';
+    return undef unless $site =~ /^[A-Za-z0-9_-]+$/;
+    my $cache = $c->stash->{_site_theme_css} ||= {};
+    return $cache->{lc $site} if exists $cache->{lc $site};
+    my $name = 'theme-' . lc($site) . '.css';
+    my $row = eval {
+        $c->model('DBEncy')->resultset('File')->search(
+            { 'LOWER(me.file_name)' => $name, 'LOWER(me.sitename)' => lc $site,
+              file_status => 'active' },
+            { order_by => { -desc => 'id' }, rows => 1 })->single;
+    };
+    my $v = $row ? ($row->file_hash // $row->file_size // $row->id) : undef;
+    $v = substr($v, 0, 12) if defined $v;
+    return $cache->{lc $site} = $row ? { id => $row->id, name => $row->file_name, v => $v } : undef;
 }
 
 sub _nf { my ($self, $c) = @_; $c->res->status(404); $c->res->content_type('text/plain'); $c->res->body('Not found'); }

@@ -127,7 +127,7 @@ COMSERV_URL=https://comserv.local</code></pre>
         </dl>
     </section>
 
-    <div class="footer" style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee; font-size: 0.9em; color: var(--text-muted-color, #666);">
+    <div class="footer" style="margin-top: 50px; padding-top: 20px; border-top: 1px solid var(--card-bg, #eee); font-size: 0.9em; color: var(--text-muted-color, #666);">
         <p>Related Documents: 
             <a href="/Documentation/ImplementationPlanTodoAPIAndMasterPlanSync">Implementation Plan</a> | 
             <a href="/Documentation/Api">API Reference</a>

@@ -17,6 +17,71 @@ READINGS = Path(
     "/home/shanta/.comserv/worktrees/aisystem/Comserv/Comserv/data/ai_usage_readings.jsonl"
 )
 BOT_HEARTBEAT_S = 3600  # same value re-recorded at most hourly
+# Oct 15 2026: Super Grok % flipped 93 <-> 100 every few seconds. A jump of more
+# than JUMP points is held until it is read twice with no revert in REVERT_S.
+# While flapping (2+ reverts in REVERT_S) the lower value wins.
+PENDING = OUT.parent / "grokcom_usage_pending.json"
+JUMP = 5
+REVERT_S = 60
+
+
+def stabilize(new, cur, now, st):
+    """Return (value_to_keep, new_state). Pure; st is a dict."""
+    st = dict(st or {})
+    reverts = [t for t in st.get("reverts", []) if now - t < REVERT_S]
+    if not isinstance(new, (int, float)):
+        return cur, st
+    if not isinstance(cur, (int, float)):
+        return new, {}
+    if abs(new - cur) <= JUMP:
+        if st.get("value") is not None:
+            reverts.append(now)          # a pending jump reverted
+        return new, {"reverts": reverts}
+    if len(reverts) >= 2 and new < cur:
+        return new, {}                   # flapping: keep the lower reading
+    if st.get("value") == new:
+        if not reverts:                  # 2nd matching read, no revert in 60s
+            return new, {}
+        return cur, {"value": new, "since": st.get("since", now), "reverts": reverts}
+    return cur, {"value": new, "since": now, "reverts": reverts}
+
+
+# Oct 18 2026 (Shanta): Saturday had ~4,450 grok_bot writes bouncing 57/58/60
+# (several grok.com tabs). Write only when the value changes from the last one
+# written, and never write a lower value within DROP_S of a higher one.
+DROP_S = 600
+
+
+def should_write(new, written, now, seen=None):
+    """written: [(at, value), ...] oldest->newest; seen: values posted (written
+    or not) as [(at, value)]. Pure. A lower value is skipped while any higher one
+    was seen in the last DROP_S (stale second tab); real drops (weekly reset)
+    show on every tab, so they get through after DROP_S."""
+    if not isinstance(new, (int, float)):
+        return False
+    pool = list(written or []) + list(seen or [])
+    if any(now - t < DROP_S and float(v) > float(new) for (t, v) in pool):
+        return False
+    if written and float(written[-1][1]) == float(new):
+        return False
+    return True
+
+
+SEEN = READINGS.parent / "grokcom_bot_seen.json"
+
+
+def _seen_update(path, new, now):
+    """Return seen list (last DROP_S) before adding new; persist with new added."""
+    try:
+        seen = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+    except Exception:
+        seen = []
+    seen = [(int(t), v) for (t, v) in seen if now - int(t) < DROP_S]
+    try:
+        path.write_text(json.dumps(seen + [(int(now), new)]) + "\n", encoding="utf-8")
+    except Exception:
+        pass
+    return seen
 
 
 def _pt(ep):
@@ -66,6 +131,10 @@ def record_bot(msg):
             return None
         now = int(time.time())
         last = None
+        written = []
+        import fcntl
+        lockf = open(str(READINGS) + ".lock", "a")
+        fcntl.flock(lockf, fcntl.LOCK_EX)
         if READINGS.exists():
             for line in READINGS.read_text(encoding="utf-8").splitlines():
                 if '"grok_bot"' in line:
@@ -76,13 +145,16 @@ def record_bot(msg):
                     if r.get("consumer") == "grok_bot" and r.get("kind") != "unconfirmed":
                         if last is None or r.get("at", 0) >= last.get("at", 0):
                             last = r
+                        if r.get("source") == "auto":
+                            written.append((int(r.get("at", 0)), r.get("value")))
         reset = _parse_reset(msg.get("bot_reset"), now)
         if reset is None and last and last.get("reset_at"):
             reset = int(last["reset_at"])
             while reset <= now:
                 reset += 7 * 86400
-        if last and last.get("source") == "auto" and float(last.get("value", -1)) == float(bot) \
-                and now - int(last.get("at", 0)) < BOT_HEARTBEAT_S:
+        written.sort()
+        seen = _seen_update(SEEN, bot, now)
+        if not should_write(bot, written, now, seen):
             return None
         rd = {"consumer": "grok_bot", "value": bot, "unit": "%", "kind": "used",
               "at": now, "at_pt": _pt(now), "source": "auto",
@@ -133,6 +205,17 @@ def main():
         _old = {}
     if not isinstance(build, (int, float)):
         build = _old.get("build")
+    else:
+        import time as _t
+        try:
+            _st = json.loads(PENDING.read_text(encoding="utf-8")) if PENDING.exists() else {}
+        except Exception:
+            _st = {}
+        build, _st = stabilize(build, _old.get("build"), _t.time(), _st)
+        try:
+            PENDING.write_text(json.dumps(_st) + "\n", encoding="utf-8")
+        except Exception:
+            pass
     if not isinstance(chat, (int, float)):
         chat = _old.get("chat")
     out = {
@@ -155,6 +238,21 @@ def main():
             prev = {}
     OUT.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
     changed = (prev.get("build") != build) or (prev.get("chat") != chat)
+    # Oct 18: same rule for the Super Grok (build) history - no bounce writes.
+    if changed and isinstance(build, (int, float)) and HIST.exists():
+        import time as _t2
+        _w = []
+        for _l in HIST.read_text(encoding="utf-8").splitlines()[-200:]:
+            try:
+                _h = json.loads(_l)
+                _ep = _parse_reset(_h.get("at"), _t2.time()) if _h.get("at") else None
+                if isinstance(_h.get("build"), (int, float)) and _ep:
+                    _w.append((_ep, _h["build"]))
+            except Exception:
+                pass
+        _seen_b = _seen_update(OUT.parent / "grokcom_build_seen.json", build, _t2.time())
+        if not should_write(build, _w, _t2.time(), _seen_b) and prev.get("chat") == chat:
+            changed = False
     if changed or not HIST.exists():
         with HIST.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps({
