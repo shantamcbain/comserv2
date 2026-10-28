@@ -198,11 +198,11 @@
         </div>
     [% ELSE %]
         <!-- User is not logged in -->
-        <a href="/user/login" class="dropbtn login-menu">
+        <a href="/user/login?return_to=[% c.req.uri.path_query | uri %]" class="dropbtn login-menu">
             <span class="login-text"><i class="icon-sign-in-alt"></i> Login</span>
         </a>
         <div class="dropdown-content">
-            <a href="/user/login" class="menu-item">
+            <a href="/user/login?return_to=[% c.req.uri.path_query | uri %]" class="menu-item">
                 <i class="icon-sign-in-alt"></i> Login
             </a>
             <a href="/user/create_account" class="menu-item">
