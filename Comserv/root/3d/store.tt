@@ -125,7 +125,7 @@
                 <button type="submit" class="btn-buy">Buy</button>
             </form>
             [% ELSE %]
-            <a href="/user/login" style="font-size:0.9em;color:var(--link-color);">Log in to purchase</a>
+            <a href="/user/login?return_to=[% c.req.uri.path_query | uri %]" style="font-size:0.9em;color:var(--link-color);">Log in to purchase</a>
             [% END %]
         [% ELSE %]
         <button class="btn-buy" disabled>Out of Stock</button>

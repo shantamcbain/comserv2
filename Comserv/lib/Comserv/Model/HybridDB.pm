@@ -1355,14 +1355,12 @@ sub _try_local_authentication {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_try_local_authentication',
             "User '$username' found in local database, verifying password");
         
-        # Verify password (assuming SHA256 hash)
-        require Digest::SHA;
-        my $hashed_password = Digest::SHA::sha256_hex($password);
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_try_local_authentication',
-            "Password hash comparison - provided: " . substr($hashed_password, 0, 10) . "..., stored: " . substr($user_data->{password}, 0, 10) . "...");
-        
-        if ($hashed_password eq $user_data->{password}) {
+        # Verify password: PBKDF2 or legacy SHA-256 (read-only here; the web
+        # login upgrades legacy hashes). Never log the password or any hash text.
+        require Comserv::Util::PasswordHash;
+        my $password_ok = Comserv::Util::PasswordHash->verify($user_data->{password}, $password);
+
+        if ($password_ok) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_try_local_authentication',
                 "Local authentication successful for user '$username'");
             return {
@@ -1520,14 +1518,12 @@ sub _try_production_authentication {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_try_production_authentication',
                 "User '$username' found in backend '$backend_name', verifying password");
             
-            # Verify password (assuming SHA256 hash)
-            require Digest::SHA;
-            my $hashed_password = Digest::SHA::sha256_hex($password);
-            
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_try_production_authentication',
-                "Password hash comparison on backend '$backend_name' - provided: " . substr($hashed_password, 0, 10) . "..., stored: " . substr($user_data->{password}, 0, 10) . "...");
-            
-            if ($hashed_password eq $user_data->{password}) {
+            # Verify password: PBKDF2 or legacy SHA-256 (read-only here).
+            # Never log the password or any hash text.
+            require Comserv::Util::PasswordHash;
+            my $password_ok = Comserv::Util::PasswordHash->verify($user_data->{password}, $password);
+
+            if ($password_ok) {
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_try_production_authentication',
                     "Authentication successful for user '$username' on backend '$backend_name'");
                 $success_result = {

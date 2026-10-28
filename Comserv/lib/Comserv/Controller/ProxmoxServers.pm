@@ -675,6 +675,9 @@ sub test_connection :Path('test') :Args(1) {
             if ($proxmox->{debug_info}->{error_type}) {
                 $error = $proxmox->{debug_info}->{error_type};
             }
+            if ($proxmox->{debug_info}->{response_status}) {
+                $error = $proxmox->{debug_info}->{response_status};
+            }
             if ($proxmox->{debug_info}->{possible_cause}) {
                 $possible_cause = $proxmox->{debug_info}->{possible_cause};
             }

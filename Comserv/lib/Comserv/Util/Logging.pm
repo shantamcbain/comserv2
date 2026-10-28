@@ -595,7 +595,12 @@ sub log_with_details {
         || $message =~ /DBI Connection failed|Can't connect to (?:MySQL|server)/i
     );
     if ($c && blessed($c) && $c->can('model') && $level_prio >= $db_min_prio && !$_skip_db_noise
-        && (($ENV{COMSERV_NO_HEALTH_LOG} // '') ne '1')) {
+        # COMSERV_NO_HEALTH_LOG=1 only suppresses health/heartbeat noise below
+        # WARN; WARN/ERROR/CRITICAL always land in system_log.
+        && !( (($ENV{COMSERV_NO_HEALTH_LOG} // '') eq '1')
+              && $level_prio < ($LEVEL_PRIORITY{WARN} // 3)
+              && ( ($subroutine // '') =~ /health|heartbeat|watchdog|monitor/i
+                   || $message =~ /\b(?:health|heartbeat)\b/i ) )) {
         my $now = time();
         if ($now - $_db_log_failed_at < $_db_log_backoff_s) {
             _print_log("[DB-LOG-SKIP] circuit breaker open, skipping DB write for $level $subroutine");

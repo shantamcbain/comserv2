@@ -22,6 +22,7 @@ use lib $ENV{CATALYST_HOME} ? "$ENV{CATALYST_HOME}/lib" : "$FindBin::Bin/../lib"
 use lib $ENV{CATALYST_HOME} ? $ENV{CATALYST_HOME} : "$FindBin::Bin/..";
 
 use Comserv;
+use Comserv::Util::PortlessHost;
 use Plack::Builder;
 
 # Survives plackup -R restarts: marks Twiggy mode for WebSocket terminal detection.
@@ -71,6 +72,14 @@ sub _comserv_peer_trusted {
 
 my $wrapped = builder {
     enable_if { _comserv_peer_trusted($_[0]->{REMOTE_ADDR}) } 'ReverseProxy';
+
+    # Public hostnames never carry a port (balancer does not accept one). Catalyst appends
+    # SERVER_PORT (:5000) to generated URLs when Host has none; normalise after ReverseProxy.
+    # dev.* / IP / localhost / *.local keep their port. COMSERV_PORTLESS_HOST=0 disables.
+    enable sub {
+        my $inner = shift;
+        sub { Comserv::Util::PortlessHost::normalize_env($_[0]); $inner->($_[0]) };
+    };
 
     # Static file serving for the navigation/menu bar (CSS/JS) + general assets
     # This must come BEFORE the main app so static requests are handled first
