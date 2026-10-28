@@ -205,28 +205,28 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr style="background:#d4edda;">
+                    <tr style="background:var(--bg-secondary, #d4edda);">
                         <td><strong>CSC Admin</strong></td>
                         <td>All sites</td>
                         <td>✅ Full — all tabs, all sites</td>
                         <td>✅ Visible (CSC tab)</td>
                         <td>✅ Create / Edit / View</td>
                     </tr>
-                    <tr style="background:#d4edda;">
+                    <tr style="background:var(--bg-secondary, #d4edda);">
                         <td><strong>SiteName Admin</strong></td>
                         <td>Own site only</td>
                         <td>✅ DB-only view (own site)</td>
                         <td>❌ Hidden</td>
                         <td>✅ Create / Edit / View (own site)</td>
                     </tr>
-                    <tr style="background:#d4edda;">
+                    <tr style="background:var(--bg-secondary, #d4edda);">
                         <td><strong>Developer</strong></td>
                         <td>Own site</td>
                         <td>✅ DB-only view (own site)</td>
                         <td>❌ Hidden</td>
                         <td>✅ View / Edit (own site)</td>
                     </tr>
-                    <tr style="background:#d4edda;">
+                    <tr style="background:var(--bg-secondary, #d4edda);">
                         <td><strong>Editor</strong></td>
                         <td>Own site</td>
                         <td>✅ DB-only view (own site)</td>
@@ -247,7 +247,7 @@
                         <td>❌ Hidden</td>
                         <td>❌ No access</td>
                     </tr>
-                    <tr style="background:#f8d7da;">
+                    <tr style="background:var(--bg-secondary, #f8d7da);">
                         <td><strong>Not Logged In</strong></td>
                         <td>—</td>
                         <td>❌ Redirect to login</td>
@@ -268,11 +268,11 @@
         <div class="col-12">
             <h2 id="hierarchy">Project Hierarchy</h2>
             <p>The DailyPlan system sits within a larger project hierarchy to ensure proper organization and reporting:</p>
-            <div style="background: #f0f4f7; padding: 20px; border-radius: 8px; border: 1px solid #d0d7de;">
+            <div style="background: var(--card-bg, #f0f4f7); padding: 20px; border-radius: 8px; border: 1px solid var(--bg-secondary, #d0d7de);">
                 <ul style="list-style-type: none; padding-left: 0;">
                     <li style="font-weight: bold; margin-bottom: 10px;">📂 Project Management (Primary Parent)</li>
                     <li style="margin-left: 20px; margin-bottom: 10px;">└─ 📂 DailyPlan System (Sub-project)</li>
-                    <li style="margin-left: 40px; color: #57606a;">└─ 📂 Daily Priorities (Active execution sub-project)</li>
+                    <li style="margin-left: 40px; color: var(--bg-secondary, #57606a);">└─ 📂 Daily Priorities (Active execution sub-project)</li>
                 </ul>
                 <p style="margin-top: 15px; font-size: 0.9em;"><strong>Purpose of "Daily Priorities":</strong> This sub-project is the specific container for tasks generated daily. It allows for high-granularity tracking of daily work without cluttering the main DailyPlan system metadata.</p>
             </div>
@@ -289,7 +289,7 @@
                             <li>Create <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/DailyPlanProject.pm</code> - Link table (many-to-many)</li>
                             <li>Update <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/Todo.pm</code> - Add <code>plan_id</code> and <code>blocked_by_todo_id</code> relationships</li>
                         </ul>
-                        <div style="background: #f5f9ff; border-left: 3px solid var(--secondary-color); padding: 12px; margin: 12px 0; border-radius: 3px;">
+                        <div style="background: var(--card-bg, #f5f9ff); border-left: 3px solid var(--secondary-color); padding: 12px; margin: 12px 0; border-radius: 3px;">
                             <p style="margin: 0 0 10px 0; font-size: 0.95em;"><strong>📚 Resources for Creating Result Files:</strong></p>
                             <ul style="margin: 8px 0; padding-left: 20px;">
                                 <li><a href="/Documentation/Result_Class_Development_Guide" style="color: var(--secondary-color); text-decoration: none; border-bottom: 1px dashed var(--secondary-color);">Result_Class_Development_Guide.tt</a> - Step-by-step guide for creating DBIC Result classes</li>
@@ -301,7 +301,7 @@
                         </div>
                     </li>
                     <li>2. Create tables via browser-based schema system (Comserv Admin > Database > Schema Designer)
-                        <div style="background: #f5f9ff; border-left: 3px solid var(--secondary-color); padding: 12px; margin: 12px 0; border-radius: 3px;">
+                        <div style="background: var(--card-bg, #f5f9ff); border-left: 3px solid var(--secondary-color); padding: 12px; margin: 12px 0; border-radius: 3px;">
                             <p style="margin: 0 0 10px 0; font-size: 0.95em;"><strong>📚 Resources for Schema Management:</strong></p>
                             <ul style="margin: 8px 0; padding-left: 20px;">
                                 <li><a href="/Documentation/DBSchemaManager_Usage_Guide" style="color: var(--secondary-color); text-decoration: none; border-bottom: 1px dashed var(--secondary-color);">DBSchemaManager_Usage_Guide.tt</a> - How to use the schema management browser tools</li>

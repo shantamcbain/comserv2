@@ -19,7 +19,7 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--card-bg, rgba(255,255,255,0.15)); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
@@ -121,7 +121,7 @@
     <!-- OUT OF SCOPE SECTION -->
     <div class="row">
         <div class="col-100">
-            <div id="out-of-scope" class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-medium) 0;">
+            <div id="out-of-scope" class="success" style="background-color: var(--card-bg, rgba(255,255,255,0.15)); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">7. Out of scope</h2>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li>Auto-closing todos when a plan phase completes — done manually in the todo UI (time logging stays accurate).</li>

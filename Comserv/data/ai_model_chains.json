@@ -34,9 +34,9 @@
  "circuit_failure_threshold": 3,
  "circuit_cooldown_minutes": 15,
  "circuit_dead_cooldown_hours": 24,
- "openrouter_soft_cap_day_usd": 1.65,
- "openrouter_soft_cap_week_usd": 11.5,
- "openrouter_soft_cap_month_usd": 50,
+ "openrouter_soft_cap_day_usd": 3.0,
+ "openrouter_soft_cap_week_usd": 15.0,
+ "openrouter_soft_cap_month_usd": 65.0,
  "supergrok_respect_guard": 1,
  "exclude_replace_verdict": 1,
  "demote_watch_verdict": 1,
@@ -45,7 +45,7 @@
  ],
  "hermes_fallback_chain": [
   "supergrok|grok-4.7",
-  "openrouter|qwen/qwen3-coder",
+  "openrouter|openai/gpt-5.6-luna",
   "openrouter|cohere/north-mini-code:free"
  ],
  "hermes_emergency_chain": [
@@ -54,9 +54,9 @@
  ],
  "channel_caps_usd": {
   "openrouter": {
-   "day": 1.65,
-   "week": 11.5,
-   "month": 50
+   "day": 3.0,
+   "week": 15.0,
+   "month": 65.0
   },
   "xai_direct": {
    "day": 0,
@@ -64,7 +64,7 @@
    "month": 0
   }
  },
- "_hermes_comment": "Oct 26 2026 (Shanta): when Super Grok is unavailable Hermes goes grok-4.7 -> paid qwen/qwen3-coder (only while OpenRouter day/week/month caps have room) -> free north-mini LAST. hermes_emergency_chain is used only if every step is unusable. channel_caps_usd = cash cap per billing channel (supergrok is a quota, not cash; xai_direct 0 = off until a number is set).",
+ "_hermes_comment": "Oct 28 2026 (Shanta): when Super Grok is unavailable Hermes goes grok-4.7 -> paid openai/gpt-5.6-luna (ON PROBATION; only while OpenRouter day/week/month caps have room: paid steps are used below 60% of the day cap and 90% of the week/month caps) -> free north-mini LAST. qwen/qwen3-coder was dropped Oct 28 after the audit (1.7/10). Luna probation (trials.gpt_56_luna, probation=1): luna own spend counts toward the OpenRouter caps and is counted from its baseline in data/ai_trials/gpt_56_luna.state.json; at 10 sessions or $5 of its own spend the guard marks it stopped, alerts once, and luna leaves the chain (guards skip it, its sessions are blocked) until Shanta approves the audit (perl script/ai_trial.pl approve gpt_56_luna). hermes_emergency_chain is used only if every step is unusable. channel_caps_usd = cash cap per billing channel (supergrok is a quota, not cash; xai_direct 0 = off until a number is set).",
  "hermes_daily_lock_cash": {
   "enabled": false,
   "steps": [
@@ -85,7 +85,24 @@
    "reserve_per_task_usd": 0.5,
    "bot_usage_stop_pct": 95,
    "approved_by": "Shanta 2026-10-26 9:28 AM PT (answer to a card; from reserve, may go past the $50 OpenRouter month figure for this trial only)",
-   "note": "Spend is counted from the OpenRouter live figures (/ai/usage_live month_usd and balance_usd) against a baseline recorded before task 1."
+   "note": "Oct 28 2026: spend is this trial model's OWN cost (Hermes state.db session_model_usage rows for the model since the baseline), not all OpenRouter spend. Frozen once the trial is stopped."
+  },
+  "gpt_56_luna": {
+   "model": "openai/gpt-5.6-luna",
+   "provider": "openrouter",
+   "selectable_by": "probation_chain",
+   "probation": 1,
+   "provider_routing": {
+    "only": ["openai", "azure"],
+    "ignore": ["relace"],
+    "allow_fallbacks": false
+   },
+   "hard_cap_usd": 5.0,
+   "max_tasks": 10,
+   "reserve_per_task_usd": 0,
+   "bot_usage_stop_pct": 95,
+   "approved_by": "Shanta 2026-10-28 9:29 AM PT (answer to a card: put gpt-5.6-luna in the fallback chain as the first paid step after Super Grok, with a probation audit after about 10 sessions or $5). Replaces the earlier $3 / 6-task trial.",
+   "note": "PROBATION, not a free pass: luna is the paid chain step but only inside the OpenRouter caps, and its own spend counts toward them. Spend is this model's own cost (state.db session_model_usage since the baseline); a session with at least one call counts as a session. At 10 sessions or $5 the guard stops it (one alert), luna drops out of the chain and its sessions are blocked until Shanta approves the audit result; then run: perl script/ai_trial.pl approve gpt_56_luna (starts the next probation window). Provider routing here is the intent (OpenAI or Azure only, never Relace); Hermes has only a global provider_routing in config.yaml, so check the provider on luna's first calls."
   }
  }
 }

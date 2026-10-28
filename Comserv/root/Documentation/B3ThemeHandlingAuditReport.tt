@@ -90,7 +90,7 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Base Theme</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Default system theme (fallback)</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>dark.css</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Base Theme</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Dark mode variant</td>
@@ -100,7 +100,7 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Site Theme</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">APIS/BMaster (Beekeeping) - honeycomb pattern</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>usbm.css</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Site Theme</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">USBM - Green theme</td>
@@ -110,7 +110,7 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Site Theme</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">CSC - Cyan/light blue theme</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>mcoop.css</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Site Theme</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">MCoop - Monashee Cooperative</td>
@@ -120,7 +120,7 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Site Theme</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Ve7tit - Radio communications</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>themes.css</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Core/Shared</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Theme system base classes</td>
@@ -130,7 +130,7 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Core/Shared</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Site-specific theme overrides</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>component_styles.css</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Shared Components</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Reusable component styling</td>
@@ -140,7 +140,7 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Component Theme</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">API credentials page styling</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>schema_compare.css</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Component Theme</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Schema comparison tool styling</td>
@@ -153,7 +153,7 @@
             </tbody>
         </table>
 
-        <div style="background: #e8f5e9; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid var(--success-color, #28a745);">
+        <div style="background: var(--card-bg, #e8f5e9); padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid var(--success-color, #28a745);">
             <p><strong>✅ Status:</strong> Theme CSS infrastructure is complete and functional. All necessary theme files present with clear organization.</p>
         </div>
     </div>
@@ -177,37 +177,37 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>default</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>default</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Base Theme</td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #d4edda;">✅ Configured</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--bg-secondary, #d4edda);">✅ Configured</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>apis</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>apis</code> (Beekeeping)</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Site Theme</td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #d4edda;">✅ Configured</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--bg-secondary, #d4edda);">✅ Configured</td>
                 </tr>
                 <tr>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>usbm</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>usbm</code> (Green)</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Site Theme</td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #d4edda;">✅ Configured</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--bg-secondary, #d4edda);">✅ Configured</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>csc</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>csc</code> (Cyan)</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Site Theme</td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #d4edda;">✅ Configured</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--bg-secondary, #d4edda);">✅ Configured</td>
                 </tr>
                 <tr>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>bmaster</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>apis</code> (Beekeeping)</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Shared Theme</td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #d4edda;">✅ Configured</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--bg-secondary, #d4edda);">✅ Configured</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>mcoop</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>mcoop</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Site Theme</td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #d4edda;">✅ Configured</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--bg-secondary, #d4edda);">✅ Configured</td>
                 </tr>
                 <tr>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>weaverbeck</strong></td>
@@ -215,7 +215,7 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Missing</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--caution-bg, #fff3cd);">⚠️ Uses default</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>shanta</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">⚠️ NOT CONFIGURED</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Missing</td>
@@ -265,7 +265,7 @@
             <li><code>--font-size-xlarge</code> = 24px</li>
         </ul>
 
-        <div style="background: #d4edda; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid var(--success-color, #28a745);">
+        <div style="background: var(--bg-secondary, #d4edda); padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid var(--success-color, #28a745);">
             <p><strong>✅ Status:</strong> CSS variables are properly defined in all themes and can be used throughout the application with `var(--variable-name)` syntax.</p>
         </div>
     </div>
@@ -292,7 +292,7 @@
 
         <h3>Example of the Problem</h3>
         <pre><code>❌ BEFORE (Current - inline styles):
-&lt;div style="background: #d4edda; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid var(--success-color, #28a745);"&gt;
+&lt;div style="background: var(--bg-secondary, #d4edda); padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid var(--success-color, #28a745);"&gt;
 
 ✅ AFTER (Refactored - CSS variables):
 &lt;div style="background: var(--success-bg); padding: var(--spacing-medium); border-radius: var(--border-radius); margin: var(--spacing-lg) 0; border-left: 4px solid var(--success-color);"&gt;</code></pre>
@@ -302,7 +302,7 @@
     <div class="content-section">
         <h2 id="finding-5-files-requiring-refactor">📊 Finding 5: Top 20 Files Requiring Refactoring</h2>
 
-        <p style="color: #721c24; background: #f8d7da; padding: 12px; border-radius: 4px; margin-bottom: 20px;">
+        <p style="color: var(--danger-color, #721c24); background: var(--bg-secondary, #f8d7da); padding: 12px; border-radius: 4px; margin-bottom: 20px;">
             <strong>URGENT:</strong> These 20 files account for 6,082 inline styles (3.1x the document total). They should be prioritized for refactoring.
         </p>
 
@@ -317,36 +317,36 @@
             </thead>
             <tbody>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #ffebee; font-weight: bold; text-align: center;">1</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--card-bg, #ffebee); font-weight: bold; text-align: center;">1</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>system/DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">767</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">3-4 hours</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #ffebee; font-weight: bold; text-align: center;">2</td>
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--card-bg, #ffebee); font-weight: bold; text-align: center;">2</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">728</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">3-4 hours</td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #ffe0b2; font-weight: bold; text-align: center;">3</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--warning-color, #ffe0b2); font-weight: bold; text-align: center;">3</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>system/docker_pycharm_setup_guide.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">365</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1.5-2 hours</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #ffe0b2; font-weight: bold; text-align: center;">4</td>
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--warning-color, #ffe0b2); font-weight: bold; text-align: center;">4</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>system/Server_Room_IP_Registry.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">333</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1.5-2 hours</td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #ffe0b2; font-weight: bold; text-align: center;">5</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--warning-color, #ffe0b2); font-weight: bold; text-align: center;">5</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>system/CREDENTIALS_AUDIT_AND_PLAN.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">303</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1.5 hours</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--caution-bg, #fff9c4); text-align: center;">6</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>DOCUMENTATION_SYSTEM_AUDIT_PLAN.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">292</td>
@@ -358,7 +358,7 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">250</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1-1.5 hours</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--caution-bg, #fff9c4); text-align: center;">8</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">243</td>
@@ -370,68 +370,68 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">221</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1 hour</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--caution-bg, #fff9c4); text-align: center;">10</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>system/Phase0KubernetesReadinessPlan.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">209</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1 hour</td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #e8f5e9; text-align: center;">11</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--card-bg, #e8f5e9); text-align: center;">11</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>operations/degradation_api_reference.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">170</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">45 min</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #e8f5e9; text-align: center;">12</td>
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--card-bg, #e8f5e9); text-align: center;">12</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>security/security_audit_findings.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">162</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">45 min</td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #e8f5e9; text-align: center;">13</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--card-bg, #e8f5e9); text-align: center;">13</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>security/comprehensive_security_audit_2025.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">150</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">45 min</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #e8f5e9; text-align: center;">14</td>
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--card-bg, #e8f5e9); text-align: center;">14</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>ai_workflows/zencoder_reset_plan.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">150</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">45 min</td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #e8f5e9; text-align: center;">15</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--card-bg, #e8f5e9); text-align: center;">15</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>kubernetes/K8S_SECRETS_SETUP.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">146</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">45 min</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #e8f5e9; text-align: center;">16</td>
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--card-bg, #e8f5e9); text-align: center;">16</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>AIIntegrationComprehensiveAudit.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">144</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">45 min</td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #e8f5e9; text-align: center;">17</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--card-bg, #e8f5e9); text-align: center;">17</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>system/ZENCODER_AI_ASSISTANT_GUIDE.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">141</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">45 min</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #e8f5e9; text-align: center;">18</td>
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--card-bg, #e8f5e9); text-align: center;">18</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>system/security_monitoring.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">125</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">30-45 min</td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #e8f5e9; text-align: center;">19</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--card-bg, #e8f5e9); text-align: center;">19</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>Phase_2_Backend_Services_Specification.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">118</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">30-45 min</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #e8f5e9; text-align: center;">20</td>
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--card-bg, #e8f5e9); text-align: center;">20</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>Result_Class_Development_Guide.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">117</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">30-45 min</td>
@@ -439,7 +439,7 @@
             </tbody>
         </table>
 
-        <div style="background: #e3f2fd; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #1976d2;">
+        <div style="background: var(--bg-secondary, #e3f2fd); padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid var(--info-color, #1976d2);">
             <p><strong>📊 Statistics:</strong></p>
             <ul>
                 <li>Top 2 files: 1,495 inline styles (77% of top 20)</li>
@@ -464,12 +464,12 @@
             <tbody>
                 <tr>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>Theme CSS Files</strong></td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #d4edda; text-align: center;">✅ Good</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--bg-secondary, #d4edda); text-align: center;">✅ Good</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">13 CSS files present, organized by type</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>CSS Variables</strong></td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #d4edda; text-align: center;">✅ Good</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--bg-secondary, #d4edda); text-align: center;">✅ Good</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">28+ variables defined in all themes</td>
                 </tr>
                 <tr>
@@ -477,14 +477,14 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--caution-bg, #fff3cd); text-align: center;">⚠️ Partial</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">6/8 sites configured; 2 missing (weaverbeck, shanta)</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>Inline Styles</strong></td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #f8d7da; text-align: center;">❌ Critical</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--bg-secondary, #f8d7da); text-align: center;">❌ Critical</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1,936 inline styles in 56 files (vs CSS standard practices)</td>
                 </tr>
                 <tr>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>Theme Application</strong></td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #d4edda; text-align: center;">✅ Functional</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--bg-secondary, #d4edda); text-align: center;">✅ Functional</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Themes load and apply correctly on configured sites</td>
                 </tr>
             </tbody>
@@ -559,7 +559,7 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">1,495</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">3-4 days (16-20 hours)</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>Phase 2 (HIGH)</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">10</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">1,996</td>
@@ -571,7 +571,7 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">445</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">2-3 days (8-12 hours)</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>TOTAL (Including Testing/Review)</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">56</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center;">1,936</td>
@@ -580,7 +580,7 @@
             </tbody>
         </table>
 
-        <div style="background: #e3f2fd; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #1976d2;">
+        <div style="background: var(--bg-secondary, #e3f2fd); padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid var(--info-color, #1976d2);">
             <p><strong>Note:</strong> Timeline assumes:</p>
             <ul>
                 <li>CSS variable standards already defined</li>

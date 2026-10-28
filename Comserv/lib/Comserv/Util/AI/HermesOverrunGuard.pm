@@ -288,6 +288,10 @@ sub offender_reason {
         return 'OpenRouter grok is blocked (grok only through Super Grok)' if is_or_grok($provider, $model);
         return 'banned model (v4-pro / glm)' if $model =~ $BANNED_RE || $model =~ /glm/i;
         return undef if $model =~ /:free\z/;
+        # Oct 28 2026 (Shanta): an ACTIVE approved trial model (state begun, not stopped, under its own hard cap / task limit; see
+        # trial_tick) is allowed even while the OpenRouter day/week/month cap is hit or the guard is tripped. Its own cap still
+        # stops it: a stopped trial is returned as an offender above. Grok/banned checks above still apply; every other paid model stays blocked.
+        return undef if ref $pol{trial_active} eq 'HASH' && $pol{trial_active}{$model};
         my $ok_paid = ref $pol{allowed_paid} eq 'HASH' && $pol{allowed_paid}{$model};
         return 'OpenRouter cap reached - no paid model is allowed' if $pol{or_over};
         return 'paid model not in the Hermes chain while the guard is tripped' if $pol{tripped} && !$ok_paid;
@@ -496,7 +500,7 @@ sub fallback_chain {
     my (%in) = @_;
     my @out;
     # Oct 26: with a configured Hermes chain the fallback list is Super Grok build, then the chain's
-    # non-Super-Grok steps in order (paid qwen only inside the caps, north-mini last), then the emergency tail.
+    # non-Super-Grok steps in order (the paid step, luna on probation, only inside the caps; north-mini last), then the emergency tail.
     my @order = (ref $in{chain} eq 'ARRAY' && @{ $in{chain} })
         ? ({%SUPERGROK}, grep { !$_->{sg_budget} } chain_candidates(chain => [ grep { $_->{tier} ne 'supergrok' } @{ $in{chain} } ], emergency => $in{emergency}))
         : ({%SUPERGROK}, @CANDIDATES);
@@ -1314,11 +1318,47 @@ sub chain_context {
     my $ld = eval { Comserv::Util::AI::ModelChains->load(undef, path => $path, logger => sub { $s->log_line("ai_model_chains: $_[1]") }) };
     return () unless $ld;
     my @chain = Comserv::Util::AI::ModelChains->hermes_chain($ld);
+    # Oct 28 2026: a PROBATION model (trials.*.probation) is a chain step only while its probation is begun and not stopped; once it
+    # hits its limit (10 sessions / $5) it is out of the chain until Shanta approves the audit (script/ai_trial.pl approve).
+    my $blocked = $s->probation_blocked($ld);
+    my @gone = grep { $blocked->{ $_->{model} } } @chain;
+    @chain = grep { !$blocked->{ $_->{model} } } @chain;
     my %allowed = map { ($_->{model} => 1) } grep { $_->{tier} eq 'paid' } @chain;
     return (chain => \@chain, emergency => [ Comserv::Util::AI::ModelChains->hermes_chain($ld, emergency => 1) ],
-            allowed_paid => \%allowed,
+            allowed_paid => \%allowed, probation_out => { map { ($_->{model} => $blocked->{ $_->{model} }) } @gone },
             channel_caps => { map { ($_ => Comserv::Util::AI::ModelChains->channel_caps($ld, $_)) } qw(openrouter xai_direct) },
             chain_source => $ld->{source});
+}
+
+# { model => 'why' } for probation trials (data/ai_model_chains.json trials.*.probation) that must NOT act as a chain step right now:
+# stopped (limit reached, audit due) or never begun (no baseline: unaudited). Fails closed. Only models named by a probation trial.
+sub probation_blocked {
+    my ($s, $ld) = @_;
+    my %out;
+    my $d = ref $ld eq 'HASH' && $ld->{data} ? $ld->{data} : $ld;
+    return \%out unless ref $d eq 'HASH' && ref $d->{trials} eq 'HASH';
+    for my $name (sort grep { !/^_/ } keys %{ $d->{trials} }) {
+        my $t = Comserv::Util::AI::ModelChains->trial($d, $name) or next;
+        next unless $t->{probation};
+        my $f = "$s->{app_root}/data/ai_trials/$name.state.json";
+        my $st; if (open my $fh, '<', $f) { $st = eval { local $/; $J->decode(<$fh>) }; close $fh }
+        if (ref $st ne 'HASH' || !$st->{baseline_at}) { $out{ $t->{model} } = "probation $name not begun (no baseline): unaudited, so not a chain step"; next }
+        $out{ $t->{model} } = "probation $name stopped: $st->{stopped}" if $st->{stopped};
+    }
+    return \%out;
+}
+
+# Models of probation trials (they are chain members, so unlike a plain trial their spend STAYS inside the OpenRouter caps).
+sub probation_models {
+    my ($s) = @_;
+    my $ld = eval { Comserv::Util::AI::ModelChains->load(undef, path => "$s->{app_root}/data/ai_model_chains.json", logger => sub { }) } or return {};
+    my $d = $ld->{data} || {};
+    my %m;
+    for my $name (grep { !/^_/ } keys %{ ref $d->{trials} eq 'HASH' ? $d->{trials} : {} }) {
+        my $t = Comserv::Util::AI::ModelChains->trial($d, $name) or next;
+        $m{ $t->{model} } = $name if $t->{probation};
+    }
+    return \%m;
 }
 
 sub read_delegation {
@@ -1442,7 +1482,7 @@ sub desktop_notify {
 # agent.log spend and re-trip to north-mini every minute. They honor tripped=1 (hold; hold leaves a
 # non-grok / xai-oauth model alone), so while the money caps are really clear but those servers would
 # still trip, keep tripped=1 + hold_reason=shield and let THIS code own the model:
-#   Super Grok has budget -> xai-oauth grok-4.7; otherwise the daily guard's paid coder (qwen3-coder).
+#   Super Grok has budget -> xai-oauth grok-4.7; otherwise the daily guard's paid step (openai/gpt-5.6-luna on probation since Oct 28 2026, none if it is stopped).
 # saved_model = that model, so an old-code restore (after UTC midnight) writes the same thing.
 # Cleared once Super Grok has budget AND the old-style all-day estimate is under the caps.
 our $SHIELD = 'shield_old_servers';
@@ -1606,14 +1646,28 @@ sub trial_exclusions {
     my $dir = "$s->{app_root}/data/ai_trials";
     return \%out unless -d $dir;
     my $ym = strftime('%Y%m', localtime $s->_now);
+    my $prob = $s->probation_models;
     for my $f (glob "$dir/*.state.json") {
         open my $fh, '<', $f or next;
         my $d = eval { local $/; $J->decode(<$fh>) }; close $fh;
         next unless ref $d eq 'HASH' && ref $d->{baseline} eq 'HASH' && $d->{model} && $d->{baseline_at};
+        next if $prob->{ $d->{model} };   # Oct 28 2026: a probation model is a chain member: its spend counts toward the OpenRouter caps (no exclusion)
         next unless strftime('%Y%m', localtime $d->{baseline_at}) eq $ym;
         $out{models}{ $d->{model} } = 1 unless $d->{stopped};   # a stopped trial is a normal paid model again (its sessions become offenders)
         $out{usd} += $d->{exclude_usd} // 0;
+        # Oct 28: this trial model's own spend inside each OpenRouter window (UTC day / Monday / 1st), up to the stop time
+        my $now = $s->_now;
+        my @u = gmtime $now;
+        my $day0 = $now - ($u[2] * 3600 + $u[1] * 60 + $u[0]);
+        my %start = (day => $day0, week => $day0 - ((($u[6] + 6) % 7) * 86400), month => $day0 - ($u[3] - 1) * 86400);
+        my $until = $d->{stopped} ? ($d->{stopped_at} // $d->{last_checked_at}) : undef;
+        for my $w (qw(day week month)) {
+            my $since = $start{$w} > $d->{baseline_at} ? $start{$w} : $d->{baseline_at};
+            my $c = Comserv::Util::AI::ModelTrial::model_cost($s->{state_db}, $d->{model}, $since, $until);
+            if (defined $c) { $out{by_window}{$w} += $c } else { $out{by_window_unknown} = 1 }
+        }
     }
+    delete $out{by_window} if $out{by_window_unknown};
     return \%out;
 }
 
@@ -1633,25 +1687,40 @@ sub trial_tick {
             my $d = do { local $/; $J->decode(<$fh>) }; close $fh;
             return 1 unless ref $d eq 'HASH' && ref $d->{baseline} eq 'HASH' && $d->{name} && $d->{baseline_at};
             my $trial = Comserv::Util::AI::ModelChains->trial($ld, $d->{name}) or return 1;
-            my $spent = Comserv::Util::AI::ModelTrial::spent($d->{baseline}, $or);
+            # Oct 28 2026: spend = this trial model's OWN cost since the baseline (state.db session_model_usage), not all OpenRouter
+            # spend. A stopped trial is frozen (stops counting). States written by the old counter (no spend_basis) are
+            # recomputed once on this basis, even downward (the Kimi trial said $10.15 for about $3.56 of its own spend).
+            my $legacy = ($d->{spend_basis} // '') eq 'model_cost' ? 0 : 1;
+            if ($d->{stopped} && !$legacy) { $s->{trial_stopped}{ $trial->{model} } = $d->{stopped}; return 1 }
+            my $until = ($d->{stopped} && $legacy) ? ($d->{stopped_at} // ((ref $d->{last_notified} eq 'HASH' && $d->{last_notified}{at}) || $d->{last_checked_at})) : undef;
+            my $spent = Comserv::Util::AI::ModelTrial::model_cost($s->{state_db}, $trial->{model}, $d->{baseline_at}, $until);
+            return 1 unless defined $spent;   # state.db unreadable: leave the state alone this run
+            if ($d->{stopped} && $legacy) { $d->{stopped_at} //= $until }
             my $tasks = $s->trial_sessions($trial->{model}, $d->{baseline_at});
             my $e = Comserv::Util::AI::ModelTrial::evaluate(trial => $trial, spent => $spent, tasks_done => (defined $tasks ? $tasks : $d->{tasks_done}),
                                                             alerted => $d->{alerted}, live_ok => 1);
             $d->{last_spent} = $spent; $d->{last_checked_at} = $s->_now;
             $d->{tasks_done} = $tasks if defined $tasks;
-            $d->{exclude_usd} = $spent if $spent > ($d->{exclude_usd} // 0);
+            $d->{exclude_usd} = ($legacy || $spent > ($d->{exclude_usd} // 0)) ? $spent : $d->{exclude_usd};
+            $d->{spend_basis} = 'model_cost';
             if ($e->{alert}) {
                 $d->{alerted} = 1;
                 $s->notify_change($d, 'trial', $d->{name}, "Model trial $d->{name}: spend check",
                     sprintf('%s: $%.2f spent of $%s after %d tasks (OpenRouter live figures). Hard stop at $%s.', $trial->{model}, $spent, $trial->{hard_cap_usd}, $d->{tasks_done} // 0, $trial->{hard_cap_usd}), 'alert_at');
             }
             if ($e->{action} eq 'stop' && !$d->{stopped}) {
-                $d->{stopped} = $e->{reason};
+                $d->{stopped} = $e->{reason}; $d->{stopped_at} = $s->_now;
+                if ($e->{probation}) {   # one alert, at the limit; luna leaves the chain until the audit is approved
+                    $s->notify_change($d, 'trial_stop', $d->{name}, "Model probation $d->{name}: audit due, out of the chain",
+                        "$trial->{model}: $e->{reason}. Spent \$" . sprintf('%.2f', $spent) . " over " . ($d->{tasks_done} // 0) . ' sessions. It is out of the Hermes chain and its sessions are blocked until Shanta approves the audit. Move open sessions with /model code.', 'stop');
+                } else {
                 $s->notify_change($d, 'trial_stop', $d->{name}, "Model trial $d->{name} STOPPED",
                     "$e->{reason}. Spent \$" . sprintf('%.2f', $spent) . " after " . ($d->{tasks_done} // 0) . ' tasks. Move open sessions with /model code.', 'stop');
+                }
                 $s->log_line("trial $d->{name} stopped: $e->{reason}");
             }
-            $s->{trial_stopped}{ $trial->{model} } = $d->{stopped} if $d->{stopped};
+            if ($d->{stopped}) { $s->{trial_stopped}{ $trial->{model} } = $d->{stopped}; delete $s->{trial_active}{ $trial->{model} } }
+            else               { $s->{trial_active}{ $trial->{model} } = $d->{name} }   # begun, not stopped: see offender_reason
             _atomic_write($f, $J->encode($d));
             1;
         } or do {
@@ -1685,12 +1754,15 @@ sub run {
     my $or;
     # Oct 22: reuse the saved OpenRouter reading only while it is itself fresh (fetched_at within
     # min_interval). Cron runs every minute, so keying this on last_check reused an Oct 16 snapshot forever.
-    my $snap = ref $st->{last_openrouter} eq 'HASH' ? $st->{last_openrouter} : {};
+    # Oct 28 2026: reuse the RAW (before trial exclusion) reading. Reusing the saved, already-reduced one took the trial's spend out
+    # again on every lite run (month fell 45.8 -> 35.7 -> 25.6 -> 15.5 -> 5.3 -> 0 in six minutes), hiding real spend from the caps.
+    my $snap_src = (ref $st->{last_openrouter_raw} eq 'HASH' && $st->{last_openrouter_raw}{ok}) ? $st->{last_openrouter_raw} : $st->{last_openrouter};
+    my $snap = ref $snap_src eq 'HASH' ? $snap_src : {};
     my $snap_age = $snap->{fetched_at} ? $t - $snap->{fetched_at} : 9e9;
     if (!$o{force} && $st->{last_check} && $t - $st->{last_check} < $s->{min_interval}
-        && $snap->{ok} && $snap_age < $s->{min_interval}) {
+        && $snap->{ok} && !$snap->{trial_excluded_usd} && $snap_age < $s->{min_interval}) {
         if (1) {
-            $or = { %{$st->{last_openrouter}} };
+            $or = { %$snap };
             $lite = 1;
         }
     } else {
@@ -1699,10 +1771,11 @@ sub run {
     $or = stale_guard($or, $t, $SNAPSHOT_MAX_AGE);
     # Oct 26 2026: an approved model trial (data/ai_trials/*.state.json) is paid from reserve: its spend is taken out of the
     # OpenRouter caps and its model out of the live estimate, so it neither trips the guard nor counts as an offender.
+    my $raw_or = { %$or };
     $s->trial_tick($or) unless $s->{dry_run};
     my $tx = $s->trial_exclusions;
     $s->{trial_models} = $tx->{models};
-    $or = Comserv::Util::AI::ModelTrial::exclude_from_or($or, $tx->{usd}) if $tx->{usd};
+    $or = Comserv::Util::AI::ModelTrial::exclude_from_or($or, $tx->{by_window} || $tx->{usd}) if $tx->{usd} || $tx->{by_window};
     my $thrash = exists $o{thrash} ? $o{thrash} : $s->thrash_count;
     my $tbc = exists $o{thrash_by_class} ? $o{thrash_by_class} : $s->thrash_by_class;
     my $lims = $s->thrash_limits;
@@ -1716,7 +1789,11 @@ sub run {
     my $dst = $shielded ? { %$st, tripped => 0 } : $st;
     my %cc0 = $s->chain_context;
     my $xai_live = (ref $live eq 'HASH' && $live->{ok} && ref $live->{by_channel} eq 'HASH') ? ($live->{by_channel}{xai_direct} || {}) : {};
+    # Oct 28 2026 (Shanta raised the OpenRouter caps to $3/day, $15/week, $65/month): the trip check reads the SAME caps as the
+    # paid-room check, from channel_caps_usd.openrouter in data/ai_model_chains.json (one place). %CAPS is only the fallback.
+    my $or_caps = (($cc0{channel_caps} || {})->{openrouter}) || \%CAPS;
     my $d = decide(thrash_by_class => $tbc, limits => $lims, thrash => $thrash, openrouter => $or, state => $dst, v4pro_recent => $v4pro_recent,
+                   caps => $or_caps,
                    xai_direct => { usd => ($xai_live->{usd} // 0), cap_day => ((($cc0{channel_caps} || {})->{xai_direct} || {})->{day}) },
                    watch_model => (ref $live eq 'HASH' ? $live->{last_watch_model} : undef));
     $d->{thrash} = $thrash;
@@ -1731,10 +1808,11 @@ sub run {
     $st->{last_thrash}   = $thrash;
     $st->{last_thrash_by_class} = (ref $tbc eq 'HASH' && $tbc->{ok}) ? $tbc->{counts} : undef;
     $st->{last_openrouter} = $reported_or;
+    $st->{last_openrouter_raw} = $raw_or;
     if (ref $live eq 'HASH' && $live->{ok}) {
         $st->{last_live} = { day_usd => $live->{day_usd}, calls => $live->{calls}, at => $t };
     }
-    $st->{caps} = { %CAPS };
+    $st->{caps} = { %{ (($cc0{channel_caps} || {})->{openrouter}) || \%CAPS } };
     $st->{caps}{thrash_per_15min} = $lims;
 
     my %ctx = $s->context;
@@ -1747,7 +1825,7 @@ sub run {
         allowed_paid => $ctx{allowed_paid}, xai_direct_cap_day => (($ctx{channel_caps} || {})->{xai_direct} || {})->{day},
         or_over => (grep { /^OpenRouter .* over / } @{ $d->{reasons} }) ? 1 : 0,
         sg_unavailable => supergrok_budget_left($ctx{supergrok}) ? 0 : 1,
-        trial_stopped => $s->{trial_stopped} || {});
+        trial_stopped => $s->{trial_stopped} || {}, trial_active => $s->{trial_active} || {});
     $d->{offenders} = $offs if @$offs;
     $d->{by_channel} = $live->{by_channel} if ref $live eq 'HASH' && $live->{ok};
     if ($s->{dry_run}) {
