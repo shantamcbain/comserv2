@@ -1078,6 +1078,48 @@ Push to origin. opts: branch (required), set_upstream => 0|1.
 sub push_to_origin {
     my ($self, $c, %opts) = @_;
     my $branch = $opts{branch} or return { success => 0, error => 'Branch required' };
+
+    # --- enforce HUMAN ADMIN only for publish to origin ---
+    my $primary = '/home/shanta/PycharmProjects/comserv2';
+    my $top = $self->repo_path($c) // '';
+    unless ($top && $top eq $primary) {
+        return {
+            success => 0,
+            error   => "Push refused: Only the primary checkout can publish to origin.",
+            output  => '',
+        };
+    }
+    unless ($branch eq 'main' || $branch eq 'master') {
+        return {
+            success => 0,
+            error   => "Push refused: Can only push 'main' or 'master' from origin.",
+            output  => '',
+        };
+    }
+    # Check for admin environment and server ancestry
+    unless (exists $ENV{COMSERV_ADMIN_PUSH} && $ENV{COMSERV_ADMIN_PUSH} == 1) {
+        return {
+            success => 0,
+            error   => "Push refused: GitHub publish must be approved via admin page (set COMSERV_ADMIN_PUSH=1).",
+            output  => '',
+        };
+    }
+    # verify parent process chain contains comserv_server.pl
+    my $pid = $$;
+    my $found = 0;
+    for (my $i = 0; $i < 12 && $pid > 1; $i++) {
+        my $cmd = `tr '\0' ' ' < /proc/$pid/cmdline 2>/dev/null`;
+        if ($cmd =~ /comserv_server.pl/) { $found = 1; last; }
+        $pid = `awk '/^PPid:/ { print $2 }' /proc/$pid/status 2>/dev/null`;
+    }
+    unless ($found) {
+        return {
+            success => 0,
+            error   => "Push refused: Admin server process not in the chain.",
+            output  => '',
+        };
+    }
+    # All checks passed — delegate to the real push
     my @argv = ('push');
     push @argv, '--set-upstream' if $opts{set_upstream};
     push @argv, 'origin', $branch;
@@ -1225,8 +1267,7 @@ sub create_branch {
     my $result = { success => 0, output => '', action => 'create_branch' };
 
     if (!$branch_name || $branch_name !~ m{^[a-zA-Z0-9_\-/]+$}) {
-        $result->{error_msg} = "Invalid branch name. Use only letters, numbers, "
-            . "underscores, hyphens, and forward slashes.";
+        $result->{error_msg} = "Invalid branch name. Use only letters, numbers, underscores, hyphens, and forward slashes.";
         return $result;
     }
     $source_branch ||= 'main';
@@ -1253,16 +1294,9 @@ sub create_branch {
         return $result;
     }
 
-    $result->{output} .= "Pushing new branch to remote...\n";
-    my $pu = $self->push_to_origin($c, branch => $branch_name, set_upstream => 1);
-    $result->{output} .= $pu->{output};
-    if (!$pu->{success}) {
-        $result->{error_msg} = "Failed to push branch '$branch_name' to remote";
-        return $result;
-    }
-
+    $result->{output} .= "Branch '$branch_name' created locally. Do not push to origin; worktree is for testing only.\n";
     $result->{success}     = 1;
-    $result->{success_msg} = "Branch '$branch_name' created successfully and pushed to remote.";
+    $result->{success_msg} = "Branch '$branch_name' created locally. Use 'hermes chat -w' to test, then switch to main to verify.";
     return $result;
 }
 

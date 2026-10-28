@@ -2,6 +2,10 @@
 
 This page provides access to comprehensive documentation for Proxmox VE, including API references, command-line tools, and configuration guides.
 
+## Current app behavior (2026-10-27)
+
+`/proxmox` is the pool page: one card per configured server, then Summary charts. Each chart is one node metric, full width, with a value axis, a time axis, and a color key for each signed-in server. The timeframe list is Hour, Day, Week, Month, Year. Servers with no stored API token are named as not signed in and do not get a line. Opening a card stays in this app (`/proxmox?server_id=...`). See [Proxmox Integration Overview](/Documentation/proxmox_integration).
+
 ## Available Documentation
 
 ### API and Integration
