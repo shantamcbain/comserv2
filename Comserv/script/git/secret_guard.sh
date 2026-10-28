@@ -11,6 +11,7 @@
 # Exit 0 = clean, 1 = blocked. Deletions (git rm --cached) always pass.
 # Checks: 1. key/secret file-name patterns  2. new small (<4KB) binary or high-entropy
 #         single-token files (raw keys)      3. gitleaks (if installed)
+#         4. junk guard (staged only): backup copies / runtime data per .commit-junk-patterns
 # Allow-list: <repo>/.secret-guard-allow — one glob per line, # comments. Allow-listed
 # hits are reported as ALLOWED but do not block.
 # Copies: ~/.git-hooks/secret-guard.sh (global hooks) — keep in sync with this file.
@@ -67,11 +68,13 @@ already_on_parent() {
     done
     return 1
 }
-hit() { # path reason
-    if allowed "$1"; then echo "  ALLOWED (allow-listed, see .secret-guard-allow): $1 — $2"
+hit() { # path reason [line]
+    local loc="$1"
+    if [ -n "${3:-}" ] && [ "$3" != 0 ]; then loc="$1:$3"; fi
+    if allowed "$1"; then echo "  ALLOWED (allow-listed, see .secret-guard-allow): $loc — $2"
     elif [ "$MODE" = staged ] && already_on_parent "$1"; then
-        echo "  ALLOWED (unchanged blob already on a parent): $1 — $2"
-    else echo "  BLOCKED: $1 — $2"; FAIL=1; fi
+        echo "  ALLOWED (unchanged blob already on a parent): $loc — $2"
+    else echo "  BLOCKED: $loc — $2"; FAIL=1; fi
 }
 
 if [ "$MODE" = staged ]; then
@@ -117,6 +120,55 @@ while IFS= read -r -d '' status && IFS= read -r -d '' path; do
     esac
 done < <("${LIST[@]}")
 
+# --- Junk guard: backup copies and app runtime data (staged mode only) ---
+# Patterns: <repo>/.commit-junk-patterns (glob per line, "!" exempts, # comments).
+# Deletions always pass, so "git rm --cached" is the fix. A merge that carries an
+# unchanged blob from a parent warns but does not block.
+JUNK_FAIL=0
+if [ "$MODE" = staged ] && [ "${COMMIT_JUNK_GUARD:-1}" != 0 ]; then
+    JPAT=(); JNOT=()
+    if [ -f "$ROOT/.commit-junk-patterns" ]; then
+        while IFS= read -r l; do
+            l="${l%%#*}"; l="$(echo "$l" | xargs)"; [ -n "$l" ] || continue
+            if [ "${l:0:1}" = "!" ]; then JNOT+=("${l:1}"); else JPAT+=("$l"); fi
+        done < "$ROOT/.commit-junk-patterns"
+    else
+        JPAT=('*.bak' '*.bak-*' '*~' '*.orig')
+    fi
+    JUNK=()
+    while IFS= read -r -d '' path; do
+        hitj=0
+        for g in "${JPAT[@]+"${JPAT[@]}"}"; do
+            # shellcheck disable=SC2053
+            if [[ "$path" == $g ]]; then hitj=1; break; fi
+        done
+        [ "$hitj" = 1 ] || continue
+        for g in "${JNOT[@]+"${JNOT[@]}"}"; do
+            # shellcheck disable=SC2053
+            if [[ "$path" == $g ]]; then hitj=0; break; fi
+        done
+        [ "$hitj" = 1 ] || continue
+        if already_on_parent "$path"; then
+            echo "  WARN (junk, unchanged blob already on a parent): $path"
+        else
+            JUNK+=("$path")
+        fi
+    done < <(git diff --cached --name-only -z --diff-filter=ACMR)
+    if [ "${#JUNK[@]}" -gt 0 ]; then
+        JUNK_FAIL=1
+        echo "junk-guard: refused - backup copies / app runtime data are staged:"
+        for f in "${JUNK[@]}"; do echo "  JUNK: $f"; done
+        echo "  These are rewritten by the app or are backup copies and cause merge conflicts."
+        echo "  Fix (keeps the files on disk):"
+        for f in "${JUNK[@]}"; do
+            echo "    git rm --cached -- '$f' && echo '$f' >> .gitignore"
+        done
+        echo "    git add .gitignore"
+        echo "  Patterns: .commit-junk-patterns (add a '!path' line to allow a file on purpose)."
+    fi
+fi
+# --- End junk guard ---
+
 # gitleaks — findings on allow-listed paths do not block
 if ! command -v gitleaks >/dev/null 2>&1 && [ "${SECRET_GUARD_REQUIRE_GITLEAKS:-0}" = 1 ]; then
     echo "secret-guard: gitleaks not installed but SECRET_GUARD_REQUIRE_GITLEAKS=1"; exit 1
@@ -144,17 +196,24 @@ if command -v gitleaks >/dev/null 2>&1; then
     if [ -s "$REP" ]; then
         perl -MJSON::PP -0777 -e 'decode_json(<STDIN> || "[]")' < "$REP" 2>/dev/null \
             || { echo "secret-guard: cannot parse gitleaks report - refusing"; exit 1; }
-        while IFS=$'\t' read -r f rule; do
+        while IFS=$'\t' read -r f rule line; do
             [ -n "$f" ] || continue
-            hit "$f" "gitleaks rule $rule"
+            hit "$f" "gitleaks rule $rule" "$line"
         done < <(perl -MJSON::PP -0777 -ne 'my %s; for (@{ decode_json($_ || "[]") }) {
-                    my $k = "$_->{File}\t$_->{RuleID}"; print "$k\n" unless $s{$k}++ }' "$REP" 2>/dev/null)
+                    my $line = $_->{StartLine} || 0;
+                    my $k = "$_->{File}\t$_->{RuleID}\t$line";
+                    print "$k\n" unless $s{$k}++ }' "$REP" 2>/dev/null)
     fi
 fi
 
 if [ "$FAIL" -ne 0 ]; then
-    echo "secret-guard: refused. Remove the flagged file(s) from the commit/merge/push,"
-    echo "  keep keys in ~/.comserv/keys, or add a reviewed glob to .secret-guard-allow."
+    echo "secret-guard: refused."
+    echo "  Location is each BLOCKED path above (file:line when the scanner knows a line)."
+    echo "  Only one encryption key belongs in the env: the primary key for the initial DB password."
+    echo "  Every other key belongs in the database, not in git."
+    echo "  Do not print the secret. Do not use --no-verify."
+    echo "  The git dashboard refusal includes an AI-editor link and a copyable fix prompt."
     exit 1
 fi
+[ "$JUNK_FAIL" -ne 0 ] && exit 1
 exit 0

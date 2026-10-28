@@ -238,5 +238,26 @@ volumes:
     driver: local
   comserv2_theme_css:
     driver: local
+  comserv2_themes_nfs:
+    # Shared themes on NFS — one writable copy for every node (THEMES_NFS).
+    driver: local
+    driver_opts:
+      type: nfs
+      o: "addr=192.168.1.175,rw,nfsvers=3,hard,timeo=600,retrans=2"
+      device: ":/mnt/data/comserv_themes/themes"
+  comserv2_theme_config_nfs:
+    # Shared themes on NFS — one writable copy for every node (THEMES_NFS).
+    driver: local
+    driver_opts:
+      type: nfs
+      o: "addr=192.168.1.175,rw,nfsvers=3,hard,timeo=600,retrans=2"
+      device: ":/mnt/data/comserv_themes/config"
+  comserv2_theme_css_nfs:
+    # Shared themes on NFS — one writable copy for every node (THEMES_NFS).
+    driver: local
+    driver_opts:
+      type: nfs
+      o: "addr=192.168.1.175,rw,nfsvers=3,hard,timeo=600,retrans=2"
+      device: ":/mnt/data/comserv_themes/css_themes"
   comserv2_cache:
     driver: local

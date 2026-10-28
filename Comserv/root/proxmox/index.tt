@@ -1,31 +1,62 @@
 [% META title = 'Proxmox Dashboard' %]
-[% PageVersion = '/proxmox/index.tt,v 0.03.01 2025/07/10 shanta Exp shanta ' %]
+[% PageVersion = '/proxmox/index.tt,v 0.06.00 2026/10/27 shanta Exp shanta ' %]
 [% IF debug == 1 %]
     [% PageVersion %]
 [% END %]
 <div class="container">
-    <h1>Proxmox VE Dashboard</h1>
+<link rel="stylesheet" href="/static/css/components/proxmox-dashboard.css?v=20261027i">
+    <h1>[% IF c.req.param('server_id') %][% current_server_name || server_id | html %][% ELSE %]Proxmox VE[% END %]</h1>
     <p class="text-muted small">[% PageVersion %]</p>
 
+[% UNLESS c.req.param('server_id') %]
 [% IF servers && servers.size > 0 %]
-<div class="server-switcher" style="margin-bottom:1em; padding:0.5em 0.75em; background:#f5f5f5; border:1px solid #ddd; border-radius:4px; display:flex; align-items:center; gap:0.75em; flex-wrap:wrap;">
-    <strong>Server:</strong>
-    [% FOREACH srv IN servers %]
-        [% IF srv.id == server_id %]
-            <span style="font-weight:bold; padding:3px 10px; background:#FF9900; color:#fff; border-radius:3px;">[% srv.name || srv.id | html %]</span>
-        [% ELSE %]
-            <a href="[% c.uri_for('/proxmox') %]?server_id=[% srv.id | uri %]"
-               style="padding:3px 10px; background:#fff; border:1px solid #ccc; border-radius:3px; text-decoration:none; color:#333;">[% srv.name || srv.id | html %]</a>
-        [% END %]
-    [% END %]
-    <a href="[% c.uri_for('/proxmox_servers') %]" style="margin-left:auto; font-size:0.85em; color:#666;">Manage Servers</a>
+<div class="pve-fleet-bar">
+    <a class="pve-add-server" href="[% c.uri_for('/proxmox_servers/add') %]">Add server</a>
 </div>
+<div class="pve-server-grid" aria-label="Proxmox servers">
+    [% FOREACH srv IN servers %]
+    [% web = srv.api_url_base %]
+    [% IF web %][% web = web.replace('/api2/json', '') %][% END %]
+    <article class="pve-server-card[% IF srv.id == server_id %] is-selected[% END %]">
+        <a class="pve-card-open" href="[% c.uri_for('/proxmox') %]?server_id=[% srv.id | uri %]" title="Open this server's application dashboard">
+            <header>
+                <span class="pve-dot[% IF srv.id == server_id && (auth_success == 'yes' || auth_success == 1) %] running[% END %]"></span>
+                <span>[% srv.name || srv.id | html %]</span>
+                [% IF srv.id == server_id %]<span class="pve-managing">Managing</span>[% END %]
+            </header>
+            <dl>
+                <dt>Server id</dt><dd>[% srv.id | html %]</dd>
+                <dt>Host</dt><dd>[% srv.host || '—' | html %]</dd>
+                <dt>Node</dt><dd>[% srv.node || '—' | html %]</dd>
+                <dt>Web UI</dt><dd>[% web || '—' | html %]</dd>
+                <dt>API user</dt><dd>[% srv.token_user || '—' | html %]</dd>
+                <dt>Token</dt>
+                <dd>[% IF srv.token_value %]<span class="pve-token-ok">stored</span>[% ELSE %]<span class="pve-token-missing">missing</span>[% END %]</dd>
+                [% IF srv.id == server_id %]
+                <dt>Connection</dt>
+                <dd>[% IF auth_success == 'yes' || auth_success == 1 %]<span class="pve-token-ok">connected</span>[% ELSE %]<span class="pve-token-missing">not connected</span>[% END %]</dd>
+                <dt>Guests</dt><dd>[% vms.size || 0 %]</dd>
+                [% END %]
+            </dl>
+        </a>
+        <div class="pve-card-actions">
+            <a href="[% c.uri_for('/proxmox_servers/edit', srv.id) %]">Edit</a>
+        </div>
+    </article>
+    [% END %]
+</div>
+[% ELSE %]
+<div class="pve-fleet-bar">
+    <a class="pve-add-server" href="[% c.uri_for('/proxmox_servers/add') %]">Add server</a>
+</div>
+<p>No Proxmox servers are configured.</p>
 [% END %]
-[% IF error_msg %]
+[% END %]
+[% IF c.req.param('server_id') && error_msg %]
 <div class="error-message">
     [% error_msg %]
 </div>
-[% ELSIF auth_error && auth_error != 'none' %]
+[% ELSIF c.req.param('server_id') && auth_error && auth_error != 'none' %]
 <div class="error-message">
     [% auth_error %]
 </div>
@@ -49,90 +80,76 @@
 [% END %]
 
 <!-- No login check required -->
-<div class="action-panel">
-    <h2>Actions</h2>
-    <div class="action-buttons">
-        <a href="[% c.uri_for('/proxmox/create') %]" class="btn-action">
-            <i class="icon-plus"></i>
-            Create New VM
-        </a>
-        <a href="#" class="btn-action" onclick="refreshVMList()">
-            <i class="icon-refresh"></i>
-            Refresh VM List
-        </a>
-        <a href="[% c.uri_for('/proxmox/upload_iso') %]" class="btn-action" style="background:#17a2b8;">
-            &#128190; Upload ISO
-        </a>
-        [% IF proxmox_host %]
-        <a href="[% proxmox_host %]" target="_blank" class="btn-action" style="background:#e47000;">
-            Open Proxmox Web UI
-        </a>
-        [% END %]
-        <a href="/Documentation/proxmox_disk_resize_guide" class="btn-action" style="background:#6f42c1;">
-            &#128214; Disk Resize How-To
-        </a>
-    </div>
-</div>
 
-<div class="vm-list-panel">
-    <h2>Virtual Machines</h2>
-
-    [% IF auth_success == 'yes' || auth_success == 1 %]
-        [% IF vms && vms.size > 0 %]
-        <div class="table-responsive">
-        <table class="data-table vm-table">
-            <thead>
-            <tr>
-                <th>VMID</th>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Memory</th>
-                <th>CPU%</th>
-                <th>Uptime</th>
-                <th>Actions</th>
-            </tr>
-            </thead>
-            <tbody>
-                [% FOREACH vm IN vms %]
-                <tr>
-                    <td>[% vm.vmid %]</td>
-                    <td>[% vm.name %]</td>
-                    <td><span class="vm-status [% vm.status %]">[% vm.status %]</span></td>
-                    <td>[% IF vm.maxmem %][% (vm.maxmem / 1073741824) | format('%.1f') %] GB[% ELSE %]N/A[% END %]</td>
-                    <td>[% IF vm.cpu %][% (vm.cpu * 100) | format('%.1f') %]%[% ELSIF vm.status == 'running' %]0%[% ELSE %]N/A[% END %]</td>
-                    <td>[% vm.uptime ? formatUptime(vm.uptime) : '—' %]</td>
-                    <td class="vm-actions" style="white-space:nowrap;">
-                        [% IF vm.status == 'stopped' %]
-                        <button type="button" class="vm-btn vm-btn-start" onclick="vmPower('[% vm.vmid %]','start','[% vm.name | html %]')" title="Start VM">▶</button>
-                        [% ELSE %]
-                        <button type="button" class="vm-btn vm-btn-stop"   onclick="vmPower('[% vm.vmid %]','shutdown','[% vm.name | html %]')" title="Shut down">■</button>
-                        <button type="button" class="vm-btn vm-btn-reboot" onclick="vmPower('[% vm.vmid %]','reboot','[% vm.name | html %]')"   title="Reboot">↺</button>
-                        [% END %]
-                        <a href="[% c.uri_for('/proxmox/vm_detail') %]/[% vm.vmid %]" class="vm-btn" style="background:#555;color:#fff;" title="VM Details">🔍</a>
-                        <a href="[% c.uri_for('/proxmox/edit_vm') %]/[% vm.vmid %]" class="vm-btn vm-btn-edit" title="Edit VM">✎</a>
-                        <a href="[% c.uri_for('/proxmox/clone_vm') %]/[% vm.vmid %]" class="vm-btn" style="background:#9c27b0;color:#fff;" title="Clone VM">⎘</a>
-                        <button type="button" class="vm-btn" onclick="showIsoPanel('[% vm.vmid %]', '[% vm.name | html %]')" title="CD/DVD ISO">💿</button>
-                        [% IF proxmox_host %]
-                        <a href="[% proxmox_host %]/#v1:0=qemu%2F[% vm.vmid %]:4::::" target="_blank" class="vm-btn vm-btn-console" title="Open console">⊡</a>
-                        [% END %]
-                    </td>
-                </tr>
-                [% END %]
-            </tbody>
-        </table>
+[% IF c.req.param('server_id') %]
+<p class="pve-back"><a href="[% c.uri_for('/proxmox') %]">All servers</a></p>
+<div class="pve-shell">
+    [% INCLUDE 'proxmox/_tree.tt' %]
+    <section class="pve-main" data-tab="summary">
+        <div class="pve-toolbar">
+            <a href="[% c.uri_for('/proxmox/create') %]">Create VM</a>
+            <a href="[% c.uri_for('/proxmox/upload_iso') %]">Upload ISO</a>
+            <a href="/Documentation/proxmox_disk_resize_guide">Disk resize</a>
         </div>
-        [% ELSE %]
-        <div class="no-vms">
-            <p>No virtual machines found.</p>
-            <p>Click "Create New VM" to get started.</p>
+        <div class="pve-tabs">
+            <button type="button" class="is-on" data-pve-tab="summary">Summary</button>
         </div>
-        [% END %]
-    [% ELSE %]
-    <div class="alert alert-warning">
-        <p>Unable to retrieve VM list. Please check Proxmox server connection and credentials.</p>
-    </div>
-    [% END %]
+        <div class="pve-body">
+            [% IF auth_success == 'yes' || auth_success == 1 %]
+            <dl class="pve-status">
+                <dt>Server</dt><dd>[% current_server_name || server_id | html %]</dd>
+                [% FOREACH srv IN servers %][% IF srv.id == server_id %]
+                <dt>Node</dt><dd>[% srv.node || '—' | html %]</dd>
+                <dt>Host</dt><dd>[% srv.host || '—' | html %]</dd>
+                [% END %][% END %]
+                <dt>Guests</dt><dd>[% vms.size || 0 %]</dd>
+            </dl>
+            [% IF vms && vms.size == 0 %]
+            <p>No virtual machines on this server.</p>
+            [% END %]
+            [% ELSE %]
+            <div class="alert alert-warning">
+                <p>Unable to retrieve the guest list for [% server_id | html %].</p>
+            </div>
+            [% END %]
+            <section class="pve-graphs" id="pve-server-dashboard" data-server-id="[% server_id | html %]" data-url="[% c.uri_for('/proxmox') %]?graphs=1">
+                <header class="pve-graphs-bar">
+                    <h2>History</h2>
+                    <label class="pve-tf-label">Timeframe
+                        <select data-pve-tf>
+                            <option value="hour" selected>Hour</option>
+                            <option value="day">Day</option>
+                            <option value="week">Week</option>
+                            <option value="month">Month</option>
+                            <option value="year">Year</option>
+                        </select>
+                    </label>
+                </header>
+                <p class="pve-graphs-status">Loading this server's history…</p>
+                <div class="pve-graph-list"></div>
+            </section>
+        </div>
+        <div class="pve-logbar">Select a guest in the tree for power, console, and hardware.</div>
+    </section>
 </div>
+[% ELSE %]
+<section class="pve-graphs" id="pve-fleet-graphs" data-url="[% c.uri_for('/proxmox') %]?graphs=1&amp;nodes=1">
+    <header class="pve-graphs-bar">
+        <h2>Summary</h2>
+        <label class="pve-tf-label">Timeframe
+            <select data-pve-tf>
+                <option value="hour" selected>Hour</option>
+                <option value="day">Day</option>
+                <option value="week">Week</option>
+                <option value="month">Month</option>
+                <option value="year">Year</option>
+            </select>
+        </label>
+    </header>
+    <p class="pve-graphs-status">Signing in to every configured server…</p>
+    <div class="pve-graph-list"></div>
+</section>
+[% END %]
 
 [% IF debug_info %]
 <div class="debug-info">

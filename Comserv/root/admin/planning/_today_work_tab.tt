@@ -121,6 +121,9 @@
                 </div>
             </details>
 
+            [%# ── Attention Order (branches / projects / stale review) ── %]
+            [% INCLUDE 'admin/planning/_attention_panel.tt' %]
+
             [%# ── TODAY'S FOCUS QUEUE (top 20 actionable todos) ── %]
             <div class="mb-24">
                 <div class="FocusHeader">
@@ -136,7 +139,7 @@
                     [% IF branch_focus_filter %]
                     <span class="FocusStats">
                         Branch <code>[% branch_focus_filter.branch | html %]</code>
-                        — Active first, then this branch's todos
+                        — only this branch's todos ([% branch_focus_filter.matched %] shown, [% branch_focus_filter.hidden %] from other branches hidden)
                         <a href="/planning/daily?filter_project=all" class="BacklogLink">Show all</a>
                     </span>
                     [%# Which ordering is actually in force. The decision-model order is

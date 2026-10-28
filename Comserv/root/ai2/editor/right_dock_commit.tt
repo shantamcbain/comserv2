@@ -1,30 +1,81 @@
-[%# ai2/right_dock_commit.tt — PyCharm-style commit panel %]
-<div style="padding:12px;font-size:13px;">
-    <div style="margin-bottom:12px;">
-        <div style="font-weight:500;color:#ddd;margin-bottom:6px;">Changes (1 file)</div>
-        <label style="display:flex;align-items:center;margin-bottom:4px;">
-            <input type="checkbox" checked style="margin-right:8px;">
-            <span style="color:#4fc1ff;">T</span>
-            <span style="margin-left:6px;color:#ddd;">editing_widget_popup.tt</span>
-        </label>
-    </div>
-
-    <div style="margin-bottom:12px;">
-        <div style="font-weight:500;color:#ddd;margin-bottom:6px;">Unversioned Files (1 file)</div>
-        <label style="display:flex;align-items:center;">
-            <input type="checkbox" checked style="margin-right:8px;">
-            <span style="color:#f0c674;">JS</span>
-            <span style="margin-left:6px;color:#ddd;">commit-ui.js</span>
-        </label>
-    </div>
-
-    <textarea placeholder="feat: improve AI2 editor commit UI"
+[%# ai2/right_dock_commit.tt — AI Editor commit form with the reviewer gate (2026-10-15).
+    Commit = review the STAGED diff first (in-app reviewer, Sonnet 5.5, $0.50/day cap),
+    show findings, then confirm. A high-severity finding blocks unless you use
+    "Commit anyway" with a reason. Cap hit / reviewer error = warning, commit allowed. %]
+<div id="aec-root" style="padding:12px;font-size:13px;color:#ddd;">
+    <div style="font-weight:500;margin-bottom:6px;">Commit staged changes</div>
+    <div style="font-size:11px;opacity:0.8;margin-bottom:8px;">Stage files in the Git panel first. Only the staged diff is reviewed and committed.</div>
+    <textarea id="aec-msg" placeholder="Commit message"
               style="width:100%;height:70px;background:#1e1f22;color:#ddd;border:1px solid #555;border-radius:4px;padding:8px;resize:vertical;margin-bottom:10px;"></textarea>
-
     <div style="display:flex;gap:8px;">
-        <button onclick="alert('Committed!');document.getElementById('aew-right-dock').innerHTML='';document.body.classList.remove('aew-right-open')"
-                style="flex:1;background:#0e639c;color:white;border:none;padding:8px;border-radius:4px;cursor:pointer;">Commit</button>
-        <button onclick="document.getElementById('aew-right-dock').innerHTML='';document.body.classList.remove('aew-right-open')"
-                style="flex:1;background:#555;color:white;border:none;padding:8px;border-radius:4px;cursor:pointer;">Cancel</button>
+        <button id="aec-review" style="flex:1;background:#0e639c;color:white;border:none;padding:8px;border-radius:4px;cursor:pointer;">Review &amp; commit</button>
+        <button id="aec-cancel" style="flex:1;background:#555;color:white;border:none;padding:8px;border-radius:4px;cursor:pointer;">Cancel</button>
+    </div>
+    <div id="aec-status" style="margin-top:10px;font-size:12px;"></div>
+    <div id="aec-findings" style="margin-top:8px;font-size:12px;"></div>
+    <div id="aec-confirm-box" style="display:none;margin-top:10px;">
+        <button id="aec-confirm" style="width:100%;background:#2e7d32;color:white;border:none;padding:8px;border-radius:4px;cursor:pointer;">Confirm commit</button>
+    </div>
+    <div id="aec-override-box" style="display:none;margin-top:10px;">
+        <input id="aec-reason" placeholder="Why commit anyway? (at least 8 characters)"
+               style="width:100%;background:#1e1f22;color:#ddd;border:1px solid #a33;border-radius:4px;padding:6px;margin-bottom:6px;">
+        <button id="aec-override" style="width:100%;background:#b71c1c;color:white;border:none;padding:8px;border-radius:4px;cursor:pointer;">Commit anyway</button>
     </div>
 </div>
+<script>
+(function () {
+    function $(id) { return document.getElementById(id); }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (ch) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]; }); }
+    function close() { var d = $('aew-right-dock'); if (d) d.innerHTML = ''; document.body.classList.remove('aew-right-open'); }
+    function post(params) {
+        var body = new URLSearchParams(params);
+        return fetch('/admin/git/editor_commit', { method: 'POST', credentials: 'same-origin', body: body })
+            .then(function (r) { return r.json(); });
+    }
+    function status(msg, color) { $('aec-status').innerHTML = '<span style="color:' + (color || '#ddd') + '">' + esc(msg) + '</span>'; }
+    $('aec-cancel').onclick = close;
+    $('aec-review').onclick = function () {
+        var msg = $('aec-msg').value.trim();
+        if (!msg) { status('Commit message required.', '#f88'); return; }
+        $('aec-review').disabled = true; status('Reviewing the staged diff…');
+        $('aec-confirm-box').style.display = 'none'; $('aec-override-box').style.display = 'none'; $('aec-findings').innerHTML = '';
+        post({ step: 'review', commit_message: msg }).then(function (d) {
+            $('aec-review').disabled = false;
+            if (!d.success && !d.blocking) { status(d.error || d.message || 'Review failed', '#f88'); return; }
+            var html = '';
+            if (d.paths && d.paths.length) html += '<div style="opacity:0.8;">Files: ' + d.paths.map(esc).join(', ') + '</div>';
+            if (d.reviewed) {
+                html += '<div>Reviewer ' + esc(d.model) + ' — verdict <b>' + esc(d.verdict || '?') + '</b>'
+                    + ' (correctness ' + esc(d.scores.correctness) + ', security ' + esc(d.scores.security) + ', quality ' + esc(d.scores.quality) + ')</div>';
+                (d.findings || []).forEach(function (f) {
+                    var col = /high/i.test(f.severity) ? '#f66' : (/med/i.test(f.severity) ? '#fc6' : '#9cf');
+                    html += '<div style="margin-top:4px;"><span style="color:' + col + '">[' + esc(f.severity || 'note') + ']</span> '
+                        + esc(f.file) + (f.line ? ':' + esc(f.line) : '') + ' ' + esc(f.issue) + '</div>';
+                });
+                if (!(d.findings || []).length) html += '<div style="opacity:0.8;">No findings.</div>';
+            }
+            $('aec-findings').innerHTML = html;
+            if (d.blocking) {
+                status('Blocked: the reviewer found a high-severity problem. Fix it, or use Commit anyway with a reason.', '#f66');
+                $('aec-override-box').style.display = 'block';
+            } else {
+                status(d.warning || d.message || 'Review finished. Confirm to commit.', d.warning ? '#fc6' : '#8f8');
+                $('aec-confirm-box').style.display = 'block';
+            }
+        }).catch(function (e) { $('aec-review').disabled = false; status('Review request failed: ' + e.message, '#f88'); });
+    };
+    function confirm(reason) {
+        status('Committing…');
+        post({ step: 'confirm', override_reason: reason || '' }).then(function (d) {
+            if (d.success) { status(d.message || 'Committed.', '#8f8'); $('aec-confirm-box').style.display = 'none'; $('aec-override-box').style.display = 'none'; }
+            else status(d.error || 'Commit failed', '#f88');
+        }).catch(function (e) { status('Commit request failed: ' + e.message, '#f88'); });
+    }
+    $('aec-confirm').onclick = function () { confirm(''); };
+    $('aec-override').onclick = function () {
+        var r = $('aec-reason').value.trim();
+        if (r.length < 8) { status('Commit anyway needs a reason of at least 8 characters.', '#f88'); return; }
+        confirm(r);
+    };
+})();
+</script>

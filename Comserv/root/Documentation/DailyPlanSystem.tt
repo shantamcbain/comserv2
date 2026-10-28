@@ -4,9 +4,9 @@
    roles = "admin,developer"
    TemplateType = "Project"
    category = "planning,dailyplan,feature"
-   page_version = "0.003"
-   last_updated = "2026-01-17"
-%]
+   page_version = "0.004"
+   last_updated = "2026-10-26"
+|%]
 [% PageVersion = 'Documentaton/DailyPlanSystem.tt, v 0.05 2026/01/17 02:15:00 Reorganized Phase 1: Result files first (DailyPlan.pm, DailyPlanProject.pm), update Todo.pm, then browser-based schema system. Removed script references. Added API token blocker note. Tasks managed via browser until API configured.' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -154,11 +154,21 @@
                 <li><strong>Plan Management</strong>: Create, edit, delete, and organize plans by project</li>
                 <li><strong>Task Linking</strong>: Associate todos with plans for tracking work items</li>
                 <li><strong>Task Dependencies</strong>: Block tasks and prevent circular dependencies</li>
+                <li><strong>Attention Order Panel</strong> (todo <a href="/todo/details?record_id=2616">#2616</a>, 2026-10-26): A collapsed dashboard card on the Today’s Work tab that surfaces branches and projects needing attention and a stale todo review queue. It ranks branches by drift from <code>main</code> (most behind first, then oldest last commit) and keeps the Focus Queue clean by moving old noise into a review bucket.</li>
                 <li><strong>Branch Focus Queue</strong>: On a worktree server, Today's Focus Queue shows Active todos (any branch, so nobody starts work already in a log), then todos that block this project, then this branch's project todos by priority. <code>main</code> still shows the full queue. Escape hatch: <code>?filter_project=all</code>. Todo cards use theme text on a light card background (priority colour is badge-only).</li>
                 <li><strong>Project Integration</strong>: Link plans to projects for organizational context</li>
                 <li><strong>Admin-Only Access</strong>: Restricted to CSC admins and SiteName admins</li>
                 <li><strong>Code Reuse</strong>: Leverages existing Todo, Project, and Calendar systems</li>
             </ul>
+            
+            <h3>Attention Order Panel</h3>
+            <p>The Attention Order panel is a coordination layer above the Focus Queue. It is rendered by <code>Comserv::Util::AttentionOrder</code> and shown on <code>/planning/daily</code> in the Today’s Work tab, alongside Cross-Project Dependencies, Application Error Audit, and HelpDesk Tickets. The panel is one closed card containing three closed group cards:</p>
+            <ul>
+                <li><strong>Branches needing attention</strong>: each worktree branch that is behind local <code>main</code> or holds unique unmerged work. Sorted by most-behind-main first, then oldest last-commit date. Each row links to the branch's planning page or <code>/admin/git</code>.</li>
+                <li><strong>Projects needing attention</strong>: projects with open work but no recent activity, or projects blocking another in-process project.</li>
+                <li><strong>Stale review queue</strong>: open todos untouched for 180+ days with Close / Suspend / Keep actions. This keeps stale noise out of the top 20 Focus Queue unless it is a real blocker.</li>
+            </ul>
+            <p>Implementation files: <code>Comserv/lib/Comserv/Util/AttentionOrder.pm</code>, <code>Comserv/lib/Comserv/Controller/Planning.pm</code>, <code>Comserv/root/admin/planning/_attention_panel.tt</code>, <code>Comserv/root/admin/planning/_today_work_tab.tt</code>, <code>Comserv/root/static/css/planning/daily-plan.css</code>. Status: initial slice delivered 2026-10-26; UI polish and action wiring remain open.</p>
         </div>
     </div>
 
@@ -195,28 +205,28 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr style="background:#d4edda;">
+                    <tr style="background:var(--bg-secondary, #d4edda);">
                         <td><strong>CSC Admin</strong></td>
                         <td>All sites</td>
                         <td>✅ Full — all tabs, all sites</td>
                         <td>✅ Visible (CSC tab)</td>
                         <td>✅ Create / Edit / View</td>
                     </tr>
-                    <tr style="background:#d4edda;">
+                    <tr style="background:var(--bg-secondary, #d4edda);">
                         <td><strong>SiteName Admin</strong></td>
                         <td>Own site only</td>
                         <td>✅ DB-only view (own site)</td>
                         <td>❌ Hidden</td>
                         <td>✅ Create / Edit / View (own site)</td>
                     </tr>
-                    <tr style="background:#d4edda;">
+                    <tr style="background:var(--bg-secondary, #d4edda);">
                         <td><strong>Developer</strong></td>
                         <td>Own site</td>
                         <td>✅ DB-only view (own site)</td>
                         <td>❌ Hidden</td>
                         <td>✅ View / Edit (own site)</td>
                     </tr>
-                    <tr style="background:#d4edda;">
+                    <tr style="background:var(--bg-secondary, #d4edda);">
                         <td><strong>Editor</strong></td>
                         <td>Own site</td>
                         <td>✅ DB-only view (own site)</td>
@@ -237,7 +247,7 @@
                         <td>❌ Hidden</td>
                         <td>❌ No access</td>
                     </tr>
-                    <tr style="background:#f8d7da;">
+                    <tr style="background:var(--bg-secondary, #f8d7da);">
                         <td><strong>Not Logged In</strong></td>
                         <td>—</td>
                         <td>❌ Redirect to login</td>
@@ -258,11 +268,11 @@
         <div class="col-12">
             <h2 id="hierarchy">Project Hierarchy</h2>
             <p>The DailyPlan system sits within a larger project hierarchy to ensure proper organization and reporting:</p>
-            <div style="background: #f0f4f7; padding: 20px; border-radius: 8px; border: 1px solid #d0d7de;">
+            <div style="background: var(--card-bg, #f0f4f7); padding: 20px; border-radius: 8px; border: 1px solid var(--bg-secondary, #d0d7de);">
                 <ul style="list-style-type: none; padding-left: 0;">
                     <li style="font-weight: bold; margin-bottom: 10px;">📂 Project Management (Primary Parent)</li>
                     <li style="margin-left: 20px; margin-bottom: 10px;">└─ 📂 DailyPlan System (Sub-project)</li>
-                    <li style="margin-left: 40px; color: #57606a;">└─ 📂 Daily Priorities (Active execution sub-project)</li>
+                    <li style="margin-left: 40px; color: var(--bg-secondary, #57606a);">└─ 📂 Daily Priorities (Active execution sub-project)</li>
                 </ul>
                 <p style="margin-top: 15px; font-size: 0.9em;"><strong>Purpose of "Daily Priorities":</strong> This sub-project is the specific container for tasks generated daily. It allows for high-granularity tracking of daily work without cluttering the main DailyPlan system metadata.</p>
             </div>
@@ -279,7 +289,7 @@
                             <li>Create <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/DailyPlanProject.pm</code> - Link table (many-to-many)</li>
                             <li>Update <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/Todo.pm</code> - Add <code>plan_id</code> and <code>blocked_by_todo_id</code> relationships</li>
                         </ul>
-                        <div style="background: #f5f9ff; border-left: 3px solid var(--secondary-color); padding: 12px; margin: 12px 0; border-radius: 3px;">
+                        <div style="background: var(--card-bg, #f5f9ff); border-left: 3px solid var(--secondary-color); padding: 12px; margin: 12px 0; border-radius: 3px;">
                             <p style="margin: 0 0 10px 0; font-size: 0.95em;"><strong>📚 Resources for Creating Result Files:</strong></p>
                             <ul style="margin: 8px 0; padding-left: 20px;">
                                 <li><a href="/Documentation/Result_Class_Development_Guide" style="color: var(--secondary-color); text-decoration: none; border-bottom: 1px dashed var(--secondary-color);">Result_Class_Development_Guide.tt</a> - Step-by-step guide for creating DBIC Result classes</li>
@@ -291,7 +301,7 @@
                         </div>
                     </li>
                     <li>2. Create tables via browser-based schema system (Comserv Admin > Database > Schema Designer)
-                        <div style="background: #f5f9ff; border-left: 3px solid var(--secondary-color); padding: 12px; margin: 12px 0; border-radius: 3px;">
+                        <div style="background: var(--card-bg, #f5f9ff); border-left: 3px solid var(--secondary-color); padding: 12px; margin: 12px 0; border-radius: 3px;">
                             <p style="margin: 0 0 10px 0; font-size: 0.95em;"><strong>📚 Resources for Schema Management:</strong></p>
                             <ul style="margin: 8px 0; padding-left: 20px;">
                                 <li><a href="/Documentation/DBSchemaManager_Usage_Guide" style="color: var(--secondary-color); text-decoration: none; border-bottom: 1px dashed var(--secondary-color);">DBSchemaManager_Usage_Guide.tt</a> - How to use the schema management browser tools</li>

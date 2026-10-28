@@ -1,0 +1,24 @@
+{
+  "ProxmoxDevelopment": {
+    "host": "172.30.236.89",
+    "port": 8006,
+    "protocol": "https",
+    "user": "root",
+    "realm": "pam",
+    "node": "pve",
+    "server_type": "proxmox",
+    "description": "Development Proxmox server at 172.30.236.89",
+    "enabled": true
+  },
+  "workstation": {
+    "host": "workstation.local",
+    "port": 8006,
+    "protocol": "https",
+    "user": "user@workstation",
+    "realm": "workstation",
+    "node": "proxmox",
+    "server_type": "proxmox",
+    "description": "Proxmox server on workstation.local",
+    "enabled": true
+  }
+}

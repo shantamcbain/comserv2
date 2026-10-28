@@ -1,0 +1,110 @@
+[% META
+   title = 'Deploy Flow: build once, test, promote'
+   version = '1.0'
+   author = 'Grok Bot'
+   date = '2026-10-22'
+   last_modified = '2026-10-22'
+   category = 'admin'
+   tags = 'docker, deploy, promote, rollback'
+%]
+[% PageVersion = 'root/admin/docker/deploy_flow.tt,v 1.0 2026/10/22 grokbot Exp grokbot ' %]
+<style>
+ #dflow { max-width: 980px; margin: 0 auto; font-family: system-ui, sans-serif; }
+ #dflow fieldset { border: 1px solid #ccc; border-radius: 6px; padding: 10px 14px; margin: 10px 0; }
+ #dflow legend { font-weight: bold; padding: 0 6px; }
+ #dflow label { display: block; margin: 4px 0; cursor: pointer; }
+ #dflow .hint { color: #555; font-size: 0.88em; margin-left: 1.6em; }
+ #dflow .preview { background: #f3f6fa; border-left: 4px solid #2f6fbd; padding: 8px 12px; margin: 10px 0; font-weight: 600; }
+ #dflow pre { background: #0d1117; color: #c9d1d9; padding: 10px; border-radius: 6px; white-space: pre-wrap; max-height: 420px; overflow: auto; font-size: 0.85em; }
+ #dflow .btns button { margin: 4px 6px 4px 0; padding: 6px 12px; }
+ #dflow .danger { background: #b42318; color: #fff; border: 0; border-radius: 4px; }
+ #dflow table { border-collapse: collapse; width: 100%; font-size: 0.9em; }
+ #dflow td, #dflow th { border: 1px solid #ddd; padding: 4px 6px; text-align: left; vertical-align: top; }
+</style>
+<div id="dflow">
+<h1>Deploy Flow</h1>
+<p>Build an image <b>once</b>, test it on <b>:4000</b>, then run that <b>same image</b> on :5000 (workstation, then production1).
+Every button first shows a <b>Preview</b>; nothing happens until you press <b>Apply</b> and confirm.</p>
+
+<h3>Running now</h3>
+<pre id="flow-state">[% flow_state | html %]</pre>
+
+<fieldset><legend>1. Image</legend>
+ <label><input type="radio" name="image_mode" value="new" checked> Build new from this checkout</label>
+ <div class="hint">Gets a fixed tag like <code>3aa8eac03-202610221430</code> (commit + UTC time). Built on the workstation only. Not pushed.</div>
+ <label><input type="radio" name="image_mode" value="tag"> Use an existing tag
+   <select id="image_tag">
+   [% FOREACH t IN flow_tags %]<option value="[% t | html %]">[% t | html %]</option>[% END %]
+   [% UNLESS flow_tags.size %]<option value="">(no fixed tags on this workstation yet)</option>[% END %]
+   </select></label>
+ <div class="hint">No build. Runs exactly that image.</div>
+</fieldset>
+
+<fieldset><legend>2. Port mode</legend>
+ <label><input type="radio" name="port" value="4000" checked> :4000 Test (<code>comserv2-web-test</code>)</label>
+ <div class="hint">Try the image beside production. Public traffic never goes here.</div>
+ <label><input type="radio" name="port" value="5000"> :5000 Production (<code>comserv2-web-prod</code>)</label>
+ <div class="hint">The live container. Prefer Promote 4000 → 5000 so only tested images get here.</div>
+ <label><input type="radio" name="port" value="3000"> :3000 Spare (<code>comserv2-web-alt</code>)</label>
+ <div class="hint">Extra slot for side-by-side checks.</div>
+</fieldset>
+
+<fieldset><legend>3. Destination</legend>
+ <label><input type="radio" name="dest" value="workstation" checked> Workstation</label>
+ <label><input type="radio" name="dest" value="production1"> Production1 (:5000 only; pulls the image by tag from Docker Hub)</label>
+ <label><input type="radio" name="dest" value="both"> Both (workstation first; production1 only if the workstation is healthy)</label>
+</fieldset>
+
+<div class="preview" id="preview-line">Will build a new image and run it on :4000 on Workstation. No push. Production untouched.</div>
+<div class="btns">
+ <button data-act="plan">Preview: Build / Run</button>
+ <button data-act="plan" data-apply="1" class="danger">Apply: Build / Run</button>
+</div>
+
+<fieldset><legend>Other actions</legend>
+<table>
+ <tr><th>Action</th><th>What it does</th><th></th></tr>
+ <tr><td><b>Local test build (:4000)</b><br><small>Destination: <b>workstation :4000, no push</b></small></td><td>Builds a new image on the workstation from the current checkout, tags it <code>&lt;commit-time&gt;</code> and <code>:test</code> (never <code>:latest</code>, never pushed) and runs it as <code>comserv2-web-test</code> on :4000 with shared NFS themes, the same secrets, <code>SYSTEM_IDENTIFIER=workstation-test</code> and <code>COMSERV_JOBS=0</code>. Health-gated; :5000 is never touched. Refuses on production hosts or if another container holds :4000.</td>
+   <td><button data-act="local-test">Preview</button> <button data-act="local-test" data-apply="1" class="danger">Apply</button></td></tr>
+ <tr><td><b>Promote 4000 → 5000</b></td><td>Takes the image that is running <i>healthy</i> on :4000 and starts the same image on :5000 for the chosen destination. No rebuild. The old :5000 is kept as <code>bk-…</code> for rollback, with a health check and automatic restore. For production1 it first pushes that tag.</td>
+   <td><button data-act="promote">Preview</button> <button data-act="promote" data-apply="1" class="danger">Apply</button></td></tr>
+ <tr><td><b>Safe Push</b></td><td>Pushes <i>only</i> the fixed tag running healthy on workstation :5000 to Docker Hub, then points <code>:latest</code> at it. Refuses if :5000 is unhealthy or not a fixed tag. Never pushes "whatever is running".</td>
+   <td><button data-act="safe-push">Preview</button> <button data-act="safe-push" data-apply="1" class="danger">Apply</button></td></tr>
+ <tr><td><b>Rollback</b></td><td>Runs the previous tag recorded for :5000 on the chosen destination (same steps as Promote).</td>
+   <td><button data-act="rollback">Preview</button> <button data-act="rollback" data-apply="1" class="danger">Apply</button></td></tr>
+</table>
+</fieldset>
+
+<h3>Output</h3>
+<pre id="flow-out">(press a Preview button)</pre>
+<p><a href="/admin/docker/flow/log" target="_blank">Full apply log</a> · <a href="/admin/docker-containers">Old Docker screen</a></p>
+</div>
+<script>
+(function(){
+  function val(n){ var e=document.querySelector('input[name="'+n+'"]:checked'); return e?e.value:''; }
+  var destName={workstation:'Workstation',production1:'Production1',both:'Workstation, then Production1'};
+  function image(){ return val('image_mode')==='new' ? 'new' : (document.getElementById('image_tag').value||''); }
+  function line(){
+    var img=image(), port=val('port'), dest=val('dest');
+    var s=(img==='new'?'Will build a new image':'Will use image '+img)+' and run it on :'+port+' on '+destName[dest]+'.';
+    if (dest!=='workstation' && port!=='5000') s+=' (production1 only runs :5000; the preview will refuse this.)';
+    else if (dest!=='workstation') s+=' The tag is pushed to Docker Hub first, then production1 pulls it.';
+    else s+=' No push. Production untouched.';
+    document.getElementById('preview-line').textContent=s;
+  }
+  document.querySelectorAll('#dflow input, #image_tag').forEach(function(e){ e.addEventListener('change', line); });
+  line();
+  document.querySelectorAll('#dflow button[data-act]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var act=b.getAttribute('data-act'), apply=b.getAttribute('data-apply')==='1';
+      if (apply && !confirm('APPLY '+act+'?\n\n'+document.getElementById('preview-line').textContent+'\n\nRun Preview first if you have not.')) return;
+      var body='action='+encodeURIComponent(act)+'&image='+encodeURIComponent(image())+'&port='+val('port')+'&dest='+val('dest')+(apply?'&apply=1':'');
+      var out=document.getElementById('flow-out'); out.textContent='...';
+      fetch('/admin/docker/flow/run',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body,credentials:'same-origin'})
+        .then(function(r){return r.json();})
+        .then(function(d){ out.textContent = d.error ? ('Refused: '+d.error) : (d.preview ? d.output : 'Started (pid '+d.pid+'). Follow the full apply log.'); })
+        .catch(function(e){ out.textContent='Request failed: '+e; });
+    });
+  });
+})();
+</script>

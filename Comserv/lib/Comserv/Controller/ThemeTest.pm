@@ -68,14 +68,14 @@ sub edit_css :Path('edit_css') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', "***** THEMETEST EDIT_CSS METHOD CALLED FOR $theme_name *****");
 
     # Get the theme CSS file path
-    my $theme_css_path = $c->path_to('root', 'static', 'css', 'themes', "$theme_name.css");
+    my $theme_css_path = $c->model('ThemeConfig')->get_theme_css_directory($c) . "/$theme_name.css";
     
     # Check if the theme CSS file exists
     unless (-f $theme_css_path) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', "Theme CSS file not found: $theme_css_path");
 
         # Create the directory if it doesn't exist
-        my $themes_dir = $c->path_to('root', 'static', 'css', 'themes');
+        my $themes_dir = $c->model('ThemeConfig')->get_theme_css_directory($c);
         unless (-d $themes_dir) {
             make_path($themes_dir) or do {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_css', "Cannot create themes directory: $!");
@@ -135,7 +135,7 @@ sub edit_css :Path('edit_css') :Args(1) {
                         };
                         
                         # Save the updated theme definitions
-                        my $theme_defs_path = $c->path_to('root', 'static', 'config', 'theme_definitions.json');
+                        my $theme_defs_path = $c->model('ThemeConfig')->get_theme_definitions_path($c);
                         require JSON;
                         my $json = JSON::encode_json($themes);
                         write_file($theme_defs_path, $json);

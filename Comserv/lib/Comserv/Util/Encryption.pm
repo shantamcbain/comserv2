@@ -172,9 +172,19 @@ sub _get_encryption_key {
         }
     }
 
+    # No key found. Never silently invent one: a new key makes every existing
+    # ciphertext undecryptable. Generation is only allowed when explicitly
+    # requested (COMSERV_ALLOW_KEYGEN=1, e.g. from script/generate_encryption_key.pl).
+    unless ($ENV{COMSERV_ALLOW_KEYGEN}) {
+        my $msg = "No encryption key for namespace '$namespace' (looked in env $env_var_name, "
+                . "\$COMSERV_KEY_DIR, ~/.comserv/keys, legacy config/). Refusing to generate one. "
+                . "Mount the key dir and set COMSERV_KEY_DIR, or run script/generate_encryption_key.pl for a NEW install.";
+        $logging->log_with_details(undef, 'error', __FILE__, __LINE__, "_get_encryption_key", $msg);
+        die "$msg\n";
+    }
     # Generate new key — 32 raw bytes from /dev/urandom (AES-256)
     $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, "_get_encryption_key",
-        "No encryption key found for namespace '$namespace', generating new one");
+        "COMSERV_ALLOW_KEYGEN set: generating new key for namespace '$namespace'");
 
     my $key;
     if (open my $urandom, '<:raw', '/dev/urandom') {
@@ -221,8 +231,9 @@ sub _get_key_file_path {
     if (my $dir = $ENV{COMSERV_KEY_DIR}) {
         return File::Spec->catfile($dir, $name);
     }
-    if ($ENV{HOME}) {
-        my $shared = File::Spec->catfile($ENV{HOME}, '.comserv', 'keys', $name);
+    my $home = $ENV{COMSERV_HOME} || ($ENV{HOME} ? File::Spec->catdir($ENV{HOME}, '.comserv') : undef);
+    if ($home) {
+        my $shared = File::Spec->catfile($home, 'keys', $name);
         return $shared if -f $shared;
     }
     my $config_dir = $class->_get_config_dir();

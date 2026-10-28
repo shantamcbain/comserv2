@@ -38,7 +38,7 @@ sub config {
     my ($s) = @_;
     my $c = _read_json($s->config_file) || {};
     return { enabled => 0, mode => 'warn', cap_usd_per_day => 0.50, primary => 'anthropic/claude-sonnet-5.5',
-             alternate => 'openai/gpt-6-sol', fixer => 'deepseek/deepseek-v4-pro',
+             alternate => 'openai/gpt-6-sol', fixer => 'cohere/north-mini-code:free',
              prices => {}, max_diff_chars => 60000, max_tokens => 1500, %$c };
 }
 
@@ -256,12 +256,40 @@ sub should_block {
     return 0;
 }
 
+# 2026-10-15: what the AI Editor commit form shows. Pure, testable.
+# Cap hit / error / disabled / empty -> warn and allow. High finding in
+# block mode -> blocked, commit only with "commit anyway" + reason.
+sub gate_view {
+    my ($s, $res) = @_;
+    $res = {} unless ref $res eq 'HASH';
+    my $rev = ref $res->{review} eq 'HASH' ? $res->{review} : {};
+    my @f = map { { severity => $_->{severity} // '', file => $_->{file} // '', line => $_->{line} // '',
+                    issue => $_->{issue} // $_->{message} // $_->{text} // '' } }
+            grep { ref $_ eq 'HASH' } @{ $rev->{findings} || [] };
+    my $skipped = ($res->{skipped} || !$res->{ok}) ? 1 : 0;
+    my $blocking = $skipped ? 0 : ($res->{blocking} // $s->should_block($res)) ? 1 : 0;
+    return {
+        reviewed  => $skipped ? 0 : 1,
+        blocking  => $blocking,
+        allow     => $blocking ? 0 : 1,
+        warning   => $skipped ? ('Not reviewed: ' . ($res->{reason} // 'skipped') . '. Commit is allowed.') : '',
+        verdict   => $rev->{verdict} // '',
+        scores    => { correctness => $rev->{correctness}, security => $rev->{security}, quality => $rev->{quality} },
+        findings  => \@f,
+        model     => $res->{model} // '',
+        usd       => $res->{usd} // 0,
+        spent_today => $res->{spent_today},
+        cap       => $res->{cap},
+    };
+}
+
 # Third-vendor repair. Returns a unified diff. Does not write the worktree.
 sub propose_fix {
     my ($s, $c, %a) = @_;
     my $cfg = $s->config;
     my ($spent) = $s->spent_today;
-    my $fixer = $cfg->{fixer} || 'deepseek/deepseek-v4-pro';
+    my $fixer = $cfg->{fixer} || 'cohere/north-mini-code:free';
+    $fixer = 'cohere/north-mini-code:free' if $fixer =~ /v4-pro/i;  # 2026-10-15: never v4-pro
     my %busy = map { vendor($_) => 1 } grep { defined && length } @{ $a{author_models} || [] };
     $busy{ vendor($a{reviewer_model}) } = 1 if $a{reviewer_model};
     return { ok => 0, skipped => 1, reason => 'no independent fixer: fixer vendor matches the author or the reviewer' }

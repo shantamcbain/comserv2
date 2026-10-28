@@ -26,6 +26,7 @@
 
     <p style="margin-top:1rem;">
       <button type="submit">Save email addresses</button>
+      <a href="[% c.uri_for('/mail/invoice/sort') %]" style="margin-left:1rem;">Invoice queue</a>
       <a href="[% c.uri_for('/mail/classify_invoices') %]" style="margin-left:1rem;">Run classification</a>
       <a href="[% c.uri_for('/mail/invoice/api') %]" style="margin-left:1rem;">View classified invoices</a>
       <a href="[% c.uri_for('/Inventory') %]" style="margin-left:1rem;">Back to inventory</a>

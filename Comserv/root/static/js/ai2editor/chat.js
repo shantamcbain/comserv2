@@ -613,6 +613,9 @@ function ensureThinkingStyles(doc) {
     }
 
     function loadCurrentFileContent() {
+        if (window.AI2Wysiwyg && typeof window.AI2Wysiwyg.flushToAce === 'function') {
+            window.AI2Wysiwyg.flushToAce();
+        }
         const ed = getEditor();
         if (ed) {
             try {
@@ -1470,6 +1473,9 @@ function ensureThinkingStyles(doc) {
         // Apply the suggestion to the editor.
         editor.setValue(pendingSuggestion, -1);
         editor.clearSelection();
+        if (window.AI2Wysiwyg && typeof window.AI2Wysiwyg.refreshFromAce === 'function') {
+            window.AI2Wysiwyg.refreshFromAce();
+        }
         clearSuggestion();
         setStatus('Applying & saving...');
 
@@ -1554,6 +1560,9 @@ function ensureThinkingStyles(doc) {
                         if (data && data.content !== undefined) {
                             const ed = getEditor();
                             if (ed) { ed.setValue(data.content, -1); ed.clearSelection(); }
+                            if (window.AI2Wysiwyg && typeof window.AI2Wysiwyg.refreshFromAce === 'function') {
+                                window.AI2Wysiwyg.refreshFromAce();
+                            }
                             if (lastModEl) lastModEl.textContent = 'updated ' + new Date().toLocaleTimeString();
                             setStatus('Reloaded (external change)');
                         }
@@ -1710,6 +1719,30 @@ function ensureThinkingStyles(doc) {
         }
 
         console.log('[AI2EditorChat] chat + suggestion wiring ready');
+        seedGuardPrompt();
+    }
+
+    function seedGuardPrompt() {
+        var params;
+        try { params = new URLSearchParams(window.location.search); } catch (e) { return; }
+        var prompt = params.get('prompt');
+        var line = parseInt(params.get('line') || '0', 10);
+        var input = document.getElementById('ai-chat-input');
+        if (prompt && input && !input.value) {
+            input.value = prompt;
+        }
+        if (!(line > 0)) { return; }
+        var tries = 0;
+        var timer = setInterval(function () {
+            tries += 1;
+            var ed = getEditor();
+            if (ed && ed.session && ed.getValue()) {
+                ed.gotoLine(line, 0, true);
+                clearInterval(timer);
+            } else if (tries > 20) {
+                clearInterval(timer);
+            }
+        }, 300);
     }
 
     if (document.readyState === 'loading') {

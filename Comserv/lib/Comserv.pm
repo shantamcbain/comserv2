@@ -65,7 +65,7 @@ __PACKAGE__->config(
         # /static/js, so include_path must be 'root' (file = root/static/...).
         # include_path => ['root/static'] looked for root/static/static/js and
         # 404'd every asset. Restrict with dirs, not a nested include_path.
-        include_path => [ 'root' ],
+        include_path => [ (do { require Comserv::Util::ThemePaths; my $s = Comserv::Util::ThemePaths::static_include_shim(); $s ? ($s) : () }), 'root' ],
         dirs => [ 'static', 'LegacyStaticPages' ],
         ignore_dirs => [ 'config' ],
         ignore => [ qr{^config/} ],
@@ -385,6 +385,23 @@ __PACKAGE__->meta->add_around_method_modifier('get_session_id', sub {
     return undef if $@ || !defined $id;
     $id =~ s/[^0-9a-fA-F]//g;
     return length($id) >= 20 ? lc($id) : undef;
+});
+
+# LAYER 2.6: Cloudflare-cache safety (Comserv::Util::PublicCache). For an
+# anonymous GET on a public cacheable prefix (/ENCY/, /marketplace, ... and no
+# comserv_session cookie in the request) never send a session cookie and mark
+# the page `Cache-Control: public, max-age=3600`; also skip writing the
+# throw-away session row. Logged-in or private requests are untouched.
+require Comserv::Util::PublicCache;
+__PACKAGE__->meta->add_around_method_modifier('finalize_cookies', sub {
+    my ($orig, $c, @args) = @_;
+    eval { Comserv::Util::PublicCache::apply($c); 1 };
+    return $c->$orig(@args);
+});
+__PACKAGE__->meta->add_around_method_modifier('finalize_session', sub {
+    my ($orig, $c, @args) = @_;
+    return if eval { Comserv::Util::PublicCache::is_public_anonymous_get($c) };
+    return $c->$orig(@args);
 });
 
 # DISABLED: ConfigDatabaseInit was causing segmentation faults during schema queries
