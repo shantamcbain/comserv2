@@ -39,6 +39,7 @@
             <div class="submenu">
                 <a href="/navigation/add_link?menu=Admin&amp;category=Admin_links&amp;submenu=admin_links&amp;return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Admin Link</a>
                 <a href="/admin/site_modules"><i class="icon-settings"></i>Site Modules</a>
+                <a href="/admin/site_modules/approval_queue"><i class="icon-settings"></i>Add-on Approval Queue</a>
                 <a href="/admin/docker-containers"><i class="icon-docker"></i>Docker Containers</a>
                 <a href="/admin/docker-containers-old"><i class="icon-docker"></i>Docker Containers (Old)</a>
                 <a href="/planning/daily"><i class="icon-calendar"></i>Daily Plan</a>
@@ -338,6 +339,7 @@
                     <a href="/site/add_site_form"><i class="icon-add"></i>Add Site</a>
                     <a href="/site/list_domains"><i class="icon-domain"></i>All Sites</a>
                     <a href="/admin/site_modules"><i class="icon-settings"></i>Site Modules</a>
+                    <a href="/admin/site_modules/approval_queue"><i class="icon-settings"></i>Add-on Approval Queue</a>
                 </div>
                 
                 <!-- System Configuration -->
@@ -345,6 +347,7 @@
                     <span class="submenu-section-title">System Configuration</span>
                     <a href="/ApiCredentials"><i class="icon-key"></i>API Credentials</a>
                     <a href="/admin/dns"><i class="icon-cloud"></i>Cloudflare DNS</a>
+                    <a href="/admin/cloudflare_cache"><i class="icon-cloud"></i>Cloudflare Cache Rules</a>
                     <a href="/css_form"><i class="icon-css"></i>CSS Settings</a>
                     <a href="/admin/compare_schema"><i class="icon-schema"></i>Database Schema Compare</a>
                     <a href="/mail/add_mail_config_form"><i class="icon-mail-config"></i>Mail Configuration</a>

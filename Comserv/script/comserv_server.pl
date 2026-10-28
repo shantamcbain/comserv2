@@ -1,4 +1,14 @@
 #!/usr/bin/env perl
+BEGIN {
+    # Raise soft open-files limit to min(8192, hard); see script/raise_nofile.pl (2026-10-16 :4006 EMFILE).
+    require File::Spec; my $f = File::Spec->rel2abs(__FILE__); $f =~ s{[^/]*$}{raise_nofile.pl};
+    eval { require $f; comserv_raise_nofile(8192); 1 } or print STDERR "[nofile] skipped: $@";
+}
+BEGIN {
+    # Same API keys on every branch/port; see script/load_shared_keys.pl (2026-10-18).
+    require File::Spec; my $f = File::Spec->rel2abs(__FILE__); $f =~ s{[^/]*$}{load_shared_keys.pl};
+    eval { require $f; comserv_load_shared_keys(); 1 } or print STDERR "[keys] skipped: $@";
+}
 use Catalyst qw( Static::Simple );
 BEGIN {
     $ENV{CATALYST_SCRIPT_GEN} = 40;
@@ -660,6 +670,24 @@ if ($use_twiggy) {
 if ( grep { $_ eq '-r' || $_ eq '--restart' } @ARGV ) {
     unless ( grep { /--?restart_directory/ } @ARGV ) {
         push @ARGV, '--restart_directory', 'lib';
+    }
+    # max_user_instances (128) is shared by every -r server plus the desktop.
+    # Linux::Inotify2->new then dies "Too many open files" and the server
+    # never binds. Poll lib/ instead so -r still starts.
+    my $ino = eval { require Linux::Inotify2; Linux::Inotify2->new };
+    if ($ino) {
+        undef $ino;
+    }
+    else {
+        my $err = $! || $@ || 'unknown';
+        print STDERR "[restart] inotify unavailable ($err) — polling lib/ for changes\n";
+        require File::ChangeNotify;
+        require File::ChangeNotify::Watcher::Default;
+        no warnings 'redefine';
+        *File::ChangeNotify::instantiate_watcher = sub {
+            shift;
+            return File::ChangeNotify::Watcher::Default->new(@_);
+        };
     }
 }
 

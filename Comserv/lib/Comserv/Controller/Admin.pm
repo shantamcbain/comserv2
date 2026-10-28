@@ -2906,7 +2906,9 @@ sub security_scan_start :Path('/admin/security-scan-start') :Args(0) {
     }
 
     if ($pid == 0) {
-        open(STDOUT, '>', $out_file) or exit 1;
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+        eval {
+        open(STDOUT, '>', $out_file) or Comserv::Util::ForkSafe::child_exit(1);
         open(STDERR, '>&STDOUT');
         my @cmd = ('perl', $script,
             '--url',    $target_url,
@@ -2916,7 +2918,8 @@ sub security_scan_start :Path('/admin/security-scan-start') :Args(0) {
         );
         push @cmd, '--auth-cookie', $auth_cookie if $auth_cookie;
         exec(@cmd);
-        exit 1;
+        };
+        Comserv::Util::ForkSafe::child_exit(1);
     }
 
     # Reap child automatically so it doesn't become a zombie
@@ -7069,6 +7072,8 @@ sub docker_ssh_terminal :Path('/admin/docker-ssh-terminal') :Args(0) {
     
     if ($pid == 0) {
         # Child process
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+        eval {
         $pty->make_slave_controlling_terminal();
         my $slave = $pty->slave();
         
@@ -7081,6 +7086,8 @@ sub docker_ssh_terminal :Path('/admin/docker-ssh-terminal') :Args(0) {
         open STDERR, '>&', $slave->fileno() or die "Can't redirect STDERR: $!";
         
         exec(@$ssh_cmd) or die "Can't exec SSH: $!";
+        };
+        Comserv::Util::ForkSafe::child_exit(1);
     }
     
     # Parent process - proxy between WebSocket and PTY

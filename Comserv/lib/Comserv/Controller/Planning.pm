@@ -7,6 +7,7 @@ use Comserv::Util::AdminAuth;
 use Comserv::Util::ProjectDependencies;
 use Comserv::Util::TodoRanking;
 use Comserv::Util::FocusRanking;
+use Comserv::Util::AttentionOrder;
 use Comserv::Util::TodoTypes qw(recurring_matches_date is_calendar_fixture);
 use Comserv::Util::ErrorAudit;
 use Comserv::Model::Ollama;
@@ -701,14 +702,20 @@ sub daily :Path('/planning/daily') :Args {
                 @branch_pids = ();
             }
             %branch_scope = map { $_ => 1 } @branch_pids;
-            my $matched = scalar grep {
+            # Branch worktrees show ONLY this branch's todos (Shanta, Oct 24 2026).
+            # Only main ranks every branch. ?filter_project=all is the escape hatch.
+            my $before_branch = scalar @all_sorted;
+            @all_sorted = grep {
                 Comserv::Util::FocusRanking::todo_matches_branch($_, $cur_branch, \%branch_scope)
             } @all_sorted;
+            my $matched = scalar @all_sorted;
+            my $hidden_other = $before_branch - $matched;
             $c->stash->{branch_focus_filter} = {
                 branch      => $cur_branch,
                 root_id     => $branch_pids[0],
                 project_ids => \@branch_pids,
                 matched     => $matched,
+                hidden      => $hidden_other,
             };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
                 "Branch focus '$cur_branch': $matched todos match branch "
@@ -937,6 +944,36 @@ sub daily :Path('/planning/daily') :Args {
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
         "Could not fetch/process project dependencies: $@") if $@;
 
+    # Attention Order panel: branches/projects/todos that need attention before
+    # they are lost in the backlog. Computed after dependencies so the panel can
+    # reuse the same sitename/role scope. Errors are logged but never block the
+    # rest of the daily view.
+    my $attention_order;
+    eval {
+        my $ao = Comserv::Util::AttentionOrder->new;
+        $attention_order = {
+            branch_attention  => $ao->branch_attention($c),
+            project_attention => $ao->project_attention($c),
+            stale_review      => $ao->stale_review_queue($c),
+        };
+        # Counts for the panel header.
+        my $b_attn = scalar grep { $_->{needs_attention} } @{ $attention_order->{branch_attention} // [] };
+        my $p_attn = scalar @{ $attention_order->{project_attention} // [] };
+        my $stale  = scalar @{ $attention_order->{stale_review} // [] };
+        $attention_order->{counts} = {
+            branches => $b_attn,
+            projects => $p_attn,
+            stale    => $stale,
+        };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
+            "AttentionOrder: $b_attn branches, $p_attn projects, $stale stale todos");
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
+            "AttentionOrder computation failed: $@");
+        $attention_order = { branch_attention => [], project_attention => [], stale_review => [], counts => {}, error => 1 };
+    }
+
     $c->stash(
         is_csc            => $is_csc,
         plan_sitename     => $sitename,
@@ -961,6 +998,8 @@ sub daily :Path('/planning/daily') :Args {
         display_date      => $display_date,
         prev_date         => $prev_date,
         next_date         => $next_date,
+
+        attention_order   => $attention_order,
 
         week_todos_by_date => \%week_todos_by_date,
         week_overdue_todos => \@week_overdue_todos,
@@ -2450,8 +2489,10 @@ sub deploy :Path('deploy') :Args(0) {
             return;
         } elsif (defined $pid) {
             # child — run the real deploy
+            require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+            eval {
             require Comserv::Util::DockerDeploy;
-            open(my $log, '>>', '/tmp/comserv_deploy_4000.log') or exit 1;
+            open(my $log, '>>', '/tmp/comserv_deploy_4000.log') or Comserv::Util::ForkSafe::child_exit(1);
             my $deploy = Comserv::Util::DockerDeploy->new(
                            log_fh   => $log,
                            logging  => $self->logging,
@@ -2463,7 +2504,9 @@ sub deploy :Path('deploy') :Args(0) {
             my $ok = $deploy->deploy_to_target_safe();
             print $log "[${\Comserv::Util::AppTime->now_utc}] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
             close($log);
-            exit($ok ? 0 : 1);
+            Comserv::Util::ForkSafe::child_exit($ok ? 0 : 1);
+            };
+            Comserv::Util::ForkSafe::child_exit(1);
         } else {
             $c->response->body(encode_json({ success => JSON::false, error => 'fork failed' }));
         }
@@ -2598,11 +2641,15 @@ sub decision_rank :Path('/planning/decision_rank') :Args(0) {
     if ($pid == 0) {
         # Child: detach and exec immediately so no Perl destructors (DB
         # handles, session) from the parent run in this process.
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+        eval {
         POSIX::setsid();
         open STDIN,  '<', '/dev/null';
         open STDOUT, '>', $log or POSIX::_exit(1);
         open STDERR, '>&', \*STDOUT;
         exec @cmd or POSIX::_exit(127);
+        };
+        POSIX::_exit(127);
     }
 
     my $job = { pid => $pid, branch => $branch, model => $model, reason => $reason,

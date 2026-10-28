@@ -613,6 +613,9 @@ function ensureThinkingStyles(doc) {
     }
 
     function loadCurrentFileContent() {
+        if (window.AI2Wysiwyg && typeof window.AI2Wysiwyg.flushToAce === 'function') {
+            window.AI2Wysiwyg.flushToAce();
+        }
         const ed = getEditor();
         if (ed) {
             try {
@@ -1470,6 +1473,9 @@ function ensureThinkingStyles(doc) {
         // Apply the suggestion to the editor.
         editor.setValue(pendingSuggestion, -1);
         editor.clearSelection();
+        if (window.AI2Wysiwyg && typeof window.AI2Wysiwyg.refreshFromAce === 'function') {
+            window.AI2Wysiwyg.refreshFromAce();
+        }
         clearSuggestion();
         setStatus('Applying & saving...');
 
@@ -1554,6 +1560,9 @@ function ensureThinkingStyles(doc) {
                         if (data && data.content !== undefined) {
                             const ed = getEditor();
                             if (ed) { ed.setValue(data.content, -1); ed.clearSelection(); }
+                            if (window.AI2Wysiwyg && typeof window.AI2Wysiwyg.refreshFromAce === 'function') {
+                                window.AI2Wysiwyg.refreshFromAce();
+                            }
                             if (lastModEl) lastModEl.textContent = 'updated ' + new Date().toLocaleTimeString();
                             setStatus('Reloaded (external change)');
                         }

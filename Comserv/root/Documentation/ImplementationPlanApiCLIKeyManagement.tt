@@ -52,7 +52,7 @@
 
     <h2>🎯 Feature Breakdown: What Users Will Be Able To Do</h2>
     
-    <div style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <div style="background: var(--bg-secondary, #e3f2fd); border-left: 4px solid var(--info-color, #2196f3); padding: 15px; margin: 20px 0; border-radius: 4px;">
         <h3 style="margin-top: 0;">End-User Capabilities After Phase 1C Completion</h3>
         <ol style="line-height: 1.8;">
             <li><strong>Generate API Key (One-Time Setup)</strong>
@@ -100,7 +100,7 @@
     <div style="margin: 30px 0;">
         <h3>Phase 1C Sub-Tasks (Tactical Implementation)</h3>
         
-        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: var(--card-bg, rgba(255,255,255,0.88)); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.1: Dedicated CLI Token Setup Endpoint</h4>
             <p><strong>What To Build</strong>: New REST endpoint <code>POST /api/token/cli-setup</code> optimized for command-line use</p>
             <p><strong>Implementation Details</strong>:</p>
@@ -129,7 +129,7 @@
             <p><strong>Effort Estimate</strong>: 2-3 hours (endpoint implementation + validation logic)</p>
         </div>
 
-        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: var(--card-bg, rgba(255,255,255,0.88)); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.2: Token Scope & Permission System</h4>
             <p><strong>What To Build</strong>: Fine-grained permission model for API tokens (which projects/endpoints they can access)</p>
             <p><strong>Implementation Details</strong>:</p>
@@ -158,7 +158,7 @@
             <p><strong>Effort Estimate</strong>: 3-4 hours (schema design, validator logic, API endpoints for scope management)</p>
         </div>
 
-        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: var(--card-bg, rgba(255,255,255,0.88)); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.3: CLI Wrapper Script (`comserv-cli` Command)</h4>
             <p><strong>What To Build</strong>: User-friendly command-line tool for key generation, management, and API testing</p>
             <p><strong>Implementation Details</strong>:</p>
@@ -199,7 +199,7 @@
             <p><strong>Effort Estimate</strong>: 4-5 hours (script implementation, sub-command structure, config file handling, error handling)</p>
         </div>
 
-        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: var(--card-bg, rgba(255,255,255,0.88)); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.4: Documentation: API Token Reference Guide</h4>
             <p><strong>What To Create</strong>: User and developer documentation for API token system (both UI and CLI)</p>
             <p><strong>Implementation Details</strong>:</p>
@@ -236,7 +236,7 @@
             <p><strong>Effort Estimate</strong>: 2-3 hours (writing, examples, testing doc accuracy)</p>
         </div>
 
-        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: var(--card-bg, rgba(255,255,255,0.88)); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.5: End-to-End Testing: Token Generation → CLI Use → API Call</h4>
             <p><strong>What To Test</strong>: Complete workflow from key generation to successful API call via command line</p>
             <p><strong>Test Scenarios</strong>:</p>
@@ -284,7 +284,7 @@
             <p><strong>Effort Estimate</strong>: 2-3 hours (test script development, execution, bug fixes)</p>
         </div>
 
-        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: var(--card-bg, rgba(255,255,255,0.88)); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.6: Grok Integration: Pass API Tokens to External Tools</h4>
             <p><strong>What To Build</strong>: Configuration and examples for using Comserv API tokens with Grok and other external systems</p>
             <p><strong>Implementation Details</strong>:</p>
@@ -311,7 +311,7 @@
             <p><strong>Effort Estimate</strong>: 2-3 hours (integration testing, config examples, verification)</p>
         </div>
 
-        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: var(--card-bg, rgba(255,255,255,0.88)); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.7: Monitoring & Audit: Token Usage Logging</h4>
             <p><strong>What To Build</strong>: Audit trail for token creation, use, and revocation</p>
             <p><strong>Implementation Details</strong>:</p>
@@ -338,7 +338,7 @@
             <p><strong>Effort Estimate</strong>: 2-3 hours (logging infrastructure, dashboard UI, log analysis utilities)</p>
         </div>
 
-        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: var(--card-bg, rgba(255,255,255,0.88)); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.8: Security Hardening & Best Practices</h4>
             <p><strong>What To Implement</strong>: Security controls and best practices for token management</p>
             <p><strong>Implementation Details</strong>:</p>
@@ -455,7 +455,7 @@
         </tbody>
     </table>
 
-    <div style="background: #c8e6c9; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <div style="background: var(--bg-secondary, #c8e6c9); border-left: 4px solid var(--success-color, #4caf50); padding: 15px; margin: 20px 0; border-radius: 4px;">
         <h3 style="margin-top: 0;">⚡ Parallelization Opportunities</h3>
         <ul>
             <li><strong>Parallel Work (Week 1)</strong>: #1C.1 (endpoint) and #1C.2 (scope system) can be developed in parallel as they target different layers</li>
@@ -468,7 +468,7 @@
 
     <h2>✅ Validation & Success Criteria</h2>
 
-    <div style="background: #e8f5e9; border: 1px solid #4caf50; border-radius: 4px; padding: 15px; margin: 20px 0;">
+    <div style="background: var(--card-bg, #e8f5e9); border: 1px solid var(--success-color, #4caf50); border-radius: 4px; padding: 15px; margin: 20px 0;">
         <h3 style="margin-top: 0;">Phase 1C Success Checklist</h3>
         <ul style="line-height: 1.8;">
             <li>✅ <strong>Endpoint Working</strong>: POST /api/token/cli-setup generates valid tokens, returns JSON response with token + .env format</li>
@@ -488,7 +488,7 @@
 
     <h2>🔗 Related Documentation & Resources</h2>
 
-    <div style="background: var(--bg-secondary, #f5f5f5); border-left: 4px solid #999; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <div style="background: var(--bg-secondary, #f5f5f5); border-left: 4px solid var(--bg-secondary, #999); padding: 15px; margin: 20px 0; border-radius: 4px;">
         <ul style="line-height: 1.8;">
             <li><a href="/Documentation/TodoAPIAndMasterPlanSync" target="_blank">📄 Implementation Plan: Todo API & Master Plan DB Sync</a> (Phase 1B foundation: Token schema, endpoints)</li>
             <li><a href="/Documentation/ApiTokenReferenceGuide" target="_blank">📘 API Token Reference Guide</a> (Documentation for users, detailed token usage)</li>
@@ -504,7 +504,7 @@
 
     <h2>📌 Key Decisions & Rationale</h2>
 
-    <div style="background: var(--caution-bg, #fff3cd); border-left: 4px solid #ff9800; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <div style="background: var(--caution-bg, #fff3cd); border-left: 4px solid var(--warning-color, #ff9800); padding: 15px; margin: 20px 0; border-radius: 4px;">
         <ul style="line-height: 1.8;">
             <li><strong>Why Phase 1C (not Phase 2)?</strong> CLI key management is a natural extension of Phase 1B token system - same authentication layer, adds user-facing workflow. Logically grouped as Phase 1C to keep token work together.</li>
             <li><strong>Why Dedicated CLI Tool?</strong> External tools (Grok, scripts, monitoring) need simple, non-browser token management. CLI wrapper reduces friction vs. forcing UI interaction.</li>

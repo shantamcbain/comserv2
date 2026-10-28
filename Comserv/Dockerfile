@@ -169,6 +169,19 @@ RUN chmod +x /opt/comserv/docker-entrypoint.sh && chown comserv:comserv /opt/com
 
 # Don't switch to comserv user - entrypoint runs as root to configure supervisor,
 # then supervisord handles dropping privileges for app processes
+# Build stamp. ARGs declared before the first FROM are NOT visible inside a
+# stage unless re-declared, which is why image labels showed an empty revision.
+# version.json is no longer tracked in git: deploy.sh writes it into the build
+# context; if it is missing (plain `docker build`), generate it from the args.
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ARG BUILD_DATE=unknown
+ARG BUILD_HOST=unknown
+RUN if [ ! -s /opt/comserv/version.json ]; then \
+      printf '{"branch":"%s","commit":"%s","build_date":"%s","build_host":"%s"}\n' \
+        "$GIT_BRANCH" "$GIT_COMMIT" "$BUILD_DATE" "$BUILD_HOST" > /opt/comserv/version.json; \
+      chown comserv:comserv /opt/comserv/version.json; \
+    fi
 USER comserv
 ENTRYPOINT ["/opt/comserv/docker-entrypoint.sh"]
 CMD []

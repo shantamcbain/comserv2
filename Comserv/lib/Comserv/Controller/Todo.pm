@@ -2614,14 +2614,26 @@ PUT /api/todo/:id - Update a todo (partial update allowed)
 sub api_todo_update :Path('/api/todo/update') :Args(1) {
     my ($self, $c, $todo_id) = @_;
 
-    my $address  = $c->req->address;
-    my $is_local = ($address eq '127.0.0.1' || $address eq '::1'
-        || $address =~ /^192\.168\./
-        || $address =~ /^172\.(1[6-9]|2[0-9]|3[01])\./
-        || $address =~ /^10\./);
-
-    unless ($is_local) {
-        $self->_api_validate_token($c);
+    # Identity first (session / Bearer token user with an allowed role), then the same
+    # LAN check as Api.pm (_api_local_ok honours COMSERV_API_LAN_BYPASS_WRITES; the old
+    # wider 192.168/16, 172.16/12, 10/8 list is gone). A presented-but-bad token is
+    # refused, never downgraded to the LAN bypass.
+    require Comserv::Controller::Api;
+    my ($actor, $via);
+    if (my $id = Comserv::Controller::Api::_api_identity($c)) {
+        ($actor, $via) = ($id->{username}, $id->{via});
+    }
+    else {
+        my $auth  = $c->req->header('Authorization') // '';
+        if ($auth !~ /^Bearer\s+\S/ && Comserv::Controller::Api::_api_local_ok($c)) {
+            ($actor, $via) = (q{system}, q{lan});
+        }
+        else {
+            my $ierr = Comserv::Controller::Api::_api_gate_refusal($c);
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_todo_update',
+                "API todo update refused ($ierr->{status}) from " . ($c->req->address // '?'));
+            $self->_api_error($c, $ierr->{error}, $ierr->{code} || 'unauthorized', $ierr->{status});
+        }
     }
 
     my $params;
@@ -2656,11 +2668,12 @@ sub api_todo_update :Path('/api/todo/update') :Args(1) {
     }
 
     if (%update) {
-        $update{last_mod_by}   = 'system';
+        $update{last_mod_by}   = $actor;
         $update{last_mod_date} = Comserv::Util::AppTime->today_ymd_for($c);
         $todo->update(\%update);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_update',
-            "Todo updated via API: record_id=$todo_id, Fields=" . join(',', keys %update));
+            "Todo updated via API: record_id=$todo_id, Fields=" . join(',', keys %update)
+            . " by $actor (via: $via)");
     }
 
     $self->_api_success($c, 'Todo updated successfully', {

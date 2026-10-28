@@ -28,6 +28,21 @@ has 'logging' => (
 # duplicated). Keeps Catalyst MVC discipline: this is business logic only.
 # ===================================================================
 
+# pure (2026-10-18). Should this turn run the app's own web search / page fetch?
+# Members+ (can_enrich) with a successful answer, when the answer looks weak or
+# the prompt is a lookup/audit - OR when the user ticked "web search" but the
+# model that answered has no native search (only grok does). Before this, a
+# ticked box with a free/OpenRouter/Ollama answer got no web data at all, so
+# members stayed confined to the in-app answer.
+sub enrich_needed {
+    my (%a) = @_;
+    return 0 unless $a{can_enrich} && $a{success};
+    my $native = (($a{provider} // '') =~ /^(?:grok|xai)$/i) ? 1 : 0;
+    return 1 if $a{use_search} && !$native;
+    return 0 if $a{use_search};
+    return (($a{quality} // '') eq 'poor' || $a{site_audit} || $a{lookup_intent}) ? 1 : 0;
+}
+
 # Role-based system prompt. $roles is an arrayref; admin/dev get the
 # "you may use tools / internal data" flavor. Mirrors v1 _build_role_system_prompt.
 sub build_role_prompt {
@@ -516,6 +531,35 @@ sub process {
     unshift @$messages, { role => 'system', content => $system_prompt }
         if $system_prompt;
 
+    # ── herbs-then-web: Ency herb DB first, web only as fallback ──────────
+    # A herb/plant question looks up ency_herb_tb; matching facts + an in-app
+    # citation are injected. If the DB facts are rich, web auto-enrich is
+    # skipped; if no row matches or the data is thin, auto-enrich runs as before.
+    my @herb_citations;
+    # Not for the AI Editor / code agents: their prompts are about code ("what is", "used for"), and
+    # they never web-enrich (see $is_editor below), so no herb lookup / context for them.
+    if (($c->config->{HerbsThenWeb}{enabled} // 1)
+        && !$is_editor
+        && !Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id})) {
+        my $hc = eval { $self->_herb_db_context($c, $prompt) };
+        push @thinking, "herbs-then-web error: $@" if $@;
+        if ($hc && $hc->{context}) {
+            if (@$messages && $messages->[0]{role} eq 'system') {
+                $messages->[0]{content} .= "\n\n" . $hc->{context};
+            } else {
+                unshift @$messages, { role => 'system', content => $hc->{context} };
+            }
+            @herb_citations = @{ $hc->{citations} || [] };
+            push @thinking, sprintf('herbs-then-web: %d herb row(s) from Ency DB (%s)%s',
+                scalar(@herb_citations), join(', ', map { $_->{title} } @herb_citations),
+                $hc->{rich} ? ' — rich, web enrich skipped' : ' — thin, web enrich allowed');
+            $args{_auto_enrich_done} = 1 if $hc->{rich};
+        } elsif ($hc && $hc->{herb_question}) {
+            push @thinking, 'herbs-then-web: herb question, no Ency match — web enrich allowed';
+            $args{_herb_no_match} = 1;
+        }
+    }
+
     # ── Golden Data / Anti-Hallucination hook (Model::AI2::Grounding) ──────
     # Default 'shadow' (root/config/ai_grounding.json): this turn is unchanged
     # and the Ledger records grounded=0. 'enforce' (config, or request
@@ -530,6 +574,7 @@ sub process {
         return $grounding->miss_reply($c, $gturn, args => \%args,
             duration_ms => _aimps_elapsed_ms($t0), thinking => \@thinking) if $gturn->{miss};
         $messages = $gturn->{messages} if $gturn->{messages};
+        @herb_citations = ();       # grounded turn replaces the payload: no unlabelled herb context/citations
         $args{_auto_enrich_done} = 1;
         delete $args{use_search};   # no unlabelled provider-side search in a grounded turn
     }
@@ -723,7 +768,7 @@ sub process {
     # Public web search AND/OR same-origin linked pages (site nav audit).
     # Runs once per turn before persist. Controllers may not reload under -r;
     # this lives in the Model so a :4006 restart picks it up reliably.
-    my $citations = [];
+    my $citations = [ @herb_citations ];
     if (!$args{_auto_enrich_done}) {
         my $roles_e = $c->session->{roles} || [];
         $roles_e = [ split(/\s*,\s*/, $roles_e) ] unless ref $roles_e;
@@ -735,13 +780,14 @@ sub process {
         }
         my $site_audit = ($prompt =~ /\b(navigate|navigation|crawl|audit|failed\s+links?|each\s+page|readable|theme|look and content|site and report|broken\s+links?)\b/i) ? 1 : 0;
         my $lookup_intent = ($prompt =~ /\b(find|look\s*up|search\s+for|what\s+is|who\s+is|tell\s+me\s+about|tell\s+me\s+what|information\s+on|info\s+on|used\s+for)\b/i) ? 1 : 0;
-        # $surface / $is_editor declared at top of process() (wider scope for editor trace)
-        $surface = $args{surface} || '';
-        $is_editor = ($surface eq 'editor') || ($args{agent_id} && $args{agent_id} =~ /^(programming|coding|code|documentation|analyze)$/i);
-        my $need = $can_enrich && $resp && $resp->{success}
-            && ($quality eq 'poor' || $site_audit || $lookup_intent)
-            && !$args{use_search}
-            && !$is_editor;  # editor already has the raw buffer + CodeRead; avoid polluting with unexpanded TT links
+        my $need = enrich_needed(
+            can_enrich => $can_enrich, success => ($resp && $resp->{success}),
+            quality => $quality, site_audit => $site_audit,
+            # herbs-then-web: a herb question with no Ency match behaves like a lookup (web enrich allowed)
+            lookup_intent => (($lookup_intent || $args{_herb_no_match}) ? 1 : 0),
+            use_search => $args{use_search}, provider => ($resp ? $resp->{provider} : undef));
+        # Editor (surface or agent) already has the raw buffer + CodeRead.
+        $need = 0 if $is_editor;
         # 2026-10-15: AI Editor agents never auto web-search; the re-answer
         # overwrote code analysis with junk (helpdesk contact.tt session).
         $need = 0 if Comserv::Model::AI2::ChatIntent::is_editor_agent($args{agent_id});
@@ -1291,5 +1337,61 @@ sub _bare_model {
 }
 
 __PACKAGE__->meta->make_immutable;
+
+
+# herbs-then-web: look up Ency herbs named in the prompt.
+# Returns { herb_question, context, citations => [{url,title}], rich } or undef.
+my %HERB_STOP = map { $_ => 1 } qw(what which used uses with that this from have does about tell your their there
+  herb herbs herbal plant plants good what's whats into make made when where some much many more most also
+  benefits benefit remedy remedies medicinal properties effects take taking dose dosage tea teas tincture help
+  helps please could would should know info information root leaf leaves flower flowers seed seeds bark oil);
+sub _herb_question {
+    my ($self, $prompt) = @_;
+    return ($prompt // '') =~ /\b(herbs?|herbal|plants?|used\s+for|uses?\s+of|medicinal|tea|tincture|remed(?:y|ies)|benefits?|dosage|contra-?indicat\w*|constituents?|what\s+is|tell\s+me\s+about|good\s+for)\b/i ? 1 : 0;
+}
+sub _herb_db_context {
+    my ($self, $c, $prompt) = @_;
+    return undef unless $self->_herb_question($prompt);
+    my @words = grep { length($_) >= 4 && !$HERB_STOP{lc $_} } ($prompt =~ /([A-Za-z][A-Za-z\-']+)/g);
+    my %seen; @words = grep { !$seen{lc $_}++ } @words;
+    return { herb_question => 1 } unless @words;
+    @words = @words[0 .. 5] if @words > 6;
+    my $rs = $c->model('DBEncy')->resultset('Ency::Herb');
+    my @rows = $rs->search(
+        { -or => [ map { ( common_names => { like => "%$_%" }, botanical_name => { like => "$_%" }, key_name => { like => "%$_%" } ) } @words ] },
+        { rows => 25 })->all;
+    # keep rows where a prompt word matches a whole word in the names
+    my @hits;
+    for my $r (@rows) {
+        my $names = join ' ', map { $_ // '' } ($r->common_names, $r->botanical_name, $r->key_name);
+        my $score = 0;
+        for my $w (@words) { $score++ if $names =~ /\b\Q$w\E\b/i }
+        push @hits, [ $score, $r ] if $score;
+    }
+    @hits = sort { $b->[0] <=> $a->[0] || length(($a->[1]->common_names // '')) <=> length(($b->[1]->common_names // '')) } @hits;
+    @hits = @hits[0 .. 2] if @hits > 3;
+    return { herb_question => 1 } unless @hits;
+    my $base = eval { my $u = $c->req->base->as_string; $u =~ s{/$}{}; $u } || '';
+    my (@cit, $ctx, $facts_len);
+    $ctx = "ENCY HERB DATABASE (in-app, authoritative for this site — answer from these facts FIRST, "
+         . "cite the in-app link as a Markdown link, and only add general knowledge if clearly marked):\n";
+    for my $h (map { $_->[1] } @hits) {
+        my $url = "$base/ENCY/herb_detail/" . $h->record_id;
+        my $title = ($h->botanical_name || 'herb') . (($h->common_names // '') ne '' ? ' (' . substr($h->common_names, 0, 80) . ')' : '');
+        push @cit, { url => $url, title => "Ency: $title" };
+        $ctx .= "\n### $title — $url\n";
+        for my $fld (qw(therapeutic_action medical_uses parts_used constituents preparation dosage administration contra_indications culinary non_med history)) {
+            my $v = eval { $h->$fld } // '';
+            $v =~ s/<[^>]+>//g; $v =~ s/\s+/ /g; $v =~ s/^\s+|\s+$//g;
+            next if $v eq '';
+            $v = substr($v, 0, 600) . '…' if length $v > 600;
+            (my $label = $fld) =~ s/_/ /g;
+            $ctx .= "- $label: $v\n";
+            $facts_len += length $v if $fld =~ /^(therapeutic_action|medical_uses|constituents|parts_used|preparation|dosage)$/;
+        }
+    }
+    my $min = $c->config->{HerbsThenWeb}{rich_min_chars} // 150;
+    return { herb_question => 1, context => $ctx, citations => \@cit, rich => (($facts_len // 0) >= $min ? 1 : 0) };
+}
 
 1;
