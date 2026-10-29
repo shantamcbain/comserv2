@@ -23,6 +23,10 @@ use Time::Local qw(timegm timelocal);
 
 our %CAPS = (day => 1.65, week => 11.50, month => 50);
 our $NEAR_CAP_FRAC = 0.6;
+# Oct 29 2026 (Shanta, fix B): every log line, notice and alert names WHERE it ran ([:3001 main], [:4005 planning], [cron aisystem]),
+# and each run records its GUARD_VERSION in the shared state file. A copy older than the newest recorded version logs one
+# SKIPPED line and does nothing (no trip, no restore, no config write). Bump this on every guard behaviour change.
+our $GUARD_VERSION = 20261029;
 our $THRASH_N      = 20;
 our $THRASH_WINDOW = 900;
 
@@ -105,6 +109,7 @@ sub new {
         ollama_url   => $a{ollama_url} // 'http://127.0.0.1:11434',
         dry_run      => $a{dry_run} // 0,
         now          => $a{now},
+        port         => $a{port} // $ENV{COMSERV_GUARD_PORT},
         %a,
     };
     return bless $self, $class;
@@ -1204,7 +1209,34 @@ sub write_state {
     rename $tmp, $s->{state_file};
 }
 sub _append { my ($f, $line) = @_; open my $fh, '>>', $f or return; print $fh $line, "\n"; close $fh }
-sub log_line { my ($s, $msg) = @_; _append($s->{log_file}, strftime('%Y-%m-%dT%H:%M:%S', localtime $s->_now) . " $msg") }
+sub log_line { my ($s, $msg) = @_; _append($s->{log_file}, strftime('%Y-%m-%dT%H:%M:%S', localtime $s->_now) . ' ' . $s->instance . " $msg") }
+
+# Oct 29 2026 (fix B): where this copy runs. Port from the server's -p (COMSERV_GUARD_PORT, set by comserv_server.pl for its
+# health evaluator) or new(port => ...); no port = the cron / CLI runner. Worktree from the app_root path (.../worktrees/<name>/...)
+# or its git branch. Override with new(instance => '...') or new(worktree => '...').
+sub worktree_name {
+    my $s = shift;
+    return $s->{worktree} if defined $s->{worktree};
+    my $root = $s->{app_root} // '.';
+    my $wt;
+    if ($root =~ m{/worktrees/([^/]+)}) { $wt = $1 }
+    elsif (-e "$root/.git" || -e "$root/../.git" || -e "$root/../../.git") {
+        if (open my $ph, '-|', 'git', '-C', $root, 'rev-parse', '--abbrev-ref', 'HEAD') {
+            my $b = <$ph>; close $ph;
+            chomp $b if defined $b;
+            $wt = $b if defined $b && length $b && $b ne 'HEAD';
+        }
+    }
+    unless (defined $wt) { (my $r = $root) =~ s{/+\z}{}; ($wt) = $r =~ m{([^/]+)\z}; }
+    return $s->{worktree} = ($wt // '?');
+}
+sub instance_name {
+    my $s = shift;
+    return $s->{instance} if defined $s->{instance};
+    my $p = $s->{port};
+    return $s->{instance} = (defined $p && length $p ? ":$p " : 'cron ') . $s->worktree_name;
+}
+sub instance { '[' . $_[0]->instance_name . ']' }
 
 sub backup_config {
     my ($s) = @_;
@@ -1539,7 +1571,7 @@ sub shield_step {
         my %al = map { ($_ => alias_value($want)) } grep { exists(($s->read_aliases || {})->{$_}) } qw(code coder);
         $s->set_aliases(\%al) if %al;
         push @did, "model -> $want->{provider}/$want->{default} (backup " . ($bak // 'FAILED') . ')';
-        _append($s->{events_file}, $J->encode({ at => $t, at_pt => pt($t), action => 'shield', to => $want->{default}, backup => $bak }));
+        _append($s->{events_file}, $J->encode({ at => $t, at_pt => pt($t), action => 'shield', instance => $s->instance_name, to => $want->{default}, backup => $bak }));
     }
     unless ($on) { $st->{hold_since} = $t; $st->{hold_pt} = pt($t) }
     %$st = (%$st, tripped => 1, paused => 0, hold_reason => $SHIELD,
@@ -1563,7 +1595,7 @@ sub notify_change {
     my $t = $s->_now;
     $st->{last_notified} = { mode => $mode, model => $model, key => $key, at => $t, at_pt => pt($t), title => $title };
     push @{ $s->{notified} }, { mode => $mode, model => $model, title => $title };
-    $s->desktop_notify($title, $body);
+    $s->desktop_notify($s->instance . " $title", $body);
     return 1;
 }
 
@@ -1747,8 +1779,19 @@ sub run {
     my ($s, %o) = @_;
     open my $lk, '>', $s->{lock_file} or return { action => 'error', error => "lock: $!" };
     flock($lk, LOCK_EX | LOCK_NB) or return { action => 'skip', reason => 'locked' };
-    eval { $s->fix_cron_grok_jobs };
     my $st = $s->read_state;
+    # Oct 29 2026 (fix B): an older copy of this guard (another worktree / port) skips itself: one log line, nothing written.
+    my $newest = $st->{guard_version_max} // 0;
+    if ($newest > $GUARD_VERSION) {
+        $s->log_line(sprintf('SKIPPED: guard version %s is older than the newest recorded %s (from %s); no trip, restore or config write',
+            $GUARD_VERSION, $newest, $st->{guard_version_by} // '?'));
+        return { action => 'skip', reason => 'older_guard_version', guard_version => $GUARD_VERSION,
+                 newest_version => $newest, instance => $s->instance_name };
+    }
+    if ($GUARD_VERSION > $newest) { $st->{guard_version_max} = $GUARD_VERSION; $st->{guard_version_by} = $s->instance_name }
+    $st->{guard_version} = $GUARD_VERSION;
+    $st->{last_run_instance} = $s->instance_name;
+    eval { $s->fix_cron_grok_jobs };
     my $t  = $s->_now;
     my $lite = 0;
     my $or;
@@ -1884,6 +1927,7 @@ sub run {
                 saved_fallback => $ctx{current_fallback}, saved_auxiliary => $ctx{auxiliary},
                 target => $target->{name}, target_default => $target->{default}, backup => $bak,
                 set => $done, aliases_set => $adone, fallback_set => $fdone, auxiliary_set => $xdone,
+                instance => $s->instance_name, tripped_by => $s->instance_name,
                 ($err ? (set_error => $err) : ()));
         delete $st->{set_error} unless $err;
         my $msg = sprintf("Hermes overrun guard TRIPPED %s (%s): %s. %s Backup: %s. Aliases blocked: %s. Fallback: %s. Open TUI/dashboard sessions adopt this at their next turn unless pinned with /model (then /model %s).",
@@ -1894,7 +1938,7 @@ sub run {
         # Oct 26: name what is actually billing (a session pinned with /model ignores the config default shown above)
         $msg .= ' Billing in the last 10 min: ' . join('; ', map { sprintf('%s $%.2f over %d calls', $_->{label}, $_->{usd}, $_->{calls}) } @$billing) . '.'
             if @$billing;
-        _write_notice($s, $msg . "\nAuto-restores when per-provider thrash limits are clear and OpenRouter day/week/month are under \$$CAPS{day}/\$$CAPS{week}/\$$CAPS{month}.");
+        _write_notice($s, $msg . "\nAuto-restores when per-provider thrash limits are clear and OpenRouter day/week/month are under \$$or_caps->{day}/\$$or_caps->{week}/\$$or_caps->{month}.");
         $s->write_session_notice({ at => $t, at_pt => pt($t), action => 'trip', reasons => $d->{reasons},
             target => $target->{name}, text => $msg });
         $s->notify_change($st, ($paused ? 'paused' : 'tripped'), $target->{name}, 'Hermes overrun guard TRIPPED',
@@ -1903,7 +1947,7 @@ sub run {
             . 'Open sessions pinned with /model keep their model: run /model code. Details: ~/.hermes/overrun_notice.txt',
             (@$billing ? "$billing->[0]{provider}/$billing->[0]{model}" : undef));
         $s->log_line($msg . ($err ? " set_error=$err" : ''));
-        my $ev = { at => $t, at_pt => pt($t), action => 'trip', kind => $plan->{kind}, reasons => $d->{reasons},
+        my $ev = { at => $t, at_pt => pt($t), action => 'trip', instance => $s->instance_name, kind => $plan->{kind}, reasons => $d->{reasons},
                    from => $cur->{default}, to => $target->{name}, to_default => $target->{default},
                    paused => $paused, backup => $bak, billing => $billing,
                    aliases_blocked => [ sort keys %{ $aplan->{set} } ], fallback => $fdone, auxiliary => $xdone,
@@ -1948,7 +1992,7 @@ sub run {
         $s->write_session_notice({ at => $t, at_pt => pt($t), action => 'clear', text => $msg });
         $s->notify_change($st, 'normal', ($dec->{restore_default} ? $want->{default} : $cur->{default}),
             'Hermes overrun guard cleared', $msg);
-        my $ev = { at => $t, at_pt => pt($t), action => 'restore',
+        my $ev = { at => $t, at_pt => pt($t), action => 'restore', instance => $s->instance_name,
                    to => ($dec->{restore_default} ? $want->{default} : $cur->{default}),
                    preserved_manual => $dec->{restore_default} ? 0 : 1,
                    backup => $bak, tripped_since => $st->{since}, fallback => $fdone, auxiliary => $xdone,
@@ -1957,7 +2001,8 @@ sub run {
         $ev->{ledger} = $s->ledger($ev);
         delete $st->{paid_block_only};
         %$st = (%$st, tripped => 0, paused => 0, restored_at => $t, restored_pt => pt($t),
-                restore_backup => $bak, restore_decision => $dec->{reason});
+                restore_backup => $bak, restore_decision => $dec->{reason},
+                instance => $s->instance_name, restored_by => $s->instance_name);
         delete @$st{qw(reasons target target_default set set_error aliases_set fallback_set auxiliary_set kind)};
         $d->{restored_to} = $ev->{to};
         $d->{preserved_manual} = $ev->{preserved_manual};
@@ -1985,7 +2030,7 @@ sub run {
             my $msg = sprintf('Hermes overrun guard SANITIZED %s: %s%s. Backup: %s',
                 pt($t), join('; ', @did), ($sp->{fallback_why} ? ' (' . join(', ', @{ $sp->{fallback_why} }) . ')' : ''), $bak // 'FAILED');
             $s->log_line($msg . ($err ? " set_error=$err" : ''));
-            _append($s->{events_file}, $J->encode({ at => $t, at_pt => pt($t), action => 'sanitize', did => \@did,
+            _append($s->{events_file}, $J->encode({ at => $t, at_pt => pt($t), action => 'sanitize', instance => $s->instance_name, did => \@did,
                 why => $sp->{fallback_why} || [], backup => $bak, ($err ? (error => $err) : ()) }));
             $d->{sanitized} = \@did;
         }
@@ -2013,7 +2058,7 @@ sub run {
             if ($bp->{delegation}) { for my $k (qw(provider model)) { eval { $s->config_set("delegation.$k", $bp->{delegation}{$k}) }; push @errs, $@ if $@ } }
             my $msg = sprintf('Hermes overrun guard BLOCKED OpenRouter grok %s: %s. Backup: %s', pt($t), join('; ', @{ $bp->{why} }), $bak // 'FAILED');
             $s->log_line($msg . (@errs ? ' set_error=' . join(' ', @errs) : ''));
-            _append($s->{events_file}, $J->encode({ at => $t, at_pt => pt($t), action => 'or_grok_block', why => $bp->{why}, backup => $bak }));
+            _append($s->{events_file}, $J->encode({ at => $t, at_pt => pt($t), action => 'or_grok_block', instance => $s->instance_name, why => $bp->{why}, backup => $bak }));
             $d->{or_grok_blocked} = $bp->{why};
         }
         # saved_* (restored later) must not carry OpenRouter grok either
@@ -2035,7 +2080,7 @@ sub run {
             my $body = sprintf('%s: %s. Session %s. Its tool calls are blocked by the overrun gate; run /model code (Super Grok / chain: %s).',
                 $top->{label}, $top->{reason}, substr($top->{session} // '?', 0, 22), $chain_txt || 'default');
             if ($s->notify_change($st, 'enforce', $key, $title, $body)) {
-                my $ev = { at => $t, at_pt => pt($t), action => 'enforce', sessions => [ map { { %$_ } } @$offs ],
+                my $ev = { at => $t, at_pt => pt($t), action => 'enforce', instance => $s->instance_name, sessions => [ map { { %$_ } } @$offs ],
                            billing => billing_summary($recent, 3), chain => $chain_txt };
                 _append($s->{events_file}, $J->encode($ev));
                 $ev->{ledger} = $s->ledger($ev);
@@ -2091,7 +2136,7 @@ sub write_gate {
     return @$offs ? 'written' : 'cleared';
 }
 
-sub _write_notice { my ($s, $m) = @_; open my $fh, '>', $s->{notice_file} or return; print $fh "$m\n"; close $fh }
+sub _write_notice { my ($s, $m) = @_; open my $fh, '>', $s->{notice_file} or return; print $fh $s->instance . " $m\n"; close $fh }
 
 # For banner: read-only status.
 

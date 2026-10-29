@@ -58,6 +58,7 @@ sub normalize_env {
     my ($h) = $name =~ /^([^:\s\/\@]+)(?::\d{1,5})?$/;
     return $env unless defined $h;
     return $env if is_port_exempt_host($h);
+    $env->{'comserv.orig_http_host'} = $hh if defined $hh && length $hh && $hh ne $h;  # for RequestTrace logging
     $env->{HTTP_HOST} = $h if defined $hh && length $hh;
     $env->{SERVER_NAME} = $h if defined $env->{SERVER_NAME} && $env->{SERVER_NAME} =~ /^\Q$h\E$/i;
     $env->{SERVER_PORT} = (($env->{'psgi.url_scheme'} // '') eq 'https') ? 443 : 80;
