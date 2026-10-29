@@ -26,7 +26,12 @@ our $NEAR_CAP_FRAC = 0.6;
 # Oct 29 2026 (Shanta, fix B): every log line, notice and alert names WHERE it ran ([:3001 main], [:4005 planning], [cron aisystem]),
 # and each run records its GUARD_VERSION in the shared state file. A copy older than the newest recorded version logs one
 # SKIPPED line and does nothing (no trip, no restore, no config write). Bump this on every guard behaviour change.
-our $GUARD_VERSION = 20261029;
+our $GUARD_VERSION = 20261030;   # 20261030: fallback notices (Oct 29 10:51 AM PT)
+# Code Guard review: a newer version only wins while it is alive. If it has not run for $VERSION_STALE_S (3 guard intervals),
+# the running copy takes over (so removing/stopping the newer copy can never lock every copy out). SKIPPED is logged at most
+# once per $SKIP_LOG_EVERY_S per instance; the first skip of an episode also raises a notice + desktop alert.
+our $VERSION_STALE_S  = 900;
+our $SKIP_LOG_EVERY_S = 3600;
 our $THRASH_N      = 20;
 our $THRASH_WINDOW = 900;
 
@@ -93,6 +98,8 @@ sub new {
         hermes_home  => $hh,
         config       => "$hh/config.yaml",
         state_file   => "$hh/overrun_guard_state.json",
+        skip_file    => "$hh/overrun_guard_skips.json",
+        fallback_seen_file => "$hh/overrun_fallback_seen.json",
         notice_file  => "$hh/overrun_notice.txt",
         session_notice => "$hh/overrun_session_notice.json",
         events_file  => "$hh/overrun_guard_events.jsonl",
@@ -1782,13 +1789,37 @@ sub run {
     my $st = $s->read_state;
     # Oct 29 2026 (fix B): an older copy of this guard (another worktree / port) skips itself: one log line, nothing written.
     my $newest = $st->{guard_version_max} // 0;
+    my $now0   = $s->_now;
     if ($newest > $GUARD_VERSION) {
-        $s->log_line(sprintf('SKIPPED: guard version %s is older than the newest recorded %s (from %s); no trip, restore or config write',
-            $GUARD_VERSION, $newest, $st->{guard_version_by} // '?'));
-        return { action => 'skip', reason => 'older_guard_version', guard_version => $GUARD_VERSION,
-                 newest_version => $newest, instance => $s->instance_name };
+        my $seen = $st->{guard_version_seen_at} // 0;
+        if ($now0 - $seen < $VERSION_STALE_S) {
+            # skip: the state file and Hermes config are not written; only the per-instance skip record (separate file)
+            my $sk = eval { open my $fh, '<', $s->{skip_file} or die; local $/; $J->decode(<$fh>) } || {};
+            my $me = $s->instance_name;
+            my $rec = ref $sk->{$me} eq 'HASH' ? $sk->{$me} : {};
+            my $new_episode = !$rec->{last_skip_at} || $now0 - $rec->{last_skip_at} >= $VERSION_STALE_S;
+            my $why = sprintf('guard version %s is older than the newest recorded %s (from %s)', $GUARD_VERSION, $newest, $st->{guard_version_by} // '?');
+            if (!$rec->{logged_at} || $now0 - $rec->{logged_at} >= $SKIP_LOG_EVERY_S) {
+                $s->log_line("SKIPPED: $why; no trip, restore or config write (logged at most hourly)");
+                $rec->{logged_at} = $now0;
+            }
+            if ($new_episode) {
+                _write_notice($s, "Hermes overrun guard copy SKIPPING: $why. Merge the newer guard into this worktree and restart its server.");
+                $s->desktop_notify($s->instance . ' Hermes overrun guard copy skipping', "$why. Merge the newer guard here and restart this server.");
+            }
+            $rec->{last_skip_at} = $now0;
+            $sk->{$me} = $rec;
+            eval { _atomic_write($s->{skip_file}, $J->encode($sk)) };
+            return { action => 'skip', reason => 'older_guard_version', guard_version => $GUARD_VERSION,
+                     newest_version => $newest, instance => $me, ($new_episode ? (notified => 1) : ()) };
+        }
+        $s->log_line(sprintf('TOOK OVER: newest guard version %s (from %s) not seen since %s (over %d min); running as version %s',
+            $newest, $st->{guard_version_by} // '?', ($seen ? pt($seen) : 'never'), $VERSION_STALE_S / 60, $GUARD_VERSION));
+        $st->{guard_version_takeover_at} = $now0;
+        $newest = 0;
     }
     if ($GUARD_VERSION > $newest) { $st->{guard_version_max} = $GUARD_VERSION; $st->{guard_version_by} = $s->instance_name }
+    $st->{guard_version_seen_at} = $now0;   # the newest version is alive
     $st->{guard_version} = $GUARD_VERSION;
     $st->{last_run_instance} = $s->instance_name;
     eval { $s->fix_cron_grok_jobs };
@@ -2091,6 +2122,8 @@ sub run {
             $st->{last_notified} = { mode => 'enforce_clear', model => '', key => 'enforce_clear', at => $t, at_pt => pt($t), title => 'enforce cleared' };
         }
     }
+    # Oct 29 2026 (Shanta 10:51 AM PT): tell her when a session falls back mid-session (grok -> luna -> north), and which branch.
+    { my $fb = eval { $s->fallback_notices }; $d->{fallback_notices} = $fb if $fb && @$fb; $d->{fallback_error} = $@ if $@; }
     # published for ~/.hermes/scripts/supergrok_daily_guard.py: may the chain's paid step be used right now?
     @$st{qw(paid_ok paid_ok_at)} = ($ctx{paid_ok} ? 1 : 0, $t);
     # cash snapshot for the Super Grok daily guard (numbers only): why the paid step has / has no room, and the
@@ -2113,6 +2146,146 @@ sub run {
 
 # Gate file read by ~/.hermes/scripts/overrun_gate_hook.py (a Hermes pre_tool_call hook): tool calls from a
 # listed session are blocked with a message until the session is moved with /model. Written only when it changes.
+# ---------------------------------------------------------------------------------------------------------------------------
+# Oct 29 2026 (Shanta 10:51 AM PT: "add the messages that also will tell us which branch is making the switch").
+# Hermes falls back INSIDE a session when a provider refuses a call; agent.log (UTC) shows e.g.
+#   2026-10-29 17:31:46,395 WARNING [local-c3dfb011...] agent.chat_completion_helpers: Profile default: grok-4.7 via xai-oauth
+#   refused for billing/credits — using fallback openai/gpt-5.6-luna via openrouter. ...
+# Each run reads agent.log from the last offset (overrun_fallback_seen.json), and for every session whose model changed by
+# fallback raises ONE desktop notice + ONE overrun_guard.log line (instance-prefixed): PT time, short session id, from -> to,
+# reason, and the session's branch/worktree + port. Repeats for the same session stay silent until its model changes again.
+our $FALLBACK_MAX_AGE_S = 3600;   # ignore older events (first run, log rotation)
+our $NORTH_RE = qr/north-mini/i;
+our $FALLBACK_MAX_PER_RUN = 3;        # Code Guard: at most 3 notices per run, the rest rolled into one summary line
+our $FALLBACK_SESSION_GAP_S = 600;    # Code Guard: at most one notice per session every 10 minutes
+our $NORTH_WARNING = 'north took over mid-task; it may lose the thread, so consider /model luna or a handoff summary';
+
+sub parse_fallback_line {
+    my ($line) = @_;
+    return unless defined $line && $line =~ /refused for .* using fallback /;
+    my ($y, $mo, $dd, $hh, $mi, $ss) = $line =~ /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)/ or return;
+    my ($sess) = $line =~ /\[([^\]\s]+)\]/;
+    my ($from, $fprov, $reason, $to, $tprov) =
+        $line =~ /(\S+) via (\S+) refused for (.+?)\s+(?:\x{2014}|\xe2\x80\x94|--?)\s+using fallback (\S+?) via ([\w-]+(?:\.[\w-]+)*)/ or return;
+    $from =~ s/^Profile\s+\S+:\s*//;
+    return { at => timegm($ss, $mi, $hh, $dd, $mo - 1, $y), session => $sess // '?', from => $from, from_provider => $fprov,
+             reason => clean_reason($reason), to => $to, to_provider => $tprov };
+}
+
+# Code Guard: the reason is free text from a provider error; mask anything key/token-like and keep it to 120 characters.
+sub clean_reason {
+    my $r = shift // '';
+    $r =~ s/\b(?:sk|pk|rk|xai|or)-[A-Za-z0-9_\-]{6,}/***/gi;
+    $r =~ s/\b(Bearer|token|key|api[_-]?key|secret)(\s*[:=]?\s*)\S+/$1$2***/gi;
+    $r =~ s/[A-Za-z0-9_\-+\/=]{24,}/***/g;
+    $r = substr($r, 0, 117) . '...' if length $r > 120;
+    return $r;
+}
+
+sub short_session { my $id = shift // '?'; $id =~ s/^local-//; return substr($id, 0, 8) }
+
+# Where does the session live?  cwd from Hermes's state.db (sessions.cwd; git_branch when Hermes filled it), then git branch
+# of that cwd; port = the comserv_server.pl whose working tree has the same git top-level.
+sub session_cwd {
+    my ($s, $sid) = @_;
+    return $s->{session_cwd_cb}->($sid) if $s->{session_cwd_cb};
+    return unless -f $s->{state_db};
+    my $r = eval {
+        require DBI;
+        my $dbh = DBI->connect("dbi:SQLite:dbname=$s->{state_db}", '', '', { RaiseError => 1, PrintError => 0, sqlite_open_flags => 1 });
+        $dbh->sqlite_busy_timeout(200);
+        # exact id, or session_key ending in ':<id>' (no LIKE, so % and _ in ids are literal)
+        my $row = $dbh->selectrow_hashref('SELECT cwd, git_branch FROM sessions WHERE id = ? OR substr(session_key, -length(?)) = ? LIMIT 1',
+                                          undef, $sid, ":$sid", ":$sid");
+        $dbh->disconnect; $row };
+    return $r ? ($r->{cwd}, $r->{git_branch}) : ();
+}
+sub _git_out { my ($dir, @a) = @_; return unless defined $dir && -d $dir; open my $ph, '-|', 'git', '-c', 'core.fsmonitor=false', '-C', $dir, @a or return;
+               my $o = <$ph>; close $ph; chomp $o if defined $o; return (defined $o && length $o) ? $o : undef }
+sub server_ports {
+    my $s = shift;
+    return $s->{server_ports} if $s->{server_ports};
+    my %top;
+    for my $pd (glob '/proc/[0-9]*') {
+        open my $fh, '<', "$pd/cmdline" or next; my $c = do { local $/; <$fh> }; close $fh;
+        next unless defined $c && $c =~ /comserv_server\.pl/;
+        my @a = split /\0/, $c; my ($port) = (join(' ', @a) =~ /(?:-p\s*|--port[= ])(\d+)/);
+        my $cwd = readlink "$pd/cwd" or next;
+        my $t = _git_out($cwd, 'rev-parse', '--show-toplevel') // $cwd;
+        $top{$t} = $port // 3001;
+    }
+    return $s->{server_ports} = \%top;
+}
+sub session_location {
+    my ($s, $sid) = @_;
+    my ($cwd, $branch) = $s->session_cwd($sid);
+    return { branch => 'branch unknown', port => undef, cwd => undef } unless defined $cwd && length $cwd;
+    $branch = undef if defined $branch && !length $branch;
+    $branch //= ($s->{branch_cb} ? $s->{branch_cb}->($cwd) : _git_out($cwd, 'branch', '--show-current'));
+    my $top = $s->{toplevel_cb} ? $s->{toplevel_cb}->($cwd) : (_git_out($cwd, 'rev-parse', '--show-toplevel') // $cwd);
+    my ($wt) = $cwd =~ m{/worktrees/([^/]+)};
+    return { branch => $branch // 'branch unknown', worktree => $wt, port => $s->server_ports->{$top}, cwd => $cwd };
+}
+
+sub fallback_notices {
+    my ($s) = @_;
+    my $f = $s->{agent_log};
+    my @st = stat $f or return [];
+    my $seen = eval { open my $fh, '<', $s->{fallback_seen_file} or die; local $/; $J->decode(<$fh>) } || {};
+    my $off = $seen->{offset} // 0;
+    $off = 0 if ($seen->{inode} // -1) != $st[1] || $off > $st[7];   # rotated or truncated
+    open my $lf, '<', $f or return [];
+    seek $lf, $off, 0;
+    my $now = $s->_now; my (@out, @rolled);
+    my $sess = ref $seen->{sessions} eq 'HASH' ? $seen->{sessions} : {};
+    my $end = $off;
+    while (defined(my $line = <$lf>)) {
+        last unless $line =~ /\n\z/;     # partial last line (Hermes still writing): leave it for the next run
+        $end = tell $lf;
+        my $e = parse_fallback_line($line) or next;
+        next if $now - $e->{at} > $FALLBACK_MAX_AGE_S;
+        my $prev = $sess->{ $e->{session} } || {};
+        next if ($prev->{to} // '') eq $e->{to};               # same session, model unchanged: stay silent
+        my $from = $e->{from};
+        $from = $prev->{to} if $prev->{to} && $from ne $prev->{to};   # it was really on the earlier fallback (luna -> north)
+        my $loc = $s->session_location($e->{session});
+        my $where = ($loc->{branch} // 'branch unknown') . ($loc->{worktree} && $loc->{worktree} ne ($loc->{branch} // '') ? " (worktree $loc->{worktree})" : '')
+                  . ' ' . (defined $loc->{port} ? ":$loc->{port}" : 'port unknown');
+        my $warn = ($from =~ /grok/i && $e->{to} =~ $NORTH_RE) ? " WARNING: $NORTH_WARNING." : '';
+        my $msg = sprintf('FALLBACK %s session %s: %s -> %s (%s), reason %s; session on %s.%s',
+            pt($e->{at}), short_session($e->{session}), $from, $e->{to}, $e->{to_provider}, $e->{reason}, $where, $warn);
+        my $rec = { %$e, from => $from, location => $loc, where => $where, text => $msg };
+        my $recent = $prev->{notified_at} && $now - $prev->{notified_at} < $FALLBACK_SESSION_GAP_S;
+        if ($recent || @out >= $FALLBACK_MAX_PER_RUN) {
+            push @rolled, $rec;
+            $sess->{ $e->{session} } = { %$prev, to => $e->{to}, at => $e->{at} };
+            next;
+        }
+        unless ($s->{dry_run}) {
+            $s->log_line($msg);
+            $s->desktop_notify($s->instance . " Hermes fell back: $from -> $e->{to}",
+                sprintf('%s session %s on %s: %s -> %s, reason %s.%s', pt($e->{at}), short_session($e->{session}), $where, $from, $e->{to}, $e->{reason}, $warn));
+        }
+        $sess->{ $e->{session} } = { to => $e->{to}, at => $e->{at}, notified_at => $now };
+        push @out, $rec;
+    }
+    close $lf;
+    if (@rolled) {
+        my $sum = sprintf('FALLBACK summary %s: %d more fallback(s) not shown (limit %d per run, 1 per session per %d min): %s',
+            pt($now), scalar @rolled, $FALLBACK_MAX_PER_RUN, $FALLBACK_SESSION_GAP_S / 60,
+            join('; ', map { sprintf('%s %s -> %s on %s', short_session($_->{session}), $_->{from}, $_->{to}, $_->{where}) } @rolled));
+        unless ($s->{dry_run}) {
+            $s->log_line($sum);
+            $s->desktop_notify($s->instance . ' Hermes fell back: ' . scalar(@rolled) . ' more', $sum);
+        }
+        push @out, { summary => 1, count => scalar @rolled, text => $sum, rolled => \@rolled };
+    }
+    for my $k (keys %$sess) { delete $sess->{$k} if $now - ($sess->{$k}{at} // 0) > 7 * 86400 }
+    eval { _atomic_write($s->{fallback_seen_file}, $J->encode({ inode => $st[1], offset => $end, sessions => $sess })) } unless $s->{dry_run};
+    push @{ $s->{fallback_notified} }, @out;
+    return \@out;
+}
+
 sub write_gate {
     my ($s, $offs, $t, $chain_txt) = @_;
     my $f = "$s->{hermes_home}/overrun_gate.json";
