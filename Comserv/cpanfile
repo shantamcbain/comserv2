@@ -78,6 +78,7 @@ requires 'Crypt::OpenSSL::AES';
 requires 'Crypt::URandom';
 requires 'MIME::Base64';
 requires 'Digest::SHA';
+requires 'Crypt::PBKDF2';
 
 # Email handling
 requires 'Email::Simple';

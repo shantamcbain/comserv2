@@ -39,6 +39,7 @@
                             <div class="form-actions">
                                 <a href="[% c.session.MailServer || 'http://webmail.computersystemconsulting.ca' %]" 
                                    target="_blank" class="btn btn-primary">Access Your Mail</a>
+                                <a href="[% c.uri_for('/mail/connect') %]" class="btn btn-secondary">Connect an existing mailbox / client settings</a>
                             </div>
                         </div>
                         
@@ -57,6 +58,7 @@
                             <p>You do not currently have an active email account. Email accounts are available to members.</p>
                             <p>Contact an administrator to upgrade your account or purchase an email address.</p>
                             <p><em>Just need replies (e.g. HelpDesk) sent to a different address?</em> That is your contact email, not a mailbox: <a href="/user/settings#email">change it in Account Settings</a>.</p>
+                            <p><strong>Already have a mailbox?</strong> <a href="[% c.uri_for('/mail/connect') %]" class="btn btn-primary">Connect an existing mailbox</a></p>
                         </div>
                     [% END %]
                 </div>

@@ -1,4 +1,5 @@
 package Comserv::Controller::Admin::HardwareMonitor;
+use Comserv::Util::HealthPrimary;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
@@ -371,6 +372,7 @@ sub run :Path('/admin/hardware_monitor/run') :Args(0) {
         $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid token' }));
         return;
     }
+    return if Comserv::Util::HealthPrimary->skip_response($c, 'hardware_monitor.run');
 
     # Canonical, deterministic node identity shared by `run` (writes heartbeat)
     # and `watchdog` (queries it). get_system_identifier() appends a volatile
@@ -521,6 +523,7 @@ sub watchdog :Path('/admin/hardware_monitor/watchdog') :Args(0) {
         $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid token' }));
         return;
     }
+    return if Comserv::Util::HealthPrimary->skip_response($c, 'hardware_monitor.watchdog');
 
     my ($sys_id, $hostname) = $self->_node_identity($c);
     my $lookup_keys = $self->_node_identity_lookup_keys($sys_id);
@@ -660,6 +663,7 @@ sub report_down :Path('/admin/hardware_monitor/report_down') :Args(0) {
         $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid token' }));
         return;
     }
+    return if Comserv::Util::HealthPrimary->skip_response($c, 'hardware_monitor.report_down');
 
     my $node = $c->req->param('node') // '';
     $node =~ s/[^A-Za-z0-9._:-]//g;
@@ -989,6 +993,7 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
 # ---------------------------------------------------------------------------
 sub ingest :Path('/admin/hardware_monitor/ingest') :Args(0) {
     my ($self, $c) = @_;
+    return if Comserv::Util::HealthPrimary->skip_response($c, 'hardware_monitor.ingest');
 
     unless ($c->req->method eq 'POST') {
         $c->response->status(405);

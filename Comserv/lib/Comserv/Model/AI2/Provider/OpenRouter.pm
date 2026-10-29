@@ -30,53 +30,26 @@ has 'logging' => (
 sub _resolve_api_key {
     my ($self, $c, $api_key, %o) = @_;
 
-    # Explicit key passed (already decrypted) takes precedence.
-    return $api_key if $api_key && length $api_key;
-
-    # K8s secret, then env var.
-    my $k8s_secret = '/run/secrets/openrouter_api_key';
-    if (-e $k8s_secret && open my $fh, '<', $k8s_secret) {
-        my $k = do { local $/; <$fh> };
-        close $fh;
-        chomp($k);
-        return $k if $k && length $k;
-    }
-    return $ENV{OPENROUTER_API_KEY} if $ENV{OPENROUTER_API_KEY} && length $ENV{OPENROUTER_API_KEY};
-
-    # 2026-10-16: servers started without a login shell (Git page button,
-    # systemd) miss OPENROUTER_API_KEY from ~/.bashrc. Fall back to the
-    # workstation secret file (one line, chmod 600) before the DB lookup.
-    if (my $home = $ENV{HOME}) {
-        for my $f ("$home/.comserv/secrets/openrouter_api_key") {
-            next unless -r $f && open(my $fh, '<', $f);
-            my $k;
-            while (my $l = <$fh>) {
-                if ($f =~ /\.env$/) { ($k) = $l =~ /^\s*(?:export\s+)?OPENROUTER_API_KEY\s*=\s*['"]?([^'"\s]+)/ and last; }
-                else { chomp $l; $k = $l if length $l; last; }
-            }
-            close $fh;
-            return $k if $k && length $k;
-        }
-    }
-
-    # 2026-10-17: every logged-in user's chat may use a shared key (it is only
-    # used server-side, never shown). Order: user's own row -> a row tagged with
-    # this site_id -> the workstation-wide row (site_id NULL, newest first).
-    # user_id is NOT NULL in user_api_keys, so "shared" = site/global scope.
-    # 2026-10-21: no session (usage_live, daily eval, guard) -> skip the user row
-    # and use the shared rows, then the workstation key files.
-    # Chat stays logged-in only; system => 1 (status/eval/guard) may use shared keys.
-    my $user_id = eval { $c->session->{user_id} };
-    # 2026-10-24 (Shanta, #2605): public-site Guests may chat on the shared
-    # workstation row, FREE models only (enforced in _chat_http). Opt-in: the
-    # caller passes guest => 1 AND the /ai2/chat controller has marked this
-    # request (stash ai_guest_chat). Never opens the generic no-user path.
+    # 2026-10-26 (Shanta): the DB is the source of keys; env / secret files are the LAST resort.
+    # Shared lookup lives in Comserv::Util::AI::ApiKeyResolver (own row -> site row -> workstation-wide
+    # row, DB error retried once and logged). Callers with no session (usage_live, daily eval, guard)
+    # pass system => 1. Chat stays logged-in only; guests only via the opt-in stash flag (is_guest_chat).
+    require Comserv::Util::AI::ApiKeyResolver;
+    my $user_id  = eval { $c->session->{user_id} };
     my $guest_ok = !defined $user_id && $o{guest} && is_guest_chat($c);
-    return undef unless defined $user_id || $o{system} || $guest_ok;
-    my $key_obj = eval { _db_key($c, $user_id) };
-    my $k = $key_obj && $key_obj->api_key_encrypted ? eval { $key_obj->get_api_key() } : undef;
-    return $k if $k && length $k;
-    return $o{system} ? shared_file_key() : undef;
+    my $system   = $o{system} ? 1 : 0;
+    my $r = Comserv::Util::AI::ApiKeyResolver->resolve($c, 'openrouter',
+        api_key  => $api_key,
+        user_id  => $user_id,
+        system   => $system,
+        guest_ok => $guest_ok,
+        db_row   => sub { my ($cc, undef, %x) = @_; _db_key($cc, $x{user_id}) },
+    );
+    $self->{_last_key_source} = $r->{source};
+    $self->{_last_key_why}    = $r->{why};
+    return $r->{key} if $r->{key};
+    # workstation key files (~/.comserv/secrets/api_keys.env, ~/.bashrc, ~/.hermes/.env), system callers only
+    return $system ? shared_file_key() : undef;
 }
 
 # ---- Guest chat (public sites, no session user_id) -----------------------
@@ -241,7 +214,8 @@ sub _chat_http {
     my $api_key = $self->_resolve_api_key($c, $args{api_key}, ($guest ? (guest => 1) : ()));
     unless ($api_key) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'openrouter_chat',
-            "No active openrouter API key found (user=" . ($c->session->{username} // 'Guest') . ")");
+            "No active openrouter API key found (user=" . ($c->session->{username} // 'Guest')
+            . ", reason=" . ($self->{_last_key_why} // 'unknown') . ")");
         return { success => 0, error => ($guest ? 'Chat is not available to guests right now. Please log in.' : 'No active openrouter API key found') };
     }
     # A guest never supplies a key and never sees why a call failed upstream.

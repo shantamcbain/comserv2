@@ -1,5 +1,5 @@
 [% META title = 'Edit Proxmox Server' %]
-[% PageVersion = 'proxmox/edit_server.tt,v 1.0.0 2025/03/25 AI_Assistant Exp' %]
+[% PageVersion = 'proxmox/edit_server.tt,v 1.1.0 2026/10/27 shanta Exp shanta ' %]
 
 [% IF debug_mode == 1 %]
     [% PageVersion %]
@@ -28,6 +28,10 @@
                             <div class="col-md-6">
                                 <h3>Server Identity</h3>
                                 <div class="form-group mb-3">
+                                    <label for="server_id_display">Server ID:</label>
+                                    <input type="text" id="server_id_display" class="form-control" readonly value="[% server_id | html %]">
+                                </div>
+                                <div class="form-group mb-3">
                                     <label for="name">Display Name:</label>
                                     <input type="text" id="name" name="name" class="form-control" required 
                                            value="[% form_data.name | html %]" placeholder="e.g., Production Proxmox">
@@ -49,10 +53,10 @@
                                 </div>
                                 
                                 <div class="form-group mb-3">
-                                    <label for="api_url_base">API URL (Optional):</label>
+                                    <label for="api_url_base">Web UI / API URL:</label>
                                     <input type="text" id="api_url_base" name="api_url_base" class="form-control"
                                            value="[% form_data.api_url_base | html %]" placeholder="e.g., https://172.30.236.89:8006/api2/json">
-                                    <div class="form-text">The base URL for the Proxmox API. If left blank, it will be generated from the hostname.</div>
+                                    <div class="form-text">Used by this application to reach the server. The card opens this application's dashboard for that server, not the Proxmox web UI.</div>
                                 </div>
                                 
                                 <div class="form-group mb-3">
@@ -85,10 +89,13 @@
                                 </div>
 
                                 <div class="form-group mb-3">
-                                    <label for="token_value">API Token Value:</label>
-                                    <input type="password" id="token_value" name="token_value" class="form-control"
-                                           placeholder="Leave blank to keep current token">
-                                    <div class="form-text">The API token value (UUID). Leave blank to keep the current token. This will be encrypted before storage.</div>
+                                    <label for="token_value">Passcode:</label>
+                                    <input type="password" id="token_value" name="token_value" class="form-control" autocomplete="off"
+                                           placeholder="Leave blank to keep the current passcode">
+                                    <div class="form-text">
+                                        [% IF token_stored || form_data.token_value %]A passcode is already stored in the database.[% ELSE %]No passcode is stored yet.[% END %]
+                                        Saving writes it encrypted to the database. It is not written to the credentials file.
+                                    </div>
                                 </div>
                                 
                                 <h3>VM Templates</h3>
@@ -107,7 +114,7 @@
                         
                         <div class="form-group mt-4">
                             <button type="submit" class="btn btn-primary">Update Server</button>
-                            <a href="[% c.uri_for('/proxmox_servers') %]" class="btn btn-secondary">Cancel</a>
+                            <a href="[% c.uri_for('/proxmox') %]" class="btn btn-secondary">Cancel</a>
                         </div>
                     </form>
                 </div>

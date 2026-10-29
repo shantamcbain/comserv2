@@ -75,7 +75,7 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">❌ No</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ Yes</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Saves User Message</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ Yes</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">❌ No</td>
@@ -87,7 +87,7 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">❌ No</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ Yes</td>
                 </tr>
-                <tr style="background-color: #f9f9f9;">
+                <tr style="background-color: var(--card-bg, #f9f9f9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Returns conversation_id</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ In stash</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">❌ Not available</td>
@@ -102,15 +102,15 @@
             <h2 id="fix" style="color: var(--text-color); font-family: var(--header-font);">Fix Applied</h2>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">File Modified</h3>
-            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace;"><code>/Comserv/lib/Comserv/Controller/AI.pm</code></pre>
+            <pre style="background-color: var(--card-bg, rgba(255,255,255,0.15)); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace;"><code>/Comserv/lib/Comserv/Controller/AI.pm</code></pre>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Method</h3>
-            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace;"><code>sub chat :Local :Args(0)  # Lines 492-731 (after fix)</code></pre>
+            <pre style="background-color: var(--card-bg, rgba(255,255,255,0.15)); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace;"><code>sub chat :Local :Args(0)  # Lines 492-731 (after fix)</code></pre>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Changes</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Added database conversation saving logic after successful Ollama response (lines 636-700):</p>
 
-            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace; margin: var(--spacing-small) 0;"><code># Save conversation to database
+            <pre style="background-color: var(--card-bg, rgba(255,255,255,0.15)); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace; margin: var(--spacing-small) 0;"><code># Save conversation to database
 my $conversation_id;
 try {
     my $user_id = $c->session->{user_id};
@@ -174,7 +174,7 @@ try {
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);"><strong>user_id</strong></td>
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Current user's ID from session</td>
             </tr>
-            <tr style="background-color: #f9f9f9;">
+            <tr style="background-color: var(--card-bg, #f9f9f9);">
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);"><strong>title</strong></td>
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">First 80 chars of user prompt</td>
             </tr>
@@ -182,7 +182,7 @@ try {
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);"><strong>status</strong></td>
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">'active'</td>
             </tr>
-            <tr style="background-color: #f9f9f9;">
+            <tr style="background-color: var(--card-bg, #f9f9f9);">
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);"><strong>created_at</strong></td>
                 <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">CURRENT_TIMESTAMP (automatic)</td>
             </tr>

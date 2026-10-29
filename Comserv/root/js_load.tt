@@ -114,6 +114,14 @@
 <script src="/static/js/HealthMonitor.js" defer></script>
 [% END %]
 
+<!-- Proxmox dashboard: power-task popup (reboot/start/shutdown log) -->
+[% IF c.request.uri.match('/proxmox') && !c.request.uri.match('/Documentation/') %]
+<script src="/static/js/proxmox/history-filter.js?v=[% cv %]-drop" defer></script>
+<script src="/static/js/proxmox/vm-power.js?v=[% cv %]" defer></script>
+<script src="/static/js/proxmox/fleet-graphs.js?v=[% cv %]-axes" defer></script>
+<script src="/static/js/proxmox/vm-history.js?v=[% cv %]-drop" defer></script>
+[% END %]
+
 <!-- Hardware Monitor JS (charts + auto-refresh; V2 external module) -->
 [% IF c.request.uri.match('/admin/hardware_monitor') %]
 <script src="/static/js/hardware-monitor.js?v=[% cv %]" defer></script>
