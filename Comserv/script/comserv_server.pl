@@ -404,6 +404,7 @@ sub _start_health_evaluator {
                         require Comserv::Util::AI::HermesOverrunGuard;
                         Comserv::Util::AI::HermesOverrunGuard->new(
                             app_root => ($ENV{CATALYST_HOME} // "$FindBin::Bin/.."),
+                            port     => $ENV{COMSERV_GUARD_PORT},
                         )->run;
                     };
 
@@ -642,6 +643,10 @@ my $_is_dev_worktree =
     ($FindBin::Bin =~ m{\.zenflow[\\/]worktrees[\\/]}) ||
     ($FindBin::Bin =~ m{PycharmProjects}) ||
     ($FindBin::Bin =~ m{comserv2});
+
+# Oct 29 2026 (Shanta, fix B): tell the forked health evaluator's overrun guard which port it serves, so every guard
+# log line / alert says e.g. [:4005 planning]. Set before the fork; the web child inherits it too (same port).
+{ my ($guard_port) = _parse_port_and_reload(@ARGV); $ENV{COMSERV_GUARD_PORT} //= $guard_port; }
 
 _start_health_evaluator() unless ($ENV{DISABLE_HEALTH_MONITOR} // '') eq '1' || $_is_dev_worktree;
 
