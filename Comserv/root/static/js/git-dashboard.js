@@ -232,6 +232,40 @@
             }).finally(function () { if (btn) { btn.disabled = false; btn.textContent = prev; } });
         }
 
+        function navigateWhenBranchReady(branch, port, url, branchTab) {
+            var attempts = 0;
+            function navigate() {
+                if (branchTab && !branchTab.closed) { branchTab.location = url; }
+                else if (url) { window.location.href = url; }
+            }
+            function poll() {
+                attempts += 1;
+                var body = new URLSearchParams();
+                body.set('action', 'open');
+                body.set('branch', branch);
+                body.set('port', port);
+                fetch('/admin/branch_server_action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body.toString(),
+                    credentials: 'same-origin'
+                }).then(function (r) { return r.json(); })
+                  .then(function (res) {
+                      if (res && res.ok && res.running) {
+                          navigate();
+                      } else if (attempts < 60) {
+                          window.setTimeout(poll, 500);
+                      } else {
+                          window.alert('Branch ' + branch + ' did not become ready on port ' + port + '.');
+                      }
+                  }).catch(function () {
+                      if (attempts < 60) { window.setTimeout(poll, 500); }
+                      else { window.alert('Branch ' + branch + ' did not become ready on port ' + port + '.'); }
+                  });
+            }
+            poll();
+        }
+
         var devServerButtons = document.querySelectorAll('.git-dev-actions button');
         for (var ds = 0; ds < devServerButtons.length; ds++) {
             devServerButtons[ds].addEventListener('click', function () {
@@ -240,11 +274,26 @@
                 if (openBranch) {
                     var url = el.getAttribute('data-url') || '';
                     var cmd = el.getAttribute('data-cmd') || '';
-                    // Old behaviour first: open the branch in a new browser window.
-                    if (url) { window.open(url, '_blank'); }
+                    // Reserve the tab from the user gesture, but do not navigate
+                    // until the backend confirms that the branch is listening.
+                    var branchTab = url ? window.open('about:blank', '_blank') : null;
+                    if (branchTab && !branchTab.closed) {
+                        try { branchTab.document.write('<p>Starting ' + openBranch + '…</p>'); } catch (e2) {}
+                    }
                     // Then show the console so you can watch boot / copy the command.
                     showDevConsole(openBranch, el.getAttribute('data-port'), url, cmd);
-                    branchServerAction('open', openBranch, el.getAttribute('data-port'), el);
+                    branchServerAction('open', openBranch, el.getAttribute('data-port'), el)
+                        .then(function (res) {
+                            if (res && res.running) {
+                                if (branchTab && !branchTab.closed) { branchTab.location = url; }
+                                else if (url) { window.location.href = url; }
+                            } else {
+                                navigateWhenBranchReady(openBranch, el.getAttribute('data-port'), url, branchTab);
+                            }
+                        })
+                        .catch(function () {
+                            if (branchTab && !branchTab.closed) { branchTab.close(); }
+                        });
                     return;
                 }
                 // "Hermes" button: copy the branch's Hermes launch command to the
@@ -257,12 +306,12 @@
                 if (hermesBranch) {
                     var appPort = el.getAttribute('data-port') || '';
                     var appPortN = parseInt(appPort, 10) || 0;
-                    var hport;
-                    if (appPortN === 3001 || hermesBranch === 'main') {
+                    var hport = el.getAttribute('data-hermes-port') || '';
+                    if (!hport && (appPortN === 3001 || hermesBranch === 'main')) {
                         hport = '9119';
-                    } else if (appPortN >= 4000) {
+                    } else if (!hport && appPortN >= 4000) {
                         hport = String(9100 + (appPortN % 100));
-                    } else {
+                    } else if (!hport) {
                         window.alert('Hermes for ' + hermesBranch + ': button has no app port.');
                         return;
                     }

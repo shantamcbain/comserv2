@@ -771,4 +771,74 @@ ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID
     ok !$mk->($now + 1900)->read_state->{paid_block_only}, 'paid_block_only cleared';
 }
 
+# Oct 29 2026 (Shanta, fix B): instance prefix, instance in state, version skip
+{
+    my $G2 = 'Comserv::Util::AI::HermesOverrunGuard';
+    my $h = home();
+    my $mk = sub { my %x = @_; $G2->new(home => $h, app_root => $h, no_ledger => 1, no_notify => 1, base_urls => [], ollama_url => 'http://127.0.0.1:9',
+                       or_ids => $IDS, supergrok => {}, live => { ok => 0 }, set_cb => sub { }, %x) };
+    is $mk->(port => 4005, worktree => 'planning')->instance, '[:4005 planning]', 'port + worktree prefix';
+    is $mk->(worktree => 'aisystem')->instance, '[cron aisystem]', 'no port -> cron prefix';
+    is $mk->(app_root => '/home/x/.comserv/worktrees/proxmox/Comserv/Comserv', port => 4016)->instance, '[:4016 proxmox]', 'worktree from path';
+    { local $ENV{COMSERV_GUARD_PORT} = 3001; is $mk->(worktree => 'main')->instance, '[:3001 main]', 'port from COMSERV_GUARD_PORT'; }
+    my $g = $mk->(port => 4005, worktree => 'planning', now => 2000000);
+    my $r = $g->run(force => 1, thrash => 0, thrash_by_class => { ok => 1, counts => {} }, live => { ok => 0 },
+                    openrouter => { ok => 1, day_usd => 9, week_usd => 2, month_usd => 3 });
+    is $r->{action}, 'trip', 'fix B: trip';
+    my $st = $g->read_state;
+    is $st->{instance}, ':4005 planning', 'trip records instance in state';
+    is $st->{tripped_by}, ':4005 planning', 'tripped_by in state';
+    is $st->{guard_version}, $Comserv::Util::AI::HermesOverrunGuard::GUARD_VERSION, 'version written';
+    is $st->{guard_version_max}, $Comserv::Util::AI::HermesOverrunGuard::GUARD_VERSION, 'newest version written';
+    open my $lf, '<', "$h/.hermes/logs/overrun_guard.log"; my @l = <$lf>; close $lf;
+    like join('', grep { /TRIPPED/ } @l), qr/^\S+ \[:4005 planning\] Hermes overrun guard TRIPPED/, 'TRIPPED log line prefixed';
+    open my $nf, '<', "$h/.hermes/overrun_notice.txt"; my $n = do { local $/; <$nf> }; close $nf;
+    like $n, qr/^\[:4005 planning\] /, 'notice prefixed';
+    my $g2 = $mk->(port => 3001, worktree => 'main', now => 2000000 + 4000);
+    $r = $g2->run(force => 1, thrash => 0, thrash_by_class => { ok => 1, counts => {} }, live => { ok => 0 },
+                  openrouter => { ok => 1, day_usd => 0.1, week_usd => 2, month_usd => 3 });
+    is $r->{action}, 'restore', 'fix B: restore';
+    is $g2->read_state->{instance}, ':3001 main', 'restore records instance';
+    is $g2->read_state->{restored_by}, ':3001 main', 'restored_by in state';
+    # an older copy skips itself
+    my $before = do { open my $c, '<', "$h/.hermes/config.yaml"; local $/; <$c> };
+    my $sb = $g2->read_state; $sb->{guard_version_max} = $Comserv::Util::AI::HermesOverrunGuard::GUARD_VERSION + 1; $sb->{guard_version_by} = 'cron aisystem';
+    $sb->{guard_version_seen_at} = 2000000 + 7900;   # newer copy ran 100 s ago
+    $g2->write_state($sb);
+    my $old = $mk->(port => 4005, worktree => 'planning', now => 2000000 + 8000);
+    $r = $old->run(force => 1, thrash => 0, thrash_by_class => { ok => 1, counts => {} }, live => { ok => 0 },
+                   openrouter => { ok => 1, day_usd => 9, week_usd => 2, month_usd => 3 });
+    is $r->{action}, 'skip', 'older version -> skip';
+    is $r->{reason}, 'older_guard_version', 'skip reason';
+    ok !$old->read_state->{tripped}, 'skip: no trip';
+    is do { open my $c, '<', "$h/.hermes/config.yaml"; local $/; <$c> }, $before, 'skip: config untouched';
+    open $lf, '<', "$h/.hermes/logs/overrun_guard.log"; @l = <$lf>; close $lf;
+    like $l[-1], qr/\[:4005 planning\] SKIPPED: guard version \d+ is older than the newest recorded \d+ \(from cron aisystem\)/, 'one SKIPPED line with prefix';
+    ok $r->{notified}, 'first skip raises a notice/alert';
+    open my $nf2, '<', "$h/.hermes/overrun_notice.txt"; my $n2 = do { local $/; <$nf2> }; close $nf2;
+    like $n2, qr/^\[:4005 planning\] Hermes overrun guard copy SKIPPING/, 'skip notice written';
+    my $cnt = sub { open my $f, '<', "$h/.hermes/logs/overrun_guard.log"; scalar grep { /\[:4005 planning\] SKIPPED/ } <$f> };
+    $r = $mk->(port => 4005, worktree => 'planning', now => 2000000 + 8300)->run(force => 1, thrash => 0, live => { ok => 0 },
+                   openrouter => { ok => 1, day_usd => 9, week_usd => 2, month_usd => 3 });
+    is $r->{action}, 'skip', 'still skipping 5 min later';
+    ok !$r->{notified}, 'no second alert in the same episode';
+    is $cnt->(), 1, 'SKIPPED logged at most once per hour';
+    # keep the newer copy alive, then skip again after an hour -> second line
+    $sb = $g2->read_state; $sb->{guard_version_seen_at} = 2000000 + 11700; $g2->write_state($sb);
+    $r = $mk->(port => 4005, worktree => 'planning', now => 2000000 + 11800)->run(force => 1, thrash => 0, live => { ok => 0 },
+                   openrouter => { ok => 1, day_usd => 9, week_usd => 2, month_usd => 3 });
+    is $r->{action}, 'skip', 'skip an hour later';
+    is $cnt->(), 2, 'SKIPPED logged again after an hour';
+    # stale newer version (not seen for > 15 min) -> takeover
+    $r = $mk->(port => 4005, worktree => 'planning', now => 2000000 + 11700 + 1000)->run(force => 1, thrash => 0, thrash_by_class => { ok => 1, counts => {} }, live => { ok => 0 },
+                   openrouter => { ok => 1, day_usd => 9, week_usd => 2, month_usd => 3 });
+    isnt $r->{action}, 'skip', 'stale newer version -> runs (takeover)';
+    my $st3 = $g2->read_state;
+    is $st3->{guard_version_max}, $Comserv::Util::AI::HermesOverrunGuard::GUARD_VERSION, 'takeover sets max to own version';
+    is $st3->{guard_version_by}, ':4005 planning', 'takeover records who';
+    is $st3->{guard_version_seen_at}, 2000000 + 12700, 'seen_at refreshed';
+    open $lf, '<', "$h/.hermes/logs/overrun_guard.log"; my $all = do { local $/; <$lf> }; close $lf;
+    like $all, qr/\[:4005 planning\] TOOK OVER: newest guard version \d+ \(from cron aisystem\) not seen since/, 'TOOK OVER logged';
+}
+
 done_testing();
