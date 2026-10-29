@@ -21,7 +21,7 @@
         <strong>Generated:</strong> 2026-01-06 17:42:00 UTC
     </div>
 
-    <div style="background: #e8f5e9; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #4caf50;">
+    <div style="background: var(--card-bg, #e8f5e9); padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid var(--success-color, #4caf50);">
         <h2 style="margin-top: 0;">✅ Daily Summary</h2>
         <ul>
             <li><strong>Daily Plan Status:</strong> IN PROGRESS - 3 parallel tasks executing</li>
@@ -75,7 +75,7 @@
     </div>
 
     <h3>E.1 AI Chat System - Feature Planning</h3>
-    <div style="background: #c8e6c9; padding: 15px; border-radius: 4px; margin: 15px 0;">
+    <div style="background: var(--bg-secondary, #c8e6c9); padding: 15px; border-radius: 4px; margin: 15px 0;">
         <p><strong>Status:</strong> ✅ COMPLETE (per Daily Plan v0.07)</p>
         <p><strong>Deliverables Completed:</strong></p>
         <ul>
@@ -133,7 +133,7 @@
 
     <h2 id="code-changes">Code Changes & Diffs</h2>
     
-    <div style="background: #e3f2fd; padding: 15px; border-radius: 4px; margin: 20px 0;">
+    <div style="background: var(--bg-secondary, #e3f2fd); padding: 15px; border-radius: 4px; margin: 20px 0;">
         <h3 style="margin-top: 0;">Files Modified Today</h3>
         <p><strong>Session Focus:</strong> Daily Plan Automator workflow setup and file synchronization</p>
         <ul>
@@ -148,7 +148,7 @@
 
     <h2 id="issues-blockers">Issues & Blockers</h2>
     
-    <div style="background: #ffebee; padding: 15px; border-radius: 4px; margin: 20px 0;">
+    <div style="background: var(--card-bg, #ffebee); padding: 15px; border-radius: 4px; margin: 20px 0;">
         <h3 style="margin-top: 0;">⚠️ Outstanding Items</h3>
         <ul>
             <li><strong>Critical:</strong> Database migration scripts (9 new tables) - blocks full A.2 K8s readiness</li>
@@ -171,7 +171,7 @@
 
     <h2 id="summary">Summary & Success Metrics</h2>
     
-    <div style="background: #e8f5e9; padding: 15px; border-radius: 4px; margin: 20px 0;">
+    <div style="background: var(--card-bg, #e8f5e9); padding: 15px; border-radius: 4px; margin: 20px 0;">
         <h3 style="margin-top: 0;">✅ Daily Automator Achievement</h3>
         <p><strong>Today's Objective:</strong> Design and initiate Daily Plan Automator workflow for automated daily plan generation synchronized with MasterPlanCoordination.tt and current date.</p>
         <p><strong>Completion Status:</strong></p>

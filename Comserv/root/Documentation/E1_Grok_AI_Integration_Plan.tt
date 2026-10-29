@@ -270,61 +270,61 @@ volumes:
                 </tr>
             </thead>
             <tbody>
-                <tr style="background: #e8f5e9;">
+                <tr style="background: var(--card-bg, #e8f5e9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2.1: Create Grok.pm model</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 02:20</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">532 lines, K8s secrets + env var fallback</td>
                 </tr>
-                <tr style="background: #e8f5e9;">
+                <tr style="background: var(--card-bg, #e8f5e9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2.2: Add controller routing</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 14:05</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">+40 lines, conditional provider routing</td>
                 </tr>
-                <tr style="background: #e8f5e9;">
+                <tr style="background: var(--card-bg, #e8f5e9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2.3: Unit tests (model)</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 14:05</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">model_Grok.t: 13/13 pass</td>
                 </tr>
-                <tr style="background: #e8f5e9;">
+                <tr style="background: var(--card-bg, #e8f5e9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2.4: Integration tests</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 14:05</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">controller_AI_grok_integration.t: 10/10 pass</td>
                 </tr>
-                <tr style="background: #e8f5e9;">
+                <tr style="background: var(--card-bg, #e8f5e9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2.5: Documentation</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 14:05</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Phase 1-2 complete in this doc</td>
                 </tr>
-                <tr style="background: #e8f5e9;">
+                <tr style="background: var(--card-bg, #e8f5e9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3.1: Admin configuration controller</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 15:08</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">209 lines, 8 methods, encryption + validation</td>
                 </tr>
-                <tr style="background: #e8f5e9;">
+                <tr style="background: var(--card-bg, #e8f5e9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3.2: Configuration form template</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 15:08</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">AiConfiguration.tt: 366 lines, responsive UI</td>
                 </tr>
-                <tr style="background: #e8f5e9;">
+                <tr style="background: var(--card-bg, #e8f5e9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3.3: Secure key storage</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 15:08</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">AiModelConfig table with encryption</td>
                 </tr>
-                <tr style="background: #e8f5e9;">
+                <tr style="background: var(--card-bg, #e8f5e9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3.4: API key validation</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 15:08</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">_validate_api_key() with AJAX test button</td>
                 </tr>
-                <tr style="background: #e8f5e9;">
+                <tr style="background: var(--card-bg, #e8f5e9);">
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3.5: Phase 3 documentation</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 15:08</td>
