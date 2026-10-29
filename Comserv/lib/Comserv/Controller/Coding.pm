@@ -170,6 +170,8 @@ sub _spawn_coding_shell {
     die "fork failed: $!" unless defined $pid;
 
     if ($pid == 0) {
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+        eval {
         $pty->make_slave_controlling_terminal();
         my $slave = $pty->slave();
 
@@ -201,6 +203,8 @@ sub _spawn_coding_shell {
             exec($shell, '--noprofile', '--norc', '-i') or exec($shell, '-i') or exec($shell) or die "Can't exec shell: $!";
         }
         exec($shell) or die "Can't exec shell: $!";
+        };
+        Comserv::Util::ForkSafe::child_exit(1);
     }
 
     return $pid;

@@ -1,0 +1,17 @@
+use strict; use warnings;
+use Test::More;
+use lib 'lib';
+use Comserv::Util::HealthPrimary;
+my $H = 'Comserv::Util::HealthPrimary';
+local $ENV{WEB_PORT}; local $ENV{COMSERV_PORT}; local $ENV{CATALYST_PORT};
+is $H->listen_port('-p','4011'), '4011', '-p 4011';
+is $H->listen_port('-p4009'), '4009', '-p4009';
+is $H->listen_port('--port=3001'), '3001', '--port=';
+ok  $H->is_primary(undef, env=>undef, container=>0, port=>'3001', primary_port=>3001), '3001 primary';
+ok !$H->is_primary(undef, env=>undef, container=>0, port=>'4011', primary_port=>3001), '4011 skips';
+ok  $H->is_primary(undef, env=>'1',  container=>0, port=>'4011', primary_port=>3001), 'env=1 forces';
+ok !$H->is_primary(undef, env=>'0',  container=>1, port=>'3001', primary_port=>3001), 'env=0 forces off';
+ok  $H->is_primary(undef, env=>undef, container=>1, port=>'5000', primary_port=>3001), 'container runs own';
+ok  $H->is_primary(undef, env=>undef, container=>0, port=>'',     primary_port=>3001), 'unknown port = primary';
+ok  $H->is_primary(undef, env=>undef, container=>0, port=>'4011', primary_port=>4011), 'configurable port';
+done_testing;

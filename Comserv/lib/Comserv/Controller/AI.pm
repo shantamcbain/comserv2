@@ -918,27 +918,31 @@ sub _grok_home {
 
 sub _grok_cli_api_key {
     my ($self, $c) = @_;
-    return $ENV{XAI_API_KEY} if $ENV{XAI_API_KEY} && $ENV{XAI_API_KEY} =~ /\S/;
+    # Oct 26 2026: DB first, config next, environment LAST (only env value that must exist is DB access).
+    my $user_id = $c->session->{user_id} || 0;
+    if ($user_id) {
+        my $db_key = try {
+            my $schema = $c->model('DBEncy')->schema;
+            my $key_obj = $schema->resultset('UserApiKeys')->search(
+                { user_id => $user_id, service => 'grok', is_active => '1' },
+                { rows => 1 }
+            )->first;
+            $key_obj ||= $schema->resultset('UserApiKeys')->search(
+                { service => 'grok', is_active => '1' },
+                { rows => 1 }
+            )->first;
+            $key_obj ? ($key_obj->get_api_key() || '') : '';
+        } catch {
+            eval { Comserv::Util::Logging->instance->log_with_details($c, 'error', __FILE__, __LINE__, '_grok_cli_api_key',
+                "DB lookup of the grok key failed, falling back to config/env: $_") };
+            '';
+        };
+        return $db_key if $db_key && $db_key =~ /\S/;
+    }
     my $cfg_key = $c->config->{grok_cli_xai_api_key} || $c->config->{xai_api_key};
     return $cfg_key if $cfg_key && $cfg_key =~ /\S/;
-
-    my $user_id = $c->session->{user_id} || 0;
-    return '' unless $user_id;
-
-    try {
-        my $schema = $c->model('DBEncy')->schema;
-        my $key_obj = $schema->resultset('UserApiKeys')->search(
-            { user_id => $user_id, service => 'grok', is_active => '1' },
-            { rows => 1 }
-        )->first;
-        $key_obj ||= $schema->resultset('UserApiKeys')->search(
-            { service => 'grok', is_active => '1' },
-            { rows => 1 }
-        )->first;
-        return $key_obj ? ($key_obj->get_api_key() || '') : '';
-    } catch {
-        return '';
-    };
+    return $ENV{XAI_API_KEY} if $ENV{XAI_API_KEY} && $ENV{XAI_API_KEY} =~ /\S/;
+    return '';
 }
 
 sub _grok_cli_auth_error {
@@ -1066,7 +1070,9 @@ sub _run_grok_cli {
             return ('', "fork failed: $!", -1);
         }
         if ($pid == 0) {
-            $run_in_child->();
+            require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+            eval { $run_in_child->() };
+            Comserv::Util::ForkSafe::child_exit(127);
         }
         waitpid($pid, 0);
         $exit = $? >> 8;
@@ -1166,6 +1172,14 @@ Parameters:
 
 sub generate :Local :Args(0) {
     my ($self, $c) = @_;
+
+    # Chat with AI is development-only: public SiteName hosts cannot reach a model.
+    unless (Comserv::Util::SystemInfo::is_dev_request_host($c)) {
+        $c->response->status(403);
+        $c->response->content_type('application/json');
+        $c->response->body(encode_json({ success => JSON::false, error => 'Chat with AI is not available on this site.' }));
+        return;
+    }
     
     # Set response content type
     $c->response->content_type('application/json');
@@ -2000,9 +2014,12 @@ sub generate :Local :Args(0) {
                     my $ping_payload = encode_json({ model => $use_model, keep_alive => '2h' });
                     my $ping_pid = fork();
                     if (defined $ping_pid && $ping_pid == 0) {
+                        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+                        eval {
                         my $child_ua = LWP::UserAgent->new(timeout => 15);
                         $child_ua->post($ping_url, 'Content-Type' => 'application/json', Content => $ping_payload);
-                        exit 0;
+                        };
+                        Comserv::Util::ForkSafe::child_exit(0);
                     }
                     push @trace, "🔁 keep_alive renewal dispatched async for '$use_model'";
                 }
@@ -2976,6 +2993,14 @@ Parameters:
 
 sub chat :Local :Args(0) {
     my ($self, $c) = @_;
+
+    # Chat with AI is development-only: public SiteName hosts cannot reach a model.
+    unless (Comserv::Util::SystemInfo::is_dev_request_host($c)) {
+        $c->response->status(403);
+        $c->response->content_type('application/json');
+        $c->response->body(encode_json({ success => JSON::false, error => 'Chat with AI is not available on this site.' }));
+        return;
+    }
     
     # Set response content type
     $c->response->content_type('application/json');
@@ -3702,9 +3727,12 @@ sub chat :Local :Args(0) {
                     my $chat_ping_payload = encode_json({ model => $chat_use_model, keep_alive => '2h' });
                     my $chat_ping_pid = fork();
                     if (defined $chat_ping_pid && $chat_ping_pid == 0) {
+                        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+                        eval {
                         my $child_ua = LWP::UserAgent->new(timeout => 15);
                         $child_ua->post($chat_ping_url, 'Content-Type' => 'application/json', Content => $chat_ping_payload);
-                        exit 0;
+                        };
+                        Comserv::Util::ForkSafe::child_exit(0);
                     }
                     push @chat_trace, "🔁 keep_alive renewal dispatched async for '$chat_use_model'";
                 }
@@ -8852,9 +8880,12 @@ sub preload_model :Local :Args(0) {
                 my $payload = encode_json({ model => $model, keep_alive => '2h' });
                 my $pid = fork();
                 if (defined $pid && $pid == 0) {
+                    require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+                    eval {
                     my $child_ua = LWP::UserAgent->new(timeout => 180);
                     $child_ua->post($url, 'Content-Type' => 'application/json', Content => $payload);
-                    exit 0;
+                    };
+                    Comserv::Util::ForkSafe::child_exit(0);
                 }
                 $preload_msg = "loading:$model";
             }
@@ -12719,8 +12750,11 @@ PYSCRIPT
     }
 
     if ($child == 0) {
+        require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
         my $grandchild = fork();
         if (defined $grandchild && $grandchild == 0) {
+            require Comserv::Util::ForkSafe; Comserv::Util::ForkSafe::child_prepare();
+            eval {
             POSIX::setsid();
             open(STDIN,  '<', '/dev/null');
             open(STDOUT, '>', '/dev/null');
@@ -12819,6 +12853,8 @@ PYSCRIPT
             close $sf;
 
             POSIX::_exit(0);
+            };
+            POSIX::_exit(1);
         }
         POSIX::_exit(0);
     }

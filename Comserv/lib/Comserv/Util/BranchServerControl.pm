@@ -85,7 +85,20 @@ sub hermes_cwd_for {
     my ($self, $branch) = @_;
     return '/home/shanta/PycharmProjects/comserv2' if !$branch || $branch eq 'main';
     my $base = eval { Comserv::Util::Git->worktree_base_dir } // "$ENV{HOME}/.comserv/worktrees";
-    return "$base/$branch/Comserv";
+    my $direct = "$base/$branch/Comserv";
+    return $direct if -d $direct;
+    # Dir name can disagree with the branch (git-dev is checked out in worktrees/git).
+    return $direct unless $base && -d $base;
+    opendir(my $dh, $base) or return $direct;
+    my @entries = grep { $_ !~ /^\./ && -e "$base/$_/Comserv/.git" } readdir($dh);
+    closedir($dh);
+    for my $name (@entries) {
+        my $dir = "$base/$name/Comserv";
+        my $got = `git -C \Q$dir\E branch --show-current 2>/dev/null`;
+        chomp $got if defined $got;
+        return $dir if defined $got && $got eq $branch;
+    }
+    return $direct;
 }
 
 sub _port_listening {

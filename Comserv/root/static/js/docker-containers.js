@@ -38,7 +38,7 @@
         // Docker dates: "2026-07-06T23:18:14.59875699Z" or similar
         var d = new Date(isoStr);
         if (isNaN(d.getTime())) return isoStr.substring(0, 10);
-        return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+        return d.toLocaleString('en-CA', { timeZone: 'America/Vancouver', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZoneName: 'short' });
     }
 
     function paintDeployLog(raw) {
@@ -231,6 +231,8 @@
             '        <option value="pull-deploy">Pull &amp; Deploy (from registry)</option>' +
             '        <option value="full">Full Rebuild (build + push + deploy)</option>' +
             '        <option value="build-push">Build &amp; Push only (no deploy)</option>' +
+            '        <option value="local-test">Build &amp; start :4000 test (workstation :4000, no push)</option>' +
+            '        <option value="promote">Promote :4000 &rarr; :5000 (workstation :5000, no rebuild, no push)</option>' +
             '      </select>' +
             '    </div>' +
 
@@ -283,6 +285,50 @@
         deployFormVisible = false;
     }
 
+    // Stream /admin/docker/flow/log?offset=N into the same log window until
+    // the 'deploy-flow finished rc=N' marker appears.
+    function streamFlowLog(offset) {
+        setStatus('busy', 'Deploy running…');
+        var timer = setInterval(function() {
+            safeFetch('/admin/docker/flow/log?offset=' + offset, {})
+                .then(function(r){ return r.json(); })
+                .then(function(d) {
+                    if (!d || !d.ok) return;
+                    offset = d.next;
+                    (d.data || '').split('\n').forEach(function(l){ if (l) log(l, /❌|FAIL|refused/i.test(l) ? 'err' : 'dim'); });
+                    if (d.done) {
+                        clearInterval(timer);
+                        if (String(d.rc) === '0') { log('✅ FINISHED: SUCCESS (rc=0)', 'ok'); setStatus('ok', 'Deploy succeeded'); }
+                        else { log('❌ FINISHED: FAILED (rc=' + d.rc + ')', 'err'); setStatus('err', 'Deploy failed'); }
+                        setTimeout(loadAll, 2000);
+                    }
+                })
+                .catch(function(){ /* transient; keep polling */ });
+        }, 2000);
+    }
+
+    function runFlowFromDialog(act) {
+        var what = act === 'local-test'
+            ? 'Build on the workstation, tag <commit-time> + :test, start comserv2-web-test on workstation :4000. No push. :5000 and production untouched.'
+            : 'Promote the healthy :4000 test image to workstation :5000 (no rebuild): old :5000 kept as bk-* backup, health check, auto-restore on failure, then tag it :latest locally. No push. Production untouched.';
+        hideDeployForm();
+        log('=== ' + (act === 'local-test' ? 'BUILD & START :4000 TEST' : 'PROMOTE :4000 -> :5000') + ' (preview) ===', 'info');
+        apiPost('/admin/docker/flow/run', 'action=' + encodeURIComponent(act) + '&dest=workstation')
+            .then(function(d) {
+                (d.output || d.error || '').split('\n').forEach(function(l){ if (l) log(l, d.ok ? 'dim' : 'err'); });
+                if (!d.ok) { setStatus('err', 'Preview refused'); return; }
+                if (!confirm(what + '\n\nPreview is in the log. Apply now?')) { log('Cancelled (nothing changed).', 'dim'); return; }
+                return apiPost('/admin/docker/flow/run', 'action=' + encodeURIComponent(act) + '&dest=workstation&apply=1')
+                    .then(function(r) {
+                        if (!r.ok) { log('❌ ' + (r.error || r.output || 'failed to start'), 'err'); return; }
+                        log('Started. Live output follows here until it finishes.', 'info');
+                        if (outputBox) { var a = document.createElement('a'); a.href = '/admin/docker/flow/log'; a.target = '_blank'; a.textContent = 'Open full log in a new tab'; outputBox.appendChild(a); outputBox.appendChild(document.createTextNode('\n')); }
+                        streamFlowLog(r.offset || 0);
+                    });
+            })
+            .catch(function(e){ log('❌ ' + e, 'err'); });
+    }
+
     function submitDeployForm() {
         var cname = document.getElementById('deploy-container-select');
         var targetEl = document.getElementById('deploy-target-select');
@@ -303,6 +349,13 @@
         var registryUser = registryUserEl ? registryUserEl.value.trim() : '';
         var registryPass = registryPassEl ? registryPassEl.value : '';
         var imageTag = imageTagEl ? imageTagEl.value.trim() : '';
+
+        // Workstation test flow: preview first, then apply via /admin/docker/flow/run.
+        // Always workstation-only; never pushes; production untouched.
+        if (mode === 'local-test' || mode === 'promote') {
+            runFlowFromDialog(mode);
+            return;
+        }
 
         // Confirm
         var confirmMsg = 'Deploy ' + containerName + ' to ' + target + '?';
@@ -450,7 +503,7 @@
             var borderColor = unhealthy ? '#f0883e' : (running ? '#3fb950' : (c.is_backup_container ? '#6a0dad' : '#f85149'));
             var statusColor = unhealthy ? '#f0883e' : (running ? '#3fb950' : (c.is_backup_container ? '#6a0dad' : '#f85149'));
             var statusIcon = unhealthy ? '!' : (running ? '●' : (c.is_backup_container ? '↩' : '○'));
-            var created = c.created ? new Date(c.created).toLocaleDateString() : '';
+            var created = c.created ? new Date(c.created).toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' }) : '';
             var backupBadge = c.is_backup_container ? '<span style="display:inline-block;background:#6a0dad;color:#fff;font-size:0.65em;padding:1px 6px;border-radius:3px;margin-left:6px;font-weight:bold;letter-spacing:0.5px;">BACKUP</span>' : '';
             var hostBadge = '<span style="font-size:0.7em;background:#e2e8f0;color:#475569;padding:1px 5px;border-radius:3px;margin-left:4px;white-space:nowrap;">' + esc(currentTarget) + '</span>';
 

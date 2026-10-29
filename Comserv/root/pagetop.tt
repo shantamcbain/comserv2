@@ -109,7 +109,7 @@
         Domain: <strong>[% c.req.uri.host %]</strong> |
         Client IP: <strong>[% c.req.address %]</strong> |
         Server: <strong>[% system_identifier || app_workflow %]</strong> | Workflow: [% app_workflow %] ([% c.forward('/get_server_ip') %]) |
-        [% IF app_version %]Build: <strong class="server-info-build" title="Commit: [% app_version.commit %] | Branch: [% app_version.branch %] | Host: [% app_version.build_host %]">[% app_version.build_date | replace('T',' ') | replace(':\d\dZ','') %] UTC</strong> | Git: <strong>[% app_version.branch %]</strong>@<code class="server-info-commit">[% app_version.commit %]</code> | [% END %]
+        [% IF app_version %]Build: <strong class="server-info-build" title="Commit: [% app_version.commit %] | Branch: [% app_version.branch %] | Host: [% app_version.build_host %]">[% IF app_version.build_date_local %][% app_version.build_date_local %][% ELSE %][% app_version.build_date | replace('T',' ') | replace(':\d\dZ','') %] UTC[% END %]</strong> | Git: <strong>[% app_version.branch %]</strong>@<code class="server-info-commit">[% app_version.commit %]</code> | [% END %]
         Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %] |
         DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% SET env = active_db_environment || 'production' %][% env.upper %]</span> |
         DB User: <strong>[% active_db_user || 'unknown' | html %]</strong>

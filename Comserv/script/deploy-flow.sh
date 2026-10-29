@@ -93,7 +93,7 @@ dest_hosts() {
 
 new_tag() {
     local sha; sha=$(git -C "$APP_DIR" rev-parse --short=9 HEAD 2>/dev/null || echo nogit)
-    echo "${sha}-$(date -u +%Y%m%d%H%M)"
+    echo "${sha}-$(TZ=America/Vancouver date +%Y%m%d%H%M)"   # tag time in Pacific
 }
 
 # ── plan builders: each fills STEPS; run_steps executes them only with --apply ──
@@ -150,6 +150,7 @@ run_prod1() {
     docker manifest inspect "$REPO:$1" >/dev/null 2>&1 || { echo "❌ $REPO:$1 is not on Docker Hub. Run Safe Push first."; return 1; }
     DEPLOY_IMAGE="$REPO:$1" "$DEPLOY_SH" --pull-deploy "$PROD1" && state_set production1 5000 "$1"
 }
+tag_latest_local() { docker tag "$REPO:$1" "$REPO:latest"; }
 push_tag() {
     docker push "$REPO:$1" && docker tag "$REPO:$1" "$REPO:latest" && docker push "$REPO:latest"
 }
@@ -223,6 +224,10 @@ case "$ACTION" in
                 CMDS+=("push_tag $TAG")
             fi
             plan_run_on "$h" 5000 "$TAG"
+            if [ "$h" = "workstation" ]; then
+                step "TAG $REPO:$TAG as :latest on the workstation only (local alias, NOT pushed)"
+                CMDS+=("tag_latest_local $TAG")
+            fi
         done
         run_steps ;;
     safe-push)
