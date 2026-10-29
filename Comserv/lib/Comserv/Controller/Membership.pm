@@ -215,8 +215,12 @@ sub _get_modules_data {
             }
         };
 
-        my $default_val = $subscribed{$key} ? 1 : 0;
-        $mod->{site_enabled} = exists $site_status{$key} ? $site_status{$key} : $default_val;
+        # Subscribed is a request. It is not access. Missing site_modules stays off.
+        my $enabled = $site_status{$key} ? 1 : 0;
+        $enabled = 1 if $key eq '3d' && $site_status{printing_3d};
+        $enabled = 1 if $key eq 'planning' && $site_status{ai};
+        $enabled = 1 if $key eq 'accounting' && $site_status{Accounting};
+        $mod->{site_enabled} = $enabled;
         $mod->{subscribed}   = $subscribed{$key} ? 1 : 0;
         $mod->{user_access}  = $c->stash->{enabled_modules}{$key} ? 1 : 0;
     }
@@ -342,36 +346,14 @@ sub addons :Local :Args(0) {
     my $is_admin  = $self->_is_admin($c);
     my $user_id   = $c->session->{user_id};
 
-    # If post and admin, handle site module updates
-    if ($c->req->method eq 'POST' && $is_admin) {
-        my $params = $c->req->body_parameters;
-        eval {
-            my $modules_ref = $self->_get_modules_data($c, $site_name);
-            foreach my $mod (@$modules_ref) {
-                my $key = $mod->{key};
-                my $enabled = $params->{"enabled_$key"} ? 1 : 0;
-                $c->model('DBEncy')->resultset('SiteModule')->update_or_create(
-                    {
-                        sitename    => $site_name,
-                        module_name => $key,
-                    },
-                    {
-                        key     => 'site_module_unique',
-                        values  => { enabled => $enabled },
-                    }
-                );
-            }
-            $c->flash->{success_msg} = "Add-on configurations for site '$site_name' updated successfully!";
-        };
-        if ($@) {
-            $c->stash->{error_msg} = "Failed to update add-ons: $@";
-        } else {
-            my $referer = $c->req->referer || '';
-            if ($referer =~ /membership$/ || $referer =~ /membership\?/) {
-                return $c->response->redirect($c->uri_for('/membership'));
-            }
-            return $c->response->redirect($c->uri_for($self->action_for('addons')));
-        }
+    # Subscribe is a request. This form must not write site_modules.enabled,
+    # including when the session host is CSC (that would enable CSC, not the subscriber).
+    if ($c->req->method eq 'POST') {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'addons',
+            "Refused site_modules write from /membership/addons for site '$site_name' by "
+            . ($c->session->{username} || 'unknown'));
+        $c->flash->{error_msg} = 'This page does not enable add-ons. Subscribe on hosting signup. A CSC admin enables a named site from the approval queue.';
+        return $c->response->redirect($c->uri_for($self->action_for('addons')));
     }
 
     my $modules = $self->_get_modules_data($c, $site_name);

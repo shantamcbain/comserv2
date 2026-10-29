@@ -245,7 +245,7 @@ sub toggle_start {
             undef,
             $record_id, $username, $sitename_val, $proj_code,
             'Started: ' . ($todo->subject // ''),
-            "Work begun by $username",
+            "Work begun by $username" . (defined $args{note} && length $args{note} ? " [$args{note}]" : ''),
             $today, $due_date_val, $now_hms,
             (eval { $todo->priority } // 5), $username, $today,
             ($c->session->{group} || ''), (eval { $todo->comments } // '')
@@ -321,6 +321,7 @@ sub close_log {
         my ($dur_hms, $dur_mins) = _duration_hms($open_row->{start_time}, $now_hms);
         my $close_summary = $summary ne '' ? $summary
                             : ("Stopped: " . ($todo->subject // '') . " after ${dur_mins} min by $username");
+        $close_summary .= " [$args{note}]" if defined $args{note} && length $args{note};
         $dbh->do(
             'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, comments=? WHERE record_id=?',
             undef, $now_hms, $dur_hms, $username, $today, $close_summary, $open_row->{record_id}
@@ -356,6 +357,7 @@ sub done_with_log {
 
         my $done_summary = $summary ne '' ? $summary
                            : ('Done: ' . ($todo->subject // '') . " by $username");
+        $done_summary .= " [$args{note}]" if defined $args{note} && length $args{note};
 
         my $open_row = _open_log_row($dbh, $record_id);
         my $todo_status = eval { $todo->status } // '';

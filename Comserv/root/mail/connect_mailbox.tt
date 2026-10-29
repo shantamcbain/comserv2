@@ -1,0 +1,73 @@
+[% META title = 'Connect an existing mailbox' %]
+<div class="content-section mail-connect">
+  <h2>Connect an existing mailbox</h2>
+  <p>Already have a mailbox (for example <code>you@computersystemconsulting.ca</code>)? Add it here, test the connection, and get the settings for Thunderbird or your phone.
+     <a href="[% c.uri_for('/mail') %]">Back to Mail</a></p>
+  [% IF success_msg %]<div class="alert alert-success">[% success_msg | html %]</div>[% END %]
+  [% IF error_msg %]<div class="alert alert-danger">[% error_msg | html %]</div>[% END %]
+  [% IF result %]
+  <div class="alert [% result.ok ? 'alert-success' : 'alert-warning' %]" id="mc-test-result">
+    <strong>Connection test [% result.ok ? 'passed' : 'failed' %]</strong>
+    <ul>
+      <li>[% result.imap_ok ? '✅' : '❌' %] [% result.imap_msg | html %]</li>
+      <li>[% result.smtp_ok ? '✅' : '❌' %] [% result.smtp_msg | html %]</li>
+    </ul>
+  </div>
+  [% END %]
+
+  <form method="post" action="[% c.uri_for('/mail/connect') %]" id="mail-connect-form" autocomplete="off">
+    <fieldset><legend>Mailbox</legend>
+      <label>Email address <input type="email" name="email_address" required value="[% form.email_address | html %]"></label>
+      <label>Login username <input type="text" name="login_username" value="[% form.login_username | html %]" placeholder="usually the full email address"></label>
+      <label>Password <input type="password" name="password" required autocomplete="new-password"></label>
+      <small>The password is only used to test the connection and is stored encrypted. It is never shown again.</small>
+    </fieldset>
+    <details [% IF form.imap_host != 'harper.whc.ca' || form.smtp_host != 'harper.whc.ca' %]open[% END %]><summary>Server settings (defaults: harper.whc.ca)</summary>
+      <fieldset><legend>Incoming (IMAP)</legend>
+        <label>Host <input type="text" name="imap_host" value="[% form.imap_host | html %]"></label>
+        <label>Port <input type="number" name="imap_port" value="[% form.imap_port | html %]"></label>
+        <label>Security <select name="imap_security">[% FOREACH s IN ['ssl','starttls','none'] %]<option value="[% s %]" [% 'selected' IF form.imap_security == s %]>[% s FILTER upper %]</option>[% END %]</select></label>
+      </fieldset>
+      <fieldset><legend>Outgoing (SMTP)</legend>
+        <label>Host <input type="text" name="smtp_host" value="[% form.smtp_host | html %]"></label>
+        <label>Port <input type="number" name="smtp_port" value="[% form.smtp_port | html %]"></label>
+        <label>Security <select name="smtp_security">[% FOREACH s IN ['ssl','starttls','none'] %]<option value="[% s %]" [% 'selected' IF form.smtp_security == s %]>[% s FILTER upper %]</option>[% END %]</select></label>
+      </fieldset>
+      <fieldset><legend>POP3 (optional)</legend>
+        <label>Host <input type="text" name="pop_host" value="[% form.pop_host | html %]"></label>
+        <label>Port <input type="number" name="pop_port" value="[% form.pop_port | html %]"></label>
+      </fieldset>
+    </details>
+    [% IF is_site_admin %]<label><input type="checkbox" name="site_managed" value="1" [% 'checked' IF form.site_managed %]> Site-managed mailbox (shared, managed by site admins)</label>[% END %]
+    <label><input type="checkbox" name="save_anyway" value="1"> Save even if the test fails</label>
+    <div class="form-actions">
+      <button type="submit" name="op" value="test" class="btn btn-secondary">Test connection</button>
+      <button type="submit" name="op" value="save" class="btn btn-primary">Test &amp; save</button>
+    </div>
+    [% UNLESS table_ready %]<p><small>Note: saving needs the <code>user_mailboxes</code> table (admin: Schema Compare). Testing works now.</small></p>[% END %]
+  </form>
+
+  <div class="content-section" id="mc-client-settings">
+    <h3>Client settings (Thunderbird, phone, Outlook)</h3>
+    <table class="table">
+      <tr><th></th><th>Server</th><th>Port</th><th>Security</th><th>Username</th></tr>
+      <tr><td>Incoming IMAP</td><td>[% client.imap_host | html %]</td><td>[% client.imap_port | html %]</td><td>[% client.imap_security == 'ssl' ? 'SSL/TLS' : (client.imap_security == 'starttls' ? 'STARTTLS' : 'None') %]</td><td>[% (client.login_username || client.email_address || 'your full email address') | html %]</td></tr>
+      <tr><td>Incoming POP3</td><td>[% client.pop_host | html %]</td><td>[% client.pop_port | html %]</td><td>SSL/TLS</td><td>same as IMAP</td></tr>
+      <tr><td>Outgoing SMTP</td><td>[% client.smtp_host | html %]</td><td>[% client.smtp_port | html %]</td><td>[% client.smtp_security == 'ssl' ? 'SSL/TLS' : (client.smtp_security == 'starttls' ? 'STARTTLS' : 'None') %]</td><td>same as IMAP (authentication required: normal password)</td></tr>
+    </table>
+    <p><small>Thunderbird: Account Settings → Add Mail Account → "Configure manually" and enter the values above. iPhone/Android: add an "Other"/IMAP account with the same values.</small></p>
+  </div>
+
+  [% IF boxes.size %]
+  <div class="content-section"><h3>Your connected mailboxes</h3>
+    <table class="table"><tr><th>Address</th><th>IMAP / SMTP</th><th>Last test</th><th></th></tr>
+    [% FOREACH b IN boxes %]
+      <tr><td>[% b.email_address | html %][% IF b.site_managed %] <em>(site-managed)</em>[% END %]</td>
+          <td>[% b.imap_host | html %]:[% b.imap_port %] / [% b.smtp_host | html %]:[% b.smtp_port %]</td>
+          <td>[% b.last_test_ok ? '✅' : '❌' %] [% b.last_test_at | html %]</td>
+          <td><form method="post" action="[% c.uri_for('/mail/connect/remove', b.id) %]" onsubmit="return confirm('Remove this saved connection? Your actual mailbox is not affected.')"><button type="submit" class="btn btn-small">Remove</button></form></td></tr>
+    [% END %]
+    </table>
+  </div>
+  [% END %]
+</div>

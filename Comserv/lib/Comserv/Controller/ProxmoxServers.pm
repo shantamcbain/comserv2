@@ -212,13 +212,17 @@ sub edit_server_form :Path('edit') :Args(1) {
     # Get the server credentials
     my $credentials = Comserv::Util::ProxmoxCredentials::get_credentials($server_id);
 
-    # If the server doesn't exist, redirect to the server list
-    unless ($credentials->{host}) {
+    # A server with only an API URL is still a real record. Host is derived
+    # from that URL. An unknown id comes back with neither.
+    unless ($credentials->{host} || $credentials->{api_url_base}) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_server_form', "Proxmox server '$server_id' not found");
         $c->flash->{error_msg} = "Proxmox server '$server_id' not found.";
-        $c->response->redirect($c->uri_for('/proxmox_servers'));
+        $c->response->redirect($c->uri_for('/proxmox'));
         return;
     }
+
+    my $token_stored = ($credentials->{token_value} && length $credentials->{token_value}) ? 1 : 0;
+    delete $credentials->{token_value};
 
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'edit_server_form', "Prepared form data for server: $server_id");
 
@@ -226,6 +230,7 @@ sub edit_server_form :Path('edit') :Args(1) {
         template => 'proxmox/edit_server.tt',
         server_id => $server_id,
         form_data => $credentials,
+        token_stored => $token_stored,
         current_view => 'TT',
     );
     $c->forward($c->view('TT'));
@@ -275,6 +280,7 @@ sub edit_server :Path('edit_server') :Args(0) {
             error_msg => 'Missing required fields: ' . join(', ', @missing_fields),
             server_id => $server_id,
             form_data => $credentials,
+            token_stored => ($credentials->{token_value} ? 1 : 0),
             current_view => 'TT',
         );
         $c->forward($c->view('TT'));
@@ -297,6 +303,7 @@ sub edit_server :Path('edit_server') :Args(0) {
         Comserv::Util::ProxmoxCredentials::save_credentials($server_id, $credentials);
         $c->flash->{success_msg} = "Proxmox server '$server_id' has been updated successfully.";
     } catch {
+        delete $credentials->{token_value};
         $c->stash(
             template => 'proxmox/edit_server.tt',
             error_msg => "Failed to save credentials: $_",
@@ -307,9 +314,8 @@ sub edit_server :Path('edit_server') :Args(0) {
         $c->forward($c->view('TT'));
         return;
     };
-    
-    # Redirect to the server list
-    $c->response->redirect($c->uri_for('/proxmox_servers'));
+
+    $c->response->redirect($c->uri_for('/proxmox'));
 }
 
 =head2 delete_server
@@ -674,6 +680,9 @@ sub test_connection :Path('test') :Args(1) {
         if ($proxmox && $proxmox->{debug_info}) {
             if ($proxmox->{debug_info}->{error_type}) {
                 $error = $proxmox->{debug_info}->{error_type};
+            }
+            if ($proxmox->{debug_info}->{response_status}) {
+                $error = $proxmox->{debug_info}->{response_status};
             }
             if ($proxmox->{debug_info}->{possible_cause}) {
                 $possible_cause = $proxmox->{debug_info}->{possible_cause};

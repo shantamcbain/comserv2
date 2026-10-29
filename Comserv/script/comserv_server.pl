@@ -404,6 +404,7 @@ sub _start_health_evaluator {
                         require Comserv::Util::AI::HermesOverrunGuard;
                         Comserv::Util::AI::HermesOverrunGuard->new(
                             app_root => ($ENV{CATALYST_HOME} // "$FindBin::Bin/.."),
+                            port     => $ENV{COMSERV_GUARD_PORT},
                         )->run;
                     };
 
@@ -643,6 +644,10 @@ my $_is_dev_worktree =
     ($FindBin::Bin =~ m{PycharmProjects}) ||
     ($FindBin::Bin =~ m{comserv2});
 
+# Oct 29 2026 (Shanta, fix B): tell the forked health evaluator's overrun guard which port it serves, so every guard
+# log line / alert says e.g. [:4005 planning]. Set before the fork; the web child inherits it too (same port).
+{ my ($guard_port) = _parse_port_and_reload(@ARGV); $ENV{COMSERV_GUARD_PORT} //= $guard_port; }
+
 _start_health_evaluator() unless ($ENV{DISABLE_HEALTH_MONITOR} // '') eq '1' || $_is_dev_worktree;
 
 if ($use_twiggy) {
@@ -670,6 +675,24 @@ if ($use_twiggy) {
 if ( grep { $_ eq '-r' || $_ eq '--restart' } @ARGV ) {
     unless ( grep { /--?restart_directory/ } @ARGV ) {
         push @ARGV, '--restart_directory', 'lib';
+    }
+    # max_user_instances (128) is shared by every -r server plus the desktop.
+    # Linux::Inotify2->new then dies "Too many open files" and the server
+    # never binds. Poll lib/ instead so -r still starts.
+    my $ino = eval { require Linux::Inotify2; Linux::Inotify2->new };
+    if ($ino) {
+        undef $ino;
+    }
+    else {
+        my $err = $! || $@ || 'unknown';
+        print STDERR "[restart] inotify unavailable ($err) — polling lib/ for changes\n";
+        require File::ChangeNotify;
+        require File::ChangeNotify::Watcher::Default;
+        no warnings 'redefine';
+        *File::ChangeNotify::instantiate_watcher = sub {
+            shift;
+            return File::ChangeNotify::Watcher::Default->new(@_);
+        };
     }
 }
 

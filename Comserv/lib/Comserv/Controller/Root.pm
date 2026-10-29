@@ -10,6 +10,7 @@ use FindBin '$Bin';
 use Time::HiRes qw(gettimeofday);
 
 use Comserv::Util::Logging;
+use Comserv::Util::RequestTrace;
 
 # Cache-buster epoch for asset URLs (?v=...): set once per server start so
 # browsers refetch CSS/JS after every restart/deploy (see Root::auto).
@@ -2986,6 +2987,22 @@ sub label_favicon :Path('/favicon/label') :Args(1) {
 
 sub end : ActionClass('RenderView') {
     my ($self, $c) = @_;
+
+    # #2618: one low-noise line per login/admin request (Host seen, backend, pid, status).
+    eval { Comserv::Util::RequestTrace->log_request($c, $self->logging) };
+
+    # Login-return: a protected page that bounced a GET to /user/login without
+    # return_to/destination → remember where the user was going.
+    eval {
+        my $loc = $c->res->location // '';
+        if ($loc =~ m{/user/login(?:\?|$)} && $loc !~ /[?&](?:return_to|destination)=/
+            && uc($c->req->method || 'GET') eq 'GET' && !$c->session->{username}) {
+            my $u = $c->controller('User');
+            my $p = $u && $u->can('_safe_return_path')
+                ? $u->_safe_return_path($c, $c->req->uri->path_query) : '';
+            $c->session->{login_return_path} = $p if $p;
+        }
+    };
 
     # Intercept unhandled Catalyst errors and render a friendly error page —
     # but only in production (CATALYST_DEBUG=0). In debug mode, let Catalyst
