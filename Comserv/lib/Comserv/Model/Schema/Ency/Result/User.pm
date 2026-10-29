@@ -1,5 +1,6 @@
 package Comserv::Model::Schema::Ency::Result::User;
 use base 'DBIx::Class::Core';
+use Crypt::PBKDF2;
 
 __PACKAGE__->table('users');
 __PACKAGE__->add_columns(

@@ -19,7 +19,7 @@
         Last Updated: 2026-06-13 | Version: 1.0 | Canonical index for all developers and AI assistants
     </div>
 
-    <div id="overview" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="overview" class="row" style="margin: var(--spacing-large) 0; background-color: var(--card-bg, rgba(255,255,255,0.15)); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); margin-top: 0;">Source-of-truth hierarchy</h2>
             <p style="color: var(--text-color); font-family: var(--body-font);">

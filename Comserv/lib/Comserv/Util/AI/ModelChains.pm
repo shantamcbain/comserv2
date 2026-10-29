@@ -49,7 +49,7 @@ our %KNOB_DEFAULTS = (
 # (within the OpenRouter caps) and only then to free north-mini, which is always the LAST step
 # (it is easily overwhelmed when it suddenly replaces a smarter model). The emergency list is used
 # only when every step of the chain is unusable. Both live in data/ai_model_chains.json.
-our @HERMES_CHAIN_DEFAULT     = ('supergrok|grok-4.7', 'openrouter|qwen/qwen3-coder', 'openrouter|cohere/north-mini-code:free');
+our @HERMES_CHAIN_DEFAULT     = ('supergrok|grok-4.7', 'openrouter|openai/gpt-5.6-luna', 'openrouter|cohere/north-mini-code:free');   # Oct 28 2026: luna (on probation) replaced qwen3-coder
 our @HERMES_EMERGENCY_DEFAULT = ('ollama|gemma4-64k:latest', 'openrouter|nvidia/nemotron-3.5-lightning:free');
 our $HERMES_NORTH_RE          = qr/north-mini-code/i;
 our $HERMES_BANNED_RE         = qr/grok|glm|v4-pro/i;     # never as an openrouter step (grok only via Super Grok)
@@ -219,14 +219,17 @@ sub _validate_hermes {
     return @e;
 }
 
-# ---- trials (Oct 26 2026): one-off, explicitly run model trials. NEVER part of any chain or fallback. ----
+# ---- trials (Oct 26 2026): one-off, explicitly run model trials. NEVER part of any chain or fallback, EXCEPT a probation trial (Oct 28 2026), which may be the paid step of hermes_fallback_chain. ----
 our $TRIAL_BANNED_RE = qr/grok|glm|v4-pro|relace/i;
 
-# every slug/model string used anywhere in the chains (a trial model must not appear in any of them)
+# every slug/model string used anywhere in the chains (a trial model must not appear in any of them).
+# Oct 28 2026: skip_hermes_fallback => 1 leaves out hermes_fallback_chain: a PROBATION trial (probation => 1) may be the paid
+# step of that one chain (never of the app chains, the emergency chain or the opt-in cash steps).
 sub _chain_models_in_use {
-    my ($class, $d) = @_;
+    my ($class, $d, %o) = @_;
     my %used;
     for my $k (grep { /^chain_|^hermes_(?:fallback|emergency)_chain$/ } keys %$d) {
+        next if $o{skip_hermes_fallback} && $k eq 'hermes_fallback_chain';
         next unless ref $d->{$k} eq 'ARRAY';
         for my $s (@{ $d->{$k} }) { next if !defined $s || ref $s; my (undef, $m) = split /\|/, $s, 2; $used{$m} = 1 if defined $m }
     }
@@ -240,7 +243,7 @@ sub _validate_trials {
     my ($class, $d) = @_;
     return () unless exists $d->{trials};
     return ('trials must be an object') unless ref $d->{trials} eq 'HASH';
-    my @e; my $used = $class->_chain_models_in_use($d);
+    my @e; my $used = $class->_chain_models_in_use($d); my $used_np = $class->_chain_models_in_use($d, skip_hermes_fallback => 1);
     for my $name (sort keys %{ $d->{trials} }) {
         next if $name =~ /^_/;
         my $t = $d->{trials}{$name};
@@ -248,16 +251,38 @@ sub _validate_trials {
         my $m = $t->{model};
         push @e, "trials.$name: $m is banned (grok / glm / deepseek v4-pro / Relace)" if defined $m && !ref $m && $m =~ $TRIAL_BANNED_RE;
         if (!defined $m || ref $m || $m !~ m{^[a-z0-9][a-z0-9._-]*/[A-Za-z0-9._:\-]+\z}) { push @e, "trials.$name.model must be an OpenRouter id like vendor/model"; next }
-        push @e, "trials.$name: $m is in a chain/fallback; a trial model must never be a fallback" if $used->{$m};
+        # Oct 28 2026: probation => 1 makes the trial the first PAID step of hermes_fallback_chain (never any other chain). A plain
+        # trial stays out of every chain. The probation limits (hard_cap_usd / max_tasks) decide when the guard drops it again.
+        my $prob = (defined $t->{probation} && !ref $t->{probation} && $t->{probation} =~ /^(?:1|true)\z/) ? 1 : 0;
+        push @e, "trials.$name: $m is in a chain/fallback; a trial model must never be a fallback" if ($prob ? $used_np : $used)->{$m};
+        push @e, "trials.$name: $m may only be in hermes_fallback_chain while on probation" if $prob && $used_np->{$m};
+        if ($prob && $m !~ /:free\z/) {
+            my $ch = ref $d->{hermes_fallback_chain} eq 'ARRAY' ? $d->{hermes_fallback_chain} : [];
+            push @e, "trials.$name: a probation model must be the only paid step of hermes_fallback_chain, before north-mini"
+                if grep { !ref && m{^openrouter\|(.+)\z} && $1 !~ /:free\z/ && $1 ne $m } @$ch;
+        }
         push @e, "trials.$name.provider must be openrouter" unless ($t->{provider} // '') eq 'openrouter';
-        push @e, "trials.$name.selectable_by must be explicit_trial_run" unless ($t->{selectable_by} // '') eq 'explicit_trial_run';
-        for my $k (qw(hard_cap_usd alert_at_usd)) {
+        my $sel = $t->{selectable_by} // '';
+        push @e, "trials.$name.selectable_by must be explicit_trial_run" . ($prob ? ' or probation_chain' : '')
+            unless $sel eq 'explicit_trial_run' || ($prob && $sel eq 'probation_chain');
+        for my $k ($prob ? qw(hard_cap_usd) : qw(hard_cap_usd alert_at_usd)) {   # a probation has one limit: alert and stop are the same event
             push @e, "trials.$name.$k must be a number > 0" unless defined $t->{$k} && !ref $t->{$k} && $t->{$k} =~ /^\d+(?:\.\d+)?\z/ && $t->{$k} > 0;
+        }
+        if (exists $t->{provider_routing}) {   # Oct 28 2026: per-trial provider intent (e.g. OpenAI or Azure only, never Relace)
+            my $pr = $t->{provider_routing};
+            if (ref $pr ne 'HASH') { push @e, "trials.$name.provider_routing must be an object" }
+            else {
+                for my $k (qw(only ignore)) {
+                    next unless exists $pr->{$k};
+                    if (ref $pr->{$k} ne 'ARRAY' || grep { !defined $_ || ref $_ || !/^[a-z0-9][a-z0-9._\/-]*\z/i } @{ $pr->{$k} }) { push @e, "trials.$name.provider_routing.$k must be a list of provider names"; next }
+                    push @e, "trials.$name.provider_routing.only must not list Relace" if $k eq 'only' && grep { /relace/i } @{ $pr->{$k} };
+                }
+            }
         }
         push @e, "trials.$name.max_tasks must be a whole number 1..100"
             unless defined $t->{max_tasks} && !ref $t->{max_tasks} && $t->{max_tasks} =~ /^\d+\z/ && $t->{max_tasks} >= 1 && $t->{max_tasks} <= 100;
         push @e, "trials.$name.alert_at_usd must be below hard_cap_usd"
-            if defined $t->{alert_at_usd} && defined $t->{hard_cap_usd} && !ref $t->{alert_at_usd} && !ref $t->{hard_cap_usd}
+            if !$prob && defined $t->{alert_at_usd} && defined $t->{hard_cap_usd} && !ref $t->{alert_at_usd} && !ref $t->{hard_cap_usd}
                && $t->{alert_at_usd} =~ /^[\d.]+\z/ && $t->{hard_cap_usd} =~ /^[\d.]+\z/ && $t->{alert_at_usd} >= $t->{hard_cap_usd};
     }
     return @e;

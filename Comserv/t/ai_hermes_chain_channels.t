@@ -2,10 +2,10 @@ use strict; use warnings; use POSIX (); use Test::More; use File::Temp qw(tempdi
 use FindBin; use lib "$FindBin::Bin/../lib"; use JSON::PP;
 use Comserv::Util::AI::HermesOverrunGuard; use Comserv::Util::AI::ModelChains;
 my $G = 'Comserv::Util::AI::HermesOverrunGuard'; my $MC = 'Comserv::Util::AI::ModelChains';
-# Oct 26 2026: Hermes fallback chain (Super Grok > paid qwen3-coder > free north-mini LAST), billing channels
+# Oct 26 2026: Hermes fallback chain (Super Grok > paid gpt-5.6-luna (probation) > free north-mini LAST), billing channels
 # (Super Grok / x.ai direct / OpenRouter) and sessions pinned on a disallowed model (Oct 25 $6.04 overrun).
 $Comserv::Util::AI::HermesOverrunGuard::COOLDOWN_S = 0;
-my $IDS = { map { ($_ => 1) } 'cohere/north-mini-code:free', 'nvidia/nemotron-3.5-lightning:free', 'qwen/qwen3-coder', 'x-ai/grok-4.7', 'deepseek/deepseek-v4.1-flash' };
+my $IDS = { map { ($_ => 1) } 'cohere/north-mini-code:free', 'nvidia/nemotron-3.5-lightning:free', 'openai/gpt-5.6-luna', 'x-ai/grok-4.7', 'deepseek/deepseek-v4.1-flash' };
 my $SG_OFF = { mode => 'openrouter', locked => 1, off_today => 1 };
 my $SG_OK  = { mode => 'grok', remaining => 60, locked => 0, off_today => 0 };
 
@@ -14,44 +14,44 @@ my $ld = $MC->load(undef, path => "$FindBin::Bin/../data/ai_model_chains.json", 
 is $ld->{source}, 'file', 'data file loads and validates';
 my @ch = $MC->hermes_chain($ld);
 is_deeply [ map { $_->{tier} } @ch ], [qw(supergrok paid free)], 'chain tiers: Super Grok, paid, free';
-like $ch[1]{slug}, qr{qwen/qwen3-coder}, 'step 2 is qwen3-coder'; like $ch[-1]{slug}, qr/north-mini/, 'north-mini is LAST';
+like $ch[1]{slug}, qr{openai/gpt-5.6-luna}, 'step 2 is gpt-5.6-luna'; like $ch[-1]{slug}, qr/north-mini/, 'north-mini is LAST';
 {
     my %d = %{ $MC->perl_default };
-    my ($ok, $e) = $MC->validate_structure({ %d, hermes_fallback_chain => ['openrouter|cohere/north-mini-code:free', 'openrouter|qwen/qwen3-coder'] });
+    my ($ok, $e) = $MC->validate_structure({ %d, hermes_fallback_chain => ['openrouter|cohere/north-mini-code:free', 'openrouter|openai/gpt-5.6-luna'] });
     ok !$ok && "@$e" =~ /north-mini must be the last|paid step/, 'north before paid rejected';
     ($ok, $e) = $MC->validate_structure({ %d, hermes_fallback_chain => ['openrouter|x-ai/grok-4.7'] });
     ok !$ok && "@$e" =~ /banned on openrouter/, 'openrouter grok step rejected';
     ($ok, $e) = $MC->validate_structure({ %d, hermes_fallback_chain => ['openrouter|z-ai/glm-5'] });
     ok !$ok && "@$e" =~ /banned/, 'glm step rejected';
-    ($ok, $e) = $MC->validate_structure({ %d, hermes_fallback_chain => ['supergrok|grok-4.7', 'openrouter|qwen/qwen3-coder', 'openrouter|cohere/north-mini-code:free'] });
+    ($ok, $e) = $MC->validate_structure({ %d, hermes_fallback_chain => ['supergrok|grok-4.7', 'openrouter|openai/gpt-5.6-luna', 'openrouter|cohere/north-mini-code:free'] });
     ok $ok, 'good chain accepted';
     is $MC->channel_caps($ld, 'xai_direct')->{day}, 0, 'x.ai direct cash cap defaults to $0 (off)';
-    is $MC->channel_caps($ld, 'openrouter')->{week}, 11.5, 'OpenRouter weekly cap $11.50';
+    is $MC->channel_caps($ld, 'openrouter')->{week}, 15, 'OpenRouter weekly cap $15 (raised from $11.50 by Shanta Oct 28 2026)';
 }
 my @CH = @ch; my @EM = $MC->hermes_chain($ld, emergency => 1);
 my %base = (or_ids => $IDS, health => {}, ollama_models => ['gemma4-64k:latest'], chain => \@CH, emergency => \@EM, kind => 'caps');
 
 # ---- pick_target follows the chain ----
 is $G->can('pick_target')->(%base, supergrok => $SG_OK)->{default}, 'grok-4.7', 'Super Grok has budget -> grok-4.7';
-is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1)->{default}, 'qwen/qwen3-coder', 'grok unavailable + room under caps -> paid qwen3-coder first';
+is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1)->{default}, 'openai/gpt-5.6-luna', 'grok unavailable + room under caps -> paid gpt-5.6-luna (probation) first';
 is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 0)->{default}, 'cohere/north-mini-code:free', 'no room under caps -> north-mini';
-is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1, or_ids => { %$IDS, 'qwen/qwen3-coder' => 0 })->{default}, 'cohere/north-mini-code:free', 'qwen not in the OpenRouter list -> north-mini';
-is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1, health => { 'openrouter|qwen/qwen3-coder' => { state => 'open' } })->{default}, 'cohere/north-mini-code:free', 'qwen circuit open -> north-mini';
-is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1, health => { 'openrouter|qwen/qwen3-coder' => { state => 'open' }, 'openrouter|cohere/north-mini-code:free' => { state => 'open' } })->{provider},
+is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1, or_ids => { %$IDS, 'openai/gpt-5.6-luna' => 0 })->{default}, 'cohere/north-mini-code:free', 'luna not in the OpenRouter list -> north-mini';
+is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1, health => { 'openrouter|openai/gpt-5.6-luna' => { state => 'open' } })->{default}, 'cohere/north-mini-code:free', 'luna circuit open -> north-mini';
+is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1, health => { 'openrouter|openai/gpt-5.6-luna' => { state => 'open' }, 'openrouter|cohere/north-mini-code:free' => { state => 'open' } })->{provider},
    'ollama-launch', 'north-mini only skipped when unusable: emergency tail after it';
 # thrash trips never move to a paid model (money safety)
-isnt $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1, kind => 'thrash')->{default}, 'qwen/qwen3-coder', 'thrash trip does not pick a paid model';
+isnt $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1, kind => 'thrash')->{default}, 'openai/gpt-5.6-luna', 'thrash trip does not pick a paid model';
 my @order = map { $_->{name} } $G->can('candidate_order')->('caps', undef, $SG_OFF, chain => \@CH, emergency => \@EM);
-is $order[0], 'xai-oauth/grok-4.7', 'order: Super Grok first'; is $order[1], 'openrouter/qwen/qwen3-coder', 'order: paid second';
+is $order[0], 'xai-oauth/grok-4.7', 'order: Super Grok first'; is $order[1], 'openrouter/openai/gpt-5.6-luna', 'order: paid second';
 is $order[2], 'openrouter/cohere/north-mini-code:free', 'order: north-mini third (last chain step)';
 ok((grep { $order[$_] =~ /gemma4|nemotron|qwen2\.5-coder/ } 3 .. $#order) == @order - 3, 'emergency tail follows north-mini');
 # permanent fallback list
 my $fc = $G->can('fallback_chain')->(%base, supergrok => $SG_OK, paid_ok => 1);
 is_deeply [ map { "$_->{provider}/$_->{model}" } @$fc ],
-    [ 'xai-oauth/grok-build-0.1', 'openrouter/qwen/qwen3-coder', 'openrouter/cohere/north-mini-code:free', 'ollama-launch/gemma4-64k:latest', 'openrouter/nvidia/nemotron-3.5-lightning:free' ],
-    'fallback_providers: Super Grok build > paid qwen > north-mini > emergency';
+    [ 'xai-oauth/grok-build-0.1', 'openrouter/openai/gpt-5.6-luna', 'openrouter/cohere/north-mini-code:free', 'ollama-launch/gemma4-64k:latest', 'openrouter/nvidia/nemotron-3.5-lightning:free' ],
+    'fallback_providers: Super Grok build > paid luna > north-mini > emergency';
 $fc = $G->can('fallback_chain')->(%base, supergrok => $SG_OK, paid_ok => 0);
-ok !grep({ $_->{model} =~ /qwen/ } @$fc), 'no paid step in fallback_providers when caps have no room';
+ok !grep({ $_->{model} =~ /luna/ } @$fc), 'no paid step in fallback_providers when caps have no room';
 
 # ---- paid_room ----
 my $caps = { day => 1.65, week => 11.5, month => 50 };
@@ -72,13 +72,13 @@ like $G->can('billing_label')->('xai', 'grok-4.7'), qr/x\.ai direct API/, 'label
 is $G->can('classify_call')->({ provider => 'xai', model => 'grok-4.7' }), 'xai_direct', 'thrash class x.ai direct apart from supergrok';
 
 # ---- offender_reason / session_offenders (the Oct 25 sessions) ----
-my %pol = (tripped => 1, allowed_paid => { 'qwen/qwen3-coder' => 1 }, xai_direct_cap_day => 0, or_over => 0, sg_unavailable => 1);
+my %pol = (tripped => 1, allowed_paid => { 'openai/gpt-5.6-luna' => 1 }, xai_direct_cap_day => 0, or_over => 0, sg_unavailable => 1);
 my $off = $G->can('offender_reason');
 like $off->('openrouter', 'x-ai/grok-4.7', %pol), qr/grok is blocked/, 'OpenRouter grok is an offender (12:16 PM session)';
 like $off->('openrouter', 'deepseek/deepseek-v4.1-flash', %pol), qr/not in the Hermes chain/, 'unlisted paid model is an offender while tripped (1:22 PM session)';
-is $off->('openrouter', 'qwen/qwen3-coder', %pol), undef, 'chain paid step is allowed';
+is $off->('openrouter', 'openai/gpt-5.6-luna', %pol), undef, 'chain paid step is allowed';
 is $off->('openrouter', 'cohere/north-mini-code:free', %pol), undef, 'free model is allowed';
-like $off->('openrouter', 'qwen/qwen3-coder', %pol, or_over => 1), qr/cap reached/, 'even the chain paid step stops at the OpenRouter cap';
+like $off->('openrouter', 'openai/gpt-5.6-luna', %pol, or_over => 1), qr/cap reached/, 'even the chain paid step stops at the OpenRouter cap';
 like $off->('xai', 'grok-4.7', %pol), qr/x\.ai direct API is off/, 'x.ai direct off while its cap is $0';
 is $off->('xai', 'grok-4.7', %pol, xai_direct_cap_day => 2), undef, 'x.ai direct allowed under its own cap';
 is $off->('xai-oauth', 'grok-4.7', %pol), undef, 'Super Grok is never a cash offender';
@@ -158,7 +158,7 @@ is $G->can('decide')->(thrash => 0, openrouter => $ok, state => {}, xai_direct =
     ok !(() = $MC->hermes_cash_steps({ %d, hermes_daily_lock_cash => { enabled => JSON::PP::false } })), 'enabled=false: no steps';
     my ($ok, $e) = $MC->validate_structure({ %d, hermes_daily_lock_cash => { enabled => 1, steps => ['xai_direct|grok-4.7', 'openrouter|x-ai/grok-4.7'] } });
     ok $ok, 'cash setting accepts grok steps (the only place OpenRouter grok is allowed)';
-    ($ok, $e) = $MC->validate_structure({ %d, hermes_daily_lock_cash => { enabled => 1, steps => ['openrouter|qwen/qwen3-coder'] } });
+    ($ok, $e) = $MC->validate_structure({ %d, hermes_daily_lock_cash => { enabled => 1, steps => ['openrouter|openai/gpt-5.6-luna'] } });
     ok !$ok && "@$e" =~ /not a grok model/, 'cash setting refuses non-grok steps';
     ($ok, $e) = $MC->validate_structure({ %d, hermes_daily_lock_cash => { enabled => 1, steps => ['openrouter|deepseek/deepseek-v4-pro'] } });
     ok !$ok, 'cash setting refuses v4-pro';
