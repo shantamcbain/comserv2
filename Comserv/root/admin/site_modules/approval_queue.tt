@@ -1,0 +1,71 @@
+[%
+   title = "Add-on Approval Queue"
+   roles = "admin"
+   PageVersion = 'admin/site_modules/approval_queue.tt v1.0 2026/10/26 CSC enables named sites only'
+%]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.sm-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-bottom:10px; border-bottom:2px solid var(--primary-color); }
+.sm-header h1 { margin:0; font-size:1.4em; }
+.sm-table { width:100%; border-collapse:collapse; font-size:0.9em; }
+.sm-table th { background:var(--bg-secondary); padding:8px 12px; text-align:left; border-bottom:2px solid var(--border-color); }
+.sm-table td { padding:8px 12px; border-bottom:1px solid var(--border-color); vertical-align:middle; }
+.tab-bar { display:flex; gap:8px; margin-bottom:16px; }
+.tab-bar a { padding:6px 16px; border-radius:4px; text-decoration:none; background:var(--bg-secondary); color:var(--text-color); border:1px solid var(--border-color); font-size:0.9em; }
+.tab-bar a.active { background:var(--primary-color); color:#fff; border-color:var(--primary-color); }
+.btn-sm { padding:3px 10px; font-size:0.82em; border:none; border-radius:3px; cursor:pointer; }
+.btn-primary { background:var(--primary-color); color:#fff; }
+</style>
+
+<div class="container">
+<div class="sm-header">
+    <h1>Add-on Approval Queue</h1>
+    <span>CSC only. Subscribe is a request. Approve names the target site.</span>
+</div>
+
+<div class="tab-bar">
+    <a href="[% c.uri_for('/admin/site_modules') %]">Site Modules</a>
+    <a href="[% c.uri_for('/admin/site_modules/approval_queue') %]" class="active">Approval Queue</a>
+    <a href="[% c.uri_for('/admin/site_modules/user_overrides') %]">User Overrides</a>
+</div>
+
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<p>A row appears when <code>requested_addons</code> lists a module and that site's <code>site_modules</code> row is missing or not enabled. Prices are not set here.</p>
+
+[% IF pending.size %]
+<table class="sm-table">
+    <thead>
+        <tr>
+            <th>Site</th>
+            <th>Feature</th>
+            <th>Subscriber</th>
+            <th>When</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH row IN pending %]
+        <tr>
+            <td>[% row.sitename | html %]</td>
+            <td>[% row.feature | html %] <code>[% row.module_name | html %]</code></td>
+            <td>[% row.subscriber | html %]</td>
+            <td>[% row.when | html %]</td>
+            <td>
+                <form method="post" action="[% c.uri_for('/admin/site_modules/approve_addon') %]">
+                    <input type="hidden" name="sitename" value="[% row.sitename | html %]" />
+                    <input type="hidden" name="module_name" value="[% row.module_name | html %]" />
+                    <button type="submit" class="btn-sm btn-primary">Approve</button>
+                </form>
+            </td>
+        </tr>
+        [% END %]
+    </tbody>
+</table>
+[% ELSE %]
+<p>No pending requests for 3d, CSC, or Shanta.</p>
+[% END %]
+</div>

@@ -30,7 +30,7 @@
 
 <p><strong>File Size:</strong> 2,486 lines | <strong>Methods:</strong> 16+ major methods | <strong>Type:</strong> Dual interface (Web + JSON API)</p>
 
-<div style="background-color: #f0f8ff; padding: 10px; border-left: 4px solid #4CAF50; margin: 10px 0;">
+<div style="background-color: var(--card-bg, #f0f8ff); padding: 10px; border-left: 4px solid var(--success-color, #4CAF50); margin: 10px 0;">
   <strong>📝 Recent Changes (v0.04 - Jan 11, 2026):</strong>
   <ul style="margin: 5px 0 0 20px; font-size: 0.9em;">
     <li><strong>v0.04 (2026-01-11):</strong> Audit script circular dependency fixed. Documentation sync workflow verified - code changes no longer trigger repeated version bump requests. All API endpoints and conversation persistence features remain unchanged.</li>

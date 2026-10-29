@@ -94,7 +94,7 @@
           </li>
           <li>On success the admin is redirected to the File List page.</li>
         </ol>
-        <p style="background:#e8f5e9;border-left:4px solid #43a047;padding:8px 12px;border-radius:3px">
+        <p style="background:var(--card-bg, #e8f5e9);border-left:4px solid var(--success-color, #43a047);padding:8px 12px;border-radius:3px">
           <strong>Result:</strong> File appears on disk AND in the database simultaneously.
           You will see it in the Admin Browser and in the File List immediately.
         </p>
@@ -126,7 +126,7 @@
             you explicitly add it to the database.
           </li>
         </ol>
-        <p style="background: var(--caution-bg, #fff3e0);border-left:4px solid #fb8c00;padding:8px 12px;border-radius:3px">
+        <p style="background: var(--caution-bg, #fff3e0);border-left:4px solid var(--danger-color, #fb8c00);padding:8px 12px;border-radius:3px">
           <strong>Result:</strong> Files appear in the Admin Browser directory listing immediately
           (because the browser reads the filesystem). They do <strong>NOT</strong> appear in the
           File List or Duplicates pages until you use the "+DB" button or the "Dir Sync" feature
@@ -173,12 +173,12 @@
           </li>
           <li>Admin is redirected back to the Admin Browser directory they were in.</li>
         </ol>
-        <p style="background:#e8f5e9;border-left:4px solid #43a047;padding:8px 12px;border-radius:3px">
+        <p style="background:var(--card-bg, #e8f5e9);border-left:4px solid var(--success-color, #43a047);padding:8px 12px;border-radius:3px">
           <strong>Result:</strong> File was already on disk; now it also has a database record.
           It will appear in the File List and Duplicates pages.
           The disk file is not touched or moved.
         </p>
-        <p style="background:#fde8e8;border-left:4px solid #e53935;padding:8px 12px;border-radius:3px;margin-top:8px">
+        <p style="background:var(--card-bg, #fde8e8);border-left:4px solid var(--danger-color, #e53935);padding:8px 12px;border-radius:3px;margin-top:8px">
           <strong>Warning:</strong> Computing the SHA256 hash reads the entire file. For very large
           files this can take several seconds and will block the server (single-threaded dev mode)
           during that time. On large directories use <em>Dir Sync</em> instead, which defers
@@ -209,7 +209,7 @@
             SHA256 is computed now, a DB record is created, and the duplicate flag is set if needed.
           </li>
         </ol>
-        <p style="background:#e8f5e9;border-left:4px solid #43a047;padding:8px 12px;border-radius:3px">
+        <p style="background:var(--card-bg, #e8f5e9);border-left:4px solid var(--success-color, #43a047);padding:8px 12px;border-radius:3px">
           <strong>Result:</strong> Selected files gain DB records; skipped files remain disk-only.
           Nothing is moved or deleted.
         </p>

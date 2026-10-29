@@ -339,7 +339,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
             $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'docker_deploy', $err);
             # Abort deploy
             $c->response->body(encode_json({ success => 0, message => 'Volume inconsistency', output => join("\n", @lines) })) if $c;
-            exit 1;
+            return;  # parent web worker: never exit() here (would kill the Starman worker)
         } else {
             push @lines, "[${\ _pt_now()}] Volume consistency check passed (all comserv2_* volumes present).";
         }

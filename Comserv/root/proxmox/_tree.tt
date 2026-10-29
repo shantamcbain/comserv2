@@ -1,0 +1,23 @@
+<aside class="pve-tree" aria-label="Guests">
+    <div class="pve-tree-dc"><a href="[% c.uri_for('/proxmox') %]">Datacenter</a></div>
+    <div class="pve-tree-node">[% current_server_name || server_id || 'node' | html %]</div>
+    <ul>
+        [% IF vms && vms.size > 0 %]
+        [% FOREACH vm IN vms %]
+        <li class="[% IF vmid && vm.vmid == vmid %]is-selected[% END %]">
+            <a href="[% c.uri_for('/proxmox/vm_detail') %]/[% vm.vmid %]">
+                <span class="pve-dot [% vm.status | html %]"></span>
+                <span>[% vm.vmid %] ([% vm.name | html %])</span>
+            </a>
+        </li>
+        [% END %]
+        [% ELSIF vmid %]
+        <li class="is-selected">
+            <a href="[% c.uri_for('/proxmox/vm_detail') %]/[% vmid %]">
+                <span class="pve-dot [% vm_status.status | html %]"></span>
+                <span>[% vmid %] ([% vm_config.name | html %])</span>
+            </a>
+        </li>
+        [% END %]
+    </ul>
+</aside>
