@@ -2023,6 +2023,136 @@ sub vm_power_action {
     }
 }
 
+sub get_power_progress {
+    my ($self, $vmid, $upid) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return { success => 0, error => 'No API URL' } unless $self->{api_url_base};
+    return { success => 0, error => 'vmid required' } unless defined $vmid && $vmid =~ /^\d+$/;
+    if (defined $upid && $upid ne '' && $upid !~ /\AUPID:[A-Za-z0-9_.:!\@-]+\z/) {
+        return { success => 0, error => 'Invalid task id' };
+    }
+
+    my $ua          = $self->_make_ua(15);
+    my $auth_header = $self->_auth_header()
+        or return { success => 0, error => 'No credentials' };
+    my $node_name = $self->_resolve_node($ua, $auth_header);
+
+    my $api_get = sub {
+        my ($path) = @_;
+        my $req = HTTP::Request->new(GET => $self->{api_url_base} . $path);
+        $req->header(Authorization => $auth_header);
+        my $res = $ua->request($req);
+        my $data;
+        if ($res->is_success) {
+            my $parsed = eval { decode_json($res->decoded_content) };
+            $data = $parsed->{data} if $parsed && exists $parsed->{data};
+        }
+        return ($res, $data);
+    };
+
+    if (!$upid) {
+        my ($tres, $tasks) = $api_get->("/nodes/$node_name/tasks?vmid=$vmid&limit=12");
+        unless ($tres->is_success) {
+            $logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'get_power_progress',
+                "task list failed for VM $vmid: " . $tres->status_line);
+            return { success => 0, error => 'Could not list tasks: ' . $tres->status_line };
+        }
+        for my $t (@{ $tasks || [] }) {
+            next unless ($t->{type} || '') =~ /^qm(?:reboot|start|stop|shutdown|reset)$/;
+            $upid = $t->{upid} || '';
+            last;
+        }
+    }
+
+    my $task = {
+        upid => $upid || '', log => [], running => 0,
+        type => '', status => '', exitstatus => '',
+    };
+    if ($upid) {
+        my ($sres, $sdata) = $api_get->("/nodes/$node_name/tasks/$upid/status");
+        if ($sres->is_success && ref $sdata eq 'HASH') {
+            $task->{type}       = $sdata->{type} || '';
+            $task->{status}     = $sdata->{status} || '';
+            $task->{exitstatus} = defined $sdata->{exitstatus} ? $sdata->{exitstatus} : '';
+            $task->{user}       = $sdata->{user} || '';
+            $task->{running}    = (($sdata->{status} || '') eq 'running') ? 1 : 0;
+            $task->{starttime}  = $sdata->{starttime};
+            $task->{endtime}    = $sdata->{endtime};
+        } else {
+            $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'get_power_progress',
+                "task status failed for VM $vmid: " . $sres->status_line);
+            $task->{error} = 'Task status unavailable: ' . $sres->status_line;
+        }
+        my ($lres, $ldata) = $api_get->("/nodes/$node_name/tasks/$upid/log?start=0&limit=80");
+        if ($lres->is_success && ref $ldata eq 'ARRAY') {
+            $task->{log} = [ map { ref $_ eq 'HASH' ? ($_->{t} // '') : "$_" } @$ldata ];
+        } elsif (!$lres->is_success) {
+            $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'get_power_progress',
+                "task log failed for VM $vmid: " . $lres->status_line);
+        }
+    }
+
+    my (undef, $pending) = $api_get->("/nodes/$node_name/qemu/$vmid/pending");
+    my ($cres, $current) = $api_get->("/nodes/$node_name/qemu/$vmid/status/current");
+    unless ($cres->is_success) {
+        $logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'get_power_progress',
+            "VM status failed for $vmid: " . $cres->status_line);
+    }
+
+    my ($mem_current, $mem_pending);
+    if (ref $pending eq 'ARRAY') {
+        for my $row (@$pending) {
+            next unless ($row->{key} || '') eq 'memory';
+            $mem_current = $row->{value} if defined $row->{value};
+            if (defined $row->{pending} && $row->{pending} ne '') {
+                $mem_pending = $row->{pending};
+            }
+        }
+    }
+    my $vm_status = (ref $current eq 'HASH') ? ($current->{status} || '') : '';
+    my $maxmem_mb = 0;
+    if (ref $current eq 'HASH' && $current->{maxmem}) {
+        $maxmem_mb = int($current->{maxmem} / 1048576);
+    }
+    my $intended = defined $mem_pending ? $mem_pending : $mem_current;
+    my $applied = 0;
+    if ($vm_status eq 'running' && defined $intended && $intended =~ /^\d+$/
+        && abs($maxmem_mb - $intended) < 128) {
+        $applied = 1;
+    }
+
+    my $log_text = join "\n", @{ $task->{log} || [] };
+    my $hint = '';
+    my $exit = $task->{exitstatus} || '';
+    if ($log_text =~ /Guest Agent is not running/i || $exit =~ /guest-ping|timeout/i) {
+        $hint = 'Reboot asked the guest agent to power the VM off so QEMU would restart and pick up pending memory. The agent is not running, so Proxmox timed out. A failed reboot does not apply memory. If the VM is stopped, Start creates a new QEMU process and applies the pending value.';
+    } elsif (defined $mem_pending && $vm_status eq 'stopped') {
+        $hint = 'VM is stopped with memory still pending. Start applies it. Reboot will not, until a new QEMU process is created.';
+    } elsif (defined $mem_pending && $vm_status eq 'running') {
+        $hint = 'Pending memory is not live. The QEMU process is still the old one. Stop, then start.';
+    }
+
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_power_progress',
+        "VM $vmid status=$vm_status mem=" . ($mem_current // '')
+        . " pending=" . ($mem_pending // '')
+        . " task=" . ($task->{type} || '-')
+        . " exit=" . ($exit || $task->{status} || '-'));
+
+    return {
+        success           => 1,
+        vmid              => 0 + $vmid,
+        vm_status         => $vm_status,
+        maxmem_mb         => $maxmem_mb,
+        memory_current_mb => $mem_current,
+        memory_pending_mb => $mem_pending,
+        memory_applied    => $applied,
+        hint              => $hint,
+        task              => $task,
+    };
+}
+
 sub get_storages_for_iso {
     my ($self) = @_;
 
@@ -2408,6 +2538,380 @@ sub list_backups {
         }
     }
     return \@backups;
+}
+
+# ── Performance history (RRD) ────────────────────────────────────────────────
+# The graphs on the Proxmox web UI's node/VM summary come from the RRD history
+# endpoints:
+#   /nodes/{node}/rrddata?timeframe=hour|day|week|month|year&cf=AVERAGE
+#   /nodes/{node}/qemu/{vmid}/rrddata?timeframe=...&cf=AVERAGE
+# Each row is one time step. Useful keys:
+#   VM  : cpu (fraction 0..1), mem, maxmem, netin/netout (B/s),
+#         diskread/diskwrite (B/s), time (epoch)
+#   Node: cpu (fraction 0..1), memused, memtotal, loadavg, iowait, netin/netout,
+#         time; "temperature" only when the platform reports thermal sensors
+#         (PVE 9+ / hardware dependent). PVE 8.x has no per-VM temperature at all.
+#
+# These methods return raw row arrays; the controller serialises them for the
+# browser and the template does the maths/plotting.
+
+sub _valid_timeframe {
+    my ($tf) = @_;
+    return 'hour' unless defined $tf && length $tf;
+    return $tf =~ /\A(?:hour|day|week|month|year)\z/ ? $tf : 'hour';
+}
+
+sub _fetch_rrd {
+    my ($self, $url) = @_;
+
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return [] unless $self->{api_url_base};
+
+    my $logging     = Comserv::Util::Logging->instance;
+    my $ua          = $self->_make_ua(20);
+    my $auth_header = $self->_auth_header() or return [];
+
+    my $req = HTTP::Request->new(GET => $url);
+    $req->header(Authorization => $auth_header);
+    my $res = $ua->request($req);
+
+    unless ($res->is_success) {
+        $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_fetch_rrd',
+            'RRD request failed (' . $res->code . ') for ' . $url . ': '
+            . substr($res->decoded_content // '', 0, 200));
+        return [];
+    }
+
+    my $data = eval { decode_json($res->decoded_content) };
+    if ($@) {
+        $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_fetch_rrd',
+            'RRD JSON parse error for ' . $url . ': ' . $@);
+        return [];
+    }
+
+    return ($data && $data->{data} && ref $data->{data} eq 'ARRAY')
+        ? $data->{data}
+        : [];
+}
+
+# Find the node a VM actually lives on. In a cluster the configured default
+# node is not necessarily the VM's host, and RRD endpoints are node-scoped.
+sub _resolve_vm_node {
+    my ($self, $ua, $auth_header, $vmid) = @_;
+
+    my $req = HTTP::Request->new(GET => $self->{api_url_base} . '/cluster/resources?type=vm');
+    $req->header(Authorization => $auth_header);
+    my $res = $ua->request($req);
+
+    if ($res->is_success) {
+        my $d = eval { decode_json($res->decoded_content) };
+        if ($d && $d->{data} && ref $d->{data} eq 'ARRAY') {
+            for my $vm (@{ $d->{data} }) {
+                return $vm->{node}
+                    if defined $vm->{vmid} && $vm->{vmid} == $vmid && $vm->{node};
+            }
+        }
+    }
+
+    return $self->_resolve_node($ua, $auth_header);
+}
+
+sub get_vm_rrd_data {
+    my ($self, $vmid, $timeframe) = @_;
+
+    my $tf = _valid_timeframe($timeframe);
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return [] unless $self->{api_url_base} && defined $vmid;
+
+    my $ua          = $self->_make_ua(20);
+    my $auth_header = $self->_auth_header() or return [];
+    my $node        = $self->_resolve_vm_node($ua, $auth_header, $vmid);
+
+    return $self->_fetch_rrd(
+        $self->{api_url_base}
+        . "/nodes/$node/qemu/$vmid/rrddata?timeframe=$tf&cf=AVERAGE"
+    );
+}
+
+sub get_node_rrd_data {
+    my ($self, $timeframe, $node) = @_;
+
+    my $tf = _valid_timeframe($timeframe);
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return [] unless $self->{api_url_base};
+
+    my $ua          = $self->_make_ua(20);
+    my $auth_header = $self->_auth_header() or return [];
+    $node ||= $self->_resolve_node($ua, $auth_header);
+
+    return $self->_fetch_rrd(
+        $self->{api_url_base} . "/nodes/$node/rrddata?timeframe=$tf&cf=AVERAGE"
+    );
+}
+
+# One call for the VM detail page: VM history + host history + current status.
+sub get_vm_graph_data {
+    my ($self, $vmid, $timeframe) = @_;
+
+    my $tf = _valid_timeframe($timeframe);
+
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    my $ua          = $self->_make_ua(20);
+    my $auth_header = $self->_auth_header();
+    my $node        = $auth_header
+        ? $self->_resolve_vm_node($ua, $auth_header, $vmid)
+        : ($self->{node} || '');
+
+    my $vm_rows   = $self->get_vm_rrd_data($vmid, $tf);
+    my $node_rows = $self->get_node_rrd_data($tf, $node);
+    my $current   = $self->get_vm_status($vmid);
+
+    # Host temperature is only present when the platform exposes thermal
+    # sensors; tell the UI so it can hide the tile instead of plotting zeros.
+    my $has_temp = 0;
+    for my $row (@$node_rows) {
+        if (defined $row->{temperature}) { $has_temp = 1; last; }
+    }
+
+    return {
+        vmid            => 0 + $vmid,
+        node            => $node,
+        timeframe       => $tf,
+        vm              => $vm_rows,
+        node_history    => $node_rows,
+        current         => $current || {},
+        has_temperature => $has_temp ? 1 : 0,
+    };
+}
+
+# Compact RRD for the fleet page: one node plus each qemu guest.
+# Percent and MB/s only. No credentials.
+sub _downsample_rrd {
+    my ($rows, $max) = @_;
+    $max ||= 48;
+    return [] unless $rows && ref $rows eq 'ARRAY';
+    my @clean = grep { ref $_ eq 'HASH' && defined $_->{time} } @$rows;
+    return \@clean if @clean <= $max;
+    my @out;
+    my $step = @clean / $max;
+    for (my $i = 0; $i < $max; $i++) {
+        push @out, $clean[int($i * $step)];
+    }
+    return \@out;
+}
+
+sub _round1 {
+    my ($n) = @_;
+    return 0 unless defined $n && $n =~ /\A-?\d/;
+    return 0 + sprintf('%.1f', $n);
+}
+
+sub _series_from {
+    my ($rows, $code) = @_;
+    my @out;
+    for my $row (@$rows) {
+        my $n = eval { $code->($row) };
+        push @out, _round1($@ ? 0 : $n);
+    }
+    return \@out;
+}
+
+sub _metric_meta {
+    my ($key) = @_;
+    my %meta = (
+        cpu         => ['CPU', '%', sub { 100 * $_[0] }, 0],
+        iowait      => ['IO wait', '%', sub { 100 * $_[0] }, 0],
+        loadavg     => ['Load', '', undef, 0],
+        maxcpu      => ['CPU count', '', undef, 1],
+        memused     => ['Memory used', 'GB', sub { $_[0] / 1073741824 }, 0],
+        memtotal    => ['Memory total', 'GB', sub { $_[0] / 1073741824 }, 1],
+        netin       => ['Network in', 'MB/s', sub { $_[0] / 1048576 }, 0],
+        netout      => ['Network out', 'MB/s', sub { $_[0] / 1048576 }, 0],
+        rootused    => ['Root disk used', 'GB', sub { $_[0] / 1073741824 }, 0],
+        roottotal   => ['Root disk total', 'GB', sub { $_[0] / 1073741824 }, 1],
+        swapused    => ['Swap used', 'GB', sub { $_[0] / 1073741824 }, 0],
+        swaptotal   => ['Swap total', 'GB', sub { $_[0] / 1073741824 }, 1],
+        temperature => ['CPU temperature', '°C', undef, 0],
+    );
+    return @{ $meta{$key} } if $meta{$key};
+    my $label = $key;
+    $label =~ s/_/ /g;
+    return ($label, '', undef, 0);
+}
+
+sub _node_metrics {
+    my ($rows) = @_;
+    return [] unless $rows && ref $rows eq 'ARRAY';
+
+    my %seen;
+    for my $row (@$rows) {
+        next unless ref $row eq 'HASH';
+        for my $key (keys %$row) {
+            next if $key eq 'time';
+            $seen{$key} = 1 if defined $row->{$key} && $row->{$key} =~ /\A-?\d/;
+        }
+    }
+
+    my @preferred = qw(
+        cpu iowait loadavg maxcpu temperature
+        memused memtotal swapused swaptotal rootused roottotal netin netout
+    );
+    my %preferred = map { $_ => 1 } @preferred;
+    my @keys = grep { $seen{$_} } @preferred;
+    push @keys, sort grep { !$preferred{$_} } keys %seen;
+
+    my @metrics;
+    for my $key (@keys) {
+        my ($label, $unit, $scale, $capacity) = _metric_meta($key);
+        push @metrics, {
+            key      => $key,
+            label    => $label,
+            unit     => $unit,
+            capacity => $capacity ? 1 : 0,
+            values   => _series_from($rows, sub {
+                my $n = $_[0]->{$key};
+                return 0 unless defined $n && $n =~ /\A-?\d/;
+                return $scale ? $scale->($n) : $n;
+            }),
+        };
+    }
+    return \@metrics;
+}
+
+sub _node_status_snapshot {
+    my ($self, $ua, $auth, $node) = @_;
+    return {} unless $ua && $auth && $node && $self->{api_url_base};
+
+    my $req = HTTP::Request->new(GET => $self->{api_url_base} . "/nodes/$node/status");
+    $req->header(Authorization => $auth);
+    my $res = $ua->request($req);
+    return {} unless $res && $res->is_success;
+
+    my $data = eval { decode_json($res->decoded_content) };
+    my $st = ($data && ref $data->{data} eq 'HASH') ? $data->{data} : {};
+    my $cpus = ($st->{cpuinfo} && $st->{cpuinfo}{cpus}) ? 0 + $st->{cpuinfo}{cpus} : 0;
+    my $load = 0;
+    if ($st->{loadavg} && ref $st->{loadavg} eq 'ARRAY' && defined $st->{loadavg}[0]) {
+        $load = 0 + $st->{loadavg}[0];
+    }
+    return {
+        uptime    => 0 + ($st->{uptime} || 0),
+        cpu_pct   => _round1(100 * ($st->{cpu} || 0)),
+        maxcpu    => $cpus,
+        memused   => _round1(($st->{memory}{used} || 0) / 1073741824),
+        memtotal  => _round1(($st->{memory}{total} || 0) / 1073741824),
+        rootused  => _round1(($st->{rootfs}{used} || 0) / 1073741824),
+        roottotal => _round1(($st->{rootfs}{total} || 0) / 1073741824),
+        swapused  => _round1(($st->{swap}{used} || 0) / 1073741824),
+        swaptotal => _round1(($st->{swap}{total} || 0) / 1073741824),
+        iowait    => _round1(100 * ($st->{wait} || 0)),
+        load      => _round1($load),
+    };
+}
+
+sub get_activity_snapshot {
+    my ($self, $timeframe, $history, $guests) = @_;
+    $history = 1 unless defined $history;
+    $guests = 1 unless defined $guests;
+
+    my $tf = _valid_timeframe($timeframe);
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+
+    return { ok => 0, error => 'No API URL', vms => [] } unless $self->{api_url_base};
+    my $auth = $self->_auth_header();
+    return { ok => 0, error => 'No API token stored', vms => [] } unless $auth;
+
+    unless ($history) {
+        my $ua   = $self->_make_ua(12);
+        my $node = $self->_resolve_node($ua, $auth);
+        my $status = $self->_node_status_snapshot($ua, $auth, $node);
+        return { ok => 0, error => 'Could not read node status', vms => [] }
+            unless $status && $status->{maxcpu};
+        $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_activity_snapshot',
+            "node snapshot node=$node cpus=$status->{maxcpu}");
+        return {
+            ok => 1, node => $node, timeframe => 'snapshot',
+            status => $status, metrics => [], vms => [],
+        };
+    }
+
+    my $ua   = $self->_make_ua(12);
+    my $node = $self->_resolve_node($ua, $auth);
+    my $node_rows = _downsample_rrd($self->get_node_rrd_data($tf, $node), 48);
+
+    my @guests;
+    if ($guests) {
+    my $req = HTTP::Request->new(
+        GET => $self->{api_url_base} . '/cluster/resources?type=vm'
+    );
+    $req->header(Authorization => $auth);
+    my $res = $ua->request($req);
+    if ($res->is_success) {
+        my $data = eval { decode_json($res->decoded_content) };
+        if ($data && $data->{data} && ref $data->{data} eq 'ARRAY') {
+            @guests = grep { ($_->{type} || '') eq 'qemu' && defined $_->{vmid} } @{ $data->{data} };
+        }
+    }
+    }
+
+    my @vms;
+    for my $vm (@guests) {
+        my $vmid  = $vm->{vmid};
+        my $vnode = $vm->{node} || $node;
+        my $rows  = _downsample_rrd(
+            $self->_fetch_rrd(
+                $self->{api_url_base}
+                . "/nodes/$vnode/qemu/$vmid/rrddata?timeframe=$tf&cf=AVERAGE"
+            ),
+            48
+        );
+        push @vms, {
+            vmid   => 0 + $vmid,
+            name   => $vm->{name} || '',
+            status => $vm->{status} || '',
+            node   => $vnode,
+            time   => _series_from($rows, sub { $_[0]->{time} }),
+            cpu    => _series_from($rows, sub { 100 * ($_[0]->{cpu} || 0) }),
+            mem    => _series_from($rows, sub {
+                my $max = $_[0]->{maxmem} || 0;
+                return $max ? 100 * ($_[0]->{mem} || 0) / $max : 0;
+            }),
+            net    => _series_from($rows, sub {
+                (($_[0]->{netin} || 0) + ($_[0]->{netout} || 0)) / 1048576;
+            }),
+            disk   => _series_from($rows, sub {
+                (($_[0]->{diskread} || 0) + ($_[0]->{diskwrite} || 0)) / 1048576;
+            }),
+        };
+    }
+
+    my $metrics = _node_metrics($node_rows);
+    my $has_temperature = (grep { $_->{key} eq 'temperature' } @$metrics) ? 1 : 0;
+    my $status = $self->_node_status_snapshot($ua, $auth, $node);
+
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_activity_snapshot',
+        "activity snapshot node=$node guests=" . scalar(@vms) . " timeframe=$tf");
+
+    return {
+        ok        => 1,
+        node      => $node,
+        timeframe => $tf,
+        time      => _series_from($node_rows, sub { $_[0]->{time} }),
+        cpu       => _series_from($node_rows, sub { 100 * ($_[0]->{cpu} || 0) }),
+        mem       => _series_from($node_rows, sub {
+            my $total = $_[0]->{memtotal} || 0;
+            return $total ? 100 * ($_[0]->{memused} || 0) / $total : 0;
+        }),
+        load      => _series_from($node_rows, sub { $_[0]->{loadavg} || 0 }),
+        net       => _series_from($node_rows, sub {
+            (($_[0]->{netin} || 0) + ($_[0]->{netout} || 0)) / 1048576;
+        }),
+        metrics   => $metrics,
+        has_temperature => $has_temperature,
+        status    => $status,
+        vms       => \@vms,
+    };
 }
 
 sub restore_backup {

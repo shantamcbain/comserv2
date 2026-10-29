@@ -104,9 +104,22 @@
 <!-- Theme class (moved from Header.tt) -->
 <!-- <script src="/static/js/theme-class.js?v=[% cv %]" defer></script> -->
 
+<!-- Theme inspector. Admin paintbrush in pagetop.tt. External module, not an inline script. -->
+[% IF is_admin %]
+<script src="/static/js/theme-editor.js?v=[% cv %]" defer></script>
+[% END %]
+
 <!-- Admin-only (conditional) -->
 [% IF is_admin && SiteName == 'CSC' && !is_dev_server %]
 <script src="/static/js/HealthMonitor.js" defer></script>
+[% END %]
+
+<!-- Proxmox dashboard: power-task popup (reboot/start/shutdown log) -->
+[% IF c.request.uri.match('/proxmox') && !c.request.uri.match('/Documentation/') %]
+<script src="/static/js/proxmox/history-filter.js?v=[% cv %]-drop" defer></script>
+<script src="/static/js/proxmox/vm-power.js?v=[% cv %]" defer></script>
+<script src="/static/js/proxmox/fleet-graphs.js?v=[% cv %]-axes" defer></script>
+<script src="/static/js/proxmox/vm-history.js?v=[% cv %]-drop" defer></script>
 [% END %]
 
 <!-- Hardware Monitor JS (charts + auto-refresh; V2 external module) -->

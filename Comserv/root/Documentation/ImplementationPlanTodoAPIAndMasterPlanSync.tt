@@ -168,7 +168,7 @@
 }</code></pre>
     
     <h4>Response (Success)</h4>
-    <pre style="background: #e8f5e9; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>{
+    <pre style="background: var(--card-bg, #e8f5e9); padding: 15px; border-radius: 4px; overflow-x: auto;"><code>{
   "success": true,
   "todo_id": 42,
   "message": "Todo created successfully",
@@ -176,7 +176,7 @@
 }</code></pre>
     
     <h4>Response (Error)</h4>
-    <pre style="background: #ffebee; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>{
+    <pre style="background: var(--card-bg, #ffebee); padding: 15px; border-radius: 4px; overflow-x: auto;"><code>{
   "success": false,
   "error": "Missing required fields: subject, start_date",
   "code": "validation_error"

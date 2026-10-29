@@ -17,7 +17,8 @@ Comserv::Util::Inventory::MailInvoiceStock - supplier-invoice mail to on-hand st
 
 Turns classified supplier-invoice mail into sitename-scoped supplier invoices
 and receives stock for lines that match existing items. Does not post GL.
-Does not create inventory items from email text.
+Automatic apply does not create inventory items. Queue Accept does, and only
+for 3d, CSC, and Shanta, after a person has corrected the lines.
 
 Watch-list addresses are the mailboxes that receive the invoice (To / Cc /
 Delivered-To), not the supplier's From address. A mailbox can be watched by
@@ -348,7 +349,7 @@ sub queue_invoices {
         invoices  => \@invoices,
         suppliers => \@suppliers,
         sites     => \@sites,
-        note      => 'One block per invoice. SiteName on the invoice or on an item is the move. Stock rows are not rewritten. Chemicals, GMO, and filament-barcode data are not stored yet.',
+        note      => 'One block per invoice. SiteName on the invoice or on an item is the move and does not rewrite stock. Accept is the only action that creates a missing item and adds on-hand. It does not post the general ledger.',
     };
 }
 
@@ -847,6 +848,297 @@ sub _default_location {
         name     => 'Default',
         status   => 'active',
     });
+}
+
+# Development core only. Other sites wait for their own Postgres database.
+sub core_site {
+    my ($self, $sitename) = @_;
+    return grep { $_ eq ($sitename // '') } qw(3d CSC Shanta);
+}
+
+# Floor, not a turnover guess. One receipt must not become reorder_quantity.
+# Cumin and cinnamon are the named exceptions (minimum 2, reorder 1).
+sub reorder_floor {
+    my ($self, $name) = @_;
+    $name = '' unless defined $name;
+    if ($name =~ /\b(?:cumin|cinnamon)\b/i) {
+        return { reorder_point => 2, reorder_quantity => 1, spice => 1 };
+    }
+    return { reorder_point => 1, reorder_quantity => undef, spice => 0 };
+}
+
+sub update_line {
+    my ($self, $c, %args) = @_;
+    my $schema = eval { $c->model('DBEncy') };
+    return { ok => 0, error => 'no database' } unless $schema;
+    my $line = eval {
+        $schema->resultset('Accounting::InventorySupplierInvoiceLine')->find($args{line_id});
+    };
+    if ($@) {
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'update_line', "$@");
+        return { ok => 0, error => 'Could not read that line.' };
+    }
+    return { ok => 0, error => 'Line not found.' } unless $line;
+
+    my $inv = eval { $line->invoice };
+    if ($@ || !$inv) {
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'update_line',
+            $@ || 'invoice missing');
+        return { ok => 0, error => 'Invoice for that line was not found.' };
+    }
+    return { ok => 0, error => 'Line edits are only for 3d, CSC, and Shanta.' }
+        unless $self->core_site($inv->sitename);
+
+    if ($self->_line_already_received($schema, $inv, $line)) {
+        return { ok => 0, error => 'That line was already received. Stock was not changed.' };
+    }
+
+    my $name = $args{description};
+    $name = '' unless defined $name;
+    $name =~ s/^\s+|\s+$//g;
+    return { ok => 0, error => 'The line needs a name of at least 2 characters.' }
+        unless length($name) >= 2;
+    $name = substr($name, 0, 250);
+
+    my $qty = $args{quantity};
+    return { ok => 0, error => 'Quantity must be a number greater than zero.' }
+        unless defined $qty && $qty =~ /^\d+(?:\.\d+)?$/ && 0+$qty > 0;
+    my $cost = $args{unit_cost};
+    $cost = 0 unless defined $cost && $cost ne '';
+    return { ok => 0, error => 'Cost must be a number, zero or more.' }
+        unless $cost =~ /^\d+(?:\.\d+)?$/;
+
+    eval {
+        $line->update({
+            description => $name,
+            quantity    => $qty,
+            unit_cost   => $cost,
+            line_total  => sprintf('%.2f', $qty * $cost),
+        });
+    };
+    if ($@) {
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'update_line', "$@");
+        return { ok => 0, error => 'Could not save the line.' };
+    }
+    $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, 'update_line',
+        'line ' . $line->id . ' corrected. Stock not changed.');
+    return { ok => 1 };
+}
+
+sub accept_invoice {
+    my ($self, $c, %args) = @_;
+    my $schema = eval { $c->model('DBEncy') };
+    return { ok => 0, error => 'no database' } unless $schema;
+    my $inv = eval {
+        $schema->resultset('Accounting::InventorySupplierInvoice')->find($args{invoice_id});
+    };
+    if ($@) {
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'accept_invoice', "$@");
+        return { ok => 0, error => 'Could not read that invoice.' };
+    }
+    return { ok => 0, error => 'Invoice not found.' } unless $inv;
+    my $site = $inv->sitename || '';
+    return { ok => 0, error => 'Accept is only for 3d, CSC, and Shanta.' }
+        unless $self->core_site($site);
+
+    my @lines = eval { $inv->lines->all };
+    if ($@) {
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'accept_invoice', "$@");
+        return { ok => 0, error => 'Could not read the invoice lines.' };
+    }
+    return { ok => 0, error => 'This invoice has no lines to accept.' } unless @lines;
+
+    for my $line (@lines) {
+        my $qty = 0 + ($line->quantity || 0);
+        return { ok => 0, error => 'Line ' . $line->id . ' needs a quantity greater than zero.' }
+            unless $qty > 0;
+        my $name = $line->description || '';
+        $name =~ s/^\s+|\s+$//g;
+        return { ok => 0, error => 'Line ' . $line->id . ' needs an item name before accept.' }
+            unless length($name) >= 2;
+    }
+
+    my $out = { ok => 1, created => 0, received => 0, already => 0 };
+    eval {
+        $schema->txn_do(sub {
+            for my $line (@lines) {
+                my $item = $line->item_id
+                    ? $schema->resultset('Accounting::InventoryItem')->find($line->item_id)
+                    : undef;
+                unless ($item) {
+                    $item = $self->_match_item($schema, $site, $inv->supplier_id, {
+                        name => $line->description,
+                    });
+                }
+                unless ($item) {
+                    $item = $self->_create_from_line($c, $schema, $site, $line);
+                    $out->{created}++;
+                }
+                if (!$line->item_id || $line->item_id != $item->id) {
+                    $line->update({ item_id => $item->id });
+                }
+                $self->_apply_cost_and_min($item, $line);
+            }
+            my $recv = $self->_receive_lines($c, $schema, $inv, $site);
+            $out->{received} = $recv->{received};
+            $out->{already}  = $recv->{already};
+        });
+    };
+    if ($@) {
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'accept_invoice',
+            'invoice ' . $inv->id . ": $@");
+        return { ok => 0, error => 'Accept failed. Stock was not changed.' };
+    }
+    $self->{logging}->log_with_details($c, 'info', __FILE__, __LINE__, 'accept_invoice',
+        "invoice " . $inv->id . " created=$out->{created} received=$out->{received} already=$out->{already} no GL");
+    $out->{invoice_id} = $inv->id;
+    return $out;
+}
+
+sub _create_from_line {
+    my ($self, $c, $schema, $sitename, $line) = @_;
+    my $name = $line->description || '';
+    $name =~ s/^\s+|\s+$//g;
+    $name = substr($name, 0, 255);
+    my $rule = $self->reorder_floor($name);
+    my $now  = Comserv::Util::AppTime->now_utc;
+    my $who  = ($c->session && $c->session->{username}) || 'invoice-queue';
+    my $cost = $line->unit_cost;
+    $cost = undef unless defined $cost && "$cost" =~ /^\d+(?:\.\d+)?$/;
+    return $schema->resultset('Accounting::InventoryItem')->create({
+        sitename            => $sitename,
+        sku                 => $self->_sku_for_line($schema, $sitename, $line),
+        name                => $name,
+        description         => $name,
+        category            => $rule->{spice} ? 'spice' : undef,
+        item_origin         => 'purchased',
+        is_assemblable      => 0,
+        is_consumable       => $rule->{spice} ? 1 : 0,
+        unit_of_measure     => 'each',
+        unit_cost           => $cost,
+        reorder_point       => $rule->{reorder_point},
+        reorder_quantity    => $rule->{reorder_quantity} || 0,
+        status              => 'active',
+        show_in_shop        => 0,
+        hide_stock_count    => 0,
+        list_in_marketplace => 0,
+        notes               => 'Created from invoice queue accept. No GL.',
+        created_by          => $who,
+        created_at          => $now,
+        updated_at          => $now,
+    });
+}
+
+sub _sku_for_line {
+    my ($self, $schema, $sitename, $line) = @_;
+    my $base = 'QINV-' . $line->id;
+    my $sku  = $base;
+    my $n    = 1;
+    while ($n < 20 && $schema->resultset('Accounting::InventoryItem')->find({
+        sitename => $sitename, sku => $sku,
+    })) {
+        $n++;
+        $sku = $base . '-' . $n;
+    }
+    return substr($sku, 0, 100);
+}
+
+sub _apply_cost_and_min {
+    my ($self, $item, $line) = @_;
+    my $rule = $self->reorder_floor($item->name || $line->description);
+    my %set;
+    my $cost = $line->unit_cost;
+    if (defined $cost && "$cost" =~ /^\d+(?:\.\d+)?$/ && (0+$cost > 0 || !defined $item->unit_cost)) {
+        $set{unit_cost} = $cost;
+    }
+    my $rp = $item->reorder_point;
+    if (!defined $rp || "$rp" eq '' || 0+$rp < $rule->{reorder_point}) {
+        $set{reorder_point} = $rule->{reorder_point};
+    }
+    if (defined $rule->{reorder_quantity}) {
+        my $rq = $item->reorder_quantity;
+        if (!defined $rq || "$rq" eq '' || 0+$rq == 0) {
+            $set{reorder_quantity} = $rule->{reorder_quantity};
+        }
+    }
+    if ($rule->{spice}) {
+        $set{is_consumable} = 1 unless $item->is_consumable;
+        $set{category} = 'spice' unless $item->category;
+    }
+    $item->update(\%set) if %set;
+    return;
+}
+
+sub _line_ref {
+    my ($self, $inv, $line) = @_;
+    my $ref = 'INV-' . ($inv->invoice_number || $inv->id);
+    return ($ref, $ref . '-L' . $line->id);
+}
+
+sub _line_already_received {
+    my ($self, $schema, $inv, $line) = @_;
+    return 0 unless $line->item_id;
+    my ($ref, $line_ref) = $self->_line_ref($inv, $line);
+    my $n = $schema->resultset('Accounting::InventoryTransaction')->search({
+        item_id          => $line->item_id,
+        transaction_type => 'receive',
+        reference_number => { -in => [ $ref, $line_ref ] },
+        sitename         => $inv->sitename,
+    })->count;
+    return $n ? 1 : 0;
+}
+
+# Same receive shape as automatic apply. No general-ledger post.
+sub _receive_lines {
+    my ($self, $c, $schema, $inv, $sitename) = @_;
+    my $loc = $self->_default_location($schema, $sitename);
+    my $now = Comserv::Util::AppTime->now_utc;
+    my $who = ($c->session && $c->session->{username}) || 'invoice-queue';
+    my ($received, $already) = (0, 0);
+    for my $line ($inv->lines->all) {
+        next unless $line->item_id;
+        if ($self->_line_already_received($schema, $inv, $line)) {
+            $already++;
+            next;
+        }
+        my (undef, $line_ref) = $self->_line_ref($inv, $line);
+        my $sl = $schema->resultset('Accounting::InventoryStockLevel')->find({
+            item_id => $line->item_id, location_id => $loc->id,
+        });
+        unless ($sl) {
+            $sl = $schema->resultset('Accounting::InventoryStockLevel')->create({
+                item_id           => $line->item_id,
+                location_id       => $loc->id,
+                quantity_on_hand  => 0,
+                quantity_reserved => 0,
+                quantity_on_order => 0,
+            });
+        }
+        my $old = 0 + ($sl->quantity_on_hand || 0);
+        $sl->update({ quantity_on_hand => $old + $line->quantity });
+        $schema->resultset('Accounting::InventoryTransaction')->create({
+            item_id          => $line->item_id,
+            location_id      => $loc->id,
+            transaction_type => 'receive',
+            quantity         => $line->quantity,
+            unit_cost        => $line->unit_cost,
+            reference_number => $line_ref,
+            sitename         => $sitename,
+            performed_by     => $who,
+            transaction_date => $now,
+            created_at       => $now,
+            notes            => 'Invoice queue accept. No GL.',
+        });
+        $received++;
+    }
+    if ($received) {
+        $inv->update({
+            status     => 'posted',
+            updated_at => $now,
+            notes      => ($inv->notes || '') . "\n[$now] Accepted from invoice queue. Stock received. No GL.",
+        });
+    }
+    return { received => $received, already => $already };
 }
 
 1;

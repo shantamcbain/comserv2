@@ -18,8 +18,8 @@
         </div>
     </header>
     
-    <div style="background-color: #e3f2fd; border: 1px solid #1976d2; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
-        <h3 style="color: #1565c0; margin-top: 0;">Current Proxmox Infrastructure</h3>
+    <div style="background-color: var(--bg-secondary, #e3f2fd); border: 1px solid var(--info-color, #1976d2); padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+        <h3 style="color: var(--info-color, #1565c0); margin-top: 0;">Current Proxmox Infrastructure</h3>
         <p><strong>3-Host Cluster (Updated Dec 23, 2025):</strong></p>
         <ul style="margin: 10px 0;">
             <li><strong>proxmoxws</strong> (192.168.1.11): PVE 8.3.0 (Kernel 6.8.12-4) - K8s Control Plane + Worker</li>

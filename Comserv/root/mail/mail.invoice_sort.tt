@@ -1,11 +1,11 @@
-[% PageVersion = 'mail/mail.invoice_sort.tt,v 0.02 2026/10/21 shanta Exp shanta ' %]
+[% PageVersion = 'mail/mail.invoice_sort.tt,v 0.03 2026/10/23 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 [% META title = 'Invoice queue' %]
 
 <div class="app-container">
   <div class="page-header">
     <h1>Invoice queue</h1>
-    <p>One block is one invoice. Its items are listed under it. Changing SiteName moves that invoice or that item. It does not rewrite stock. Chemicals, GMO, and filament-barcode data are not stored yet.</p>
+    <p>One block is one invoice. Its items are listed under it. Changing SiteName moves that invoice or that item and does not rewrite stock. Accept creates a missing item, sets cost from this purchase, and adds the quantity to on-hand. It does not post the general ledger.</p>
   </div>
   [% IF c.flash.error_msg %]<p>[% c.flash.error_msg | html %]</p>[% END %]
   [% IF c.flash.success_msg %]<p>[% c.flash.success_msg | html %]</p>[% END %]
@@ -81,9 +81,34 @@
           <td>[% line.item_site | html %]</td>
           <td>[% line.barcode | html %]</td>
         </tr>
+        <tr>
+          <td colspan="5">
+            <details>
+              <summary>Correct line</summary>
+              <form method="post" action="[% c.uri_for('/mail/invoice/sort/line') %]">
+                <input type="hidden" name="line_id" value="[% line.line_id | html %]">
+                <label>Name
+                  <input type="text" name="description" value="[% line.item | html %]" maxlength="250">
+                </label>
+                <label>Qty
+                  <input type="number" name="quantity" value="[% line.qty | html %]" min="0.001" step="any">
+                </label>
+                <label>Cost
+                  <input type="number" name="unit_cost" value="[% line.cost | html %]" min="0" step="0.01">
+                </label>
+                <button type="submit">Save line</button>
+              </form>
+            </details>
+          </td>
+        </tr>
         [% END %]
       </tbody>
     </table>
+    <form method="post" action="[% c.uri_for('/mail/invoice/sort/accept') %]">
+      <input type="hidden" name="invoice_id" value="[% inv.id | html %]">
+      <button type="submit">Accept into stock</button>
+    </form>
+    <p>Minimum on hand becomes 1. Cumin and cinnamon become 2, with reorder quantity 1. One receipt does not set the reorder quantity for other items.</p>
     [% ELSE %]
     <p>No lines on this invoice.</p>
     [% END %]

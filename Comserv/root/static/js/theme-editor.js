@@ -1884,4 +1884,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const editor = new ThemeEditor();
         editor.init();
     }
+
+    var pageToggle = document.getElementById('css-edit-toggle');
+    if (pageToggle && pageToggle.dataset.bound !== '1') {
+        pageToggle.dataset.bound = '1';
+        pageToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!window.themeEditor) {
+                window.themeEditor = new ThemeEditor();
+                window.themeEditor.init();
+            }
+            window.themeEditor.toggleInspector();
+            var isActive = window.themeEditor.isInspectorActive;
+            document.body.classList.toggle('css-edit-mode', isActive);
+            pageToggle.classList.toggle('edit-mode', isActive);
+            pageToggle.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            var label = pageToggle.querySelector('.css-edit-label');
+            if (label) label.textContent = isActive ? 'Close Editor' : 'Theme Editor';
+        });
+    }
 });

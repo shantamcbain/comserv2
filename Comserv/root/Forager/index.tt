@@ -18,23 +18,8 @@
 }
 .forager-hero p {
     font-size: 1.2rem;
-    margin: 0.5rem 0 1.5rem;
+    margin: 0.5rem 0 0;
     opacity: 0.92;
-}
-.forager-hero .hero-links a {
-    display: inline-block;
-    margin: 0.4rem;
-    padding: 0.6rem 1.4rem;
-    background: rgba(255,255,255,0.2);
-    color: #fff;
-    border: 2px solid rgba(255,255,255,0.6);
-    border-radius: 24px;
-    text-decoration: none;
-    font-weight: bold;
-    transition: background 0.2s;
-}
-.forager-hero .hero-links a:hover {
-    background: rgba(255,255,255,0.4);
 }
 
 .forager-cards {
@@ -93,18 +78,8 @@
 </style>
 
 <div class="forager-hero">
-    <h1>&#127807; Welcome to Forager</h1>
+    <h1>Welcome to Forager</h1>
     <p>Your guide to wild plants, medicinal herbs, and the art of foraging safely.</p>
-    <div class="hero-links">
-        <a href="[% c.uri_for('/ENCY') %]">&#128218; Plant Encyclopedia</a>
-        <a href="[% c.uri_for('/workshop') %]">&#127807; Workshops</a>
-        <a href="[% c.uri_for('/membership') %]">&#10024; Membership</a>
-        [% IF c.session.username %]
-        <a href="[% c.uri_for('/user/profile') %]">&#128100; My Profile</a>
-        [% ELSE %]
-        <a href="[% c.uri_for('/user/login') %]">&#128274; Login</a>
-        [% END %]
-    </div>
 </div>
 
 <div class="forager-about">

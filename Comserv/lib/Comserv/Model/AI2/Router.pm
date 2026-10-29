@@ -51,6 +51,8 @@ sub _detect_provider {
     elsif ($bare =~ s/^([^|]+)\|//) {
         $prefix = lc($1);
     }
+    # 2026-10-15: deepseek-v4-pro is never used; map to the free north-mini.
+    return ('openrouter', 'cohere/north-mini-code:free') if $bare =~ /deepseek-v4-pro/i;
     if ($prefix eq 'supergrok' || $prefix eq 'grok-oauth') {
         $bare =~ s/^x-ai\///i;
         return ('supergrok', $bare);
@@ -370,7 +372,7 @@ sub _external_default_available {
     return 0 unless $prov && $prov->can('_resolve_api_key');
 
     # Key must resolve (k8s secret / env / DBEncy UserApiKeys).
-    my $key = try { $prov->_resolve_api_key($c) } catch { undef };
+    my $key = try { $prov->_resolve_api_key($c, undef, ($svc eq 'openrouter' ? (guest => 1) : ())) } catch { undef };
     return 0 unless $key;
 
     # Model must exist in the live catalog (skip the network check if the
@@ -1376,7 +1378,24 @@ sub chat_with_fallback {
                 . ($hr && $hr->{opened} ? '; circuit OPEN' : '') . ': ' . ($att->{error} // ''));
         }
         $down{ $cand->{provider} } = 1 if $reason eq 'unreachable' && $cand->{provider} eq 'ollama';
+        # 2026-10-16: a missing/invalid key fails every model of that provider;
+        # don't burn attempts on its other models this turn.
+        $down{ $cand->{provider} } = 1 if $reason eq 'auth';
         push @failed, $att;
+        # Last resort (once): queue ran dry with no answer -> try Super Grok
+        # (xai-oauth, still subject to the guard via _skip_reason) and local Ollama
+        # before reporting all_exhausted. Never paid OpenRouter.
+        if (!@queue && !$opts{_tail_added}++ && !(defined $opts{failover} && !$opts{failover})) {
+            for my $t (['supergrok', 'grok-4.7', 'last_resort'], [undef, undef, 'ollama_auto']) {
+                if (!defined $t->[0]) {
+                    push @queue, { placeholder => 'ollama_auto', step => 99, source => 'last_resort', slug => 'ollama_auto' };
+                    next;
+                }
+                my $slug = Comserv::Util::AI::ModelHealth->normalize_slug($t->[0], $t->[1]);
+                next if $seen{$slug}++ || $down{ $t->[0] };
+                push @queue, { provider => $t->[0], model => $t->[1], slug => $slug, step => 99, source => $t->[2] };
+            }
+        }
     }
 
     # Grounded turn where every answer was stripped to nothing: the post-check
@@ -1660,8 +1679,9 @@ sub _default_free_catalog {
                 if $has_key;
         }
         else {
-            $has_key = try { $prov->_resolve_api_key($c) } catch { undef };
-            $listed  = try { $prov->list_models($c) } catch { undef } if $has_key;
+            # guest => 1 only takes effect on the guest-chat path (stash flag).
+            $has_key = try { $prov->_resolve_api_key($c, undef, ($svc eq 'openrouter' ? (guest => 1) : ())) } catch { undef };
+            $listed  = try { $prov->list_models($c, ($c->session->{user_id} ? undef : $has_key)) } catch { undef } if $has_key;
         }
 
         if ($has_key) {

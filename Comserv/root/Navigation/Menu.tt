@@ -1,6 +1,6 @@
 [%# LEGACY MENU ONLY – static includes, no DB-driven menu, no toggle %]
 <li class="horizontal-dropdown">
-    <a href="[% c.stash.nav_back_url || c.session.nav_back_url || '/' %]" class="dropbtn nav-back-link" data-nav-back="1">Back</a>
+    <a href="[% c.stash.nav_back_url || c.session.nav_back_url || '/' %]" class="dropbtn nav-back-link" data-nav-back="1"><i class="icon-back" aria-hidden="true"></i>Back</a>
 </li>
 [%# CSC-20260909-2862: subscribable menus show only when the module is on for
     the site or the user (enabled_modules = site_modules ∪ user grants). Admins see all.

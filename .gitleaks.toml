@@ -155,3 +155,5 @@ secretGroup = 1
 entropy = 2.5
 [rules.allowlist]
 stopwords = ["your","example","changeme","replace","placeholder","dummy","xxx","redacted","fake","sample","test","here","paste","insert","set_me","todo","secret_value","password"]
+# plain lowercase URL paths and file paths (e.g. `/proxmox`, `.hermes/docs/x-y.md`) are not credentials
+regexes = ['''^[./~]?[a-z0-9_-]*(/[a-z0-9_.-]+)+/?$''']

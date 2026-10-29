@@ -136,6 +136,26 @@
             align-self: flex-end !important;
         }
         #ai-chat-sidebar a { color: #7ec8ff !important; }
+
+        /* Visual (WYSIWYG) editor — Ace stays mounted underneath */
+        #ai2-wysiwyg {
+            position: absolute; inset: 0; z-index: 2;
+            display: flex; flex-direction: column; min-height: 0;
+            background: #fff; color: #222;
+        }
+        #ai2-wysiwyg[hidden] { display: none !important; }
+        #ai2-wysiwyg-bar {
+            flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+            padding: 6px 8px; background: #f4f4f4; color: #222;
+            border-bottom: 1px solid #ccc;
+        }
+        .ai2-wysiwyg-btn {
+            font-size: 12px; padding: 3px 8px; border-radius: 3px; cursor: pointer;
+            border: 1px solid #bbb; background: #fff; color: #222;
+        }
+        .ai2-wysiwyg-btn:hover { border-color: #0e639c; background: #e8f3fb; }
+        #ai2-wysiwyg-note { margin-left: 8px; font-size: 11px; color: #666; }
+        #ai2-wysiwyg-frame { flex: 1 1 auto; width: 100%; min-height: 0; border: 0; background: #fff; }
     </style>
 </head>
 <body>
@@ -157,9 +177,9 @@
         </label>
 
         <label style="margin-left:12px">Editor:
-            <select id="editor-select">
-                <option value="ace">Ace</option>
-                <option value="richtext">Rich Text</option>
+            <select id="editor-select" title="Ace source, or Visual (WYSIWYG) for HTML and template files">
+                <option value="ace">Ace (source)</option>
+                <option value="richtext">Visual (WYSIWYG)</option>
             </select>
         </label>
 
@@ -334,6 +354,23 @@
                 </div>
                 <div class="editor-content" style="flex:1; position:relative; min-height:0;">
                     <div id="ace-editor" style="width:100%;height:100%;"></div>
+                    <div id="ai2-wysiwyg" hidden>
+                        <div id="ai2-wysiwyg-bar" role="toolbar" aria-label="Visual formatting">
+                            <button type="button" class="ai2-wysiwyg-btn" data-cmd="bold" title="Bold"><b>B</b></button>
+                            <button type="button" class="ai2-wysiwyg-btn" data-cmd="italic" title="Italic"><i>I</i></button>
+                            <button type="button" class="ai2-wysiwyg-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+                            <button type="button" class="ai2-wysiwyg-btn" data-cmd="h2" title="Heading 2">H2</button>
+                            <button type="button" class="ai2-wysiwyg-btn" data-cmd="h3" title="Heading 3">H3</button>
+                            <button type="button" class="ai2-wysiwyg-btn" data-cmd="p" title="Paragraph">P</button>
+                            <button type="button" class="ai2-wysiwyg-btn" data-cmd="insertUnorderedList" title="Bullet list">List</button>
+                            <button type="button" class="ai2-wysiwyg-btn" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
+                            <button type="button" class="ai2-wysiwyg-btn" data-cmd="createLink" title="Insert link">Link</button>
+                            <button type="button" class="ai2-wysiwyg-btn" data-cmd="undo" title="Undo">Undo</button>
+                            <button type="button" class="ai2-wysiwyg-btn" data-cmd="redo" title="Redo">Redo</button>
+                            <span id="ai2-wysiwyg-note"></span>
+                        </div>
+                        <iframe id="ai2-wysiwyg-frame" title="Visual page editor"></iframe>
+                    </div>
                 </div>
             </div>
         </div>

@@ -28,36 +28,103 @@ has 'logging' => (
 # ===================================================================
 
 sub _resolve_api_key {
-    my ($self, $c, $api_key) = @_;
+    my ($self, $c, $api_key, %o) = @_;
 
-    # Explicit key passed (already decrypted) takes precedence.
-    return $api_key if $api_key && length $api_key;
+    # 2026-10-26 (Shanta): the DB is the source of keys; env / secret files are the LAST resort.
+    # Shared lookup lives in Comserv::Util::AI::ApiKeyResolver (own row -> site row -> workstation-wide
+    # row, DB error retried once and logged). Callers with no session (usage_live, daily eval, guard)
+    # pass system => 1. Chat stays logged-in only; guests only via the opt-in stash flag (is_guest_chat).
+    require Comserv::Util::AI::ApiKeyResolver;
+    my $user_id  = eval { $c->session->{user_id} };
+    my $guest_ok = !defined $user_id && $o{guest} && is_guest_chat($c);
+    my $system   = $o{system} ? 1 : 0;
+    my $r = Comserv::Util::AI::ApiKeyResolver->resolve($c, 'openrouter',
+        api_key  => $api_key,
+        user_id  => $user_id,
+        system   => $system,
+        guest_ok => $guest_ok,
+        db_row   => sub { my ($cc, undef, %x) = @_; _db_key($cc, $x{user_id}) },
+    );
+    $self->{_last_key_source} = $r->{source};
+    $self->{_last_key_why}    = $r->{why};
+    return $r->{key} if $r->{key};
+    # workstation key files (~/.comserv/secrets/api_keys.env, ~/.bashrc, ~/.hermes/.env), system callers only
+    return $system ? shared_file_key() : undef;
+}
 
-    # K8s secret, then env var.
-    my $k8s_secret = '/run/secrets/openrouter_api_key';
-    if (-e $k8s_secret && open my $fh, '<', $k8s_secret) {
-        my $k = do { local $/; <$fh> };
-        close $fh;
-        chomp($k);
-        return $k if $k && length $k;
+# ---- Guest chat (public sites, no session user_id) -----------------------
+# Only the /ai2/chat controller sets stash ai_guest_chat, and only when the
+# session has no user_id. Background/no-session callers never carry the flag.
+our $GUEST_LIMIT  = 10;      # chat calls per IP per window
+our $GUEST_WINDOW = 3600;    # seconds
+my %GUEST_HITS;              # ip => [epoch, ...]  (per process, in memory)
+
+sub is_guest_chat {
+    my ($c) = @_;
+    return 0 unless $c;
+    my $uid = eval { $c->session->{user_id} };
+    return 0 if defined $uid && length $uid;
+    return eval { $c->stash->{ai_guest_chat} } ? 1 : 0;
+}
+
+# Free = OpenRouter ':free' id or the app's FREE_MODEL; never a PaidBlock id.
+sub guest_model_ok {
+    my ($model) = $_[-1];
+    return 0 unless defined $model && length $model;
+    $model =~ s/^[^|]+\|//;
+    require Comserv::Util::AI::PaidBlock;
+    return 0 if Comserv::Util::AI::PaidBlock->blocked_on_openrouter($model);
+    return ($model =~ /:free$/i || $model eq $Comserv::Util::AI::PaidBlock::FREE_MODEL) ? 1 : 0;
+}
+
+# 1 = allowed (and counted), 0 = over the per-IP limit. $now is injectable.
+sub guest_rate_ok {
+    my ($ip, $now) = @_;
+    $ip = 'unknown' unless defined $ip && length $ip;
+    $now //= time;
+    if (keys %GUEST_HITS > 5000) {
+        for my $k (keys %GUEST_HITS) {
+            @{ $GUEST_HITS{$k} } = grep { $now - $_ < $GUEST_WINDOW } @{ $GUEST_HITS{$k} };
+            delete $GUEST_HITS{$k} unless @{ $GUEST_HITS{$k} };
+        }
     }
-    return $ENV{OPENROUTER_API_KEY} if $ENV{OPENROUTER_API_KEY} && length $ENV{OPENROUTER_API_KEY};
+    my $h = $GUEST_HITS{$ip} ||= [];
+    @$h = grep { $now - $_ < $GUEST_WINDOW } @$h;
+    return 0 if @$h >= $GUEST_LIMIT;
+    push @$h, $now;
+    return 1;
+}
+sub _guest_rate_reset { %GUEST_HITS = () }
 
-    my $user_id = $c->session->{user_id} or return undef;
-    my $roles   = $c->session->{roles} || [];
-    $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
-    my $is_admin = grep { $_ =~ /^(admin|developer)$/i } @$roles;
-    return undef unless $is_admin;   # key sync is admin-only (per v1)
+# Workstation files, same names as script/load_shared_keys.pl, plus ~/.hermes/.env.
+# Returns the value only; never logged.
+sub shared_file_key {
+    my $home = shift // $ENV{HOME} or return undef;
+    for my $f ("$home/.comserv/secrets/api_keys.env", "$home/.bashrc", "$home/.hermes/.env") {
+        next unless -r $f && open(my $fh, '<', $f);
+        my $k;
+        while (my $l = <$fh>) {
+            ($k) = $l =~ /^\s*(?:export\s+)?OPENROUTER_API_KEY\s*=\s*['"]?([^'"\s#]+)/ or next;
+            last if $k =~ /^\S{8,}$/ && $k !~ /^\$/;
+            undef $k;
+        }
+        close $fh;
+        return $k if $k;
+    }
+    return undef;
+}
 
+sub _db_key {
+    my ($c, $user_id) = @_;
     my $schema = eval { $c->model('DBEncy')->schema } or return undef;
-    my $key_obj = $schema->resultset('UserApiKeys')->search(
-        { user_id => $user_id, service => 'openrouter', is_active => '1' }
-    )->first || $schema->resultset('UserApiKeys')->search(
-        { service => 'openrouter', is_active => '1' }
-    )->first;
-
-    return undef unless $key_obj && $key_obj->api_key_encrypted;
-    return eval { $key_obj->get_api_key() } || undef;
+    my $rs = $schema->resultset('UserApiKeys');
+    my %base = (service => 'openrouter', is_active => '1');
+    my %newest = (order_by => { -desc => 'updated_at' }, rows => 1);
+    my $site_id = eval { $c->stash->{site_id} } // eval { $c->session->{site_id} };
+    my $key_obj = (defined $user_id ? $rs->search({ %base, user_id => $user_id }, \%newest)->first : undef)
+        || (defined $site_id ? $rs->search({ %base, site_id => $site_id }, \%newest)->first : undef)
+        || $rs->search({ %base, site_id => undef }, \%newest)->first;
+    return $key_obj;
 }
 
 sub list_models {
@@ -117,12 +184,41 @@ sub _per_million {
 sub _chat_http {
     my ($self, $c, %args) = @_;
 
-    my $api_key = $self->_resolve_api_key($c, $args{api_key});
+    # 2026-10-15 last-line guard: OpenRouter is never called for any grok id
+    # or deepseek-v4-pro. Callers should have rerouted grok to Super Grok.
+    my $guest = is_guest_chat($c);
+    if ($guest) {
+        unless (guest_model_ok($args{model})) {
+            eval { $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'openrouter_chat',
+                "Guest chat refused non-free model " . ($args{model} // '(none)')) };
+            return { success => 0, error => 'Guests can use free models only. Please log in to use other models.' };
+        }
+        require Comserv::Util::AI::GuestGuard;
+        my $ip = Comserv::Util::AI::GuestGuard->client_ip($c);
+        unless (guest_rate_ok($ip)) {
+            eval { $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'openrouter_chat',
+                "Guest chat rate limit hit for " . ($ip // 'unknown')) };
+            return { success => 0, rate_limited => 1,
+                     error => "You've reached the guest chat limit for now ($GUEST_LIMIT messages per hour). Please try again later, or log in to keep chatting." };
+        }
+    }
+
+    require Comserv::Util::AI::PaidBlock;
+    if (Comserv::Util::AI::PaidBlock->blocked_on_openrouter($args{model} // '')) {
+        my $was = $args{model};
+        $args{model} = $Comserv::Util::AI::PaidBlock::FREE_MODEL;
+        eval { $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'openrouter_chat',
+            "Blocked paid OpenRouter model $was; sent $args{model} instead") };
+    }
+
+    my $api_key = $self->_resolve_api_key($c, $args{api_key}, ($guest ? (guest => 1) : ()));
     unless ($api_key) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'openrouter_chat',
-            "No active openrouter API key found (user=" . ($c->session->{username} // 'Guest') . ")");
-        return { success => 0, error => 'No active openrouter API key found' };
+            "No active openrouter API key found (user=" . ($c->session->{username} // 'Guest')
+            . ", reason=" . ($self->{_last_key_why} // 'unknown') . ")");
+        return { success => 0, error => ($guest ? 'Chat is not available to guests right now. Please log in.' : 'No active openrouter API key found') };
     }
+    # A guest never supplies a key and never sees why a call failed upstream.
 
     my $messages = $args{messages} || [];
     return { success => 0, error => 'No messages provided' }

@@ -214,12 +214,14 @@ sub _copy_archive_to_nfs_async {
         return;
     }
     if ($pid == 0) {
+        require Comserv::Util::ForkSafe;
+        Comserv::Util::ForkSafe::child_prepare();
         eval {
             make_path($nfs_archive_dir) unless -d $nfs_archive_dir;
             my (undef, undef, $fname) = File::Spec->splitpath($archived_log);
             File::Copy::copy($archived_log, File::Spec->catfile($nfs_archive_dir, $fname));
         };
-        exit 0;
+        Comserv::Util::ForkSafe::child_exit(0);
     }
 }
 
@@ -375,6 +377,8 @@ sub get_system_identifier {
     $identifier .= " ($tag_str)" if $tag_str;
 
     # Append port to disambiguate multiple dev servers on the same host
+    # Host-published port (e.g. 4000 for comserv2-web-test) beats the in-container listen port.
+    $port = $ENV{COMSERV_PUBLIC_PORT} if ($ENV{COMSERV_PUBLIC_PORT} // '') =~ /^\d+$/;
     $port //= $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || ( $is_docker ? '3000' : '3001' );
     $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
 
@@ -591,7 +595,12 @@ sub log_with_details {
         || $message =~ /DBI Connection failed|Can't connect to (?:MySQL|server)/i
     );
     if ($c && blessed($c) && $c->can('model') && $level_prio >= $db_min_prio && !$_skip_db_noise
-        && (($ENV{COMSERV_NO_HEALTH_LOG} // '') ne '1')) {
+        # COMSERV_NO_HEALTH_LOG=1 only suppresses health/heartbeat noise below
+        # WARN; WARN/ERROR/CRITICAL always land in system_log.
+        && !( (($ENV{COMSERV_NO_HEALTH_LOG} // '') eq '1')
+              && $level_prio < ($LEVEL_PRIORITY{WARN} // 3)
+              && ( ($subroutine // '') =~ /health|heartbeat|watchdog|monitor/i
+                   || $message =~ /\b(?:health|heartbeat)\b/i ) )) {
         my $now = time();
         if ($now - $_db_log_failed_at < $_db_log_backoff_s) {
             _print_log("[DB-LOG-SKIP] circuit breaker open, skipping DB write for $level $subroutine");
