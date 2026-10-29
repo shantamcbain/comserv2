@@ -601,18 +601,37 @@
     /* ── Branch server operations ───────────────────────────────────────── */
 
     function smartOpenBranch(branch, port, targetUrl) {
-        // Open synchronously from the user's click.  A delayed window.open is
-        // treated as a popup by browsers and is blocked, which made an already
-        // running branch appear not to open.
-        var branchWindow = targetUrl ? window.open(targetUrl, '_blank') : null;
-        fetch('/admin/branch_server_action', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: 'action=open&branch=' + encodeURIComponent(branch) + '&port=' + port
-        }).catch(function() {});
-        // Keep the command-output terminal available without making it the
-        // only new tab.  The branch page is the primary Open action.
-        if (!branchWindow && targetUrl) window.location.href = targetUrl;
+        // Reserve the tab from the user's click, but do not navigate until the
+        // backend confirms that the branch is listening. Opening the target
+        // first races the server startup and leaves an intermittent connection
+        // failure page in the new tab.
+        var branchWindow = targetUrl ? window.open('about:blank', '_blank') : null;
+        if (branchWindow && !branchWindow.closed) {
+            try { branchWindow.document.write('<p>Starting ' + branch + '…</p>'); } catch (e1) {}
+        }
+        var attempts = 0;
+        function poll() {
+            attempts += 1;
+            fetch('/admin/branch_server_action', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=open&branch=' + encodeURIComponent(branch) + '&port=' + port
+            }).then(function(r) { return r.json(); })
+              .then(function(data) {
+                  if (data && data.ok && data.running) {
+                      if (branchWindow && !branchWindow.closed) { branchWindow.location = targetUrl; }
+                      else if (targetUrl) { window.location.href = targetUrl; }
+                  } else if (attempts < 60) {
+                      window.setTimeout(poll, 500);
+                  } else {
+                      window.alert('Branch ' + branch + ' did not become ready on port ' + port + '.');
+                  }
+              }).catch(function() {
+                  if (attempts < 60) { window.setTimeout(poll, 500); }
+                  else { window.alert('Branch ' + branch + ' did not become ready on port ' + port + '.'); }
+              });
+        }
+        poll();
     }
 
     function showBranchStartModal(branch, port, targetUrl) {
@@ -620,6 +639,11 @@
         var title = document.getElementById('branch-modal-title');
         var cmdEl = document.getElementById('branch-modal-cmd');
         var logEl = document.getElementById('branch-modal-log');
+        var branchWindow = targetUrl ? window.open('about:blank', '_blank') : null;
+        if (branchWindow && !branchWindow.closed) {
+            try { branchWindow.document.write('<p>Starting ' + branch + '…</p>'); } catch (e2) {}
+        }
+        var attempts = 0;
 
         title.textContent = 'Starting ' + branch + ' on port ' + port + '…';
         cmdEl.textContent = '';
@@ -644,7 +668,16 @@
                 if (data.running) {
                     clearInterval(poll);
                     closeBranchModal();
-                    window.open(targetUrl, '_blank');
+                    if (branchWindow && !branchWindow.closed) { branchWindow.location = targetUrl; }
+                    else if (targetUrl) { window.location.href = targetUrl; }
+                } else if (++attempts >= 60) {
+                    clearInterval(poll);
+                    logEl.textContent += '\nBranch did not become ready on port ' + port + '.\n';
+                }
+            }).catch(function() {
+                if (++attempts >= 60) {
+                    clearInterval(poll);
+                    logEl.textContent += '\nUnable to confirm branch readiness on port ' + port + '.\n';
                 }
             });
         }, 2000);
