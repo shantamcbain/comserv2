@@ -21,7 +21,13 @@ use Comserv::Util::Logging ();
 use File::Copy ();
 use Time::Local qw(timegm timelocal);
 
-our %CAPS = (day => 1.65, week => 11.50, month => 50);
+# Oct 30 2026 (Shanta): no hard-coded caps. Real caps come from ONE shared file (~/.comserv/ai_caps.json) via
+# ModelChains->channel_caps (repo data/ai_model_chains.json is the fallback). %CAPS is only the fail-safe (0 = no paid room).
+our %CAPS = (day => 0, week => 0, month => 0);
+# What copies of this guard from before Oct 28 hard-coded; used ONLY to predict whether such an old copy would trip.
+# OpenRouter caps from the shared file (repo json not known here); %CAPS fail-safe if missing.
+sub shared_or_caps { require Comserv::Util::AI::ModelChains; my $c = eval { Comserv::Util::AI::ModelChains->channel_caps(undef, 'openrouter') }; return $c || { %CAPS } }
+our %OLD_CODE_CAPS = (day => 1.65, week => 11.50, month => 50);
 our $NEAR_CAP_FRAC = 0.6;
 # Oct 29 2026 (Shanta, fix B): every log line, notice and alert names WHERE it ran ([:3001 main], [:4005 planning], [cron aisystem]),
 # and each run records its GUARD_VERSION in the shared state file. A copy older than the newest recorded version logs one
@@ -133,7 +139,7 @@ sub pt { my $e = shift // time; local $ENV{TZ} = 'America/Los_Angeles'; POSIX::t
 # Else: legacy thrash behaviour exactly.
 sub decide {
     my (%in) = @_;
-    my $caps = $in{caps} || \%CAPS;
+    my $caps = $in{caps} || shared_or_caps();
     my $tn   = $in{thrash_n} // $THRASH_N;
     my $st   = $in{state} || {};
     my $or   = $in{openrouter} || {};
@@ -279,7 +285,7 @@ sub paid_room_why {
     my @w;
     push @w, 'an OpenRouter money cap is already hit' if grep { /^OpenRouter/ } @{ $reasons || [] };
     return (@w, 'OpenRouter usage unknown') unless ref $or eq 'HASH' && $or->{ok};
-    $caps ||= \%CAPS;
+    $caps ||= shared_or_caps();
     my %frac = (day => $NEAR_CAP_FRAC, week => 0.9, month => 0.9);
     for my $w (qw(day week month)) {
         my ($v, $cap) = ($or->{"${w}_usd"}, $caps->{$w});
@@ -1365,7 +1371,7 @@ sub chain_context {
     my %allowed = map { ($_->{model} => 1) } grep { $_->{tier} eq 'paid' } @chain;
     return (chain => \@chain, emergency => [ Comserv::Util::AI::ModelChains->hermes_chain($ld, emergency => 1) ],
             allowed_paid => \%allowed, probation_out => { map { ($_->{model} => $blocked->{ $_->{model} }) } @gone },
-            channel_caps => { map { ($_ => Comserv::Util::AI::ModelChains->channel_caps($ld, $_)) } qw(openrouter xai_direct) },
+            channel_caps => { map { ($_ => Comserv::Util::AI::ModelChains->channel_caps($ld, $_, logger => sub { $s->log_line($_[1]) })) } qw(openrouter xai_direct) },
             chain_source => $ld->{source});
 }
 
@@ -1537,7 +1543,7 @@ sub old_code_would_trip {
     return 0 unless $m->{ok};
     for my $w (qw(day week month)) {
         my $v = $m->{"${w}_usd"};
-        return 1 if defined $v && defined $CAPS{$w} && $v >= $CAPS{$w};
+        return 1 if defined $v && defined $OLD_CODE_CAPS{$w} && $v >= $OLD_CODE_CAPS{$w};
     }
     return 0;
 }
@@ -1865,7 +1871,8 @@ sub run {
     my $xai_live = (ref $live eq 'HASH' && $live->{ok} && ref $live->{by_channel} eq 'HASH') ? ($live->{by_channel}{xai_direct} || {}) : {};
     # Oct 28 2026 (Shanta raised the OpenRouter caps to $3/day, $15/week, $65/month): the trip check reads the SAME caps as the
     # paid-room check, from channel_caps_usd.openrouter in data/ai_model_chains.json (one place). %CAPS is only the fallback.
-    my $or_caps = (($cc0{channel_caps} || {})->{openrouter}) || \%CAPS;
+    my $or_caps = (($cc0{channel_caps} || {})->{openrouter})
+        || Comserv::Util::AI::ModelChains->channel_caps(undef, 'openrouter', logger => sub { $s->log_line($_[1]) });
     my $d = decide(thrash_by_class => $tbc, limits => $lims, thrash => $thrash, openrouter => $or, state => $dst, v4pro_recent => $v4pro_recent,
                    caps => $or_caps,
                    xai_direct => { usd => ($xai_live->{usd} // 0), cap_day => ((($cc0{channel_caps} || {})->{xai_direct} || {})->{day}) },
@@ -1886,11 +1893,11 @@ sub run {
     if (ref $live eq 'HASH' && $live->{ok}) {
         $st->{last_live} = { day_usd => $live->{day_usd}, calls => $live->{calls}, at => $t };
     }
-    $st->{caps} = { %{ (($cc0{channel_caps} || {})->{openrouter}) || \%CAPS } };
+    $st->{caps} = { %{ (($cc0{channel_caps} || {})->{openrouter}) || shared_or_caps() } };
     $st->{caps}{thrash_per_15min} = $lims;
 
     my %ctx = $s->context;
-    $ctx{paid_ok} = paid_room($or, ($ctx{channel_caps} && $ctx{channel_caps}{openrouter}) || \%CAPS, $d->{reasons}) ? 1 : 0;
+    $ctx{paid_ok} = paid_room($or, ($ctx{channel_caps} && $ctx{channel_caps}{openrouter}) || shared_or_caps(), $d->{reasons}) ? 1 : 0;
     # Oct 26: sessions already running on a model that is not allowed right now. A guard trip only rewrites
     # config.yaml; a session pinned with /model keeps its model, so list them and gate them (see write_gate).
     my $recent = (ref $live eq 'HASH' && $live->{ok}) ? $live->{recent} : {};
@@ -2130,11 +2137,11 @@ sub run {
     # x.ai direct and OpenRouter spend against their channel caps
     {
         my $ccaps = $ctx{channel_caps} || {};
-        my @why = paid_room_why($or, $ccaps->{openrouter} || \%CAPS, $d->{reasons});
+        my @why = paid_room_why($or, $ccaps->{openrouter} || shared_or_caps(), $d->{reasons});
         $st->{cash} = {
             at => $t,
             openrouter => { ok => ($or->{ok} ? 1 : 0), day_usd => $or->{day_usd}, week_usd => $or->{week_usd}, month_usd => $or->{month_usd},
-                            caps => $ccaps->{openrouter} || \%CAPS },
+                            caps => $ccaps->{openrouter} || shared_or_caps() },
             xai_direct => { usd => $xai_live->{usd} // 0, caps => $ccaps->{xai_direct} || { day => 0, week => 0, month => 0 } },
             paid_why   => \@why,
         };

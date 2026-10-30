@@ -43,13 +43,22 @@ sub _resolve_api_key {
         user_id  => $user_id,
         system   => $system,
         guest_ok => $guest_ok,
-        db_row   => sub { my ($cc, undef, %x) = @_; _db_key($cc, $x{user_id}) },
+        # Oct 30 2026: default DB path = Comserv::Util::AI::UserKeys->get_user_key (own -> site -> owner row only).
     );
     $self->{_last_key_source} = $r->{source};
     $self->{_last_key_why}    = $r->{why};
+    $self->{_last_key_owner}  = $r->{key_owner} // ($r->{key} ? 'owner' : undef);   # 'user' = the user's own key: bills to them, not the shared caps
+    $self->{_last_key_row_id} = $r->{row_id};
+    if ($r->{key} && ref $c && eval { $c->can('stash') }) { require Comserv::Util::AI::UserKeys; $c->stash->{ai_key_tags} = Comserv::Util::AI::UserKeys->usage_tags($r) }
+    $self->{_last_key_user_id} = $r->{user_id};
     return $r->{key} if $r->{key};
-    # workstation key files (~/.comserv/secrets/api_keys.env, ~/.bashrc, ~/.hermes/.env), system callers only
-    return $system ? shared_file_key() : undef;
+    # workstation key files (~/.comserv/secrets/api_keys.env, ~/.bashrc, ~/.hermes/.env): system callers AND logged-in
+    # users (Oct 30 2026, Shanta: chat said 'No active openrouter API key found' when the DB had no row though the
+    # workstation config had one). Never for guests. Order stays DB -> env/secret -> config files.
+    return undef unless $system || defined $user_id;
+    my $k = shared_file_key();
+    if ($k) { $self->{_last_key_source} = 'workstation_config'; $self->{_last_key_why} = undef }
+    return $k;
 }
 
 # ---- Guest chat (public sites, no session user_id) -----------------------
