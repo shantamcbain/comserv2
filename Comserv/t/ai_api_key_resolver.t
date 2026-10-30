@@ -1,5 +1,7 @@
 use strict; use warnings; use Test::More; use File::Temp qw(tempdir);
 use lib 'lib';
+# Oct 30 2026: "workstation-wide" rows are now only the OWNER's rows (COMSERV_AI_OWNER_USER_ID); here the owner is user 7.
+$ENV{COMSERV_AI_OWNER_USER_ID} = 7;
 # Oct 26 2026: shared key lookup is DB first, env/files last; a DB error is retried once and the
 # reason is reported. Fake schema only: no database, no real keys.
 require_ok 'Comserv::Util::AI::ApiKeyResolver';
