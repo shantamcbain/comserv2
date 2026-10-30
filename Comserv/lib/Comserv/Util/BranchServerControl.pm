@@ -43,53 +43,262 @@ sub get_command {
         };
 }
 
+sub _log {
+    my ($level, $msg) = @_;
+    eval {
+        require Comserv::Util::Logging;
+        Comserv::Util::Logging->instance->log_with_details(undef, $level, __FILE__, __LINE__, 'branch_server', $msg);
+    };
+}
+
+# Branch names come from the dashboard POST. Only a registered worktree port is
+# startable or stoppable. main is the primary checkout on 3001.
+sub _check_target {
+    my ($self, $branch, $port) = @_;
+    return { ok => 0, error => 'invalid branch' }
+        unless defined $branch && $branch =~ /\A[A-Za-z0-9._-]+\z/;
+    return { ok => 0, error => 'invalid port' }
+        unless defined $port && $port =~ /\A\d{2,5}\z/;
+    $port = int($port);
+    my $want;
+    if ($branch eq 'main') {
+        $want = 3001;
+    } else {
+        my $cfg = eval { Comserv::Util::Git->_worktree_config() } || {};
+        $want = $cfg->{branches}{$branch}{port};
+    }
+    return { ok => 0, error => "branch $branch is not in worktrees.json" }
+        unless defined $want && $want =~ /\A\d+\z/;
+    return { ok => 0, error => "port $port is not the registered port for $branch ($want)" }
+        if $port != int($want);
+    return { ok => 1, branch => $branch, port => $port };
+}
+
+# comserv-<branch>-<port>.service, and only if that unit's ExecStart names this port.
+sub unit_name {
+    my ($self, $branch, $port) = @_;
+    my $checked = $self->_check_target($branch, $port);
+    return undef unless $checked->{ok};
+    my $home = $ENV{HOME} || (getpwuid($<))[7] || '';
+    return undef unless $home;
+    my $name = "comserv-$checked->{branch}-$checked->{port}.service";
+    my $path = "$home/.config/systemd/user/$name";
+    return undef unless -f $path;
+    open my $fh, '<', $path or return undef;
+    local $/;
+    my $txt = <$fh> // '';
+    close $fh;
+    return undef unless $txt =~ /-p\s+\Q$checked->{port}\E\b/;
+    return $name;
+}
+
+sub _systemctl {
+    my ($self, @args) = @_;
+    my $quiet = 0;
+    if (@args && ref $args[0] eq 'HASH') {
+        my $opt = shift @args;
+        $quiet = $opt->{quiet} ? 1 : 0;
+    }
+    my $runtime = '/run/user/' . $<;
+    local $ENV{XDG_RUNTIME_DIR} = $runtime if !($ENV{XDG_RUNTIME_DIR} && -d $ENV{XDG_RUNTIME_DIR}) && -d $runtime;
+    local $ENV{DBUS_SESSION_BUS_ADDRESS} = "unix:path=$runtime/bus"
+        unless $ENV{DBUS_SESSION_BUS_ADDRESS};
+    require IPC::Run3;
+    my ($out, $err) = ('', '');
+    my $ok = eval { IPC::Run3::run3(['systemctl', '--user', @args], \undef, \$out, \$err); 1 };
+    my $rc = $ok ? ($? >> 8) : 127;
+    my $err_s = $err // '';
+    $err_s =~ s/\s+\z//;
+    if (!$quiet && (!$ok || $rc != 0)) {
+        _log('error', 'systemctl --user ' . join(' ', @args) . " failed: $err_s");
+    }
+    return { ok => $ok && $rc == 0 ? 1 : 0, rc => $rc, output => $out // '', error => $err_s };
+}
+
+# PIDs of comserv_server.pl bound to this port, plus the -r restarter parent and
+# its server children. Never a pid whose command line is some other program.
+sub _server_pids {
+    my ($self, $port) = @_;
+    require IPC::Run3;
+    my $out = '';
+    eval { IPC::Run3::run3(['ss', '-ltnp'], \undef, \$out, \undef); 1 };
+    my %keep;
+    for my $line (split /\n/, $out // '') {
+        next unless $line =~ /:$port\b/;
+        while ($line =~ /pid=(\d+)/g) {
+            my $pid = $1;
+            my $cmd = _cmdline($pid);
+            $keep{$pid} = 1 if $cmd =~ /comserv_server\.pl/ && $cmd =~ /-p\s+\Q$port\E\b/;
+        }
+    }
+    for my $pid (keys %keep) {
+        my $ppid = _ppid($pid);
+        next unless $ppid;
+        my $pcmd = _cmdline($ppid);
+        $keep{$ppid} = 1 if $pcmd =~ /comserv_server\.pl/ && $pcmd =~ /-p\s+\Q$port\E\b/;
+    }
+    if (opendir my $dh, '/proc') {
+        my @nums = grep { /\A\d+\z/ } readdir $dh;
+        closedir $dh;
+        for my $cand (@nums) {
+            my $ppid = _ppid($cand) or next;
+            next unless $keep{$ppid};
+            my $cmd = _cmdline($cand);
+            $keep{$cand} = 1 if $cmd =~ /comserv_server\.pl/;
+        }
+    }
+    return [ sort { $a <=> $b } keys %keep ];
+}
+
+sub _cmdline {
+    my ($pid) = @_;
+    return '' unless defined $pid && $pid =~ /\A\d+\z/;
+    open my $fh, '<', "/proc/$pid/cmdline" or return '';
+    local $/;
+    my $cmd = <$fh> // '';
+    close $fh;
+    $cmd =~ s/\0/ /g;
+    return $cmd;
+}
+
+sub _ppid {
+    my ($pid) = @_;
+    return undef unless defined $pid && $pid =~ /\A\d+\z/;
+    open my $fh, '<', "/proc/$pid/stat" or return undef;
+    my $stat = <$fh> // '';
+    close $fh;
+    return $1 if $stat =~ /\)\s+\S\s+(\d+)/;
+    return undef;
+}
+
+sub _free_port {
+    my ($self, $port) = @_;
+    my $pids = $self->_server_pids($port);
+    return { cleared => [], still => $self->_port_listening($port) ? 1 : 0 } unless @$pids;
+    kill 'TERM', @$pids;
+    my $deadline = time() + 3;
+    while (time() < $deadline && $self->_port_listening($port)) {
+        sleep 0.2;
+    }
+    if ($self->_port_listening($port)) {
+        my $left = $self->_server_pids($port);
+        kill 'KILL', @$left if @$left;
+        sleep 0.3;
+    }
+    return { cleared => $pids, still => $self->_port_listening($port) ? 1 : 0 };
+}
+
 sub start {
     my ($self, $branch, $port) = @_;
-    my $cmd = $self->get_command($branch, $port);
+    my $t = $self->_check_target($branch, $port);
+    return { %$t, action => 'start' } unless $t->{ok};
+    $branch = $t->{branch};
+    $port   = $t->{port};
     my $log = "/tmp/branch-$branch.log";
+    my $unit = $self->unit_name($branch, $port);
     my $lock = $self->_start_lock("/tmp/branch-$branch.start.lock");
     return {
-        ok => 0, action => 'start', branch => $branch, log => $log,
+        ok => 0, action => 'start', branch => $branch, port => $port, log => $log,
         error => 'could not acquire branch startup lock',
     } unless $lock;
 
     if ($self->_port_listening($port)) {
+        my $ours = $self->_server_pids($port);
         return {
             ok => 1, action => 'start', branch => $branch, port => $port,
-            running => 1, started => 0, log => $log,
+            running => 1, started => 0, log => $log, via => $unit ? 'systemd' : 'process',
+            unit => $unit // '',
+        } if @$ours;
+        _log('error', "start refused: port $port is in use by another process");
+        return {
+            ok => 0, action => 'start', branch => $branch, port => $port,
+            error => "port $port is in use by another process",
         };
     }
 
+    if ($unit) {
+        my $sys = $self->_systemctl('start', $unit);
+        if (!$sys->{ok}) {
+            return {
+                ok => 0, action => 'start', branch => $branch, port => $port,
+                via => 'systemd', unit => $unit,
+                error => 'systemctl start failed: ' . ($sys->{error} || "exit $sys->{rc}"),
+            };
+        }
+        return {
+            ok => 1, action => 'start', branch => $branch, port => $port,
+            running => 1, started => 1, via => 'systemd', unit => $unit, log => $log,
+        } if $self->_wait_for_port($port);
+        my $active = $self->_systemctl({ quiet => 1 }, 'is-active', $unit);
+        my $state = $active->{output} // '';
+        $state =~ s/\s+\z//;
+        _log('error', "unit $unit did not listen on $port (is-active=$state)");
+        return {
+            ok => 0, action => 'start', branch => $branch, port => $port,
+            running => 0, started => 1, via => 'systemd', unit => $unit,
+            error => "unit $unit did not listen on port $port (is-active=$state)",
+        };
+    }
+
+    my $cmd = $self->get_command($branch, $port);
     my $res = system('/bin/bash', '-c', "$cmd > '$log' 2>&1 &");
     if ($res != 0) {
+        _log('error', "spawn exit $res for $branch:$port");
         return {
-            ok => 0, action => 'start', branch => $branch, log => $log,
-            error => "spawn exit $res",
+            ok => 0, action => 'start', branch => $branch, port => $port, log => $log,
+            via => 'process', error => "spawn exit $res",
         };
     }
     return {
         ok => 1, action => 'start', branch => $branch, port => $port,
-        running => 1, started => 1, log => $log,
+        running => 1, started => 1, via => 'process', log => $log,
     } if $self->_wait_for_port($port);
 
+    _log('error', "server did not listen on port $port within ${START_TIMEOUT}s");
     return {
         ok => 0, action => 'start', branch => $branch, port => $port,
-        running => 0, started => 1, log => $log,
+        running => 0, started => 1, via => 'process', log => $log,
         error => "server did not listen on port $port within ${START_TIMEOUT}s",
     };
 }
 
 sub stop {
     my ($self, $branch, $port) = @_;
-    system("fuser -k ${port}/tcp 2>/dev/null || true");
-    return { ok => 1, action => 'stop', branch => $branch };
+    my $t = $self->_check_target($branch, $port);
+    return { %$t, action => 'stop' } unless $t->{ok};
+    $branch = $t->{branch};
+    $port   = $t->{port};
+    my $unit = $self->unit_name($branch, $port);
+    my $sys;
+    if ($unit) {
+        $sys = $self->_systemctl('stop', $unit);
+    }
+    my $freed = $self->_free_port($port);
+    if ($freed->{still}) {
+        _log('error', "port $port still listening after stop of $branch");
+        return {
+            ok => 0, action => 'stop', branch => $branch, port => $port,
+            unit => $unit // '', via => $unit ? 'systemd' : 'process',
+            cleared => $freed->{cleared},
+            error => "port $port still listening after stop",
+        };
+    }
+    return {
+        ok => 1, action => 'stop', branch => $branch, port => $port,
+        unit => $unit // '', via => $unit ? 'systemd' : 'process',
+        cleared => $freed->{cleared}, running => 0,
+        ($sys ? (systemd_stop => $sys->{ok}) : ()),
+    };
 }
 
 sub restart {
     my ($self, $branch, $port) = @_;
-    $self->stop($branch, $port);
-    sleep 1;
-    return $self->start($branch, $port);
+    my $stopped = $self->stop($branch, $port);
+    return $stopped unless $stopped->{ok};
+    my $started = $self->start($branch, $port);
+    $started->{action} = 'restart';
+    $started->{cleared} = $stopped->{cleared} if $stopped->{cleared};
+    return $started;
 }
 
 sub open_or_start {
