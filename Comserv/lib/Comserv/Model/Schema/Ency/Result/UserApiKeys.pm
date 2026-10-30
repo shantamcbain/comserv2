@@ -20,9 +20,11 @@ __PACKAGE__->add_columns(
         data_type => 'integer',
         is_nullable => 1,
     },
+    # Oct 30 2026: free lowercase provider slug (^[a-z0-9_.-]{2,64}$), no enum -> a new provider needs no schema change.
+    # Applied by Admin > Schema Compare from this file. See Comserv::Util::AI::UserKeys.
     service => {
-        data_type => 'enum',
-        extra => { list => ['grok', 'ollama', 'brave', 'searxng', 'openai', 'claude', 'gemini', 'anthropic', 'cohere', 'openrouter'] },
+        data_type => 'varchar',
+        size => 64,
         is_nullable => 0,
     },
     api_key_encrypted => {
@@ -31,6 +33,24 @@ __PACKAGE__->add_columns(
     },
     metadata => {
         data_type => 'text',
+        is_nullable => 1,
+    },
+    # chat | management | billing | search | ... (NULL rows from before the migration count as chat)
+    key_type => {
+        data_type => 'varchar',
+        size => 32,
+        is_nullable => 1,
+        default_value => 'chat',
+    },
+    # optional OpenAI-compatible endpoint (validated by UserKeys->validate_base_url: https, or http only for LAN/localhost)
+    base_url => {
+        data_type => 'varchar',
+        size => 255,
+        is_nullable => 1,
+    },
+    label => {
+        data_type => 'varchar',
+        size => 128,
         is_nullable => 1,
     },
     is_active => {
@@ -53,7 +73,7 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('id');
 
 __PACKAGE__->add_unique_constraint(
-    'unique_user_site_service' => ['user_id', 'site_id', 'service']
+    'unique_user_site_service_type' => ['user_id', 'site_id', 'service', 'key_type']
 );
 
 __PACKAGE__->belongs_to(

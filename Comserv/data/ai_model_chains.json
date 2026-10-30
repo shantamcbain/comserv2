@@ -27,7 +27,9 @@
   "openrouter|stealth/ox-alpha",
   "openrouter|google/gemma-3-27b-it:free",
   "openrouter|google/gemma-4-26b-a4b-it:free",
-  "openrouter|google/gemma-4-31b-it:free"
+  "openrouter|google/gemma-4-31b-it:free",
+  "openrouter|x-ai/grok-4.7",
+  "openrouter|qwen/qwen3-coder"
  ],
  "model_caps_usd_per_day": {},
  "chain_caps_usd_per_day": {},
@@ -68,8 +70,7 @@
  "hermes_daily_lock_cash": {
   "enabled": false,
   "steps": [
-   "xai_direct|grok-4.7",
-   "openrouter|x-ai/grok-4.7"
+   "xai_direct|grok-4.7"
   ],
   "_comment": "OFF by default (Shanta's rule: grok only through Super Grok). Oct 26 2026 she asked for the option: when true, the Super Grok daily lock tries x.ai direct grok, then OpenRouter grok, BEFORE paid qwen/qwen3-coder, then north-mini LAST, each only inside its channel_caps_usd. Do not turn on without her go-ahead. The chains above still reject grok on OpenRouter."
  },
@@ -93,8 +94,13 @@
    "selectable_by": "probation_chain",
    "probation": 1,
    "provider_routing": {
-    "only": ["openai", "azure"],
-    "ignore": ["relace"],
+    "only": [
+     "openai",
+     "azure"
+    ],
+    "ignore": [
+     "relace"
+    ],
     "allow_fallbacks": false
    },
    "hard_cap_usd": 5.0,
@@ -104,5 +110,6 @@
    "approved_by": "Shanta 2026-10-28 9:29 AM PT (answer to a card: put gpt-5.6-luna in the fallback chain as the first paid step after Super Grok, with a probation audit after about 10 sessions or $5). Replaces the earlier $3 / 6-task trial.",
    "note": "PROBATION, not a free pass: luna is the paid chain step but only inside the OpenRouter caps, and its own spend counts toward them. Spend is this model's own cost (state.db session_model_usage since the baseline); a session with at least one call counts as a session. At 10 sessions or $5 the guard stops it (one alert), luna drops out of the chain and its sessions are blocked until Shanta approves the audit result; then run: perl script/ai_trial.pl approve gpt_56_luna (starts the next probation window). Provider routing here is the intent (OpenAI or Azure only, never Relace); Hermes has only a global provider_routing in config.yaml, so check the provider on luna's first calls."
   }
- }
+ },
+ "_removed_comment": "Oct 30 2026 (Shanta): x-ai/grok-4.7 (0 of 22 calls OK; grok only via Super Grok) and qwen/qwen3-coder (dropped Oct 28) removed from the app chains."
 }

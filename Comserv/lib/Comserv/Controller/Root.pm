@@ -977,12 +977,15 @@ sub auto :Private {
                     };
                     if ($sp && $sp->{ok}) {
                         my @caps;
-                        push @caps, sprintf('day $%.2f/%s',
-                            $sp->{day}, '$1.65')   if ($sp->{day}   || 0) >= 1.65;
-                        push @caps, sprintf('week $%.2f/%s',
-                            $sp->{week}, '$11.50')  if ($sp->{week}  || 0) >= 11.50;
-                        push @caps, sprintf('month $%.2f/%s',
-                            $sp->{month}, '$50')    if ($sp->{month} || 0) >= 50;
+                        # Oct 30 2026: caps from the ONE shared file (~/.comserv/ai_caps.json), repo json fallback, never hard-coded.
+                        require Comserv::Util::AI::ModelChains;
+                        my $cap = Comserv::Util::AI::ModelChains->channel_caps(
+                            scalar eval { Comserv::Util::AI::ModelChains->load($c) }, 'openrouter',
+                            logger => sub { $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', $_[1]) });
+                        for my $w (qw(day week month)) {
+                            push @caps, sprintf('%s $%.2f/$%.2f', $w, $sp->{$w} || 0, $cap->{$w})
+                                if ($sp->{$w} || 0) >= $cap->{$w};
+                        }
                         if (@caps) {
                             $locked = 1;
                             $notice = 'OpenRouter spend cap reached — '
@@ -2359,6 +2362,17 @@ sub setup_site {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', 'Completed site setup');
 }
 
+# is_local_host($host): same rule as the PSGI wrapper (Comserv::Util::PortlessHost): IP literal, localhost, single-label,
+# dev.*, *.local/.lan/.internal/.test/... keep their port; public domains do not.
+sub is_local_host { require Comserv::Util::PortlessHost; return Comserv::Util::PortlessHost::is_port_exempt_host($_[0]) }
+# host_with_port($host, $port): "host:port" for local addresses (non-80/443), plain "host" for public domains.
+sub host_with_port {
+    my ($h, $port) = @_;
+    $h //= '';
+    return $h unless $port && $port != 80 && $port != 443;
+    return is_local_host($h) ? "$h:$port" : $h;
+}
+
 sub site_setup {
     my ($self, $c, $SiteName) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "SiteName (input): '" . (defined $SiteName ? $SiteName : 'UNDEF') . "'");
@@ -2367,13 +2381,13 @@ sub site_setup {
     # Get the current domain for HostName
     my $domain = $c->req->uri->host;
     my $port = $c->req->uri->port;
-    my $host_port = $domain;
-    if ($port && $port != 80 && $port != 443) {
-        $host_port .= ":$port";
-    }
+    # Oct 30 2026 (Shanta): a real domain never carries the dev port (https://computersystemconsulting.ca:4006/... breaks
+    # behind Cloudflare); a local address (IP, localhost, *.local, single-label host) keeps it or it will not connect.
+    my $host_port = host_with_port($domain, $port);
 
     # Set a default HostName based on the current domain
-    my $protocol = $c->req->secure ? 'https' : 'http';
+    my $fwd_proto = lc($c->req->header('X-Forwarded-Proto') // '');
+    my $protocol = ($c->req->secure || ($fwd_proto eq 'https' && !is_local_host($domain))) ? 'https' : 'http';
     my $default_hostname = "$protocol://$host_port";
     $c->stash->{HostName} = $default_hostname;
     $c->session->{Domain} = $domain;

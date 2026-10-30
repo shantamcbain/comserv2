@@ -43,13 +43,22 @@ sub _resolve_api_key {
         user_id  => $user_id,
         system   => $system,
         guest_ok => $guest_ok,
-        db_row   => sub { my ($cc, undef, %x) = @_; _db_key($cc, $x{user_id}) },
+        db_row   => sub { my ($cc, undef, %x) = @_; _db_key($cc, $x{user_id}) },   # Oct 30 2026: UserKeys precedence (own -> site -> owner)
     );
     $self->{_last_key_source} = $r->{source};
     $self->{_last_key_why}    = $r->{why};
+    $self->{_last_key_owner}  = $r->{key_owner} // ($r->{key} ? 'owner' : undef);   # 'user' = the user's own key: bills to them, not the shared caps
+    $self->{_last_key_row_id} = $r->{row_id};
+    if ($r->{key} && ref $c && eval { $c->can('stash') }) { require Comserv::Util::AI::UserKeys; $c->stash->{ai_key_tags} = Comserv::Util::AI::UserKeys->usage_tags($r) }
+    $self->{_last_key_user_id} = $r->{user_id};
     return $r->{key} if $r->{key};
-    # workstation key files (~/.comserv/secrets/api_keys.env, ~/.bashrc, ~/.hermes/.env), system callers only
-    return $system ? shared_file_key() : undef;
+    # workstation key files (~/.comserv/secrets/api_keys.env, ~/.bashrc, ~/.hermes/.env): system callers AND logged-in
+    # users (Oct 30 2026, Shanta: chat said 'No active openrouter API key found' when the DB had no row though the
+    # workstation config had one). Never for guests. Order stays DB -> env/secret -> config files.
+    return undef unless $system || defined $user_id;
+    my $k = shared_file_key();
+    if ($k) { $self->{_last_key_source} = 'workstation_config'; $self->{_last_key_why} = undef }
+    return $k;
 }
 
 # ---- Guest chat (public sites, no session user_id) -----------------------
@@ -116,15 +125,10 @@ sub shared_file_key {
 
 sub _db_key {
     my ($c, $user_id) = @_;
-    my $schema = eval { $c->model('DBEncy')->schema } or return undef;
-    my $rs = $schema->resultset('UserApiKeys');
-    my %base = (service => 'openrouter', is_active => '1');
-    my %newest = (order_by => { -desc => 'updated_at' }, rows => 1);
-    my $site_id = eval { $c->stash->{site_id} } // eval { $c->session->{site_id} };
-    my $key_obj = (defined $user_id ? $rs->search({ %base, user_id => $user_id }, \%newest)->first : undef)
-        || (defined $site_id ? $rs->search({ %base, site_id => $site_id }, \%newest)->first : undef)
-        || $rs->search({ %base, site_id => undef }, \%newest)->first;
-    return $key_obj;
+    # Oct 30 2026: was "own -> site -> ANY site_id-NULL row" (could pick another user's own key). Now the shared rule in
+    # Comserv::Util::AI::UserKeys: own row -> site row (owner's) -> owner/system row. Returns ($row, $scope).
+    require Comserv::Util::AI::UserKeys;
+    return Comserv::Util::AI::UserKeys->find_row($c, 'openrouter', user_id => $user_id, allow_owner => 1);
 }
 
 sub list_models {
