@@ -264,7 +264,7 @@ sub gate_view {
     $res = {} unless ref $res eq 'HASH';
     my $rev = ref $res->{review} eq 'HASH' ? $res->{review} : {};
     my @f = map { { severity => $_->{severity} // '', file => $_->{file} // '', line => $_->{line} // '',
-                    issue => $_->{issue} // $_->{message} // $_->{text} // '' } }
+                    issue => $_->{issue} // $_->{message} // $_->{text} // $_->{reason} // '' } }
             grep { ref $_ eq 'HASH' } @{ $rev->{findings} || [] };
     my $skipped = ($res->{skipped} || !$res->{ok}) ? 1 : 0;
     my $blocking = $skipped ? 0 : ($res->{blocking} // $s->should_block($res)) ? 1 : 0;
