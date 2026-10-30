@@ -344,4 +344,46 @@ $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no 
     ok  $G->can('paid_room')->({ ok => 1, day_usd => 0.4, week_usd => 6.6, month_usd => 52.4 }, $caps, []), 'after the UTC day resets: room (day < 60%, week < 90%, month < 90%)';
     ok !$G->can('paid_room')->({ ok => 1, day_usd => 0.4, week_usd => 6.6, month_usd => 58.6 }, $caps, []), 'month >= 90% of $65 ($58.50): no room';
 }
+
+# ---- Oct 28 2026 11:04 AM PT blip: an active probation model is never an ENFORCE offender, whatever the OpenRouter reading / state.db / other state files are ----
+{
+    require Comserv::Util::AI::HermesOverrunGuard; require File::Temp;
+    my $G = 'Comserv::Util::AI::HermesOverrunGuard';
+    my $root = File::Temp::tempdir(CLEANUP => 1); mkdir "$root/data"; mkdir "$root/data/ai_trials"; mkdir "$root/.hermes"; mkdir "$root/.hermes/logs";
+    system('cp', "$FindBin::Bin/../data/ai_model_chains.json", "$root/data/ai_model_chains.json");
+    my $now = time; my $model = 'openai/gpt-5.6-luna';
+    open my $fh, '>', "$root/data/ai_trials/gpt_56_luna.state.json";
+    print $fh encode_json({ name => 'gpt_56_luna', model => $model, baseline => { month_usd => 50 }, baseline_at => $now - 3600, alerted => 0, tasks_done => 1, spend_basis => 'model_cost' }); close $fh;
+    # a corrupted sibling state file (merge-conflict markers, as the Kimi file had) must not matter
+    open my $kf, '>', "$root/data/ai_trials/kimi_k27_code.state.json"; print $kf "<<<<<<< HEAD\n{\"name\":\"kimi_k27_code\"}\n=======\n{}\n>>>>>>> main\n"; close $kf;
+    my $g = $G->new(home => $root, app_root => $root, now => $now, base_urls => [], no_notify => 1);
+    $g->{state_db} = "$root/no-such-state.db";   # unreadable: trial_tick would return before marking the trial active
+    $g->trial_flags;
+    ok $g->{trial_active}{$model}, 'trial_flags: begun, not stopped probation model is active without state.db / OpenRouter reading';
+    ok !$g->{trial_stopped}{$model}, '... and not stopped';
+    $g->trial_tick({ ok => 0 });
+    ok $g->{trial_active}{$model}, 'stale/unreachable OpenRouter reading (trial_tick skipped): still active';
+    my %pol = (tripped => 1, or_over => 0, sg_unavailable => 1, allowed_paid => {});
+    is $G->can('offender_reason')->('openrouter', $model, %pol, trial_active => $g->{trial_active}, trial_stopped => $g->{trial_stopped}), undef, 'active probation model is not an offender while the guard is tripped';
+    like $G->can('offender_reason')->('openrouter', 'qwen/qwen3-coder', %pol, trial_active => $g->{trial_active}), qr/not in the Hermes chain and not an active probation\/trial model/, 'other paid model: offender, wording no longer names qwen';
+    unlike $G->can('offender_reason')->('openrouter', 'qwen/qwen3-coder', %pol), qr/qwen/, 'reason text has no hard-coded model name';
+    # stopped probation: offender again
+    open my $sf, '>', "$root/data/ai_trials/gpt_56_luna.state.json";
+    print $sf encode_json({ name => 'gpt_56_luna', model => $model, baseline => { month_usd => 50 }, baseline_at => $now - 3600, stopped => 'limit', stopped_at => $now - 60, spend_basis => 'model_cost' }); close $sf;
+    my $g2 = $G->new(home => $root, app_root => $root, now => $now, base_urls => [], no_notify => 1); $g2->trial_flags;
+    ok !$g2->{trial_active}{$model} && $g2->{trial_stopped}{$model}, 'stopped probation: not active, flagged stopped';
+    like $G->can('offender_reason')->('openrouter', $model, %pol, trial_active => $g2->{trial_active}, trial_stopped => $g2->{trial_stopped}), qr/approved trial stopped/, 'stopped probation model is an offender';
+    # full run(): tripped state + unreachable OpenRouter + luna session in the recent window -> not listed as an offender, gate stays inactive
+    open my $cf, '>', "$root/.hermes/config.yaml"; print $cf "model:\n  default: openrouter/cohere/north-mini-code:free\n  provider: openrouter\n  base_url: https://openrouter.ai/api/v1\n  api_mode: chat_completions\n"; close $cf;
+    open my $st, '>', "$root/.hermes/overrun_guard_state.json"; print $st encode_json({ tripped => 1, since => $now - 7200, since_pt => 'x', kind => 'caps', target => 'openrouter/cohere/north-mini-code:free', target_default => 'cohere/north-mini-code:free' }); close $st;
+    open my $sf2, '>', "$root/data/ai_trials/gpt_56_luna.state.json";
+    print $sf2 encode_json({ name => 'gpt_56_luna', model => $model, baseline => { month_usd => 50 }, baseline_at => $now - 3600, alerted => 0, tasks_done => 1, spend_basis => 'model_cost' }); close $sf2;
+    my $g3 = $G->new(home => $root, app_root => $root, now => $now, base_urls => [], no_notify => 1, no_ledger => 1, or_ids => {}, supergrok => {}); $g3->{state_db} = "$root/no-such-state.db";
+    my $r = $g3->run(force => 1, thrash => 0, thrash_by_class => { ok => 1, counts => {} },
+                     openrouter => { ok => 0, error => 'usage_live unreachable' },
+                     live => { ok => 1, day_usd => 0.05, calls => 2, recent => { s1 => { provider => 'openrouter', model => $model, session => 'local-982b', last_t => $now - 5, usd => 0.02, calls => 2 } } });
+    ok !$r->{offenders}, 'run(): active luna session is not an offender (no ENFORCE) while tripped with an unreachable OpenRouter reading';
+    isnt $r->{action}, 'restore', 'run(): unreachable OpenRouter reading never restores the trip';
+}
+
 done_testing;

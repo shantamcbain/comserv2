@@ -7,6 +7,7 @@ use JSON::PP;
 use Comserv::Util::AI::HermesOverrunGuard;
 my $G = 'Comserv::Util::AI::HermesOverrunGuard';
 $Comserv::Util::AI::HermesOverrunGuard::COOLDOWN_S = 0;   # Oct 23: legacy tests restore within minutes; cool-down tested below
+$Comserv::Util::AI::HermesOverrunGuard::CLEAR_RUNS = 1;   # Oct 28: legacy tests restore on the first clear run; hysteresis tested below
 # OpenRouter models list stand-in (validated ids only; no network in tests)
 my $IDS = { map { ($_ => 1) } 'cohere/north-mini-code:free', 'nvidia/nemotron-3.5-lightning:free',
             'deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-flash' };
@@ -769,6 +770,46 @@ ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID
                                  openrouter => { ok => 1, day_usd => 0.5, week_usd => 2, month_usd => 3 });
     is $r->{action}, 'restore', 'clear after 31 min -> restore';
     ok !$mk->($now + 1900)->read_state->{paid_block_only}, 'paid_block_only cleared';
+}
+
+# ---- Oct 28 2026: flapping fix (trip held until an AUTHORITATIVE reading is under every cap; 2 consecutive clear runs) ----
+{
+    my $dc = $G->can('decide');
+    my $ov = { ok => 1, day_usd => 6.31, week_usd => 10.4, month_usd => 56.2 };
+    my %caps = (day => 3, week => 15, month => 65);
+    # the 11:03:59 bug: usage_live unreachable -> merge_live fell back to the agent.log estimate {ok=>1, day_usd=>0.05, live_only=>1}
+    my $m = $G->can('merge_live')->({ ok => 0, error => 'usage_live unreachable' }, { ok => 1, day_usd => 0.047, calls => 97 });
+    ok $m->{ok} && $m->{live_only}, 'unreachable OpenRouter + live estimate -> live_only fallback reading (precondition of the old bug)';
+    is $dc->(thrash => 0, openrouter => $m, state => { tripped => 1 }, caps => \%caps)->{action}, 'hold', 'live-estimate-only reading can NOT restore a trip (was: restore at 11:03:59 with day $6.31 still over $3)';
+    is $dc->(thrash => 0, openrouter => { ok => 1, day_usd => 3.5, live_only => 1 }, state => {}, caps => \%caps)->{action}, 'trip', 'a live estimate over the cap can still trip';
+    is $dc->(thrash => 0, openrouter => { ok => 1, day_usd => 0.5 }, state => { tripped => 1 }, caps => \%caps)->{action}, 'hold', 'reading missing week/month figures: no restore';
+    is $dc->(thrash => 0, openrouter => { ok => 1, day_usd => 0.5, week_usd => 2, month_usd => 9, stale => 1 }, state => { tripped => 1 }, caps => \%caps)->{action}, 'hold', 'stale-flagged reading: no restore';
+    is $dc->(thrash => 0, openrouter => $ov, state => { tripped => 1 }, caps => \%caps)->{action}, 'hold', 'day still $6.31 over $3 -> hold';
+    is $dc->(thrash => 0, openrouter => { ok => 1, day_usd => 0.5, week_usd => 2, month_usd => 9 }, state => { tripped => 1 }, caps => \%caps)->{action}, 'restore', 'authoritative clear reading -> restore (unchanged)';
+    ok scalar(() = $G->can('paid_room_why')->({ ok => 1, day_usd => 0.05, live_only => 1 }, \%caps, [])) > 0, 'live-only reading is not "paid room" either';
+
+    # run(): two consecutive authoritative clear runs required (CLEAR_RUNS=2); an over/unknown run in between resets the count
+    local $Comserv::Util::AI::HermesOverrunGuard::CLEAR_RUNS = 2;
+    my $h2 = home();
+    my $clear = { ok => 1, day_usd => 0.5, week_usd => 2, month_usd => 9 };
+    my $over  = { ok => 1, day_usd => 6.31, week_usd => 10.4, month_usd => 56.2 };
+    my %run = (force => 1, thrash => 0, thrash_by_class => { ok => 1, counts => {} }, live => { ok => 0 });
+    my ($g1) = guard($h2, now => 2000000);
+    is $g1->run(%run, openrouter => { %$over })->{action}, 'trip', 'trip on day over cap';
+    ($g1) = guard($h2, now => 2000600);
+    is $g1->run(%run, openrouter => { %$clear })->{action}, 'hold', 'first clear run -> hold (1 of 2)';
+    is $g1->read_state->{clear_streak}, 1, 'clear_streak recorded';
+    ($g1) = guard($h2, now => 2000660);
+    is $g1->run(%run, openrouter => { %$over })->{action}, 'hold', 'over again -> hold';
+    is $g1->read_state->{clear_streak}, 0, 'over reading resets the streak';
+    ($g1) = guard($h2, now => 2000720);
+    is $g1->run(%run, openrouter => { ok => 1, day_usd => 0.05, live_only => 1 })->{action}, 'hold', 'live-only run does not count as clear';
+    ($g1) = guard($h2, now => 2000780);
+    is $g1->run(%run, openrouter => { %$clear })->{action}, 'hold', 'clear 1 of 2 again';
+    ($g1) = guard($h2, now => 2000840);
+    is $g1->run(%run, openrouter => { %$clear })->{action}, 'restore', 'second consecutive clear run -> restore';
+    ok !exists $g1->read_state->{clear_streak}, 'streak cleared after restore';
+    like do { local (@ARGV, $/) = "$h2/.hermes/overrun_notice.txt"; <> }, qr/RESTORED/, 'restore notice written';
 }
 
 done_testing();
