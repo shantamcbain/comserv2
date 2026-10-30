@@ -89,6 +89,12 @@ sub log {
         $meta->{sitename} //= (eval { $c->session->{SiteName} } || eval { $c->stash->{SiteName} });
         $meta->{username} //= eval { $c->session->{username} };
         delete $meta->{$_} for grep { !defined $meta->{$_} } qw(branch sitename username);
+        # Oct 30 2026: who pays. A user's own key (key_owner=user) bills to that user and is kept OUT of the owner's
+        # shared caps (~/.comserv/ai_caps.json; Router::openrouter_spend skips billing_status=user_key). Still logged + tagged.
+        my $kt = ref $args{key_tags} eq 'HASH' ? $args{key_tags} : (eval { ref $c->stash->{ai_key_tags} eq 'HASH' ? $c->stash->{ai_key_tags} : undef } || {});
+        $meta->{key_owner}  //= $kt->{key_owner}  if defined $kt->{key_owner};
+        $meta->{key_row_id} //= $kt->{key_row_id} if defined $kt->{key_row_id};
+        $meta->{bill_to_user_id} //= $kt->{bill_to_user_id} if defined $kt->{bill_to_user_id};
         # A "success" with no text is not a success (Ollama and some
         # providers answer 200 with nothing). With text but 0 tokens the
         # provider just did not report usage: keep success, flag it.
@@ -148,6 +154,7 @@ sub log {
             }
         };
 
+        $bill_status = 'user_key' if ($meta->{key_owner} // '') eq 'user';
         $schema->resultset('AiUsageLog')->create({
             user_id                  => $user_id,
             site_id                  => $site_id,

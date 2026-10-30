@@ -43,7 +43,7 @@ sub _resolve_api_key {
         user_id  => $user_id,
         system   => $system,
         guest_ok => $guest_ok,
-        # Oct 30 2026: default DB path = Comserv::Util::AI::UserKeys->get_user_key (own -> site -> owner row only).
+        db_row   => sub { my ($cc, undef, %x) = @_; _db_key($cc, $x{user_id}) },   # Oct 30 2026: UserKeys precedence (own -> site -> owner)
     );
     $self->{_last_key_source} = $r->{source};
     $self->{_last_key_why}    = $r->{why};
@@ -125,15 +125,10 @@ sub shared_file_key {
 
 sub _db_key {
     my ($c, $user_id) = @_;
-    my $schema = eval { $c->model('DBEncy')->schema } or return undef;
-    my $rs = $schema->resultset('UserApiKeys');
-    my %base = (service => 'openrouter', is_active => '1');
-    my %newest = (order_by => { -desc => 'updated_at' }, rows => 1);
-    my $site_id = eval { $c->stash->{site_id} } // eval { $c->session->{site_id} };
-    my $key_obj = (defined $user_id ? $rs->search({ %base, user_id => $user_id }, \%newest)->first : undef)
-        || (defined $site_id ? $rs->search({ %base, site_id => $site_id }, \%newest)->first : undef)
-        || $rs->search({ %base, site_id => undef }, \%newest)->first;
-    return $key_obj;
+    # Oct 30 2026: was "own -> site -> ANY site_id-NULL row" (could pick another user's own key). Now the shared rule in
+    # Comserv::Util::AI::UserKeys: own row -> site row (owner's) -> owner/system row. Returns ($row, $scope).
+    require Comserv::Util::AI::UserKeys;
+    return Comserv::Util::AI::UserKeys->find_row($c, 'openrouter', user_id => $user_id, allow_owner => 1);
 }
 
 sub list_models {
