@@ -376,8 +376,19 @@
                 }
                 var action = el.getAttribute('data-branch-action');
                 if (action) {
-                    branchServerAction(action, el.getAttribute('data-branch'),
-                        el.getAttribute('data-port'), el);
+                    var bname = el.getAttribute('data-branch');
+                    branchServerAction(action, bname, el.getAttribute('data-port'), el)
+                        .then(function (res) {
+                            if (action !== 'stop' && action !== 'restart' && action !== 'start') { return; }
+                            var bits = [action, bname];
+                            if (res && res.via) { bits.push('via ' + res.via); }
+                            if (res && res.unit) { bits.push(res.unit); }
+                            if (res && res.cleared && res.cleared.length) {
+                                bits.push('stopped pid ' + res.cleared.join(','));
+                            }
+                            if (res && res.running) { bits.push('listening on :' + res.port); }
+                            window.alert(bits.join(' '));
+                        });
                 }
             });
         }
