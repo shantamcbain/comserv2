@@ -4,10 +4,10 @@
    roles = "user,admin"
    TemplateType = "Application"
    category = "HealthKitchen"
-   page_version = "0.01"
-   last_updated = "2026-10-18"
+   page_version = "0.02"
+   last_updated = "2026-10-29"
 %]
-[% PageVersion = 'healthkitchen/history.tt,v 0.01 2026/10/18 grok-bot Exp shanta ' %]
+[% PageVersion = 'healthkitchen/history.tt,v 0.02 2026/10/29 hermes-agent Exp shanta - owner chart, ciphertext only' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="app-container">
@@ -24,11 +24,11 @@
     [% ELSIF !hk_consent %]
         <div class="content-section">
             <h2>Opt in</h2>
-            <p>You can keep a private record of past and current conditions, medications and allergies. Health Kitchen uses it only to skip herbs with matching cautions or interactions, add ENCY herbs linked to your conditions, and keep allergens out of meal plans and AI recipe ideas.</p>
+            <p>This chart is the personal history used to build recipes and a week meal plan. It is not a diagnosis.</p>
             <ul>
-                <li>Private by default. Site admins see an entry only if you share that entry, and every admin view is logged.</li>
-                <li>Names and notes are stored encrypted. Diagnoses are never sent to AI.</li>
-                <li>You can export or delete everything at any time, and revoke consent.</li>
+                <li>Only you can read it. There are no practitioners in the system, so no one else can be granted access yet.</li>
+                <li>The chart text is stored encrypted. A dump of those fields does not show the words.</li>
+                <li>You can export or delete everything, and revoke consent.</li>
             </ul>
             <form method="post" action="[% c.uri_for('/healthkitchen/history') %]">
                 <input type="hidden" name="hk_action" value="consent" />
@@ -38,6 +38,21 @@
         </div>
     [% ELSE %]
         [% e = hk_edit %]
+        [% ch = hk_chart || {} %]
+        <div class="content-section">
+            <h2>Chart</h2>
+            <p class="doc-muted">Only you can see this. It is stored encrypted. Fill what you know. Blank fields stay blank. This is not a diagnosis.</p>
+            <form method="post" action="[% c.uri_for('/healthkitchen/history') %]">
+                <input type="hidden" name="hk_action" value="chart" />
+                <label>Birth year <input type="text" name="birth_year" maxlength="4" value="[% ch.birth_year | html %]" /></label>
+                <label>Allergies <textarea name="allergies" rows="2">[% ch.allergies | html %]</textarea></label>
+                <label>Conditions that change what you eat <textarea name="conditions" rows="2">[% ch.conditions | html %]</textarea></label>
+                <label>Medications <textarea name="medications" rows="2">[% ch.medications | html %]</textarea></label>
+                <label>Foods you do not eat <textarea name="avoided_foods" rows="2">[% ch.avoided_foods | html %]</textarea></label>
+                <label>What this week’s meals should do <textarea name="week_goal" rows="2">[% ch.week_goal | html %]</textarea></label>
+                <button type="submit" class="btn btn-primary">Save chart</button>
+            </form>
+        </div>
         <div class="content-section">
             <h2>[% IF e %]Edit entry[% ELSE %]Add entry[% END %]</h2>
             <form method="post" action="[% c.uri_for('/healthkitchen/history') %]">
@@ -52,7 +67,6 @@
                 <label>Resolved <input type="date" name="resolved_date" value="[% e.resolved_date %]" /></label>
                 <label>Severity <select name="severity"><option value="">—</option>[% FOREACH s IN ['mild','moderate','severe'] %]<option value="[% s %]"[% IF e.severity == s %] selected[% END %]>[% s %]</option>[% END %]</select></label>
                 <label>Use for suggestions <select name="use_for_matching"><option value="1">yes</option><option value="0"[% IF e && !e.use_for_matching %] selected[% END %]>no</option></select></label>
-                <label>Visibility <select name="visibility"><option value="private">private (only me)</option><option value="site_admin"[% IF e.visibility == 'site_admin' %] selected[% END %]>share with site admins</option></select></label>
                 <label>Notes <textarea name="notes" rows="2" maxlength="5000">[% e.notes | html %]</textarea></label>
                 <button type="submit" class="btn btn-primary">Save</button>
                 [% IF e %]<a href="[% c.uri_for('/healthkitchen/history') %]">Cancel</a>[% END %]

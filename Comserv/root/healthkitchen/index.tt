@@ -4,10 +4,10 @@
    roles = "user,admin"
    TemplateType = "Application"
    category = "HealthKitchen"
-   page_version = "0.02"
-   last_updated = "2026-09-23"
+   page_version = "0.03"
+   last_updated = "2026-10-29"
 %]
-[% PageVersion = 'healthkitchen/index.tt,v 0.02 2026/09/23 hermes-agent Exp shanta ' %]
+[% PageVersion = 'healthkitchen/index.tt,v 0.03 2026/10/29 hermes-agent Exp shanta - embed the day view filtered to the kitchen schedule' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="app-container">
@@ -29,6 +29,40 @@
         <a href="[% c.uri_for('/healthkitchen/symptoms') %]" class="btn btn-primary">Symptoms</a>
         <a href="[% c.uri_for('/ENCY') %]" class="btn btn-secondary">ENCY</a>
     </p>
+
+    <div class="content-section">
+        <h2>Today [% IF hk_today.plan_date %]<span class="doc-muted">[% hk_today.plan_date | html %]</span>[% END %]</h2>
+        <iframe title="Today" src="[% c.uri_for('/todo/day') %][% IF hk_today.plan_date %]/[% hk_today.plan_date %][% END %]?embed=1&amp;filter=schedule" style="width:100%;height:72vh;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-color);"></iframe>
+        [% IF !hk_today.ready %]
+            <div class="alert alert-warning">Health plan tables are not on this database yet. Admin: Schema Compare for <code>HealthKitchen::UserHealthPlan</code>.</div>
+        [% ELSIF hk_today.plan %]
+            <p class="doc-muted">[% hk_today.plan.trust_summary | html %]
+                <a href="[% c.uri_for('/healthkitchen/plan') %]/[% hk_today.plan.id %]">Open plan</a>
+            </p>
+            <h3>Menu</h3>
+            [% IF hk_today.plan.slots.size %]
+                <ul>
+                    [% FOREACH s IN hk_today.plan.slots %]
+                        <li><strong>[% s.meal_slot | html %]</strong> &mdash; [% s.free_text | html %]</li>
+                    [% END %]
+                </ul>
+            [% ELSE %]
+                <p class="doc-muted">No in-pantry match for the active symptoms. Off-pantry items are not added to the menu.</p>
+            [% END %]
+            <h3>Activities</h3>
+            [% INCLUDE 'healthkitchen/_activities.tt' hk_plan = hk_today.plan %]
+            <form method="post" action="[% c.uri_for('/healthkitchen') %]">
+                <input type="hidden" name="hk_action" value="build_today" />
+                <button type="submit" class="btn btn-secondary">Rebuild from pantry</button>
+            </form>
+        [% ELSE %]
+            <p class="doc-muted">No menu saved yet. Build a general menu now. Symptoms and chart data tighten it later. They are not required to start.</p>
+            <form method="post" action="[% c.uri_for('/healthkitchen') %]">
+                <input type="hidden" name="hk_action" value="build_today" />
+                <button type="submit" class="btn btn-primary">Build today's menu</button>
+            </form>
+        [% END %]
+    </div>
 
     <div class="content-section">
         [% IF hk_has_inventory %]
@@ -67,6 +101,9 @@
                     <li>[% r.name | html %]</li>
                 [% END %]
             </ul>
+            [% IF hk_recipe_n > 5 %]
+                <p class="doc-muted">[% hk_recipe_n %] recipes. <a href="[% c.uri_for('/healthkitchen/recipes') %]">See all</a>.</p>
+            [% END %]
         [% ELSE %]
             <p class="doc-muted">No food recipes yet. Open Recipes to seed the morning turmeric coffee.</p>
         [% END %]
