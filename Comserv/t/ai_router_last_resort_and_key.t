@@ -155,6 +155,7 @@ my $AUTH = $FAIL->('No active openrouter API key found');
 use_ok('Comserv::Model::AI2::Provider::OpenRouter');
 delete local $ENV{OPENROUTER_API_KEY};
 local $ENV{HOME} = tempdir(CLEANUP => 1);
+local $ENV{COMSERV_AI_OWNER_USER_ID} = 7;   # Oct 30 2026: site + workstation-wide rows must belong to the owner
 my $OR = Comserv::Model::AI2::Provider::OpenRouter->new(logging => T::Log->new);
 my @rows = (
     { user_id => 7,   site_id => undef, service => 'openrouter', is_active => '1', key => 'k-global' },

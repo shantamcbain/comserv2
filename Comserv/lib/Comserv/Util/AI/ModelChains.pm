@@ -33,9 +33,11 @@ our %KNOB_DEFAULTS = (
     circuit_failure_threshold      => 3,
     circuit_cooldown_minutes       => 15,
     circuit_dead_cooldown_hours    => 24,
-    openrouter_soft_cap_day_usd    => 1.65,
-    openrouter_soft_cap_week_usd   => 11.50,
-    openrouter_soft_cap_month_usd  => 50,
+    # Oct 30 2026 (Shanta): the real caps live in ONE shared file (~/.comserv/ai_caps.json, see shared_caps).
+    # These 0s are the fail-safe used only when neither that file nor data/ai_model_chains.json has them.
+    openrouter_soft_cap_day_usd    => 0,
+    openrouter_soft_cap_week_usd   => 0,
+    openrouter_soft_cap_month_usd  => 0,
     supergrok_respect_guard        => 1,
     exclude_replace_verdict        => 1,
     demote_watch_verdict           => 1,
@@ -55,9 +57,12 @@ our $HERMES_NORTH_RE          = qr/north-mini-code/i;
 our $HERMES_BANNED_RE         = qr/grok|glm|v4-pro/i;     # never as an openrouter step (grok only via Super Grok)
 # Cash caps per billing channel. supergrok is a quota, not cash, so it has no entry.
 our %CHANNEL_CAPS_DEFAULT = (
-    openrouter => { day => 1.65, week => 11.50, month => 50 },
-    xai_direct => { day => 0,    week => 0,     month => 0  },   # x.ai API key: off until Shanta sets a number
+    openrouter => { day => 0, week => 0, month => 0 },   # fail-safe only (no paid room); real caps: ~/.comserv/ai_caps.json
+    xai_direct => { day => 0, week => 0, month => 0 },   # x.ai API key: off until Shanta sets a number
 );
+my %KNOB_CAP = (openrouter_soft_cap_day_usd => 'day', openrouter_soft_cap_week_usd => 'week', openrouter_soft_cap_month_usd => 'month');
+my %SHARED;      # path => { mtime, data }
+my %CAP_LOGGED;  # "where|channel" => 1
 
 my %CACHE;   # path => { mtime, size, data, source, errors }
 my %LOGGED;  # "path|reason" => 1 — log the Perl-default fallback once per state
@@ -316,17 +321,67 @@ sub hermes_cash_steps {
     my $d = ref $loaded eq 'HASH' && $loaded->{data} ? $loaded->{data} : $loaded;
     my $c = ref $d eq 'HASH' ? $d->{hermes_daily_lock_cash} : undef;
     return () unless ref $c eq 'HASH' && $c->{enabled} && $c->{enabled} !~ /^(?:false|0)\z/;
-    my @src = ref $c->{steps} eq 'ARRAY' ? @{ $c->{steps} } : ('xai_direct|grok-4.7', 'openrouter|x-ai/grok-4.7');
+    my @src = ref $c->{steps} eq 'ARRAY' ? @{ $c->{steps} } : ('xai_direct|grok-4.7');   # Oct 30 2026: OpenRouter grok removed (0/22 OK)
     return map { my ($p, $m) = split /\|/, $_, 2; { slug => $_, channel => $p, provider => ($p eq 'xai_direct' ? 'xai' : $p), model => $m } } @src;
 }
 
-# channel_caps($loaded, 'openrouter') -> { day, week, month }
+# Oct 30 2026 (Shanta): ONE cap file shared by every worktree/branch. COMSERV_AI_CAPS_FILE overrides the path.
+sub shared_caps_path { $ENV{COMSERV_AI_CAPS_FILE} || (($ENV{HOME} // '') . '/.comserv/ai_caps.json') }
+sub shared_caps {
+    my ($class) = @_;
+    my $p = $class->shared_caps_path;
+    my @st = stat $p or return undef;
+    my $hit = $SHARED{$p};
+    return $hit->{data} if $hit && $hit->{mtime} == $st[9] && $hit->{size} == $st[7];
+    my $d = eval { open my $fh, '<', $p or die; local $/; JSON->new->relaxed->decode(<$fh>) };
+    $d = undef unless ref $d eq 'HASH';
+    $SHARED{$p} = { mtime => $st[9], size => $st[7], data => $d };
+    return $d;
+}
+sub _cap_hash_ok {
+    my ($h) = @_;
+    return 0 unless ref $h eq 'HASH';
+    for (qw(day week month)) { return 0 unless defined $h->{$_} && !ref $h->{$_} && $h->{$_} =~ /^\d+(?:\.\d+)?$/ }
+    return 1;
+}
+# "[:4006 aisystem]" / "[cli main]" — which port and worktree/branch is reading the caps (for error lines).
+sub where_label {
+    my ($class) = @_;
+    my $port = $ENV{COMSERV_GUARD_PORT} || $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT};
+    my $f = __FILE__; my $wt;
+    if ($f =~ m{/worktrees/([^/]+)/}) { $wt = $1 }
+    else {
+        (my $dir = $f) =~ s{/[^/]*$}{};
+        my $b = eval { open my $ph, '-|', 'git', '-C', ($dir || '.'), 'rev-parse', '--abbrev-ref', 'HEAD' or die; my $x = <$ph>; close $ph; $x };
+        chomp $b if defined $b; $wt = $b if defined $b && length $b;
+    }
+    return '[' . ($port ? ":$port" : 'cli') . ' ' . ($wt // '?') . ']';
+}
+# channel_caps($loaded, 'openrouter' [, logger => sub($lvl,$msg)]) -> { day, week, month, source }
+# Order: shared ~/.comserv/ai_caps.json -> repo channel_caps_usd (openrouter: then the soft_cap knobs) -> fail-safe 0/0/0
+# (0 = no paid room) with ONE clear error line naming the port and branch.
 sub channel_caps {
-    my ($class, $loaded, $channel) = @_;
+    my ($class, $loaded, $channel, %o) = @_;
+    my $sh = $class->shared_caps;
+    return { (map { ($_ => $sh->{$channel}{$_} + 0) } qw(day week month)), source => $class->shared_caps_path }
+        if $sh && _cap_hash_ok($sh->{$channel});
     my $d = ref $loaded eq 'HASH' && $loaded->{data} ? $loaded->{data} : $loaded;
-    my %dflt = %{ $CHANNEL_CAPS_DEFAULT{$channel} || {} };
-    my $f = ref $d->{channel_caps_usd} eq 'HASH' && ref $d->{channel_caps_usd}{$channel} eq 'HASH' ? $d->{channel_caps_usd}{$channel} : {};
-    return { %dflt, %$f };
+    my $repo_ok = ref $d eq 'HASH' && !(ref $loaded eq 'HASH' && ($loaded->{source} // '') eq 'perl_default');
+    if ($repo_ok) {
+        my $f = ref $d->{channel_caps_usd} eq 'HASH' ? $d->{channel_caps_usd}{$channel} : undef;
+        return { (map { ($_ => $f->{$_} + 0) } qw(day week month)), source => 'repo channel_caps_usd' } if _cap_hash_ok($f);
+        if ($channel eq 'openrouter') {
+            my %k = map { ($KNOB_CAP{$_} => $d->{$_}) } keys %KNOB_CAP;
+            return { %k, source => 'repo soft_cap knobs' } if _cap_hash_ok(\%k);
+        }
+    }
+    my $msg = sprintf('%s AI caps MISSING for %s: no valid %s and no repo data/ai_model_chains.json caps; fail-safe 0/0/0 (no paid spend)',
+                      $class->where_label, $channel, $class->shared_caps_path);
+    unless ($CAP_LOGGED{"$channel"}++) {
+        my $log = $o{logger};
+        if ($log) { eval { $log->('error', $msg) } } else { warn "$msg\n" }
+    }
+    return { %{ $CHANNEL_CAPS_DEFAULT{$channel} || { day => 0, week => 0, month => 0 } }, source => 'fail-safe' };
 }
 
 # load($c, %o) -> { data => {...}, source => 'file'|'perl_default', path, errors => [] }
@@ -406,6 +461,7 @@ sub all_slugs {
 
 sub knob {
     my ($class, $loaded, $k) = @_;
+    return $class->channel_caps($loaded, 'openrouter')->{ $KNOB_CAP{$k} } if $KNOB_CAP{$k};   # shared cap file first
     my $d = $loaded->{data} || $loaded;
     return defined $d->{$k} ? $d->{$k} : $KNOB_DEFAULTS{$k};
 }

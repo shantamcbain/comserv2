@@ -59,16 +59,30 @@ sub db_row {
 }
 
 # Decrypted key from the DB, or { key => undef, why => ... }.
+# Oct 30 2026: the default path is Comserv::Util::AI::UserKeys->get_user_key (own row -> site row -> owner/system row;
+# key_type aware; any service slug). A caller may still inject o{db_row} (tests).
 sub from_db {
     my ($class, $c, $service, %o) = @_;
-    my $finder = $o{db_row} || sub { $class->db_row(@_) };
+    unless ($o{db_row}) {
+        require Comserv::Util::AI::UserKeys;
+        my $r;
+        for my $try (1, 2) {
+            $r = Comserv::Util::AI::UserKeys->get_user_key($c, $service, %o, allow_owner => 1);
+            last unless ($r->{why} // '') eq 'db_unavailable';
+            _log($c, 'warn', "DB key lookup for $service failed (try $try)");
+            eval { ($o{schema} || $c->model('DBEncy')->schema)->storage->disconnect } if $try == 1;
+        }
+        _log($c, 'error', "DB key row for $service could not be decrypted; check API_KEY_ENCRYPTION_KEY") if ($r->{why} // '') eq 'decrypt_failed';
+        return { key => undef, why => $r->{why} } unless $r->{key};
+        return { %$r, source => "db_" . ($r->{scope} eq 'owner' ? 'global' : $r->{scope}) };
+    }
+    my $finder = $o{db_row};
     my ($row, $scope, $err);
     for my $try (1, 2) {
         ($row, $scope) = eval { $finder->($c, $service, %o) };
         $err = $@;
         last unless $err;
         _log($c, 'warn', "DB key lookup for $service failed (try $try): " . substr("$err", 0, 160));
-        # stale connection (e.g. first request after an idle night): reconnect once
         eval { ($o{schema} || $c->model('DBEncy')->schema)->storage->disconnect } if $try == 1;
     }
     return { key => undef, why => 'db_unavailable' } if $err;
@@ -78,7 +92,9 @@ sub from_db {
         _log($c, 'error', "DB key row for $service ($scope scope) could not be decrypted; check API_KEY_ENCRYPTION_KEY");
         return { key => undef, why => 'decrypt_failed' };
     }
-    return { key => $k, source => "db_$scope" };
+    my $ko = 'owner';
+    if (($scope // '') eq 'user') { require Comserv::Util::AI::UserKeys; my $ru = eval { $row->user_id }; $ko = (defined $ru && $ru == Comserv::Util::AI::UserKeys->owner_user_id) ? 'owner' : 'user' }
+    return { key => $k, source => 'db_' . ($scope // 'row'), key_owner => $ko, row_id => scalar(eval { $row->id }), user_id => scalar(eval { $row->user_id }) };
 }
 
 # Last-resort sources. Order: container secret, env, workstation secret file.
