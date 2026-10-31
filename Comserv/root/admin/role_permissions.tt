@@ -1,0 +1,90 @@
+[% META
+  title = 'Role Permissions'
+  roles = 'admin'
+  TemplateType = 'Application'
+  category = 'admin,security'
+%]
+<style>
+.rp-wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+.rp-wrap table { width: 100%; border-collapse: collapse; font-size: 0.92em; }
+.rp-wrap th { background: var(--header-bg, #f0f0f0); padding: 7px 9px; text-align: left; }
+.rp-wrap td { padding: 6px 9px; border-bottom: 1px solid var(--border-color, #eee); }
+.rp-wrap form.inline { display: inline; }
+.rp-wrap .banner { padding: 10px 14px; border-radius: 4px; margin-bottom: 14px; }
+.rp-wrap .err { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; }
+.rp-wrap .ok  { background: #e8f5e9; border: 1px solid #a5d6a7; color: #1b5e20; }
+.rp-wrap .info{ background: #e3f2fd; border: 1px solid #90caf9; }
+.rp-wrap .btn { padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; }
+.rp-wrap .btn-primary { background: #2196f3; color: #fff; } .rp-wrap .btn-danger { background: #c62828; color: #fff; }
+</style>
+<div class="rp-wrap">
+  <h1><i class="fas fa-user-shield"></i> Role Permissions</h1>
+  [% IF c.flash.error_msg %]<div class="banner err">[% c.flash.error_msg | html %]</div>[% END %]
+  [% IF c.flash.status_msg %]<div class="banner ok">[% c.flash.status_msg | html %]</div>[% END %]
+  <div class="banner info">
+    Each row lets a <b>role</b> (from user site roles) do one <b>action</b> on one <b>module</b>, on one site or on every site (blank).
+    <b>Own only</b> limits it to records the user owns (todo: user_id, owner, poster or developer).
+    <b>Requires grant</b> means the row only applies when the user has that module granted on the site (e.g. subscribed to <i>planning</i>).
+    Roles: [% real_roles.join(', ') | html %]. Admins and developers always pass. guest and user hold no rights; the site <i>none</i> grants nothing. Module switches in <a href="/admin/site_modules">Site Modules</a> still apply.
+    [% IF !table_ok %]<br><b>The role_permissions table does not exist yet.</b> Create it in <a href="/admin/schema_compare">Schema Compare</a>.
+    [% END %]
+  </div>
+  [% IF table_ok && !rbac_on %]
+  <div class="banner err">
+    <b>Warning: the table is empty, so the old hard-coded role lists are in force.</b>
+    The <b>first row</b> you save switches every non-admin user and bot to these data rules: anyone without a matching row loses access.
+    The starter rows below follow the current role rules: editor keeps today's access; normal and member get their own todos and calendar only when subscribed to planning;
+    helpdesk gets no todo/project rows (HelpDesk tickets are not affected); guest and user get nothing.
+    <table style="margin:8px 0">
+      <tr><th>Role</th><th>Module</th><th>Action</th><th>Site</th><th>Own only</th><th>Requires grant</th></tr>
+      [% FOREACH r IN starter %]<tr><td>[% r.role | html %]</td><td>[% r.module | html %]</td><td>[% r.action | html %]</td><td>(any site)</td><td>[% r.own_only ? 'yes' : 'no' %]</td><td>[% r.requires_grant || '-' | html %]</td></tr>[% END %]
+    </table>
+    <form method="post" action="[% c.uri_for('/admin/role_permissions/starter') %]">
+      <input type="hidden" name="csrf" value="[% rp_csrf | html %]">
+      <button class="btn btn-primary" type="submit">Add starter rows matching current access</button>
+    </form>
+  </div>
+  [% END %]
+
+  <h3>Add a row</h3>
+  <form method="post" action="[% c.uri_for('/admin/role_permissions/save') %]">
+    <input type="hidden" name="csrf" value="[% rp_csrf | html %]">
+    Role <input name="role" size="12" required list="rp-roles" placeholder="normal">
+    <datalist id="rp-roles">[% FOREACH r IN real_roles %]<option value="[% r | html %]">[% END %]</datalist>
+    Module <input name="module" size="12" required placeholder="todo">
+    Action <select name="action">[% FOREACH a IN actions %]<option>[% a | html %]</option>[% END %]</select>
+    Site <select name="sitename"><option value="">(any site)</option>[% FOREACH s IN sitenames %]<option>[% s | html %]</option>[% END %]</select>
+    <label><input type="checkbox" name="own_only" value="1"> own only</label>
+    Requires grant <input name="requires_grant" size="10" placeholder="planning">
+    [% IF table_ok && !rbac_on %]<label><input type="checkbox" name="confirm_first" value="1"> I understand this first row switches everyone to data rules</label>[% END %]
+    <button class="btn btn-primary" type="submit">Add</button>
+  </form>
+
+  <h3>Rows ([% perms.size %])</h3>
+  <table>
+    <tr><th>Role</th><th>Module</th><th>Action</th><th>Site</th><th>Own only</th><th>Requires grant</th><th></th></tr>
+    [% FOREACH p IN perms %]
+    <tr>
+      [% fid = 'rpf' _ p.id %]
+      <td><input form="[% fid %]" name="role" size="12" value="[% p.role | html %]"></td>
+      <td><input form="[% fid %]" name="module" size="12" value="[% p.module | html %]"></td>
+      <td><select form="[% fid %]" name="action">[% FOREACH a IN actions %]<option[% IF a == p.action %] selected[% END %]>[% a | html %]</option>[% END %]</select></td>
+      <td><select form="[% fid %]" name="sitename"><option value="">(any site)</option>[% FOREACH s IN sitenames %]<option[% IF s == p.sitename %] selected[% END %]>[% s | html %]</option>[% END %]</select></td>
+      <td><input form="[% fid %]" type="checkbox" name="own_only" value="1"[% IF p.own_only %] checked[% END %]></td>
+      <td><input form="[% fid %]" name="requires_grant" size="10" value="[% p.requires_grant | html %]"></td>
+      <td>
+        <form class="inline" id="[% fid %]" method="post" action="[% c.uri_for('/admin/role_permissions/save') %]">
+          <input type="hidden" name="csrf" value="[% rp_csrf | html %]">
+          <input type="hidden" name="id" value="[% p.id | html %]">
+          <button class="btn btn-primary" type="submit">Save</button>
+        </form>
+        <form class="inline" method="post" action="[% c.uri_for('/admin/role_permissions/delete') %]" onsubmit="return confirm('Delete this row?');">
+          <input type="hidden" name="csrf" value="[% rp_csrf | html %]">
+          <input type="hidden" name="id" value="[% p.id | html %]">
+          <button class="btn btn-danger" type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+    [% END %]
+  </table>
+</div>

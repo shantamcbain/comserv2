@@ -4,6 +4,9 @@ use Test::More;
 use File::Temp qw(tempdir);
 use FindBin; use lib "$FindBin::Bin/../lib";
 use JSON::PP;
+# Oct 31 2026 (Shanta): caps come from the shared caps file mechanism, pointed at a fixed test file, never hard-coded here.
+BEGIN { $ENV{COMSERV_AI_CAPS_FILE} = "$FindBin::Bin/data/ai_caps_guard_test.json" }
+my $TCAPS = do { open my $fh, '<', $ENV{COMSERV_AI_CAPS_FILE} or die "caps test file: $!"; local $/; JSON::PP::decode_json(<$fh>)->{openrouter} };
 use Comserv::Util::AI::HermesOverrunGuard;
 my $G = 'Comserv::Util::AI::HermesOverrunGuard';
 $Comserv::Util::AI::HermesOverrunGuard::COOLDOWN_S = 0;   # Oct 23: legacy tests restore within minutes; cool-down tested below
@@ -19,7 +22,7 @@ is $G->can('decide')->(thrash => 5, openrouter => $ok, state => {})->{action}, '
 my $d = $G->can('decide')->(thrash => 20, openrouter => $ok, state => {});
 is $d->{action}, 'trip', 'thrash 20 trips'; like $d->{reasons}[0], qr/thrash: 20/, 'thrash reason';
 is $G->can('decide')->(thrash => 19, openrouter => $ok, state => {})->{action}, 'none', 'thrash 19 ok';
-for ([day => 1.65], [week => 11.5], [month => 50]) {
+for (map { [$_ => $TCAPS->{$_}] } qw(day week month)) {
     my ($w, $v) = @$_;
     my $r = $G->can('decide')->(thrash => 0, openrouter => { %$ok, "${w}_usd" => $v }, state => {});
     is $r->{action}, 'trip', "$w cap trips at $v"; like "@{$r->{reasons}}", qr/$w/, "$w reason";
@@ -58,7 +61,8 @@ sub guard {
 }
 my $h = home();
 my ($g, $set) = guard($h, now => 1000000);
-my $r = $g->run(thrash => 3, openrouter => { %$ok, week_usd => 15.89 });
+# Oct 31 2026: lite reuse needs a fresh snapshot (fetched_at, commit d17fb91f5); give the trip reading one.
+my $r = $g->run(thrash => 3, openrouter => { %$ok, week_usd => 15.89, fetched_at => 1000000 });
 is $r->{action}, 'trip', 'run trips on week';
 is $r->{target}, 'openrouter/cohere/north-mini-code:free', 'switched to cheapest';
 ok $r->{backup} && -f $r->{backup}, 'config backed up';
@@ -176,7 +180,7 @@ is $G->can('restore_model_decision')->(current_default => 'openrouter/cohere/nor
     is $r->{action}, 'restore', 'alias restore';
     ok $r->{preserved_manual}, 'preserved manual flag';
     is $g->current_model->{default}, 'openrouter/deepseek/deepseek-v4-flash-0731', 'hand-set default kept';
-    is $g->read_aliases->{code}, 'xai-oauth/grok-build-0.1', 'code alias restored to Super Grok, never v4-pro';
+    is $g->read_aliases->{code}, 'xai-oauth/grok-4.7', 'code alias restored to Super Grok grok-4.7 (Oct 31: no grok-build), never v4-pro';
 }
 
 # ---- Oct 6 2026: valid ids, Super Grok on thrash, safe fallback/aux, self-heal ----
@@ -192,7 +196,7 @@ is $G->can('restore_model_decision')->(current_default => 'openrouter/cohere/nor
     is $G->can('trip_kind')->(['thrash: 24', 'OpenRouter day $2 over $1.65 cap']), 'caps', 'caps kind';
 
     my $t = $pick->(or_ids => $IDS, supergrok => $SG_OK, kind => 'thrash', ollama_models => []);
-    is $t->{provider}, 'xai-oauth', 'thrash prefers Super Grok'; is $t->{default}, 'grok-build-0.1', 'Super Grok id';
+    is $t->{provider}, 'xai-oauth', 'thrash prefers Super Grok'; is $t->{default}, 'grok-4.7', 'Super Grok id (Oct 31: grok-4.7)';
     is $pick->(or_ids => $IDS, supergrok => $SG_OK, kind => 'caps')->{default}, 'grok-4.7', '$ caps + Super Grok budget -> grok-4.7 (proposal #34a, eval report 35)';
     is $pick->(or_ids => $IDS, supergrok => { %$SG_OK, locked => 1 }, kind => 'caps')->{default}, 'cohere/north-mini-code:free', '$ caps, Super Grok locked -> free';
     is $pick->(or_ids => $IDS, supergrok => { %$SG_OK, locked => 1 }, kind => 'thrash')->{default}, 'cohere/north-mini-code:free', 'locked Super Grok -> free';
@@ -202,8 +206,9 @@ is $G->can('restore_model_decision')->(current_default => 'openrouter/cohere/nor
 
     my $fc = $G->can('fallback_chain')->(or_ids => $IDS, supergrok => $SG_OK, ollama_models => undef);
     is_deeply [ map { "$_->{provider}/$_->{model}" } @$fc ],
-        [ 'xai-oauth/grok-build-0.1', 'openrouter/cohere/north-mini-code:free', 'ollama-launch/gemma4-64k:latest',
-          'openrouter/nvidia/nemotron-3.5-lightning:free' ], 'permanent chain: Super Grok > north-mini > 64K Ollama > nemotron';
+        [ 'openrouter/cohere/north-mini-code:free', 'ollama-launch/gemma4-64k:latest',
+          'openrouter/nvidia/nemotron-3.5-lightning:free' ], 'permanent chain (Oct 31: no grok-build first): north-mini > 64K Ollama > nemotron';
+    ok !grep({ $_->{model} =~ /grok-build/ } @$fc), 'chain never grok-build';
     ok !grep({ $_->{model} =~ /v4-pro/ } @$fc), 'chain never v4-pro';
 
     my $bad = $G->can('fallback_bad')->(or_ids => $IDS, current => [
@@ -281,7 +286,7 @@ sub cb_for {
     # dry run first: shows what would be written, writes nothing
     my $dry = $G->new(home => $h, app_root => $h, no_ledger => 1, base_urls => [], ollama_url => 'http://127.0.0.1:9',
                       or_ids => $IDS, supergrok => $SG_OK, now => 7000000, dry_run => 1)->run(thrash => 25, openrouter => { ok => 1, day_usd => 0, week_usd => 0, month_usd => 0 });
-    is $dry->{would}{trip}{model}{default}, 'grok-build-0.1', 'dry-run trip (thrash) -> Super Grok';
+    is $dry->{would}{trip}{model}{default}, 'grok-4.7', 'dry-run trip (thrash) -> Super Grok grok-4.7';
     my $dryj = JSON::PP->new->canonical->encode([ $dry->{would}{trip}, $dry->{would}{restore} ]);
     unlike $dryj, qr/v4-pro|"openrouter\/openrouter|default":"openrouter\//, 'dry-run plans: no v4-pro, no double prefix';
     ok !-e "$h/.hermes/overrun_guard_state.json", 'dry run wrote no state';
@@ -291,11 +296,12 @@ sub cb_for {
     is $g->current_model->{provider}, 'xai-oauth', 'thrash trip keeps/sets Super Grok';
     my $cfg = do { local (@ARGV, $/) = "$h/.hermes/config.yaml"; <> };
     unlike $cfg, qr/v4-pro/, 'trip removed v4-pro fallback';
-    like $cfg, qr/fallback_providers:\n  - provider: xai-oauth\n    model: grok-build-0.1\n  - provider: openrouter\n    model: cohere\/north-mini-code:free/, 'fallback chain Super Grok first then free';
+    like $cfg, qr/fallback_providers:\n  - provider: openrouter\n    model: cohere\/north-mini-code:free/, 'fallback chain free first (Oct 31: no grok-build)';
+    unlike $cfg, qr/grok-build-0\.1\n  - provider/, 'no grok-build fallback entry';
     like $cfg, qr/title_generation:\n    provider: openrouter\n    model: cohere\/north-mini-code:free/, 'aux title_generation -> :free';
     like $cfg, qr/toolsets:\n  - hermes-cli/, 'rest of config intact';
     is $g->read_aliases->{code}, 'xai-oauth/grok-build-0.1', 'Super Grok coding alias untouched';
-    is $g->read_aliases->{delegate}, 'xai-oauth/grok-build-0.1', 'paid delegate alias -> Super Grok while tripped';
+    is $g->read_aliases->{delegate}, 'xai-oauth/grok-4.7', 'paid delegate alias -> Super Grok grok-4.7 while tripped';
     my ($g2) = $G->new(home => $h, app_root => $h, no_ledger => 1, no_notify => 1, base_urls => [], ollama_url => 'http://127.0.0.1:9',
                        or_ids => $IDS, supergrok => $SG_OK, now => 7000600, set_cb => cb_for($h, \@log));
     $r = $g2->run(thrash => 1, openrouter => { ok => 1, day_usd => 0, week_usd => 0, month_usd => 0 });
@@ -772,9 +778,6 @@ ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID
     ok !$mk->($now + 1900)->read_state->{paid_block_only}, 'paid_block_only cleared';
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
 # ---- Oct 28 2026: flapping fix (trip held until an AUTHORITATIVE reading is under every cap; 2 consecutive clear runs) ----
 {
     my $dc = $G->can('decide');
@@ -815,7 +818,6 @@ ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID
     like do { local (@ARGV, $/) = "$h2/.hermes/overrun_notice.txt"; <> }, qr/RESTORED/, 'restore notice written';
 }
 
->>>>>>> aisystem
 # Oct 29 2026 (Shanta, fix B): instance prefix, instance in state, version skip
 {
     my $G2 = 'Comserv::Util::AI::HermesOverrunGuard';
@@ -884,49 +886,6 @@ ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID
     is $st3->{guard_version_seen_at}, 2000000 + 12700, 'seen_at refreshed';
     open $lf, '<', "$h/.hermes/logs/overrun_guard.log"; my $all = do { local $/; <$lf> }; close $lf;
     like $all, qr/\[:4005 planning\] TOOK OVER: newest guard version \d+ \(from cron aisystem\) not seen since/, 'TOOK OVER logged';
-<<<<<<< HEAD
-=======
-# ---- Oct 28 2026: flapping fix (trip held until an AUTHORITATIVE reading is under every cap; 2 consecutive clear runs) ----
-{
-    my $dc = $G->can('decide');
-    my $ov = { ok => 1, day_usd => 6.31, week_usd => 10.4, month_usd => 56.2 };
-    my %caps = (day => 3, week => 15, month => 65);
-    # the 11:03:59 bug: usage_live unreachable -> merge_live fell back to the agent.log estimate {ok=>1, day_usd=>0.05, live_only=>1}
-    my $m = $G->can('merge_live')->({ ok => 0, error => 'usage_live unreachable' }, { ok => 1, day_usd => 0.047, calls => 97 });
-    ok $m->{ok} && $m->{live_only}, 'unreachable OpenRouter + live estimate -> live_only fallback reading (precondition of the old bug)';
-    is $dc->(thrash => 0, openrouter => $m, state => { tripped => 1 }, caps => \%caps)->{action}, 'hold', 'live-estimate-only reading can NOT restore a trip (was: restore at 11:03:59 with day $6.31 still over $3)';
-    is $dc->(thrash => 0, openrouter => { ok => 1, day_usd => 3.5, live_only => 1 }, state => {}, caps => \%caps)->{action}, 'trip', 'a live estimate over the cap can still trip';
-    is $dc->(thrash => 0, openrouter => { ok => 1, day_usd => 0.5 }, state => { tripped => 1 }, caps => \%caps)->{action}, 'hold', 'reading missing week/month figures: no restore';
-    is $dc->(thrash => 0, openrouter => { ok => 1, day_usd => 0.5, week_usd => 2, month_usd => 9, stale => 1 }, state => { tripped => 1 }, caps => \%caps)->{action}, 'hold', 'stale-flagged reading: no restore';
-    is $dc->(thrash => 0, openrouter => $ov, state => { tripped => 1 }, caps => \%caps)->{action}, 'hold', 'day still $6.31 over $3 -> hold';
-    is $dc->(thrash => 0, openrouter => { ok => 1, day_usd => 0.5, week_usd => 2, month_usd => 9 }, state => { tripped => 1 }, caps => \%caps)->{action}, 'restore', 'authoritative clear reading -> restore (unchanged)';
-    ok scalar(() = $G->can('paid_room_why')->({ ok => 1, day_usd => 0.05, live_only => 1 }, \%caps, [])) > 0, 'live-only reading is not "paid room" either';
-
-    # run(): two consecutive authoritative clear runs required (CLEAR_RUNS=2); an over/unknown run in between resets the count
-    local $Comserv::Util::AI::HermesOverrunGuard::CLEAR_RUNS = 2;
-    my $h2 = home();
-    my $clear = { ok => 1, day_usd => 0.5, week_usd => 2, month_usd => 9 };
-    my $over  = { ok => 1, day_usd => 6.31, week_usd => 10.4, month_usd => 56.2 };
-    my %run = (force => 1, thrash => 0, thrash_by_class => { ok => 1, counts => {} }, live => { ok => 0 });
-    my ($g1) = guard($h2, now => 2000000);
-    is $g1->run(%run, openrouter => { %$over })->{action}, 'trip', 'trip on day over cap';
-    ($g1) = guard($h2, now => 2000600);
-    is $g1->run(%run, openrouter => { %$clear })->{action}, 'hold', 'first clear run -> hold (1 of 2)';
-    is $g1->read_state->{clear_streak}, 1, 'clear_streak recorded';
-    ($g1) = guard($h2, now => 2000660);
-    is $g1->run(%run, openrouter => { %$over })->{action}, 'hold', 'over again -> hold';
-    is $g1->read_state->{clear_streak}, 0, 'over reading resets the streak';
-    ($g1) = guard($h2, now => 2000720);
-    is $g1->run(%run, openrouter => { ok => 1, day_usd => 0.05, live_only => 1 })->{action}, 'hold', 'live-only run does not count as clear';
-    ($g1) = guard($h2, now => 2000780);
-    is $g1->run(%run, openrouter => { %$clear })->{action}, 'hold', 'clear 1 of 2 again';
-    ($g1) = guard($h2, now => 2000840);
-    is $g1->run(%run, openrouter => { %$clear })->{action}, 'restore', 'second consecutive clear run -> restore';
-    ok !exists $g1->read_state->{clear_streak}, 'streak cleared after restore';
-    like do { local (@ARGV, $/) = "$h2/.hermes/overrun_notice.txt"; <> }, qr/RESTORED/, 'restore notice written';
->>>>>>> aisystem
-=======
->>>>>>> aisystem
 }
 
 done_testing();

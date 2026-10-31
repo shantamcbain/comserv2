@@ -508,6 +508,16 @@ sub auto :Private {
         $c->stash->{user_id} = $user_id;
         $c->stash->{user_roles} = $user_roles;
         $c->stash->{is_admin} = $is_admin;
+        # Global admin by the STORED users.roles (session roles include site roles
+        # merged at login). Used for links to global-only pages such as
+        # /admin/role_permissions. One PK lookup, only for admins.
+        $c->stash->{is_global_admin} = 0;
+        if ($is_admin && $user_id) {
+            $c->stash->{is_global_admin} = eval {
+                require Comserv::Util::AccessCheck;
+                Comserv::Util::AccessCheck->is_global_admin($c->model('DBEncy'), $user_id)
+            } ? 1 : 0;
+        }
 
         # Durable CSC-admin capability flag for the site switcher.
         # AdminAuth->is_csc_admin() returns false once a CSC admin has *switched*

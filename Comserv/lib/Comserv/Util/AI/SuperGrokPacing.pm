@@ -80,9 +80,13 @@ sub alert_config {
 # Daily Super Grok budget (Oct 9 2026). The switch itself is owned by
 # ~/.hermes/scripts/supergrok_daily_guard.py, which reads daily_budget from
 # GET /ai/usage_pacing_json; this module only does the arithmetic.
-# data/supergrok_pacing.json keys: week_off_at (90), extra_today_pct +
+# data/supergrok_pacing.json keys: week_off_at (100; was 90 before Oct 31 2026), extra_today_pct +
 # extra_today_date (YYYY-MM-DD PT), allow_overrun_date (YYYY-MM-DD PT).
-our $WEEK_OFF_AT = 90;
+# Oct 31 2026 (Shanta): both Groks should land at 100% at or just before the reset; an hour
+# or two on paid after that is fine. Even line: budget = (100 - used at day start) / days left,
+# and in the final window (<= 1 day to reset) the rest of the week is allowed today.
+our $WEEK_OFF_AT = 100;
+our $FINAL_WINDOW_DAYS = 1;
 our $DAY_START_HOUR = 5;
 sub day_start_hour {
     my ($cfg) = @_;
@@ -110,8 +114,9 @@ sub daily_budget {
     my $dsh   = day_start_hour($cfg);
     my $today = pt_date($in{now}, $dsh);
     my $days  = ($in{reset} - $in{day_from}) / 86400;
+    my $final = $days <= $FINAL_WINDOW_DAYS ? 1 : 0;
     $days = 0.25 if $days < 0.25;
-    my $budget = ($woa - $in{used_day_start}) / $days;
+    my $budget = $final ? ($woa - $in{used_day_start}) : ($woa - $in{used_day_start}) / $days;
     $budget = 0 if $budget < 0;
     my $extra = (($cfg->{extra_today_date} // '') eq $today) ? ($num->($cfg->{extra_today_pct}) // 0) : 0;
     my $allow = (($cfg->{allow_overrun_date} // '') eq $today) ? 1 : 0;
@@ -127,6 +132,7 @@ sub daily_budget {
         effective_budget_pct => sprintf('%.1f', $eff), used_today_pct => sprintf('%.1f', $used_today),
         remaining_today_pct => sprintf('%.1f', ($eff - $used_today > 0 ? $eff - $used_today : 0)),
         allow_overrun => $allow, override_active => (($allow || $extra > 0) ? 1 : 0),
+        final_window => $final, used_basis => ($in{used_basis} // 'estimate'),
         over => $over, week_off => $week_off, switch_off => (($over || $week_off) ? 1 : 0),
         reason => ($week_off ? sprintf('week %.0f%% >= %s%%', $in{used}, $woa)
                   : $over ? sprintf('today %.1f%% >= budget %.1f%%%s', $used_today, $eff, $extra ? sprintf(' (incl. +%.1f extra)', $extra) : '')
@@ -309,8 +315,18 @@ sub pacing {
         day_from_pt => pt($day_from), used_day_start_pct => sprintf('%.1f', $used_day_start),
         day_rise_pct => sprintf('%.1f', $used - $used_day_start),
     );
-    $o{daily_budget} = daily_budget(used => $used, used_day_start => $used_day_start, day_from => $day_from,
-                                    reset => $reset, now => $now, cfg => $in{daily_cfg});
+    # Oct 31 2026 (Shanta): the daily budget's 'current %' is the add-on's live reading when it is
+    # fresh (< 2 h, first seen this cycle); else the newest stored reading + token estimate.
+    my ($db_used, $db_basis) = ($used, 'estimate');
+    if (my $m = $in{meter_now}) {
+        if (defined $m->{value} && $m->{value} =~ /^\d+(?:\.\d+)?$/ && $m->{at}
+            && $m->{at} >= $cs && ($m->{changed_at} // $m->{at}) >= $cs && $now - $m->{at} < 2 * 3600) {
+            ($db_used, $db_basis) = (0 + $m->{value}, 'meter');
+        }
+    }
+    my $db_day_start = $used_day_start > $db_used ? $db_used : $used_day_start;
+    $o{daily_budget} = daily_budget(used => $db_used, used_day_start => $db_day_start, day_from => $day_from,
+                                    reset => $reset, now => $now, cfg => $in{daily_cfg}, used_basis => $db_basis);
     $o{day_start_hour} = $dsh;
     # 2026-10-18: a grok.com meter value under 2 h old beats the token estimate
     # for the burn alerts (estimate said 44 %, meter 36 %).
