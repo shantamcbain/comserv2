@@ -277,9 +277,124 @@ sub toggle_start {
     return $result;
 }
 
+# A recurring template is the clock. Stop/Done must not close it.
+# The log row for that calendar day is the lock.
+sub _is_occurrence_template {
+    my ($todo) = @_;
+    return 0 unless $todo;
+    return 1 if eval { $todo->is_recurring };
+    my $comments = eval { $todo->comments } // '';
+    return $comments =~ /hk_day_slot:/ ? 1 : 0;
+}
+
+sub occurrence_lock_marker {
+    my ($class, $date) = @_;
+    return undef unless defined $date && $date =~ /^(\d{4}-\d{2}-\d{2})$/;
+    return "occurrence_lock:$1";
+}
+
+sub locked_on_date {
+    my ($class, $c, $date, $ids) = @_;
+    my $marker = $class->occurrence_lock_marker($date) or return {};
+    my @ids = grep { defined $_ && $_ =~ /^\d+$/ } @{ $ids || [] };
+    return {} unless @ids && $c;
+    my $dbh = eval { $c->model('DBEncy')->storage->dbh };
+    return {} unless $dbh;
+    my $in = join(',', @ids);
+    my $sth = $dbh->prepare(
+        "SELECT DISTINCT todo_record_id FROM log WHERE comments LIKE ? AND todo_record_id IN ($in)"
+    );
+    $sth->execute('%' . $marker . '%');
+    my %locked;
+    while ( my ($id) = $sth->fetchrow_array ) {
+        $locked{$id} = 1;
+    }
+    return \%locked;
+}
+
+# Write one completed log for this calendar day. Do not change the template
+# status to done, and do not replace the template comments.
+sub lock_occurrence {
+    my ($class, $c, %args) = @_;
+    my $record_id = $args{record_id} or die "Missing record_id\n";
+    my $username  = $args{username} // 'api';
+    my $kind      = ($args{kind} // '') eq 'stop' ? 'stop' : 'done';
+    my ( $today, $now_hms ) = _clock($c);
+    my $lock_date = $class->occurrence_lock_marker($args{lock_date})
+        ? $args{lock_date}
+        : $today;
+    my $marker = $class->occurrence_lock_marker($lock_date);
+
+    my $result = try {
+        my ($dbh, $todo, $proj_code) = _todo_ctx($c, $record_id);
+        die "Not a recurring occurrence\n" unless _is_occurrence_template($todo);
+
+        my $existing = $dbh->selectrow_hashref(
+            'SELECT record_id FROM log WHERE todo_record_id=? AND comments LIKE ? LIMIT 1',
+            undef, $record_id, '%' . $marker . '%'
+        );
+        my $st = eval { $todo->status } // '';
+        if ("$st" eq '5') {
+            $dbh->do(
+                'UPDATE todo SET status=1, last_mod_by=?, last_mod_date=? WHERE record_id=?',
+                undef, $username, $today, $record_id
+            );
+            $st = 1;
+        }
+        if ($existing) {
+            return {
+                success => 1, already_locked => 1, locked => 1,
+                log_id => $existing->{record_id}, lock_date => $lock_date,
+                todo_status => $st,
+            };
+        }
+
+        my $summary = $args{summary} // '';
+        $summary = ($kind eq 'stop' ? 'Stopped' : 'Done')
+            . " $lock_date: " . ($todo->subject // '')
+            if $summary eq '';
+        $summary .= " [$args{note}]" if defined $args{note} && length $args{note};
+        my $log_comments = "$marker $kind\n$summary";
+
+        my $open_row = _open_log_row($dbh, $record_id);
+        if ($open_row) {
+            my ($dur_hms, $dur_mins) = _duration_hms($open_row->{start_time}, $now_hms);
+            $dbh->do(
+                'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, start_date=?, comments=? WHERE record_id=?',
+                undef, $now_hms, $dur_hms, $username, $today, $lock_date, $log_comments, $open_row->{record_id}
+            );
+            return {
+                success => 1, locked => 1, log_id => $open_row->{record_id},
+                lock_date => $lock_date, duration_mins => $dur_mins, todo_status => $st,
+            };
+        }
+
+        $dbh->do(
+            'INSERT INTO log (todo_record_id, username, sitename, project_code, abstract, details, start_date, due_date, start_time, end_time, time, status, priority, last_mod_by, last_mod_date, group_of_poster, comments) VALUES (?,?,?,?,?,?,?,?,?,?,?,3,?,?,?,?,?)',
+            undef,
+            $record_id, $username, (eval { $todo->sitename } || ''), $proj_code,
+            "Locked $lock_date: " . ($todo->subject // ''),
+            $summary,
+            $lock_date, $lock_date,
+            $now_hms, $now_hms, '00:01:00',
+            (eval { $todo->priority } // 5), $username, $today,
+            ($c->session->{group} || ''), $log_comments
+        );
+        my $new_id = $dbh->last_insert_id(undef, undef, 'log', 'record_id');
+        return {
+            success => 1, locked => 1, log_id => ($new_id // 0),
+            lock_date => $lock_date, duration_mins => 1, todo_status => $st,
+        };
+    } catch {
+        die $_;
+    };
+    return $result;
+}
+
 # ===========================================================================
 # PUBLIC: close_log — stop work WITHOUT marking done. Graceful when no log
 # is open (returns graceful flag; caller logs at warn, never error).
+# A recurring template is locked to lock_date (or viewer today) instead.
 #   { success, log_id, duration_mins, todo_status } or { success=>0, graceful=>1 }
 # ===========================================================================
 sub close_log {
@@ -301,6 +416,17 @@ sub close_log {
         }
         die $@ if $@;
         $todo or die "Todo not found\n";
+
+        if ( _is_occurrence_template($todo) ) {
+            return $class->lock_occurrence($c,
+                record_id => $record_id,
+                username  => $username,
+                summary   => $summary,
+                note      => $args{note},
+                lock_date => $args{lock_date},
+                kind      => 'stop',
+            );
+        }
 
         my $open_row = _open_log_row($dbh, $record_id);
         unless ($open_row) {
@@ -354,6 +480,17 @@ sub done_with_log {
 
     my $result = try {
         my ($dbh, $todo, undef) = _todo_ctx($c, $record_id);
+
+        if ( _is_occurrence_template($todo) ) {
+            return $class->lock_occurrence($c,
+                record_id => $record_id,
+                username  => $username,
+                summary   => $summary,
+                note      => $args{note},
+                lock_date => $args{lock_date},
+                kind      => 'done',
+            );
+        }
 
         my $done_summary = $summary ne '' ? $summary
                            : ('Done: ' . ($todo->subject // '') . " by $username");

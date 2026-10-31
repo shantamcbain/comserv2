@@ -2120,6 +2120,17 @@ sub day :Path('/todo/day') :Args {
         # Overdue items are intentionally NOT pushed into today's day view.
     }
 
+    # Request filter only. Does not change the session calendar filter.
+    # filter=schedule is the Health Kitchen day: recurring personal blocks.
+    if ( ($c->req->param('filter') // '') eq 'schedule' ) {
+        @today_todos = grep {
+            my $comments = eval { $_->comments } // '';
+            $comments =~ /hk_day_slot:/;
+        } @today_todos;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
+            "filter=schedule -> " . scalar(@today_todos) . " day blocks");
+    }
+
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
         "Branch='$cur_branch' scope=" . scalar(keys %branch_scope)
         . " -> " . scalar(@today_todos) . " scheduled todos (overdue excluded from day view)");
@@ -2177,6 +2188,14 @@ sub day :Path('/todo/day') :Args {
         %active_todos = map { $_ => 1 } @$rows if $rows;
     };
 
+    my %occurrence_locked;
+    eval {
+        my @ids = map { $_->record_id } @today_todos;
+        %occurrence_locked = %{ Comserv::Util::TodoLog->locked_on_date($c, $date, \@ids) };
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'day',
+        "occurrence lock lookup failed: $@") if $@;
+
     $c->stash(
         todos                  => \@today_todos,
         overdue_todos          => \@overdue_todos,
@@ -2192,6 +2211,7 @@ sub day :Path('/todo/day') :Args {
         cal_filter_site  => do { my $sf = $c->session->{cal_filter_site} // ''; $sf ? $sf : ($c->session->{SiteName} || '') },
         cal_filter_user        => ($c->session->{cal_filter_user} // ''),
         active_todos           => \%active_todos,
+        occurrence_locked      => \%occurrence_locked,
         template               => 'todo/day.tt',
     );
 
@@ -3717,6 +3737,7 @@ sub close_log :Path('close_log') :Args(0) {
             record_id => $record_id,
             username  => ($username || $data->{actor} // 'api'),
             summary   => ($data->{notes} // $data->{summary} // ''),
+            lock_date => $data->{lock_date},
         );
     };
     if ($@ || !$res || !$res->{success}) {
@@ -3741,6 +3762,8 @@ sub close_log :Path('close_log') :Args(0) {
             : "Closed log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
     $c->response->body('{"ok":1,"duration_mins":' . ($res->{duration_mins} // 0)
         . ',"todo_status":' . ($res->{todo_status}//2)
+        . ',"locked":' . ($res->{locked} ? 1 : 0)
+        . ',"already_locked":' . ($res->{already_locked} ? 1 : 0)
         . ',"recovered":' . ($res->{recovered} ? 1 : 0) . '}');
 }
 
@@ -3761,6 +3784,11 @@ sub done_with_log :Path('done_with_log') :Args(0) {
     my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
     my $data;
     eval { require JSON; $data = JSON::decode_json($body) if $body; };
+    $data = {
+        record_id => $c->req->param('record_id'),
+        lock_date => $c->req->param('lock_date'),
+        notes     => $c->req->param('notes'),
+    } unless ref $data eq 'HASH' && $data->{record_id};
     my $record_id = $data->{record_id} if $data;
     unless ($record_id) {
         $c->response->status(400);
@@ -3776,6 +3804,7 @@ sub done_with_log :Path('done_with_log') :Args(0) {
             record_id => $record_id,
             username  => ($username || $data->{actor} // 'api'),
             summary   => ($notes // ''),
+            lock_date => $data->{lock_date},
         );
     };
     if ($@ || !$res || !$res->{success}) {
@@ -3788,7 +3817,10 @@ sub done_with_log :Path('done_with_log') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'done_with_log',
         "Todo $record_id marked done by $username" . ($res->{log_closed} ? " (log closed)" : " (completed log inserted)"));
-    $c->response->body('{"ok":1,"already_done":' . ($res->{already_done} ? 1 : 0) . ',"todo_status":' . ($res->{todo_status}//3) . '}');
+    $c->response->body('{"ok":1,"already_done":' . ($res->{already_done} ? 1 : 0)
+        . ',"locked":' . ($res->{locked} ? 1 : 0)
+        . ',"already_locked":' . ($res->{already_locked} ? 1 : 0)
+        . ',"todo_status":' . ($res->{todo_status}//3) . '}');
 }
 
 sub next_step :Path('next_step') :Args(0) {
