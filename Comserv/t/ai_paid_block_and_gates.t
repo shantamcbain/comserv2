@@ -25,6 +25,9 @@ my $high = { ok => 1, model => 'anthropic/claude-sonnet-5.5', review => { verdic
   my $v = $rv->gate_view($high);
   ok($v->{blocking} && !$v->{allow}, 'high finding blocks');
   is($v->{findings}[0]{issue}, 'SQL injection', 'finding shown');
+  my $reason_only = { ok => 1, review => { verdict => 'warn', correctness => 4, security => 5,
+      findings => [ { severity => 'medium', file => 'a.pm', line => 9, reason => 'shell interpolation' } ] } };
+  is($rv->gate_view($reason_only)->{findings}[0]{issue}, 'shell interpolation', 'finding reason is shown when issue is absent');
   my $low = { %$high, review => { %{ $high->{review} }, findings => [ { severity => 'low', issue => 'naming' } ] } };
   ok(!$rv->gate_view($low)->{blocking}, 'low finding does not block');
 }
