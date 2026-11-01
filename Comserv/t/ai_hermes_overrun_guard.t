@@ -297,7 +297,7 @@ sub cb_for {
     is $g->current_model->{provider}, 'xai-oauth', 'thrash trip keeps/sets Super Grok';
     my $cfg = do { local (@ARGV, $/) = "$h/.hermes/config.yaml"; <> };
     unlike $cfg, qr/v4-pro/, 'trip removed v4-pro fallback';
-    like $cfg, qr/fallback_providers:\n(?:  - provider: xai\n    model: grok-4\.7\n)?  - provider: openrouter\n    model: cohere\/north-mini-code:free/, 'fallback chain: optional paid x.ai, then free (Oct 31: no grok-build)';
+    like $cfg, qr/fallback_providers:\n(?:  - provider: xai\n    model: grok-4\.7\n)?  - provider: openrouter\n    model: cohere\/north-mini-code:free/, q{fallback chain: optional paid x.ai, then free (Oct 31: no grok-build)};
     unlike $cfg, qr/grok-build-0\.1\n  - provider/, 'no grok-build fallback entry';
     like $cfg, qr/title_generation:\n    provider: openrouter\n    model: cohere\/north-mini-code:free/, 'aux title_generation -> :free';
     like $cfg, qr/toolsets:\n  - hermes-cli/, 'rest of config intact';
