@@ -1421,12 +1421,27 @@ sub auto :Private {
 sub health :Path('/health') :Args(0) {
     my ($self, $c) = @_;
     
-    # Lightweight liveness check — no DB query, no session, no logging.
-    # Purpose: tell Docker the web process is alive and accepting connections.
-    # DB health is monitored separately by ContainerHealthMonitor.pl.
+    # Readiness check used by Docker HEALTHCHECK and HAProxy. No session, no
+    # logging. 200 only when the real DB (MariaDB/MySQL, not the SQLite
+    # fallback) answers and the core tables exist; otherwise 503 so HAProxy
+    # stops routing here (Oct 31 2026: production1 served 500s from an empty
+    # SQLite DB while /health said ok). Result cached per worker for
+    # <DBReadiness> health_cache_s seconds (default 5), so it stays cheap.
+    require Comserv::Util::DbReadiness;
+    my $s   = Comserv::Util::DbReadiness->settings($c->config);
+    my $dbh = eval { $c->model('DBEncy')->schema->storage->dbh };
+    my $r   = Comserv::Util::DbReadiness->check($dbh,
+        cache_s => $s->{health_cache_s}, tables => $s->{core_tables});
     $c->response->content_type('application/json');
-    $c->response->status(200);
-    $c->response->body('{"status":"ok"}');
+    $c->response->header('Cache-Control' => 'no-store');
+    if ($r->{ok}) {
+        $c->response->status(200);
+        $c->response->body('{"status":"ok","db":"ok"}');
+    } else {
+        (my $why = $r->{error} // 'db not ready') =~ s/["\\\x00-\x1f]/ /g;
+        $c->response->status(503);
+        $c->response->body(qq({"status":"unavailable","db":"$why"}));
+    }
     $c->detach;
     return;
 }

@@ -214,6 +214,29 @@ my %TARGET_HOSTS = (
     },
 );
 
+# A registered repo that is NOT a Comserv worktree. Key match is
+# case-insensitive because resolve_target lowercases the selector value.
+# Path comes only from worktrees.json — never from the browser.
+sub external_repo {
+    my ($self, $key) = @_;
+    return undef unless defined $key && length $key;
+    my $cfg = eval { _worktree_config() } || {};
+    my $ext = $cfg->{external_repos} || {};
+    return undef unless ref $ext eq 'HASH';
+    for my $k (keys %$ext) {
+        next unless lc($k) eq lc($key);
+        my $spec = $ext->{$k};
+        next unless ref $spec eq 'HASH';
+        return {
+            key         => lc($k),
+            label       => $spec->{label} || $k,
+            repo        => $spec->{repo} || '',
+            hermes_port => int($spec->{hermes_port} || 0),
+        };
+    }
+    return undef;
+}
+
 sub resolve_target {
     my ($self, $c, $target) = @_;
     $target = '' unless defined $target;
@@ -243,6 +266,33 @@ sub resolve_target {
     }
 
     unless ($spec) {
+        my $ext = $self->external_repo($target);
+        if ($ext) {
+            my $repo = $ext->{repo} || '';
+            unless ($repo =~ m{^/} && -d "$repo/.git") {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_target',
+                    "External repo '$ext->{key}' path missing or not a git checkout: $repo");
+                return {
+                    mode     => 'local',
+                    repo     => undef,
+                    host     => '', user => '', port => 22,
+                    label    => $ext->{label},
+                    key      => $ext->{key},
+                    external => 1,
+                    publish  => 0,
+                    error    => 'external repo path missing',
+                };
+            }
+            return {
+                mode     => 'local',
+                repo     => $repo,
+                host     => '', user => '', port => 22,
+                label    => $ext->{label},
+                key      => $ext->{key},
+                external => 1,
+                publish  => 1,
+            };
+        }
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_target',
             "Unknown git target '$target' -> falling back to local");
         return {
@@ -275,6 +325,18 @@ sub list_targets {
     my @out = ({ key => 'local', label => 'Local (this app host)' });
     for my $k (sort keys %TARGET_HOSTS) {
         push @out, { key => $k, label => $TARGET_HOSTS{$k}{label} // $k };
+    }
+    my $cfg = eval { _worktree_config() } || {};
+    my $ext = $cfg->{external_repos} || {};
+    if (ref $ext eq 'HASH') {
+        for my $k (sort keys %$ext) {
+            my $spec = $ext->{$k};
+            next unless ref $spec eq 'HASH';
+            push @out, {
+                key   => lc($k),
+                label => ($spec->{label} || $k) . ' (external repo)',
+            };
+        }
     }
     return \@out;
 }
@@ -802,6 +864,34 @@ sub get_tracking_info {
             $info->{ahead}  = $2;
         }
         return $info;
+    }
+
+    # External repo (not a Comserv worktree): publish the checked-out branch
+    # to that repo's own origin, the same way main publishes. Do not compare
+    # it to Comserv main.
+    my $ext_key = ($c && $c->stash) ? ($c->stash->{git_target} // '') : '';
+    my $ext = $self->external_repo($ext_key);
+    if ($ext && $ext->{repo} && -d "$ext->{repo}/.git") {
+        my $current = $self->get_current_branch($c);
+        if (defined $current && length $current && $current ne 'unknown') {
+            my $origin_ref = "origin/$current";
+            $info->{upstream} = $origin_ref;
+            $info->{external} = 1;
+            my $has = $self->_run($c, 'rev-parse', '--verify', '--quiet', "refs/remotes/$origin_ref");
+            if ($has->{success} && length($has->{output} // '')) {
+                my $cr = $self->_run($c, 'rev-list', '--left-right', '--count', "$origin_ref...HEAD");
+                my $counts = $cr->{output};
+                chomp $counts if defined $counts;
+                if ($counts && $counts =~ /^(\d+)\s+(\d+)$/) {
+                    $info->{behind} = $1;
+                    $info->{ahead}  = $2;
+                }
+            }
+            else {
+                $info->{publish_new} = 1;
+            }
+            return $info;
+        }
     }
 
     # --- Layer 2: primary checkout publishes to origin even with no @{u} --
@@ -1681,6 +1771,40 @@ sub build_worktree_list {
                 : undef,
         };
     }
+
+    # Repos that are not Comserv checkouts. No Catalyst port, no server cmd.
+    # The row is a git + Hermes target only. Files stay in their own tree.
+    my $ext = $cfg->{external_repos} || {};
+    if (ref $ext eq 'HASH') {
+        for my $name (sort keys %$ext) {
+            my $b = $ext->{$name} || {};
+            next unless ref $b eq 'HASH';
+            my $repo = $b->{repo} || '';
+            next unless $repo =~ m{^/};
+            my $live = '';
+            if (-d "$repo/.git" && open my $fh, '-|', 'git', '-C', $repo, 'branch', '--show-current') {
+                $live = <$fh> // '';
+                close $fh;
+                chomp $live;
+            }
+            my $label = $b->{label} || $name;
+            $label .= " · $live" if $live;
+            my $hp = int($b->{hermes_port} || 0);
+            push @list, {
+                name        => lc($name),
+                port        => 0,
+                label       => $label,
+                url         => '/admin/git?target=' . lc($name),
+                cmd         => $repo,
+                external    => 1,
+                repo        => $repo,
+                hermes_port => $hp,
+                hermes_cwd  => $repo,
+                hermes_cmd  => "cd '$repo' && hermes dashboard --isolated --host 0.0.0.0 --port $hp --no-open --skip-build",
+                git_target  => lc($name),
+            };
+        }
+    }
     return \@list;
 }
 
@@ -1909,6 +2033,10 @@ Human-gated merge of $branch into the current branch (expected to be main) using
 verified the branch is non-protected and tests are green. On conflict, --abort is
 NOT auto-run here; the controller reports the conflict and offers abort.
 
+Optional C<{ repo => $path, autostash => 1, skip_secret_guard => 1 }> options
+allow the main-to-worktree dashboard path to use the same guarded merge
+implementation without scanning the whole main history for secrets.
+
 =cut
 
 sub merge_branch {
@@ -1919,6 +2047,7 @@ sub merge_branch {
     my $repo = $opts->{repo};   # optional explicit checkout (primary repo for merge_to_main)
     my $run_opts = $repo ? { repo => $repo } : {};
     my $checkout_label = $repo // 'this checkout';
+    my $use_autostash = $opts->{autostash} ? 1 : 0;
 
     if (!$branch) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
@@ -1969,21 +2098,59 @@ sub merge_branch {
     my %seen_d; @dirty = grep { !$seen_d{$_}++ } @dirty;
     $result->{uncommitted_files} = \@dirty if @dirty;
 
-    # Secret guard on the incoming merge diff (merge-base..branch). Refuse on a hit.
-    my $guard = $self->secret_guard($c, $repo, '--merge', $branch);
-    unless ($guard->{ok}) {
+    # Never invoke a second merge while the target is already mid-merge or has
+    # unmerged index entries. Git's wording for this state varies ("unmerged
+    # files", "unmerged paths", or "You have not concluded your merge");
+    # checking the repository state before invoking git avoids the generic
+    # exit=2 audit todo and gives the operator the actual recovery action.
+    my $target_state = $self->merge_target_state($c, $repo);
+    unless ($target_state->{success}) {
+        $result->{reason}    = 'target_state_unavailable';
+        $result->{error_msg} = $target_state->{error_msg}
+            || "Cannot inspect merge state for $checkout_label.";
+        $result->{fix_hint}  = 'Verify the target checkout exists and is readable, then retry.';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+            "merge_branch: target state unavailable repo=" . ($repo // 'default')
+            . " detail=" . ($result->{error_msg} // ''));
+        return $result;
+    }
+    if ($target_state->{merge_in_progress} || @{ $target_state->{unmerged_files} || [] }) {
+        my @files = @{ $target_state->{unmerged_files} || [] };
+        $result->{reason}         = 'merge_in_progress';
+        $result->{conflict}       = 1;
+        $result->{conflict_files} = \@files if @files;
+        $result->{error_msg} = @files
+            ? "Cannot start merge of '$branch': the target checkout already has an unresolved merge "
+              . "involving " . join(', ', @files) . '.'
+            : "Cannot start merge of '$branch': the target checkout already has a merge in progress.";
+        $result->{fix_hint} =
+            'Resolve and commit the existing merge, or use Merge Abort on the target checkout, then retry.';
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
-            "merge_branch: secret guard refused merging '$branch' into $current");
-        $result->{error_msg} = "Merge refused by secret guard: '$branch' would bring in a key/secret file. "
-                             . "Only the primary DB key belongs in the env; other keys belong in the database.\n"
-                             . ($guard->{remediation} || $guard->{output} // q{});
-        $result->{output}    = $guard->{output} // q{};
-        $result->{hits}      = $guard->{hits} || [];
-        $result->{reason}    = 'secret_guard';
+            "merge_branch: refused nested/incomplete merge branch='$branch' repo="
+            . ($repo // 'default') . " files=" . join(',', @files));
         return $result;
     }
 
-    my $r = $self->_run($c, 'merge', '--no-ff', $branch, $run_opts);
+    # Secret guard on the incoming merge diff (merge-base..branch). Refuse on a hit.
+    unless ($opts->{skip_secret_guard}) {
+        my $guard = $self->secret_guard($c, $repo, '--merge', $branch);
+        unless ($guard->{ok}) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+                "merge_branch: secret guard refused merging '$branch' into $current");
+            $result->{error_msg} = "Merge refused by secret guard: '$branch' would bring in a key/secret file. "
+                                 . "Only the primary DB key belongs in the env; other keys belong in the database.\n"
+                                 . ($guard->{remediation} || $guard->{output} // q{});
+            $result->{output}    = $guard->{output} // q{};
+            $result->{hits}      = $guard->{hits} || [];
+            $result->{reason}    = 'secret_guard';
+            return $result;
+        }
+    }
+
+    my @merge_argv = ('merge', '--no-ff');
+    push @merge_argv, '--autostash' if $use_autostash;
+    push @merge_argv, $branch;
+    my $r = $self->_run($c, @merge_argv, $run_opts);
     # CRITICAL: git prints almost all merge failures on stderr. _run keeps
     # stdout/stderr separate — reading only {output} produced the useless UI
     # message "Merge of 'helpdesk' failed" with no reason.
@@ -1991,6 +2158,9 @@ sub merge_branch {
         $r->{output}, $r->{error});
     $result->{output}    = $out;
     $result->{exit_code} = $r->{exit_code};
+    $result->{autostash} = ($out =~ /Created autostash|Applied autostash/i) ? 1 : 0;
+    $result->{autostash_conflict} = $use_autostash && $out =~ /Applying autostash resulted in conflicts|Could not reapply autostash|stash.*conflict/i
+        ? 1 : 0;
 
     if ($r->{success}) {
         $result->{success}     = 1;
@@ -2006,7 +2176,16 @@ sub merge_branch {
     my $is_main_target = ($current eq 'main' || $current eq 'master'
         || (defined $repo && length $repo && $repo eq ($self->main_repo_path($c) // '')));
 
-    if ($out =~ /already used by worktree|already checked out/i) {
+    if ($result->{autostash_conflict}) {
+        $result->{reason}    = 'autostash_conflict';
+        $result->{conflict}  = 1;
+        $result->{error_msg} =
+            "Git merged '$branch' into $current but could not reapply the target checkout's local work. "
+          . "Those changes remain in the stash.";
+        $result->{fix_hint} =
+            'Resolve the autostash conflict in the target checkout, then use Stash Pop if needed.';
+    }
+    elsif ($out =~ /already used by worktree|already checked out/i) {
         $result->{reason}    = 'worktree_collision';
         $result->{error_msg} =
             "Git refused the merge because a branch is already checked out in another worktree. "
@@ -2068,7 +2247,7 @@ sub merge_branch {
         $result->{fix_hint} =
             "Confirm the branch exists (linked worktrees share refs). Fetch origin if needed, then retry.";
     }
-    elsif ($out =~ /You have not concluded your merge|Merge with strategy|unmerged paths|index\.lock/i) {
+    elsif ($out =~ /You have not concluded your merge|Merge with strategy|unmerged paths|unmerged files|index\.lock/i) {
         $result->{reason}    = 'merge_in_progress';
         $result->{conflict}  = 1 if $out =~ /unmerged|not concluded/i;
         $result->{error_msg} =
@@ -2111,13 +2290,54 @@ sub merge_branch {
     # not auto-create error-audit todos. Real failures and unexpected errors
     # remain at 'error'.
     my $log_level = 'error';
-    if (($result->{reason} // '') =~ /^(uncommitted|uncommitted_on_main|worktree_collision|merge_in_progress|missing_ref)$/
+    if (($result->{reason} // '') =~ /^(uncommitted|uncommitted_on_main|worktree_collision|merge_in_progress|missing_ref|autostash_conflict)$/
         || $result->{conflict}) {
         $log_level = 'warn';
     }
     $self->logging->log_with_details($c, $log_level, __FILE__, __LINE__, 'git_merge', $log_line);
 
     return $result;
+}
+
+=head2 merge_target_state($c, $repo)
+
+Inspect the target checkout before starting a merge. A merge is not a safe
+operation when C<MERGE_HEAD> exists or the index contains unmerged entries;
+returning that state explicitly prevents a second merge from producing a
+misleading generic Git failure.
+
+=cut
+
+sub merge_target_state {
+    my ($self, $c, $repo) = @_;
+    $repo ||= $self->repo_path($c);
+    return {
+        success    => 0,
+        error_msg  => 'The merge target checkout could not be resolved.',
+        unmerged_files => [],
+    } unless defined $repo && length $repo;
+
+    my $st = $self->_run($c, 'status', '--porcelain', { repo => $repo });
+    return {
+        success       => 0,
+        error_msg     => 'Could not inspect the merge target checkout: '
+                       . join(' ', grep { defined && length } $st->{output}, $st->{error}),
+        repo          => $repo,
+        unmerged_files => [],
+    } unless $st->{success};
+
+    my @unmerged;
+    for my $line (split /\n/, $st->{output} // '') {
+        if ($line =~ /^(?:DD|AU|UD|UA|DU|AA|UU)\s+(.*)$/) {
+            push @unmerged, $1;
+        }
+    }
+    return {
+        success          => 1,
+        repo             => $repo,
+        merge_in_progress => _worktree_merge_in_progress($repo) ? 1 : 0,
+        unmerged_files   => \@unmerged,
+    };
 }
 
 =head2 merge_abort($c)
@@ -2133,17 +2353,30 @@ sub merge_abort {
     my ($self, $c) = @_;
     my $result = { success => 0, output => '', action => 'merge_abort' };
 
-    my $r = $self->_run($c, 'merge', '--abort');
-    $result->{output} = $r->{output};
-    # git merge --abort exits 0 when it aborts, and also exits 0 (no-op) when
-    # there is no merge in progress in modern git. Treat either as success so
-    # the UI's Abort button always resolves a conflicted state cleanly.
+    my $repo = $self->repo_path($c);
+    my $state = $self->merge_target_state($c, $repo);
+    # Git versions differ: some return 0 and some return 128 for `merge --abort`
+    # when there is nothing to abort. Make the dashboard action idempotent based
+    # on repository state instead of treating that harmless variation as an
+    # application error.
+    if ($state->{success} && !$state->{merge_in_progress}
+        && !@{ $state->{unmerged_files} || [] }) {
+        $result->{success}     = 1;
+        $result->{success_msg} = 'No merge was in progress.';
+        $result->{output}      = 'No merge was in progress.';
+        return $result;
+    }
+
+    my $run_opts = (defined $repo && length $repo) ? { repo => $repo } : {};
+    my $r = $self->_run($c, 'merge', '--abort', $run_opts);
+    $result->{output} = join("\n", grep { defined && length } $r->{output}, $r->{error});
     if ($r->{success}) {
         $result->{success}     = 1;
         $result->{success_msg} = "Merge aborted.";
     }
     else {
-        $result->{error_msg} = "Merge abort failed (see output).";
+        $result->{error_msg} = "Merge abort failed: "
+            . ($result->{output} || 'git returned a non-zero status.');
     }
     return $result;
 }

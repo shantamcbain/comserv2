@@ -36,10 +36,37 @@ sub COMPONENT {
     }
 
     # Use RemoteDB to select the best connection for 'shanta_forager' database
+    # Production/staging: wait for the real DB (MariaDB may still be booting
+    # after a power blip) and never fall back to SQLite. If it is still not
+    # reachable after <DBReadiness> startup_wait_s, die so plackup exits
+    # non-zero and Docker (restart: unless-stopped) restarts the container.
+    require Comserv::Util::DbReadiness;
+    my $is_prod = Comserv::Util::DbReadiness->is_production;
     my $connection_info;
-    eval {
-        $connection_info = $remote_db->get_connection_info('shanta_forager');
-    };
+    if ($is_prod) {
+        my $ready = Comserv::Util::DbReadiness->settings(eval { $app->config } || {});
+        $connection_info = Comserv::Util::DbReadiness->wait_for(
+            sub {
+                my $ci = $remote_db->get_connection_info('shanta_forager');
+                die "only a SQLite connection is configured\n"
+                    if $ci && (($ci->{config}{db_type} // '') =~ /sqlite/i);
+                $ci;
+            },
+            timeout  => $ready->{startup_wait_s},
+            on_retry => sub {
+                my ($n, $err, $delay) = @_;
+                $err = defined $err ? $err : ''; $err =~ s/\s+\z//;
+                warn "DBForager: database 'shanta_forager' not reachable (attempt $n: $err); retrying in ${delay}s\n";
+            },
+        );
+        die "DBForager FATAL: database 'shanta_forager' not reachable after $ready->{startup_wait_s}s in "
+          . "production; refusing SQLite fallback (exiting so Docker restarts the container)\n"
+            unless $connection_info;
+    } else {
+        eval {
+            $connection_info = $remote_db->get_connection_info('shanta_forager');
+        };
+    }
 
     # Same rule as DBEncy: MariaDB only. Do not open a local SQLite file.
     if ($@ || !$connection_info) {
@@ -135,6 +162,7 @@ sub COMPONENT {
             : (mysql_auto_reconnect => 1);  # mysql fallback: DBD::mysql attr name
         $connect_info = {
             dsn => $dsn,
+            AutoInactiveDestroy => 1,   # forked children never close the parent's socket
             user => $conn->{username},
             password => $conn->{password},
             %driver_attrs,

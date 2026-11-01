@@ -151,6 +151,15 @@ sub _git_list {
             my $r = $self->git_service->_ssh_exec_git($c, $tinfo, @argv);
             return ($r->{output}, $r->{exit_code});
         }
+        if ($tinfo->{external}) {
+            my $repo = $tinfo->{repo};
+            return ('', -1) unless defined $repo && length $repo && -d $repo;
+            require IPC::Run3;
+            my $out = '';
+            IPC::Run3::run3([ 'git', '-C', $repo, @argv ], \undef, \$out, \$out);
+            my $code = $? >> 8;
+            return ($out, $code);
+        }
     }
 
     my $repo = $self->repo_path($c);
@@ -380,9 +389,8 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     elsif ($op eq 'push') {
         my $branch = $self->get_current_branch($c);
         my $tracking = $self->get_tracking_info($c);
-        # main/master on the primary checkout (:3001) always publishes to origin.
-        # Worktree branches still require an explicit set-upstream checkbox.
-        my $publish = ($branch eq 'main' || $branch eq 'master');
+        my $tinfo = $self->git_service->resolve_target($c, $c->stash->{git_target} // '');
+        my $publish = ($branch eq 'main' || $branch eq 'master' || $tinfo->{publish});
         if (!$tracking->{upstream} && !$publish && !$c->req->param('set_upstream')) {
             $msg = "Branch '$branch' has no upstream. Re-submit with 'set upstream' checked to push.";
         }
@@ -793,6 +801,7 @@ sub index :Path('/admin/git') :Args(0) {
     # Honor ?target= so a direct link or the selector opens on a given host.
     $self->_bind_target($c);
     my $target_key = $c->stash->{git_target} // '';
+    my $tinfo = $self->git_service->resolve_target($c, $target_key);
 
     my $status = $self->get_git_status($c);
 
@@ -812,7 +821,8 @@ sub index :Path('/admin/git') :Args(0) {
     }
 
     $c->stash(
-        repo_path       => $self->repo_path($c),
+        repo_path       => ($tinfo->{repo} || $self->repo_path($c)),
+        git_external    => $tinfo->{external} ? 1 : 0,
         current_branch  => $self->get_current_branch($c),
         # current_worktree = registry key from app_workflow (path-based worktree dir name under ~/.comserv/worktrees/).
         # Used to highlight the matching row in Develop Servers / Branch Servers list (b.name).
@@ -2521,89 +2531,46 @@ sub merge :Path('/admin/git/merge') :Args(0) {
             }));
             return;
         }
-        # Do not pre-scan `main` with secret_guard --merge. That scan diffs the
-        # whole main range and gitleaks hangs, and it refuses files already on
-        # main (which blocks every worktree update). The pre-merge-commit hook
-        # still blocks a blob this branch newly adds or changes, and that refusal
-        # includes the file:line fix route. If the hook leaves MERGE_HEAD, the
-        # failure path below aborts it.
+        # Fetch first, then use the service's guarded merge implementation. It
+        # preflights MERGE_HEAD/unmerged index state before invoking git and
+        # preserves the intentional --autostash behavior for WIP. The incoming
+        # main range is not scanned here because that scan is both expensive
+        # and wrong for files already present on main; the pre-merge hook still
+        # blocks a newly introduced secret.
         my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $dest });
-        # --autostash: the worktree routinely has uncommitted WIP; a plain merge
-        # refuses ("Your local changes would be overwritten"). Autostash stashes
-        # the WIP, merges, then reapplies. If reapplying conflicts, git KEEPS the
-        # stash entry (recoverable via the dashboard's Stash Pop) — nothing lost.
-        my $up = $self->git_service->_run($c, 'merge', '--no-ff', '--autostash', 'main',
-            { repo => $dest });
-        my $combined = join("\n", grep { defined && length }
-            $fetch->{output}, $fetch->{error}, $up->{output}, $up->{error});
-        my $autostash_used = ($combined // '') =~ /Created autostash|Applied autostash/ ? 1 : 0;
-        # WIP could not be reapplied cleanly: git saved it as stash@{0}. Surface
-        # that distinctly so the user knows to recover via Stash Pop.
-        my $autostash_conflict = ($combined // '') =~ /Cannot store stash|Please commit or stash|stash.*conflict/i
-            && $autostash_used ? 1 : 0;
-        my $fail_msg;
-        my $reason;
-        my $fix_hint;
-        my $uncommitted = 0;
-        my $conflict = ($combined // '') =~ /CONFLICT|Automatic merge failed|overwritten by merge/ ? 1 : 0;
-        if (!$up->{success}) {
-            if ($combined =~ /already used by worktree|already checked out/i) {
-                $reason = 'worktree_collision';
-                $fail_msg =
-                    "Git refused to merge main into '$target' (worktree checkout collision). "
-                  . "Stay on the branch worktree; do not checkout main there.";
-                $fix_hint =
-                    "Run this merge from the branch worktree dashboard (or primary) without switching branches.";
-            }
-            elsif ($conflict) {
-                $reason = 'conflict';
-                my @files = $combined =~ /Merge conflict in ([^\s]+)/g;
-                my %sf; @files = grep { !$sf{$_}++ } @files;
-                $fail_msg = @files
-                    ? "Merge conflict bringing main into '$target': " . join(', ', @files)
-                    : "Merge conflict bringing main into '$target'.";
-                $fix_hint = "Resolve in the '$target' worktree, commit, or abort.";
-            }
-            elsif ($combined =~ /secret-guard:|pre-merge-commit:|BLOCKED:/) {
-                $reason = 'secret_guard';
-                # Hook refused the merge commit and left MERGE_HEAD. Abort so
-                # the worktree is not stuck mid-merge.
-                $self->git_service->_run($c, 'merge', '--abort', { repo => $dest });
-                $fail_msg = "Merge of main into '$target' refused by secret guard. The incomplete merge was aborted.";
-                $fix_hint = "See BLOCKED paths in detail. Do not retry until those files are removed from main or allow-listed.";
-            }
-            elsif ($combined =~ /Please commit or stash|local changes.*would be overwritten/i) {
-                $reason = 'uncommitted';
-                $uncommitted = 1;
-                $fail_msg =
-                    "Merge of main into '$target' blocked by uncommitted changes in the worktree.";
-                $fix_hint =
-                    "Commit/stash WIP, or retry (this path uses --autostash when possible).";
-            }
-            else {
-                $reason = 'merge_failed';
-                my $first = '';
-                for my $line (split /\n/, $combined) {
-                    next unless defined $line && $line =~ /\S/;
-                    next if $line =~ /^\s*hint:/i;
-                    $first = $line; last;
-                }
-                $fail_msg = length $first
-                    ? "Merge of main into '$target' failed: $first"
-                    : "Merge of main into '$target' failed.";
-                $fix_hint = "See detail and server log (git_merge).";
-            }
+        my $mr;
+        if (!$fetch->{success}) {
+            $mr = {
+                success   => 0,
+                output    => join("\n", grep { defined && length } $fetch->{output}, $fetch->{error}),
+                error_msg => 'Could not fetch origin before updating the worktree.',
+                reason    => 'fetch_failed',
+                fix_hint  => 'Check the remote connection and repository state, then retry.',
+            };
         }
+        else {
+            # The Git service owns preflight, stderr preservation, conflict
+            # classification, and abort-safe recovery for this path too.
+            $mr = $self->git_service->merge_branch($c, 'main', {
+                repo              => $dest,
+                autostash         => 1,
+                skip_secret_guard => 1,
+            });
+        }
+        my $combined = join("\n", grep { defined && length }
+            $fetch->{output}, $fetch->{error}, $mr->{output}, $mr->{error_msg});
         $res = {
-            success   => $up->{success} ? 1 : 0,
+            success   => $mr->{success} ? 1 : 0,
             output    => $combined,
-            autostash => $autostash_used,
-            autostash_conflict => $autostash_conflict,
-            error_msg => $up->{success} ? undef : $fail_msg,
-            reason    => $reason,
-            fix_hint  => $fix_hint,
-            uncommitted => $uncommitted,
-            conflict  => $conflict,
+            autostash => $mr->{autostash} ? 1 : 0,
+            autostash_conflict => $mr->{autostash_conflict} ? 1 : 0,
+            error_msg => $mr->{success} ? undef : $mr->{error_msg},
+            reason    => $mr->{reason},
+            fix_hint  => $mr->{fix_hint},
+            uncommitted => $mr->{uncommitted} ? 1 : 0,
+            conflict  => $mr->{conflict} ? 1 : 0,
+            conflict_files => $mr->{conflict_files} || [],
+            uncommitted_files => $mr->{uncommitted_files} || [],
         };
     }
     elsif ($source ne 'main' && $target eq 'main') {
@@ -2662,7 +2629,8 @@ sub merge :Path('/admin/git/merge') :Args(0) {
 
     if (!$res->{success}) {
         my $level = ($res->{conflict} || $res->{uncommitted}
-                     || ($res->{reason} // '') eq 'secret_guard') ? 'warn' : 'error';
+                     || ($res->{reason} // '') =~ /^(?:secret_guard|merge_in_progress|worktree_collision|missing_ref|autostash_conflict)$/)
+            ? 'warn' : 'error';
         $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_merge',
             "merge failed direction=$direction source=$source target=$target"
             . " reason=" . ($res->{reason} // 'unknown')
