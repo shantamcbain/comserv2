@@ -151,6 +151,15 @@ sub _git_list {
             my $r = $self->git_service->_ssh_exec_git($c, $tinfo, @argv);
             return ($r->{output}, $r->{exit_code});
         }
+        if ($tinfo->{external}) {
+            my $repo = $tinfo->{repo};
+            return ('', -1) unless defined $repo && length $repo && -d $repo;
+            require IPC::Run3;
+            my $out = '';
+            IPC::Run3::run3([ 'git', '-C', $repo, @argv ], \undef, \$out, \$out);
+            my $code = $? >> 8;
+            return ($out, $code);
+        }
     }
 
     my $repo = $self->repo_path($c);
@@ -380,9 +389,8 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     elsif ($op eq 'push') {
         my $branch = $self->get_current_branch($c);
         my $tracking = $self->get_tracking_info($c);
-        # main/master on the primary checkout (:3001) always publishes to origin.
-        # Worktree branches still require an explicit set-upstream checkbox.
-        my $publish = ($branch eq 'main' || $branch eq 'master');
+        my $tinfo = $self->git_service->resolve_target($c, $c->stash->{git_target} // '');
+        my $publish = ($branch eq 'main' || $branch eq 'master' || $tinfo->{publish});
         if (!$tracking->{upstream} && !$publish && !$c->req->param('set_upstream')) {
             $msg = "Branch '$branch' has no upstream. Re-submit with 'set upstream' checked to push.";
         }
@@ -793,6 +801,7 @@ sub index :Path('/admin/git') :Args(0) {
     # Honor ?target= so a direct link or the selector opens on a given host.
     $self->_bind_target($c);
     my $target_key = $c->stash->{git_target} // '';
+    my $tinfo = $self->git_service->resolve_target($c, $target_key);
 
     my $status = $self->get_git_status($c);
 
@@ -812,7 +821,8 @@ sub index :Path('/admin/git') :Args(0) {
     }
 
     $c->stash(
-        repo_path       => $self->repo_path($c),
+        repo_path       => ($tinfo->{repo} || $self->repo_path($c)),
+        git_external    => $tinfo->{external} ? 1 : 0,
         current_branch  => $self->get_current_branch($c),
         # current_worktree = registry key from app_workflow (path-based worktree dir name under ~/.comserv/worktrees/).
         # Used to highlight the matching row in Develop Servers / Branch Servers list (b.name).
