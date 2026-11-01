@@ -9,6 +9,7 @@ BEGIN { $ENV{COMSERV_AI_CAPS_FILE} = "$FindBin::Bin/data/ai_caps_guard_test.json
 my $TCAPS = do { open my $fh, '<', $ENV{COMSERV_AI_CAPS_FILE} or die "caps test file: $!"; local $/; JSON::PP::decode_json(<$fh>)->{openrouter} };
 use Comserv::Util::AI::HermesOverrunGuard;
 my $G = 'Comserv::Util::AI::HermesOverrunGuard';
+require Comserv::Util::AI::ModelChains;
 $Comserv::Util::AI::HermesOverrunGuard::COOLDOWN_S = 0;   # Oct 23: legacy tests restore within minutes; cool-down tested below
 $Comserv::Util::AI::HermesOverrunGuard::CLEAR_RUNS = 1;   # Oct 28: legacy tests restore on the first clear run; hysteresis tested below
 # OpenRouter models list stand-in (validated ids only; no network in tests)
@@ -296,7 +297,7 @@ sub cb_for {
     is $g->current_model->{provider}, 'xai-oauth', 'thrash trip keeps/sets Super Grok';
     my $cfg = do { local (@ARGV, $/) = "$h/.hermes/config.yaml"; <> };
     unlike $cfg, qr/v4-pro/, 'trip removed v4-pro fallback';
-    like $cfg, qr/fallback_providers:\n  - provider: openrouter\n    model: cohere\/north-mini-code:free/, 'fallback chain free first (Oct 31: no grok-build)';
+    like $cfg, qr/fallback_providers:\n(?:  - provider: xai\n    model: grok-4\.7\n)?  - provider: openrouter\n    model: cohere\/north-mini-code:free/, 'fallback chain: optional paid x.ai, then free (Oct 31: no grok-build)';
     unlike $cfg, qr/grok-build-0\.1\n  - provider/, 'no grok-build fallback entry';
     like $cfg, qr/title_generation:\n    provider: openrouter\n    model: cohere\/north-mini-code:free/, 'aux title_generation -> :free';
     like $cfg, qr/toolsets:\n  - hermes-cli/, 'rest of config intact';
@@ -543,6 +544,7 @@ sub cb_for {
 # ---- Oct 9 2026: daily Super Grok lock wins over restore ----
 {
     my $G = 'Comserv::Util::AI::HermesOverrunGuard';
+    require Comserv::Util::AI::ModelChains;
     my $now = do { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset(); my $t = Time::Local::timelocal(0, 0, 15, 9, 9, 2026); $t };
     POSIX::tzset();
     my $sg = { mode => 'openrouter', off_today => 1, lock_date => '2026-10-09', switch_provider => 'openrouter',
@@ -576,6 +578,7 @@ sub cb_for {
 # Oct 15 2026: OpenRouter grok is blocked, not just watched.
 {
     my $G = 'Comserv::Util::AI::HermesOverrunGuard';
+    require Comserv::Util::AI::ModelChains;
     my $open = { mode => 'grok', hard_cap => 0 };
     my $shut = { mode => 'openrouter' };
     ok $G->can('is_or_grok')->('openrouter', 'x-ai/grok-4.7'), 'openrouter x-ai/grok-4.7 is OR grok';
@@ -886,6 +889,29 @@ ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID
     is $st3->{guard_version_seen_at}, 2000000 + 12700, 'seen_at refreshed';
     open $lf, '<', "$h/.hermes/logs/overrun_guard.log"; my $all = do { local $/; <$lf> }; close $lf;
     like $all, qr/\[:4005 planning\] TOOK OVER: newest guard version \d+ \(from cron aisystem\) not seen since/, 'TOOK OVER logged';
+}
+
+# Oct 31 2026 (Shanta): paid x.ai grok-4.7 after Super Grok, under the SHARED OpenRouter + x.ai cash caps.
+{
+    my $G = 'Comserv::Util::AI::HermesOverrunGuard';
+    require Comserv::Util::AI::ModelChains;
+    my @c = map { my ($p, $m) = split /\|/, $_, 2; { slug => $_, provider => $p, model => $m, tier => Comserv::Util::AI::ModelChains->slug_tier($_) } }
+        ('supergrok|grok-4.7', 'xai|grok-4.7', 'openrouter|openai/gpt-5.6-luna', 'openrouter|cohere/north-mini-code:free');
+    is $c[1]{tier}, 'paid', 'xai|grok-4.7 is a paid tier';
+    my %al = map { ($_->{model} => 1) } grep { $_->{tier} eq 'paid' } @c;
+    is $G->can('offender_reason')->('xai', 'grok-4.7', allowed_paid => \%al, sg_unavailable => 1, xai_direct_cap_day => 0), undef,
+        'x.ai grok-4.7 in the chain is allowed with room in the shared caps';
+    like $G->can('offender_reason')->('xai', 'grok-4.7', allowed_paid => \%al, or_over => 1), qr/shared cash cap/, 'blocked once the shared cap is hit';
+    like $G->can('offender_reason')->('xai', 'grok-4.9', allowed_paid => \%al, xai_direct_cap_day => 0), qr/off/, 'x.ai model not in the chain stays off';
+    like $G->can('offender_reason')->('openrouter', 'x-ai/grok-4.7', allowed_paid => \%al), qr/OpenRouter grok is blocked/, 'OpenRouter grok still blocked';
+    my $fb = $G->can('fallback_chain')->(chain => \@c, paid_ok => 1, or_ids => { 'openai/gpt-5.6-luna' => 1, 'cohere/north-mini-code:free' => 1 });
+    is_deeply [ map { "$_->{provider}/$_->{model}" } @$fb[0..2] ], [ 'xai/grok-4.7', 'openrouter/openai/gpt-5.6-luna', 'openrouter/cohere/north-mini-code:free' ],
+        'fallback_providers: x.ai grok-4.7, luna, north-mini';
+    my $fb0 = $G->can('fallback_chain')->(chain => \@c, paid_ok => 0, or_ids => { 'openai/gpt-5.6-luna' => 1, 'cohere/north-mini-code:free' => 1 });
+    is $fb0->[0]{model}, 'cohere/north-mini-code:free', 'no paid room: paid steps left out';
+    my $or = $G->can('add_shared_cash')->({ ok => 1, day_usd => 1, week_usd => 5, month_usd => 20 }, 0.5);
+    is_deeply [ @$or{qw(day_usd week_usd month_usd)} ], [ 1.5, 5.5, 20.5 ], 'x.ai cash added to the shared totals';
+    is sprintf('%.3f', $G->can('xai_price_call')->({ model => 'grok-4.7', in => 100000, out => 2000, cache => 40000 })), '0.152', 'x.ai grok-4.7 priced from published rates';
 }
 
 done_testing();
