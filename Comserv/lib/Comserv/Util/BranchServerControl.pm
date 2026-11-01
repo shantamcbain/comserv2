@@ -241,39 +241,16 @@ sub start {
     }
 
     my $cmd = $self->get_command($branch, $port);
-<<<<<<< Updated upstream
     my $res = system('/bin/bash', '-c', "$cmd > '$log' 2>&1 &");
     if ($res != 0) {
         _log('error', "spawn exit $res for $branch:$port");
         return {
             ok => 0, action => 'start', branch => $branch, port => $port, log => $log,
             via => 'process', error => "spawn exit $res",
-=======
-    my $log = "/tmp/branch-$branch.log";
-    my $lock = $self->_start_lock("/tmp/branch-$branch.start.lock");
-    return {
-        ok => 0, action => 'start', branch => $branch, log => $log,
-        error => 'could not acquire branch startup lock',
-    } unless $lock;
-
-    if ($self->_port_listening($port)) {
-        return {
-            ok => 1, action => 'start', branch => $branch, port => $port,
-            running => 1, started => 0, log => $log,
-        };
-    }
-
-    my $res = system('/bin/bash', '-c', "$cmd > '$log' 2>&1 &");
-    if ($res != 0) {
-        return {
-            ok => 0, action => 'start', branch => $branch, log => $log,
-            error => "spawn exit $res",
->>>>>>> Stashed changes
         };
     }
     return {
         ok => 1, action => 'start', branch => $branch, port => $port,
-<<<<<<< Updated upstream
         running => 1, started => 1, via => 'process', log => $log,
     } if $self->_wait_for_port($port);
 
@@ -281,14 +258,6 @@ sub start {
     return {
         ok => 0, action => 'start', branch => $branch, port => $port,
         running => 0, started => 1, via => 'process', log => $log,
-=======
-        running => 1, started => 1, log => $log,
-    } if $self->_wait_for_port($port);
-
-    return {
-        ok => 0, action => 'start', branch => $branch, port => $port,
-        running => 0, started => 1, log => $log,
->>>>>>> Stashed changes
         error => "server did not listen on port $port within ${START_TIMEOUT}s",
     };
 }
@@ -367,6 +336,8 @@ sub open_or_start {
 sub hermes_port_for {
     my ($self, $branch, $app_port) = @_;
     $app_port = int($app_port || 0);
+    my $ext = eval { Comserv::Util::Git->external_repo($branch) };
+    return int($ext->{hermes_port}) if $ext && $ext->{hermes_port};
     return 9119 if !$branch || $branch eq 'main' || $app_port == 3001;
     my $cfg = eval { Comserv::Util::Git->_worktree_config() } || {};
     my $override = eval { $cfg->{branches}{$branch}{hermes_port} };
@@ -376,6 +347,8 @@ sub hermes_port_for {
 
 sub hermes_cwd_for {
     my ($self, $branch) = @_;
+    my $ext = eval { Comserv::Util::Git->external_repo($branch) };
+    return $ext->{repo} if $ext && $ext->{repo} && -d $ext->{repo};
     return '/home/shanta/PycharmProjects/comserv2' if !$branch || $branch eq 'main';
     my $base = eval { Comserv::Util::Git->worktree_base_dir } // "$ENV{HOME}/.comserv/worktrees";
     my $direct = "$base/$branch/Comserv";

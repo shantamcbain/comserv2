@@ -117,6 +117,13 @@ Returns the resolved key (or '' for local).
 
 =cut
 
+sub _git_back {
+    my ($self, $c) = @_;
+    my $t = $c->stash->{git_target} // '';
+    return $c->uri_for('/admin/git', { target => $t }) if $t && $t ne 'local';
+    return $c->uri_for('/admin/git');
+}
+
 sub _bind_target {
     my ($self, $c) = @_;
     my $t = $c->req->param('target');
@@ -150,6 +157,16 @@ sub _git_list {
         if ($tinfo->{mode} eq 'ssh') {
             my $r = $self->git_service->_ssh_exec_git($c, $tinfo, @argv);
             return ($r->{output}, $r->{exit_code});
+        }
+        # External local repo: never fall through to the Comserv checkout.
+        if ($tinfo->{external}) {
+            my $repo = $tinfo->{repo};
+            return ('', -1) unless defined $repo && length $repo && -d $repo;
+            require IPC::Run3;
+            my $out = '';
+            IPC::Run3::run3([ 'git', '-C', $repo, @argv ], \undef, \$out, \$out);
+            my $code = $? >> 8;
+            return ($out, $code);
         }
     }
 
@@ -254,7 +271,7 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     # Every write is POST + confirm.
     unless ($c->req->method eq 'POST' && $c->req->param('confirm')) {
         $c->flash->{error_msg} = 'Git actions require a confirmed POST.';
-        $c->response->redirect($c->uri_for('/admin/git'));
+        $c->response->redirect($self->_git_back($c));
         return;
     }
 
@@ -275,12 +292,12 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         if (@{ $validated->{invalid} }) {
             $c->flash->{error_msg} =
                 "Rejected unsafe or unknown path(s): " . join(', ', @{ $validated->{invalid} }) . " (must exactly match git status --porcelain on the bound target. Refresh view or select only current dirty paths for this target. Runtime data should be gitignored.)";
-            $c->response->redirect($c->uri_for('/admin/git'));
+            $c->response->redirect($self->_git_back($c));
             return;
         }
         if ($requires_selection{$op} && !@{ $validated->{valid} }) {
             $c->flash->{error_msg} = 'No files selected.';
-            $c->response->redirect($c->uri_for('/admin/git'));
+            $c->response->redirect($self->_git_back($c));
             return;
         }
     }
@@ -380,9 +397,11 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     elsif ($op eq 'push') {
         my $branch = $self->get_current_branch($c);
         my $tracking = $self->get_tracking_info($c);
-        # main/master on the primary checkout (:3001) always publishes to origin.
+        my $tinfo = $self->git_service->resolve_target($c, $c->stash->{git_target} // '');
+        # main/master on the primary checkout, and a registered external repo,
+        # publish the checked-out branch to that repo's origin.
         # Worktree branches still require an explicit set-upstream checkbox.
-        my $publish = ($branch eq 'main' || $branch eq 'master');
+        my $publish = ($branch eq 'main' || $branch eq 'master' || $tinfo->{publish});
         if (!$tracking->{upstream} && !$publish && !$c->req->param('set_upstream')) {
             $msg = "Branch '$branch' has no upstream. Re-submit with 'set upstream' checked to push.";
         }
@@ -518,7 +537,7 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     if ($ok) { $c->flash->{success_msg} = $msg; }
     else     { $c->flash->{error_msg}   = $msg; }
 
-    $c->response->redirect($c->uri_for('/admin/git'));
+    $c->response->redirect($self->_git_back($c));
 }
 
 =head2 suggest_commit_message
@@ -793,6 +812,7 @@ sub index :Path('/admin/git') :Args(0) {
     # Honor ?target= so a direct link or the selector opens on a given host.
     $self->_bind_target($c);
     my $target_key = $c->stash->{git_target} // '';
+    my $tinfo = $self->git_service->resolve_target($c, $target_key);
 
     my $status = $self->get_git_status($c);
 
@@ -812,13 +832,16 @@ sub index :Path('/admin/git') :Args(0) {
     }
 
     $c->stash(
-        repo_path       => $self->repo_path($c),
+        repo_path       => ($tinfo->{repo} || $self->repo_path($c)),
+        git_external    => $tinfo->{external} ? 1 : 0,
         current_branch  => $self->get_current_branch($c),
         # current_worktree = registry key from app_workflow (path-based worktree dir name under ~/.comserv/worktrees/).
         # Used to highlight the matching row in Develop Servers / Branch Servers list (b.name).
         # This can differ from current_branch (live git) if a feature branch was checked out inside a worktree slot.
         # The list itself is registry-driven; highlighting marks "this running server".
-        current_worktree => $c->stash->{app_workflow} || 'main',
+        current_worktree => $tinfo->{external}
+            ? ($tinfo->{key} || $target_key)
+            : ($c->stash->{app_workflow} || 'main'),
         local_branches  => $self->get_local_branches($c),
         branch_details  => $self->git_service->get_branch_details($c),
         recent_commits  => $self->get_recent_commits($c),

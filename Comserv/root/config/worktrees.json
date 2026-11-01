@@ -110,6 +110,13 @@
     }
   },
   "base_dir": "/home/shanta/.comserv/worktrees",
-  "port_start": 4000,
-  "update_all_skip": []
+  "port_start": 4066,
+  "update_all_skip": [],
+  "external_repos": {
+    "openbafang": {
+      "label": "OpenBafangTool",
+      "repo": "/home/shanta/dev/OpenBafangTool",
+      "hermes_port": 9120
+    }
+  }
 }

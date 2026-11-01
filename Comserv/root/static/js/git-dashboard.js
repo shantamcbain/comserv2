@@ -326,20 +326,20 @@
                         + ' && hermes dashboard --isolated --host 0.0.0.0 --port '
                         + hport + ' --no-open --skip-build'
                     );
-                    var tab = window.open('about:blank', 'hermes-' + hermesBranch);
-                    if (tab && !tab.closed) {
-                        try { tab.document.write('<p>Starting Hermes on :' + hport + '…</p>'); } catch (e1) {}
-                    }
+                    var hermesUrl = window.location.protocol + '//' + window.location.hostname
+                        + ':' + hport + '/';
+                    // Open the dashboard on the click itself. A blank tab that we
+                    // navigate later gets blocked, and a failed start used to close it.
+                    var tab = window.open(hermesUrl, 'hermes-' + hermesBranch);
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         navigator.clipboard.writeText(hcmd);
                     }
-                    showDevConsole(hermesBranch, hport, '', hcmd, 'hermes');
+                    showDevConsole(hermesBranch, hport, hermesUrl, hcmd, 'hermes');
                     function goHermes(port) {
-                        // Open the Hermes dashboard root (not /chat). The dashboard serves the full web UI
-                        // at / after any login redirect. /chat was a leftover from chat-focused launches.
                         var url = window.location.protocol + '//' + window.location.hostname
                             + ':' + port + '/';
                         if (devOpenLink) { devOpenLink.href = url; devOpenLink.style.display = ''; }
+                        if (url === hermesUrl) { return; }
                         if (tab && !tab.closed) { tab.location = url; }
                         else { window.open(url, 'hermes-' + hermesBranch); }
                     }
@@ -370,7 +370,7 @@
                             else { waitReady(port); }
                         })
                         .catch(function () {
-                            if (tab && !tab.closed) { tab.close(); }
+                            if (devOpenLink) { devOpenLink.href = hermesUrl; devOpenLink.style.display = ''; }
                         });
                     return;
                 }

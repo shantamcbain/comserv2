@@ -306,16 +306,11 @@ sub paid_room_why {
     my ($or, $caps, $reasons) = @_;
     my @w;
     push @w, 'an OpenRouter money cap is already hit' if grep { /^OpenRouter/ } @{ $reasons || [] };
-<<<<<<< Updated upstream
-    return (@w, 'OpenRouter usage unknown') unless ref $or eq 'HASH' && $or->{ok};
-    $caps ||= shared_or_caps();
+    return (@w, 'OpenRouter usage unknown') unless ref $or eq 'HASH' && $or->{ok} && !$or->{live_only};
+    $caps ||= \%CAPS;
     # Oct 31 2026: an estimate-only or stale reading is not proof of room for paid models.
     push @w, 'OpenRouter reading is a live estimate only' if $or->{live_only};
     push @w, 'OpenRouter reading is stale' if $or->{stale};
-=======
-    return (@w, 'OpenRouter usage unknown') unless ref $or eq 'HASH' && $or->{ok} && !$or->{live_only};
-    $caps ||= \%CAPS;
->>>>>>> Stashed changes
     my %frac = (day => $NEAR_CAP_FRAC, week => 0.9, month => 0.9);
     for my $w (qw(day week month)) {
         my ($v, $cap) = ($or->{"${w}_usd"}, $caps->{$w});
@@ -386,15 +381,10 @@ sub billing_summary {
     return [ map { { %$_, label => billing_label($_->{provider}, $_->{model}) } } @top ];
 }
 
-our $COOLDOWN_S = 1800;
-<<<<<<< Updated upstream
-# Oct 31 2026 (Shanta): consecutive authoritative clear runs needed before a restore (hysteresis).
-=======
-# Oct 28 2026 hysteresis: a trip is restored only after this many consecutive runs each with an authoritative reading under every cap
-# (a single clear-looking reading, e.g. a bad/partial fetch, no longer clears a trip). Tests set it to 1.
->>>>>>> Stashed changes
 our $CLEAR_RUNS = 2;
-# pure: an OpenRouter money-cap trip while Hermes is on Super Grok (xai-oauth) only blocks paid models.
+our $COOLDOWN_S = 1800;
+    # Oct 28 2026 hysteresis: a trip is restored only after this many consecutive runs each with an authoritative reading under every cap
+    # (a single clear-looking reading, e.g. a bad/partial fetch, no longer clears a trip). Tests set it to 1.
 sub paid_only_trip {
     my ($kind, $cm) = @_;
     return 0 unless ($kind // '') eq 'caps' && ref $cm eq 'HASH';
@@ -2147,12 +2137,8 @@ sub run {
                    ($err ? (error => $err) : ()) };
         _append($s->{events_file}, $J->encode($ev));
         $ev->{ledger} = $s->ledger($ev);
-<<<<<<< Updated upstream
         delete $st->{paid_block_only};
         delete $st->{clear_streak};
-=======
-        delete $st->{paid_block_only}; delete $st->{clear_streak};
->>>>>>> Stashed changes
         %$st = (%$st, tripped => 0, paused => 0, restored_at => $t, restored_pt => pt($t),
                 restore_backup => $bak, restore_decision => $dec->{reason},
                 instance => $s->instance_name, restored_by => $s->instance_name);
