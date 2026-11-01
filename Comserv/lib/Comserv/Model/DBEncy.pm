@@ -41,32 +41,19 @@ sub COMPONENT {
         $connection_info = $remote_db->get_connection_info('ency');
     };
 
-    # Fallback to SQLite if primary connections fail
+    # The application database is MariaDB only (192.168.1.20:3307). Never invent
+    # a SQLite file and keep serving: an empty file connects, then every query dies.
     if ($@ || !$connection_info) {
         my $error = $@ || "No connection info returned from RemoteDB";
-        
-        # Write error to STDERR for debugging  (bypasses logging system if broken)
-        warn "\n=== DBEncy CRITICAL ERROR ===\n";
-        warn "Failed to get connection from RemoteDB\n";
-        warn "Error: $error\n";
-        warn "===========================\n\n";
-        
-        $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
-            "DBEncy CRITICAL: Failed to get connection from RemoteDB: $error");
-        $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
-            "DBEncy CRITICAL: Falling back to SQLite offline mode - APPLICATION WILL HAVE LIMITED FUNCTIONALITY");
-        
-        # Create a fallback SQLite connection
-        $connection_info = {
-            connection_name => 'sqlite_ency_fallback',
-            config => {
-                db_type => 'sqlite',
-                database_path => 'data/ency_offline.db',
-                description => 'SQLite Fallback - ENCY Database (offline mode)',
-                priority => 999
-            },
-            database_name => 'ency'
-        };
+        $logger->log_with_details(undef, 'critical', __FILE__, __LINE__, 'COMPONENT',
+            "DBEncy CRITICAL: no MariaDB connection for ency: $error");
+        die "DBEncy: no MariaDB connection for ency: $error";
+    }
+    if (($connection_info->{config}{db_type} // '') =~ /^sqlite$/i) {
+        my $name = $connection_info->{connection_name} // 'unknown';
+        $logger->log_with_details(undef, 'critical', __FILE__, __LINE__, 'COMPONENT',
+            "DBEncy CRITICAL: refused SQLite connection '$name'; application database is MariaDB only");
+        die "DBEncy: refused SQLite connection '$name'";
     }
 
     # Extract connection details from RemoteDB
