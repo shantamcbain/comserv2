@@ -241,16 +241,39 @@ sub start {
     }
 
     my $cmd = $self->get_command($branch, $port);
+<<<<<<< Updated upstream
     my $res = system('/bin/bash', '-c', "$cmd > '$log' 2>&1 &");
     if ($res != 0) {
         _log('error', "spawn exit $res for $branch:$port");
         return {
             ok => 0, action => 'start', branch => $branch, port => $port, log => $log,
             via => 'process', error => "spawn exit $res",
+=======
+    my $log = "/tmp/branch-$branch.log";
+    my $lock = $self->_start_lock("/tmp/branch-$branch.start.lock");
+    return {
+        ok => 0, action => 'start', branch => $branch, log => $log,
+        error => 'could not acquire branch startup lock',
+    } unless $lock;
+
+    if ($self->_port_listening($port)) {
+        return {
+            ok => 1, action => 'start', branch => $branch, port => $port,
+            running => 1, started => 0, log => $log,
+        };
+    }
+
+    my $res = system('/bin/bash', '-c', "$cmd > '$log' 2>&1 &");
+    if ($res != 0) {
+        return {
+            ok => 0, action => 'start', branch => $branch, log => $log,
+            error => "spawn exit $res",
+>>>>>>> Stashed changes
         };
     }
     return {
         ok => 1, action => 'start', branch => $branch, port => $port,
+<<<<<<< Updated upstream
         running => 1, started => 1, via => 'process', log => $log,
     } if $self->_wait_for_port($port);
 
@@ -258,6 +281,14 @@ sub start {
     return {
         ok => 0, action => 'start', branch => $branch, port => $port,
         running => 0, started => 1, via => 'process', log => $log,
+=======
+        running => 1, started => 1, log => $log,
+    } if $self->_wait_for_port($port);
+
+    return {
+        ok => 0, action => 'start', branch => $branch, port => $port,
+        running => 0, started => 1, log => $log,
+>>>>>>> Stashed changes
         error => "server did not listen on port $port within ${START_TIMEOUT}s",
     };
 }

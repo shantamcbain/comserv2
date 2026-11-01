@@ -316,7 +316,7 @@ sub hermes_chain {
 }
 
 # hermes_cash_steps($loaded) -> list of { slug, channel, provider, model }: the opt-in x.ai direct / OpenRouter grok
-# steps tried BEFORE the paid qwen step on the daily lock. Empty unless hermes_daily_lock_cash.enabled is true.
+# steps tried BEFORE the paid chain step (probation model) on the daily lock. Empty unless hermes_daily_lock_cash.enabled is true.
 sub hermes_cash_steps {
     my ($class, $loaded) = @_;
     my $d = ref $loaded eq 'HASH' && $loaded->{data} ? $loaded->{data} : $loaded;
