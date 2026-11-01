@@ -1027,6 +1027,54 @@ start_prod_container_from_image() {
         fi
     fi
 
+    # The application has one production MariaDB endpoint: the working
+    # production_server connection on the .20:3307 host. DBForager uses the
+    # same server and credentials but a different logical database name. Keep
+    # that derived entry synchronized here so a stale legacy production_forager
+    # file cannot send startup to the retired .198:3306 endpoint.
+    local primary_secret="$secrets/dbi/production_server.json"
+    local forager_secret="$secrets/dbi/production_forager.json"
+    if [ ! -f "$primary_secret" ]; then
+        echo "❌ missing production_server.json in $secrets/dbi — refusing to start with an unverified Forager endpoint"
+        return 1
+    fi
+    local forager_sync_result
+    if ! forager_sync_result=$(PRIMARY_SECRET="$primary_secret" FORAGER_SECRET="$forager_secret" perl -MJSON::PP -e '
+        my ($src, $dst) = @ENV{qw(PRIMARY_SECRET FORAGER_SECRET)};
+        open my $in, "<", $src or die "cannot read $src: $!";
+        local $/;
+        my $data = decode_json(<$in>);
+        close $in;
+        my $primary = $data->{production_server};
+        die "production_server.json has no production_server connection" unless ref $primary eq "HASH";
+        my %forager = %$primary;
+        $forager{database} = "shanta_forager";
+        $forager{description} = "Production Forager Database";
+        $forager{priority} = $primary->{priority} // 1;
+        my $json = encode_json({ production_forager => \%forager }) . "\n";
+        if (-f $dst) {
+            open my $old, "<", $dst or die "cannot read $dst: $!";
+            local $/;
+            my $previous = <$old>;
+            close $old;
+            if ($previous eq $json) {
+                print "production_forager already synchronized";
+                exit 0;
+            }
+        }
+        my $tmp = "$dst.tmp.$$";
+        open my $out, ">", $tmp or die "cannot write $tmp: $!";
+        print {$out} $json;
+        close $out or die "cannot close $tmp: $!";
+        rename $tmp, $dst or die "cannot install $dst: $!";
+        chmod 0644, $dst;
+        print "production_forager synchronized from production_server";
+    ' 2>&1); then
+        echo "❌ could not synchronize production_forager.json: $forager_sync_result"
+        return 1
+    fi
+    echo "    database secrets: $forager_sync_result"
+
     local extra=()
     if [ -d /root/LegacyStaticPages ] && [ "$(ls -A /root/LegacyStaticPages 2>/dev/null | wc -l)" -gt 0 ]; then
         extra+=(-v /root/LegacyStaticPages:/opt/comserv/root/LegacyStaticPages:ro)

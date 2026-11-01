@@ -908,13 +908,8 @@ sub token_login :Local :Args(0) {
 sub chat :Local :Args(0) {
     my ($self, $c) = @_;
 
-    # Chat with AI is development-only: public SiteName hosts cannot reach a model.
-    unless (Comserv::Util::SystemInfo::is_dev_request_host($c)) {
-        $c->response->status(403);
-        $c->response->content_type('application/json');
-        $c->response->body(encode_json({ success => JSON::false, error => 'Chat with AI is not available on this site.' }));
-        return;
-    }
+    # 2026-10-31: public hosts allowed again; Guest requests are limited by
+    # Util::AI::GuestGuard below (free models only, per-IP rate, scrubbed fields).
 
     $c->response->content_type('application/json');
 

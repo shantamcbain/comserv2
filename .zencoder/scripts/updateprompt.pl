@@ -1,1 +1,0 @@
-/home/shanta/PycharmProjects/comserv2/Comserv/script/updateprompt.pl
