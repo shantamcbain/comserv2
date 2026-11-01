@@ -214,6 +214,29 @@ my %TARGET_HOSTS = (
     },
 );
 
+# A registered repo that is NOT a Comserv worktree. Key match is
+# case-insensitive because resolve_target lowercases the selector value.
+# Path comes only from worktrees.json — never from the browser.
+sub external_repo {
+    my ($self, $key) = @_;
+    return undef unless defined $key && length $key;
+    my $cfg = eval { _worktree_config() } || {};
+    my $ext = $cfg->{external_repos} || {};
+    return undef unless ref $ext eq 'HASH';
+    for my $k (keys %$ext) {
+        next unless lc($k) eq lc($key);
+        my $spec = $ext->{$k};
+        next unless ref $spec eq 'HASH';
+        return {
+            key         => lc($k),
+            label       => $spec->{label} || $k,
+            repo        => $spec->{repo} || '',
+            hermes_port => int($spec->{hermes_port} || 0),
+        };
+    }
+    return undef;
+}
+
 sub resolve_target {
     my ($self, $c, $target) = @_;
     $target = '' unless defined $target;
@@ -243,6 +266,33 @@ sub resolve_target {
     }
 
     unless ($spec) {
+        my $ext = $self->external_repo($target);
+        if ($ext) {
+            my $repo = $ext->{repo} || '';
+            unless ($repo =~ m{^/} && -d "$repo/.git") {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_target',
+                    "External repo '$ext->{key}' path missing or not a git checkout: $repo");
+                return {
+                    mode     => 'local',
+                    repo     => undef,
+                    host     => '', user => '', port => 22,
+                    label    => $ext->{label},
+                    key      => $ext->{key},
+                    external => 1,
+                    publish  => 0,
+                    error    => 'external repo path missing',
+                };
+            }
+            return {
+                mode     => 'local',
+                repo     => $repo,
+                host     => '', user => '', port => 22,
+                label    => $ext->{label},
+                key      => $ext->{key},
+                external => 1,
+                publish  => 1,
+            };
+        }
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_target',
             "Unknown git target '$target' -> falling back to local");
         return {
@@ -275,6 +325,18 @@ sub list_targets {
     my @out = ({ key => 'local', label => 'Local (this app host)' });
     for my $k (sort keys %TARGET_HOSTS) {
         push @out, { key => $k, label => $TARGET_HOSTS{$k}{label} // $k };
+    }
+    my $cfg = eval { _worktree_config() } || {};
+    my $ext = $cfg->{external_repos} || {};
+    if (ref $ext eq 'HASH') {
+        for my $k (sort keys %$ext) {
+            my $spec = $ext->{$k};
+            next unless ref $spec eq 'HASH';
+            push @out, {
+                key   => lc($k),
+                label => ($spec->{label} || $k) . ' (external repo)',
+            };
+        }
     }
     return \@out;
 }
@@ -802,6 +864,34 @@ sub get_tracking_info {
             $info->{ahead}  = $2;
         }
         return $info;
+    }
+
+    # External repo (not a Comserv worktree): publish the checked-out branch
+    # to that repo's own origin, the same way main publishes. Do not compare
+    # it to Comserv main.
+    my $ext_key = ($c && $c->stash) ? ($c->stash->{git_target} // '') : '';
+    my $ext = $self->external_repo($ext_key);
+    if ($ext && $ext->{repo} && -d "$ext->{repo}/.git") {
+        my $current = $self->get_current_branch($c);
+        if (defined $current && length $current && $current ne 'unknown') {
+            my $origin_ref = "origin/$current";
+            $info->{upstream} = $origin_ref;
+            $info->{external} = 1;
+            my $has = $self->_run($c, 'rev-parse', '--verify', '--quiet', "refs/remotes/$origin_ref");
+            if ($has->{success} && length($has->{output} // '')) {
+                my $cr = $self->_run($c, 'rev-list', '--left-right', '--count', "$origin_ref...HEAD");
+                my $counts = $cr->{output};
+                chomp $counts if defined $counts;
+                if ($counts && $counts =~ /^(\d+)\s+(\d+)$/) {
+                    $info->{behind} = $1;
+                    $info->{ahead}  = $2;
+                }
+            }
+            else {
+                $info->{publish_new} = 1;
+            }
+            return $info;
+        }
     }
 
     # --- Layer 2: primary checkout publishes to origin even with no @{u} --
@@ -1680,6 +1770,40 @@ sub build_worktree_list {
                 ? ("http://" . $b->{host} . ":" . $b->{port})
                 : undef,
         };
+    }
+
+    # Repos that are not Comserv checkouts. No Catalyst port, no server cmd.
+    # The row is a git + Hermes target only. Files stay in their own tree.
+    my $ext = $cfg->{external_repos} || {};
+    if (ref $ext eq 'HASH') {
+        for my $name (sort keys %$ext) {
+            my $b = $ext->{$name} || {};
+            next unless ref $b eq 'HASH';
+            my $repo = $b->{repo} || '';
+            next unless $repo =~ m{^/};
+            my $live = '';
+            if (-d "$repo/.git" && open my $fh, '-|', 'git', '-C', $repo, 'branch', '--show-current') {
+                $live = <$fh> // '';
+                close $fh;
+                chomp $live;
+            }
+            my $label = $b->{label} || $name;
+            $label .= " · $live" if $live;
+            my $hp = int($b->{hermes_port} || 0);
+            push @list, {
+                name        => lc($name),
+                port        => 0,
+                label       => $label,
+                url         => '/admin/git?target=' . lc($name),
+                cmd         => $repo,
+                external    => 1,
+                repo        => $repo,
+                hermes_port => $hp,
+                hermes_cwd  => $repo,
+                hermes_cmd  => "cd '$repo' && hermes dashboard --isolated --host 0.0.0.0 --port $hp --no-open --skip-build",
+                git_target  => lc($name),
+            };
+        }
     }
     return \@list;
 }
