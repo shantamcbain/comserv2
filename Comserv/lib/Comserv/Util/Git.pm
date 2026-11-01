@@ -2724,6 +2724,70 @@ sub update_all_from_main {
     return { rows => \@rows, summary => $summary, restart_ports => \@restart, dry_run => $dry };
 }
 
+# App-written trial records. A commit of these is data entry (spend, timestamp,
+# task log), not a code change. Low reviewer notes on them must not hold the
+# first commit. Medium/high findings, and any finding on another file, still hold.
+sub data_entry_runtime_path {
+    my ($self, $path) = @_;
+    return 0 unless defined $path && length $path;
+    $path =~ s{\\}{/}g;
+    return $path =~ m{(?:^|/)data/ai_trials/[^/]+\.(?:state\.json|tasks\.jsonl)\z} ? 1 : 0;
+}
+
+# Drop data-entry hunks so the reviewer and the confirm hash see only code.
+# A later timestamp rewrite must not look like a new review.
+sub strip_data_entry_diff {
+    my ($self, $diff) = @_;
+    return '' unless defined $diff && length $diff;
+    my @keep;
+    for my $part (split /(?=^diff --git )/m, $diff) {
+        next unless $part =~ /\S/;
+        if ($part =~ m{^diff --git a/(.+?) b/}) {
+            next if $self->data_entry_runtime_path($1);
+        }
+        push @keep, $part;
+    }
+    return join '', @keep;
+}
+
+# Low notes on a data-entry file are churn. Anything else still stops the commit.
+sub commit_findings_that_hold {
+    my ($self, $findings) = @_;
+    my @hold;
+    for my $f (@{ $findings || [] }) {
+        next unless ref $f eq 'HASH';
+        my $sev  = lc($f->{severity} || '');
+        my $file = $f->{file} || '';
+        next if $sev eq 'low' && $self->data_entry_runtime_path($file);
+        push @hold, $f;
+    }
+    return \@hold;
+}
+
+# Structural problems in a data-entry blob. These are real errors and must
+# still refuse the commit even though the file is not sent to the reviewer.
+# Returns an error string, or undef when the blob is safe to commit.
+sub data_entry_blob_error {
+    my ($self, $path, $content) = @_;
+    return undef unless $self->data_entry_runtime_path($path);
+    $content = '' unless defined $content;
+    return "Data-entry file $path has merge conflict markers" if $content =~ /^<{7}(?: |$)/m;
+    if ($path =~ /\.json\z/) {
+        my $ok = eval { JSON::MaybeXS::decode_json($content); 1 };
+        return "Data-entry file $path is not valid JSON" if !$ok;
+    }
+    elsif ($path =~ /\.jsonl\z/) {
+        my $n = 0;
+        for my $line (split /\n/, $content) {
+            next unless $line =~ /\S/;
+            $n++;
+            my $ok = eval { JSON::MaybeXS::decode_json($line); 1 };
+            return "Data-entry file $path line $n is not valid JSON" if !$ok;
+        }
+    }
+    return undef;
+}
+
 # True when $dir (a worktree checkout) has MERGE_HEAD. A linked worktree's
 # .git is a file ("gitdir: <path>"), and MERGE_HEAD lives in that gitdir.
 sub _worktree_merge_in_progress {
