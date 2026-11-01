@@ -112,6 +112,12 @@ reader" discipline.
   - Changelog fragment `2026-10-05-fix-usage-monitor-templates.inc`.
   - Verified `/ai/usage` now returns 200; followed comserv2-session-doc-sync.
 
+- 2026-11-01: Git merge-state audit cleanup (main worktree).
+  - Added merge-target preflight for active `MERGE_HEAD` and unmerged index entries; routed main→worktree merges through the shared guarded service path.
+  - Made Merge Abort idempotent and preserved stderr for real failures; closed audit todos #2521, #2537, and #2643 after compile/test verification.
+  - Changelog fragment `2026-11-01-git-merge-state-preflight.inc`; handoff `.hermes/plans/2026-11-01-git-audit-root-cause-fixes.md`.
+  - No commit or server restart performed; propagation to other branch worktrees remains Next.
+
 ---
 
 ## 4. Backlog (prioritized)

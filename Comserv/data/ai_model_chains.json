@@ -47,6 +47,7 @@
  ],
  "hermes_fallback_chain": [
   "supergrok|grok-4.7",
+    "xai|grok-4.7",
   "openrouter|openai/gpt-5.6-luna",
   "openrouter|cohere/north-mini-code:free"
  ],

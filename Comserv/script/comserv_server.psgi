@@ -89,4 +89,22 @@ my $wrapped = builder {
 
     $app;
 };
+# Fork-safety for Starman workers (Oct 2026: retired workers stuck at 50-68%
+# CPU for days, holding the listen socket, while the master spawned
+# replacements -> 21/15 "starman worker" processes against --workers 8).
+# A worker that leaves after --max-requests runs END blocks and global
+# destruction, including DBI->disconnect_all over handles it shares with
+# siblings/the master (the app is preloaded); that is where they spin or
+# segfault in DBD::mysql. Leave workers via POSIX::_exit after flushing
+# output. This END is compiled after DBI's, so it runs first. The master
+# ("starman master") and non-Starman runs are unaffected.
+END {
+    if (($0 // '') =~ /^starman worker/) {
+        my $rc = $?;
+        eval { require IO::Handle; STDOUT->flush; STDERR->flush; 1 };
+        require POSIX;
+        POSIX::_exit($rc);
+    }
+}
+
 return $wrapped;
