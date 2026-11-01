@@ -248,6 +248,11 @@
 <script src="/static/js/ai-chat/index.js?v=[% cv %]" defer></script>
 [% END %]
 
+<!-- Health Kitchen dashboard: activity check-off -->
+[% IF c.request.uri.match('/healthkitchen') %]
+<script src="/static/js/healthkitchen/dashboard.js?v=[% cv %]" defer></script>
+[% END %]
+
 <!-- Planning / Daily page JS (covers both /planning/daily and /Documentation/DailyPlan) -->
 [% IF c.request.uri.match('/planning/daily') || c.request.uri.match('/Documentation/DailyPlan') || c.request.uri.match('/project/') %]
 <script src="/static/js/planning/daily-plan.js?v=[% cv %]" defer></script>

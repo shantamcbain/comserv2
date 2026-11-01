@@ -79,7 +79,8 @@ my %ALLOWED_FLAGS = (
     # --ff-only is ONLY for catch_up_registered_worktrees (main into a branch
     # that has no commits of its own). Never use it to land a branch on main,
     # and never pair it with --no-ff — that pairing is the ping-pong loop.
-    merge    => { map { $_ => 1 } qw(--no-ff --no-commit --abort --squash --autostash --ff-only) },
+    merge    => { map { $_ => 1 } qw(--no-ff --no-commit --abort --squash --autostash --ff-only --no-edit) },
+    # --no-edit: update_all_from_main only (never opens an editor in a web request).
     # Worktree is used by the isolation primitive (create_worktree / remove_worktree):
     # allow add, remove (with --force to clear a dirty checkout), list, prune.
     worktree => { map { $_ => 1 } qw(add remove list prune --porcelain --force) },
@@ -2444,6 +2445,174 @@ sub catch_up_registered_worktrees {
         ($dry ? 'catch_up dry_run: ' : 'catch_up: ') . $summary);
 
     return { rows => \@rows, summary => $summary };
+}
+
+=head2 update_all_from_main($c, \%opts)
+
+Oct 31 2026 (Shanta): the Git page's "Update all branches from main" button. For every registered worktree in
+root/config/worktrees.json, bring main into the branch:
+
+=over
+
+=item * Always skip C<Proxmox> / :4016, and any key in C<update_all_skip> (worktrees.json). Skip :4003 unless C<include_4003>.
+
+=item * A dirty tree is NOT skipped: the merge is attempted and git itself refuses when main touches a changed file
+("local changes would be overwritten"). That refusal becomes a C<skipped_local_changes> row with the files.
+Never stash, never force, never rebase.
+
+=item * No commits of its own: C<merge --ff-only main>. Has its own commits: C<merge --no-ff --no-edit main>.
+
+=item * Conflict: C<merge --abort>, row C<conflict> with the files. Secret/junk guard refusal: row C<blocked>, never bypassed.
+
+=item * Each row records C<pre_merge_commit> (undo: C<git reset --hard E<lt>pre_merge_commitE<gt>> in that worktree, by a human).
+
+=back
+
+C<dry_run> moves nothing; it predicts the action (including a local-changes refusal) and lists the running ports that
+would auto-restart (dev servers run with C<-r>). C<config> overrides worktrees.json (tests). Returns { rows, summary, restart_ports }.
+
+=cut
+
+our %UPDATE_ALL_ALWAYS_SKIP = (Proxmox => 1);
+our %UPDATE_ALL_SKIP_PORTS  = (4016 => 1);
+our $UPDATE_ALL_GATED_PORT  = 4003;
+
+sub _port_listening_local {
+    my ($port) = @_;
+    return 0 unless defined $port && $port =~ /^\d+\z/;
+    my $ok = 0;
+    eval {
+        require IO::Socket::INET;
+        my $sock = IO::Socket::INET->new(PeerAddr => '127.0.0.1', PeerPort => $port, Proto => 'tcp', Timeout => 1);
+        if ($sock) { $ok = 1; close $sock }
+    };
+    return $ok;
+}
+
+sub _lines { my ($t) = @_; $t //= ''; return grep { /\S/ } split /\n/, $t }
+
+sub update_all_from_main {
+    my ($self, $c, $opts) = @_;
+    $opts //= {};
+    my $dry  = $opts->{dry_run} ? 1 : 0;
+    my $inc3 = $opts->{include_4003} ? 1 : 0;
+    my $cfg  = $opts->{config} || (eval { _worktree_config() } // {});
+    my $base = $cfg->{base_dir} // "$ENV{HOME}/.comserv/worktrees";
+    my $branches = $cfg->{branches} // {};
+    my %listed = map { ($_ => 1) } @{ ref $cfg->{update_all_skip} eq 'ARRAY' ? $cfg->{update_all_skip} : [] };
+    my $listening = $opts->{port_listening} || \&_port_listening_local;
+    my @rows;
+
+    for my $key (sort keys %$branches) {
+        my $ent  = $branches->{$key};
+        my $port = ref $ent eq 'HASH' ? $ent->{port} : $ent;
+        my $dir  = "$base/$key/Comserv";
+        my $row  = { key => $key, port => $port, path => $dir, action => 'skipped' };
+        push @rows, $row;
+
+        if ($UPDATE_ALL_ALWAYS_SKIP{$key} || (defined $port && $UPDATE_ALL_SKIP_PORTS{$port})) {
+            $row->{action} = 'skipped_proxmox'; $row->{reason} = 'Proxmox / :4016 is always left alone'; next;
+        }
+        if ($listed{$key}) { $row->{action} = 'skipped_listed'; $row->{reason} = 'in update_all_skip (worktrees.json)'; next; }
+        if (defined $port && $port == $UPDATE_ALL_GATED_PORT && !$inc3) {
+            $row->{action} = 'skipped_4003'; $row->{reason} = ':4003 needs the "include :4003" box ticked'; next;
+        }
+        unless (-e "$dir/.git") { $row->{action} = 'missing'; $row->{reason} = 'no checkout'; next; }
+
+        my $b = $self->_run($c, 'branch', '--show-current', { repo => $dir });
+        (my $branch = $b->{output} // '') =~ s/\s+\z//;
+        $row->{branch} = $branch;
+        if (!$b->{success} || !length $branch || $branch eq 'main' || $branch eq 'master') {
+            $row->{reason} = 'not a feature branch'; next;
+        }
+        if (_worktree_merge_in_progress($dir)) { $row->{reason} = 'merge already in progress'; next; }
+
+        my $head = $self->_run($c, 'rev-parse', 'HEAD', { repo => $dir });
+        ($row->{pre_merge_commit} = $head->{output} // '') =~ s/\s+\z//;
+        my $ahead_r  = $self->_run($c, 'rev-list', '--count', 'main..HEAD', { repo => $dir });
+        my $behind_r = $self->_run($c, 'rev-list', '--count', 'HEAD..main', { repo => $dir });
+        unless ($head->{success} && $ahead_r->{success} && $behind_r->{success}) {
+            $row->{action} = 'failed'; $row->{reason} = 'could not compare to main'; next;
+        }
+        ($row->{ahead}  = $ahead_r->{output})  =~ s/\D//g; $row->{ahead}  ||= 0;
+        ($row->{behind} = $behind_r->{output}) =~ s/\D//g; $row->{behind} ||= 0;
+        $row->{$_} += 0 for qw(ahead behind);
+
+        my $st = $self->_run($c, 'status', '--porcelain', { repo => $dir });
+        my @dirty;
+        for my $line (_lines($st->{output})) {
+            (my $p = $line) =~ s/^.{2}\s//; $p =~ s/^.* -> //; $p =~ s/\s+\z//;
+            push @dirty, $p if length $p;
+        }
+        $row->{dirty_files} = [ @dirty[0 .. ($#dirty < 19 ? $#dirty : 19)] ] if @dirty;
+
+        if ($row->{behind} == 0) { $row->{action} = 'uptodate'; next; }
+        $row->{will_restart} = $listening->($port) ? 1 : 0;
+
+        if ($dry) {
+            # Predict git's own refusal: main changes a file that is dirty here.
+            my %d = map { ($_ => 1) } @dirty;
+            my $ch = $self->_run($c, 'diff', '--name-only', 'HEAD...main', { repo => $dir });
+            my @hit = grep { $d{$_} } _lines($ch->{output});
+            if (@hit) {
+                $row->{action} = 'would_skip_local_changes'; $row->{files} = \@hit;
+                $row->{reason} = 'main changes files with uncommitted edits here';
+                $row->{will_restart} = 0;
+            } else {
+                $row->{action} = $row->{ahead} ? 'would_merge' : 'would_ff';
+            }
+            next;
+        }
+
+        my @m = $row->{ahead} ? ('merge', '--no-ff', '--no-edit', 'main') : ('merge', '--ff-only', 'main');
+        my $m = $self->_run($c, @m, { repo => $dir });
+        my $out = join("\n", grep { defined && length } $m->{output}, $m->{error});
+        if ($m->{success}) {
+            $row->{action} = $row->{ahead} ? 'merged' : 'fast_forwarded';
+            my $post = $self->_run($c, 'rev-parse', 'HEAD', { repo => $dir });
+            ($row->{post_merge_commit} = $post->{output} // '') =~ s/\s+\z//;
+            next;
+        }
+        $row->{will_restart} = 0;
+        if ($out =~ /would be overwritten by merge/i) {
+            my @f; my $in = 0;
+            for my $l (split /\n/, $out) {
+                if ($l =~ /would be overwritten by merge/i) { $in = 1; next }
+                if ($in && $l =~ /^\s+(\S.*?)\s*$/) { push @f, $1; next }
+                $in = 0 if $in && $l !~ /^\s/;
+            }
+            $row->{action} = 'skipped_local_changes'; $row->{files} = \@f;
+            $row->{reason} = 'git refused: uncommitted changes would be overwritten (nothing changed)';
+        }
+        elsif ($out =~ /secret-guard:|junk-guard:|pre-merge-commit:|^\s*BLOCKED:/m) {
+            $row->{action} = 'blocked'; $row->{reason} = 'secret/junk guard refused the merge (not bypassed)';
+            $row->{detail} = substr($out, 0, 400);
+        }
+        elsif (_worktree_merge_in_progress($dir)) {
+            my $s2 = $self->_run($c, 'status', '--porcelain', { repo => $dir });
+            my @cf = map { (my $p = $_) =~ s/^.{2}\s//; $p } grep { /^(?:UU|AA|DD|AU|UA|DU|UD) / } _lines($s2->{output});
+            $row->{action} = 'conflict'; $row->{files} = \@cf;
+            $row->{reason} = 'conflict; merge aborted, branch unchanged';
+        }
+        else {
+            ($row->{reason} = substr($out, 0, 240)) =~ s/\s+/ /g;
+            $row->{action} = 'failed';
+        }
+        if (_worktree_merge_in_progress($dir)) {
+            my $ab = $self->_run($c, 'merge', '--abort', { repo => $dir });
+            $row->{reason} .= $ab->{success} ? ' (aborted)' : ' (ABORT FAILED - check this worktree)';
+        }
+    }
+
+    my %n; $n{ $_->{action} }++ for @rows;
+    my @restart = map { $_->{port} } grep { $_->{will_restart} } @rows;
+    my $summary = join(', ', map { "$n{$_} $_" } sort keys %n);
+    $summary = ($dry ? 'Preview (nothing changed): ' : 'Update all from main: ') . $summary;
+    $summary .= '. Will auto-restart (-r): ' . join(', ', map { ":$_" } @restart) if @restart && $dry;
+    $summary .= '. Auto-restarted (-r): '    . join(', ', map { ":$_" } @restart) if @restart && !$dry;
+    $self->logging->log_with_details($c, ($n{failed} || $n{conflict} || $n{blocked}) ? 'warn' : 'info',
+        __FILE__, __LINE__, 'git_merge', $summary);
+    return { rows => \@rows, summary => $summary, restart_ports => \@restart, dry_run => $dry };
 }
 
 # True when $dir (a worktree checkout) has MERGE_HEAD. A linked worktree's

@@ -326,6 +326,34 @@
                 </div>
             </div>
 
+            [%# ==================== Update all branches from main (Oct 31 2026, Shanta) ==================== %]
+            [%# Admin-only POST + CSRF to /admin/git/update_all_from_main; driven by git-dashboard.js (data-git-update-all).
+               No stash, no force, no rebase. Proxmox/:4016 always skipped; :4003 only when the box is ticked. #]
+            <details class="git-collapse git-update-all">
+                <summary>Update all branches from main</summary>
+                <div class="git-collapse-body" data-git-update-all="1"
+                     data-update-all-url="[% c.uri_for('/admin/git/update_all_from_main') %]"
+                     data-csrf="[% update_all_csrf | html %]">
+                    <p>Merges main into every registered worktree. A branch with uncommitted files is still merged when main
+                       does not touch those files; otherwise git refuses and the row says so (nothing is stashed or forced).
+                       A conflict is aborted and the branch is left as it was. Proxmox (:4016) is always skipped.
+                       Dev servers started with <code>-r</code> restart on their own when their files change.</p>
+                    <label><input type="checkbox" data-update-all-4003="1"> Include :4003 (3d)</label>
+                    <div class="git-actions">
+                        <button type="button" class="admin-btn admin-btn-sm" data-update-all-mode="preview">
+                            <i class="fas fa-eye"></i> Preview</button>
+                        <button type="button" class="admin-btn admin-btn-sm admin-btn-primary" data-update-all-mode="update">
+                            <i class="fas fa-code-branch"></i> Update all from main</button>
+                    </div>
+                    <div data-update-all-summary="1" class="git-merge-status"></div>
+                    <table class="data-table" data-update-all-table="1" hidden>
+                        <thead><tr><th>Worktree</th><th>Branch</th><th>Port</th><th>Result</th><th>Behind / ahead</th>
+                            <th>Before (undo point)</th><th>Files / reason</th><th>Auto-restart</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </details>
+
             [%# ==================== Develop Servers (zenflow worktree registry) ==================== %]
             [%# Highlight uses current_worktree (from app_workflow = worktree dir key) to mark the active server row.
                This matches b.name even when live git branch (current_branch) differs (e.g. feature branch in a named worktree slot). #]

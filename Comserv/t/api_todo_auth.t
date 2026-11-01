@@ -55,7 +55,8 @@ my @TL;
     my @cols = qw(subject description project_id start_date due_date priority status developer sitename date_time_posted
         username_of_poster accumulative_time last_mod_by last_mod_date comments parent_todo estimated_man_hours group_of_poster
         project_code share user_id reporter owner is_blocking blocked_by_todo_id parent_id sort_order todo_type billable
-        company_code time_of_day scheduled_date scheduled_start scheduled_end plan_id point_rate role_category is_fixed is_recurring);
+        company_code time_of_day scheduled_date scheduled_start scheduled_end plan_id point_rate role_category is_fixed is_recurring
+        recurrence_rule creator_timezone);
     __PACKAGE__->add_columns(record_id => { data_type => 'integer', is_auto_increment => 1 }, map { $_ => { data_type => 'text', is_nullable => 1 } } @cols);
     __PACKAGE__->set_primary_key('record_id');
     __PACKAGE__->belongs_to(project => 'T::Result::Project', { 'foreign.id' => 'self.project_id' }, { join_type => 'left' });
@@ -353,17 +354,16 @@ for my $t (sort keys %BAD) {
 }
 
 # =============================================================================
-# 7. Controller::Todo api_todo_update (/api/todo/update/<id>)
+# 7. /api/todo/update/<id> (moved from Todo.pm to Api.pm api_todo_update_by_id, Oct 2026;
+#    same contract, now also AccessCheck-gated)
 # =============================================================================
-SKIP: {
-    my $ok = eval { require Comserv::Controller::Todo; 1 };
-    skip "Comserv::Controller::Todo did not load: " . substr("$@", 0, 80), 12 unless $ok;
-    my $todo_ctrl = bless { logging => Comserv::Util::Logging->instance }, 'Comserv::Controller::Todo';
+{
+    my $todo_ctrl = $ctrl;
     # this action also takes $todo_id, so it is called directly
     my $tcall = sub {
         my (%a) = @_;
         my $c = mk(path => 'api/todo/update/10', method => 'PUT', %a);
-        eval { $todo_ctrl->api_todo_update($c, 10); 1 } or do { die $@ unless ref $@ eq 'HASH' && $@->{detach} };
+        eval { $todo_ctrl->api_todo_update_by_id($c, 10); 1 } or do { die $@ unless ref $@ eq 'HASH' && $@->{detach} };
         my $b = $c->res->body; return ($c->res->status, ($b ? eval { decode_json($b) } || {} : {}));
     };
     $S->('Todo')->find(10)->update({ last_mod_by => 'start', status => '2' });
@@ -511,6 +511,34 @@ sub mint { my ($body, %o) = @_; return api('api_admin_bot_token', %ADMINC, %o, b
     my $c6 = mk(%ADMINC, method => 'DELETE', path => 'api/api_revoke_token/99999');
     eval { $ctrl->api_revoke_token($c6, 99999); 1 } or do { die $@ unless ref $@ eq 'HASH' && $@->{detach} };
     is($c6->res->status, 404, 'revoke: unknown id 404');
+}
+
+# =============================================================================
+# identity from the authenticated caller; recurrence/timezone validation (Oct 2026)
+# =============================================================================
+{
+    my %new = (subject => 'Id test', start_date => '2026-10-26', due_date => '2026-10-27', priority => 3, status => 2, project_id => 1,
+               user_id => 9, username_of_poster => 'Shanta', group_of_poster => 'admin',
+               recurrence_rule => 'FREQ=WEEKLY;BYDAY=MO,WE', creator_timezone => 'America/Vancouver');
+    my ($st, $j) = api('api_todo_create', token => $TOK{good}, path => 'api/todo/create', body => \%new);
+    is($st, 200, 'create with body identity fields -> 200') or diag explain $j;
+    my $row = $S->('Todo')->find($j->{todo_id});
+    is($row->user_id, 1, 'body user_id ignored: token user id');
+    is($row->username_of_poster, 'botdev', 'body username_of_poster ignored');
+    is($row->group_of_poster, 'developer', 'group_of_poster = caller role, not hardcoded admin');
+    is($row->recurrence_rule, 'FREQ=WEEKLY;BYDAY=MO,WE', 'recurrence_rule stored');
+    is($row->creator_timezone, 'America/Vancouver', 'creator_timezone stored');
+    for my $bad ('WEEKLY', 'FREQ=SOMETIMES', 'FREQ=DAILY;<script>', 'FREQ=DAILY;' . ('X=1;' x 70)) {
+        ($st) = api('api_todo_create', token => $TOK{good}, path => 'api/todo/create', body => { %new, subject => 'bad rr', recurrence_rule => $bad });
+        is($st, 400, "bad recurrence_rule refused: " . substr($bad, 0, 20));
+    }
+    ($st) = api('api_todo_create', token => $TOK{good}, path => 'api/todo/create', body => { %new, subject => 'bad tz', creator_timezone => 'Mars/Olympus' });
+    is($st, 400, 'bad creator_timezone refused');
+    is($S->('Todo')->search({ subject => ['bad rr', 'bad tz'] })->count, 0, '... nothing created');
+    ($st) = api('api_todo_update', token => $TOK{good}, path => 'api/todo/update', body => { record_id => 10, creator_timezone => 'Nope/Zone' });
+    is($st, 400, 'update: bad creator_timezone refused');
+    ($st) = api('api_todo_update', token => $TOK{good}, path => 'api/todo/update', body => { record_id => 10, recurrence_rule => 'FREQ=MONTHLY;BYMONTHDAY=1' });
+    is($st, 200, 'update: valid recurrence_rule ok');
 }
 
 done_testing();

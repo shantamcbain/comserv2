@@ -832,6 +832,7 @@ sub index :Path('/admin/git') :Args(0) {
         # The Git dashboard's "Develop Servers" card reuses the same data the planning
         # tab's "Branch Servers" panel shows, so the two can never drift.
         worktree_list   => $self->git_service->build_worktree_list,
+        update_all_csrf => $self->_update_all_csrf_token($c),
         template        => 'admin/git/index.tt',
     );
 
@@ -2267,6 +2268,70 @@ sub _catch_up_note {
     my $out = $output // '';
     $out .= "\n\n" . $summary if length $summary;
     return ($out, $summary, $cu->{rows} || []);
+}
+
+=head2 update_all_from_main
+
+POST /admin/git/update_all_from_main (admin-only, session CSRF token). Oct 31 2026 (Shanta).
+Params: mode=preview|update, include_4003=1 (optional), csrf. Brings main into every registered
+worktree via Comserv::Util::Git->update_all_from_main (no stash, no force, no rebase; conflicts
+aborted; Proxmox/:4016 always skipped). Returns JSON { success, rows, summary, restart_ports, dry_run }.
+
+=cut
+
+sub _update_all_csrf_token {
+    my ($self, $c) = @_;
+    my $t = $c->session->{git_update_all_csrf};
+    unless ($t) {
+        require Digest::SHA;
+        my $rand = '';
+        if (open(my $fh, '<:raw', '/dev/urandom')) { read($fh, $rand, 32); close $fh }
+        $t = Digest::SHA::sha256_hex($rand . time . $$ . rand());
+        $c->session->{git_update_all_csrf} = $t;
+    }
+    return $t;
+}
+
+sub _update_all_csrf_ok {
+    my ($self, $c) = @_;
+    my $want = $c->session->{git_update_all_csrf};
+    my $got  = $c->req->params->{csrf};
+    return 0 unless defined $want && length $want && defined $got && length($got) == length($want);
+    my $diff = 0;
+    $diff |= ord(substr($want, $_, 1)) ^ ord(substr($got, $_, 1)) for 0 .. length($want) - 1;
+    return $diff == 0 ? 1 : 0;
+}
+
+sub update_all_from_main :Path('/admin/git/update_all_from_main') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_merge');
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+    unless ($self->_update_all_csrf_ok($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            'update_all_from_main: CSRF token missing or wrong');
+        $c->response->body(encode_json({ success => 0, error => 'Security token expired. Reload the Git page and try again.' }));
+        return;
+    }
+    my $mode = $c->req->param('mode') // 'preview';
+    my $dry  = $mode eq 'update' ? 0 : 1;
+    my $res = eval {
+        $self->git_service->update_all_from_main($c, {
+            dry_run      => $dry,
+            include_4003 => ($c->req->param('include_4003') ? 1 : 0),
+        });
+    };
+    if (!$res) {
+        my $err = $@ || 'unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+            "update_all_from_main died: $err");
+        $c->response->body(encode_json({ success => 0, error => 'Update all failed; see the application log.' }));
+        return;
+    }
+    $c->response->body(encode_json({ success => 1, %$res }));
 }
 
 =head2 merge_to_main

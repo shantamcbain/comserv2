@@ -4,6 +4,9 @@ use Test::More;
 use File::Temp qw(tempdir);
 use FindBin; use lib "$FindBin::Bin/../lib";
 use JSON::PP;
+# Oct 31 2026 (Shanta): caps come from the shared caps file mechanism, pointed at a fixed test file, never hard-coded here.
+BEGIN { $ENV{COMSERV_AI_CAPS_FILE} = "$FindBin::Bin/data/ai_caps_guard_test.json" }
+my $TCAPS = do { open my $fh, '<', $ENV{COMSERV_AI_CAPS_FILE} or die "caps test file: $!"; local $/; JSON::PP::decode_json(<$fh>)->{openrouter} };
 use Comserv::Util::AI::HermesOverrunGuard;
 my $G = 'Comserv::Util::AI::HermesOverrunGuard';
 require Comserv::Util::AI::ModelChains;
@@ -20,7 +23,7 @@ is $G->can('decide')->(thrash => 5, openrouter => $ok, state => {})->{action}, '
 my $d = $G->can('decide')->(thrash => 20, openrouter => $ok, state => {});
 is $d->{action}, 'trip', 'thrash 20 trips'; like $d->{reasons}[0], qr/thrash: 20/, 'thrash reason';
 is $G->can('decide')->(thrash => 19, openrouter => $ok, state => {})->{action}, 'none', 'thrash 19 ok';
-for ([day => 1.65], [week => 11.5], [month => 50]) {
+for (map { [$_ => $TCAPS->{$_}] } qw(day week month)) {
     my ($w, $v) = @$_;
     my $r = $G->can('decide')->(thrash => 0, openrouter => { %$ok, "${w}_usd" => $v }, state => {});
     is $r->{action}, 'trip', "$w cap trips at $v"; like "@{$r->{reasons}}", qr/$w/, "$w reason";
@@ -59,7 +62,8 @@ sub guard {
 }
 my $h = home();
 my ($g, $set) = guard($h, now => 1000000);
-my $r = $g->run(thrash => 3, openrouter => { %$ok, week_usd => 15.89 });
+# Oct 31 2026: lite reuse needs a fresh snapshot (fetched_at, commit d17fb91f5); give the trip reading one.
+my $r = $g->run(thrash => 3, openrouter => { %$ok, week_usd => 15.89, fetched_at => 1000000 });
 is $r->{action}, 'trip', 'run trips on week';
 is $r->{target}, 'openrouter/cohere/north-mini-code:free', 'switched to cheapest';
 ok $r->{backup} && -f $r->{backup}, 'config backed up';

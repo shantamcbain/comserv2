@@ -194,10 +194,14 @@ sub decide {
         }
     }
     my $over = @r ? 1 : 0;
+    # Oct 31 2026 (Shanta): only an authoritative reading can restore a trip. A live-estimate-only, stale, or partial reading
+    # (missing day/week/month) can still trip, but never restores (Oct 30 11:03:59 restore with day $6.31 still over $3).
+    my $authoritative = ($or->{ok} && !$or->{live_only} && !$or->{stale}
+                         && defined $or->{day_usd} && defined $or->{week_usd} && defined $or->{month_usd}) ? 1 : 0;
     my $action = $over ? ($st->{tripped} ? 'hold' : 'trip')
-               : $st->{tripped} ? ($known ? 'restore' : 'hold')
+               : $st->{tripped} ? (($known && $authoritative) ? 'restore' : 'hold')
                : 'none';
-    return { action => $action, reasons => \@r, over => $over, known => $known };
+    return { action => $action, reasons => \@r, over => $over, known => $known, authoritative => $authoritative };
 }
 
 # pure: strip a repeated provider prefix ('openrouter/openrouter/x' or 'openrouter/x'
@@ -296,6 +300,9 @@ sub paid_room_why {
     push @w, 'an OpenRouter money cap is already hit' if grep { /^OpenRouter/ } @{ $reasons || [] };
     return (@w, 'OpenRouter usage unknown') unless ref $or eq 'HASH' && $or->{ok};
     $caps ||= shared_or_caps();
+    # Oct 31 2026: an estimate-only or stale reading is not proof of room for paid models.
+    push @w, 'OpenRouter reading is a live estimate only' if $or->{live_only};
+    push @w, 'OpenRouter reading is stale' if $or->{stale};
     my %frac = (day => $NEAR_CAP_FRAC, week => 0.9, month => 0.9);
     for my $w (qw(day week month)) {
         my ($v, $cap) = ($or->{"${w}_usd"}, $caps->{$w});
@@ -367,6 +374,8 @@ sub billing_summary {
 }
 
 our $COOLDOWN_S = 1800;
+# Oct 31 2026 (Shanta): consecutive authoritative clear runs needed before a restore (hysteresis).
+our $CLEAR_RUNS = 2;
 # pure: an OpenRouter money-cap trip while Hermes is on Super Grok (xai-oauth) only blocks paid models.
 sub paid_only_trip {
     my ($kind, $cm) = @_;
@@ -1971,6 +1980,20 @@ sub run {
         $d->{action} = 'hold';
         $d->{cooldown_left_s} = $COOLDOWN_S - ($t - $st->{since});
     }
+    # Oct 31 2026 (Shanta): restore only after $CLEAR_RUNS consecutive authoritative clear runs. Any over / unknown /
+    # estimate-only run while tripped resets the count. The count lives in the shared state file (clear_streak).
+    if ($st->{tripped} && !$shielded) {
+        if ($d->{action} eq 'restore') {
+            my $streak = ($st->{clear_streak} // 0) + 1;
+            if ($streak < ($CLEAR_RUNS // 1)) {
+                $st->{clear_streak} = $streak;
+                $d->{action} = 'hold';
+                $d->{clear_streak} = $streak;
+            }
+        } elsif ($d->{action} eq 'hold' && !$d->{cooldown_left_s}) {
+            $st->{clear_streak} = 0;
+        }
+    }
     if ($d->{action} eq 'trip') {
         my $plan   = build_trip_plan(%ctx, reasons => $d->{reasons});
         # Oct 23 (Shanta 6:57 AM PT): on Super Grok, an OpenRouter cap trip only blocks the paid
@@ -2074,6 +2097,7 @@ sub run {
         _append($s->{events_file}, $J->encode($ev));
         $ev->{ledger} = $s->ledger($ev);
         delete $st->{paid_block_only};
+        delete $st->{clear_streak};
         %$st = (%$st, tripped => 0, paused => 0, restored_at => $t, restored_pt => pt($t),
                 restore_backup => $bak, restore_decision => $dec->{reason},
                 instance => $s->instance_name, restored_by => $s->instance_name);

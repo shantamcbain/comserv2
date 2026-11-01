@@ -845,3 +845,56 @@
         }
     });
 })();
+
+// Oct 31 2026 (Shanta): "Update all branches from main" card. Rows are rendered with textContent only (no HTML from the server).
+(function () {
+    'use strict';
+    var box = document.querySelector('[data-git-update-all]');
+    if (!box) { return; }
+    var url = box.getAttribute('data-update-all-url');
+    var csrf = box.getAttribute('data-csrf') || '';
+    var summary = box.querySelector('[data-update-all-summary]');
+    var table = box.querySelector('[data-update-all-table]');
+    var tbody = table ? table.querySelector('tbody') : null;
+    var inc3 = box.querySelector('[data-update-all-4003]');
+    var buttons = box.querySelectorAll('[data-update-all-mode]');
+
+    function cell(tr, text) { var td = document.createElement('td'); td.textContent = text == null ? '' : String(text); tr.appendChild(td); }
+    function render(data) {
+        summary.textContent = data.summary || data.error || '';
+        if (!tbody || !data.rows) { return; }
+        while (tbody.firstChild) { tbody.removeChild(tbody.firstChild); }
+        data.rows.forEach(function (r) {
+            var tr = document.createElement('tr');
+            cell(tr, r.key); cell(tr, r.branch); cell(tr, r.port ? ':' + r.port : '');
+            cell(tr, r.action);
+            cell(tr, (r.behind != null ? r.behind : '') + (r.ahead != null ? ' / ' + r.ahead : ''));
+            cell(tr, r.pre_merge_commit ? r.pre_merge_commit.substring(0, 10) : '');
+            var bits = [];
+            if (r.files && r.files.length) { bits.push(r.files.join(', ')); }
+            if (r.reason) { bits.push(r.reason); }
+            if (r.dirty_files && r.dirty_files.length && !(r.files && r.files.length)) { bits.push('uncommitted kept: ' + r.dirty_files.join(', ')); }
+            cell(tr, bits.join(' - '));
+            cell(tr, r.will_restart ? 'yes' : '');
+            tbody.appendChild(tr);
+        });
+        table.hidden = false;
+    }
+    Array.prototype.forEach.call(buttons, function (btn) {
+        btn.addEventListener('click', function () {
+            var mode = btn.getAttribute('data-update-all-mode');
+            if (mode === 'update' && !window.confirm('Merge main into every registered branch now? Running -r dev servers will restart. Run Preview first if unsure.')) { return; }
+            var body = new URLSearchParams();
+            body.set('mode', mode); body.set('csrf', csrf);
+            if (inc3 && inc3.checked) { body.set('include_4003', '1'); }
+            summary.textContent = mode === 'update' ? 'Updating...' : 'Previewing...';
+            Array.prototype.forEach.call(buttons, function (b) { b.disabled = true; });
+            fetch(url, { method: 'POST', credentials: 'same-origin', body: body,
+                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+                .then(function (r) { return r.json(); })
+                .then(render)
+                .catch(function (e) { summary.textContent = 'Request failed: ' + e; })
+                .then(function () { Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; }); });
+        });
+    });
+})();
