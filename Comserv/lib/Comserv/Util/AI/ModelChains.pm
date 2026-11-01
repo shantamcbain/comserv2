@@ -24,7 +24,8 @@ use JSON ();
 our @PURPOSES = qw(chat docs coding title);
 
 # Slug grammar: provider|model. Providers the Router can dispatch.
-our $SLUG_RE = qr/^(?:openrouter|external|supergrok|grok|ollama)\|[A-Za-z0-9._:\/~+\-]+$/;
+# Oct 31 2026 (Shanta): xai = paid x.ai direct API (cash, shared caps with OpenRouter).
+our $SLUG_RE = qr/^(?:openrouter|external|supergrok|grok|ollama|xai)\|[A-Za-z0-9._:\/~+\-]+$/;
 # "ollama|auto" = first installed chat-capable Ollama tag at call time.
 our $OLLAMA_AUTO = 'ollama|auto';
 
@@ -51,7 +52,7 @@ our %KNOB_DEFAULTS = (
 # (within the OpenRouter caps) and only then to free north-mini, which is always the LAST step
 # (it is easily overwhelmed when it suddenly replaces a smarter model). The emergency list is used
 # only when every step of the chain is unusable. Both live in data/ai_model_chains.json.
-our @HERMES_CHAIN_DEFAULT     = ('supergrok|grok-4.7', 'openrouter|openai/gpt-5.6-luna', 'openrouter|cohere/north-mini-code:free');   # Oct 28 2026: luna (on probation) replaced qwen3-coder
+our @HERMES_CHAIN_DEFAULT     = ('supergrok|grok-4.7', 'xai|grok-4.7', 'openrouter|openai/gpt-5.6-luna', 'openrouter|cohere/north-mini-code:free');   # Oct 28 2026: luna (on probation) replaced qwen3-coder
 our @HERMES_EMERGENCY_DEFAULT = ('ollama|gemma4-64k:latest', 'openrouter|nvidia/nemotron-3.5-lightning:free');
 our $HERMES_NORTH_RE          = qr/north-mini-code/i;
 our $HERMES_BANNED_RE         = qr/grok|glm|v4-pro/i;     # never as an openrouter step (grok only via Super Grok)

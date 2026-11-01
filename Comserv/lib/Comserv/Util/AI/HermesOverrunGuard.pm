@@ -92,6 +92,15 @@ our $OR_MODELS_URL  = 'https://openrouter.ai/api/v1/models';
 our $OR_CACHE_TTL   = 6 * 3600;
 our $OR_CACHE_STALE = 7 * 86400;
 our ($UNPRICED_IN, $UNPRICED_OUT) = (2e-6, 4e-6);   # $/token when endpoint prices are unknown
+# Oct 31 2026 (Shanta): x.ai direct API published prices, $/token [in, out, cached in] (x.ai /v1/language-models, Oct 31 2026).
+# XaiBilling is a stub, so x.ai cash is estimated as tokens x price and counted in the SHARED cash caps with OpenRouter.
+our %XAI_PRICE = ('grok-4.7' => [2e-6, 6e-6, 0.5e-6], 'grok-4.6' => [2e-6, 6e-6, 0.5e-6], 'grok-4.5' => [2e-6, 6e-6, 0.3e-6]);
+sub xai_price_call {
+    my ($c) = @_;
+    my $p = $XAI_PRICE{ $c->{model} // '' } or return ($c->{in} // 0) * $UNPRICED_IN + ($c->{out} // 0) * $UNPRICED_OUT * 1.5;
+    my $in = $c->{in} // 0; my $cache = $c->{cache} // 0; $cache = $in if $cache > $in;
+    return ($in - $cache) * $p->[0] + $cache * $p->[2] + ($c->{out} // 0) * $p->[1];
+}
 our @PROVIDER_PREFIXES = qw(openrouter ollama-launch ollama xai-oauth xai);
 our @MODEL_KEYS = qw(provider default base_url api_mode);
 
@@ -326,6 +335,12 @@ sub offender_reason {
         return undef;
     }
     if ($ch eq 'xai_direct') {
+        # Oct 31 2026 (Shanta): x.ai grok in the Hermes chain is a paid step under the SHARED cash caps (x.ai spend is added
+        # to the OpenRouter day/week/month totals in run), so it is stopped by the same shared cap, not by xai_direct caps.
+        if (ref $pol{allowed_paid} eq 'HASH' && $pol{allowed_paid}{$model}) {
+            return 'shared cash cap reached (OpenRouter + x.ai) - no paid model is allowed' if $pol{or_over};
+            return undef;
+        }
         my $cap = $pol{xai_direct_cap_day} // 0;
         return 'x.ai direct API is off (cash cap $0)' if $cap <= 0;
         return 'x.ai direct API cap reached' if $pol{xai_over};
@@ -480,6 +495,11 @@ sub chain_candidates {
         my ($t, $prov, $m) = ($st->{tier}, $st->{provider}, $st->{model});
         my $cand;
         if ($t eq 'supergrok') { $cand = { %SUPERGROK_CAPS, default => $m, name => "xai-oauth/$m" } }
+        elsif ($t eq 'paid' && $prov =~ /^xai(?:_direct)?\z/) {
+            # Oct 31 2026 (Shanta): paid x.ai direct grok (API key = cash), after Super Grok, inside the SHARED OpenRouter+x.ai caps.
+            $cand = { name => "xai/$m", provider => 'xai', default => $m, base_url => 'https://api.x.ai/v1',
+                      api_mode => 'chat_completions', paid => 1, xai => 1 };
+        }
         elsif ($t eq 'paid')   {
             next if is_or_grok($prov, $m) || $m =~ /glm/i || $m =~ $BANNED_RE;
             $cand = { name => "openrouter/$m", provider => 'openrouter', default => $m, base_url => 'https://openrouter.ai/api/v1',
@@ -990,7 +1010,7 @@ sub live_spend {
         my $ch = billing_channel($c->{provider}, $m);
         if ($ch ne 'openrouter') {
             # not billed by OpenRouter: counted per channel (x.ai direct = flat unpriced estimate), never in the OpenRouter dollars
-            my $est = $ch eq 'xai_direct' ? ($c->{in} // 0) * $UNPRICED_IN + ($c->{out} // 0) * $UNPRICED_OUT : 0;
+            my $est = $ch eq 'xai_direct' ? xai_price_call($c) : 0;
             $chan{$ch} ||= { calls => 0, usd => 0 }; $chan{$ch}{calls}++; $chan{$ch}{usd} += $est;
             if ($now - $c->{t} < 600) {
                 my $k = join "\0", $c->{session} // '?', $c->{provider}, $m;
@@ -1047,6 +1067,16 @@ sub stale_guard {
     return $or if !defined $age || $age <= $max;   # no fetched_at: caller-supplied/unknown age, trust as before
     return { ok => 0, stale => 1, error => sprintf('openrouter reading stale (%dm old)', $age/60),
              (defined $or->{balance_usd} ? (balance_usd => $or->{balance_usd}) : ()) };
+}
+
+# pure: add x.ai direct cash (estimate) to an OpenRouter reading (shared cash budget).
+sub add_shared_cash {
+    my ($or, $usd) = @_;
+    return $or unless ref $or eq 'HASH' && $usd && $usd > 0;
+    my %o = %$or;
+    for my $k (qw(day_usd week_usd month_usd)) { $o{$k} += $usd if defined $o{$k} }
+    $o{xai_direct_usd} = $usd;
+    return \%o;
 }
 
 # pure
@@ -1881,6 +1911,9 @@ sub run {
     my $dst = $shielded ? { %$st, tripped => 0 } : $st;
     my %cc0 = $s->chain_context;
     my $xai_live = (ref $live eq 'HASH' && $live->{ok} && ref $live->{by_channel} eq 'HASH') ? ($live->{by_channel}{xai_direct} || {}) : {};
+    # Oct 31 2026 (Shanta: x.ai and OpenRouter share one cash budget): today's x.ai direct estimate is added to the
+    # OpenRouter day/week/month totals so the trip and paid-room checks use the shared caps.
+    $or = add_shared_cash($or, $xai_live->{usd});
     # Oct 28 2026 (Shanta raised the OpenRouter caps to $3/day, $15/week, $65/month): the trip check reads the SAME caps as the
     # paid-room check, from channel_caps_usd.openrouter in data/ai_model_chains.json (one place). %CAPS is only the fallback.
     my $or_caps = (($cc0{channel_caps} || {})->{openrouter})
