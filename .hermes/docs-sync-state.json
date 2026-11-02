@@ -1,9 +1,9 @@
 {
-  "branch": "main",
-  "head_sha": "d73b9fda952c69194d8f985e379265dbdfb609f8",
+  "branch": "git-dev",
+  "head_sha": "62d8d08dc",
   "date": "2026-11-01",
-  "last_doc_commit": "c7f40217ec7d965f20c94a4aaf3d42e5ba0fa98f",
-  "changelog_entry": "Comserv/root/Documentation/changelog/entries/2026-11-01-git-merge-state-preflight.inc",
-  "todos_touched": [2521, 2537, 2643],
-  "note": "Added merge-target state preflight, routed main-to-worktree merges through the shared guarded service path, and made Merge Abort idempotent. Perl compilation and focused Git tests passed (72 tests); todos 2521, 2537, and 2643 are status 3 with closed logs. Changes remain uncommitted; propagation to other branch worktrees is next."
+  "last_doc_commit": "4c2ed59cb",
+  "changelog_entry": "Comserv/root/Documentation/changelog/entries/2026-11-01-git-external-repo-hermes.inc",
+  "todos_touched": [],
+  "note": "Registered OpenBafangTool as an external git target and made the Develop Servers Hermes button open :9120. Working tree only; not committed. Unrelated open clocks 2311, 2469, 2595 were left running. Main Hermes dashboard :9119 was already on main."
 }
