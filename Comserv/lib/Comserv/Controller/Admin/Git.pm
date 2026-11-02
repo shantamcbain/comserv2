@@ -117,6 +117,13 @@ Returns the resolved key (or '' for local).
 
 =cut
 
+sub _git_back {
+    my ($self, $c) = @_;
+    my $t = $c->stash->{git_target} // '';
+    return $c->uri_for('/admin/git', { target => $t }) if $t && $t ne 'local';
+    return $c->uri_for('/admin/git');
+}
+
 sub _bind_target {
     my ($self, $c) = @_;
     my $t = $c->req->param('target');
@@ -133,6 +140,9 @@ Unlike _git (which builds a shell string and is fine for fixed internal commands
 is the ONLY safe way to pass browser-supplied values (file paths, messages) to git: each argument
 is handed to git as a distinct argv element via IPC::Run3, so shell metacharacters in a filename
 or commit message can never be interpreted.
+
+The name refers to the explicit argument list passed to git, not to listing branches. Branch
+listing is provided by C<get_local_branches>.
 
 Usage: my ($out, $code) = $self->_git_list($c, 'add', '--', @paths);
 Returns (combined_output, exit_code). Returns ('', -1) if the repo path can't be resolved.
@@ -151,6 +161,7 @@ sub _git_list {
             my $r = $self->git_service->_ssh_exec_git($c, $tinfo, @argv);
             return ($r->{output}, $r->{exit_code});
         }
+        # External local repo: never fall through to the Comserv checkout.
         if ($tinfo->{external}) {
             my $repo = $tinfo->{repo};
             return ('', -1) unless defined $repo && length $repo && -d $repo;
@@ -263,7 +274,7 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     # Every write is POST + confirm.
     unless ($c->req->method eq 'POST' && $c->req->param('confirm')) {
         $c->flash->{error_msg} = 'Git actions require a confirmed POST.';
-        $c->response->redirect($c->uri_for('/admin/git'));
+        $c->response->redirect($self->_git_back($c));
         return;
     }
 
@@ -284,12 +295,12 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         if (@{ $validated->{invalid} }) {
             $c->flash->{error_msg} =
                 "Rejected unsafe or unknown path(s): " . join(', ', @{ $validated->{invalid} }) . " (must exactly match git status --porcelain on the bound target. Refresh view or select only current dirty paths for this target. Runtime data should be gitignored.)";
-            $c->response->redirect($c->uri_for('/admin/git'));
+            $c->response->redirect($self->_git_back($c));
             return;
         }
         if ($requires_selection{$op} && !@{ $validated->{valid} }) {
             $c->flash->{error_msg} = 'No files selected.';
-            $c->response->redirect($c->uri_for('/admin/git'));
+            $c->response->redirect($self->_git_back($c));
             return;
         }
     }
@@ -390,6 +401,9 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         my $branch = $self->get_current_branch($c);
         my $tracking = $self->get_tracking_info($c);
         my $tinfo = $self->git_service->resolve_target($c, $c->stash->{git_target} // '');
+        $tinfo = {} unless ref($tinfo) eq 'HASH';
+        # Main/master and registered external repositories publish to their own
+        # origin. Other worktree branches require explicit set-upstream approval.
         my $publish = ($branch eq 'main' || $branch eq 'master' || $tinfo->{publish});
         if (!$tracking->{upstream} && !$publish && !$c->req->param('set_upstream')) {
             $msg = "Branch '$branch' has no upstream. Re-submit with 'set upstream' checked to push.";
@@ -526,7 +540,7 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     if ($ok) { $c->flash->{success_msg} = $msg; }
     else     { $c->flash->{error_msg}   = $msg; }
 
-    $c->response->redirect($c->uri_for('/admin/git'));
+    $c->response->redirect($self->_git_back($c));
 }
 
 =head2 suggest_commit_message
@@ -828,7 +842,9 @@ sub index :Path('/admin/git') :Args(0) {
         # Used to highlight the matching row in Develop Servers / Branch Servers list (b.name).
         # This can differ from current_branch (live git) if a feature branch was checked out inside a worktree slot.
         # The list itself is registry-driven; highlighting marks "this running server".
-        current_worktree => $c->stash->{app_workflow} || 'main',
+        current_worktree => $tinfo->{external}
+            ? ($tinfo->{key} || $target_key)
+            : ($c->stash->{app_workflow} || 'main'),
         local_branches  => $self->get_local_branches($c),
         branch_details  => $self->git_service->get_branch_details($c),
         recent_commits  => $self->get_recent_commits($c),

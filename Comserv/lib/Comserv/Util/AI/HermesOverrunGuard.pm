@@ -183,6 +183,14 @@ sub decide {
             push @r, sprintf('OpenRouter %s $%.2f over $%.2f cap', $w, $v, $caps->{$w}) if $v >= $caps->{$w};
         }
     } else { $known = 0 }
+    # Oct 28 2026 (Shanta, flapping): a restore needs an AUTHORITATIVE OpenRouter reading: every capped window present, and not the
+    # live-estimate-only fallback ({live_only}: only an agent.log day estimate when /ai/usage_live was unreachable). Such a reading
+    # looks "under every cap" (tiny day figure, no week/month) and restored a tripped guard while day was still $6.31 over $3.
+    # It may still TRIP (an estimate over the cap is real), but it can never clear a trip.
+    if ($or->{ok}) {
+        $known = 0 if $or->{live_only} || $or->{stale};
+        for my $w (qw(day week month)) { $known = 0 if defined $caps->{$w} && !defined $or->{"${w}_usd"} }
+    }
     # x.ai direct API (cash, own cap): enforced apart from OpenRouter and from the Super Grok quota
     if (ref $in{xai_direct} eq 'HASH' && defined $in{xai_direct}{cap_day} && $in{xai_direct}{cap_day} > 0
         && ($in{xai_direct}{usd} // 0) >= $in{xai_direct}{cap_day}) {
@@ -303,8 +311,8 @@ sub paid_room_why {
     my ($or, $caps, $reasons) = @_;
     my @w;
     push @w, 'an OpenRouter money cap is already hit' if grep { /^OpenRouter/ } @{ $reasons || [] };
-    return (@w, 'OpenRouter usage unknown') unless ref $or eq 'HASH' && $or->{ok};
-    $caps ||= shared_or_caps();
+    return (@w, 'OpenRouter usage unknown') unless ref $or eq 'HASH' && $or->{ok} && !$or->{live_only};
+    $caps ||= \%CAPS;
     # Oct 31 2026: an estimate-only or stale reading is not proof of room for paid models.
     push @w, 'OpenRouter reading is a live estimate only' if $or->{live_only};
     push @w, 'OpenRouter reading is stale' if $or->{stale};
@@ -334,8 +342,8 @@ sub offender_reason {
         return undef if ref $pol{trial_active} eq 'HASH' && $pol{trial_active}{$model};
         my $ok_paid = ref $pol{allowed_paid} eq 'HASH' && $pol{allowed_paid}{$model};
         return 'OpenRouter cap reached - no paid model is allowed' if $pol{or_over};
-        return 'paid model not in the Hermes chain while the guard is tripped' if $pol{tripped} && !$ok_paid;
-        return 'paid model not in the Hermes chain (only the chain paid step is allowed when Super Grok is unavailable)'
+        return 'paid model not in the Hermes chain and not an active probation/trial model while the guard is tripped' if $pol{tripped} && !$ok_paid;
+        return 'paid model not in the Hermes chain and not an active probation/trial model (only the chain paid step is allowed when Super Grok is unavailable)'
             if $pol{sg_unavailable} && !$ok_paid;
         return undef;
     }
@@ -378,10 +386,10 @@ sub billing_summary {
     return [ map { { %$_, label => billing_label($_->{provider}, $_->{model}) } } @top ];
 }
 
-our $COOLDOWN_S = 1800;
-# Oct 31 2026 (Shanta): consecutive authoritative clear runs needed before a restore (hysteresis).
 our $CLEAR_RUNS = 2;
-# pure: an OpenRouter money-cap trip while Hermes is on Super Grok (xai-oauth) only blocks paid models.
+our $COOLDOWN_S = 1800;
+    # Oct 28 2026 hysteresis: a trip is restored only after this many consecutive runs each with an authoritative reading under every cap
+    # (a single clear-looking reading, e.g. a bad/partial fetch, no longer clears a trip). Tests set it to 1.
 sub paid_only_trip {
     my ($kind, $cm) = @_;
     return 0 unless ($kind // '') eq 'caps' && ref $cm eq 'HASH';
@@ -1774,6 +1782,29 @@ sub trial_exclusions {
     return \%out;
 }
 
+# Oct 28 2026: which trial / probation models are ACTIVE (begun, not stopped) or STOPPED, from data/ai_trials/*.state.json alone. This
+# must not depend on a fresh OpenRouter reading or a readable state.db: trial_tick only runs with an ok OpenRouter reading and returns
+# early when state.db is unreadable, so on a stale/unreachable run the active probation model (luna) was missing from trial_active and
+# became an ENFORCE offender (11:04 AM PT blip). Malformed state files are skipped (logged), never fatal.
+sub trial_flags {
+    my ($s) = @_;
+    my $dir = "$s->{app_root}/data/ai_trials";
+    return unless -d $dir;
+    my $ld = eval { Comserv::Util::AI::ModelChains->load(undef, path => "$s->{app_root}/data/ai_model_chains.json", logger => sub { }) } or return;
+    for my $f (glob "$dir/*.state.json") {
+        my $d = eval { open my $fh, '<', $f or die "open: $!"; local $/; my $x = $J->decode(<$fh>); close $fh; $x };
+        unless (ref $d eq 'HASH') {
+            my $err = $@ || 'not a JSON object'; $err =~ s/\s+/ /g;
+            eval { Comserv::Util::Logging->instance->log_with_details(undef, 'error', __FILE__, __LINE__, 'trial_flags', "trial state $f unreadable: $err") };
+            next;
+        }
+        next unless $d->{name} && $d->{baseline_at};
+        my $trial = Comserv::Util::AI::ModelChains->trial($ld, $d->{name}) or next;
+        if ($d->{stopped}) { $s->{trial_stopped}{ $trial->{model} } = $d->{stopped}; delete $s->{trial_active}{ $trial->{model} } }
+        else               { $s->{trial_active}{ $trial->{model} } = $d->{name}; delete $s->{trial_stopped}{ $trial->{model} } }
+    }
+}
+
 # Trial spend counter (Oct 26 2026, Shanta: the trial model is run by hand from Hermes, e.g. /model kimi). Every guard run, for each
 # approved trial in data/ai_trials/*.state.json: spend = OpenRouter live figures vs the baseline taken at begin; tasks = Hermes
 # sessions on the trial model since then. One-time alert at alert_at_usd; at the hard cap / task limit the trial is marked stopped,
@@ -1936,6 +1967,7 @@ sub run {
     # Oct 26 2026: an approved model trial (data/ai_trials/*.state.json) is paid from reserve: its spend is taken out of the
     # OpenRouter caps and its model out of the live estimate, so it neither trips the guard nor counts as an offender.
     my $raw_or = { %$or };
+    $s->trial_flags;   # active/stopped trial + probation models from the state files, whatever the OpenRouter reading is
     $s->trial_tick($or) unless $s->{dry_run};
     my $tx = $s->trial_exclusions;
     $s->{trial_models} = $tx->{models};
@@ -2017,6 +2049,15 @@ sub run {
         return $d;
     }
 
+    # Oct 28 2026 hysteresis (Shanta: flapping trip/restore): count consecutive runs that are authoritatively clear; a trip is restored
+    # only after $CLEAR_RUNS of them. Any over / unknown / live-estimate-only reading resets the count. State is shared, so a server
+    # running older code that restores on its own cannot be stopped here; the next run of this code re-trips (see report).
+    if ($st->{tripped} && !$shielded) {
+        if ($d->{action} eq 'restore') {
+            $st->{clear_streak} = ($st->{clear_streak} // 0) + 1;
+            if ($st->{clear_streak} < $CLEAR_RUNS) { $d->{action} = 'hold'; $d->{clear_streak} = $st->{clear_streak}; $d->{clear_runs_needed} = $CLEAR_RUNS }
+        } else { $st->{clear_streak} = 0 }
+    }
     # Oct 23: 30-minute cool-down between a trip and a restore.
     if ($d->{action} eq 'restore' && $st->{since} && $t - $st->{since} < $COOLDOWN_S) {
         $d->{action} = 'hold';
