@@ -141,11 +141,15 @@ is the ONLY safe way to pass browser-supplied values (file paths, messages) to g
 is handed to git as a distinct argv element via IPC::Run3, so shell metacharacters in a filename
 or commit message can never be interpreted.
 
+The name refers to the explicit argument list passed to git, not to listing branches. Branch
+listing is provided by C<get_local_branches>.
+
 Usage: my ($out, $code) = $self->_git_list($c, 'add', '--', @paths);
 Returns (combined_output, exit_code). Returns ('', -1) if the repo path can't be resolved.
 
 =cut
 
+sub _git_list {
     my ($self, $c, @argv) = @_;
 
     # Honor the per-request target bound by _bind_target (dashboard selector).
@@ -397,12 +401,9 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         my $branch = $self->get_current_branch($c);
         my $tracking = $self->get_tracking_info($c);
         my $tinfo = $self->git_service->resolve_target($c, $c->stash->{git_target} // '');
-<<<<<<< HEAD
-        # main/master on the primary checkout, and a registered external repo,
-        # publish the checked-out branch to that repo's origin.
-        # Worktree branches still require an explicit set-upstream checkbox.
-=======
->>>>>>> main
+        $tinfo = {} unless ref($tinfo) eq 'HASH';
+        # Main/master and registered external repositories publish to their own
+        # origin. Other worktree branches require explicit set-upstream approval.
         my $publish = ($branch eq 'main' || $branch eq 'master' || $tinfo->{publish});
         if (!$tracking->{upstream} && !$publish && !$c->req->param('set_upstream')) {
             $msg = "Branch '$branch' has no upstream. Re-submit with 'set upstream' checked to push.";
