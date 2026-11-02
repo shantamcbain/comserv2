@@ -32,12 +32,17 @@ our $NEAR_CAP_FRAC = 0.6;
 # Oct 29 2026 (Shanta, fix B): every log line, notice and alert names WHERE it ran ([:3001 main], [:4005 planning], [cron aisystem]),
 # and each run records its GUARD_VERSION in the shared state file. A copy older than the newest recorded version logs one
 # SKIPPED line and does nothing (no trip, no restore, no config write). Bump this on every guard behaviour change.
-our $GUARD_VERSION = 20261030;   # 20261030: fallback notices (Oct 29 10:51 AM PT)
+our $GUARD_VERSION = 20261101;   # 20261101: :4006 is the only trip owner unless it missed a call
 # Code Guard review: a newer version only wins while it is alive. If it has not run for $VERSION_STALE_S (3 guard intervals),
 # the running copy takes over (so removing/stopping the newer copy can never lock every copy out). SKIPPED is logged at most
 # once per $SKIP_LOG_EVERY_S per instance; the first skip of an episode also raises a notice + desktop alert.
 our $VERSION_STALE_S  = 900;
 our $SKIP_LOG_EVERY_S = 3600;
+# Nov 1 2026 (Shanta): :4006 is the master for usage trips. The aisystem cron (no port, this worktree) is that
+# server's scheduled call. Every other server skips unless the master has missed one call. Health eval is 5 min;
+# 10 min is one missed call plus slack so a slow tick is not a miss.
+our $MASTER_PORT   = 4006;
+our $MASTER_MISS_S = 600;
 our $THRASH_N      = 20;
 our $THRASH_WINDOW = 900;
 
@@ -415,23 +420,25 @@ sub supergrok_available {
 sub supergrok_budget_left {
     my ($sg) = @_;
     return 0 unless ref $sg eq 'HASH' && %$sg;
-    return 0 if $sg->{locked} || $sg->{off_today};
-    # 2026-10-17: never hand Hermes to Super Grok at/above the weekly hard stop (~98 %).
-    my $hard = $sg->{hard_week_cap} // 98;
+    return 0 if $sg->{locked};
+    # 2026-10-17: never hand Hermes to Super Grok at/above the weekly hard stop.
+    my $hard = $sg->{hard_week_cap} // 100;
     for my $u ($sg->{build}, (ref $sg->{daily_budget} eq 'HASH' ? $sg->{daily_budget}{used_now_pct} : undef)) {
         return 0 if defined $u && $u =~ /^[\d.]+$/ && $hard =~ /^[\d.]+$/ && $u >= $hard;
     }
     my $b = $sg->{daily_budget};
-    unless (ref $b eq 'HASH' && %$b) {
-        # app pacing unreachable: trust the daily guard's own call. deferred_mode 'grok' means it
-        # wanted Super Grok but held off because this guard had tripped.
-        my $want = ($sg->{mode} // '') eq 'grok' || ($sg->{deferred_mode} // '') eq 'grok';
-        return ($want && ($sg->{remaining} // 0) > 5) ? 1 : 0;
+    if (ref $b eq 'HASH' && %$b) {
+        # off_today is sticky. A later reading with room is the budget.
+        return 0 if $b->{over} || $b->{switch_off} || $b->{week_off};
+        my $rem = $b->{remaining_today_pct};
+        $rem = ($b->{effective_budget_pct} // 0) - ($b->{used_today_pct} // 0) unless defined $rem && $rem =~ /^-?[\d.]+$/;
+        return ($rem =~ /^-?[\d.]+$/ && $rem > 0) ? 1 : 0;
     }
-    return 0 if $b->{over} || $b->{switch_off} || $b->{week_off};
-    my $rem = $b->{remaining_today_pct};
-    $rem = ($b->{effective_budget_pct} // 0) - ($b->{used_today_pct} // 0) unless defined $rem && $rem =~ /^-?[\d.]+$/;
-    return ($rem =~ /^-?[\d.]+$/ && $rem > 0) ? 1 : 0;
+    return 0 if $sg->{off_today};
+    # app pacing unreachable: trust the daily guard's own call. deferred_mode 'grok' means it
+    # wanted Super Grok but held off because this guard had tripped.
+    my $want = ($sg->{mode} // '') eq 'grok' || ($sg->{deferred_mode} // '') eq 'grok';
+    return ($want && ($sg->{remaining} // 0) > 5) ? 1 : 0;
 }
 
 # pure: is candidate $c writable right now? Validated id, never banned, never double-prefixed.
@@ -1301,6 +1308,15 @@ sub instance_name {
 }
 sub instance { '[' . $_[0]->instance_name . ']' }
 
+# :4006, or the aisystem cron that is that server's scheduled call. Any other port is a backup.
+sub is_trip_master {
+    my $s = shift;
+    my $p = $s->{port};
+    return 1 if defined $p && length $p && $p == $MASTER_PORT;
+    return 1 if (!defined $p || !length $p) && $s->worktree_name eq 'aisystem';
+    return 0;
+}
+
 sub backup_config {
     my ($s) = @_;
     my $dst = $s->{config} . '.bak-overrun-' . strftime('%Y%m%d-%H%M%S', localtime $s->_now);
@@ -1896,6 +1912,32 @@ sub run {
             $newest, $st->{guard_version_by} // '?', ($seen ? pt($seen) : 'never'), $VERSION_STALE_S / 60, $GUARD_VERSION));
         $st->{guard_version_takeover_at} = $now0;
         $newest = 0;
+    }
+    # Nov 1 2026 (Shanta): only :4006 (and its aisystem cron) trips. Another server runs only
+    # after the master has missed a call. A skip writes nothing — no trip, restore, or config change.
+    my $now_m = $s->_now;
+    if ($s->is_trip_master) {
+        $st->{master_seen_at} = $now_m;
+        $st->{master_instance} = $s->instance_name;
+    } else {
+        my $seen_m = $st->{master_seen_at} // 0;
+        if ($seen_m && $now_m - $seen_m < $MASTER_MISS_S) {
+            my $sk = eval { open my $fh, '<', $s->{skip_file} or die; local $/; $J->decode(<$fh>) } || {};
+            my $me = $s->instance_name;
+            my $rec = ref $sk->{$me} eq 'HASH' ? $sk->{$me} : {};
+            my $why = sprintf('master %s last called %s; this copy trips only if that call is missed',
+                $st->{master_instance} // ':4006', pt($seen_m));
+            if (!$rec->{master_logged_at} || $now_m - $rec->{master_logged_at} >= $SKIP_LOG_EVERY_S) {
+                $s->log_line("SKIPPED: $why");
+                $rec->{master_logged_at} = $now_m;
+                $sk->{$me} = $rec;
+                eval { _atomic_write($s->{skip_file}, $J->encode($sk)) };
+            }
+            return { action => 'skip', reason => 'master_alive', instance => $me,
+                     master => $st->{master_instance}, master_seen_at => $seen_m };
+        }
+        $s->log_line(sprintf('TOOK OVER: master %s missed a call (last %s, over %d min); running as %s',
+            $st->{master_instance} // ':4006', ($seen_m ? pt($seen_m) : 'never'), int($MASTER_MISS_S / 60), $s->instance_name));
     }
     if ($GUARD_VERSION > $newest) { $st->{guard_version_max} = $GUARD_VERSION; $st->{guard_version_by} = $s->instance_name }
     $st->{guard_version_seen_at} = $now0;   # the newest version is alive

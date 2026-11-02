@@ -146,7 +146,6 @@ Returns (combined_output, exit_code). Returns ('', -1) if the repo path can't be
 
 =cut
 
-sub _git_list {
     my ($self, $c, @argv) = @_;
 
     # Honor the per-request target bound by _bind_target (dashboard selector).
@@ -398,9 +397,12 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         my $branch = $self->get_current_branch($c);
         my $tracking = $self->get_tracking_info($c);
         my $tinfo = $self->git_service->resolve_target($c, $c->stash->{git_target} // '');
+<<<<<<< HEAD
         # main/master on the primary checkout, and a registered external repo,
         # publish the checked-out branch to that repo's origin.
         # Worktree branches still require an explicit set-upstream checkbox.
+=======
+>>>>>>> main
         my $publish = ($branch eq 'main' || $branch eq 'master' || $tinfo->{publish});
         if (!$tracking->{upstream} && !$publish && !$c->req->param('set_upstream')) {
             $msg = "Branch '$branch' has no upstream. Re-submit with 'set upstream' checked to push.";
@@ -1748,6 +1750,28 @@ sub _save_user_gate {
 # commits at once; findings need a second click on the same diff; a
 # high-severity finding needs a "commit anyway" reason (8+ chars).
 # Reviewer off / cap hit / error -> warning, commit allowed.
+#
+# Data-entry files (trial state the app rewrites) are not sent to the
+# reviewer. A timestamp or spend bump must not hold the first commit.
+# Conflict markers, invalid JSON, the secret guard, and any finding on
+# another file still stop it.
+sub _data_entry_staged_error {
+    my ($self, $c, $diff) = @_;
+    my $git = $self->git_service;
+    my %seen;
+    for my $path (($diff // '') =~ m{^diff --git a/(.+?) b/}mg) {
+        next if $seen{$path}++;
+        next unless $git->data_entry_runtime_path($path);
+        my ($blob, $code) = $self->_git_list($c, 'show', ":$path");
+        if ($code) {
+            return "Could not read staged data-entry file $path. Nothing has been committed yet.";
+        }
+        my $err = $git->data_entry_blob_error($path, $blob);
+        return $err . ' Nothing has been committed yet.' if $err;
+    }
+    return undef;
+}
+
 sub _format_findings {
     my ($self, $view) = @_;
     my @l = map { sprintf('[%s] %s%s %s', $_->{severity} || 'note', $_->{file},
@@ -1759,8 +1783,22 @@ sub _dashboard_commit_gate {
     my ($self, $c, $message) = @_;
     my ($diff) = $self->_git_list($c, 'diff', '--cached');
     $diff //= '';
+    my $git = $self->git_service;
+    my $blob_err = $self->_data_entry_staged_error($c, $diff);
+    if ($blob_err) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_dashboard_commit_gate', $blob_err);
+        return { proceed => 0, msg => $blob_err };
+    }
+    # Review and confirm against the code diff only. A data-entry rewrite
+    # between clicks must not look like a new review.
+    my $review_diff = $git->strip_data_entry_diff($diff);
+    if ($review_diff !~ /\S/) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_dashboard_commit_gate',
+            'data-entry files only; structural checks passed; reviewer not called');
+        return { proceed => 1, note => 'Data-entry files only. Structural checks passed; not sent to the reviewer.' };
+    }
     require Digest::SHA;
-    my $sha = Digest::SHA::sha256_hex($diff);
+    my $sha = Digest::SHA::sha256_hex($review_diff);
     my $rv = $self->_reviewer_for($c);
     my $reason = $c->req->param('override_reason') // '';
     $reason =~ s/^\s+|\s+$//g;
@@ -1779,10 +1817,11 @@ sub _dashboard_commit_gate {
         }
         return { proceed => 1, note => 'Reviewed findings were confirmed.' };
     }
-    my $res = eval { $rv->review($c, diff => $diff, files => [ $diff =~ /^diff --git a\/(.+?) b\//mg ],
+    my $res = eval { $rv->review($c, diff => $review_diff, files => [ $review_diff =~ m{^diff --git a/(.+?) b/}mg ],
                                  diff_sha => $sha, task => $message, source => 'commit_gate') };
     $res = { ok => 0, skipped => 1, reason => 'review call failed' . ($@ ? ": $@" : '') } if $@ || !$res;
     my $view = $rv->gate_view($res);
+    $view->{findings} = $git->commit_findings_that_hold($view->{findings});
     $res->{blocking} = $view->{blocking};
     $self->_save_user_gate($c, { at => time, diff_sha => $sha, message => $message, review => $res, dashboard => 1 });
     return { proceed => 1, note => $view->{warning} } unless $view->{reviewed};
