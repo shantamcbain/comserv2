@@ -1,4 +1,6 @@
 {
+  "base_dir": "/home/shanta/.comserv/worktrees",
+  "port_start": 4001,
   "branches": {
     "Proxmox": {
       "url": "/planning/daily",
@@ -109,8 +111,6 @@
       "port": 4010
     }
   },
-  "base_dir": "/home/shanta/.comserv/worktrees",
-  "port_start": 4066,
   "update_all_skip": [],
   "external_repos": {
     "openbafang": {

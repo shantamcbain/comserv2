@@ -412,23 +412,25 @@ sub supergrok_available {
 sub supergrok_budget_left {
     my ($sg) = @_;
     return 0 unless ref $sg eq 'HASH' && %$sg;
-    return 0 if $sg->{locked} || $sg->{off_today};
-    # 2026-10-17: never hand Hermes to Super Grok at/above the weekly hard stop (~98 %).
-    my $hard = $sg->{hard_week_cap} // 98;
+    return 0 if $sg->{locked};
+    # 2026-10-17: never hand Hermes to Super Grok at/above the weekly hard stop.
+    my $hard = $sg->{hard_week_cap} // 100;
     for my $u ($sg->{build}, (ref $sg->{daily_budget} eq 'HASH' ? $sg->{daily_budget}{used_now_pct} : undef)) {
         return 0 if defined $u && $u =~ /^[\d.]+$/ && $hard =~ /^[\d.]+$/ && $u >= $hard;
     }
     my $b = $sg->{daily_budget};
-    unless (ref $b eq 'HASH' && %$b) {
-        # app pacing unreachable: trust the daily guard's own call. deferred_mode 'grok' means it
-        # wanted Super Grok but held off because this guard had tripped.
-        my $want = ($sg->{mode} // '') eq 'grok' || ($sg->{deferred_mode} // '') eq 'grok';
-        return ($want && ($sg->{remaining} // 0) > 5) ? 1 : 0;
+    if (ref $b eq 'HASH' && %$b) {
+        # off_today is sticky. A later reading with room is the budget.
+        return 0 if $b->{over} || $b->{switch_off} || $b->{week_off};
+        my $rem = $b->{remaining_today_pct};
+        $rem = ($b->{effective_budget_pct} // 0) - ($b->{used_today_pct} // 0) unless defined $rem && $rem =~ /^-?[\d.]+$/;
+        return ($rem =~ /^-?[\d.]+$/ && $rem > 0) ? 1 : 0;
     }
-    return 0 if $b->{over} || $b->{switch_off} || $b->{week_off};
-    my $rem = $b->{remaining_today_pct};
-    $rem = ($b->{effective_budget_pct} // 0) - ($b->{used_today_pct} // 0) unless defined $rem && $rem =~ /^-?[\d.]+$/;
-    return ($rem =~ /^-?[\d.]+$/ && $rem > 0) ? 1 : 0;
+    return 0 if $sg->{off_today};
+    # app pacing unreachable: trust the daily guard's own call. deferred_mode 'grok' means it
+    # wanted Super Grok but held off because this guard had tripped.
+    my $want = ($sg->{mode} // '') eq 'grok' || ($sg->{deferred_mode} // '') eq 'grok';
+    return ($want && ($sg->{remaining} // 0) > 5) ? 1 : 0;
 }
 
 # pure: is candidate $c writable right now? Validated id, never banned, never double-prefixed.

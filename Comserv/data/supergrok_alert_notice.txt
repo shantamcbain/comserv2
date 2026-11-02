@@ -1,4 +1,0 @@
-Sun Nov 01 15:00 PT
-Super Grok burned 28 points in the Sun Nov 01 work day (since Sun Nov 01 05:00 PT; limit 15): now 100% used (meter). Slow down or stop the big sessions.
-By 09:00 PT 417% of today's Super Grok budget is gone (28.0 of 6.7 points; limit 60%). Pace the rest of the work window or switch big jobs to glm.
-See http://localhost:4006/ai/usage#supergrok-pacing
