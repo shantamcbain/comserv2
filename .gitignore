@@ -222,7 +222,6 @@ Comserv/data/ai_commit_gate.json
 Comserv/data/ai_review_scores.json
 Comserv/data/ai_reviewer_spend.json
 Comserv/data/ai_trials/
-Comserv/data/ai_trials/**
 Comserv/root/static/ai/*usage*.json*
 Comserv/root/static/ai/*monitor*.json*
 
