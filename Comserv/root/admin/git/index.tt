@@ -91,7 +91,7 @@
                 </div>
             [% END %]
 
-            [%# ============ Top summary strip (one row, cards fit content) ============ %]
+            [%# ===== Top summary strip (one row, cards fit content) ===== %]
             <div class="git-strip">
 
                 [%# ---- Host / target selector (run git on local or a remote host over SSH) ---- %]
@@ -108,11 +108,9 @@
                             [% END %]
                         </select>
                     </div>
-<<<<<<< HEAD
+
                     <div class="git-branch-meta" id="git-target-path">[% IF git_external %]external: <code class="code-inline">[% repo_path | html %]</code>[% ELSIF git_target == 'local' || !git_target %]local: <code class="code-inline">[% repo_path | html %]</code>[% END %]</div>
-=======
-                    <div class="git-branch-meta" id="git-target-path">[% IF git_target == 'local' || !git_target %]local: <code class="code-inline">[% repo_path | html %]</code>[% END %]</div>
->>>>>>> main
+
                     <div class="git-inline" style="margin-top:8px;">
                         <a class="admin-btn admin-btn-sm admin-btn-primary" href="/admin/git?target=openbafang">OpenBafangTool git</a>
                     </div>
@@ -225,7 +223,7 @@
 
             </div>
 
-            [%# ==================== Working Tree (the only open card) ==================== %]
+            [%# ====== Working Tree (the only open card) ====== %]
             <div class="admin-panel git-worktree">
                 <div class="admin-panel-header"><h3>Working Tree</h3></div>
                 <div class="admin-panel-body">
@@ -337,7 +335,7 @@
                 </div>
             </div>
 
-            [%# ==================== Update all branches from main (Oct 31 2026, Shanta) ==================== %]
+            [%# ====== Update all branches from main (Oct 31 2026, Shanta) ====== %]
             [%# Admin-only POST + CSRF to /admin/git/update_all_from_main; driven by git-dashboard.js (data-git-update-all).
                No stash, no force, no rebase. Proxmox/:4016 always skipped; :4003 only when the box is ticked. #]
             <details class="git-collapse git-update-all">
@@ -365,7 +363,7 @@
                 </div>
             </details>
 
-            [%# ==================== Develop Servers (zenflow worktree registry) ==================== %]
+            [%# ====== Develop Servers (zenflow worktree registry) ====== %]
             [%# Highlight uses current_worktree (from app_workflow = worktree dir key) to mark the active server row.
                This matches b.name even when live git branch (current_branch) differs (e.g. feature branch in a named worktree slot). #]
             [%# Single source of truth = stash.worktree_list (Comserv::Util::Git->build_worktree_list,\n               which reads root/config/worktrees.json). Mirrors the planning tab's "Branch Servers"\n               panel. Open/Stop/Restart buttons POST to /admin/branch_server_action (handled in\n               git-dashboard.js). No inline <script>. #]
@@ -392,15 +390,13 @@
                                 <td><code class="git-dev-cmd" title="/home/shanta/dev/OpenBafangTool">/home/shanta/dev/OpenBafangTool</code></td>
                                 <td class="git-dev-actions">
                                     <a class="admin-btn admin-btn-sm admin-btn-primary" href="/admin/git?target=openbafang">Git</a>
-<<<<<<< HEAD
+
                                     <button type="button" class="admin-btn admin-btn-sm"
                                             data-hermes-branch="openbafang"
                                             data-port="9120"
                                             data-hermes-port="9120"
                                             data-hermes-cwd="/home/shanta/dev/OpenBafangTool"
                                             data-hermes-cmd="cd '/home/shanta/dev/OpenBafangTool' &amp;&amp; hermes dashboard --isolated --host 0.0.0.0 --port 9120 --no-open --skip-build">Hermes</button>
-=======
->>>>>>> main
                                 </td>
                             </tr>
                             [% FOREACH b IN worktree_list %]
@@ -570,7 +566,7 @@
                 </div>
             </details>
 
-            [%# ==================== Branches (collapsed) ==================== %]
+            [%# ====== Branches (collapsed) ====== %]
             <details class="git-collapse">
                 <summary>Branches <span class="git-count">([% branch_details.size %])</span></summary>
                 <div class="git-collapse-body">
@@ -618,7 +614,7 @@
                 </div>
             </details>
 
-            [%# ==================== Recent commits (collapsed) ==================== %]
+            [%# ====== Recent commits (collapsed) ====== %]
             <details class="git-collapse">
                 <summary>Recent Commits <span class="git-count">([% recent_commits.size %])</span></summary>
                 <div class="git-collapse-body">
@@ -635,7 +631,7 @@
                 </div>
             </details>
 
-            [%# ==================== Stashes (collapsed, only if any) ==================== %]
+            [%# ====== Stashes (collapsed, only if any) ====== %]
             [% IF stash_list.size %]
             <details class="git-collapse">
                 <summary>Stashes <span class="git-count">([% stash_list.size %])</span></summary>
