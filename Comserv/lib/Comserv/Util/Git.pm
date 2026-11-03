@@ -567,16 +567,32 @@ sub _run {
     my $ff_only_refused = ($subcmd eq 'merge')
         && (grep { defined $_ && $_ eq '--ff-only' } @argv)
         && $combined =~ /Not possible to fast-forward|unable to fast-forward/i;
+    # A merge CONFLICT is an expected, user-resolvable outcome. merge_branch()
+    # already classifies it (reason=conflict, conflict_files, fix_hint) and logs
+    # at 'warn'; _run double-logged the same command at ERROR, which spawned the
+    # git_run audit todos of 2026-10-31/11-01 (2646/2647) purely as noise.
+    # Keep 'warn' so the merge is still visible in the log, not an audit todo.
+    my $merge_conflict = ($subcmd eq 'merge')
+        && $combined =~ /CONFLICT|Automatic merge failed/i;
+    # `git merge --abort` exits 128 with "There is no merge to abort
+    # (MERGE_HEAD missing)" on some git versions when there is nothing to undo.
+    # merge_abort() is deliberately idempotent, so this is not a failure.
+    my $abort_noop = ($subcmd eq 'merge')
+        && (grep { defined $_ && $_ eq '--abort' } @argv)
+        && $combined =~ /There is no merge to abort|MERGE_HEAD missing/i;
     my $benign   = !$result->{success}
                 && ( $asks_upstream
                   || $checkout_collision
                   || $show_current_empty
                   || $secret_guard_block
                   || $ff_only_refused
+                  || $merge_conflict
+                  || $abort_noop
                   || $combined =~ /no upstream configured|does not have an upstream|no such branch/i );
     my $level    = $result->{success}       ? 'info'
                  : $secret_guard_block      ? 'warn'
                  : $ff_only_refused         ? 'warn'
+                 : $merge_conflict          ? 'warn'
                  : $benign                  ? 'info'
                  :                            'error';
     my $shown = ($result->{output} // '');
