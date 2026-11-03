@@ -210,16 +210,12 @@ sub resolve_prepaid_key {
         return $self->_remember_source('supergrok_file', $k) if $k;
     }
     my $schema = eval { $c && $c->model('DBEncy')->schema } or return undef;
-    my $uid = eval { $c->session->{user_id} };
+    # Oct 30 2026: was "first active row of ANY user" (could pick another user's own key). Now the shared lookup:
+    # own row -> site row -> owner/system row.
+    require Comserv::Util::AI::UserKeys;
     for my $svc (qw(supergrok xai-oauth)) {
-        my $key_obj = $schema->resultset('UserApiKeys')->search(
-            { service => $svc, is_active => '1' }
-        )->first;
-        $key_obj ||= $uid ? $schema->resultset('UserApiKeys')->search(
-            { user_id => $uid, service => $svc, is_active => '1' }
-        )->first : undef;
-        next unless $key_obj && $key_obj->api_key_encrypted;
-        my $dbk = eval { $key_obj->get_api_key() } || next;
+        my $r = Comserv::Util::AI::UserKeys->get_user_key($c, $svc, schema => $schema, allow_owner => 1);
+        my $dbk = $r->{key} or next;
         return $self->_remember_source('db_supergrok', $dbk);
     }
     return undef;
@@ -228,27 +224,15 @@ sub resolve_prepaid_key {
 sub resolve_paid_key {
     my ($self, $c) = @_;
     $self->{_last_cred_source} = undef;
-    if (my $k = _read_secret_file('/run/secrets/grok_api_key')) {
-        return $self->_remember_source('k8s', $k);
-    }
-    if ($ENV{GROK_API_KEY} && length $ENV{GROK_API_KEY}) {
-        return $self->_remember_source('env_grok', $ENV{GROK_API_KEY});
-    }
-    if ($ENV{XAI_API_KEY} && length $ENV{XAI_API_KEY}) {
-        return $self->_remember_source('env_xai', $ENV{XAI_API_KEY});
-    }
-    my $schema = eval { $c && $c->model('DBEncy')->schema } or return undef;
-    my $uid = eval { $c->session->{user_id} };
-    my $key_obj = $schema->resultset('UserApiKeys')->search(
-        { service => 'grok', is_active => '1' }
-    )->first;
-    $key_obj ||= $uid ? $schema->resultset('UserApiKeys')->search(
-        { user_id => $uid, service => 'grok', is_active => '1' }
-    )->first : undef;
-    return undef unless $key_obj && $key_obj->api_key_encrypted;
-    my $dbk = eval { $key_obj->get_api_key() } || undef;
-    return undef unless $dbk;
-    return $self->_remember_source('db', $dbk);
+    # 2026-10-26: DB first (own row -> site row -> workstation-wide row), then /run/secrets,
+    # then env (GROK_API_KEY / XAI_API_KEY) as the last resort. Shared lookup:
+    # Comserv::Util::AI::ApiKeyResolver. This key is pay-as-you-go x.ai, not Super Grok.
+    require Comserv::Util::AI::ApiKeyResolver;
+    my $r = Comserv::Util::AI::ApiKeyResolver->resolve($c, 'grok', system => 1);
+    return undef unless $r->{key};
+    my $src = $r->{source} // '';
+    return $self->_remember_source($src =~ /^db_/ ? 'db' : $src eq 'k8s_secret' ? 'k8s'
+        : $src eq 'env_GROK_API_KEY' ? 'env_grok' : $src eq 'env_XAI_API_KEY' ? 'env_xai' : $src, $r->{key});
 }
 
 sub _resolve_api_key {

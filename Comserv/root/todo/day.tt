@@ -1,5 +1,5 @@
 
-[% PageVersion = 'todo/day.tt, v  0.28 2026/06/13 shanta Exp shanta - User prefs DB sync for calendar colours and lane width.' %]
+[% PageVersion = 'todo/day.tt, v  0.30 2026/10/30 shanta Exp shanta - Stop/Done locks a recurring block to this date.' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -83,6 +83,14 @@
    END;
    IF !next_date AND next_day;
       next_date = next_day;
+   END;
+
+   # Keep an embed filter across day navigation. Does not touch the session filter.
+   day_qs = '';
+   IF c.req.params.filter == 'schedule';
+      day_qs = '?embed=1&filter=schedule';
+   ELSIF c.req.params.embed.defined;
+      day_qs = '?embed=1';
    END;
 %]
 
@@ -243,6 +251,19 @@
 .gcal-ev.is-fixed-ev .gcal-ev-actions { flex-wrap: wrap; }
 
 .gcal-ev.is-done { opacity: 0.45 !important; }
+.hk-day-lock {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    z-index: 40;
+    font-size: 0.72em;
+    padding: 1px 6px;
+    border: 0;
+    border-radius: 3px;
+    background: #fff;
+    color: #1a73e8;
+    cursor: pointer;
+}
 .gcal-ev.dragging { opacity: 0.35; cursor: grabbing; }
 .gcal-ev-row {
     display: flex; flex-wrap: wrap; align-items: center;
@@ -1271,14 +1292,14 @@ function gcalNavigateDay(dir) {
     var d = m ? new Date(m[1] + 'T00:00:00') : new Date();
     d.setDate(d.getDate() + dir);
     var nd = d.toISOString().slice(0,10);
-    var href = (base || '/todo/day') + '/' + nd + window.location.hash;
+    var href = (base || '/todo/day') + '/' + nd + window.location.search + window.location.hash;
     window.location.href = href;
 }
 
 function gcalGoToday() {
     var today = new Date().toISOString().slice(0,10);
     var base = window.location.pathname.replace(/\/\d{4}-\d{2}-\d{2}.*/, '') || '/todo/day';
-    window.location.href = base + '/' + today;
+    window.location.href = base + '/' + today + window.location.search;
 }
 
 var _gcalDragged = null;
@@ -1596,10 +1617,11 @@ document.addEventListener('DOMContentLoaded', function() {
         <option value="/todo/month/[% date %]">Month</option>
     </select>
     [% ELSE %]
-    <a class="gcal-today-btn" href="/todo/day/[% today || date %]">Today</a>
-    <a class="gcal-nav-btn" href="/todo/day/[% previous_date %]">&#8249;</a>
+    <a class="gcal-today-btn" href="/todo/day/[% today || date %][% day_qs %]">Today</a>
+    <a class="gcal-nav-btn" href="/todo/day/[% previous_date %][% day_qs %]">&#8249;</a>
     <span class="gcal-date-label">[% date %]</span>
-    <a class="gcal-nav-btn" href="/todo/day/[% next_date %]">&#8250;</a>
+    <a class="gcal-nav-btn" href="/todo/day/[% next_date %][% day_qs %]">&#8250;</a>
+    [% UNLESS c.req.params.filter == 'schedule' %]
     <a class="gcal-nav-btn" href="/todo/addtodo" style="margin-left:4px;">+ New</a>
     <select class="gcal-view-select" onchange="window.location=this.value" style="margin-left:0;">
         <option value="/todo/day/[% date %]" selected>Day</option>
@@ -1608,6 +1630,8 @@ document.addEventListener('DOMContentLoaded', function() {
         <option value="/todo">List</option>
     </select>
     [% END %]
+    [% END %]
+    [% UNLESS c.req.params.filter == 'schedule' %]
     [% IF ap_all_sitenames.size > 0 %]
     <span style="font-size:0.82em;color:#70757a;white-space:nowrap;margin-left:8px;flex-shrink:0;">Site:</span>
     <select id="gcal-site-filter" onchange="gcalSiteFilterChange(this)" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;">
@@ -1648,6 +1672,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <option value="errors">Errors Only</option>
     </select>
     <button type="button" class="gcal-nav-btn" onclick="gcalRescheduleTodos(this)" style="flex-shrink:0;white-space:nowrap;" title="Re-stack today's todos from the current time. Uses Site and User filters. Each user has their own timeline.">&#9851; Reschedule</button>
+    [% END %]
     [% END %]
 </div>
 <div class="gcal-legend-bar" id="gcal-legend-bar"
@@ -1703,7 +1728,8 @@ document.addEventListener('DOMContentLoaded', function() {
             [% SET ts       = todo.sitename || '' %]
             [% SET tdev     = todo.developer || todo.username_of_poster || '' %]
             [% SET tproj    = proj_name_map.${todo.project_id} || '' %]
-            [% SET tdone    = (todo.status == 3 OR todo.status == 4
+            [% SET tlocked  = occurrence_locked.${todo.record_id} %]
+            [% SET tdone    = tlocked OR (todo.status == 3 OR todo.status == 4
                                 OR todo.status == 'DONE' OR todo.status == 'Completed'
                                 OR todo.status == 'completed' OR todo.status == 'Closed'
                                 OR todo.status == 'closed' OR todo.status == 'Done') %]
@@ -1766,12 +1792,18 @@ document.addEventListener('DOMContentLoaded', function() {
                  data-end-min="[% tenm %]"
                  data-dur-min="[% test %]"
                  data-date="[% date %]"
+                 [% IF c.req.params.filter == 'schedule' %]data-hk-lock="1"[% END %]
                  [% IF todo.creator_timezone %]data-creator-tz="[% todo.creator_timezone %]"[% END %]
                  style="top:[% tpx %]px; height:[% tht %]px; left:0.3%; width:99.4%;">
                 [% SET tcard_wrap_g = "data-todo-id='" _ todo.record_id _ "' data-todo-date='" _ date _ "' data-is-recurring='" _ isrec _ "' draggable='true'" %]
                 [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 tc_calendar=1
                     tc_drag_class='gcal-ev-card'
                     tc_wrapper_extra=tcard_wrap_g %]
+                [% IF isrec == '1' %]
+                <button type="button" class="hk-day-lock" data-day-lock="1"
+                    data-record-id="[% todo.record_id %]" data-lock-date="[% date %]"
+                    data-kind="[% tlocked ? 'locked' : 'done' %]">[% IF tlocked %]Done this day[% ELSE %]Done today[% END %]</button>
+                [% END %]
             </div>
         [% END %]
     </div>
@@ -1825,6 +1857,56 @@ document.addEventListener('DOMContentLoaded', function() {
     </table>
 </div>
 [% END %]
+
+<script>
+(function () {
+    function lockDay(id, date, kind) {
+        if (!id || !date) return;
+        var url = kind === 'stop' ? '/todo/close_log' : '/todo/done_with_log';
+        fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ record_id: parseInt(id, 10), lock_date: date, notes: '' })
+        }).then(function (r) { return r.json(); }).then(function (d) {
+            if (d && (d.ok || d.locked)) {
+                window.location.reload();
+            } else {
+                window.alert((d && d.error) || 'Could not lock this day');
+            }
+        }).catch(function () {
+            window.alert('Could not lock this day');
+        });
+    }
+    document.addEventListener('click', function (e) {
+        var dayBtn = e.target.closest('[data-day-lock]');
+        if (dayBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (dayBtn.getAttribute('data-kind') === 'locked') return;
+            lockDay(dayBtn.getAttribute('data-record-id'), dayBtn.getAttribute('data-lock-date'), 'done');
+            return;
+        }
+        var lockCard = e.target.closest('.gcal-ev[data-hk-lock="1"]');
+        if (lockCard && !e.target.closest('[data-start-btn]')) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (lockCard.classList.contains('is-done')) return;
+            lockDay(lockCard.getAttribute('data-todo-id'), lockCard.getAttribute('data-date'), 'done');
+            return;
+        }
+        var card = e.target.closest('.gcal-ev[data-is-recurring="1"]');
+        if (!card) return;
+        var doneBtn = e.target.closest('[data-done-btn]');
+        var stopBtn = e.target.closest('[data-start-btn][data-is-active="1"]');
+        if (!doneBtn && !stopBtn) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        var btn = doneBtn || stopBtn;
+        lockDay(btn.getAttribute('data-record-id'), card.getAttribute('data-date'), doneBtn ? 'done' : 'stop');
+    }, true);
+})();
+</script>
 
 <div id="gcal-notes-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:8px;padding:24px;min-width:340px;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,0.25);">

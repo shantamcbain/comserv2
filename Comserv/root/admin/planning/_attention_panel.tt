@@ -1,0 +1,133 @@
+[% PageVersion = 'root/admin/planning/_attention_panel.tt,v 0.05 2026/10/26 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% attention = attention_order || {} %]
+[% counts = attention.counts || {} %]
+[% MAX_SHOWN = 20 %]
+
+<details id="attention-panel" class="attention-panel-card">
+    <summary class="attention-panel-summary">
+        <h2>🚨 Attention Order</h2>
+        <span class="attention-summary-badges">
+            [% IF counts.branches %]<span class="attention-badge attention-badge--branch">[% counts.branches %] branch[% 'es' IF counts.branches != 1 %]</span>[% END %]
+            [% IF counts.projects %]<span class="attention-badge attention-badge--project">[% counts.projects %] project[% 's' IF counts.projects != 1 %]</span>[% END %]
+            [% IF counts.stale %]<span class="attention-badge attention-badge--stale">[% counts.stale %] stale todo[% 's' IF counts.stale != 1 %]</span>[% END %]
+        </span>
+    </summary>
+
+    <div class="attention-panel-body">
+        [% IF attention.error %]
+            <p class="attention-error">Could not load attention data. See application log for details.</p>
+        [% END %]
+
+        [% IF !attention.branch_attention.size && !attention.project_attention.size && !attention.stale_review.size && !attention.error %]
+            <p class="attention-empty">Nothing needs attention right now.</p>
+        [% END %]
+
+        <div class="attention-card-stack">
+
+        [% IF attention.branch_attention.size %]
+        <details class="attention-card">
+            <summary class="attention-card-summary">
+                <span class="attention-card-title">Branches needing attention</span>
+                <span class="attention-card-count">[% counts.branches || 0 %]</span>
+            </summary>
+            <div class="attention-card-body">
+                <ul class="attention-list">
+                    [% branch_count = 0 %]
+                    [% FOREACH b IN attention.branch_attention %]
+                    [% NEXT UNLESS b.needs_attention %]
+                    [% branch_count = branch_count + 1 %]
+                    [% LAST IF branch_count > MAX_SHOWN %]
+                    <li class="attention-item attention-item--[% b.attention_reason.replace(' ', '-') %]">
+                        <span class="attention-name">
+                            [% IF b.url && b.exists %]<a href="[% b.url %]">[% b.label %]</a>[% ELSE %][% b.label %][% END %]
+                        </span>
+                        <span class="attention-meta">
+                            [% IF b.behind_main %]behind main by [% b.behind_main %] commit[% 's' IF b.behind_main != 1 %][% END %]
+                            [% IF b.behind_main && b.ahead_main %]; [% END %]
+                            [% IF b.ahead_main %][% b.ahead_main %] unique commit[% 's' IF b.ahead_main != 1 %][% END %]
+                            [% IF b.unique_files %]([% b.unique_files %] file[% 's' IF b.unique_files != 1 %])[% END %]
+                            [% IF b.last_commit %] · last commit [% b.last_commit %][% END %]
+                        </span>
+                        <span class="attention-reason">[% b.attention_reason %]</span>
+                    </li>
+                    [% END %]
+                </ul>
+                [% IF counts.branches > MAX_SHOWN %]
+                <p class="attention-more"><a href="/admin/git">… and [% counts.branches - MAX_SHOWN %] more branches</a></p>
+                [% END %]
+            </div>
+        </details>
+        [% END %]
+
+        [% IF attention.project_attention.size %]
+        <details class="attention-card">
+            <summary class="attention-card-summary">
+                <span class="attention-card-title">Projects needing attention</span>
+                <span class="attention-card-count">[% attention.project_attention.size %]</span>
+            </summary>
+            <div class="attention-card-body">
+                <ul class="attention-list">
+                    [% FOREACH p IN attention.project_attention %]
+                    [% LAST IF loop.index >= MAX_SHOWN %]
+                    <li class="attention-item attention-item--[% p.attention_reason.replace(' ', '-') %]">
+                        <span class="attention-name">
+                            <a href="/todo?project_id=[% p.project_id %]">[% p.project_name || p.project_code || 'Project #' _ p.project_id %]</a>
+                        </span>
+                        <span class="attention-meta">
+                            [% p.open_todos %] open todo[% 's' IF p.open_todos != 1 %]
+                            [% IF p.stale_days %] · newest activity [% p.stale_days %] day[% 's' IF p.stale_days != 1 %] ago[% END %]
+                            [% IF p.stale_open_todos %] · [% p.stale_open_todos %] stale[% END %]
+                            [% IF p.blocks_names.size %] · blocking: [% p.blocks_names.join(', ') %][% END %]
+                        </span>
+                        <span class="attention-reason">[% p.attention_reason %]</span>
+                    </li>
+                    [% END %]
+                </ul>
+                [% IF attention.project_attention.size > MAX_SHOWN %]
+                <p class="attention-more"><a href="/todo">… and [% attention.project_attention.size - MAX_SHOWN %] more projects</a></p>
+                [% END %]
+            </div>
+        </details>
+        [% END %]
+
+        [% IF attention.stale_review.size %]
+        <details class="attention-card">
+            <summary class="attention-card-summary">
+                <span class="attention-card-title">Stale review queue</span>
+                <span class="attention-card-count">[% attention.stale_review.size %]</span>
+            </summary>
+            <div class="attention-card-body">
+                <p class="attention-hint">Open todos untouched for 180+ days. Suggested triage class is shown; use the real todo actions to close or suspend.</p>
+                <ul class="attention-list">
+                    [% FOREACH t IN attention.stale_review %]
+                    [% LAST IF loop.index >= MAX_SHOWN %]
+                    <li class="attention-item attention-item--[% t.suggested_class %]">
+                        <span class="attention-name">
+                            <a href="/todo/details?record_id=[% t.record_id %]">#[% t.record_id %] — [% t.subject %]</a>
+                        </span>
+                        <span class="attention-meta">
+                            [% IF t.project_name %][% t.project_name %] · [% END %]
+                            [% t.stale_days %] day[% 's' IF t.stale_days != 1 %] stale
+                            [% IF t.activity_date %] · last activity [% t.activity_date %][% END %]
+                        </span>
+                        <span class="attention-class">[% t.suggested_class %]</span>
+                        <span class="attention-actions">
+                            <a class="attention-action attention-action--close" href="/todo/close?record_id=[% t.record_id %]&amp;return_to=/planning/daily">Close</a>
+                            <a class="attention-action attention-action--suspend" href="/todo/suspend?record_id=[% t.record_id %]&amp;return_to=/planning/daily">Suspend</a>
+                            <a class="attention-action attention-action--keep" href="/todo/details?record_id=[% t.record_id %]">Keep</a>
+                        </span>
+                    </li>
+                    [% END %]
+                </ul>
+                [% IF attention.stale_review.size > MAX_SHOWN %]
+                <p class="attention-more"><a href="/todo">… and [% attention.stale_review.size - MAX_SHOWN %] more stale todos</a></p>
+                [% END %]
+            </div>
+        </details>
+        [% END %]
+
+        </div>
+    </div>
+</details>

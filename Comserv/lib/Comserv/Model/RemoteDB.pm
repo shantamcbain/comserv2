@@ -172,6 +172,15 @@ sub _load_from_k8s_secrets {
                     
                     my $loaded = decode_json($json_text);
                     if (ref $loaded eq 'HASH') {
+                        foreach my $conn_name (keys %$loaded) {
+                            my $conn = $loaded->{$conn_name};
+                            next unless ref $conn eq 'HASH';
+                            next unless ($conn->{db_type} // '') =~ /^sqlite$/i;
+                            delete $loaded->{$conn_name};
+                            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_load_from_k8s_secrets',
+                                "Ignored SQLite connection '$conn_name' in $secret_file; application database is MariaDB only");
+                        }
+                        next unless keys %$loaded;
                         %k8s_config = (%k8s_config, %$loaded);
                         $k8s_secrets_found = 1;
                         $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_from_k8s_secrets',
@@ -411,8 +420,8 @@ sub select_connection {
     my @matching_connections = grep {
         my $conn = $config->{$_};
         $conn && ref $conn eq 'HASH' &&
-        (($conn->{database} && $conn->{database} eq $database_name) ||
-         ((defined $conn->{db_type} && $conn->{db_type} eq 'sqlite') && $_ =~ /\Q$database_name\E/))
+        ($conn->{database} && $conn->{database} eq $database_name
+            && ($conn->{db_type} // '') !~ /^sqlite$/i)
     } keys %$config;
 
     @matching_connections = sort {
@@ -433,9 +442,15 @@ sub select_connection {
         my $skip = 0;
         my $skip_reason = '';
         
-        # Accept mysql/mariadb/sqlite AND postgresql/postgres/pg (SCPG-REMOTEDB /
+        # Application data is MariaDB (or Postgres where configured). SQLite is
+        # not a database in this system; an empty file would pass a connect test.
+        if (($conn->{db_type} // '') =~ /^sqlite$/i) {
+            $skip = 1;
+            $skip_reason = "SQLite is not an application database";
+        }
+        # Accept mysql/mariadb AND postgresql/postgres/pg (SCPG-REMOTEDB /
         # todo #2325). get_connection already builds dbi:Pg for postgresql.
-        if (!$conn->{db_type} || $conn->{db_type} !~ /^(mysql|sqlite|mariadb|postgresql|postgres|pg)$/i) {
+        if (!$skip && (!$conn->{db_type} || $conn->{db_type} !~ /^(mysql|mariadb|postgresql|postgres|pg)$/i)) {
             $skip = 1;
             $skip_reason = "Invalid db_type";
         }

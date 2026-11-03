@@ -232,6 +232,40 @@
             }).finally(function () { if (btn) { btn.disabled = false; btn.textContent = prev; } });
         }
 
+        function navigateWhenBranchReady(branch, port, url, branchTab) {
+            var attempts = 0;
+            function navigate() {
+                if (branchTab && !branchTab.closed) { branchTab.location = url; }
+                else if (url) { window.location.href = url; }
+            }
+            function poll() {
+                attempts += 1;
+                var body = new URLSearchParams();
+                body.set('action', 'open');
+                body.set('branch', branch);
+                body.set('port', port);
+                fetch('/admin/branch_server_action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body.toString(),
+                    credentials: 'same-origin'
+                }).then(function (r) { return r.json(); })
+                  .then(function (res) {
+                      if (res && res.ok && res.running) {
+                          navigate();
+                      } else if (attempts < 60) {
+                          window.setTimeout(poll, 500);
+                      } else {
+                          window.alert('Branch ' + branch + ' did not become ready on port ' + port + '.');
+                      }
+                  }).catch(function () {
+                      if (attempts < 60) { window.setTimeout(poll, 500); }
+                      else { window.alert('Branch ' + branch + ' did not become ready on port ' + port + '.'); }
+                  });
+            }
+            poll();
+        }
+
         var devServerButtons = document.querySelectorAll('.git-dev-actions button');
         for (var ds = 0; ds < devServerButtons.length; ds++) {
             devServerButtons[ds].addEventListener('click', function () {
@@ -240,11 +274,26 @@
                 if (openBranch) {
                     var url = el.getAttribute('data-url') || '';
                     var cmd = el.getAttribute('data-cmd') || '';
-                    // Old behaviour first: open the branch in a new browser window.
-                    if (url) { window.open(url, '_blank'); }
+                    // Reserve the tab from the user gesture, but do not navigate
+                    // until the backend confirms that the branch is listening.
+                    var branchTab = url ? window.open('about:blank', '_blank') : null;
+                    if (branchTab && !branchTab.closed) {
+                        try { branchTab.document.write('<p>Starting ' + openBranch + '…</p>'); } catch (e2) {}
+                    }
                     // Then show the console so you can watch boot / copy the command.
                     showDevConsole(openBranch, el.getAttribute('data-port'), url, cmd);
-                    branchServerAction('open', openBranch, el.getAttribute('data-port'), el);
+                    branchServerAction('open', openBranch, el.getAttribute('data-port'), el)
+                        .then(function (res) {
+                            if (res && res.running) {
+                                if (branchTab && !branchTab.closed) { branchTab.location = url; }
+                                else if (url) { window.location.href = url; }
+                            } else {
+                                navigateWhenBranchReady(openBranch, el.getAttribute('data-port'), url, branchTab);
+                            }
+                        })
+                        .catch(function () {
+                            if (branchTab && !branchTab.closed) { branchTab.close(); }
+                        });
                     return;
                 }
                 // "Hermes" button: copy the branch's Hermes launch command to the
@@ -257,12 +306,12 @@
                 if (hermesBranch) {
                     var appPort = el.getAttribute('data-port') || '';
                     var appPortN = parseInt(appPort, 10) || 0;
-                    var hport;
-                    if (appPortN === 3001 || hermesBranch === 'main') {
+                    var hport = el.getAttribute('data-hermes-port') || '';
+                    if (!hport && (appPortN === 3001 || hermesBranch === 'main')) {
                         hport = '9119';
-                    } else if (appPortN >= 4000) {
+                    } else if (!hport && appPortN >= 4000) {
                         hport = String(9100 + (appPortN % 100));
-                    } else {
+                    } else if (!hport) {
                         window.alert('Hermes for ' + hermesBranch + ': button has no app port.');
                         return;
                     }
@@ -277,20 +326,20 @@
                         + ' && hermes dashboard --isolated --host 0.0.0.0 --port '
                         + hport + ' --no-open --skip-build'
                     );
-                    var tab = window.open('about:blank', 'hermes-' + hermesBranch);
-                    if (tab && !tab.closed) {
-                        try { tab.document.write('<p>Starting Hermes on :' + hport + '…</p>'); } catch (e1) {}
-                    }
+                    var hermesUrl = window.location.protocol + '//' + window.location.hostname
+                        + ':' + hport + '/';
+                    // Open the dashboard on the click itself. A blank tab that we
+                    // navigate later gets blocked, and a failed start used to close it.
+                    var tab = window.open(hermesUrl, 'hermes-' + hermesBranch);
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         navigator.clipboard.writeText(hcmd);
                     }
-                    showDevConsole(hermesBranch, hport, '', hcmd, 'hermes');
+                    showDevConsole(hermesBranch, hport, hermesUrl, hcmd, 'hermes');
                     function goHermes(port) {
-                        // Open the Hermes dashboard root (not /chat). The dashboard serves the full web UI
-                        // at / after any login redirect. /chat was a leftover from chat-focused launches.
                         var url = window.location.protocol + '//' + window.location.hostname
                             + ':' + port + '/';
                         if (devOpenLink) { devOpenLink.href = url; devOpenLink.style.display = ''; }
+                        if (url === hermesUrl) { return; }
                         if (tab && !tab.closed) { tab.location = url; }
                         else { window.open(url, 'hermes-' + hermesBranch); }
                     }
@@ -321,14 +370,25 @@
                             else { waitReady(port); }
                         })
                         .catch(function () {
-                            if (tab && !tab.closed) { tab.close(); }
+                            if (devOpenLink) { devOpenLink.href = hermesUrl; devOpenLink.style.display = ''; }
                         });
                     return;
                 }
                 var action = el.getAttribute('data-branch-action');
                 if (action) {
-                    branchServerAction(action, el.getAttribute('data-branch'),
-                        el.getAttribute('data-port'), el);
+                    var bname = el.getAttribute('data-branch');
+                    branchServerAction(action, bname, el.getAttribute('data-port'), el)
+                        .then(function (res) {
+                            if (action !== 'stop' && action !== 'restart' && action !== 'start') { return; }
+                            var bits = [action, bname];
+                            if (res && res.via) { bits.push('via ' + res.via); }
+                            if (res && res.unit) { bits.push(res.unit); }
+                            if (res && res.cleared && res.cleared.length) {
+                                bits.push('stopped pid ' + res.cleared.join(','));
+                            }
+                            if (res && res.running) { bits.push('listening on :' + res.port); }
+                            window.alert(bits.join(' '));
+                        });
                 }
             });
         }
@@ -783,5 +843,58 @@
                 form.submit();
             });
         }
+    });
+})();
+
+// Oct 31 2026 (Shanta): "Update all branches from main" card. Rows are rendered with textContent only (no HTML from the server).
+(function () {
+    'use strict';
+    var box = document.querySelector('[data-git-update-all]');
+    if (!box) { return; }
+    var url = box.getAttribute('data-update-all-url');
+    var csrf = box.getAttribute('data-csrf') || '';
+    var summary = box.querySelector('[data-update-all-summary]');
+    var table = box.querySelector('[data-update-all-table]');
+    var tbody = table ? table.querySelector('tbody') : null;
+    var inc3 = box.querySelector('[data-update-all-4003]');
+    var buttons = box.querySelectorAll('[data-update-all-mode]');
+
+    function cell(tr, text) { var td = document.createElement('td'); td.textContent = text == null ? '' : String(text); tr.appendChild(td); }
+    function render(data) {
+        summary.textContent = data.summary || data.error || '';
+        if (!tbody || !data.rows) { return; }
+        while (tbody.firstChild) { tbody.removeChild(tbody.firstChild); }
+        data.rows.forEach(function (r) {
+            var tr = document.createElement('tr');
+            cell(tr, r.key); cell(tr, r.branch); cell(tr, r.port ? ':' + r.port : '');
+            cell(tr, r.action);
+            cell(tr, (r.behind != null ? r.behind : '') + (r.ahead != null ? ' / ' + r.ahead : ''));
+            cell(tr, r.pre_merge_commit ? r.pre_merge_commit.substring(0, 10) : '');
+            var bits = [];
+            if (r.files && r.files.length) { bits.push(r.files.join(', ')); }
+            if (r.reason) { bits.push(r.reason); }
+            if (r.dirty_files && r.dirty_files.length && !(r.files && r.files.length)) { bits.push('uncommitted kept: ' + r.dirty_files.join(', ')); }
+            cell(tr, bits.join(' - '));
+            cell(tr, r.will_restart ? 'yes' : '');
+            tbody.appendChild(tr);
+        });
+        table.hidden = false;
+    }
+    Array.prototype.forEach.call(buttons, function (btn) {
+        btn.addEventListener('click', function () {
+            var mode = btn.getAttribute('data-update-all-mode');
+            if (mode === 'update' && !window.confirm('Merge main into every registered branch now? Running -r dev servers will restart. Run Preview first if unsure.')) { return; }
+            var body = new URLSearchParams();
+            body.set('mode', mode); body.set('csrf', csrf);
+            if (inc3 && inc3.checked) { body.set('include_4003', '1'); }
+            summary.textContent = mode === 'update' ? 'Updating...' : 'Previewing...';
+            Array.prototype.forEach.call(buttons, function (b) { b.disabled = true; });
+            fetch(url, { method: 'POST', credentials: 'same-origin', body: body,
+                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+                .then(function (r) { return r.json(); })
+                .then(render)
+                .catch(function (e) { summary.textContent = 'Request failed: ' + e; })
+                .then(function () { Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; }); });
+        });
     });
 })();

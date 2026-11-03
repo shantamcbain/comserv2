@@ -117,6 +117,13 @@ Returns the resolved key (or '' for local).
 
 =cut
 
+sub _git_back {
+    my ($self, $c) = @_;
+    my $t = $c->stash->{git_target} // '';
+    return $c->uri_for('/admin/git', { target => $t }) if $t && $t ne 'local';
+    return $c->uri_for('/admin/git');
+}
+
 sub _bind_target {
     my ($self, $c) = @_;
     my $t = $c->req->param('target');
@@ -134,6 +141,9 @@ is the ONLY safe way to pass browser-supplied values (file paths, messages) to g
 is handed to git as a distinct argv element via IPC::Run3, so shell metacharacters in a filename
 or commit message can never be interpreted.
 
+The name refers to the explicit argument list passed to git, not to listing branches. Branch
+listing is provided by C<get_local_branches>.
+
 Usage: my ($out, $code) = $self->_git_list($c, 'add', '--', @paths);
 Returns (combined_output, exit_code). Returns ('', -1) if the repo path can't be resolved.
 
@@ -150,6 +160,16 @@ sub _git_list {
         if ($tinfo->{mode} eq 'ssh') {
             my $r = $self->git_service->_ssh_exec_git($c, $tinfo, @argv);
             return ($r->{output}, $r->{exit_code});
+        }
+        # External local repo: never fall through to the Comserv checkout.
+        if ($tinfo->{external}) {
+            my $repo = $tinfo->{repo};
+            return ('', -1) unless defined $repo && length $repo && -d $repo;
+            require IPC::Run3;
+            my $out = '';
+            IPC::Run3::run3([ 'git', '-C', $repo, @argv ], \undef, \$out, \$out);
+            my $code = $? >> 8;
+            return ($out, $code);
         }
     }
 
@@ -254,7 +274,7 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     # Every write is POST + confirm.
     unless ($c->req->method eq 'POST' && $c->req->param('confirm')) {
         $c->flash->{error_msg} = 'Git actions require a confirmed POST.';
-        $c->response->redirect($c->uri_for('/admin/git'));
+        $c->response->redirect($self->_git_back($c));
         return;
     }
 
@@ -275,12 +295,12 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         if (@{ $validated->{invalid} }) {
             $c->flash->{error_msg} =
                 "Rejected unsafe or unknown path(s): " . join(', ', @{ $validated->{invalid} }) . " (must exactly match git status --porcelain on the bound target. Refresh view or select only current dirty paths for this target. Runtime data should be gitignored.)";
-            $c->response->redirect($c->uri_for('/admin/git'));
+            $c->response->redirect($self->_git_back($c));
             return;
         }
         if ($requires_selection{$op} && !@{ $validated->{valid} }) {
             $c->flash->{error_msg} = 'No files selected.';
-            $c->response->redirect($c->uri_for('/admin/git'));
+            $c->response->redirect($self->_git_back($c));
             return;
         }
     }
@@ -289,7 +309,10 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     my $msg = '';
 
     if ($op eq 'stage') {
-        my ($out, $code) = $self->_git_list($c, 'add', '--', @{ $validated->{valid} });
+        # -f: a tracked path can be matched by a .gitignore added later (e.g.
+        # data/ai_trials/), and plain `git add` refuses it. Paths are already
+        # validated against git status --porcelain, so -f adds no new exposure.
+        my ($out, $code) = $self->_git_list($c, 'add', '-f', '--', @{ $validated->{valid} });
         $ok = ($code == 0);
         $msg = $ok ? "Staged " . scalar(@{ $validated->{valid} }) . " file(s)." : "Stage failed: $out";
     }
@@ -330,7 +353,10 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
                 }
                 my @to_add = grep { $stage_needed{$_} } @{ $validated->{valid} };
                 if (@to_add) {
-                    my ($aout, $acode) = $self->_git_list($c, 'add', '--', @to_add);
+                    # -f: without it, a tracked file that a LATER .gitignore rule now
+                    # matches (Comserv/data/ai_trials/) fails with "paths are ignored"
+                    # and the whole commit aborts. See ALLOWED_FLAGS{add} in Util::Git.
+                    my ($aout, $acode) = $self->_git_list($c, 'add', '-f', '--', @to_add);
                     if ($acode != 0) {
                         $msg = "Stage-before-commit failed: $aout";
                         goto COMMIT_DONE;
@@ -380,9 +406,11 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     elsif ($op eq 'push') {
         my $branch = $self->get_current_branch($c);
         my $tracking = $self->get_tracking_info($c);
-        # main/master on the primary checkout (:3001) always publishes to origin.
-        # Worktree branches still require an explicit set-upstream checkbox.
-        my $publish = ($branch eq 'main' || $branch eq 'master');
+        my $tinfo = $self->git_service->resolve_target($c, $c->stash->{git_target} // '');
+        $tinfo = {} unless ref($tinfo) eq 'HASH';
+        # Main/master and registered external repositories publish to their own
+        # origin. Other worktree branches require explicit set-upstream approval.
+        my $publish = ($branch eq 'main' || $branch eq 'master' || $tinfo->{publish});
         if (!$tracking->{upstream} && !$publish && !$c->req->param('set_upstream')) {
             $msg = "Branch '$branch' has no upstream. Re-submit with 'set upstream' checked to push.";
         }
@@ -518,7 +546,7 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     if ($ok) { $c->flash->{success_msg} = $msg; }
     else     { $c->flash->{error_msg}   = $msg; }
 
-    $c->response->redirect($c->uri_for('/admin/git'));
+    $c->response->redirect($self->_git_back($c));
 }
 
 =head2 suggest_commit_message
@@ -793,6 +821,7 @@ sub index :Path('/admin/git') :Args(0) {
     # Honor ?target= so a direct link or the selector opens on a given host.
     $self->_bind_target($c);
     my $target_key = $c->stash->{git_target} // '';
+    my $tinfo = $self->git_service->resolve_target($c, $target_key);
 
     my $status = $self->get_git_status($c);
 
@@ -812,13 +841,16 @@ sub index :Path('/admin/git') :Args(0) {
     }
 
     $c->stash(
-        repo_path       => $self->repo_path($c),
+        repo_path       => ($tinfo->{repo} || $self->repo_path($c)),
+        git_external    => $tinfo->{external} ? 1 : 0,
         current_branch  => $self->get_current_branch($c),
         # current_worktree = registry key from app_workflow (path-based worktree dir name under ~/.comserv/worktrees/).
         # Used to highlight the matching row in Develop Servers / Branch Servers list (b.name).
         # This can differ from current_branch (live git) if a feature branch was checked out inside a worktree slot.
         # The list itself is registry-driven; highlighting marks "this running server".
-        current_worktree => $c->stash->{app_workflow} || 'main',
+        current_worktree => $tinfo->{external}
+            ? ($tinfo->{key} || $target_key)
+            : ($c->stash->{app_workflow} || 'main'),
         local_branches  => $self->get_local_branches($c),
         branch_details  => $self->git_service->get_branch_details($c),
         recent_commits  => $self->get_recent_commits($c),
@@ -832,6 +864,7 @@ sub index :Path('/admin/git') :Args(0) {
         # The Git dashboard's "Develop Servers" card reuses the same data the planning
         # tab's "Branch Servers" panel shows, so the two can never drift.
         worktree_list   => $self->git_service->build_worktree_list,
+        update_all_csrf => $self->_update_all_csrf_token($c),
         template        => 'admin/git/index.tt',
     );
 
@@ -1724,6 +1757,28 @@ sub _save_user_gate {
 # commits at once; findings need a second click on the same diff; a
 # high-severity finding needs a "commit anyway" reason (8+ chars).
 # Reviewer off / cap hit / error -> warning, commit allowed.
+#
+# Data-entry files (trial state the app rewrites) are not sent to the
+# reviewer. A timestamp or spend bump must not hold the first commit.
+# Conflict markers, invalid JSON, the secret guard, and any finding on
+# another file still stop it.
+sub _data_entry_staged_error {
+    my ($self, $c, $diff) = @_;
+    my $git = $self->git_service;
+    my %seen;
+    for my $path (($diff // '') =~ m{^diff --git a/(.+?) b/}mg) {
+        next if $seen{$path}++;
+        next unless $git->data_entry_runtime_path($path);
+        my ($blob, $code) = $self->_git_list($c, 'show', ":$path");
+        if ($code) {
+            return "Could not read staged data-entry file $path. Nothing has been committed yet.";
+        }
+        my $err = $git->data_entry_blob_error($path, $blob);
+        return $err . ' Nothing has been committed yet.' if $err;
+    }
+    return undef;
+}
+
 sub _format_findings {
     my ($self, $view) = @_;
     my @l = map { sprintf('[%s] %s%s %s', $_->{severity} || 'note', $_->{file},
@@ -1735,8 +1790,22 @@ sub _dashboard_commit_gate {
     my ($self, $c, $message) = @_;
     my ($diff) = $self->_git_list($c, 'diff', '--cached');
     $diff //= '';
+    my $git = $self->git_service;
+    my $blob_err = $self->_data_entry_staged_error($c, $diff);
+    if ($blob_err) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_dashboard_commit_gate', $blob_err);
+        return { proceed => 0, msg => $blob_err };
+    }
+    # Review and confirm against the code diff only. A data-entry rewrite
+    # between clicks must not look like a new review.
+    my $review_diff = $git->strip_data_entry_diff($diff);
+    if ($review_diff !~ /\S/) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_dashboard_commit_gate',
+            'data-entry files only; structural checks passed; reviewer not called');
+        return { proceed => 1, note => 'Data-entry files only. Structural checks passed; not sent to the reviewer.' };
+    }
     require Digest::SHA;
-    my $sha = Digest::SHA::sha256_hex($diff);
+    my $sha = Digest::SHA::sha256_hex($review_diff);
     my $rv = $self->_reviewer_for($c);
     my $reason = $c->req->param('override_reason') // '';
     $reason =~ s/^\s+|\s+$//g;
@@ -1755,10 +1824,11 @@ sub _dashboard_commit_gate {
         }
         return { proceed => 1, note => 'Reviewed findings were confirmed.' };
     }
-    my $res = eval { $rv->review($c, diff => $diff, files => [ $diff =~ /^diff --git a\/(.+?) b\//mg ],
+    my $res = eval { $rv->review($c, diff => $review_diff, files => [ $review_diff =~ m{^diff --git a/(.+?) b/}mg ],
                                  diff_sha => $sha, task => $message, source => 'commit_gate') };
     $res = { ok => 0, skipped => 1, reason => 'review call failed' . ($@ ? ": $@" : '') } if $@ || !$res;
     my $view = $rv->gate_view($res);
+    $view->{findings} = $git->commit_findings_that_hold($view->{findings});
     $res->{blocking} = $view->{blocking};
     $self->_save_user_gate($c, { at => time, diff_sha => $sha, message => $message, review => $res, dashboard => 1 });
     return { proceed => 1, note => $view->{warning} } unless $view->{reviewed};
@@ -2246,6 +2316,93 @@ sub test_gate :Path('/admin/git/test_gate') :Args(1) {
     }));
 }
 
+=head2 _catch_up_note
+
+After a successful land on main, fast-forward registered worktrees that have
+nothing of their own. A catch-up failure must not turn a successful merge into
+a failed response. Returns C<($output, $summary, $rows)>.
+
+=cut
+
+sub _catch_up_note {
+    my ($self, $c, $output) = @_;
+    my $cu = eval { $self->git_service->catch_up_registered_worktrees($c) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+            "catch_up after main land died: $@");
+        my $summary = "Branch catch-up failed: $@";
+        return (($output // '') . "\n\n" . $summary, $summary, []);
+    }
+    my $summary = $cu->{summary} // '';
+    my $out = $output // '';
+    $out .= "\n\n" . $summary if length $summary;
+    return ($out, $summary, $cu->{rows} || []);
+}
+
+=head2 update_all_from_main
+
+POST /admin/git/update_all_from_main (admin-only, session CSRF token). Oct 31 2026 (Shanta).
+Params: mode=preview|update, include_4003=1 (optional), csrf. Brings main into every registered
+worktree via Comserv::Util::Git->update_all_from_main (no stash, no force, no rebase; conflicts
+aborted; Proxmox/:4016 always skipped). Returns JSON { success, rows, summary, restart_ports, dry_run }.
+
+=cut
+
+sub _update_all_csrf_token {
+    my ($self, $c) = @_;
+    my $t = $c->session->{git_update_all_csrf};
+    unless ($t) {
+        require Digest::SHA;
+        my $rand = '';
+        if (open(my $fh, '<:raw', '/dev/urandom')) { read($fh, $rand, 32); close $fh }
+        $t = Digest::SHA::sha256_hex($rand . time . $$ . rand());
+        $c->session->{git_update_all_csrf} = $t;
+    }
+    return $t;
+}
+
+sub _update_all_csrf_ok {
+    my ($self, $c) = @_;
+    my $want = $c->session->{git_update_all_csrf};
+    my $got  = $c->req->params->{csrf};
+    return 0 unless defined $want && length $want && defined $got && length($got) == length($want);
+    my $diff = 0;
+    $diff |= ord(substr($want, $_, 1)) ^ ord(substr($got, $_, 1)) for 0 .. length($want) - 1;
+    return $diff == 0 ? 1 : 0;
+}
+
+sub update_all_from_main :Path('/admin/git/update_all_from_main') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_merge');
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+    unless ($self->_update_all_csrf_ok($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            'update_all_from_main: CSRF token missing or wrong');
+        $c->response->body(encode_json({ success => 0, error => 'Security token expired. Reload the Git page and try again.' }));
+        return;
+    }
+    my $mode = $c->req->param('mode') // 'preview';
+    my $dry  = $mode eq 'update' ? 0 : 1;
+    my $res = eval {
+        $self->git_service->update_all_from_main($c, {
+            dry_run      => $dry,
+            include_4003 => ($c->req->param('include_4003') ? 1 : 0),
+        });
+    };
+    if (!$res) {
+        my $err = $@ || 'unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+            "update_all_from_main died: $err");
+        $c->response->body(encode_json({ success => 0, error => 'Update all failed; see the application log.' }));
+        return;
+    }
+    $c->response->body(encode_json({ success => 1, %$res }));
+}
+
 =head2 merge_to_main
 
 POST /admin/git/merge_to_main
@@ -2326,9 +2483,12 @@ sub merge_to_main :Path('/admin/git/merge_to_main') :Args(0) {
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_merge',
         "merge_to_main: merged '$branch' into main (success)");
+    my ($out, $summary, $rows) = $self->_catch_up_note($c, $res->{output});
     $c->response->body(encode_json({
         success => 1,
-        output  => $res->{output},
+        output  => $out,
+        catch_up_summary => $summary,
+        catch_up => $rows,
         error   => undef,
     }));
 }
@@ -2430,89 +2590,46 @@ sub merge :Path('/admin/git/merge') :Args(0) {
             }));
             return;
         }
-        # Do not pre-scan `main` with secret_guard --merge. That scan diffs the
-        # whole main range and gitleaks hangs, and it refuses files already on
-        # main (which blocks every worktree update). The pre-merge-commit hook
-        # still blocks a blob this branch newly adds or changes, and that refusal
-        # includes the file:line fix route. If the hook leaves MERGE_HEAD, the
-        # failure path below aborts it.
+        # Fetch first, then use the service's guarded merge implementation. It
+        # preflights MERGE_HEAD/unmerged index state before invoking git and
+        # preserves the intentional --autostash behavior for WIP. The incoming
+        # main range is not scanned here because that scan is both expensive
+        # and wrong for files already present on main; the pre-merge hook still
+        # blocks a newly introduced secret.
         my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $dest });
-        # --autostash: the worktree routinely has uncommitted WIP; a plain merge
-        # refuses ("Your local changes would be overwritten"). Autostash stashes
-        # the WIP, merges, then reapplies. If reapplying conflicts, git KEEPS the
-        # stash entry (recoverable via the dashboard's Stash Pop) — nothing lost.
-        my $up = $self->git_service->_run($c, 'merge', '--no-ff', '--autostash', 'main',
-            { repo => $dest });
-        my $combined = join("\n", grep { defined && length }
-            $fetch->{output}, $fetch->{error}, $up->{output}, $up->{error});
-        my $autostash_used = ($combined // '') =~ /Created autostash|Applied autostash/ ? 1 : 0;
-        # WIP could not be reapplied cleanly: git saved it as stash@{0}. Surface
-        # that distinctly so the user knows to recover via Stash Pop.
-        my $autostash_conflict = ($combined // '') =~ /Cannot store stash|Please commit or stash|stash.*conflict/i
-            && $autostash_used ? 1 : 0;
-        my $fail_msg;
-        my $reason;
-        my $fix_hint;
-        my $uncommitted = 0;
-        my $conflict = ($combined // '') =~ /CONFLICT|Automatic merge failed|overwritten by merge/ ? 1 : 0;
-        if (!$up->{success}) {
-            if ($combined =~ /already used by worktree|already checked out/i) {
-                $reason = 'worktree_collision';
-                $fail_msg =
-                    "Git refused to merge main into '$target' (worktree checkout collision). "
-                  . "Stay on the branch worktree; do not checkout main there.";
-                $fix_hint =
-                    "Run this merge from the branch worktree dashboard (or primary) without switching branches.";
-            }
-            elsif ($conflict) {
-                $reason = 'conflict';
-                my @files = $combined =~ /Merge conflict in ([^\s]+)/g;
-                my %sf; @files = grep { !$sf{$_}++ } @files;
-                $fail_msg = @files
-                    ? "Merge conflict bringing main into '$target': " . join(', ', @files)
-                    : "Merge conflict bringing main into '$target'.";
-                $fix_hint = "Resolve in the '$target' worktree, commit, or abort.";
-            }
-            elsif ($combined =~ /secret-guard:|pre-merge-commit:|BLOCKED:/) {
-                $reason = 'secret_guard';
-                # Hook refused the merge commit and left MERGE_HEAD. Abort so
-                # the worktree is not stuck mid-merge.
-                $self->git_service->_run($c, 'merge', '--abort', { repo => $dest });
-                $fail_msg = "Merge of main into '$target' refused by secret guard. The incomplete merge was aborted.";
-                $fix_hint = "See BLOCKED paths in detail. Do not retry until those files are removed from main or allow-listed.";
-            }
-            elsif ($combined =~ /Please commit or stash|local changes.*would be overwritten/i) {
-                $reason = 'uncommitted';
-                $uncommitted = 1;
-                $fail_msg =
-                    "Merge of main into '$target' blocked by uncommitted changes in the worktree.";
-                $fix_hint =
-                    "Commit/stash WIP, or retry (this path uses --autostash when possible).";
-            }
-            else {
-                $reason = 'merge_failed';
-                my $first = '';
-                for my $line (split /\n/, $combined) {
-                    next unless defined $line && $line =~ /\S/;
-                    next if $line =~ /^\s*hint:/i;
-                    $first = $line; last;
-                }
-                $fail_msg = length $first
-                    ? "Merge of main into '$target' failed: $first"
-                    : "Merge of main into '$target' failed.";
-                $fix_hint = "See detail and server log (git_merge).";
-            }
+        my $mr;
+        if (!$fetch->{success}) {
+            $mr = {
+                success   => 0,
+                output    => join("\n", grep { defined && length } $fetch->{output}, $fetch->{error}),
+                error_msg => 'Could not fetch origin before updating the worktree.',
+                reason    => 'fetch_failed',
+                fix_hint  => 'Check the remote connection and repository state, then retry.',
+            };
         }
+        else {
+            # The Git service owns preflight, stderr preservation, conflict
+            # classification, and abort-safe recovery for this path too.
+            $mr = $self->git_service->merge_branch($c, 'main', {
+                repo              => $dest,
+                autostash         => 1,
+                skip_secret_guard => 1,
+            });
+        }
+        my $combined = join("\n", grep { defined && length }
+            $fetch->{output}, $fetch->{error}, $mr->{output}, $mr->{error_msg});
         $res = {
-            success   => $up->{success} ? 1 : 0,
+            success   => $mr->{success} ? 1 : 0,
             output    => $combined,
-            autostash => $autostash_used,
-            autostash_conflict => $autostash_conflict,
-            error_msg => $up->{success} ? undef : $fail_msg,
-            reason    => $reason,
-            fix_hint  => $fix_hint,
-            uncommitted => $uncommitted,
-            conflict  => $conflict,
+            autostash => $mr->{autostash} ? 1 : 0,
+            autostash_conflict => $mr->{autostash_conflict} ? 1 : 0,
+            error_msg => $mr->{success} ? undef : $mr->{error_msg},
+            reason    => $mr->{reason},
+            fix_hint  => $mr->{fix_hint},
+            uncommitted => $mr->{uncommitted} ? 1 : 0,
+            conflict  => $mr->{conflict} ? 1 : 0,
+            conflict_files => $mr->{conflict_files} || [],
+            uncommitted_files => $mr->{uncommitted_files} || [],
         };
     }
     elsif ($source ne 'main' && $target eq 'main') {
@@ -2571,7 +2688,8 @@ sub merge :Path('/admin/git/merge') :Args(0) {
 
     if (!$res->{success}) {
         my $level = ($res->{conflict} || $res->{uncommitted}
-                     || ($res->{reason} // '') eq 'secret_guard') ? 'warn' : 'error';
+                     || ($res->{reason} // '') =~ /^(?:secret_guard|merge_in_progress|worktree_collision|missing_ref|autostash_conflict)$/)
+            ? 'warn' : 'error';
         $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_merge',
             "merge failed direction=$direction source=$source target=$target"
             . " reason=" . ($res->{reason} // 'unknown')
@@ -2611,6 +2729,16 @@ sub merge :Path('/admin/git/merge') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
         'git_merge', "direction=$direction source=$source target=$target success=1");
 
+    my $output = $res->{output};
+    my $summary = '';
+    my $rows = [];
+    # Only when main actually moved. main->branch is a manual freshen of one
+    # worktree; fanning out from there would hide a human merge inside an
+    # automatic one. Never merge those branches back to main.
+    if ($direction eq 'branch->main') {
+        ($output, $summary, $rows) = $self->_catch_up_note($c, $output);
+    }
+
     $c->response->body(encode_json({
         success   => 1,
         target    => $target,
@@ -2619,7 +2747,9 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         autostash => $res->{autostash} ? 1 : 0,
         autostash_conflict => $res->{autostash_conflict} ? 1 : 0,
         error     => undef,
-        output    => $res->{output},
+        output    => $output,
+        catch_up_summary => $summary,
+        catch_up  => $rows,
     }));
 }
 

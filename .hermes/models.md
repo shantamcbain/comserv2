@@ -30,8 +30,8 @@ not a PONG):
 | Slot | Preference |
 |------|------------|
 | **Director (primary)** | `xai-oauth` / `grok-composer-2.5-fast` (or current SuperGrok coding pick) |
-| **Coder (delegation)** | `opencode-free` / `nemotron-3.5-lightning-free` |
-| **Primary fallback order** | ling-3.0-flash-fin:free (or) → cohere/north-mini-code:free (or) → ling-3.0-flash-sante:free (or) → dots-3-note-preview:free (or) → nemotron-3.5-lightning:free (or) → nemotron-3-ultra-550b-a55b:free (or) → deepseek/deepseek-v4-flash (or) → deepseek/deepseek-v4-pro (or) → z-ai/glm-5.3-flash (or) — **all OpenRouter**; see probe notes above |
+| **Coder (delegation)** | `nemotron-3.5-lightning-free` — `opencode-free` is dead for scripted use and must never be the coder |
+| **Primary fallback order** | Live Hermes chain, Nov 2 2026: `supergrok / grok-4.7` → `openrouter / particle-ai/particle-1` (probation) → `xai / grok-4.7` → `openrouter / openai/gpt-5.6-luna` (probation, stop reached) → `openrouter / cohere/north-mini-code:free`. Free-first probe order when SuperGrok is unavailable: `ling-3.0-flash-fin:free` → `north-mini-code:free` → `nemotron-3.5-lightning:free` → `deepseek-v4-flash` → `deepseek-v4-pro` → `glm-5.3-flash`; **Ollama last**. The source of truth is `@HERMES_CHAIN_DEFAULT` in `Util/AI/ModelChains.pm`, not this row. |
 | Aliases | `code` → Director; `cheap` / `delegate` → Coder; `local` → Ollama last-resort |
 
 Apply sketch (Director session on default profile):
@@ -39,7 +39,7 @@ Apply sketch (Director session on default profile):
 ```bash
 hermes config set model.provider xai-oauth
 hermes config set model.default grok-composer-2.5-fast
-hermes config set delegation.provider opencode-free
+hermes config set delegation.provider openrouter
 hermes config set delegation.model nemotron-3.5-lightning-free
 # fallback_providers: edit list — fast free first, Ollama last, no hy3
 ```

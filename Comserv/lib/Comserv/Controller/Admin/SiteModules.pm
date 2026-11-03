@@ -54,11 +54,22 @@ sub index :Path('/admin/site_modules') :Args(0) {
         @sitenames = ('CSC');
     };
 
+    my $addon_approval_count = 0;
+    if ($is_csc_admin) {
+        try {
+            $addon_approval_count = scalar $self->_pending_addon_requests($c);
+        } catch {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
+                "Approval queue count failed: $_");
+        };
+    }
+
     $c->stash(
-        modules      => \@modules,
-        sitenames    => \@sitenames,
-        is_csc_admin => $is_csc_admin,
-        template     => 'admin/site_modules/index.tt',
+        modules              => \@modules,
+        sitenames            => \@sitenames,
+        is_csc_admin         => $is_csc_admin,
+        addon_approval_count => $addon_approval_count,
+        template             => 'admin/site_modules/index.tt',
     );
 }
 
@@ -66,12 +77,25 @@ sub toggle :Path('/admin/site_modules/toggle') :Args(0) {
     my ($self, $c) = @_;
 
     my $id      = $c->req->param('id');
-    my $enabled = $c->req->param('enabled');  # 0 or 1
+    my $enabled = $c->req->param('enabled') ? 1 : 0;
+    my $refused = '';
+
+    if ($enabled && !$self->_is_csc_admin($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'toggle',
+            "Refused enable id=$id — not a CSC admin");
+        $c->flash->{error_msg} = 'Only a CSC admin can enable an add-on. Use the approval queue.';
+        $c->res->redirect($c->uri_for('/admin/site_modules/approval_queue'));
+        return $c->detach;
+    }
 
     try {
         my $row = $c->model('DBEncy')->resultset('SiteModule')->find($id);
-        if ($row) {
-            $row->update({ enabled => $enabled ? 1 : 0 });
+        if ($row && $enabled && !$self->_core_site_name($row->sitename)) {
+            $refused = $row->sitename;
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'toggle',
+                "Refused enable for site $refused — not 3d, CSC, or Shanta");
+        } elsif ($row) {
+            $row->update({ enabled => $enabled });
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'toggle',
                 "site_modules id=$id set enabled=$enabled by " . ($c->session->{username} || 'unknown'));
         }
@@ -79,6 +103,12 @@ sub toggle :Path('/admin/site_modules/toggle') :Args(0) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'toggle',
             "Toggle failed for id=$id: $_");
     };
+
+    if ($refused) {
+        $c->flash->{error_msg} = "Add-ons are enabled only for 3d, CSC, and Shanta (refused $refused).";
+        $c->res->redirect($c->uri_for('/admin/site_modules/approval_queue'));
+        return $c->detach;
+    }
 
     $c->res->redirect($c->uri_for('/admin/site_modules'));
     $c->detach;
@@ -120,6 +150,17 @@ sub add :Path('/admin/site_modules/add') :Args(0) {
         }
 
         if ($sitename && $module_name) {
+            if ($enabled) {
+                my $canon = $self->_core_site_name($sitename);
+                unless ($self->_is_csc_admin($c) && $canon) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add',
+                        "Refused enable site=$sitename module=$module_name — CSC admin and core site required");
+                    $c->flash->{error_msg} = 'Only a CSC admin can enable an add-on, and only for 3d, CSC, or Shanta. Use the approval queue.';
+                    $c->res->redirect($c->uri_for('/admin/site_modules/approval_queue'));
+                    return $c->detach;
+                }
+                $sitename = $canon;
+            }
             try {
                 $c->model('DBEncy')->resultset('SiteModule')->update_or_create(
                     {
@@ -351,7 +392,20 @@ sub edit_addon :Path('/admin/site_modules/edit_addon') :Args(0) {
         my $is_active    = $c->req->param('is_active') ? 1 : 0;
         my $site_enabled = $c->req->param('site_enabled') ? 1 : 0;
         my $min_role     = $c->req->param('min_role') || 'member';
-        $edit_site       = $c->req->param('sitename') || $edit_site;
+        my $posted_site  = $c->req->param('sitename') || '';
+        $edit_site       = $posted_site || $edit_site;
+
+        if ($site_enabled) {
+            my $canon = $self->_core_site_name($posted_site);
+            unless ($self->_is_csc_admin($c) && $posted_site && $canon) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_addon',
+                    "Refused enable key=$key sitename=$posted_site — CSC admin must name 3d, CSC, or Shanta");
+                $c->flash->{error_msg} = 'Only a CSC admin can enable an add-on, and the target SiteName must be posted (3d, CSC, or Shanta). The session site is not the target.';
+                $c->res->redirect($c->uri_for('/admin/site_modules/approval_queue'));
+                return $c->detach;
+            }
+            $edit_site = $canon;
+        }
 
         my $saved_ok = 0;
         try {
@@ -409,6 +463,219 @@ sub edit_addon :Path('/admin/site_modules/edit_addon') :Args(0) {
         template      => 'admin/site_modules/edit_addon.tt',
     );
     $c->forward($c->view('TT'));
+}
+
+sub _is_csc_admin {
+    my ($self, $c) = @_;
+    my $site = uc($c->stash->{SiteName} || $c->session->{SiteName} || '');
+    return 0 unless $site eq 'CSC';
+    return 1 if $c->stash->{is_admin} || $c->session->{is_admin};
+    my $roles = $c->session->{roles} || [];
+    if (ref $roles eq 'ARRAY') {
+        return 1 if grep { lc($_) eq 'admin' } @$roles;
+    } elsif ($roles && lc($roles) =~ /\badmin\b/) {
+        return 1;
+    }
+    return 0;
+}
+
+# Same core-site list MailInvoiceStock uses. Other sites are not enabled here.
+sub _core_site_name {
+    my ($self, $name) = @_;
+    my %canon = ( '3d' => '3d', csc => 'CSC', shanta => 'Shanta' );
+    return $canon{ lc($name // '') } || '';
+}
+
+sub _enable_module_name {
+    my ($self, $key) = @_;
+    $key = lc($key // '');
+    return '3d'         if $key eq '3d' || $key eq 'printing_3d';
+    return 'planning'   if $key eq 'planning' || $key eq 'ai';
+    return 'workshops'  if $key eq 'workshops' || $key eq 'workshop';
+    return 'accounting' if $key eq 'accounting';
+    return $key;
+}
+
+sub _module_aliases {
+    my ($self, $key) = @_;
+    my $write = $self->_enable_module_name($key);
+    my %extra = (
+        '3d'        => [qw(3d printing_3d)],
+        planning    => [qw(planning ai)],
+        workshops   => [qw(workshops workshop)],
+        accounting  => [qw(accounting Accounting)],
+    );
+    return @{ $extra{$write} || [$write] };
+}
+
+sub _feature_label {
+    my ($self, $key) = @_;
+    my $write = $self->_enable_module_name($key);
+    for my $row ($self->_default_addon_catalog()) {
+        return $row->{name} if $row->{key} eq $write;
+    }
+    return $write;
+}
+
+sub _addon_enabled {
+    my ($self, $c, $canon, $key) = @_;
+    my @aliases = $self->_module_aliases($key);
+    my $rs = $c->model('DBEncy')->resultset('SiteModule')->search({
+        module_name => { -in => \@aliases },
+        enabled     => 1,
+    });
+    while (my $row = $rs->next) {
+        return 1 if lc($row->sitename) eq lc($canon);
+    }
+    return 0;
+}
+
+sub _pending_addon_requests {
+    my ($self, $c) = @_;
+    my @pending;
+    my @accounts = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
+        { requested_addons => { '!=' => '' } },
+        { order_by => 'sitename' },
+    )->all;
+    for my $acct (@accounts) {
+        my $raw = $acct->requested_addons || '';
+        next if $raw =~ /^\s*$/;
+        my $canon = $self->_core_site_name($acct->sitename);
+        next unless $canon;
+        my $subscriber = $acct->created_by || $acct->contact_email || '';
+        my $when = $acct->updated_at || $acct->created_at || '';
+        for my $key (split /\s*,\s*/, $raw) {
+            $key =~ s/^\s+|\s+$//g;
+            next unless length $key;
+            $key = lc $key;
+            next if $self->_addon_enabled($c, $canon, $key);
+            push @pending, {
+                sitename    => $canon,
+                module_name => $key,
+                feature     => $self->_feature_label($key),
+                subscriber  => $subscriber,
+                when        => "$when",
+            };
+        }
+    }
+    return @pending;
+}
+
+sub approval_queue :Path('/admin/site_modules/approval_queue') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($self->_is_csc_admin($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'approval_queue',
+            'Refused approval queue — not a CSC admin');
+        $c->flash->{error_msg} = 'The add-on approval queue is only for a CSC admin on the CSC site.';
+        $c->res->redirect($c->uri_for('/admin/site_modules'));
+        return $c->detach;
+    }
+
+    my @pending;
+    my $error = '';
+    try {
+        @pending = $self->_pending_addon_requests($c);
+    } catch {
+        $error = "$_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'approval_queue',
+            "Failed to load approval queue: $_");
+    };
+
+    $c->stash(
+        pending    => \@pending,
+        error_msg  => $error,
+        template   => 'admin/site_modules/approval_queue.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub approve_addon :Path('/admin/site_modules/approve_addon') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->req->method eq 'POST' && $self->_is_csc_admin($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'approve_addon',
+            'Refused addon approve — CSC admin POST required');
+        $c->flash->{error_msg} = 'Only a CSC admin can approve an add-on.';
+        $c->res->redirect($c->uri_for('/admin/site_modules/approval_queue'));
+        return $c->detach;
+    }
+
+    my $posted_site = $c->req->body_parameters->{sitename} || '';
+    my $posted_mod  = lc($c->req->body_parameters->{module_name} || '');
+    my $canon       = $self->_core_site_name($posted_site);
+    unless ($canon && $posted_mod) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'approve_addon',
+            "Refused approve sitename=$posted_site module=$posted_mod — name a core site and a module");
+        $c->flash->{error_msg} = 'Name the target SiteName (3d, CSC, or Shanta) and the add-on. Other sites are not enabled from this queue.';
+        $c->res->redirect($c->uri_for('/admin/site_modules/approval_queue'));
+        return $c->detach;
+    }
+
+    my $acct;
+    my $lookup_failed = 0;
+    try {
+        my @accounts = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
+            { requested_addons => { '!=' => '' } },
+        )->all;
+        for my $row (@accounts) {
+            if (lc($row->sitename) eq lc($canon)) {
+                $acct = $row;
+                last;
+            }
+        }
+    } catch {
+        $lookup_failed = 1;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'approve_addon',
+            "Hosting account lookup failed: $_");
+    };
+    if ($lookup_failed) {
+        $c->flash->{error_msg} = 'Could not read the subscribe list.';
+        $c->res->redirect($c->uri_for('/admin/site_modules/approval_queue'));
+        return $c->detach;
+    }
+
+    my %wanted;
+    if ($acct) {
+        $wanted{lc $_} = 1 for grep { length } map { s/^\s+|\s+$//gr } split /\s*,\s*/, ($acct->requested_addons || '');
+    }
+    my $requested = 0;
+    for my $alias ($self->_module_aliases($posted_mod)) {
+        $requested = 1 if $wanted{lc $alias};
+    }
+    unless ($acct && $requested) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'approve_addon',
+            "Refused approve $canon/$posted_mod — not on requested_addons");
+        $c->flash->{error_msg} = "No subscribe request for $posted_mod on $canon.";
+        $c->res->redirect($c->uri_for('/admin/site_modules/approval_queue'));
+        return $c->detach;
+    }
+
+    my $write_name = $self->_enable_module_name($posted_mod);
+    my $saved = 0;
+    try {
+        $c->model('DBEncy')->resultset('SiteModule')->update_or_create(
+            {
+                sitename    => $canon,
+                module_name => $write_name,
+                enabled     => 1,
+            },
+            { key => 'site_module_unique' }
+        );
+        $saved = 1;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'approve_addon',
+            "Enabled $write_name for $canon (requested $posted_mod) by "
+            . ($c->session->{username} || 'unknown'));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'approve_addon',
+            "Enable failed for $canon/$write_name: $_");
+        $c->flash->{error_msg} = "Could not enable $write_name for $canon.";
+    };
+    if ($saved) {
+        $c->flash->{success_msg} = "Enabled $write_name for $canon. Subscription was not treated as access until this approve.";
+    }
+    $c->res->redirect($c->uri_for('/admin/site_modules/approval_queue'));
+    return $c->detach;
 }
 
 __PACKAGE__->meta->make_immutable;

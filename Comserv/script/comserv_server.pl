@@ -314,11 +314,13 @@ my ($use_twiggy, @argv_without_twiggy) = _strip_twiggy_flag(@ARGV);
 # =========================================================================
 
 sub _start_health_evaluator {
+    my ($guard_port) = @_;
     my $pid = fork();
     return unless defined $pid;   # fork failed - skip silently
 
     if ($pid == 0) {
         # --- child process ---
+        $ENV{COMSERV_GUARD_PORT} = $guard_port if defined $guard_port;
         eval {
             require Comserv::Util::HealthLogger;
             require Comserv::Model::RemoteDB;
@@ -404,6 +406,7 @@ sub _start_health_evaluator {
                         require Comserv::Util::AI::HermesOverrunGuard;
                         Comserv::Util::AI::HermesOverrunGuard->new(
                             app_root => ($ENV{CATALYST_HOME} // "$FindBin::Bin/.."),
+                            port     => $guard_port,
                         )->run;
                     };
 
@@ -643,7 +646,9 @@ my $_is_dev_worktree =
     ($FindBin::Bin =~ m{PycharmProjects}) ||
     ($FindBin::Bin =~ m{comserv2});
 
-_start_health_evaluator() unless ($ENV{DISABLE_HEALTH_MONITOR} // '') eq '1' || $_is_dev_worktree;
+# Oct 29 2026 (Shanta, fix B): the forked health evaluator's overrun guard names the port it serves ([:4005 planning]).
+# The port comes from this server's -p only (set in the child; an inherited COMSERV_GUARD_PORT never wins).
+_start_health_evaluator((_parse_port_and_reload(@ARGV))[0]) unless ($ENV{DISABLE_HEALTH_MONITOR} // '') eq '1' || $_is_dev_worktree;
 
 if ($use_twiggy) {
     my ($port, $reload) = _parse_port_and_reload(@ARGV);
@@ -670,6 +675,24 @@ if ($use_twiggy) {
 if ( grep { $_ eq '-r' || $_ eq '--restart' } @ARGV ) {
     unless ( grep { /--?restart_directory/ } @ARGV ) {
         push @ARGV, '--restart_directory', 'lib';
+    }
+    # max_user_instances (128) is shared by every -r server plus the desktop.
+    # Linux::Inotify2->new then dies "Too many open files" and the server
+    # never binds. Poll lib/ instead so -r still starts.
+    my $ino = eval { require Linux::Inotify2; Linux::Inotify2->new };
+    if ($ino) {
+        undef $ino;
+    }
+    else {
+        my $err = $! || $@ || 'unknown';
+        print STDERR "[restart] inotify unavailable ($err) — polling lib/ for changes\n";
+        require File::ChangeNotify;
+        require File::ChangeNotify::Watcher::Default;
+        no warnings 'redefine';
+        *File::ChangeNotify::instantiate_watcher = sub {
+            shift;
+            return File::ChangeNotify::Watcher::Default->new(@_);
+        };
     }
 }
 

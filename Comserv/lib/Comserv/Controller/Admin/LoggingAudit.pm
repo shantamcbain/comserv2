@@ -1,4 +1,5 @@
 package Comserv::Controller::Admin::LoggingAudit;
+use Comserv::Util::HealthPrimary;
 
 use Moose;
 use namespace::autoclean;
@@ -59,6 +60,7 @@ sub run :Path('/admin/logging_audit/run') :Args(0) {
         $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid token' }));
         return;
     }
+    return if Comserv::Util::HealthPrimary->skip_response($c, 'logging_audit.run');
 
     my $summary = eval { Comserv::Util::LoggingAudit->new->run_scan($c) };
     if ($@) {

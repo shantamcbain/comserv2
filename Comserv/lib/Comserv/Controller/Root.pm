@@ -10,6 +10,7 @@ use FindBin '$Bin';
 use Time::HiRes qw(gettimeofday);
 
 use Comserv::Util::Logging;
+use Comserv::Util::RequestTrace;
 
 # Cache-buster epoch for asset URLs (?v=...): set once per server start so
 # browsers refetch CSS/JS after every restart/deploy (see Root::auto).
@@ -507,6 +508,16 @@ sub auto :Private {
         $c->stash->{user_id} = $user_id;
         $c->stash->{user_roles} = $user_roles;
         $c->stash->{is_admin} = $is_admin;
+        # Global admin by the STORED users.roles (session roles include site roles
+        # merged at login). Used for links to global-only pages such as
+        # /admin/role_permissions. One PK lookup, only for admins.
+        $c->stash->{is_global_admin} = 0;
+        if ($is_admin && $user_id) {
+            $c->stash->{is_global_admin} = eval {
+                require Comserv::Util::AccessCheck;
+                Comserv::Util::AccessCheck->is_global_admin($c->model('DBEncy'), $user_id)
+            } ? 1 : 0;
+        }
 
         # Durable CSC-admin capability flag for the site switcher.
         # AdminAuth->is_csc_admin() returns false once a CSC admin has *switched*
@@ -976,12 +987,15 @@ sub auto :Private {
                     };
                     if ($sp && $sp->{ok}) {
                         my @caps;
-                        push @caps, sprintf('day $%.2f/%s',
-                            $sp->{day}, '$1.65')   if ($sp->{day}   || 0) >= 1.65;
-                        push @caps, sprintf('week $%.2f/%s',
-                            $sp->{week}, '$11.50')  if ($sp->{week}  || 0) >= 11.50;
-                        push @caps, sprintf('month $%.2f/%s',
-                            $sp->{month}, '$50')    if ($sp->{month} || 0) >= 50;
+                        # Oct 30 2026: caps from the ONE shared file (~/.comserv/ai_caps.json), repo json fallback, never hard-coded.
+                        require Comserv::Util::AI::ModelChains;
+                        my $cap = Comserv::Util::AI::ModelChains->channel_caps(
+                            scalar eval { Comserv::Util::AI::ModelChains->load($c) }, 'openrouter',
+                            logger => sub { $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', $_[1]) });
+                        for my $w (qw(day week month)) {
+                            push @caps, sprintf('%s $%.2f/$%.2f', $w, $sp->{$w} || 0, $cap->{$w})
+                                if ($sp->{$w} || 0) >= $cap->{$w};
+                        }
                         if (@caps) {
                             $locked = 1;
                             $notice = 'OpenRouter spend cap reached — '
@@ -1407,12 +1421,27 @@ sub auto :Private {
 sub health :Path('/health') :Args(0) {
     my ($self, $c) = @_;
     
-    # Lightweight liveness check — no DB query, no session, no logging.
-    # Purpose: tell Docker the web process is alive and accepting connections.
-    # DB health is monitored separately by ContainerHealthMonitor.pl.
+    # Readiness check used by Docker HEALTHCHECK and HAProxy. No session, no
+    # logging. 200 only when the real DB (MariaDB/MySQL, not the SQLite
+    # fallback) answers and the core tables exist; otherwise 503 so HAProxy
+    # stops routing here (Oct 31 2026: production1 served 500s from an empty
+    # SQLite DB while /health said ok). Result cached per worker for
+    # <DBReadiness> health_cache_s seconds (default 5), so it stays cheap.
+    require Comserv::Util::DbReadiness;
+    my $s   = Comserv::Util::DbReadiness->settings($c->config);
+    my $dbh = eval { $c->model('DBEncy')->schema->storage->dbh };
+    my $r   = Comserv::Util::DbReadiness->check($dbh,
+        cache_s => $s->{health_cache_s}, tables => $s->{core_tables});
     $c->response->content_type('application/json');
-    $c->response->status(200);
-    $c->response->body('{"status":"ok"}');
+    $c->response->header('Cache-Control' => 'no-store');
+    if ($r->{ok}) {
+        $c->response->status(200);
+        $c->response->body('{"status":"ok","db":"ok"}');
+    } else {
+        (my $why = $r->{error} // 'db not ready') =~ s/["\\\x00-\x1f]/ /g;
+        $c->response->status(503);
+        $c->response->body(qq({"status":"unavailable","db":"$why"}));
+    }
     $c->detach;
     return;
 }
@@ -2358,6 +2387,17 @@ sub setup_site {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', 'Completed site setup');
 }
 
+# is_local_host($host): same rule as the PSGI wrapper (Comserv::Util::PortlessHost): IP literal, localhost, single-label,
+# dev.*, *.local/.lan/.internal/.test/... keep their port; public domains do not.
+sub is_local_host { require Comserv::Util::PortlessHost; return Comserv::Util::PortlessHost::is_port_exempt_host($_[0]) }
+# host_with_port($host, $port): "host:port" for local addresses (non-80/443), plain "host" for public domains.
+sub host_with_port {
+    my ($h, $port) = @_;
+    $h //= '';
+    return $h unless $port && $port != 80 && $port != 443;
+    return is_local_host($h) ? "$h:$port" : $h;
+}
+
 sub site_setup {
     my ($self, $c, $SiteName) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "SiteName (input): '" . (defined $SiteName ? $SiteName : 'UNDEF') . "'");
@@ -2366,13 +2406,13 @@ sub site_setup {
     # Get the current domain for HostName
     my $domain = $c->req->uri->host;
     my $port = $c->req->uri->port;
-    my $host_port = $domain;
-    if ($port && $port != 80 && $port != 443) {
-        $host_port .= ":$port";
-    }
+    # Oct 30 2026 (Shanta): a real domain never carries the dev port (https://computersystemconsulting.ca:4006/... breaks
+    # behind Cloudflare); a local address (IP, localhost, *.local, single-label host) keeps it or it will not connect.
+    my $host_port = host_with_port($domain, $port);
 
     # Set a default HostName based on the current domain
-    my $protocol = $c->req->secure ? 'https' : 'http';
+    my $fwd_proto = lc($c->req->header('X-Forwarded-Proto') // '');
+    my $protocol = ($c->req->secure || ($fwd_proto eq 'https' && !is_local_host($domain))) ? 'https' : 'http';
     my $default_hostname = "$protocol://$host_port";
     $c->stash->{HostName} = $default_hostname;
     $c->session->{Domain} = $domain;
@@ -2986,6 +3026,22 @@ sub label_favicon :Path('/favicon/label') :Args(1) {
 
 sub end : ActionClass('RenderView') {
     my ($self, $c) = @_;
+
+    # #2618: one low-noise line per login/admin request (Host seen, backend, pid, status).
+    eval { Comserv::Util::RequestTrace->log_request($c, $self->logging) };
+
+    # Login-return: a protected page that bounced a GET to /user/login without
+    # return_to/destination → remember where the user was going.
+    eval {
+        my $loc = $c->res->location // '';
+        if ($loc =~ m{/user/login(?:\?|$)} && $loc !~ /[?&](?:return_to|destination)=/
+            && uc($c->req->method || 'GET') eq 'GET' && !$c->session->{username}) {
+            my $u = $c->controller('User');
+            my $p = $u && $u->can('_safe_return_path')
+                ? $u->_safe_return_path($c, $c->req->uri->path_query) : '';
+            $c->session->{login_return_path} = $p if $p;
+        }
+    };
 
     # Intercept unhandled Catalyst errors and render a friendly error page —
     # but only in production (CATALYST_DEBUG=0). In debug mode, let Catalyst

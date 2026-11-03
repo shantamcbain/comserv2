@@ -91,6 +91,31 @@ sub discover :Path('/3d/printer_lan/discover') :Args(0) {
             "farm lookup: $@");
     }
 
+    # The 0.15s sweep misses a Kobra that is slow to accept. Probe each farm
+    # row's stored address so Discover still lists a printer we already know.
+    my %seen_ip = map { ($_->{ip} || '') => 1 } @{ $printers || [] };
+    for my $row (@farm) {
+        my $host = _lan_host_from_notes(eval { $row->notes } || '');
+        next unless $host && !$seen_ip{$host};
+        my $info = eval { $adapter->fetch_info($c, $host, 18910, 4) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'discover',
+                "stored host probe $host: $@");
+            next;
+        }
+        next unless $info && $info->{ok};
+        push @$printers, {
+            ip     => $info->{host},
+            port   => 18910,
+            model  => $info->{model_name} || 'Kobra',
+            status => 'online',
+            http   => $info->{http_status} || 200,
+        };
+        $seen_ip{$host} = 1;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'discover',
+            "stored host $host answered; sweep had missed it");
+    }
+
     if (($c->req->params->{format} || '') eq 'json' || ($c->req->header('Accept') || '') =~ /json/) {
         $c->res->content_type('application/json');
         $c->res->body(encode_json({ success => 1, subnet => $subnet, printers => $printers }));

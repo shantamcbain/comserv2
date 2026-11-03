@@ -6,8 +6,8 @@
    category = "git,ai-systems,security,development-plan"
    project_id   = "238"
    project_code = "GITWT-NEW"
-   page_version = "0.3"
-   last_updated = "Wed Aug 13 2026"
+   page_version = "0.4"
+   last_updated = "Mon Nov 02 2026"
    site_specific = "false"
 %]
 
@@ -90,9 +90,36 @@
                 <tr><td class="doc-td">Test in worktree</td><td class="doc-td">✅ test_gate.sh + per-branch port</td><td class="doc-td">not yet a required pre-merge step</td></tr>
                 <tr><td class="doc-td">Main sees worktree branch</td><td class="doc-td">✅ shared .git — branch IS visible</td><td class="doc-td">no UI to pick/inspect it</td></tr>
                 <tr><td class="doc-td">Contextual diff review</td><td class="doc-td">partial (suggest_message reads diff)</td><td class="doc-td">no shared per-file view/edit/stage UI (see &sect;3.5)</td></tr>
-                <tr><td class="doc-td">Merge worktree &rarr; main</td><td class="doc-td">❌ not in app</td><td class="doc-td"><code>merge</code> not in Util::Git whitelist</td></tr>
+                <tr><td class="doc-td">Merge worktree &rarr; main</td><td class="doc-td">✅ <code>POST /admin/git/merge</code> and <code>merge</code> is allow-listed</td><td class="doc-td">human approve gate (&sect;3.6) still open</td></tr>
                 <tr><td class="doc-td">Push main &rarr; GitHub</td><td class="doc-td">✅ push exists (deploy.sh pushes currently disabled)</td><td class="doc-td">wire as explicit human action</td></tr>
             </table>
+            <p class="doc-body"><strong>2026-10-28 session.</strong> <code>/admin/git_pull</code> on main failed.
+            <code>git pull origin main</code> exited 128 because local <code>main</code> and <code>origin/main</code>
+            had diverged and <code>pull.rebase</code> is unset. The page showed only &quot;Git pull failed&quot; because
+            <code>Util::Git::pull</code> keeps stdout and drops stderr. The remote tip was the git-dev line; it had
+            not erased local commits. Those histories were merged and pushed (<code>0897bc94a</code>). SQLite
+            <code>.db-shm</code> / <code>.db-wal</code> and <code>ai_rank_jobs/git.json</code> were untracked.
+            The pull command itself was not changed. Next: show stderr, and do not guess a merge when the branches
+            have diverged. Todos #1991, #1992, and #1993 stay in progress.</p>
+            <p class="doc-body"><strong>2026-11-02 session — main merged into <code>aisystem</code> (<code>3cd825463</code>).</strong>
+            The halted merge had exactly one real conflict, in runtime trial state:
+            <code>data/ai_trials/gpt_56_luna.state.json</code>. Resolution kept the <code>aisystem</code> side
+            (<code>tasks_done 10</code>, <code>stopped</code> at the probation limit, <code>last_checked_at 1793637921</code>)
+            because these files are append-only snapshots that <code>script/ai_trial.pl</code> rewrites; <code>main</code>'s
+            copy was the older <code>tasks_done 6</code> snapshot. A second defect came in <em>tracked</em> on
+            <code>main</code>: <code>data/ai_trials/kimi_k27_code.state.json</code> contained
+            <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt; Stashed changes</code> markers baked into the JSON from an earlier stash pop.
+            Both sides' payloads were byte-identical, so the clean copy was restored instead of committing invalid JSON.
+            The same merge also stripped committed conflict markers out of <code>Controller/Api.pm</code> (the
+            <code>recurrence_rule</code> / <code>creator_timezone</code> column list survived intact).
+            Note for the next merge: <code>.gitignore</code> now excludes <code>Comserv/data/ai_trials/</code> but the three
+            state files are still tracked, so <code>git add</code> on them needs <code>-f</code> — the dashboard now passes it
+            itself (<code>ALLOWED_FLAGS{add}</code> in <code>Util::Git</code> plus both staging sites in
+            <code>Admin/Git.pm</code>), because without it the dashboard Commit died with
+            &quot;Stage-before-commit failed: paths are ignored&quot;. Untracking them is a separate decision. <strong>Next:</strong> <code>merge_abort</code> logs only <code>success=N</code>
+            (<code>Admin/Git.pm</code>), which is why the audit row for the 2026-10-31 abort carries no cause — log
+            <code>error_msg</code> and the target with it. Verified: <code>perl -c</code> clean on the four touched modules,
+            <code>t/controller_Admin_Git.t</code> 4/4, all three state files parse as JSON.</p>
             <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
         </div>
     </div>
@@ -232,8 +259,8 @@
             <ul class="doc-body">
                 <li><strong>Full plan:</strong> <a href="/Documentation/plans/2026-08-17-git-dashboard-merge-ui" class="doc-link">2026-08-17 Git Dashboard Merge UI plan</a> (&sect;7.1 backlog: first-class "Rename branch" control).</li>
                 <li><strong>Changelog:</strong> <a href="/Documentation/changelog/2026-08-17-git-dashboard-merge-ui" class="doc-link">2026-08-17 — Git Dashboard: Merge UI (Shipped)</a>.</li>
-                <li><strong>Backend:</strong> <code>Controller::Admin::Git::merge</code> (POST /admin/git/merge, admin-gated <code>git_merge</code>) + <code>merge_abort</code>; <code>Util::Git::worktree_checkout_path_for_branch</code> hardened to resolve a branch's worktree by actual branch (the <code>git</code>&rarr;<code>git-dev</code> rename left stale <code>git worktree list</code> metadata).</li>
-                <li><strong>Key design decision (as built):</strong> the main&rarr;branch merge runs <em>inside the branch's own worktree checkout</em> (a worktree branch is already checked out, so it cannot be switched in the main repo), and merges the <strong>local <code>main</code></strong> ref (not <code>origin/main</code> — origin is stale when local main has unpushed commits).</li>
+                <li><strong>Backend:</strong> <code>Controller::Admin::Git::merge</code> (POST /admin/git/merge, admin-gated <code>git_merge</code>) + <code>merge_abort</code>; <code>Util::Git::worktree_checkout_path_for_branch</code> hardened to resolve a branch's worktree by actual branch (the <code>git</code>&rarr;<code>git-dev</code> rename left stale <code>git worktree list</code> metadata). Merge entry points now share <code>merge_target_state</code> preflight and refuse an active <code>MERGE_HEAD</code> or unmerged index before invoking a second merge.</li>
+                <li><strong>Key design decision (as built):</strong> the main&rarr;branch merge runs <em>inside the branch's own worktree checkout</em> (a worktree branch is already checked out, so it cannot be switched in the main repo), merges the <strong>local <code>main</code></strong> ref (not <code>origin/main</code> — origin is stale when local main has unpushed commits), and uses guarded <code>--autostash</code> handling for WIP. Merge Abort is idempotent when no merge is active and preserves stderr for real failures.</li>
                 <li><strong>Linked project:</strong> <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a>.</li>
             </ul>
             <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>

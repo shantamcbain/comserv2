@@ -1,7 +1,7 @@
 # Documentation Maintenance Plan — Comserv2
 
 Owned by: the Documentation expert (`.hermes.md` role).
-Status: active. Last refreshed: 2026-10-05 (aisystem: fixed /ai/usage TT parse errors).
+Status: active. Last refreshed: 2026-10-27 (Proxmox: pool summary graphs; session stopped, not done).
 
 Purpose: keep every documentation surface accurate, consistent, and in sync with the
 code — and to give a repeatable process so the docs don't drift again.
@@ -112,6 +112,12 @@ reader" discipline.
   - Changelog fragment `2026-10-05-fix-usage-monitor-templates.inc`.
   - Verified `/ai/usage` now returns 200; followed comserv2-session-doc-sync.
 
+- 2026-11-01: Git merge-state audit cleanup (main worktree).
+  - Added merge-target preflight for active `MERGE_HEAD` and unmerged index entries; routed main→worktree merges through the shared guarded service path.
+  - Made Merge Abort idempotent and preserved stderr for real failures; closed audit todos #2521, #2537, and #2643 after compile/test verification.
+  - Changelog fragment `2026-11-01-git-merge-state-preflight.inc`; handoff `.hermes/plans/2026-11-01-git-audit-root-cause-fixes.md`.
+  - No commit or server restart performed; propagation to other branch worktrees remains Next.
+
 ---
 
 ## 4. Backlog (prioritized)
@@ -156,3 +162,9 @@ branch. P3 needs a quick owner sign-off.
 - No controller/model change is undocumented (sync hook green).
 - No dead path/reference in the top-level docs.
 - This plan's audit section is no more than one week stale.
+
+---
+
+## 7. Recent session — Proxmox pool summary (2026-10-27)
+
+`/proxmox` on :4016 now lists each configured server as a card and, under Summary, draws one history chart per node metric. Each chart uses the page width, labels the value axis and the time axis for the selected Hour/Day/Week/Month/Year window, and shows a color key for each signed-in server. Only servers with a stored API token get a line. ProxmoxDevelopment and workstation still have no token. Handoff: `.hermes/plans/proxmox-pool-summary-graphs.md`. Tracking row is under project #79; left In Progress, clock stopped.

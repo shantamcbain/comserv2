@@ -22,6 +22,7 @@ use lib $ENV{CATALYST_HOME} ? "$ENV{CATALYST_HOME}/lib" : "$FindBin::Bin/../lib"
 use lib $ENV{CATALYST_HOME} ? $ENV{CATALYST_HOME} : "$FindBin::Bin/..";
 
 use Comserv;
+use Comserv::Util::PortlessHost;
 use Plack::Builder;
 
 # Survives plackup -R restarts: marks Twiggy mode for WebSocket terminal detection.
@@ -72,6 +73,14 @@ sub _comserv_peer_trusted {
 my $wrapped = builder {
     enable_if { _comserv_peer_trusted($_[0]->{REMOTE_ADDR}) } 'ReverseProxy';
 
+    # Public hostnames never carry a port (balancer does not accept one). Catalyst appends
+    # SERVER_PORT (:5000) to generated URLs when Host has none; normalise after ReverseProxy.
+    # dev.* / IP / localhost / *.local keep their port. COMSERV_PORTLESS_HOST=0 disables.
+    enable sub {
+        my $inner = shift;
+        sub { Comserv::Util::PortlessHost::normalize_env($_[0]); $inner->($_[0]) };
+    };
+
     # Static file serving for the navigation/menu bar (CSS/JS) + general assets
     # This must come BEFORE the main app so static requests are handled first
     enable 'Plack::Middleware::Static',
@@ -80,4 +89,22 @@ my $wrapped = builder {
 
     $app;
 };
+# Fork-safety for Starman workers (Oct 2026: retired workers stuck at 50-68%
+# CPU for days, holding the listen socket, while the master spawned
+# replacements -> 21/15 "starman worker" processes against --workers 8).
+# A worker that leaves after --max-requests runs END blocks and global
+# destruction, including DBI->disconnect_all over handles it shares with
+# siblings/the master (the app is preloaded); that is where they spin or
+# segfault in DBD::mysql. Leave workers via POSIX::_exit after flushing
+# output. This END is compiled after DBI's, so it runs first. The master
+# ("starman master") and non-Starman runs are unaffected.
+END {
+    if (($0 // '') =~ /^starman worker/) {
+        my $rc = $?;
+        eval { require IO::Handle; STDOUT->flush; STDERR->flush; 1 };
+        require POSIX;
+        POSIX::_exit($rc);
+    }
+}
+
 return $wrapped;
