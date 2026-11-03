@@ -890,7 +890,7 @@
             var body = new URLSearchParams();
             body.set('mode', mode); body.set('csrf', csrf);
             if (inc3 && inc3.checked) { body.set('include_4003', '1'); }
-            summary.textContent = mode === 'update' ? 'Updating...' : 'Previewing...';
+            if (summary) { summary.textContent = mode === 'update' ? 'Updating...' : 'Previewing...'; }
             Array.prototype.forEach.call(buttons, function (b) { b.disabled = true; });
             fetch(url, { method: 'POST', credentials: 'same-origin', body: body,
                          headers: { 'Content-Type': 'application/x-www-form-urlencoded',
@@ -906,14 +906,28 @@
                     return r.json();
                 })
                 .then(render)
-                .catch(function (e) { summary.textContent = 'Request failed: ' + e; })
+                .catch(function (e) { if (summary) { summary.textContent = 'Request failed: ' + e; } })
                 .then(function () { Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; }); });
     }
-    if (form) {
+    // Only take over the submit when the JS path can actually finish. Any doubt,
+    // any throw: fall back to the browser's native POST so the click is never lost.
+    // (Shanta 2026-11-03: a preventDefault() followed by a throw left the buttons
+    // disabled and the card dead — no request, no message, nothing.)
+    function reEnable() {
+        Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; });
+    }
+    if (form && url && summary && window.fetch) {
         form.addEventListener('submit', function (ev) {
-            ev.preventDefault();
             var st = ev.submitter;
-            run((st && st.value) ? st.value : 'preview');
+            var mode = (st && st.value) ? st.value : 'preview';
+            ev.preventDefault();
+            try {
+                run(mode);
+            } catch (e) {
+                reEnable();
+                if (summary) { summary.textContent = 'Script error, posting the form directly: ' + e; }
+                if (form.submit) { form.submit(); }
+            }
         });
     } else {
         Array.prototype.forEach.call(buttons, function (btn) {
