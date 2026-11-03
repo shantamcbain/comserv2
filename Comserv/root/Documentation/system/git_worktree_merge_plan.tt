@@ -6,8 +6,8 @@
    category = "git,ai-systems,security,development-plan"
    project_id   = "238"
    project_code = "GITWT-NEW"
-   page_version = "0.3"
-   last_updated = "Wed Oct 28 2026"
+   page_version = "0.4"
+   last_updated = "Mon Nov 02 2026"
    site_specific = "false"
 %]
 
@@ -101,6 +101,25 @@
             <code>.db-shm</code> / <code>.db-wal</code> and <code>ai_rank_jobs/git.json</code> were untracked.
             The pull command itself was not changed. Next: show stderr, and do not guess a merge when the branches
             have diverged. Todos #1991, #1992, and #1993 stay in progress.</p>
+            <p class="doc-body"><strong>2026-11-02 session — main merged into <code>aisystem</code> (<code>3cd825463</code>).</strong>
+            The halted merge had exactly one real conflict, in runtime trial state:
+            <code>data/ai_trials/gpt_56_luna.state.json</code>. Resolution kept the <code>aisystem</code> side
+            (<code>tasks_done 10</code>, <code>stopped</code> at the probation limit, <code>last_checked_at 1793637921</code>)
+            because these files are append-only snapshots that <code>script/ai_trial.pl</code> rewrites; <code>main</code>'s
+            copy was the older <code>tasks_done 6</code> snapshot. A second defect came in <em>tracked</em> on
+            <code>main</code>: <code>data/ai_trials/kimi_k27_code.state.json</code> contained
+            <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt; Stashed changes</code> markers baked into the JSON from an earlier stash pop.
+            Both sides' payloads were byte-identical, so the clean copy was restored instead of committing invalid JSON.
+            The same merge also stripped committed conflict markers out of <code>Controller/Api.pm</code> (the
+            <code>recurrence_rule</code> / <code>creator_timezone</code> column list survived intact).
+            Note for the next merge: <code>.gitignore</code> now excludes <code>Comserv/data/ai_trials/</code> but the three
+            state files are still tracked, so <code>git add</code> on them needs <code>-f</code> — the dashboard now passes it
+            itself (<code>ALLOWED_FLAGS{add}</code> in <code>Util::Git</code> plus both staging sites in
+            <code>Admin/Git.pm</code>), because without it the dashboard Commit died with
+            &quot;Stage-before-commit failed: paths are ignored&quot;. Untracking them is a separate decision. <strong>Next:</strong> <code>merge_abort</code> logs only <code>success=N</code>
+            (<code>Admin/Git.pm</code>), which is why the audit row for the 2026-10-31 abort carries no cause — log
+            <code>error_msg</code> and the target with it. Verified: <code>perl -c</code> clean on the four touched modules,
+            <code>t/controller_Admin_Git.t</code> 4/4, all three state files parse as JSON.</p>
             <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
         </div>
     </div>

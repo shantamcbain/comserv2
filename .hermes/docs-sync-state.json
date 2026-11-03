@@ -1,9 +1,9 @@
 {
-  "branch": "git-dev",
-  "head_sha": "62d8d08dc",
-  "date": "2026-11-01",
-  "last_doc_commit": "4c2ed59cb",
-  "changelog_entry": "Comserv/root/Documentation/changelog/entries/2026-11-01-git-external-repo-hermes.inc",
-  "todos_touched": [],
-  "note": "Registered OpenBafangTool as an external git target and made the Develop Servers Hermes button open :9120. Working tree only; not committed. Unrelated open clocks 2311, 2469, 2595 were left running. Main Hermes dashboard :9119 was already on main."
+  "branch": "aisystem",
+  "head_sha": "3cd825463",
+  "date": "2026-11-02",
+  "last_doc_commit": "c0d77cc13",
+  "changelog_entry": "Comserv/root/Documentation/changelog/entries/2026-11-02-aisystem-merge-trial-state.inc",
+  "todos_touched": [2645, 2647, 2648],
+  "note": "Completed the halted main->aisystem merge (3cd825463): gpt_56_luna trial-state conflict resolved to the newer aisystem snapshot, committed stash-conflict markers stripped out of kimi_k27_code.state.json. Docs written but NOT committed: Documentation/system/git_worktree_merge_plan.tt (v0.4), Documentation/AISYSTEMPlan.tt (v1.06, new trials/probation/overrun-guard section), changelog 2026-11-02-aisystem-merge-trial-state.inc. Todo 2645 closed as In Progress (2) because Admin/Git.pm merge_abort still logs success=N without error_msg; 2647 and 2648 done. Open clocks 2311, 2469, 2595, 2644 belong to other threads and were left running. .hermes/models.md resolved: two committed conflict blocks removed (kept the 2026-09-08 probe notes, fallback order row now reflects @HERMES_CHAIN_DEFAULT, opencode-free references dropped from the coder row and the config sketch)."
 }

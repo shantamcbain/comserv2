@@ -309,7 +309,10 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     my $msg = '';
 
     if ($op eq 'stage') {
-        my ($out, $code) = $self->_git_list($c, 'add', '--', @{ $validated->{valid} });
+        # -f: a tracked path can be matched by a .gitignore added later (e.g.
+        # data/ai_trials/), and plain `git add` refuses it. Paths are already
+        # validated against git status --porcelain, so -f adds no new exposure.
+        my ($out, $code) = $self->_git_list($c, 'add', '-f', '--', @{ $validated->{valid} });
         $ok = ($code == 0);
         $msg = $ok ? "Staged " . scalar(@{ $validated->{valid} }) . " file(s)." : "Stage failed: $out";
     }
@@ -350,7 +353,10 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
                 }
                 my @to_add = grep { $stage_needed{$_} } @{ $validated->{valid} };
                 if (@to_add) {
-                    my ($aout, $acode) = $self->_git_list($c, 'add', '--', @to_add);
+                    # -f: without it, a tracked file that a LATER .gitignore rule now
+                    # matches (Comserv/data/ai_trials/) fails with "paths are ignored"
+                    # and the whole commit aborts. See ALLOWED_FLAGS{add} in Util::Git.
+                    my ($aout, $acode) = $self->_git_list($c, 'add', '-f', '--', @to_add);
                     if ($acode != 0) {
                         $msg = "Stage-before-commit failed: $aout";
                         goto COMMIT_DONE;
