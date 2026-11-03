@@ -1176,7 +1176,11 @@ sub thrash_by_class {
         next unless defined $c->{t} && $c->{t} > $since && $c->{t} <= $now;
         # Oct 26 2026: an ACTIVE approved trial model (see trial_exclusions; stopped trials count again) is not thrash
         next if $self->{trial_models} && $self->{trial_models}{ $c->{model} // '' };
-        my $cl = classify_call($c);
+        # Nov 3 2026 (Shanta, eval report 65 #2): a model with its own limit in ~/.comserv/ai_caps.json
+        # thrash_per_15min_by_model (e.g. particle-ai/particle-1 => 60) is counted on its own, not in its class.
+        my $bym = model_thrash_limits();
+        my $mid = bare_model_id($c->{model} // '');
+        my $cl = exists $bym->{$mid} ? "model:$mid" : classify_call($c);
         $counts{$cl}++;
         $total++;
     }
@@ -1185,9 +1189,27 @@ sub thrash_by_class {
 
 # optional override: $hermes_home/overrun_guard_limits.json { "thrash_per_15min": { "supergrok":150, ... } }
 # merges over defaults; bad json -> defaults + log_line
+# pure-ish: per-model 15-min call limits from the shared caps file (thrash_per_15min_by_model). Keys are bare ids
+# (no openrouter/ prefix); only numbers > 0 count. Missing file or key -> {} (every model uses its class limit).
+sub model_thrash_limits {
+    my ($caps) = @_;
+    unless ($caps) { require Comserv::Util::AI::ModelChains; $caps = eval { Comserv::Util::AI::ModelChains->shared_caps } }
+    my $h = ref $caps eq 'HASH' ? $caps->{thrash_per_15min_by_model} : undef;
+    return {} unless ref $h eq 'HASH';
+    my %o;
+    for my $m (keys %$h) {
+        next if $m =~ /^_/;
+        my $v = $h->{$m};
+        $o{ bare_model_id($m) } = $v + 0 if defined $v && !ref $v && $v =~ /^\d+(?:\.\d+)?$/ && $v > 0;
+    }
+    return \%o;
+}
+
 sub thrash_limits {
     my ($self) = @_;
     my %lims = %THRASH_LIMITS;
+    my $bym = model_thrash_limits();
+    $lims{"model:$_"} = $bym->{$_} for keys %$bym;
     my $f = "$self->{hermes_home}/overrun_guard_limits.json";
     if (-f $f) {
         my $ok = eval {
