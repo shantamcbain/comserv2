@@ -11,7 +11,7 @@
 
 [%# Absolute-URL building for branch links (RELATIVE-URL TRAP: a relative path
     resolves against the current page origin, so the Open button would reopen
-    the SAME server instead of the branch's own port). Build the full URL. #]
+    the SAME server instead of the branch's own port). Build the full URL. %]
 [% SET scheme = c.req.uri.scheme %]
 [% SET host = c.req.uri.host %]
 
@@ -337,28 +337,29 @@
 
             [%# ====== Update all branches from main (Oct 31 2026, Shanta) ====== %]
             [%# Admin-only POST + CSRF to /admin/git/update_all_from_main; driven by git-dashboard.js (data-git-update-all).
-               No stash, no force, no rebase. Proxmox/:4016 always skipped; :4003 only when the box is ticked. #]
+               No stash, no force, no rebase. Proxmox/:4016 always skipped; :4003 only when the box is ticked. %]
             <details class="git-collapse git-update-all">
                 <summary>Update all branches from main</summary>
-                <form class="git-collapse-body" method="post"
-                     action="[% c.uri_for('/admin/git/update_all_from_main') %]"
-                     data-git-update-all="1" data-git-update-all-form="1"
+                <div class="git-collapse-body" data-git-update-all="1"
                      data-update-all-url="[% c.uri_for('/admin/git/update_all_from_main') %]"
                      data-csrf="[% update_all_csrf | html %]">
-                    [%# Real form: a POST works even when JS is stale, cached or broken.
-                       git-dashboard.js intercepts submit and renders JSON in place; without
-                       JS the action redirects back here and the result renders below. #]
-                    <input type="hidden" name="csrf" value="[% update_all_csrf | html %]">
+                    [%# NOT a <form>: the Working Tree card above already opens a form and
+                       closes it at line ~331, so this card sits INSIDE it. A nested <form>
+                       is silently dropped by the HTML parser — the start tag vanishes and
+                       the buttons join the outer form, which is why Preview/Update did
+                       nothing when clicked. Links cannot be swallowed that way. %]
                     <p>Merges main into every registered worktree. A branch with uncommitted files is still merged when main
                        does not touch those files; otherwise git refuses and the row says so (nothing is stashed or forced).
                        A conflict is aborted and the branch is left as it was. Proxmox (:4016) is always skipped.
                        Dev servers started with <code>-r</code> restart on their own when their files change.</p>
                     <label><input type="checkbox" name="include_4003" value="1" data-update-all-4003="1"> Include :4003 (3d)</label>
                     <div class="git-actions">
-                        <button type="submit" name="mode" value="preview" class="admin-btn admin-btn-sm" data-update-all-mode="preview">
-                            <i class="fas fa-eye"></i> Preview</button>
-                        <button type="submit" name="mode" value="update" class="admin-btn admin-btn-sm admin-btn-primary" data-update-all-mode="update">
-                            <i class="fas fa-code-branch"></i> Update all from main</button>
+                        <a class="admin-btn admin-btn-sm" rel="nofollow" data-update-all-mode="preview"
+                           href="[% c.uri_for('/admin/git/update_all_from_main', { mode => 'preview', csrf => update_all_csrf }) %]">
+                            <i class="fas fa-eye"></i> Preview</a>
+                        <a class="admin-btn admin-btn-sm admin-btn-primary" rel="nofollow" data-update-all-mode="update"
+                           href="[% c.uri_for('/admin/git/update_all_from_main', { mode => 'update', csrf => update_all_csrf }) %]">
+                            <i class="fas fa-code-branch"></i> Update all from main</a>
                     </div>
                     <div data-update-all-summary="1" class="git-merge-status">[% update_all_result ? update_all_result.summary : '' %]</div>
                     <div class="git-merge-status" style="font-size:11px;opacity:.65">
@@ -389,13 +390,13 @@
                             <th>Before (undo point)</th><th>Files / reason</th><th>Auto-restart</th></tr></thead>
                         <tbody></tbody>
                     </table>
-                </form>
+                </div>
             </details>
 
             [%# ====== Develop Servers (zenflow worktree registry) ====== %]
             [%# Highlight uses current_worktree (from app_workflow = worktree dir key) to mark the active server row.
-               This matches b.name even when live git branch (current_branch) differs (e.g. feature branch in a named worktree slot). #]
-            [%# Single source of truth = stash.worktree_list (Comserv::Util::Git->build_worktree_list,\n               which reads root/config/worktrees.json). Mirrors the planning tab's "Branch Servers"\n               panel. Open/Stop/Restart buttons POST to /admin/branch_server_action (handled in\n               git-dashboard.js). No inline <script>. #]
+               This matches b.name even when live git branch (current_branch) differs (e.g. feature branch in a named worktree slot). %]
+            [%# Single source of truth = stash.worktree_list (Comserv::Util::Git->build_worktree_list,\n               which reads root/config/worktrees.json). Mirrors the planning tab's "Branch Servers"\n               panel. Open/Stop/Restart buttons POST to /admin/branch_server_action (handled in\n               git-dashboard.js). No inline <script>. %]
             [% IF worktree_list && worktree_list.size %]
             <details class="git-collapse git-dev-servers" open>
                 <summary>Develop Servers <span class="git-count">([% worktree_list.size %])</span></summary>
@@ -507,7 +508,7 @@
 
             [%# Live console modal for a branch server's startup log. Shown by the Open
                button (git-dashboard.js) so you can watch the server boot and read any
-               command-line errors. Markup only — JS + /admin/branch_server_log drive it. #]
+               command-line errors. Markup only — JS + /admin/branch_server_log drive it. %]
             <div id="git-dev-console" class="git-dev-console-overlay" style="display:none;">
                 <div class="git-dev-console">
                     <div class="git-dev-console-header">

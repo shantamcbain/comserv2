@@ -2393,7 +2393,7 @@ sub update_all_from_main :Path('/admin/git/update_all_from_main') :Args(0) {
         }));
         return;
     }
-    unless ($c->request->method eq 'POST') {
+    unless ($c->request->method =~ /^(?:POST|GET)$/) {
         $c->response->body(encode_json({ success => 0, error => 'POST required' }));
         return;
     }

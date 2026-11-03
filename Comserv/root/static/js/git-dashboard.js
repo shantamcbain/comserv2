@@ -858,11 +858,10 @@
     var tbody = table ? table.querySelector('tbody') : null;
     var inc3 = box.querySelector('[data-update-all-4003]');
     var buttons = box.querySelectorAll('[data-update-all-mode]');
-    // The card is a real <form>: without JS the browser posts it and the server
-    // renders the result. When JS runs we intercept the submit instead, so a
-    // stale/cached script can no longer make the buttons look dead.
-    var form = (box.tagName && box.tagName.toUpperCase() === 'FORM') ? box
-             : (box.closest ? box.closest('form') : null);
+    // No form here on purpose: the card sits inside the Working Tree form, and a
+    // nested <form> is dropped by the parser. Buttons are links, so a click always
+    // navigates; when this script runs we upgrade it to an AJAX POST in place.
+    var form = null;
 
     function cell(tr, text) { var td = document.createElement('td'); td.textContent = text == null ? '' : String(text); tr.appendChild(td); }
     function render(data) {
@@ -913,44 +912,32 @@
     // any throw: fall back to the browser's native POST so the click is never lost.
     // (Shanta 2026-11-03: a preventDefault() followed by a throw left the buttons
     // disabled and the card dead — no request, no message, nothing.)
-    function reEnable() {
-        Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; });
-    }
-    // Self-reporting: the card now shows whether its script is alive and bound.
-    // A dead handler used to be indistinguishable from "the click did nothing".
+    // Self-reporting: the card shows any uncaught script error inline.
     window.addEventListener('error', function (e) {
         if (!summary) { return; }
         summary.textContent = 'JS ERROR: ' + (e.message || 'unknown')
             + ' @ ' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || '?');
     });
-    if (summary && !summary.textContent) {
-        summary.textContent = 'JS ready — click Preview';
-    }
-    // Shanta 2026-11-03: the card was dead three times over because JS intercepted
-    // the submit. It no longer does. A click is a plain browser POST and the server
-    // redirects back with the result rendered; nothing in this file can stop it.
-    // AJAX in-place rendering is opt-in per card via data-update-all-ajax="1".
-    if (form && url && summary && window.fetch
-        && form.getAttribute('data-update-all-ajax') === '1') {
-        form.addEventListener('submit', function (ev) {
-            var st = ev.submitter;
-            var mode = (st && st.value) ? st.value : 'preview';
+    // Links always navigate — there is no form to be swallowed by the outer one.
+    // When this script runs we POST in place for a nicer result, and any failure
+    // falls back to the plain link so the action is never lost.
+    Array.prototype.forEach.call(buttons, function (btn) {
+        btn.addEventListener('click', function (ev) {
+            if (!url || !window.fetch) { return; }
+            var mode = btn.getAttribute('data-update-all-mode') || 'preview';
+            if (mode === 'update' && !window.confirm('Merge main into every registered branch now? Running -r dev servers will restart. Run Preview first if unsure.')) {
+                ev.preventDefault();
+                return;
+            }
             ev.preventDefault();
             try {
                 run(mode);
             } catch (e) {
-                reEnable();
-                if (form.submit) { form.submit(); }
+                if (btn.href) { window.location = btn.href; }
             }
         });
-    } else {
-        Array.prototype.forEach.call(buttons, function (btn) {
-            btn.addEventListener('click', function () {
-                if (summary) { summary.textContent = 'Submitting…'; }
-            });
-        });
-        if (summary && !summary.textContent) {
-            summary.textContent = 'Click Preview or Update — the form posts directly.';
-        }
+    });
+    if (summary && !summary.textContent) {
+        summary.textContent = 'Ready — click Preview.';
     }
 })();
