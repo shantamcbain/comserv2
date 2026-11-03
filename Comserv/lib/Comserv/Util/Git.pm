@@ -580,6 +580,17 @@ sub _run {
     my $abort_noop = ($subcmd eq 'merge')
         && (grep { defined $_ && $_ eq '--abort' } @argv)
         && $combined =~ /There is no merge to abort|MERGE_HEAD missing/i;
+    # `rev-parse --verify --quiet <ref>` is an EXISTENCE PROBE: "the ref is not
+    # there" is signalled by exit 1 with empty stdout AND empty stderr. Callers
+    # (get_available_branches, catch_up) already branch on that. Logging the
+    # answer "no" as ERROR spawned audit todo 2650 every time a worktree asked
+    # about an origin branch it had never fetched. An exit that carries a
+    # message (e.g. "fatal: not a git repository") still logs at error.
+    my $ref_probe_absent = ($subcmd eq 'rev-parse')
+        && (grep { defined $_ && $_ eq '--verify' } @argv)
+        && $code == 1
+        && (($result->{output} // '') =~ /^\s*$/)
+        && (($result->{error}  // '') =~ /^\s*$/);
     my $benign   = !$result->{success}
                 && ( $asks_upstream
                   || $checkout_collision
@@ -588,6 +599,7 @@ sub _run {
                   || $ff_only_refused
                   || $merge_conflict
                   || $abort_noop
+                  || $ref_probe_absent
                   || $combined =~ /no upstream configured|does not have an upstream|no such branch/i );
     my $level    = $result->{success}       ? 'info'
                  : $secret_guard_block      ? 'warn'
