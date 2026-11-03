@@ -705,9 +705,28 @@ sub daily :Path('/planning/daily') :Args {
             # Branch worktrees show ONLY this branch's todos (Shanta, Oct 24 2026).
             # Only main ranks every branch. ?filter_project=all is the escape hatch.
             my $before_branch = scalar @all_sorted;
+            # An ACTIVE todo (status 5, or a log that is still open) is somebody's
+            # current work: it must never disappear behind branch scope. Measured
+            # 2026-11-03: todo 2006 was running with an open log (id 2110) yet was
+            # invisible on /planning/daily served from the git worktree, because its
+            # project (3) is outside that branch's project scope. Keep a copy of the
+            # active rows and merge back any the branch filter would drop.
+            my @active_rows = grep {
+                (($_->{status} // '') eq '5') || $_->{in_progress}
+            } @all_sorted;
             @all_sorted = grep {
                 Comserv::Util::FocusRanking::todo_matches_branch($_, $cur_branch, \%branch_scope)
             } @all_sorted;
+            if (@active_rows) {
+                my %_have = map { ($_->{record_id} // 0) => 1 } @all_sorted;
+                my @_rescued = grep { !$_have{ $_->{record_id} // 0 } } @active_rows;
+                push @all_sorted, @_rescued if @_rescued;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                    'daily', 'Branch focus rescued ' . scalar(@_rescued)
+                    . ' active todo(s) outside branch scope: '
+                    . join(',', map { $_->{record_id} } @_rescued))
+                    if @_rescued;
+            }
             my $matched = scalar @all_sorted;
             my $hidden_other = $before_branch - $matched;
             $c->stash->{branch_focus_filter} = {
