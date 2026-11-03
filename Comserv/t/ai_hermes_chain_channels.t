@@ -13,8 +13,8 @@ my $SG_OK  = { mode => 'grok', remaining => 60, locked => 0, off_today => 0 };
 my $ld = $MC->load(undef, path => "$FindBin::Bin/../data/ai_model_chains.json", logger => sub {});
 is $ld->{source}, 'file', 'data file loads and validates';
 my @ch = $MC->hermes_chain($ld);
-is_deeply [ map { $_->{tier} } @ch ], [qw(supergrok paid paid free)], 'chain tiers: Super Grok, paid x.ai, paid luna, free';
-like $ch[1]{slug}, qr{^xai\|grok-4\.7}, 'step 2 is paid x.ai grok-4.7 (Oct 31 2026)'; like $ch[2]{slug}, qr{openai/gpt-5.6-luna}, 'step 3 is gpt-5.6-luna'; like $ch[-1]{slug}, qr/north-mini/, 'north-mini is LAST';
+is_deeply [ map { $_->{tier} } @ch ], [qw(supergrok paid paid paid free)], 'chain tiers: Super Grok, paid particle-1, paid x.ai, paid luna, free (Nov 2 2026)';
+like $ch[1]{slug}, qr{particle-ai/particle-1}, 'step 2 is paid particle-1 (probation, Nov 2 2026)'; like $ch[2]{slug}, qr{^xai\|grok-4\.7}, 'step 3 is paid x.ai grok-4.7'; like $ch[3]{slug}, qr{openai/gpt-5.6-luna}, 'step 4 is gpt-5.6-luna'; like $ch[-1]{slug}, qr/north-mini/, 'north-mini is LAST';
 {
     my %d = %{ $MC->perl_default };
     my ($ok, $e) = $MC->validate_structure({ %d, hermes_fallback_chain => ['openrouter|cohere/north-mini-code:free', 'openrouter|openai/gpt-5.6-luna'] });
@@ -43,9 +43,9 @@ is $G->can('pick_target')->(%base, chain => [ grep { $_->{provider} ne 'xai' } @
 # thrash trips never move to a paid model (money safety)
 isnt $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1, kind => 'thrash')->{default}, 'openai/gpt-5.6-luna', 'thrash trip does not pick a paid model';
 my @order = map { $_->{name} } $G->can('candidate_order')->('caps', undef, $SG_OFF, chain => \@CH, emergency => \@EM);
-is $order[0], 'xai-oauth/grok-4.7', 'order: Super Grok first'; is $order[1], 'xai/grok-4.7', 'order: paid x.ai second'; is $order[2], 'openrouter/openai/gpt-5.6-luna', 'order: paid luna third';
-is $order[3], 'openrouter/cohere/north-mini-code:free', 'order: north-mini fourth (last chain step)';
-ok((grep { $order[$_] =~ /gemma4|nemotron|qwen2\.5-coder/ } 4 .. $#order) == @order - 4, 'emergency tail follows north-mini');
+is $order[0], 'xai-oauth/grok-4.7', 'order: Super Grok first'; is $order[1], 'openrouter/particle-ai/particle-1', 'order: paid particle-1 second (Nov 2 2026)'; is $order[2], 'xai/grok-4.7', 'order: paid x.ai third'; is $order[3], 'openrouter/openai/gpt-5.6-luna', 'order: paid luna fourth';
+is $order[4], 'openrouter/cohere/north-mini-code:free', 'order: north-mini fifth (last chain step)';
+ok((grep { $order[$_] =~ /gemma4|nemotron|qwen2\.5-coder/ } 5 .. $#order) == @order - 5, 'emergency tail follows north-mini');
 # permanent fallback list
 my $fc = $G->can('fallback_chain')->(%base, supergrok => $SG_OK, paid_ok => 1);
 is_deeply [ map { "$_->{provider}/$_->{model}" } @$fc ],

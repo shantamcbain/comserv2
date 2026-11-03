@@ -63,7 +63,13 @@ my %ALLOWED_FLAGS = (
     pull     => { map { $_ => 1 } qw(--ff-only) },
     push     => { map { $_ => 1 } qw(--set-upstream -u --delete) },
     'ls-files' => { map { $_ => 1 } qw(--error-unmatch --others --exclude-standard) },
-    add      => {},
+    # -f is allowed for add ONLY because the dashboard stages paths it has already
+    # validated against `git status --porcelain`. A tracked file can become matched
+    # by a later .gitignore rule (e.g. data/ai_trials/*.state.json), and `git add`
+    # then refuses it with "paths are ignored ... use -f" even though it is tracked.
+    # Ignored UNTRACKED files never appear in porcelain, so -f cannot stage anything
+    # the operator did not see and tick.
+    add      => { map { $_ => 1 } qw(-f) },
     commit   => { map { $_ => 1 } qw(-m --amend) },
     stash    => { map { $_ => 1 } qw(push pop drop list -m) },
     checkout => { map { $_ => 1 } qw(-b) },
@@ -567,16 +573,44 @@ sub _run {
     my $ff_only_refused = ($subcmd eq 'merge')
         && (grep { defined $_ && $_ eq '--ff-only' } @argv)
         && $combined =~ /Not possible to fast-forward|unable to fast-forward/i;
+    # A merge CONFLICT is an expected, user-resolvable outcome. merge_branch()
+    # already classifies it (reason=conflict, conflict_files, fix_hint) and logs
+    # at 'warn'; _run double-logged the same command at ERROR, which spawned the
+    # git_run audit todos of 2026-10-31/11-01 (2646/2647) purely as noise.
+    # Keep 'warn' so the merge is still visible in the log, not an audit todo.
+    my $merge_conflict = ($subcmd eq 'merge')
+        && $combined =~ /CONFLICT|Automatic merge failed/i;
+    # `git merge --abort` exits 128 with "There is no merge to abort
+    # (MERGE_HEAD missing)" on some git versions when there is nothing to undo.
+    # merge_abort() is deliberately idempotent, so this is not a failure.
+    my $abort_noop = ($subcmd eq 'merge')
+        && (grep { defined $_ && $_ eq '--abort' } @argv)
+        && $combined =~ /There is no merge to abort|MERGE_HEAD missing/i;
+    # `rev-parse --verify --quiet <ref>` is an EXISTENCE PROBE: "the ref is not
+    # there" is signalled by exit 1 with empty stdout AND empty stderr. Callers
+    # (get_available_branches, catch_up) already branch on that. Logging the
+    # answer "no" as ERROR spawned audit todo 2650 every time a worktree asked
+    # about an origin branch it had never fetched. An exit that carries a
+    # message (e.g. "fatal: not a git repository") still logs at error.
+    my $ref_probe_absent = ($subcmd eq 'rev-parse')
+        && (grep { defined $_ && $_ eq '--verify' } @argv)
+        && $code == 1
+        && (($result->{output} // '') =~ /^\s*$/)
+        && (($result->{error}  // '') =~ /^\s*$/);
     my $benign   = !$result->{success}
                 && ( $asks_upstream
                   || $checkout_collision
                   || $show_current_empty
                   || $secret_guard_block
                   || $ff_only_refused
+                  || $merge_conflict
+                  || $abort_noop
+                  || $ref_probe_absent
                   || $combined =~ /no upstream configured|does not have an upstream|no such branch/i );
     my $level    = $result->{success}       ? 'info'
                  : $secret_guard_block      ? 'warn'
                  : $ff_only_refused         ? 'warn'
+                 : $merge_conflict          ? 'warn'
                  : $benign                  ? 'info'
                  :                            'error';
     my $shown = ($result->{output} // '');

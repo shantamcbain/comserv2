@@ -4,12 +4,6 @@ This file is the **branch-aware recommendation matrix**. Agents read it from the
 checkout; humans apply it with `hermes config set` or a dedicated profile
 (`hermes -p <name>`). Do **not** commit API keys or OAuth tokens.
 
-<<<<<<< HEAD
-Last probed free-coder reliability (workstation, 2026-08-29):  
-`nemotron-3.5-lightning-free` ~4s PONG → preferred free coder.  
-`laguna-s-2.1-free` OK but flaky 503. **Never hy3 / hy3-free / muse-spark.**  
-Ollama (`gemma4-64k` etc.) = **last** (slow if cold). Delegation needs ≥64K context.
-=======
 Last probed free-coder reliability (workstation, **2026-09-08** — live code-gen probe,
 not a PONG):
 
@@ -28,7 +22,6 @@ not a PONG):
   `thinkingmachines/inkling:free` (403 — agentic-harness only).
 - **Never hy3 / hy3-free / muse-spark.**
 - Ollama (`gemma4-64k` etc.) = **last** (slow if cold). Delegation needs ≥64K context.
->>>>>>> main
 
 ---
 
@@ -37,12 +30,8 @@ not a PONG):
 | Slot | Preference |
 |------|------------|
 | **Director (primary)** | `xai-oauth` / `grok-composer-2.5-fast` (or current SuperGrok coding pick) |
-| **Coder (delegation)** | `opencode-free` / `nemotron-3.5-lightning-free` |
-<<<<<<< HEAD
-| **Primary fallback order** | lightning → laguna → deepseek free → other free → deepseek flash paid → glm-5.3-flash → deepseek-v4-pro → **Ollama last** |
-=======
-| **Primary fallback order** | ling-3.0-flash-fin:free (or) → cohere/north-mini-code:free (or) → ling-3.0-flash-sante:free (or) → dots-3-note-preview:free (or) → nemotron-3.5-lightning:free (or) → nemotron-3-ultra-550b-a55b:free (or) → deepseek/deepseek-v4-flash (or) → deepseek/deepseek-v4-pro (or) → z-ai/glm-5.3-flash (or) — **all OpenRouter**; see probe notes above |
->>>>>>> main
+| **Coder (delegation)** | `nemotron-3.5-lightning-free` — `opencode-free` is dead for scripted use and must never be the coder |
+| **Primary fallback order** | Live Hermes chain, Nov 2 2026: `supergrok / grok-4.7` → `openrouter / particle-ai/particle-1` (probation) → `xai / grok-4.7` → `openrouter / openai/gpt-5.6-luna` (probation, stop reached) → `openrouter / cohere/north-mini-code:free`. Free-first probe order when SuperGrok is unavailable: `ling-3.0-flash-fin:free` → `north-mini-code:free` → `nemotron-3.5-lightning:free` → `deepseek-v4-flash` → `deepseek-v4-pro` → `glm-5.3-flash`; **Ollama last**. The source of truth is `@HERMES_CHAIN_DEFAULT` in `Util/AI/ModelChains.pm`, not this row. |
 | Aliases | `code` → Director; `cheap` / `delegate` → Coder; `local` → Ollama last-resort |
 
 Apply sketch (Director session on default profile):
@@ -50,7 +39,7 @@ Apply sketch (Director session on default profile):
 ```bash
 hermes config set model.provider xai-oauth
 hermes config set model.default grok-composer-2.5-fast
-hermes config set delegation.provider opencode-free
+hermes config set delegation.provider openrouter
 hermes config set delegation.model nemotron-3.5-lightning-free
 # fallback_providers: edit list — fast free first, Ollama last, no hy3
 ```
