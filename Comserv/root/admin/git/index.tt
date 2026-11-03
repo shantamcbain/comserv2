@@ -361,6 +361,9 @@
                             <i class="fas fa-code-branch"></i> Update all from main</button>
                     </div>
                     <div data-update-all-summary="1" class="git-merge-status">[% update_all_result ? update_all_result.summary : '' %]</div>
+                    <div class="git-merge-status" style="font-size:11px;opacity:.65">
+                        Card build [% update_all_build %] &middot; form mode (works without JS)
+                    </div>
                     [% IF update_all_result && update_all_result.rows && update_all_result.rows.size %]
                     <table class="data-table" data-update-all-table="1">
                         <thead><tr><th>Worktree</th><th>Branch</th><th>Port</th><th>Result</th><th>Behind / ahead</th>

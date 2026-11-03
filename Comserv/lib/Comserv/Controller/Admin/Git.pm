@@ -868,6 +868,9 @@ sub index :Path('/admin/git') :Args(0) {
         # One-shot: the previous "Update all from main" result, rendered server-side
         # so the card works as a plain form POST (no JS required).
         update_all_result => delete $c->session->{git_update_all_result},
+        # Visible marker so "did my browser get the new card?" is answerable by eye,
+        # not by grepping a log that may be blind on this path.
+        update_all_build => scalar(localtime) . ' pid ' . $$,
         template        => 'admin/git/index.tt',
     );
 
