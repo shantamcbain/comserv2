@@ -914,4 +914,25 @@ ok 'openrouter/qwen/qwen3-coder' =~ $Comserv::Util::AI::HermesOverrunGuard::PAID
     is sprintf('%.3f', $G->can('xai_price_call')->({ model => 'grok-4.7', in => 100000, out => 2000, cache => 40000 })), '0.152', 'x.ai grok-4.7 priced from published rates';
 }
 
+{   # Nov 3 2026 (Shanta, eval report 65 #2): per-model 15-min limit from the shared caps file
+    my $G = 'Comserv::Util::AI::HermesOverrunGuard';
+    my $dir = tempdir(CLEANUP => 1);
+    open my $fh, '>', "$dir/caps.json" or die; print $fh encode_json({ openrouter => { day => 3, week => 15, month => 65 },
+        thrash_per_15min_by_model => { _comment => 'x', 'openrouter/particle-ai/particle-1' => 60, 'bad/model' => 'x' } }); close $fh;
+    local $ENV{COMSERV_AI_CAPS_FILE} = "$dir/caps.json";
+    Comserv::Util::AI::ModelChains->clear_cache if Comserv::Util::AI::ModelChains->can('clear_cache');
+    my $m = $G->can('model_thrash_limits')->();
+    is_deeply $m, { 'particle-ai/particle-1' => 60 }, 'per-model limit read, prefix stripped, comments and junk ignored';
+    my $lims = { %Comserv::Util::AI::HermesOverrunGuard::THRASH_LIMITS, 'model:particle-ai/particle-1' => 60 };
+    my $d = $G->can('decide')->(thrash_by_class => { ok => 1, counts => { 'model:particle-ai/particle-1' => 40, openrouter_paid => 5 } },
+        limits => $lims, openrouter => { ok => 1, day_usd => 0, week_usd => 0, month_usd => 0 }, state => {});
+    ok !grep({ /thrash/ } @{ $d->{reasons} || [] }), '40 particle-1 calls under its 60 limit: no thrash trip';
+    $d = $G->can('decide')->(thrash_by_class => { ok => 1, counts => { 'model:particle-ai/particle-1' => 61 } },
+        limits => $lims, openrouter => { ok => 1, day_usd => 0, week_usd => 0, month_usd => 0 }, state => {});
+    ok grep({ /61 model:particle-ai\/particle-1 calls in 15 min \(limit 60\)/ } @{ $d->{reasons} || [] }), '61 particle-1 calls trip at 60';
+    $d = $G->can('decide')->(thrash_by_class => { ok => 1, counts => { openrouter_paid => 31 } },
+        limits => $lims, openrouter => { ok => 1, day_usd => 0, week_usd => 0, month_usd => 0 }, state => {});
+    ok grep({ /openrouter_paid calls in 15 min \(limit 30\)/ } @{ $d->{reasons} || [] }), 'other paid models keep the 30 limit';
+}
+
 done_testing();
