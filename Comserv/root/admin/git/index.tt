@@ -340,27 +340,53 @@
                No stash, no force, no rebase. Proxmox/:4016 always skipped; :4003 only when the box is ticked. #]
             <details class="git-collapse git-update-all">
                 <summary>Update all branches from main</summary>
-                <div class="git-collapse-body" data-git-update-all="1"
+                <form class="git-collapse-body" method="post"
+                     action="[% c.uri_for('/admin/git/update_all_from_main') %]"
+                     data-git-update-all="1" data-git-update-all-form="1"
                      data-update-all-url="[% c.uri_for('/admin/git/update_all_from_main') %]"
                      data-csrf="[% update_all_csrf | html %]">
+                    [%# Real form: a POST works even when JS is stale, cached or broken.
+                       git-dashboard.js intercepts submit and renders JSON in place; without
+                       JS the action redirects back here and the result renders below. #]
+                    <input type="hidden" name="csrf" value="[% update_all_csrf | html %]">
                     <p>Merges main into every registered worktree. A branch with uncommitted files is still merged when main
                        does not touch those files; otherwise git refuses and the row says so (nothing is stashed or forced).
                        A conflict is aborted and the branch is left as it was. Proxmox (:4016) is always skipped.
                        Dev servers started with <code>-r</code> restart on their own when their files change.</p>
-                    <label><input type="checkbox" data-update-all-4003="1"> Include :4003 (3d)</label>
+                    <label><input type="checkbox" name="include_4003" value="1" data-update-all-4003="1"> Include :4003 (3d)</label>
                     <div class="git-actions">
-                        <button type="button" class="admin-btn admin-btn-sm" data-update-all-mode="preview">
+                        <button type="submit" name="mode" value="preview" class="admin-btn admin-btn-sm" data-update-all-mode="preview">
                             <i class="fas fa-eye"></i> Preview</button>
-                        <button type="button" class="admin-btn admin-btn-sm admin-btn-primary" data-update-all-mode="update">
+                        <button type="submit" name="mode" value="update" class="admin-btn admin-btn-sm admin-btn-primary" data-update-all-mode="update">
                             <i class="fas fa-code-branch"></i> Update all from main</button>
                     </div>
-                    <div data-update-all-summary="1" class="git-merge-status"></div>
+                    <div data-update-all-summary="1" class="git-merge-status">[% update_all_result ? update_all_result.summary : '' %]</div>
+                    [% IF update_all_result && update_all_result.rows && update_all_result.rows.size %]
+                    <table class="data-table" data-update-all-table="1">
+                        <thead><tr><th>Worktree</th><th>Branch</th><th>Port</th><th>Result</th><th>Behind / ahead</th>
+                            <th>Before (undo point)</th><th>Files / reason</th><th>Auto-restart</th></tr></thead>
+                        <tbody>
+                        [% FOREACH r IN update_all_result.rows %]
+                            <tr>
+                                <td>[% r.key %]</td>
+                                <td>[% r.branch %]</td>
+                                <td>[% IF r.port %]:[% r.port %][% END %]</td>
+                                <td>[% r.action %]</td>
+                                <td>[% r.behind %][% IF r.ahead %] / [% r.ahead %][% END %]</td>
+                                <td>[% IF r.pre_merge_commit %][% r.pre_merge_commit.substr(0, 10) %][% END %]</td>
+                                <td>[% IF r.reason %][% r.reason %][% ELSIF r.dirty_files && r.dirty_files.size %]uncommitted kept: [% r.dirty_files.join(', ') %][% END %]</td>
+                                <td>[% IF r.will_restart %]yes[% END %]</td>
+                            </tr>
+                        [% END %]
+                        </tbody>
+                    </table>
+                    [% END %]
                     <table class="data-table" data-update-all-table="1" hidden>
                         <thead><tr><th>Worktree</th><th>Branch</th><th>Port</th><th>Result</th><th>Behind / ahead</th>
                             <th>Before (undo point)</th><th>Files / reason</th><th>Auto-restart</th></tr></thead>
                         <tbody></tbody>
                     </table>
-                </div>
+                </form>
             </details>
 
             [%# ====== Develop Servers (zenflow worktree registry) ====== %]

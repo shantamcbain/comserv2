@@ -861,6 +861,23 @@ sub daily :Path('/planning/daily') :Args {
         @active_priorities = @picked;
         $c->stash->{active_priorities_backlog} = $focus_total - scalar(@active_priorities);
 
+        # Render-time truth: without this, "an active todo is missing from the
+        # page" can only be argued about, never measured. Lists whether the row
+        # reached the pool, whether it was ranked active, and where it sits.
+        if ($self->logging) {
+            my @_act = grep { $_->{is_active_work} } @active_priorities;
+            my @_top = @active_priorities ? @active_priorities[0 .. ($#active_priorities > 4 ? 4 : $#active_priorities)] : ();
+            my ($_in_pool) = grep { ($_->{record_id} // 0) == 2006 } @all_sorted;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
+                'Focus queue: pool=' . scalar(@all_sorted)
+                . ' picked=' . scalar(@active_priorities)
+                . ' active_flagged=' . scalar(@_act)
+                . ' top=[' . join(',', map { ($_->{record_id} // 0) . ':' . ($_->{status} // '?') } @_top) . ']'
+                . ' todo2006_in_pool=' . ($_in_pool ? 1 : 0)
+                . ' sitename=' . ($sitename // '?')
+                . ' branch=' . ($cur_branch // '?'));
+        }
+
         # Keep the complete eligible backlog available separately from the
         # limited Focus Queue. It uses the same server-side filters and score
         # ordering, but is never truncated to FOCUS_QUEUE_LIMIT.

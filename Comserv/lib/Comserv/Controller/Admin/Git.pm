@@ -865,6 +865,9 @@ sub index :Path('/admin/git') :Args(0) {
         # tab's "Branch Servers" panel shows, so the two can never drift.
         worktree_list   => $self->git_service->build_worktree_list,
         update_all_csrf => $self->_update_all_csrf_token($c),
+        # One-shot: the previous "Update all from main" result, rendered server-side
+        # so the card works as a plain form POST (no JS required).
+        update_all_result => delete $c->session->{git_update_all_result},
         template        => 'admin/git/index.tt',
     );
 
@@ -2394,6 +2397,14 @@ sub update_all_from_main :Path('/admin/git/update_all_from_main') :Args(0) {
     unless ($self->_update_all_csrf_ok($c)) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
             'update_all_from_main: CSRF token missing or wrong');
+        if (!$self->_wants_json($c)) {
+            $c->session->{git_update_all_result} = {
+                summary => 'Security token expired. The page was reloaded — try again.',
+                rows    => [],
+            };
+            $c->response->redirect($c->uri_for('/admin/git'));
+            return;
+        }
         $c->response->body(encode_json({ success => 0, error => 'Security token expired. Reload the Git page and try again.' }));
         return;
     }
@@ -2409,10 +2420,32 @@ sub update_all_from_main :Path('/admin/git/update_all_from_main') :Args(0) {
         my $err = $@ || 'unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
             "update_all_from_main died: $err");
+        if (!$self->_wants_json($c)) {
+            $c->session->{git_update_all_result} = { summary => "Update all failed: $err", rows => [] };
+            $c->response->redirect($c->uri_for('/admin/git'));
+            return;
+        }
         $c->response->body(encode_json({ success => 0, error => 'Update all failed; see the application log.' }));
         return;
     }
+    # A plain browser form submit gets a redirect + server-rendered rows, so the
+    # button works with no JS at all. fetch() callers keep the JSON contract.
+    unless ($self->_wants_json($c)) {
+        $c->session->{git_update_all_result} = $res;
+        $c->response->redirect($c->uri_for('/admin/git'));
+        return;
+    }
     $c->response->body(encode_json({ success => 1, %$res }));
+}
+
+# True when the caller is fetch()/XHR and expects JSON rather than a page.
+sub _wants_json {
+    my ($self, $c) = @_;
+    my $accept = $c->req->header('Accept') // '';
+    return 1 if $accept =~ m{json}i;
+    my $xrw = $c->req->header('X-Requested-With') // '';
+    return 1 if $xrw =~ m{XMLHttpRequest}i;
+    return 0;
 }
 
 =head2 merge_to_main

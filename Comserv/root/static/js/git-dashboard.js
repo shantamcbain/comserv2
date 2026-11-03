@@ -858,6 +858,11 @@
     var tbody = table ? table.querySelector('tbody') : null;
     var inc3 = box.querySelector('[data-update-all-4003]');
     var buttons = box.querySelectorAll('[data-update-all-mode]');
+    // The card is a real <form>: without JS the browser posts it and the server
+    // renders the result. When JS runs we intercept the submit instead, so a
+    // stale/cached script can no longer make the buttons look dead.
+    var form = (box.tagName && box.tagName.toUpperCase() === 'FORM') ? box
+             : (box.closest ? box.closest('form') : null);
 
     function cell(tr, text) { var td = document.createElement('td'); td.textContent = text == null ? '' : String(text); tr.appendChild(td); }
     function render(data) {
@@ -880,9 +885,7 @@
         });
         table.hidden = false;
     }
-    Array.prototype.forEach.call(buttons, function (btn) {
-        btn.addEventListener('click', function () {
-            var mode = btn.getAttribute('data-update-all-mode');
+    function run(mode) {
             if (mode === 'update' && !window.confirm('Merge main into every registered branch now? Running -r dev servers will restart. Run Preview first if unsure.')) { return; }
             var body = new URLSearchParams();
             body.set('mode', mode); body.set('csrf', csrf);
@@ -905,6 +908,16 @@
                 .then(render)
                 .catch(function (e) { summary.textContent = 'Request failed: ' + e; })
                 .then(function () { Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; }); });
+    }
+    if (form) {
+        form.addEventListener('submit', function (ev) {
+            ev.preventDefault();
+            var st = ev.submitter;
+            run((st && st.value) ? st.value : 'preview');
         });
-    });
+    } else {
+        Array.prototype.forEach.call(buttons, function (btn) {
+            btn.addEventListener('click', function () { run(btn.getAttribute('data-update-all-mode')); });
+        });
+    }
 })();
