@@ -2374,7 +2374,19 @@ sub _update_all_csrf_ok {
 sub update_all_from_main :Path('/admin/git/update_all_from_main') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
-    return unless $self->admin_auth->require_admin_access($c, 'git_merge');
+    # JSON endpoints must never answer an auth failure with a 302 redirect to
+    # /user/login — fetch().json() then throws "Unexpected token '<'" on the
+    # HTML login page and the card just says "Request failed". Same defect was
+    # fixed in `merge` (2026-08-26); this action still had the redirect, which
+    # is why Preview/Update silently failed on an expired admin session.
+    unless ($self->admin_auth->check_admin_access($c, 'git_merge')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({
+            success => 0,
+            error   => 'Administrator access required: your session expired. Sign in again, then reload the Git page.',
+        }));
+        return;
+    }
     unless ($c->request->method eq 'POST') {
         $c->response->body(encode_json({ success => 0, error => 'POST required' }));
         return;

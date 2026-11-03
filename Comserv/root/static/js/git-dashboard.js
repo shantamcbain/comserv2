@@ -890,8 +890,18 @@
             summary.textContent = mode === 'update' ? 'Updating...' : 'Previewing...';
             Array.prototype.forEach.call(buttons, function (b) { b.disabled = true; });
             fetch(url, { method: 'POST', credentials: 'same-origin', body: body,
-                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
-                .then(function (r) { return r.json(); })
+                         headers: { 'Content-Type': 'application/x-www-form-urlencoded',
+                                    'Accept': 'application/json' } })
+                .then(function (r) {
+                    // A 302 to /user/login (or any HTML error page) is not JSON. Without this guard the
+                    // card shows only "Request failed: SyntaxError" and looks like a dead button.
+                    var ct = (r.headers.get('content-type') || '').toLowerCase();
+                    if (ct.indexOf('json') === -1) {
+                        throw new Error('HTTP ' + r.status + ' ' + (ct || 'no content-type') +
+                                        ' — you are probably signed out. Reload the Git page and sign in again.');
+                    }
+                    return r.json();
+                })
                 .then(render)
                 .catch(function (e) { summary.textContent = 'Request failed: ' + e; })
                 .then(function () { Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; }); });
