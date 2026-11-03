@@ -63,7 +63,13 @@ my %ALLOWED_FLAGS = (
     pull     => { map { $_ => 1 } qw(--ff-only) },
     push     => { map { $_ => 1 } qw(--set-upstream -u --delete) },
     'ls-files' => { map { $_ => 1 } qw(--error-unmatch --others --exclude-standard) },
-    add      => {},
+    # -f is allowed for add ONLY because the dashboard stages paths it has already
+    # validated against `git status --porcelain`. A tracked file can become matched
+    # by a later .gitignore rule (e.g. data/ai_trials/*.state.json), and `git add`
+    # then refuses it with "paths are ignored ... use -f" even though it is tracked.
+    # Ignored UNTRACKED files never appear in porcelain, so -f cannot stage anything
+    # the operator did not see and tick.
+    add      => { map { $_ => 1 } qw(-f) },
     commit   => { map { $_ => 1 } qw(-m --amend) },
     stash    => { map { $_ => 1 } qw(push pop drop list -m) },
     checkout => { map { $_ => 1 } qw(-b) },
