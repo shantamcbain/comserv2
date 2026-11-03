@@ -916,6 +916,16 @@
     function reEnable() {
         Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; });
     }
+    // Self-reporting: the card now shows whether its script is alive and bound.
+    // A dead handler used to be indistinguishable from "the click did nothing".
+    window.addEventListener('error', function (e) {
+        if (!summary) { return; }
+        summary.textContent = 'JS ERROR: ' + (e.message || 'unknown')
+            + ' @ ' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || '?');
+    });
+    if (summary && !summary.textContent) {
+        summary.textContent = 'JS ready — click Preview';
+    }
     if (form && url && summary && window.fetch) {
         form.addEventListener('submit', function (ev) {
             var st = ev.submitter;
