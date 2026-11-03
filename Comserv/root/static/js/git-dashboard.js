@@ -926,7 +926,12 @@
     if (summary && !summary.textContent) {
         summary.textContent = 'JS ready — click Preview';
     }
-    if (form && url && summary && window.fetch) {
+    // Shanta 2026-11-03: the card was dead three times over because JS intercepted
+    // the submit. It no longer does. A click is a plain browser POST and the server
+    // redirects back with the result rendered; nothing in this file can stop it.
+    // AJAX in-place rendering is opt-in per card via data-update-all-ajax="1".
+    if (form && url && summary && window.fetch
+        && form.getAttribute('data-update-all-ajax') === '1') {
         form.addEventListener('submit', function (ev) {
             var st = ev.submitter;
             var mode = (st && st.value) ? st.value : 'preview';
@@ -935,13 +940,17 @@
                 run(mode);
             } catch (e) {
                 reEnable();
-                if (summary) { summary.textContent = 'Script error, posting the form directly: ' + e; }
                 if (form.submit) { form.submit(); }
             }
         });
     } else {
         Array.prototype.forEach.call(buttons, function (btn) {
-            btn.addEventListener('click', function () { run(btn.getAttribute('data-update-all-mode')); });
+            btn.addEventListener('click', function () {
+                if (summary) { summary.textContent = 'Submitting…'; }
+            });
         });
+        if (summary && !summary.textContent) {
+            summary.textContent = 'Click Preview or Update — the form posts directly.';
+        }
     }
 })();
