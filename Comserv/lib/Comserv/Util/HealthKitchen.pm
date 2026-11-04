@@ -432,7 +432,7 @@ sub save_profile {
     my %data = (
         diet_flags => $args->{diet_flags},
         allergies  => $self->_enc( $args->{allergies} ),
-        goals      => $args->{goals},
+        goals      => $self->_enc( $args->{goals} ),
     );
     my $prefs_ok = $self->prefs_cols_ready($c);
     if ( $prefs_ok && grep { exists $args->{$_} } @PREF_COLS, 'prefs_submitted' ) {
@@ -470,7 +470,7 @@ sub get_profile {
             $h = {
                 diet_flags => $row->diet_flags,
                 allergies  => $self->_dec( $row->allergies ),
-                goals      => $row->goals,
+                goals      => $self->_dec( $row->goals ),
             };
             if ( $self->prefs_cols_ready($c) ) {
                 $h->{$_} = $row->get_column($_) for @PREF_COLS;
@@ -1876,7 +1876,8 @@ sub list_history {
     my @out;
     try {
         push @out, $self->_history_hash($_)
-            for $self->_history_rs($c)->search( {}, { order_by => [ { -desc => 'onset_date' }, { -desc => 'id' } ] } )->all;
+            for grep { $self->_dec( $_->label ) ne 'hk_chart' }
+            $self->_history_rs($c)->search( {}, { order_by => [ { -desc => 'onset_date' }, { -desc => 'id' } ] } )->all;
     }
     catch {
         $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'list_history', "failed: $_" );
@@ -1899,7 +1900,7 @@ sub _clean_history_args {
     my $sev = lc( $a->{severity} // '' );
     $h{severity} = $sev =~ /^(mild|moderate|severe)$/ ? $sev : undef;
     $h{use_for_matching} = ( defined $a->{use_for_matching} && !$a->{use_for_matching} ) ? 0 : 1;
-    $h{visibility} = ( ( $a->{visibility} // '' ) eq 'site_admin' ) ? 'site_admin' : 'private';
+    $h{visibility} = 'private';
     my $label = $a->{label} // '';
     $label =~ s/^\s+|\s+$//g;
     $h{label} = substr( $label, 0, 255 );
@@ -1953,6 +1954,75 @@ sub delete_all_history {
     return $ok ? { ok => 1, deleted => $n } : { ok => 0, error => 'Could not delete health history.' };
 }
 
+# Chart body lives in one encrypted notes blob. The marker label is also ciphertext.
+# No practitioner grant table exists, so only the signed-in owner may read or write it.
+our @CHART_FIELDS = qw(birth_year allergies conditions medications avoided_foods week_goal);
+
+sub chart_document {
+    my ( $self, $a ) = @_;
+    $a ||= {};
+    my %doc;
+    for my $k (@CHART_FIELDS) {
+        my $v = $a->{$k} // '';
+        $v =~ s/^\s+|\s+$//g;
+        $doc{$k} = substr( $v, 0, 2000 );
+    }
+    if ( length $doc{birth_year} && $doc{birth_year} !~ /^(19|20)\d{2}$/ ) {
+        return { error => 'Birth year must be a four-digit year, or left blank.' };
+    }
+    return { doc => \%doc };
+}
+
+sub _find_chart_row {
+    my ( $self, $c ) = @_;
+    for my $row ( $self->_history_rs($c)->all ) {
+        return $row if $self->_dec( $row->label ) eq 'hk_chart';
+    }
+    return undef;
+}
+
+sub get_chart {
+    my ( $self, $c ) = @_;
+    return {} unless $self->active_consent($c);
+    my $row = eval { $self->_find_chart_row($c) };
+    if ($@) {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'get_chart', "failed: $@" );
+        return {};
+    }
+    return {} unless $row;
+    my $doc = eval { decode_json( $self->_dec( $row->notes ) || '{}' ) };
+    return ref $doc eq 'HASH' ? $doc : {};
+}
+
+sub save_chart {
+    my ( $self, $c, $a ) = @_;
+    return { ok => 0, error => 'Please give consent before saving the chart.' } unless $self->active_consent($c);
+    my $parsed = $self->chart_document($a);
+    return { ok => 0, error => $parsed->{error} } if $parsed->{error};
+    my $label = eval { $self->_enc('hk_chart') };
+    my $notes = eval { $self->_enc( encode_json( $parsed->{doc} ) ) };
+    if ( $@ || !$label || !$notes ) {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'save_chart',
+            'encryption failed: ' . ( $@ || 'empty ciphertext' ) );
+        return { ok => 0, error => 'Could not encrypt the chart. Nothing was saved.' };
+    }
+    my $ok = eval {
+        my $row = $self->_find_chart_row($c);
+        my %h = (
+            entry_type => 'condition', label => $label, notes => $notes, status => 'managed',
+            visibility => 'private', use_for_matching => 0,
+            ency_disease_id => undef, ency_symptom_id => undef, ency_drug_id => undef,
+            onset_date => undef, resolved_date => undef, severity => undef,
+        );
+        if ($row) { $row->update(\%h) }
+        else      { $self->_history_rs($c)->create(\%h) }
+        $self->_audit( $c, $c->session->{user_id}, 'chart_save', 1 );
+        1;
+    };
+    $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'save_chart', "failed: $@" ) unless $ok;
+    return $ok ? { ok => 1 } : { ok => 0, error => 'Could not save the chart.' };
+}
+
 our @EXPORT_COLS = qw(id entry_type label status onset_date resolved_date severity ency_disease_id ency_symptom_id ency_drug_id use_for_matching visibility notes);
 
 sub export_history {
@@ -1971,19 +2041,17 @@ sub history_to_csv {
         map { my $r = $_; join( ',', map { $q->( $r->{$_} ) } @EXPORT_COLS ) } @$rows ) . "\n";
 }
 
-# Admin view of ONE user's entries that user shared (visibility=site_admin). Audited.
+# No practitioner grant exists. A site-admin share is not a care relationship.
 sub admin_shared_history {
     my ( $self, $c, $subject_id ) = @_;
-    return [] unless $subject_id && $subject_id =~ /^\d+$/ && $self->active_consent( $c, $subject_id );
-    my @rows = map { $self->_history_hash($_) }
-        eval { $self->_history_rs( $c, $subject_id )->search( { visibility => 'site_admin' } )->all };
-    $self->_audit( $c, $subject_id, 'admin_view', scalar @rows );
-    return \@rows;
+    $self->logging->log_with_details( $c, 'warn', __FILE__, __LINE__, 'admin_shared_history',
+        'Refused admin history read; only the owner can see the chart until a practitioner grant exists' );
+    return [];
 }
 
 # Pure: turn decrypted history + profile into matching inputs.
 sub history_matching_inputs {
-    my ( $self, $history, $profile ) = @_;
+    my ( $self, $history, $profile, $chart ) = @_;
     my ( %terms, %drugs, %diseases, %allergens );
     for my $h ( @{ $history || [] } ) {
         next unless $h->{use_for_matching};
@@ -2002,13 +2070,26 @@ sub history_matching_inputs {
         $a =~ s/^\s+|\s+$//g;
         $allergens{$a} = 1 if length $a;
     }
+    $chart ||= {};
+    for my $blob ( $chart->{allergies}, $chart->{avoided_foods} ) {
+        for my $a ( split /\s*[,;\n]\s*/, lc( $blob // '' ) ) {
+            $a =~ s/^\s+|\s+$//g;
+            $allergens{$a} = 1 if length $a;
+        }
+    }
+    for my $blob ( $chart->{conditions}, $chart->{medications} ) {
+        for my $t ( split /\s*[,;\n]\s*/, lc( $blob // '' ) ) {
+            $t =~ s/^\s+|\s+$//g;
+            $terms{$t} = 1 if length $t >= 3;
+        }
+    }
     return { contra_terms => [ sort keys %terms ], drug_ids => [ sort { $a <=> $b } keys %drugs ],
              disease_ids => [ sort { $a <=> $b } keys %diseases ], allergens => [ sort keys %allergens ] };
 }
 
 sub user_matching_inputs {
     my ( $self, $c ) = @_;
-    return $self->history_matching_inputs( $self->list_history($c), $self->get_profile($c) );
+    return $self->history_matching_inputs( $self->list_history($c), $self->get_profile($c), $self->get_chart($c) );
 }
 
 # Pure: split recipes into allowed / excluded by allergen terms found in ingredient names.
@@ -3017,6 +3098,443 @@ sub classify_sourcing {
 sub brand_code {
     my ( $self, $name ) = @_;
     return ( defined $name && $name =~ /^([A-Z]{2,5})\s+\S/ ) ? $1 : undef;
+}
+
+# Standing wellness tasks. Not a clinical order and not a CSC planning todo.
+my @DAY_ACTIVITIES = (
+    'Hydration: drink water through the day',
+    'Movement: a walk or a stretch',
+    'Sleep: keep a regular bedtime',
+    'Forage-prep: set out one pantry item for the next meal',
+);
+my @MENU_SLOTS = qw(breakfast lunch dinner tea);
+my %GENERIC_PLATE = (
+    breakfast => 'A drink and a simple plate from what you have',
+    lunch     => 'A plate built from foods you already stock',
+    dinner    => 'A cooked plate, with a vegetable if you have one',
+    tea       => 'A warm drink, light if you want one',
+);
+
+sub default_activities {
+    return [@DAY_ACTIVITIES];
+}
+
+# Always four slots. Recipes, then pantry names, then a plain plate. No symptoms required.
+sub generic_menu {
+    my ( $self, $opts ) = @_;
+    $opts ||= {};
+    my @recipes = grep { defined && length } @{ $opts->{recipe_names} || [] };
+    my @pantry  = grep { defined && length } @{ $opts->{pantry_names} || [] };
+    my @slots;
+    my $pi = 0;
+    for my $i ( 0 .. $#MENU_SLOTS ) {
+        my $slot = $MENU_SLOTS[$i];
+        my $text = $GENERIC_PLATE{$slot};
+        if ( $i < @recipes ) {
+            $text = $recipes[$i];
+        }
+        elsif (@pantry) {
+            my @use;
+            for ( 1 .. 2 ) {
+                push @use, $pantry[ $pi % @pantry ];
+                $pi++;
+            }
+            $text .= ' (' . join( ', ', @use ) . ')';
+        }
+        push @slots, {
+            meal_slot  => $slot,
+            formula_id => undef,
+            free_text  => $text,
+            basis      => 'general',
+        };
+    }
+    return \@slots;
+}
+
+# Personal day blocks stored as recurring calendar todos (comments hk_day_slot:).
+# The calendar owns the clock. The kitchen menu reads the same rows.
+sub day_schedule {
+    my ( $self, $c ) = @_;
+    my $schema = eval { $c->model('DBEncy') };
+    return [] unless $schema && $c->session->{user_id};
+    my @out;
+    try {
+        my $rs = $schema->resultset('Todo')->search(
+            {
+                user_id      => $c->session->{user_id},
+                is_recurring => 1,
+                comments     => { like => '%hk_day_slot:%' },
+            },
+            { order_by => 'time_of_day' }
+        );
+        while ( my $t = $rs->next ) {
+            my ($slot) = ( $t->comments // '' ) =~ /hk_day_slot:([a-z0-9_]+)/;
+            my $comments = $t->comments // '';
+            my @courses;
+            while ( $comments =~ /hk_course:(appetizer|main|side|dessert):([^\n]*)/g ) {
+                my $name = $2;
+                $name =~ s/^\s+|\s+$//g;
+                push @courses, { role => $1, name => $name };
+            }
+            my $tod = $t->time_of_day;
+            $tod = ref $tod ? $tod->hms : "$tod" if defined $tod;
+            $tod = substr( $tod, 0, 5 ) if $tod && length $tod >= 5;
+            push @out, {
+                id          => $t->record_id,
+                slot        => $slot || 'meal',
+                subject     => $t->subject || '',
+                description => $t->description || '',
+                time_of_day => $tod || '',
+                courses     => \@courses,
+            };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'day_schedule',
+            "day_schedule failed: $_" );
+    };
+    return \@out;
+}
+
+sub menu_from_schedule {
+    my ( $self, $rows ) = @_;
+    my @slots;
+    for my $r ( @{ $rows || [] } ) {
+        next unless ref $r eq 'HASH';
+        my $when = $r->{time_of_day} ? $r->{time_of_day} . ' ' : '';
+        if ( ref $r->{courses} eq 'ARRAY' && @{ $r->{courses} } ) {
+            for my $course ( @{ $r->{courses} } ) {
+                next unless ref $course eq 'HASH';
+                my $role = $course->{role} || 'main';
+                my $name = $course->{name} || '';
+                push @slots, {
+                    meal_slot  => substr( $role, 0, 20 ),
+                    formula_id => undef,
+                    free_text  => $when . ( length $name ? $name : 'no recipe yet' ),
+                    basis      => 'schedule',
+                };
+            }
+            next;
+        }
+        my $text = $r->{description} || $r->{subject} || '';
+        $text = $r->{subject} . '. ' . $text if $r->{subject} && $r->{description};
+        push @slots, {
+            meal_slot  => substr( $r->{slot} || 'meal', 0, 20 ),
+            formula_id => undef,
+            free_text  => $when . $text,
+            basis      => 'schedule',
+        };
+    }
+    return \@slots;
+}
+
+# Replace leading general slots with in-pantry matches only. Never copies not_in_pantry.
+sub tighten_menu {
+    my ( $self, $base, $match ) = @_;
+    my @slots = map { { %{ $_ || {} } } } @{ $base || [] };
+    @slots = @{ $self->generic_menu } unless @slots;
+    my $spec = $self->menu_from_match($match);
+    for my $i ( 0 .. $#$spec ) {
+        next unless $slots[$i];
+        $slots[$i]{meal_slot}  = $spec->[$i]{meal_slot} || $slots[$i]{meal_slot};
+        $slots[$i]{formula_id} = $spec->[$i]{formula_id};
+        $slots[$i]{free_text}  = $spec->[$i]{free_text} if length( $spec->[$i]{free_text} || '' );
+        $slots[$i]{basis}      = 'tightened';
+    }
+    return \@slots;
+}
+
+# Menu rows come only from in-pantry herbs and formulas. not_in_pantry is never copied.
+sub menu_from_match {
+    my ( $self, $match ) = @_;
+    $match ||= {};
+    my @slots;
+    my $i = 0;
+    for my $f ( @{ $match->{formulas} || [] } ) {
+        last if $i >= @MENU_SLOTS;
+        next unless ref $f eq 'HASH';
+        push @slots, {
+            meal_slot  => $MENU_SLOTS[$i],
+            formula_id => $f->{formula_id} || $f->{id},
+            free_text  => $f->{name} || '',
+        };
+        $i++;
+    }
+    for my $h ( @{ $match->{herbs} || [] } ) {
+        last if $i >= @MENU_SLOTS;
+        next unless ref $h eq 'HASH';
+        my $name = $h->{name} || '';
+        next unless length $name;
+        push @slots, {
+            meal_slot  => $MENU_SLOTS[$i],
+            formula_id => undef,
+            free_text  => $name,
+        };
+        $i++;
+    }
+    return \@slots;
+}
+
+sub plan_tables_ready {
+    my ( $self, $c ) = @_;
+    return $self->table_ready( $c, 'HealthKitchen::UserHealthPlan' )
+        && $self->table_ready( $c, 'HealthKitchen::UserMealSlot' )
+        && $self->table_ready( $c, 'HealthKitchen::UserHealthActivity' );
+}
+
+sub _plan_today {
+    my ( $self, $c ) = @_;
+    require Comserv::Util::AppTime;
+    return Comserv::Util::AppTime->today_ymd_for($c);
+}
+
+sub _plan_ids_for_date {
+    my ( $self, $c, $ymd ) = @_;
+    my $schema = eval { $c->model('DBEncy') };
+    return [] unless $schema;
+    my %ids;
+    my $uid  = $c->session->{user_id};
+    my $site = $self->sitename($c);
+    for my $src (qw(HealthKitchen::UserMealSlot HealthKitchen::UserHealthActivity)) {
+        next unless $self->source_ok( $schema, $src );
+        try {
+            my $rs = $schema->resultset($src)->search(
+                {
+                    plan_date              => $ymd,
+                    'health_plan.user_id'  => $uid,
+                    'health_plan.sitename' => $site,
+                },
+                { join => 'health_plan' }
+            );
+            while ( my $row = $rs->next ) {
+                $ids{ $row->health_plan_id } = 1 if $row->health_plan_id;
+            }
+        }
+        catch {
+            $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, '_plan_ids_for_date',
+                "plan date lookup failed for $src: $_" );
+        };
+    }
+    return [ sort { $b <=> $a } keys %ids ];
+}
+
+sub _plan_hash {
+    my ( $self, $c, $plan ) = @_;
+    return unless $plan;
+    my $body = {};
+    if ( $plan->body_json ) {
+        try { $body = decode_json( $plan->body_json ) }
+        catch {
+            $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, '_plan_hash',
+                "plan body_json not decoded: $_" );
+            $body = {};
+        };
+    }
+    my @slots;
+    my @acts;
+    try {
+        for my $s ( $plan->meal_slots->search( {}, { order_by => 'id' } )->all ) {
+            push @slots, {
+                id         => $s->id,
+                plan_date  => _ymd( $s->plan_date ),
+                meal_slot  => $s->meal_slot,
+                formula_id => $s->formula_id,
+                free_text  => $s->free_text || '',
+            };
+        }
+        for my $a ( $plan->activities->search( {}, { order_by => 'id' } )->all ) {
+            push @acts, {
+                id            => $a->id,
+                plan_date     => _ymd( $a->plan_date ),
+                activity_text => $a->activity_text,
+                done          => $a->done ? 1 : 0,
+            };
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, '_plan_hash',
+            "plan children failed: $_" );
+    };
+    my $missing = $body->{not_in_pantry} || [];
+    $missing = [ @{$missing}[ 0 .. 5 ] ] if @$missing > 6;
+    return {
+        id            => $plan->id,
+        source        => $plan->source || 'util',
+        trust_summary => $plan->trust_summary || '',
+        plan_date     => $body->{plan_date} || '',
+        slots         => \@slots,
+        activities    => \@acts,
+        not_in_pantry => $missing,
+    };
+}
+
+sub _ymd {
+    my ($v) = @_;
+    return '' unless defined $v && length "$v";
+    return $v->ymd if ref $v && eval { $v->can('ymd') };
+    my $s = "$v";
+    return $1 if $s =~ /^(\d{4}-\d{2}-\d{2})/;
+    return $s;
+}
+
+sub today_dashboard {
+    my ( $self, $c ) = @_;
+    my $today = $self->_plan_today($c);
+    my $ready = $self->plan_tables_ready($c) ? 1 : 0;
+    my $plan;
+    if ($ready) {
+        my $ids = $self->_plan_ids_for_date( $c, $today );
+        if (@$ids) {
+            my $row = eval {
+                $c->model('DBEncy')->resultset('HealthKitchen::UserHealthPlan')->find( $ids->[0] );
+            };
+            $plan = $self->_plan_hash( $c, $row ) if $row;
+        }
+    }
+    return { ready => $ready, plan_date => $today, plan => $plan, schedule => $self->day_schedule($c) };
+}
+
+sub load_plan {
+    my ( $self, $c, $id ) = @_;
+    return unless $id && $id =~ /^\d+$/;
+    return unless $self->plan_tables_ready($c);
+    my $row = eval {
+        $c->model('DBEncy')->resultset('HealthKitchen::UserHealthPlan')->search(
+            {
+                id       => $id,
+                user_id  => $c->session->{user_id},
+                sitename => $self->sitename($c),
+            },
+            { rows => 1 }
+        )->first;
+    };
+    if ($@) {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'load_plan',
+            "load_plan $id failed: $@" );
+        return;
+    }
+    return $self->_plan_hash( $c, $row );
+}
+
+sub build_today_plan {
+    my ( $self, $c ) = @_;
+    unless ( $self->plan_tables_ready($c) ) {
+        return { ok => 0, error => 'Health plan tables are not on this database yet.' };
+    }
+    my $today = $self->_plan_today($c);
+    my $active = $self->list_active_symptoms($c);
+    my @symptom_ids = map { $_->{symptom_id} } grep { $_->{symptom_id} } @$active;
+    my $match = eval { $self->match_for_symptoms( $c, { symptom_ids => \@symptom_ids } ) } || {};
+    if ($@) {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'build_today_plan',
+            "match_for_symptoms failed, using general menu: $@" );
+        $match = {};
+    }
+    my @pantry_names = map { $_->{name} } grep { $_->{name} } @{ $self->list_pantry($c) || [] };
+    my @recipe_names = map { $_->{name} } grep { $_->{name} } @{ $self->list_recipes($c) || [] };
+    my $schedule = $self->day_schedule($c);
+    my $slots = @$schedule
+        ? $self->menu_from_schedule($schedule)
+        : $self->tighten_menu(
+            $self->generic_menu( { pantry_names => \@pantry_names, recipe_names => \@recipe_names } ),
+            $match,
+        );
+    my $tight = grep { ( $_->{basis} || '' ) eq 'tightened' } @$slots;
+    my $from_schedule = @$schedule ? 1 : 0;
+    my $schema = $c->model('DBEncy');
+    my $plan;
+    try {
+        for my $old ( @{ $self->_plan_ids_for_date( $c, $today ) } ) {
+            my $row = $schema->resultset('HealthKitchen::UserHealthPlan')->find($old);
+            $row->delete if $row;
+        }
+        require Comserv::Util::AppTime;
+        my $stamp = Comserv::Util::AppTime->now_utc;
+        my $missing = $match->{not_in_pantry} || [];
+        $missing = [ @{$missing}[ 0 .. 7 ] ] if @$missing > 8;
+        my $summary = $from_schedule
+            ? 'Your daily schedule from the calendar. Symptoms do not replace these meals. Not a diagnosis.'
+            : $tight
+            ? sprintf(
+                'General menu, tightened on %d slot(s) from the pantry match (%d active symptom(s)). Off-pantry items were not added. Not a diagnosis.',
+                $tight, scalar(@symptom_ids),
+            )
+            : 'General menu. No chart age or active symptoms were applied. Add symptoms or history, then rebuild, to tighten it. Not a diagnosis.';
+        $plan = $schema->resultset('HealthKitchen::UserHealthPlan')->create( {
+            user_id       => $c->session->{user_id},
+            sitename      => $self->sitename($c),
+            source        => 'util',
+            trust_summary => $summary,
+            body_json     => encode_json( {
+                plan_date     => $today,
+                symptom_ids   => \@symptom_ids,
+                herbs         => $match->{herbs} || [],
+                formulas      => $match->{formulas} || [],
+                not_in_pantry => $missing,
+            } ),
+            created_at => $stamp,
+            updated_at => $stamp,
+        } );
+        for my $s (@$slots) {
+            $plan->create_related( 'meal_slots', {
+                plan_date  => $today,
+                meal_slot  => $s->{meal_slot},
+                formula_id => $s->{formula_id},
+                free_text  => $s->{free_text},
+                created_at => $stamp,
+                updated_at => $stamp,
+            } );
+        }
+        for my $text ( @{ $self->default_activities } ) {
+            $plan->create_related( 'activities', {
+                plan_date     => $today,
+                activity_text => $text,
+                done          => 0,
+                created_at    => $stamp,
+                updated_at    => $stamp,
+            } );
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'build_today_plan',
+            "build_today_plan failed: $_" );
+        return { ok => 0, error => 'Could not save today\'s plan.' };
+    };
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'build_today_plan',
+        'built health plan ' . ( $plan ? $plan->id : '?' ) . " for $today" );
+    return { ok => 1, id => $plan->id, plan_date => $today };
+}
+
+sub set_activity_done {
+    my ( $self, $c, $plan_id, $activity_id, $done ) = @_;
+    return { ok => 0, error => 'Missing activity.' }
+        unless $plan_id && $plan_id =~ /^\d+$/ && $activity_id && $activity_id =~ /^\d+$/;
+    my $row = eval {
+        $c->model('DBEncy')->resultset('HealthKitchen::UserHealthActivity')->search(
+            {
+                id                         => $activity_id,
+                health_plan_id             => $plan_id,
+                'health_plan.user_id'      => $c->session->{user_id},
+                'health_plan.sitename'     => $self->sitename($c),
+            },
+            { join => 'health_plan', rows => 1 }
+        )->first;
+    };
+    if ( $@ || !$row ) {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, 'set_activity_done',
+            "activity $activity_id not found for plan $plan_id: " . ( $@ || 'none' ) );
+        return { ok => 0, error => 'Activity not found.' };
+    }
+    try {
+        require Comserv::Util::AppTime;
+        $row->update( { done => $done ? 1 : 0, updated_at => Comserv::Util::AppTime->now_utc } );
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'set_activity_done',
+            "activity update failed: $_" );
+        return { ok => 0, error => 'Could not update activity.' };
+    };
+    return { ok => 1, done => $row->done ? 1 : 0 };
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -314,11 +314,13 @@ my ($use_twiggy, @argv_without_twiggy) = _strip_twiggy_flag(@ARGV);
 # =========================================================================
 
 sub _start_health_evaluator {
+    my ($guard_port) = @_;
     my $pid = fork();
     return unless defined $pid;   # fork failed - skip silently
 
     if ($pid == 0) {
         # --- child process ---
+        $ENV{COMSERV_GUARD_PORT} = $guard_port if defined $guard_port;
         eval {
             require Comserv::Util::HealthLogger;
             require Comserv::Model::RemoteDB;
@@ -404,7 +406,7 @@ sub _start_health_evaluator {
                         require Comserv::Util::AI::HermesOverrunGuard;
                         Comserv::Util::AI::HermesOverrunGuard->new(
                             app_root => ($ENV{CATALYST_HOME} // "$FindBin::Bin/.."),
-                            port     => $ENV{COMSERV_GUARD_PORT},
+                            port     => $guard_port,
                         )->run;
                     };
 
@@ -644,11 +646,9 @@ my $_is_dev_worktree =
     ($FindBin::Bin =~ m{PycharmProjects}) ||
     ($FindBin::Bin =~ m{comserv2});
 
-# Oct 29 2026 (Shanta, fix B): tell the forked health evaluator's overrun guard which port it serves, so every guard
-# log line / alert says e.g. [:4005 planning]. Set before the fork; the web child inherits it too (same port).
-{ my ($guard_port) = _parse_port_and_reload(@ARGV); $ENV{COMSERV_GUARD_PORT} //= $guard_port; }
-
-_start_health_evaluator() unless ($ENV{DISABLE_HEALTH_MONITOR} // '') eq '1' || $_is_dev_worktree;
+# Oct 29 2026 (Shanta, fix B): the forked health evaluator's overrun guard names the port it serves ([:4005 planning]).
+# The port comes from this server's -p only (set in the child; an inherited COMSERV_GUARD_PORT never wins).
+_start_health_evaluator((_parse_port_and_reload(@ARGV))[0]) unless ($ENV{DISABLE_HEALTH_MONITOR} // '') eq '1' || $_is_dev_worktree;
 
 if ($use_twiggy) {
     my ($port, $reload) = _parse_port_and_reload(@ARGV);

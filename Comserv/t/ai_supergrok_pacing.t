@@ -192,33 +192,49 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
     my $reset = Time::Local::timelocal(0, 31, 10, 15, 9, 2026);
     my $now   = Time::Local::timelocal(0, 15, 8, 9, 9, 2026);
     my $db = $P->can('daily_budget')->(used => 54, used_day_start => 53, day_from => $mid, reset => $reset, now => $now);
-    is $db->{budget_pct}, '5.7', 'budget (90-53)/6.44 days';
+    is $db->{budget_pct}, '7.3', 'budget (100-53)/6.44 days (Oct 31: even line to 100)';
     is $db->{used_today_pct}, '1.0', 'used today';
     is $db->{over}, 0, 'under budget';
     is $db->{date}, '2026-10-09', 'PT date';
-    $db = $P->can('daily_budget')->(used => 59.5, used_day_start => 53, day_from => $mid, reset => $reset, now => $now);
+    $db = $P->can('daily_budget')->(used => 61, used_day_start => 53, day_from => $mid, reset => $reset, now => $now);
     is $db->{over}, 1, 'over budget';
     is $db->{switch_off}, 1, 'switch_off';
-    like $db->{reason}, qr/today 6\.5% >= budget 5\.7%/, 'reason';
-    $db = $P->can('daily_budget')->(used => 59.5, used_day_start => 53, day_from => $mid, reset => $reset, now => $now,
+    like $db->{reason}, qr/today 8\.0% >= budget 7\.3%/, 'reason';
+    $db = $P->can('daily_budget')->(used => 61, used_day_start => 53, day_from => $mid, reset => $reset, now => $now,
         cfg => { extra_today_pct => 3, extra_today_date => '2026-10-09' });
-    is $db->{effective_budget_pct}, '8.7', 'extra today raises budget';
+    is $db->{effective_budget_pct}, '10.3', 'extra today raises budget';
     is $db->{over}, 0, '... not over';
     is $db->{override_active}, 1, '... override active';
-    $db = $P->can('daily_budget')->(used => 59.5, used_day_start => 53, day_from => $mid, reset => $reset, now => $now,
+    $db = $P->can('daily_budget')->(used => 61, used_day_start => 53, day_from => $mid, reset => $reset, now => $now,
         cfg => { extra_today_pct => 3, extra_today_date => '2026-10-08' });
     is $db->{over}, 1, 'extra for another day ignored';
     $db = $P->can('daily_budget')->(used => 70, used_day_start => 53, day_from => $mid, reset => $reset, now => $now,
         cfg => { allow_overrun_date => '2026-10-09' });
     is $db->{over}, 0, 'allow_overrun_date today: never over';
     is $db->{allow_overrun}, 1, '... flagged';
-    $db = $P->can('daily_budget')->(used => 91, used_day_start => 85, day_from => $mid, reset => $reset, now => $now,
+    $db = $P->can('daily_budget')->(used => 100, used_day_start => 95, day_from => $mid, reset => $reset, now => $now,
         cfg => { allow_overrun_date => '2026-10-09' });
     is $db->{week_off}, 1, 'week cutoff still applies with allow_overrun';
     is $db->{switch_off}, 1, '... switch_off';
     $db = $P->can('daily_budget')->(used => 91, used_day_start => 85, day_from => $mid, reset => $reset, now => $now, cfg => { week_off_at => 95 });
     is $db->{week_off}, 0, 'week_off_at configurable';
     is $db->{budget_pct}, '1.6', '... budget uses it';
+    # Oct 31 2026: no 90% stop; final window (<= 1 day to reset) may run to 100%.
+    $db = $P->can('daily_budget')->(used => 92, used_day_start => 85, day_from => $mid, reset => $reset, now => $now);
+    is $db->{week_off}, 0, '92% is not a week stop any more';
+    is $db->{week_off_at}, 100, 'week_off_at default 100';
+    is $db->{final_window}, 0, 'not final window 6 days out';
+    my $thu5 = Time::Local::timelocal(0, 0, 5, 15, 9, 2026);
+    $db = $P->can('daily_budget')->(used => 97, used_day_start => 80, day_from => $thu5, reset => $reset, now => $thu5 + 3600);
+    is $db->{final_window}, 1, 'Thu 05:00 -> final window';
+    is $db->{budget_pct}, '20.0', 'final window: all of the rest (100-80)';
+    is $db->{over}, 0, '... 97% still on grok';
+    $db = $P->can('daily_budget')->(used => 100, used_day_start => 80, day_from => $thu5, reset => $reset, now => $thu5 + 3600);
+    is $db->{switch_off}, 1, '100% -> off (luna)';
+    my $wed5 = Time::Local::timelocal(0, 0, 5, 14, 9, 2026);
+    $db = $P->can('daily_budget')->(used => 70, used_day_start => 70, day_from => $wed5, reset => $reset, now => $wed5 + 60);
+    is $db->{final_window}, 0, 'Wed 05:00 (29.5 h) is not final';
+    is $db->{budget_pct}, '24.4', 'Wed budget (100-70)/1.23 days';
     # normalization: readings 41 (Oct 8 19:04) and 54 (Oct 9 08:12), uniform tokens -> split by time
     my $cs = Time::Local::timelocal(0, 31, 10, 8, 9, 2026);
     my @rd = ({ at => $cs, value => 0, kind => 'used', source => 'other' },
@@ -246,6 +262,10 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
     ok !(grep { $_->{kind} eq 'day_rise' } @{ $m->{alerts} }), 'fresh meter 20% (rise ~5) -> no day_rise despite high estimate';
     my $old = $P->can('pacing')->(%base, meter_now => { value => 20, at => $now - 3 * 3600 });
     ok( (grep { $_->{kind} eq 'day_rise' && $_->{basis} eq 'estimate' } @{ $old->{alerts} }), 'meter 3 h old -> estimate again');
+    # Oct 31 2026: the daily budget's current % is the live add-on reading when fresh.
+    is $m->{daily_budget}{used_basis}, 'meter', 'daily budget uses live add-on reading';
+    is $m->{daily_budget}{used_now_pct}, '20.0', '... 20%';
+    is $old->{daily_budget}{used_basis}, 'estimate', 'stale add-on -> newest stored reading + estimate';
 }
 
 # Oct 20 2026: unchanged add-on posts keep the meter fresh (history row is 36 h old).

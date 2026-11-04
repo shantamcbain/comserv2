@@ -124,3 +124,36 @@ id = "dbi-dsn-password"
 description = "Perl DBI DSN with inline password=..."
 regex = '''(?i)dbi:[A-Za-z]+:[^'"\s]*;password=([^;'"\s$]{4,})'''
 secretGroup = 1
+
+# A live DB password was copied into docs and agent skills in forms the rules
+# above never match: a mysql -p flag, a DBI->connect() positional argument, a
+# backtick-quoted value in markdown. None of those name the field "password",
+# so they scanned clean and were committed. These three close that gap.
+[[rules]]
+id = "mysql-cli-password-flag"
+description = "mysql/mariadb client invocation with a -p password literal"
+regex = '''(?i)\b(?:mysql|mariadb|mysqldump)\b[^|\n]{0,240}?-[pP](['"])([^$'"\s]{6,})['"]'''
+secretGroup = 2
+entropy = 2.5
+[rules.allowlist]
+stopwords = ["your","example","changeme","replace","placeholder","dummy","xxx","redacted","fake","sample","test","here","paste","insert","set_me","todo","secret_value","password"]
+
+[[rules]]
+id = "dbi-connect-positional-password"
+description = "DBI->connect positional call whose password argument is a literal"
+regex = '''(?i)DBI\s*->\s*connect\s*\(\s*(?:\$\w+|['"][^'"]*['"])\s*,\s*(?:\$\w+|['"][^'"]*['"])\s*,\s*['"]([^'"\s$@%]{6,})['"]'''
+secretGroup = 1
+entropy = 2.5
+[rules.allowlist]
+stopwords = ["your","example","changeme","replace","placeholder","dummy","xxx","redacted","fake","sample","test","here","paste","insert","set_me","todo","secret_value","password"]
+
+[[rules]]
+id = "backtick-quoted-credential"
+description = "Credential value quoted in markdown backticks next to a password/key word"
+regex = '''(?i)(?:password|passwd|secret|api_key|apikey|token)\b[^`\n]{0,40}`([^`\s]{8,})`'''
+secretGroup = 1
+entropy = 2.5
+[rules.allowlist]
+stopwords = ["your","example","changeme","replace","placeholder","dummy","xxx","redacted","fake","sample","test","here","paste","insert","set_me","todo","secret_value","password"]
+# plain lowercase URL paths and file paths (e.g. `/proxmox`, `.hermes/docs/x-y.md`) are not credentials
+regexes = ['''^[./~]?[a-z0-9_-]*(/[a-z0-9_.-]+)+/?$''']

@@ -188,7 +188,10 @@
             [% FOREACH key IN api_keys %]
             <div class="api-key-card">
                 <div class="key-header">
-                    <span class="key-service">[% key.service %]</span>
+                    <span class="key-service">[% key.service | html %]</span>
+                    [% IF key.key_type && key.key_type != "chat" %]<span class="key-type">([% key.key_type | html %])</span>[% END %]
+                    [% IF key.label %]<span class="key-label">[% key.label | html %]</span>[% END %]
+                    [% IF key.base_url %]<span class="key-base-url" title="OpenAI-compatible endpoint">[% key.base_url | html %]</span>[% END %]
                     <span class="key-status [% key.is_active ? 'status-active' : 'status-inactive' %]">
                         [% key.is_active ? 'Active' : 'Inactive' %]
                     </span>
@@ -201,16 +204,16 @@
                 <div class="key-actions">
                     <a href="[% c.uri_for('/ai/edit_api_key', key.id) %]" class="btn btn-secondary">Edit Key</a>
                     <button type="button" class="btn btn-primary sync-models-btn" 
-                            data-service="[% key.service %]"
-                            title="Fetch latest available models from [% key.service %] API">
+                            data-service="[% key.service | html %]"
+                            title="Fetch latest available models from [% key.service | html %] API">
                         🔄 Sync Models
                     </button>
                     <form method="POST" action="[% c.uri_for('/ai/delete_api_key', key.id) %]" style="display: inline;" 
-                          onsubmit="return confirm('Are you sure you want to delete the API key for [% key.service %]?');">
+                          onsubmit="return confirm('Are you sure you want to delete the API key for [% key.service | html %]?');">
                         <button type="submit" class="btn btn-danger">Delete</button>
                     </form>
                 </div>
-                <div class="sync-result-[% key.service %]" style="margin-top:10px;display:none;"></div>
+                <div class="sync-result-[% key.service | html %]" style="margin-top:10px;display:none;"></div>
             </div>
             [% END %]
         [% ELSE %]

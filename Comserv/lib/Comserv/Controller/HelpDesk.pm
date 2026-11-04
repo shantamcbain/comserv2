@@ -301,12 +301,22 @@ sub _process_contact_post {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'contact_send',
         "Processing contact form submission");
 
-    my $name    = $c->req->params->{name}    || '';
-    my $email   = $c->req->params->{email}   || '';
-    my $subject = $c->req->params->{subject} || '';
+    require Comserv::Util::SpamGuard;
+    my $SG = 'Comserv::Util::SpamGuard';
+    # Header-injection guard (CSC-20261012-0420): these three go into the mail
+    # subject/body header lines, so CR/LF and control chars are stripped.
+    my $name    = $SG->clean_header($c->req->params->{name}    // '', 120);
+    my $email   = $SG->clean_header($c->req->params->{email}   // '', 254);
+    my $subject = $SG->clean_header($c->req->params->{subject} // '', 200);
     my $message = $c->req->params->{message} || '';
 
-    my $spam_err = $self->_spam_guard_fail($c, 'contact_send', $subject, $message);
+    # Content is scored below (quarantine) instead of hard-rejected, same as tickets.
+    my $spam_err = $self->_spam_guard_fail($c, 'contact_send', $subject, $message,
+        skip_content => $self->_hs_cfg($c, 'quarantine_enabled') ? 1 : 0);
+    if (!$spam_err && length $email && !$SG->valid_email($email)) {
+        $spam_err = 'Please enter a valid email address.';
+        $c->stash->{hd_error_field} = 'email';
+    }
     if ($spam_err) {
         my ($n1, $n2) = $self->_issue_math_challenge($c);
         $c->stash(
@@ -337,6 +347,52 @@ sub _process_contact_post {
     }
 
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+
+    # Shared spam guard: spam is kept as a quarantined HelpDesk ticket (staff can
+    # review/release it at /HelpDesk/admin/quarantine) and is NOT emailed.
+    my $is_guest = $self->_is_public_guest($c);
+    my $v = $SG->verdict(subject => $subject, body => $message, email => $email,
+                         guest => $is_guest, threshold => $self->_hs_cfg($c, 'quarantine_threshold'));
+    my $quarantine = $v->{quarantine};
+    $quarantine = 1 if !$self->_hs_cfg($c, 'quarantine_enabled') && $SG->looks_like_spam($subject, $message);
+    if ($quarantine) {
+        my $ok = eval {
+            my $tn = uc($site_name) . '-' . Comserv::Util::AppTime->today_utc_ymd_compact . '-' . sprintf('%04d', int(rand(9999)) + 1);
+            $c->model('DBEncy')->schema->resultset('SupportTicket')->create({
+                ticket_number => $tn,
+                site_name     => $site_name,
+                user_id       => $c->session->{user_id} || undef,
+                username      => $c->session->{username} || 'guest',
+                email         => $email,
+                subject       => $subject,
+                description   => $message,
+                category      => 'contact',
+                priority      => 'low',
+                status        => 'quarantine',
+                created_at    => Comserv::Util::AppTime->now_utc,
+                metadata      => $self->_build_ticket_metadata($c,
+                    entry_path => 'contact_form', contact_name => $name,
+                    spam_score => $v->{score}, spam_reasons => $v->{reasons}, quarantine => 1),
+            });
+            1;
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'contact_send',
+            "Contact message quarantined (no email) score=$v->{score} (" . join(',', @{ $v->{reasons} })
+            . ") ip=" . ($self->_client_ip($c) // '') . ($ok ? '' : ' store_failed=' . substr($@ // '', 0, 150)));
+        $self->_record_public_submit($c) if $is_guest;
+        $self->_hs_ip_rate_record($c) if $is_guest;
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
+        $c->stash(
+            template        => 'CSC/HelpDesk/contact.tt',
+            success_msg     => 'Your message has been sent. We will respond within 24 hours.',
+            title           => 'Contact Support',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $is_guest ? 1 : 0,
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
 
     try {
         $self->_notify_contact_admins($c,
@@ -2138,65 +2194,8 @@ sub _public_submit_rate_exceeded {
 
 sub _looks_like_spam_content {
     my ($self, $subject, $body) = @_;
-    my $text = join(' ', map { defined $_ ? $_ : '' } ($subject, $body));
-    # Normalize lookalikes used by BMASTER-20260901-6247 class spam
-    $text =~ s/\x{2116}/No./g;  # №
-    $text = lc($text);
-    $text =~ s/\s+/ /g;
-
-    # Crypto/phishing patterns (CSC-20260830-2900, BMASTER-20260901-6247, WEAVERBECK-20260902-0936)
-    my @patterns = (
-        qr/graph\.org/i,
-        qr/coinbase/i,
-        qr/\bbitcoin\b/i,
-        qr/bitcoin[\s\-_]?mining/i,
-        qr/cloud.?mining/i,                 # Cloud-Mining-08-27 etc. (WEAVERBECK-20260902-0936)
-        qr/one.?message.?for.?you/i,        # ONE MESSAGE for you (WEAVERBECK spam)
-        qr/open\s*[-=]*>+/i,               # OPEN ->>> graph.org
-        qr/\bbtc\b/i,
-        qr/you.?have.?a.?new.?bitcoin/i,
-        qr/wallet.?transfer/i,
-        qr/claim.?your.?crypto/i,
-        qr/hs=[0-9a-f]{16,}/i,
-        qr/no\.\s*[a-z]?\d{3,}/i,          # Transfer No. V8998 / № V8998
-        qr/transfer\s+(?:no\.?|n[o0]\.?|#)\s*[a-z]?\d+/i,
-        qr/next\s*-*>+/i,                  # NEXT ->> graph.org
-        qr/open\s*[⚡]/i,
-    );
-    for my $re (@patterns) {
-        return 1 if $text =~ $re;
-    }
-    # Extreme link density / short-link spam
-    my $links = () = $text =~ m{https?://}g;
-    return 1 if $links >= 3 && length($text) < 400;
-    # Bare graph.org / shortener without scheme still counts as a link bait
-    my $bare = () = $text =~ m{\b[\w\-]+\.(?:org|com|net|io)/\S+}g;
-    return 1 if $bare >= 1 && $text =~ /(?:coinbase|bitcoin|mining|transfer|wallet|cloud)/i;
-
-    # Link-only / promo profile detection (CSC-20260911-6270)
-    my @urls;
-    while ($text =~ m{(?:https?://|www\.)\S+}g) {
-        push @urls, $&;
-    }
-    if (@urls) {
-        my $stripped = $text;
-        for my $u (@urls) {
-            my $q = quotemeta($u);
-            $stripped =~ s/$q//g;
-        }
-        $stripped =~ s/\s+/ /g;
-        $stripped =~ s/^\s+|\s+$//g;
-        my $remain = length($stripped);
-        return 1 if $remain < 40;
-        if ($remain < 80 && $text =~ /(?:profile|follow me|check out my|visit my|subscribe|followers|promo|discount)/) {
-            return 1;
-        }
-        my $url_len = 0;
-        $url_len += length($_) for @urls;
-        my $tlen = length($text);
-        return 1 if $tlen > 0 && ($url_len / $tlen) >= 0.55;
-    }
-    return 0;
+    require Comserv::Util::SpamGuard;
+    return Comserv::Util::SpamGuard->looks_like_spam($subject, $body);
 }
 
 # Returns error message string on failure, empty string if OK.
@@ -2549,26 +2548,8 @@ sub _hs_turnstile_verify {
 # Pure: ($subject, $body, $email, $is_guest) -> ($score, \@reasons)
 sub _spam_score {
     my ($self, $subject, $body, $email, $is_guest) = @_;
-    my $text = join ' ', map { $_ // '' } ($subject, $body);
-    my ($score, @why) = (0);
-    my $add = sub { my ($n, $r) = @_; $score += $n; push @why, $r };
-
-    $add->(10, 'known_spam_pattern') if $self->_looks_like_spam_content($subject, $body);
-    my $links = () = $text =~ m{https?://}gi;
-    $add->($links >= 3 ? 3 : $links, "links=$links") if $links;
-    $add->(2, 'shortener') if $text =~ m{\b(?:bit\.ly|tinyurl\.com|t\.me|graph\.org|telegra\.ph|rb\.gy|cutt\.ly)\b}i;
-    my @kw = ($text =~ /\b(crypto|bitcoin|btc|usdt|wallet|airdrop|casino|viagra|cialis|seo services|backlinks?|guest post|loan offer|forex|investment opportunity|telegram|whatsapp me|binance|metamask)\b/gi);
-    $add->(scalar(@kw) * 2 > 6 ? 6 : scalar(@kw) * 2, 'keywords=' . join(',', map { lc } @kw)) if @kw;
-    if ($is_guest) {
-        $add->(1, 'guest_no_email') unless defined $email && $email =~ /\@/;
-        $add->(1, 'disposable_email') if defined $email && $email =~ /\@(?:mailinator|guerrillamail|10minutemail|tempmail|yopmail|sharklasers)\./i;
-    }
-    my $letters = () = $text =~ /[A-Za-z]/g;
-    my $caps    = () = $text =~ /[A-Z]/g;
-    $add->(1, 'mostly_caps') if $letters > 30 && $caps / $letters > 0.6;
-    $add->(1, 'cyrillic_mix') if $text =~ /\p{Cyrillic}/ && $text =~ /[A-Za-z]{4}/;
-    $add->(1, 'html_markup') if $text =~ /<a\s+href|\[url=/i;
-    return ($score, \@why);
+    require Comserv::Util::SpamGuard;
+    return Comserv::Util::SpamGuard->score($subject, $body, $email, $is_guest);
 }
 
 # --- Layer 6: optional AI classifier -----------------------------------

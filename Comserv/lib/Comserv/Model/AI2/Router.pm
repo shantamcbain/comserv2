@@ -106,16 +106,16 @@ my %CONTEXT_PREFS = (
     ency        => ['gemma4-64k', 'qwen2.5-coder', 'gemma4', 'qwen2.5'],
     bmaster     => ['gemma4-64k', 'qwen2.5-coder', 'gemma4', 'qwen2.5'],
     csc         => ['gemma4-64k', 'gemma4', 'qwen2.5-coder', 'qwen2.5'],
-    general     => ['gemma4-64k', 'gemma4', 'qwen2.5-coder', 'qwen3-coder'],
+    general     => ['gemma4-64k', 'gemma4', 'qwen2.5-coder'],
     navigation  => ['gemma4-64k', 'gemma4', 'qwen2.5-coder'],
     simple      => ['gemma4-64k', 'gemma4', 'qwen2.5-coder'],
-    code        => ['qwen2.5-coder', 'qwen3-coder', 'gemma4-64k', 'gemma4'],
-    developer   => ['qwen2.5-coder', 'qwen3-coder', 'gemma4-64k'],
+    code        => ['qwen2.5-coder', 'gemma4-64k', 'gemma4'],
+    developer   => ['qwen2.5-coder', 'gemma4-64k'],
     docker      => ['gemma4-64k', 'qwen2.5-coder', 'gemma4'],
     # Editor agents (from ai2/editor dropdown): analyze = root cause/short plan (can be lighter),
     # programming = code work (prefer coder models or higher tier), documentation = plans/docs.
-    analyze     => ['gemma4-64k', 'gemma4', 'qwen2.5-coder', 'qwen3-coder'],
-    programming => ['qwen2.5-coder', 'qwen3-coder', 'gemma4-64k', 'gemma4'],
+    analyze     => ['gemma4-64k', 'gemma4', 'qwen2.5-coder'],
+    programming => ['qwen2.5-coder', 'gemma4-64k', 'gemma4'],
     documentation => ['gemma4-64k', 'qwen2.5-coder', 'gemma4', 'qwen2.5'],
 );
 
@@ -972,6 +972,8 @@ sub openrouter_spend {
         my $rs = $schema->resultset('AiUsageLog');
         my %paid = (
             'me.provider' => { -in => [qw(openrouter external)] },
+            # Oct 30 2026: rows paid by a user's OWN key do not count against the owner's shared caps.
+            'me.billing_status' => [ { '!=' => 'user_key' }, undef ],
             -and => [
                 { 'me.model' => { -not_like => '%:free' } },
                 { 'me.model' => { -not_in => [qw(_api_snapshot xai-usage-check)] } },
@@ -1146,9 +1148,9 @@ sub _skip_reason {
         if ($is_failover) {
             my $sp = $a{spend} || ($c && ref $c && $c->can('model') ? $self->openrouter_spend($c) : { ok => 0 });
             return 'budget_unknown' unless $sp->{ok};
-            return 'budget_cap_day'   if $sp->{day}   >= ($k->{openrouter_soft_cap_day_usd}   // 1.65);
-            return 'budget_cap_week'  if $sp->{week}  >= ($k->{openrouter_soft_cap_week_usd}  // 11.50);
-            return 'budget_cap_month' if $sp->{month} >= ($k->{openrouter_soft_cap_month_usd} // 50);
+            return 'budget_cap_day'   if $sp->{day}   >= ($k->{openrouter_soft_cap_day_usd}   // 0);   # 0 = fail-safe; caps from ~/.comserv/ai_caps.json via ModelChains->knob
+            return 'budget_cap_week'  if $sp->{week}  >= ($k->{openrouter_soft_cap_week_usd}  // 0);
+            return 'budget_cap_month' if $sp->{month} >= ($k->{openrouter_soft_cap_month_usd} // 0);
             my $mcap = $k->{model_caps_usd_per_day}{$slug};
             return 'model_cap' if defined $mcap && ($sp->{by_model_day}{$slug} || 0) >= $mcap;
             my $ccap = $k->{chain_caps_usd_per_day}{ $a{purpose} // 'chat' };
@@ -1482,6 +1484,40 @@ sub dispatch_chat {
     my $resp = $self->chat_with_fallback($c, $provider_name, $use_model, $messages, %opts);
     $self->log_dispatch_usage($c, $resp, $log_purpose, int((Time::HiRes::time() - $t0) * 1000))
         if $log_purpose;
+    return $resp;
+}
+
+# Oct 30 2026: call a USER key that has a base_url as an OpenAI-compatible endpoint with any model id the user picks.
+# chat_user_endpoint($c, service => 'my-vllm', model => '...', messages => [...], key_type => 'chat', max_tokens => n)
+# Only the caller's own key (or a site/owner key with a base_url for a logged-in user). Guests: refused.
+# Every call is ledgered (branch/sitename/user tags + key_owner); a user's own key bills to them, not the shared caps.
+sub chat_user_endpoint {
+    my ($self, $c, %a) = @_;
+    require Comserv::Util::AI::UserKeys;
+    require Comserv::Model::AI2::Provider::OpenAICompatible;
+    my $uid = eval { $c->session->{user_id} };
+    return { success => 0, error => 'Please log in to use your own AI keys.' } unless defined $uid;
+    my $r = Comserv::Util::AI::UserKeys->get_user_key($c, $a{service}, key_type => ($a{key_type} // 'chat'),
+                                                       allow_owner => 0, ($a{schema} ? (schema => $a{schema}) : ()));
+    return { success => 0, error => 'No active key with a base URL for that provider.' } unless $r->{key} && $r->{base_url};
+    my $t0 = Time::HiRes::time();
+    my $resp = ($a{client} || Comserv::Model::AI2::Provider::OpenAICompatible->new)->chat(
+        base_url => $r->{base_url}, api_key => $r->{key}, model => $a{model}, messages => $a{messages},
+        max_tokens => $a{max_tokens}, ($a{ua} ? (ua => $a{ua}) : ()), ($a{no_dns} ? (no_dns => 1) : ()));
+    delete $r->{key};
+    my $u = ref $resp->{usage} eq 'HASH' ? $resp->{usage} : {};
+    my %row = (provider => "user:$r->{service}", model => ($a{model} // 'unknown'),
+               prompt_tokens => $u->{prompt_tokens} // 0, completion_tokens => $u->{completion_tokens} // 0,
+               duration_ms => int((Time::HiRes::time() - $t0) * 1000), request_type => 'chat_user_endpoint',
+               status => ($resp->{success} ? 'success' : 'error'), error_message => ($resp->{success} ? undef : $resp->{error}),
+               estimated_cost_usd => 0,   # billed by the user's own provider; we do not know their price
+               key_tags => Comserv::Util::AI::UserKeys->usage_tags({ %$r, key => 1 }),
+               metadata => { via => 'AI2::Router::chat_user_endpoint', base_url_host => ($r->{base_url} =~ m{^https?://([^/:]+)})[0] });
+    $row{response_text} = $resp->{response} if $resp->{success};
+    unless ($a{no_log}) {
+        eval { require Comserv::Model::AI::Usage; Comserv::Model::AI::Usage->new->log($c, %row); 1 };
+    }
+    $resp->{ledger_row} = \%row if $a{return_row};
     return $resp;
 }
 
