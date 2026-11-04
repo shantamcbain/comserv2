@@ -405,10 +405,65 @@ sub _ssh_exec_git {
     $result->{exit_code} = $code;
     $result->{output}    = defined $out ? $out : '';
     $result->{success}   = ($code == 0) ? 1 : 0;
+    # Name the host AND the remote repo: several targets share a host, and a
+    # bare "ssh host git merge ... failed" cannot be placed either.
+    my $where = $self->_log_where($tinfo, $tinfo->{repo}, 0);
     $self->logging->log_with_details($c, $result->{success} ? 'info' : 'error',
         __FILE__, __LINE__, 'git_ssh',
-        "ssh $tinfo->{host} git " . join(' ', @argv) . " -> exit=$code");
+        "[$where] ssh $tinfo->{host} git " . join(' ', @argv) . " -> exit=$code");
     return $result;
+}
+
+=head2 _checkout_branch($repo)
+
+Best-effort branch name of the checkout at C<$repo>, for log context only.
+Returns 'detached' on a detached HEAD, 'unknown' when the path is not a git
+checkout. Never dies and never logs — it must be safe to call from the failure
+path of another git command.
+
+=cut
+
+sub _checkout_branch {
+    my ($self, $repo) = @_;
+    return 'unknown' unless defined $repo && length $repo && -e "$repo/.git";
+    my ($out, $err) = ('', '');
+    eval { IPC::Run3::run3([ 'git', '-C', $repo, 'rev-parse', '--abbrev-ref', 'HEAD' ], \undef, \$out, \$err); 1 }
+        or return 'unknown';
+    my $b = $out // '';
+    $b =~ s/\s+\z//;
+    return 'detached' if !length $b || $b eq 'HEAD';
+    return $b;
+}
+
+=head2 _log_where($tinfo, $repo, $resolve_branch)
+
+Short "which checkout" tag prefixed to every C<git_run>/C<git_ssh> log line, so
+a failure in the log says WHICH branch/worktree/repo it happened in instead of
+four indistinguishable "git merge ... failed" rows (that ambiguity is exactly
+what made a dirty-worktree refusal unreadable in the health panel, 2026-11-04).
+
+Local: C<branch=git-dev worktree=git repo=/home/x/.comserv/worktrees/git/Comserv>
+Remote: C<host=workstation(192.168.1.20) user=shanta repo=/path/on/that/host>
+C<worktree=> is only added when the repo lives under a worktrees base dir.
+C<$resolve_branch> is false for successful commands: the extra C<rev-parse> is
+only worth running when something actually went wrong.
+
+=cut
+
+sub _log_where {
+    my ($self, $tinfo, $repo, $resolve_branch) = @_;
+    $tinfo //= {};
+    $repo  //= '';
+    if (($tinfo->{mode} // 'local') eq 'ssh') {
+        return sprintf('host=%s(%s) user=%s repo=%s',
+            ($tinfo->{label} // 'remote'), ($tinfo->{host} // '?'),
+            ($tinfo->{user} // '?'), $repo);
+    }
+    my @parts;
+    push @parts, 'branch=' . $self->_checkout_branch($repo) if $resolve_branch;
+    if ($repo =~ m{/worktrees/([^/]+)/[^/]+\z}) { push @parts, "worktree=$1"; }
+    push @parts, "repo=$repo";
+    return join(' ', @parts);
 }
 
 =head2 _run($c, @argv, \%opts)
@@ -580,6 +635,15 @@ sub _run {
     # Keep 'warn' so the merge is still visible in the log, not an audit todo.
     my $merge_conflict = ($subcmd eq 'merge')
         && $combined =~ /CONFLICT|Automatic merge failed/i;
+    # A merge refused because THIS checkout has uncommitted edits to files the
+    # merge would touch. Expected and already classified by the caller
+    # (update_all_from_main -> skipped_local_changes, merge_branch -> uncommitted*),
+    # and the branch is named in the log prefix. Logging it at ERROR put four
+    # indistinguishable rows in the health panel for worktrees that needed a
+    # commit, not a git fix (2026-11-04). 'warn' keeps it visible in the log/DB
+    # without spawning an error-audit todo for a normal dirty worktree.
+    my $merge_local_changes = ($subcmd eq 'merge')
+        && $combined =~ /would be overwritten by merge|Please commit your changes or stash them before you merge/i;
     # `git merge --abort` exits 128 with "There is no merge to abort
     # (MERGE_HEAD missing)" on some git versions when there is nothing to undo.
     # merge_abort() is deliberately idempotent, so this is not a failure.
@@ -611,12 +675,17 @@ sub _run {
                  : $secret_guard_block      ? 'warn'
                  : $ff_only_refused         ? 'warn'
                  : $merge_conflict          ? 'warn'
+                 : $merge_local_changes     ? 'warn'
                  : $benign                  ? 'info'
                  :                            'error';
     my $shown = ($result->{output} // '');
     $shown .= "\n" . $result->{error} if length($result->{error} // '');
+    # Name the checkout on every line. Without it, "git merge --no-ff --no-edit
+    # main -> exit=2" is identical for every worktree being bulk-updated, so the
+    # log/health panel cannot say which branch is dirty.
+    my $where = $self->_log_where($tinfo, $repo, $result->{success} ? 0 : 1);
     $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_run',
-        "git " . join(' ', @argv) . " -> exit=$code out=" . substr($shown, 0, 500));
+        "[$where] git " . join(' ', @argv) . " -> exit=$code out=" . substr($shown, 0, 500));
 
     return $result;
 }
@@ -1758,6 +1827,22 @@ sub _worktree_json_fresh {
 # with `main` first (port 3001), then every branch from root/config/worktrees.json
 # sorted by name. `cmd` is the one launch form used everywhere:
 #   cd <base_dir>/<branch>/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p <port> -r
+=head2 worktree_branches()
+
+Public view of C<root/config/worktrees.json>: C<{ base_dir => ..., branches => { <key> => { port, label, ... } } }>.
+C<build_worktree_list> carries only the display fields (name/port/label/url/cmd); callers that have to find each
+checkout ON DISK — e.g. Planning's C</planning/branch_sync> endpoint behind the Branch Servers card's Refresh
+button — need the registry key and the base dir. Read-only, never dies on a malformed file.
+
+=cut
+
+sub worktree_branches {
+    my ($self) = @_;
+    my $cfg  = eval { _worktree_config() } || {};
+    my $base = $cfg->{base_dir} // ($ENV{HOME} ? "$ENV{HOME}/.comserv/worktrees" : '');
+    return { base_dir => $base, branches => ($cfg->{branches} // {}) };
+}
+
 # BranchServerControl (per-branch start/stop/restart) consumes the same path/port, so
 # the list, the launch command, and the running server all agree.
 sub build_worktree_list {
@@ -2721,11 +2806,14 @@ root/config/worktrees.json, bring main into the branch:
 
 =over
 
-=item * Always skip C<Proxmox> / :4016, and any key in C<update_all_skip> (worktrees.json). Skip :4003 unless C<include_4003>.
+=item * NO port or branch is special-cased. C<Proxmox> / :4016 and C<3d> / :4003 are merged like every other worktree:
+a skip list of two branches is what let them drift hundreds of commits behind main. The only opt-out is an explicit key in
+C<update_all_skip> (worktrees.json), which is empty by default and is data, not code.
 
-=item * A dirty tree is NOT skipped: the merge is attempted and git itself refuses when main touches a changed file
-("local changes would be overwritten"). That refusal becomes a C<skipped_local_changes> row with the files.
-Never stash, never force, never rebase.
+=item * A dirty tree is NOT skipped and is NOT left holding back the whole merge: when git refuses with
+"local changes would be overwritten", the merge is retried with C<--autostash>. Everything main brings in lands, the dirty files are
+re-applied on top, and only an edit that actually collides stays behind (worktree conflict + kept stash). That row is
+C<merged_manual> with C<needs_manual> and the conflicted files. Never force, never reset, never rebase.
 
 =item * No commits of its own: C<merge --ff-only main>. Has its own commits: C<merge --no-ff --no-edit main>.
 
@@ -2739,10 +2827,6 @@ C<dry_run> moves nothing; it predicts the action (including a local-changes refu
 would auto-restart (dev servers run with C<-r>). C<config> overrides worktrees.json (tests). Returns { rows, summary, restart_ports }.
 
 =cut
-
-our %UPDATE_ALL_ALWAYS_SKIP = (Proxmox => 1);
-our %UPDATE_ALL_SKIP_PORTS  = (4016 => 1);
-our $UPDATE_ALL_GATED_PORT  = 4003;
 
 sub _port_listening_local {
     my ($port) = @_;
@@ -2762,7 +2846,6 @@ sub update_all_from_main {
     my ($self, $c, $opts) = @_;
     $opts //= {};
     my $dry  = $opts->{dry_run} ? 1 : 0;
-    my $inc3 = $opts->{include_4003} ? 1 : 0;
     my $cfg  = $opts->{config} || (eval { _worktree_config() } // {});
     my $base = $cfg->{base_dir} // "$ENV{HOME}/.comserv/worktrees";
     my $branches = $cfg->{branches} // {};
@@ -2777,13 +2860,10 @@ sub update_all_from_main {
         my $row  = { key => $key, port => $port, path => $dir, action => 'skipped' };
         push @rows, $row;
 
-        if ($UPDATE_ALL_ALWAYS_SKIP{$key} || (defined $port && $UPDATE_ALL_SKIP_PORTS{$port})) {
-            $row->{action} = 'skipped_proxmox'; $row->{reason} = 'Proxmox / :4016 is always left alone'; next;
-        }
+        # The ONLY skip is the explicit per-branch list in worktrees.json (empty
+        # by default). Proxmox/:4016 and 3d/:4003 used to be hard-coded here and
+        # that is exactly what kept them out of sync with main.
         if ($listed{$key}) { $row->{action} = 'skipped_listed'; $row->{reason} = 'in update_all_skip (worktrees.json)'; next; }
-        if (defined $port && $port == $UPDATE_ALL_GATED_PORT && !$inc3) {
-            $row->{action} = 'skipped_4003'; $row->{reason} = ':4003 needs the "include :4003" box ticked'; next;
-        }
         unless (-e "$dir/.git") { $row->{action} = 'missing'; $row->{reason} = 'no checkout'; next; }
 
         my $b = $self->_run($c, 'branch', '--show-current', { repo => $dir });
@@ -2812,8 +2892,19 @@ sub update_all_from_main {
             push @dirty, $p if length $p;
         }
         $row->{dirty_files} = [ @dirty[0 .. ($#dirty < 19 ? $#dirty : 19)] ] if @dirty;
+        $row->{dirty_count} = scalar @dirty;
+        $row->{tree} = @dirty ? scalar(@dirty) . ' uncommitted' : 'tree clean';
 
-        if ($row->{behind} == 0) { $row->{action} = 'uptodate'; next; }
+        if ($row->{behind} == 0) {
+            # 'uptodate' was read as "identical to main" and hid a branch that is clean
+            # but carries its own commits (git-dev was 0 behind / 1 ahead and displayed
+            # as up to date). Report the ahead count and the tree state separately.
+            $row->{action} = $row->{ahead} ? 'ahead_only' : 'in_sync';
+            $row->{reason} = $row->{ahead}
+                ? $row->{ahead} . ' commit(s) main does not have - nothing to merge'
+                : 'nothing to merge';
+            next;
+        }
         $row->{will_restart} = $listening->($port) ? 1 : 0;
 
         if ($dry) {
@@ -2832,9 +2923,10 @@ sub update_all_from_main {
                 push @hit, $f unless $same->{success};
             }
             if (@hit) {
-                $row->{action} = 'would_skip_local_changes'; $row->{files} = \@hit;
-                $row->{reason} = 'main changes files with uncommitted edits here';
-                $row->{will_restart} = 0;
+                # Not a blocker any more: the real run merges with --autostash and
+                # re-applies these edits. Preview says so instead of "skipped".
+                $row->{action} = 'would_merge_autostash'; $row->{files} = \@hit;
+                $row->{reason} = 'main changes files you have edited here — merged with --autostash, your edits re-applied on top';
             } else {
                 $row->{action} = $row->{ahead} ? 'would_merge' : 'would_ff';
             }
@@ -2844,6 +2936,41 @@ sub update_all_from_main {
         my @m = $row->{ahead} ? ('merge', '--no-ff', '--no-edit', 'main') : ('merge', '--ff-only', 'main');
         my $m = $self->_run($c, @m, { repo => $dir });
         my $out = join("\n", grep { defined && length } $m->{output}, $m->{error});
+
+        # A dirty worktree refuses the WHOLE merge when main touches even one of those
+        # files, so every other incoming change is held back too — that is the "it is
+        # not really merging what it could" complaint. Retry with git's own --autostash:
+        # it stores the dirty files, merges everything that does not conflict, then
+        # re-applies them. Nothing is discarded; if the re-apply conflicts, the stash is
+        # KEPT and the row is flagged needs_manual so the branch is named.
+        if (!$m->{success} && $out =~ /would be overwritten by merge|Please commit your changes or stash them before you merge/i) {
+            my @m2 = $row->{ahead} ? ('merge', '--no-ff', '--no-edit', '--autostash', 'main')
+                                   : ('merge', '--ff-only', '--autostash', 'main');
+            my $m2  = $self->_run($c, @m2, { repo => $dir });
+            my $out2 = join("\n", grep { defined && length } $m2->{output}, $m2->{error});
+            $row->{autostash} = 1;
+            if ($m2->{success} && $out2 !~ /autostash resulted in conflicts/i) {
+                $m = $m2; $out = $out2;
+            }
+            elsif ($out2 =~ /autostash resulted in conflicts/i) {
+                # Merge landed, but re-applying the user's edits collided with it.
+                # Stop here: the tree is left for a human, the stash keeps those edits.
+                my $sl = $self->_run($c, 'stash', 'list', { repo => $dir });
+                ($row->{stash} = $sl->{output} // '') =~ s/\s+\z//;
+                my $s2 = $self->_run($c, 'status', '--porcelain', { repo => $dir });
+                $row->{manual_files} = [ map { (my $p = $_) =~ s/^.{2}\s//; $p }
+                                         grep { /^(?:UU|AA|DD|AU|UA|DU|UD) / } _lines($s2->{output}) ];
+                $row->{action} = 'merged_manual'; $row->{needs_manual} = 1; $row->{will_restart} = 0;
+                $row->{reason} = 'merged main, but your uncommitted edits conflict with it — resolve in that worktree; edits are kept in git stash';
+                my $post = $self->_run($c, 'rev-parse', 'HEAD', { repo => $dir });
+                ($row->{post_merge_commit} = $post->{output} // '') =~ s/\s+\z//;
+                next;
+            }
+            else {
+                $m = $m2; $out = $out2;   # fall through to conflict/blocked/failed classification
+            }
+        }
+
         if ($m->{success}) {
             $row->{action} = $row->{ahead} ? 'merged' : 'fast_forwarded';
             my $post = $self->_run($c, 'rev-parse', 'HEAD', { repo => $dir });
@@ -2858,22 +2985,23 @@ sub update_all_from_main {
                 if ($in && $l =~ /^\s+(\S.*?)\s*$/) { push @f, $1; next }
                 $in = 0 if $in && $l !~ /^\s/;
             }
-            $row->{action} = 'skipped_local_changes'; $row->{files} = \@f;
-            $row->{reason} = 'git refused: uncommitted changes would be overwritten (nothing changed)';
+            $row->{action} = 'skipped_local_changes'; $row->{files} = \@f; $row->{needs_manual} = 1;
+            $row->{reason} = 'git refused even with --autostash: uncommitted changes would be overwritten (nothing changed)';
         }
         elsif ($out =~ /secret-guard:|junk-guard:|pre-merge-commit:|^\s*BLOCKED:/m) {
-            $row->{action} = 'blocked'; $row->{reason} = 'secret/junk guard refused the merge (not bypassed)';
+            $row->{action} = 'blocked'; $row->{needs_manual} = 1;
+            $row->{reason} = 'secret/junk guard refused the merge (not bypassed)';
             $row->{detail} = substr($out, 0, 400);
         }
         elsif (_worktree_merge_in_progress($dir)) {
             my $s2 = $self->_run($c, 'status', '--porcelain', { repo => $dir });
             my @cf = map { (my $p = $_) =~ s/^.{2}\s//; $p } grep { /^(?:UU|AA|DD|AU|UA|DU|UD) / } _lines($s2->{output});
-            $row->{action} = 'conflict'; $row->{files} = \@cf;
+            $row->{action} = 'conflict'; $row->{files} = \@cf; $row->{needs_manual} = 1;
             $row->{reason} = 'conflict; merge aborted, branch unchanged';
         }
         else {
             ($row->{reason} = substr($out, 0, 240)) =~ s/\s+/ /g;
-            $row->{action} = 'failed';
+            $row->{action} = 'failed'; $row->{needs_manual} = 1;
         }
         if (_worktree_merge_in_progress($dir)) {
             my $ab = $self->_run($c, 'merge', '--abort', { repo => $dir });
@@ -2881,13 +3009,36 @@ sub update_all_from_main {
         }
     }
 
+    # No fallback: $row->{tree} is set at the one place the tree is actually
+    # inspected (status --porcelain). Rows that were skipped, missing, never a
+    # feature branch, or failed before that point leave it unset, and the view
+    # then shows nothing rather than claiming "tree clean" for an unknown state.
+
     my %n; $n{ $_->{action} }++ for @rows;
     my @restart = map { $_->{port} } grep { $_->{will_restart} } @rows;
     my $summary = join(', ', map { "$n{$_} $_" } sort keys %n);
     $summary = ($dry ? 'Preview (nothing changed): ' : 'Update all from main: ') . $summary;
     $summary .= '. Will auto-restart (-r): ' . join(', ', map { ":$_" } @restart) if @restart && $dry;
     $summary .= '. Auto-restarted (-r): '    . join(', ', map { ":$_" } @restart) if @restart && !$dry;
-    $self->logging->log_with_details($c, ($n{failed} || $n{conflict} || $n{blocked}) ? 'warn' : 'info',
+    # Name the worktrees that need a human. A dirty worktree refuses with the
+    # same three stderr lines as every other dirty worktree, so the counts alone
+    # ("4 skipped_local_changes") never said WHICH branch to go and commit in.
+    my @attention = grep { $_->{needs_manual} || ($_->{action} // '') =~ /^(?:skipped_local_changes|failed|conflict|blocked|merged_manual)\z/ } @rows;
+    if (@attention) {
+        $summary .= '. Needs attention: ' . join('; ', map {
+            my $f = ($_->{files} && @{ $_->{files} }) ? ' [' . join(', ', @{ $_->{files} }) . ']' : '';
+            sprintf('%s%s (:%s) %s%s',
+                $_->{key}, ($_->{branch} ? "=$_->{branch}" : ''), ($_->{port} // '?'), $_->{action}, $f);
+        } @attention);
+    }
+    # Deliberately NO automatic restart here. Restarting a branch server kills that
+    # port's open browser sessions and any Hermes/agent chat running in it, so the
+    # operator restarts what they choose (Develop Servers card / systemctl --user).
+    # The rows only say whether a server was listening, and the -r watchers handle
+    # their own reload after the files settle.
+
+    $self->logging->log_with_details($c,
+        ($n{failed} || $n{conflict} || $n{blocked} || $n{skipped_local_changes}) ? 'warn' : 'info',
         __FILE__, __LINE__, 'git_merge', $summary);
     return { rows => \@rows, summary => $summary, restart_ports => \@restart, dry_run => $dry };
 }

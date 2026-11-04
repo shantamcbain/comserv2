@@ -2348,9 +2348,9 @@ sub _catch_up_note {
 =head2 update_all_from_main
 
 POST /admin/git/update_all_from_main (admin-only, session CSRF token). Oct 31 2026 (Shanta).
-Params: mode=preview|update, include_4003=1 (optional), csrf. Brings main into every registered
+Params: mode=preview|update, csrf. Brings main into every registered
 worktree via Comserv::Util::Git->update_all_from_main (no stash, no force, no rebase; conflicts
-aborted; Proxmox/:4016 always skipped). Returns JSON { success, rows, summary, restart_ports, dry_run }.
+aborted; no branch or port is special-cased). Returns JSON { success, rows, summary, restart_ports, dry_run }.
 
 =cut
 
@@ -2416,7 +2416,6 @@ sub update_all_from_main :Path('/admin/git/update_all_from_main') :Args(0) {
     my $res = eval {
         $self->git_service->update_all_from_main($c, {
             dry_run      => $dry,
-            include_4003 => ($c->req->param('include_4003') ? 1 : 0),
         });
     };
     if (!$res) {

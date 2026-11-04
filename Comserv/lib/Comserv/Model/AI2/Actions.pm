@@ -529,12 +529,15 @@ sub perform {
         my $user_id     = $c->session->{user_id} || undef;
         my $username    = $current_user;
 
-        if (Comserv::Controller::HelpDesk->_looks_like_spam_content($subject, $description)) {
+        # Shared spam guard (CSC-20261012-0420): spam -> quarantined ticket, no webhook.
+        require Comserv::Util::SpamGuard;
+        my $sg = Comserv::Util::SpamGuard->verdict(subject => $subject, body => $description,
+            email => $email, guest => ($user_id ? 0 : 1));
+        $sg->{quarantine} = 1 if Comserv::Util::SpamGuard->looks_like_spam($subject, $description);
+        if ($sg->{quarantine}) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'action',
-                "AI create_helpdesk_ticket blocked as spam: subject=" . substr($subject // '', 0, 80));
-            $c->response->status(400);
-            $c->response->body(encode_json({ success => JSON::false, error => 'Your request was blocked by our spam filter.' }));
-            return;
+                "AI create_helpdesk_ticket quarantined score=$sg->{score} (" . join(',', @{ $sg->{reasons} })
+                . ") subject=" . substr($subject // '', 0, 80));
         }
 
         my $ticket_number = uc($site_name) . '-' . DateTime->now->strftime('%Y%m%d') . '-' . sprintf('%04d', int(rand(9999)) + 1);
@@ -552,7 +555,7 @@ sub perform {
                 description   => $description,
                 category      => $category,
                 priority      => $priority,
-                status        => 'open',
+                status        => $sg->{quarantine} ? 'quarantine' : 'open',
                 created_at    => $now_str,
                 metadata      => eval { JSON->new->canonical->encode({ entry_path => "ai2_action", client_ip => (scalar($c->req->header("CF-Connecting-IP")) || $c->req->address), remote_addr => $c->req->address, user_agent => scalar($c->req->user_agent), sitename => $site_name }) },
             });
@@ -569,6 +572,7 @@ sub perform {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
             "AI action create_helpdesk_ticket: id=$ticket_id num=$ticket_num sitename=$site_name by=$username subject='$subject'");
         eval {
+            die "quarantined\n" if $sg->{quarantine};   # no webhook for quarantined spam
             Comserv::Util::HelpDeskWebhook->notify_ticket_change($c,
                 event  => 'ticket.created',
                 change => 'created',
