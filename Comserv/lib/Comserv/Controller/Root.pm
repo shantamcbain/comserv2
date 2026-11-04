@@ -237,6 +237,22 @@ sub auto :Private {
     # endpoints) — guests must never reach these (CSC-20260831-3242 / 6513 / 4599).
     if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site(?:/|$)|themetest|file/admin|Weather/(?:configuration|test_config|save_configuration|poll|test_location|lookup_postal)(?:/|$))}) {
         unless ($c->user_exists && $c->check_user_roles('admin')) {
+            # A JSON/XHR caller (the Git dashboard's fetch handlers) must never be
+            # answered with a 302 to an HTML login page: the browser follows it,
+            # fetch().json() throws "Unexpected token '<'", and the button looks
+            # dead. 2026-11-03: this is exactly why "Update all from main" seemed
+            # not to work on an expired session. Return JSON 403 instead; normal
+            # page GETs keep the redirect.
+            my $wants_json = (($c->req->header('Accept') // '') =~ m{application/json}i)
+                          || (($c->req->header('X-Requested-With') // '') =~ m{XMLHttpRequest}i);
+            if ($wants_json && $c->req->method ne 'GET') {
+                $c->response->status(403);
+                $c->response->content_type('application/json');
+                $c->response->body(
+                    '{"success":false,"error":"Administrator access required: your session expired. '
+                  . 'Sign in again, then reload the page."}');
+                return 0;
+            }
             $c->response->redirect($c->uri_for('/user/login'));
             return 0;
         }
@@ -508,6 +524,16 @@ sub auto :Private {
         $c->stash->{user_id} = $user_id;
         $c->stash->{user_roles} = $user_roles;
         $c->stash->{is_admin} = $is_admin;
+        # Global admin by the STORED users.roles (session roles include site roles
+        # merged at login). Used for links to global-only pages such as
+        # /admin/role_permissions. One PK lookup, only for admins.
+        $c->stash->{is_global_admin} = 0;
+        if ($is_admin && $user_id) {
+            $c->stash->{is_global_admin} = eval {
+                require Comserv::Util::AccessCheck;
+                Comserv::Util::AccessCheck->is_global_admin($c->model('DBEncy'), $user_id)
+            } ? 1 : 0;
+        }
 
         # Durable CSC-admin capability flag for the site switcher.
         # AdminAuth->is_csc_admin() returns false once a CSC admin has *switched*
@@ -1411,12 +1437,27 @@ sub auto :Private {
 sub health :Path('/health') :Args(0) {
     my ($self, $c) = @_;
     
-    # Lightweight liveness check — no DB query, no session, no logging.
-    # Purpose: tell Docker the web process is alive and accepting connections.
-    # DB health is monitored separately by ContainerHealthMonitor.pl.
+    # Readiness check used by Docker HEALTHCHECK and HAProxy. No session, no
+    # logging. 200 only when the real DB (MariaDB/MySQL, not the SQLite
+    # fallback) answers and the core tables exist; otherwise 503 so HAProxy
+    # stops routing here (Oct 31 2026: production1 served 500s from an empty
+    # SQLite DB while /health said ok). Result cached per worker for
+    # <DBReadiness> health_cache_s seconds (default 5), so it stays cheap.
+    require Comserv::Util::DbReadiness;
+    my $s   = Comserv::Util::DbReadiness->settings($c->config);
+    my $dbh = eval { $c->model('DBEncy')->schema->storage->dbh };
+    my $r   = Comserv::Util::DbReadiness->check($dbh,
+        cache_s => $s->{health_cache_s}, tables => $s->{core_tables});
     $c->response->content_type('application/json');
-    $c->response->status(200);
-    $c->response->body('{"status":"ok"}');
+    $c->response->header('Cache-Control' => 'no-store');
+    if ($r->{ok}) {
+        $c->response->status(200);
+        $c->response->body('{"status":"ok","db":"ok"}');
+    } else {
+        (my $why = $r->{error} // 'db not ready') =~ s/["\\\x00-\x1f]/ /g;
+        $c->response->status(503);
+        $c->response->body(qq({"status":"unavailable","db":"$why"}));
+    }
     $c->detach;
     return;
 }

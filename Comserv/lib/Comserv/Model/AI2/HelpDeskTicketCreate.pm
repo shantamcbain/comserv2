@@ -226,12 +226,17 @@ sub create_from_params {
     }
     $username = 'ai' if !$username;
 
-    require Comserv::Controller::HelpDesk;
-    if (Comserv::Controller::HelpDesk->_looks_like_spam_content($subject, $description)) {
+    # Shared spam guard (CSC-20261012-0420), same scoring as the web forms:
+    # spam becomes a quarantined ticket (no webhook), staff can release it.
+    require Comserv::Util::SpamGuard;
+    my $sg = Comserv::Util::SpamGuard->verdict(subject => $subject, body => $description,
+        email => $email, guest => ($username eq 'guest' ? 1 : 0));
+    $sg->{quarantine} = 1 if Comserv::Util::SpamGuard->looks_like_spam($subject, $description);
+    if ($sg->{quarantine}) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
             'create_from_params',
-            'AI helpdesk ticket blocked as spam: subject=' . substr($subject, 0, 80));
-        return { success => JSON::false, error => 'Your request was blocked by our spam filter.' };
+            "AI helpdesk ticket quarantined score=$sg->{score} (" . join(',', @{ $sg->{reasons} })
+            . ') subject=' . substr($subject, 0, 80));
     }
 
     my $schema = $self->_schema($c)
@@ -253,7 +258,7 @@ sub create_from_params {
             description   => $description,
             category      => $category,
             priority      => $priority,
-            status        => 'open',
+            status        => $sg->{quarantine} ? 'quarantine' : 'open',
             created_at    => $now_str,
         });
     };
@@ -269,6 +274,7 @@ sub create_from_params {
         'create_from_params',
         "AI helpdesk ticket: id=$ticket_id num=$ticket_num sitename=$site_name by=$username subject='$subject'");
     eval {
+        die "quarantined\n" if $sg->{quarantine};   # no webhook for quarantined spam
         Comserv::Util::HelpDeskWebhook->notify_ticket_change($c,
             event  => 'ticket.created',
             change => 'created',

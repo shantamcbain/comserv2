@@ -609,7 +609,13 @@
                     — currently on <code style="font-size:1em;">[% cur_branch %]</code>
                     [% END %]
                 </span>
-                <span style="color:var(--text-muted-color);font-size:0.9em;">▾</span>
+                <span style="display:flex;gap:8px;align-items:center;">
+                    <span data-branch-sync-note="1" style="font-size:0.78em;color:var(--text-muted-color);white-space:nowrap;"></span>
+                    <button type="button" data-branch-sync-refresh="1" data-branch-sync-url="/planning/branch_sync"
+                            title="Re-read every branch's state vs main (read-only — nothing is merged)"
+                            style="padding:3px 10px;background:#fd7e14;color:#fff;border:none;border-radius:3px;font-size:0.85em;cursor:pointer;white-space:nowrap;">⟳ Refresh</button>
+                    <span style="color:var(--text-muted-color);font-size:0.9em;">▾</span>
+                </span>
             </summary>
             <div style="padding:10px 14px;">
 
@@ -650,6 +656,7 @@
                     <tr style="border-bottom:1px solid var(--border-color);">
                         <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Branch</th>
                         <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Port</th>
+                        <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);" title="Filled live by ⟳ Refresh">vs main</th>
                         <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Start Command</th>
                         <th style="padding:4px 8px;"></th>
                     </tr>
@@ -659,6 +666,7 @@
                             [% IF b.name == cur_branch %]<span style="color:#fd7e14;font-size:0.8em;"> ← current</span>[% END %]
                         </td>
                         <td style="padding:5px 8px;"><code>:[% b.port %]</code></td>
+                        <td data-branch-sync="[% b.port %]" style="padding:5px 8px;white-space:nowrap;font-size:0.85em;color:var(--text-muted-color);">…</td>
                         <td style="padding:5px 8px;max-width:340px;">
                             <code id="cmd-[% b.port %]" style="font-size:0.8em;word-break:break-all;">[% b.cmd %]</code>
                             <button onclick="navigator.clipboard.writeText(document.getElementById('cmd-[% b.port %]').textContent);this.textContent='✓';setTimeout(()=>this.textContent='📋',1500);"

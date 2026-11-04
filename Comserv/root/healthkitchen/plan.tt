@@ -1,0 +1,56 @@
+[% META
+   title = "Health Kitchen plan"
+   description = "Today menu and activities from the pantry match"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "HealthKitchen"
+   page_version = "0.01"
+   last_updated = "2026-10-29"
+%]
+[% PageVersion = 'healthkitchen/plan.tt,v 0.01 2026/10/29 hermes-agent Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+    [% INCLUDE 'healthkitchen/_disclaimer.tt' %]
+    <div class="page-header">
+        <h1>Today's plan</h1>
+        <p class="doc-muted">
+            <a href="[% c.uri_for('/healthkitchen') %]">Health Kitchen</a>
+            [% IF hk_plan.plan_date %] &middot; [% hk_plan.plan_date | html %][% END %]
+            &middot; source [% hk_plan.source | html %]
+        </p>
+    </div>
+    [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+
+    <div class="content-section">
+        <p>[% hk_plan.trust_summary | html %]</p>
+        <h2>Menu</h2>
+        [% IF hk_plan.slots.size %]
+            <ul>
+                [% FOREACH s IN hk_plan.slots %]
+                    <li><strong>[% s.meal_slot | html %]</strong> &mdash; [% s.free_text | html %]</li>
+                [% END %]
+            </ul>
+        [% ELSE %]
+            <p class="doc-muted">Nothing was saved on this plan. Rebuild from Health Kitchen. A general menu does not need symptoms.</p>
+        [% END %]
+    </div>
+
+    <div class="content-section">
+        <h2>Activities</h2>
+        [% INCLUDE 'healthkitchen/_activities.tt' %]
+    </div>
+
+    [% IF hk_plan.not_in_pantry.size %]
+        <div class="content-section">
+            <h2>Not on the menu</h2>
+            <p class="doc-muted">ENCY links that are not in the pantry. Shown so you can see what was left out. Not a suggestion to buy or take them.</p>
+            <ul>
+                [% FOREACH h IN hk_plan.not_in_pantry %]
+                    <li>[% h.name | html %][% IF h.contra_indications %] <span class="doc-muted">cautions: [% h.contra_indications | html %]</span>[% END %]</li>
+                [% END %]
+            </ul>
+        </div>
+    [% END %]
+</div>

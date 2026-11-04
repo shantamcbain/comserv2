@@ -705,9 +705,28 @@ sub daily :Path('/planning/daily') :Args {
             # Branch worktrees show ONLY this branch's todos (Shanta, Oct 24 2026).
             # Only main ranks every branch. ?filter_project=all is the escape hatch.
             my $before_branch = scalar @all_sorted;
+            # An ACTIVE todo (status 5, or a log that is still open) is somebody's
+            # current work: it must never disappear behind branch scope. Measured
+            # 2026-11-03: todo 2006 was running with an open log (id 2110) yet was
+            # invisible on /planning/daily served from the git worktree, because its
+            # project (3) is outside that branch's project scope. Keep a copy of the
+            # active rows and merge back any the branch filter would drop.
+            my @active_rows = grep {
+                (($_->{status} // '') eq '5') || $_->{in_progress}
+            } @all_sorted;
             @all_sorted = grep {
                 Comserv::Util::FocusRanking::todo_matches_branch($_, $cur_branch, \%branch_scope)
             } @all_sorted;
+            if (@active_rows) {
+                my %_have = map { ($_->{record_id} // 0) => 1 } @all_sorted;
+                my @_rescued = grep { !$_have{ $_->{record_id} // 0 } } @active_rows;
+                push @all_sorted, @_rescued if @_rescued;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                    'daily', 'Branch focus rescued ' . scalar(@_rescued)
+                    . ' active todo(s) outside branch scope: '
+                    . join(',', map { $_->{record_id} } @_rescued))
+                    if @_rescued;
+            }
             my $matched = scalar @all_sorted;
             my $hidden_other = $before_branch - $matched;
             $c->stash->{branch_focus_filter} = {
@@ -841,6 +860,23 @@ sub daily :Path('/planning/daily') :Args {
         }
         @active_priorities = @picked;
         $c->stash->{active_priorities_backlog} = $focus_total - scalar(@active_priorities);
+
+        # Render-time truth: without this, "an active todo is missing from the
+        # page" can only be argued about, never measured. Lists whether the row
+        # reached the pool, whether it was ranked active, and where it sits.
+        if ($self->logging) {
+            my @_act = grep { $_->{is_active_work} } @active_priorities;
+            my @_top = @active_priorities ? @active_priorities[0 .. ($#active_priorities > 4 ? 4 : $#active_priorities)] : ();
+            my ($_in_pool) = grep { ($_->{record_id} // 0) == 2006 } @all_sorted;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
+                'Focus queue: pool=' . scalar(@all_sorted)
+                . ' picked=' . scalar(@active_priorities)
+                . ' active_flagged=' . scalar(@_act)
+                . ' top=[' . join(',', map { ($_->{record_id} // 0) . ':' . ($_->{status} // '?') } @_top) . ']'
+                . ' todo2006_in_pool=' . ($_in_pool ? 1 : 0)
+                . ' sitename=' . ($sitename // '?')
+                . ' branch=' . ($cur_branch // '?'));
+        }
 
         # Keep the complete eligible backlog available separately from the
         # limited Focus Queue. It uses the same server-side filters and score
@@ -1687,6 +1723,68 @@ buttons (Back-to-Top / AI Editor / Chat) render correctly — no nested
 full-page injection.
 
 =cut
+
+=head2 branch_sync
+
+GET C</planning/branch_sync> — JSON, read-only: the live git state of every worktree in
+C<root/config/worktrees.json> (current branch, commits ahead of / behind C<main>, uncommitted file count,
+merge-in-progress flag). It backs the Branch Servers card's Refresh button and its fill-on-load, so the card
+never has to be left and re-entered to see a branch move relative to main. Mutates nothing; a git failure becomes
+a C<missing> row or a zero count rather than an error page.
+
+=cut
+
+sub branch_sync :Path('/planning/branch_sync') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $roles = $c->stash->{user_roles} || $c->session->{roles} || [];
+    $roles = [$roles] unless ref $roles eq 'ARRAY';
+    my $can = $c->stash->{is_admin} || grep { lc($_) =~ /^(admin|developer|editor)$/ } @$roles;
+    unless ($can) {
+        $c->response->status(403);
+        return $c->response->body(encode_json({ success => 0, error => 'admin/developer role required' }));
+    }
+
+    require Comserv::Util::Git;
+    my $git  = Comserv::Util::Git->new(logging => $self->logging);
+    my $reg  = $git->worktree_branches;
+    my $base = $reg->{base_dir} // '';
+
+    my @out;
+    for my $key (sort keys %{ $reg->{branches} }) {
+        my $ent  = $reg->{branches}{$key};
+        my $port = ref $ent eq 'HASH' ? $ent->{port} : $ent;
+        my $dir  = (length $base ? "$base/$key/Comserv" : '');
+        my %row  = (
+            key   => $key,
+            port  => (defined $port && $port =~ /^\d+$/) ? $port + 0 : undef,
+            label => (ref $ent eq 'HASH' ? ($ent->{label} // $key) : $key),
+        );
+
+        # Not a checkout on this host (or the registry points somewhere that is not here).
+        unless (length $dir && -e "$dir/.git") { $row{missing} = 1; push @out, \%row; next; }
+
+        my $b = $git->_run($c, 'branch', '--show-current', { repo => $dir });
+        (my $branch = $b->{output} // '') =~ s/\s+\z//;
+        $row{branch} = length $branch ? $branch : undef;
+
+        $row{ahead} = $row{behind} = 0;
+        my $ab = $git->_run($c, 'rev-list', '--left-right', '--count', 'main...HEAD', { repo => $dir });
+        if ($ab->{success} && ($ab->{output} // '') =~ /^(\d+)\s+(\d+)/) {
+            $row{behind} = $1 + 0;   # in main, missing here
+            $row{ahead}  = $2 + 0;   # here, missing in main
+        }
+
+        my $st = $git->_run($c, 'status', '--porcelain', { repo => $dir });
+        $row{dirty} = scalar( grep { /\S/ } split /\n/, ($st->{output} // '') );
+        $row{merge_in_progress} = Comserv::Util::Git::_worktree_merge_in_progress($dir) ? 1 : 0;
+
+        push @out, \%row;
+    }
+
+    return $c->response->body(encode_json({ success => 1, branches => \@out }));
+}
 
 sub daily_priorities :Path('/planning/daily-priorities') :Args {
     my ($self, $c, @args) = @_;
