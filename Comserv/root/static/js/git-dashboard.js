@@ -20,6 +20,42 @@
     }
 
     ready(function () {
+        /* ---- Card open-state memory (every card starts CLOSED) --------------
+           Each card on /admin/git is a <details> that starts closed. Actions on
+           this page reload it (a git op reloads after ~1.5s, merge reloads too),
+           so without this the card being worked in would shut after every
+           Stage/Commit. Keys are the summary label with counts and the branch
+           pill stripped, kept in sessionStorage for this tab only — a fresh
+           visit still opens fully closed. */
+        (function () {
+            var KEY = 'gitdash.openCards';
+            var cards = [].slice.call(document.querySelectorAll('details.git-collapse'));
+            if (!cards.length) { return; }
+            function keyOf(d, i) {
+                var s = d.querySelector('summary');
+                var label = '';
+                if (s) {
+                    var copy = s.cloneNode(true);
+                    var strip = copy.querySelectorAll('.git-count, .git-current-branch');
+                    for (var k = 0; k < strip.length; k++) {
+                        if (strip[k].parentNode) { strip[k].parentNode.removeChild(strip[k]); }
+                    }
+                    label = (copy.textContent || '').replace(/\s+/g, ' ').trim();
+                }
+                return d.id || label || ('card-' + i);
+            }
+            function save() {
+                var open = cards.filter(function (d) { return d.open; }).map(keyOf);
+                try { sessionStorage.setItem(KEY, JSON.stringify(open)); } catch (e) {}
+            }
+            var saved = [];
+            try { saved = JSON.parse(sessionStorage.getItem(KEY) || '[]') || []; } catch (e) { saved = []; }
+            for (var i = 0; i < cards.length; i++) {
+                if (saved.indexOf(keyOf(cards[i], i)) >= 0) { cards[i].open = true; }
+                cards[i].addEventListener('toggle', save);
+            }
+        })();
+
         document.addEventListener('click', function (e) {
             var btn = e.target && e.target.closest ? e.target.closest('[data-guard-copy]') : null;
             if (!btn) { return; }
@@ -856,7 +892,6 @@
     var summary = box.querySelector('[data-update-all-summary]');
     var table = box.querySelector('[data-update-all-table]');
     var tbody = table ? table.querySelector('tbody') : null;
-    var inc3 = box.querySelector('[data-update-all-4003]');
     var buttons = box.querySelectorAll('[data-update-all-mode]');
     // No form here on purpose: the card sits inside the Working Tree form, and a
     // nested <form> is dropped by the parser. Buttons are links, so a click always
@@ -871,13 +906,16 @@
         data.rows.forEach(function (r) {
             var tr = document.createElement('tr');
             cell(tr, r.key); cell(tr, r.branch); cell(tr, r.port ? ':' + r.port : '');
-            cell(tr, r.action);
+            cell(tr, r.action + (r.autostash ? ' (autostash)' : ''));
+            cell(tr, r.needs_manual ? '\u2691 needs manual' : '');
             cell(tr, (r.behind != null ? r.behind : '') + (r.ahead != null ? ' / ' + r.ahead : ''));
             cell(tr, r.pre_merge_commit ? r.pre_merge_commit.substring(0, 10) : '');
             var bits = [];
             if (r.files && r.files.length) { bits.push(r.files.join(', ')); }
             if (r.reason) { bits.push(r.reason); }
             if (r.dirty_files && r.dirty_files.length && !(r.files && r.files.length)) { bits.push('uncommitted kept: ' + r.dirty_files.join(', ')); }
+            if (r.manual_files && r.manual_files.length) { bits.push('conflict in: ' + r.manual_files.join(', ')); }
+            if (r.stash) { bits.push('stash: ' + String(r.stash).substring(0, 60)); }
             cell(tr, bits.join(' - '));
             cell(tr, r.will_restart ? 'yes' : '');
             tbody.appendChild(tr);
@@ -888,7 +926,6 @@
             if (mode === 'update' && !window.confirm('Merge main into every registered branch now? Running -r dev servers will restart. Run Preview first if unsure.')) { return; }
             var body = new URLSearchParams();
             body.set('mode', mode); body.set('csrf', csrf);
-            if (inc3 && inc3.checked) { body.set('include_4003', '1'); }
             if (summary) { summary.textContent = mode === 'update' ? 'Updating...' : 'Previewing...'; }
             Array.prototype.forEach.call(buttons, function (b) { b.disabled = true; });
             fetch(url, { method: 'POST', credentials: 'same-origin', body: body,
