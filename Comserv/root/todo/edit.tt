@@ -239,6 +239,15 @@ function syncDur() {
         <div class="form-group">
             <label for="description">Description:</label>
             <textarea id="description" name="description" required>[% record.get_column('description') %]</textarea>
+        <button type="button" class="btn btn-sm btn-outline-secondary" style="margin-top:4px;" data-template="[% description_template | html %]"
+                onclick="var t=document.getElementById('description');if(!t.value.trim()||confirm('Replace the description with the standard layout?')){t.value=this.getAttribute('data-template');}">Use standard layout</button>
+        <small style="color:var(--text-muted-color,#666);">What to do / Steps / How-to docs / Form to complete / Done when. See <a href="/Documentation/TodoDescriptionStandard" target="_blank">the standard</a>.</small>
+        </div>
+        <div class="form-group">
+            <label for="reminder_offsets">Reminders:</label>
+            <input type="text" id="reminder_offsets" name="reminder_offsets" value="[% reminder_offsets_str | html %]"
+                   placeholder="-PT60M,-PT15M" pattern="^\s*(-?P[0-9WDTHM]+\s*)(,\s*-?P[0-9WDTHM]+\s*)*$|^$" maxlength="200">
+            <small style="color:var(--text-muted-color,#666);">Alarm times before the start, comma-separated: -PT15M, -PT1H, -P1D (max 5). Leave empty for none.</small>
         </div>
         
         <div class="form-group">

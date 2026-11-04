@@ -12,6 +12,7 @@ our %ALLOWED_KEYS = (
     'ui.theme_override'       => 'string',
     'ui.timezone'             => 'string',   # IANA TZ; display via AppTime
     'dev_server.saved_commands' => 'object',
+    'calendar.visible_sites'  => 'array',    # subset of the user's SiteNames shown on the calendar
 );
 
 sub new { bless {}, shift }
@@ -40,6 +41,14 @@ sub validate_value {
         for my $site (keys %$value) {
             return 0 if length($site) > 64;
             return 0 unless ($value->{$site} // '') =~ /^#[0-9A-Fa-f]{6}$/;
+        }
+        return 1;
+    }
+
+    if ($key eq 'calendar.visible_sites') {
+        return 0 unless ref $value eq 'ARRAY' && @$value <= 100;
+        for my $s (@$value) {
+            return 0 unless defined $s && !ref $s && $s =~ /^[A-Za-z0-9_.\- ]{1,64}$/;
         }
         return 1;
     }
