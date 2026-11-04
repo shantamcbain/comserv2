@@ -184,7 +184,7 @@ sub _safe_return_path {
     $dpath =~ s/%([0-9a-fA-F]{2})/chr(hex($1))/ge;
     return '' if $dpath =~ /[\x00-\x1f\x7f\\]/ || $dpath =~ m{^//};
     $path = $dpath;
-    return '' if $path =~ m{^/(?:user/(?:login|do_login|logout|register|do_create_account|verify_email|complete_profile)|login|logout|do_login)(?:/|\z)}i;
+    return '' if $path =~ m{^/(?:user/(?:login|do_login|logout|register|do_create_account|verify_email|complete_profile|forgot_password|reset_password)|login|logout|do_login)(?:/|\z)}i;
     return $url;
 }
 

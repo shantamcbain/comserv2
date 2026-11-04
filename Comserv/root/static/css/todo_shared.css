@@ -246,12 +246,12 @@
 
 .action-button-shared.details-button {
     background-color: var(--secondary-color, #6c757d);
-    color: white;
+    color: var(--text-color, #000);
 }
 
 .action-button-shared.edit-button {
     background-color: var(--warning-color, #FF9800);
-    color: white;
+    color: var(--text-color, #000);
 }
 
 .action-button-shared:hover {
@@ -262,7 +262,8 @@
 /* Add Todo Button Styles */
 .add-todo-shared {
     background-color: var(--primary-color, #4CAF50);
-    color: white;
+    /* pale primary in default/CSC/APIS: white text on it is invisible */
+    color: var(--nav-text, var(--text-color, #000));
     border: none;
     border-radius: 3px;
     cursor: pointer;

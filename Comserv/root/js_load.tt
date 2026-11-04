@@ -203,7 +203,7 @@
      git-dashboard.js so ComservGitDiff exists when bindFileDiff() runs. -->
 <script src="/static/js/git-diff-viewer.js?v=[% cv %]" defer></script>
 <link rel="stylesheet" href="/static/css/components/git-diff-viewer.css?v=[% cv %]">
-<script src="/static/js/git-dashboard.js?v=[% cv %]-guard2" defer></script>
+<script src="/static/js/git-dashboard.js?v=[% cv %]-hermes5" defer></script>
 <script>
     // Give the git dashboard the same canonical catalog (with price_* / tier)
     // so model-select.js uses the fast path and shows real per-token cost,
@@ -246,6 +246,11 @@
 <script src="/static/js/ai-chat/audio-backup.js?v=[% cv %]" defer></script>
 <script src="/static/js/local-chat.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai-chat/index.js?v=[% cv %]" defer></script>
+[% END %]
+
+<!-- Health Kitchen dashboard: activity check-off -->
+[% IF c.request.uri.match('/healthkitchen') %]
+<script src="/static/js/healthkitchen/dashboard.js?v=[% cv %]" defer></script>
 [% END %]
 
 <!-- Planning / Daily page JS (covers both /planning/daily and /Documentation/DailyPlan) -->

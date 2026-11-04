@@ -50,7 +50,9 @@
     
     .calendar-header {
         background-color: var(--primary-color, #4CAF50);
-        color: var(--nav-text, white);
+        /* --nav-text is "text on the theme's primary colour"; the white fallback
+           used to make the header white-on-white on pale-primary themes. */
+        color: var(--nav-text, var(--text-color, #000));
         padding: 4px 2px;
         text-align: center;
         font-weight: bold;
@@ -440,24 +442,12 @@
 </style>
 
 <script>
-// Ensure theme class is applied based on site
+/* The site theme class is set once by the page wrapper from the site
+   configuration (SiteName -> theme). This page used to force its own
+   hardcoded sitename->theme map here, which replaced a theme the wrapper had
+   already applied (apiary, forager, dark, ...) and left the calendar with the
+   wrapper's colours but theme-default's class. Never re-apply it here. */
 document.addEventListener('DOMContentLoaded', function() {
-    const sitename = '[% sitename %]';
-    const siteThemeMap = {
-        'default': 'theme-default',
-        'apis': 'theme-apis',
-        'usbm': 'theme-usbm', 
-        'csc': 'theme-csc',
-        'bmaster': 'theme-apis',
-        'mcoop': 'theme-mcoop'
-    };
-    
-    const themeClass = siteThemeMap[sitename.toLowerCase()] || 'theme-default';
-    if (!document.body.classList.contains(themeClass)) {
-        document.body.className = document.body.className.replace(/theme-\w+/, '');
-        document.body.classList.add(themeClass);
-    }
-
     // Scroll today's cell into focus
     const todayCell = document.getElementById('today-cell');
     if (todayCell) {
@@ -492,10 +482,37 @@ document.addEventListener('DOMContentLoaded', function() {
         <a href="/todo[% url_hash %]">Back to Todo List</a>
         <a href="/todo/month/[% next_month_date %][% url_hash %]">Next Month ▶</a>
     </div>
+    <div class="cal-feed-tools" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:4px 0;font-size:0.85em;">
+        <a href="/calendar/subscribe" title="Get a private link for Thunderbird or the Android app">&#128197; Subscribe (copy calendar link)</a>
+        [% IF ap_all_sitenames.size > 1 %]
+        <details id="cal-my-sites">
+            <summary>My sites on this calendar[% IF cal_visible_sites.size %] ([% cal_visible_sites.size %])[% END %]</summary>
+            <form id="cal-my-sites-form" onsubmit="return calSaveMySites(event)" style="padding:4px 0;">
+                [% FOREACH sname IN ap_all_sitenames %]
+                <label style="margin-right:8px;white-space:nowrap;"><input type="checkbox" name="sites" value="[% sname | html %]"[% IF cal_visible_sites.grep('^' _ sname _ '$').size %] checked[% END %]> [% sname | html %]</label>
+                [% END %]
+                <button type="submit" class="btn btn-sm btn-primary">Show these</button>
+                <small style="color:var(--text-muted-color,#6c757d);">Saved to your account. Picking one site in the Site box below overrides it.</small>
+            </form>
+        </details>
+        <script>
+        function calSaveMySites(ev) {
+            ev.preventDefault();
+            var fd = new URLSearchParams();
+            document.querySelectorAll('#cal-my-sites-form input[name=sites]:checked').forEach(function (b) { fd.append('sites', b.value); });
+            fetch('/calendar/visible_sites', { method: 'POST', credentials: 'same-origin', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (j) { if (j.ok) { location.reload(); } else { alert(j.error || 'Could not save'); } })
+                .catch(function () { alert('Could not save'); });
+            return false;
+        }
+        </script>
+        [% END %]
+    </div>
     [% IF ap_all_sitenames.size > 0 %]
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;padding:4px 0 8px 0;">
         <span style="font-size:0.82em;color:var(--text-muted-color,#70757a);white-space:nowrap;">Site:</span>
-        <select id="month-site-filter" onchange="monthApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;">
+        <select id="month-site-filter" onchange="monthApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid var(--border-color,#ddd);border-radius:4px;background:var(--background-color,#fff);color:var(--text-color,#000);width:auto;">
             <option value="">All</option>
             [% FOREACH sname IN ap_all_sitenames %]
             <option value="[% sname %]"[% IF cal_filter_site == sname %] selected[% END %]>[% sname %]</option>
@@ -582,8 +599,8 @@ function monthApplyFilters() {
                     [% # Add overdue todos to the first day cell %]
                     [% IF !first_day_rendered AND all_overdue_todos.size > 0 %]
                         [% SET first_day_rendered = 1 %]
-                        <div class="overdue-section" style="border-top: 2px solid #ff4444; padding-top: 5px; margin-top: 5px;">
-                            <div style="color: #ff4444; font-weight: bold; font-size: 0.8em; margin-bottom: 3px;">⚠️ Overdue</div>
+                        <div class="overdue-section" style="border-top: 2px solid var(--danger-color,#dc3545); padding-top: 5px; margin-top: 5px;">
+                            <div style="color: var(--danger-color,#dc3545); font-weight: bold; font-size: 0.8em; margin-bottom: 3px;">⚠️ Overdue</div>
                             [% FOREACH todo IN all_overdue_todos %]
                                 [% SET tcard_wrap_mo = "data-todo-id='" _ todo.record_id _ "' data-todo-date='" _ (todo.start_date || todo.due_date) _ "' data-is-recurring='0' draggable='true'" %]
                                 [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 tc_is_overdue=1 tc_stale_days=999 tc_calendar=1
@@ -661,10 +678,10 @@ function monthApplyFilters() {
 [% END %]
 
 <div id="month-day-modal" onclick="if(event.target===this)closeMonthDayModal()" style="display:none;position:fixed;inset:0;z-index:50000;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;">
-    <div style="background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.4);width:min(960px,96vw);height:88vh;display:flex;flex-direction:column;overflow:hidden;">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:2px solid #4CAF50;background:#f8f9fa;flex-shrink:0;">
+    <div style="background:var(--background-color,#fff);color:var(--text-color,#000);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.4);width:min(960px,96vw);height:88vh;display:flex;flex-direction:column;overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:2px solid var(--primary-color,#4CAF50);background:var(--table-header-bg,#f2f2f2);color:var(--text-color,#000);flex-shrink:0;">
             <span id="month-day-modal-title" style="font-weight:bold;font-size:1em;"></span>
-            <button onclick="closeMonthDayModal()" style="border:none;background:transparent;font-size:1.3em;cursor:pointer;color:#555;line-height:1;" title="Close (Esc)">✕</button>
+            <button onclick="closeMonthDayModal()" style="border:none;background:transparent;font-size:1.3em;cursor:pointer;color:var(--text-muted-color,#6c757d);line-height:1;" title="Close (Esc)">✕</button>
         </div>
         <div id="month-day-modal-body" style="flex:1;overflow:hidden;padding:0;display:flex;"></div>
     </div>
@@ -689,11 +706,28 @@ function monthSiteColor(site) {
     }
     return _monthSiteColors[site];
 }
+/* Readable ink (black or white) for an arbitrary event background colour.
+   Event colours are data, not theme colours: a light site colour used to leave
+   the fixed white event text unreadable. */
+function monthInk(color) {
+    var m = String(color || '').trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (!m) return '';
+    var h = m[1];
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    function lin(c) { c = c / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+    var L = 0.2126 * lin(parseInt(h.substr(0, 2), 16))
+          + 0.7152 * lin(parseInt(h.substr(2, 2), 16))
+          + 0.0722 * lin(parseInt(h.substr(4, 2), 16));
+    return L > 0.45 ? '#000' : '#fff';
+}
+
 function monthColorizeAndLayout(container) {
     container.querySelectorAll('.gcal-ev[data-site]').forEach(function(el) {
         var col = monthSiteColor(el.getAttribute('data-site') || '');
         el.style.background = col;
         el.style.borderLeft = '3px solid ' + col;
+        var ink = monthInk(col);
+        if (ink) el.style.color = ink;
     });
     var area = container.querySelector('.gcal-events-area, .gcal-events-area-col');
     if (!area) return;
@@ -737,7 +771,7 @@ function showMonthDayModal(dateStr, event) {
     event.preventDefault();
     document.getElementById('month-day-modal-title').textContent = dateStr;
     var body = document.getElementById('month-day-modal-body');
-    body.innerHTML = '<p style="padding:20px;color:#888;">Loading...</p>';
+    body.innerHTML = '<p style="padding:20px;color:var(--text-muted-color,#6c757d);">Loading...</p>';
     document.getElementById('month-day-modal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
     fetch('/todo/day/' + encodeURIComponent(dateStr) + '?embed=1', { credentials: 'same-origin' })
@@ -751,7 +785,25 @@ function showMonthDayModal(dateStr, event) {
         iframe.style.cssText = 'width:100%;height:100%;border:none;flex:1;display:block;';
         iframe.onload = function() {
             try {
-                var outer = iframe.contentDocument.querySelector('.gcal-grid-outer');
+                /* The ?embed=1 document has no theme class of its own (the wrapper
+                   renders bare), so carry the page theme into it instead of letting
+                   the day view fall back to unthemed white. */
+                var doc = iframe.contentDocument;
+                var themeCls = (document.body.className.match(/theme-[\w-]+/) || [])[0];
+                if (doc && doc.body) {
+                    if (themeCls) doc.body.className = (doc.body.className + ' ' + themeCls).trim();
+                    var cs = getComputedStyle(document.documentElement);
+                    ['--background-color','--text-color','--text-muted-color','--border-color',
+                     '--secondary-color','--table-header-bg','--card-bg','--primary-color',
+                     '--nav-text','--accent-color','--success-color','--warning-color',
+                     '--danger-color','--info-color','--link-color','--link-hover-color',
+                     '--button-bg','--button-text','--button-border','--button-hover-bg'
+                    ].forEach(function(v) {
+                        var val = cs.getPropertyValue(v).trim();
+                        if (val) doc.documentElement.style.setProperty(v, val);
+                    });
+                }
+                var outer = doc && doc.querySelector('.gcal-grid-outer');
                 if (outer) {
                     var now = new Date();
                     var minsFromStart = now.getHours() * 60 + now.getMinutes() - 300;
@@ -763,7 +815,7 @@ function showMonthDayModal(dateStr, event) {
         body.appendChild(iframe);
     })
     .catch(function(err) {
-        body.innerHTML = '<p style="padding:20px;color:#c00;">Could not load day view: ' + err + '</p>';
+        body.innerHTML = '<p style="padding:20px;color:var(--danger-color,#dc3545);">Could not load day view: ' + err + '</p>';
     });
 }
 function closeMonthDayModal() {

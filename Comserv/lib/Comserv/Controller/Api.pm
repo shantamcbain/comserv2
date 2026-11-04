@@ -14,6 +14,7 @@ use Comserv::Util::ApiSecretCompare;
 use Comserv::Util::DocumentationConfig;
 use Comserv::Util::ModelCatalog;
 use Comserv::Util::TodoLog;
+use Comserv::Util::AccessCheck;
 
 # Resolve the default model for the AI Focus-Tune picker from the SAME shared
 # catalog every other AI surface uses (ModelCatalog::default_for) — NEVER a
@@ -476,7 +477,7 @@ sub api_todo_create :Path('todo/create') :Args(0) {
     
     # Check if request is from localhost or workstation.local
     # Identity first (session / Bearer token); LAN bypass only per _api_lan_bypass_mode().
-    my $gate = $self->_api_gate($c) or return;
+    my $gate = $self->_api_gate($c, module => 'todo', action => 'create', defer_site => 1) or return;
 
     my $params;
     eval {
@@ -533,7 +534,15 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         $c->detach();
     }
 
-    my $sitename = $self->_sitename_for_write($c, $params, $project);
+    # recurrence_rule / creator_timezone are validated before anything is written.
+    for my $err (_api_validate_recurrence($params)) {
+        $self->_json_error($c, 400, $err, 'validation_error');
+    }
+
+    my $sitename = $self->_sitename_for_write($c, $params, $project, $gate, module => 'todo', action => 'create');
+
+    # Identity columns come from the authenticated caller, never the body.
+    delete @{$params}{qw(user_id username_of_poster group_of_poster)} if ref $params eq 'HASH';
 
     my $poster_user_id;
     if (!$gate->{lan} && $gate->{user_id}) {
@@ -580,6 +589,7 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         sort_order todo_type billable estimated_man_hours comments
         company_code time_of_day scheduled_date scheduled_start scheduled_end
         plan_id point_rate role_category is_fixed is_recurring
+        recurrence_rule creator_timezone
     );
 
     my %create = (
@@ -599,7 +609,7 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         parent_todo => '',
         estimated_man_hours => 0,
         accumulative_time => '00:00:00',
-        group_of_poster => 'admin',
+        group_of_poster => $self->_api_poster_group($c, $gate, $sitename),
         project_code => $params->{project_code} || 'system',
         share => 0,
         user_id => $poster_user_id,
@@ -837,6 +847,15 @@ sub api_create_project :Path('project/create') :Args(0) {
             "parent_id $parent_id not found: $@") if $@;
     }
     my $sitename = $self->_sitename_for_write($c, $params, $parent);
+    my $pgate = $api_user
+        ? { username => $api_user->username, user_id => $api_user->id, lan => 0,
+            roles => _api_roles_list($api_user->roles), via => 'token',
+            token => _api_token_scope($c, $schema) }
+        : { lan => 1 };
+    # NOTE: a LAN caller (127.0.0.1 / ::1 / 192.168.1.x, no token) skips this check,
+    # same as before; only token callers are checked here.
+    $self->_api_authorize($c, $pgate, module => 'project', action => 'create', sitename => $sitename)
+        unless $pgate->{lan};
 
     my $project;
     eval {
@@ -854,7 +873,7 @@ sub api_create_project :Path('project/create') :Args(0) {
             sitename            => $sitename,
             comments            => $params->{comments}             || '',
             username_of_poster  => $current_user,
-            group_of_poster     => 'admin',
+            group_of_poster     => $self->_api_poster_group($c, $pgate, $sitename),
             date_time_posted    => Comserv::Util::AppTime->now_utc,
             parent_id           => $parent_id,
             record_id           => 0,
@@ -1805,7 +1824,7 @@ Returns: { success, message, updated: [ field, ... ], todo: { ... } }
 sub api_todo_update :Path('todo/update') :Args(0) {
     my ($self, $c) = @_;
 
-    my $gate   = $self->_api_gate($c) or return;
+    my $gate   = $self->_api_gate($c, module => 'todo', action => 'update', defer_site => 1) or return;
     my $params = $self->_parse_json_body($c);
 
     my $todo_id = $params->{record_id} || $params->{todo_id} || $params->{id};
@@ -1817,6 +1836,17 @@ sub api_todo_update :Path('todo/update') :Args(0) {
     my $todo   = $schema->resultset('Todo')->find($todo_id);
     unless ($todo) {
         $self->_json_error($c, 404, "Todo $todo_id not found", 'not_found');
+    }
+    $self->_api_authorize($c, $gate, module => 'todo', action => 'update',
+        sitename => ($todo->sitename // ''), record => $todo);
+    # Moving a todo to another site needs a role there too.
+    if (defined $params->{sitename} && !ref $params->{sitename} && $params->{sitename} ne ''
+        && $params->{sitename} ne ($todo->sitename // '')) {
+        $self->_api_authorize($c, $gate, module => 'todo', action => 'update',
+            sitename => $params->{sitename}, record => $todo);
+    }
+    for my $err (_api_validate_recurrence($params)) {
+        $self->_json_error($c, 400, $err, 'validation_error');
     }
 
     # Validate a referenced project before pointing the todo at it
@@ -1845,9 +1875,11 @@ sub api_todo_update :Path('todo/update') :Args(0) {
         estimated_man_hours accumulative_time comments
         developer owner reporter company_code
         parent_id parent_todo sort_order is_blocking blocked_by_todo_id
-        plan_id share billable todo_type is_recurring recurrence_rule
+        plan_id share billable todo_type
+        time_of_day scheduled_start scheduled_end is_fixed is_recurring
+        recurrence_rule creator_timezone
     );
-    my @nullable = qw(parent_id blocked_by_todo_id plan_id scheduled_date comments recurrence_rule);
+    my @nullable = qw(parent_id blocked_by_todo_id plan_id scheduled_date comments recurrence_rule creator_timezone);
 
     my $current_user = $gate->{lan} ? ($c->session->{username} || 'system') : $gate->{username};
 
@@ -1890,6 +1922,106 @@ sub api_todo_update :Path('todo/update') :Args(0) {
     });
 }
 
+=head2 api_todo_update_by_id
+
+PUT|POST /api/todo/update/<record_id>  { status?, priority?, description?, developer?, comments? }
+
+Replaces the old Todo.pm route of the same path (Hermes reprioritize skills use it).
+Same 5-field allowlist and the same response shape { success, message, todo }, but
+gated like /api/todo/update: identity, then AccessCheck against the stored todo.
+
+=cut
+
+sub api_todo_update_by_id :Path('todo/update') :Args(1) {
+    my ($self, $c, $todo_id) = @_;
+    my $gate = $self->_api_gate($c, module => 'todo', action => 'update', defer_site => 1) or return;
+    my $params = $self->_parse_json_body($c) || {};
+    unless (defined $todo_id && $todo_id =~ /^\d+$/) {
+        $self->_json_error($c, 400, 'record_id must be a number', 'validation_error');
+    }
+    my $todo = $c->model('DBEncy')->resultset('Todo')->find($todo_id);
+    $self->_json_error($c, 404, "Todo not found: $todo_id", 'not_found') unless $todo;
+    $self->_api_authorize($c, $gate, module => 'todo', action => 'update',
+        sitename => ($todo->sitename // ''), record => $todo) or return;
+
+    my %allowed = map { $_ => 1 } qw(status priority description developer comments);
+    my %update = map { $_ => $params->{$_} } grep { $allowed{$_} && !ref $params->{$_} } keys %$params;
+    if (%update) {
+        my $actor = $gate->{lan} ? 'system' : $gate->{username};
+        $update{last_mod_by}   = $actor;
+        $update{last_mod_date} = Comserv::Util::AppTime->today_ymd_for($c);
+        $todo->update(\%update);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_update_by_id',
+            "Todo updated via API: record_id=$todo_id, Fields=" . join(',', sort keys %update)
+            . " by $actor (" . _api_via_note($gate, $params->{actor} // $params->{username}) . ")");
+    }
+    $self->_json_ok($c, { message => 'Todo updated successfully', todo => _api_todo_legacy_hash($todo) });
+}
+
+=head2 api_todo_get
+
+GET /api/todo/<record_id> - one todo { success, message, todo } (same shape as the old
+Todo.pm api_todo_read). Session or Bearer token only (no LAN bypass: the old route was
+dev-only + token), then AccessCheck read on the stored todo.
+
+=cut
+
+sub api_todo_get :Path('todo') :Args(1) {
+    my ($self, $c, $todo_id) = @_;
+    my $gate = $self->_api_gate($c, module => 'todo', action => 'read', defer_site => 1, no_lan => 1) or return;
+    unless (defined $todo_id && $todo_id =~ /^\d+$/) {
+        $self->_json_error($c, 404, "Todo not found: " . _api_log_name($todo_id), 'not_found');
+    }
+    my $todo = $c->model('DBEncy')->resultset('Todo')->find($todo_id);
+    $self->_json_error($c, 404, "Todo not found: $todo_id", 'not_found') unless $todo;
+    $self->_api_authorize($c, $gate, module => 'todo', action => 'read',
+        sitename => ($todo->sitename // ''), record => $todo) or return;
+    $self->_json_ok($c, { message => 'Todo retrieved', todo => _api_todo_legacy_hash($todo) });
+}
+
+=head2 api_project_get
+
+GET /api/project/<id> - one project { success, message, project } (same shape as the old
+Todo.pm api_project_read). Session or Bearer token only (no LAN bypass), then AccessCheck
+read on the stored project.
+
+=cut
+
+sub api_project_get :Path('project') :Args(1) {
+    my ($self, $c, $project_id) = @_;
+    my $gate = $self->_api_gate($c, module => 'project', action => 'read', defer_site => 1, no_lan => 1) or return;
+    unless (defined $project_id && $project_id =~ /^\d+$/) {
+        $self->_json_error($c, 404, "Project not found: " . _api_log_name($project_id), 'not_found');
+    }
+    my $p = $c->model('DBEncy')->resultset('Project')->find($project_id);
+    $self->_json_error($c, 404, "Project not found: $project_id", 'not_found') unless $p;
+    $self->_api_authorize($c, $gate, module => 'project', action => 'read',
+        sitename => ($p->sitename // ''), record => $p) or return;
+    $self->_json_ok($c, { message => 'Project retrieved', project => {
+        id => $p->id, name => $p->name, project_code => $p->project_code,
+        description => $p->description, sitename => $p->sitename, status => $p->status } });
+}
+
+# Response shape of the removed Todo.pm API routes (kept for existing callers).
+sub _api_todo_legacy_hash {
+    my ($todo) = @_;
+    return {
+        id                 => $todo->id,
+        subject            => $todo->subject,
+        description        => $todo->description,
+        project_id         => $todo->project_id,
+        start_date         => $todo->start_date ? "${\$todo->start_date}" : undef,
+        due_date           => $todo->due_date   ? "${\$todo->due_date}"   : undef,
+        priority           => $todo->priority,
+        status             => $todo->status,
+        developer          => $todo->developer,
+        sitename           => $todo->sitename,
+        date_time_posted   => $todo->date_time_posted || undef,
+        username_of_poster => $todo->username_of_poster,
+        accumulative_time  => $todo->accumulative_time || 0,
+    };
+}
+
 =head2 api_project_update
 
 POST /api/project/update - Update an existing project (bypass token for local/workstation.local)
@@ -1907,7 +2039,7 @@ Returns: { success, message, updated: [ field, ... ], project: { ... } }
 sub api_project_update :Path('project/update') :Args(0) {
     my ($self, $c) = @_;
 
-    my $gate   = $self->_api_gate($c) or return;
+    my $gate   = $self->_api_gate($c, module => 'project', action => 'update', defer_site => 1) or return;
     my $params = $self->_parse_json_body($c);
 
     my $project_id = $params->{project_id} || $params->{id};
@@ -1919,6 +2051,13 @@ sub api_project_update :Path('project/update') :Args(0) {
     my $project = $schema->resultset('Project')->find($project_id);
     unless ($project) {
         $self->_json_error($c, 404, "Project $project_id not found", 'not_found');
+    }
+    $self->_api_authorize($c, $gate, module => 'project', action => 'update',
+        sitename => ($project->sitename // ''), record => $project);
+    if (defined $params->{sitename} && !ref $params->{sitename} && $params->{sitename} ne ''
+        && $params->{sitename} ne ($project->sitename // '')) {
+        $self->_api_authorize($c, $gate, module => 'project', action => 'update',
+            sitename => $params->{sitename}, record => $project);
     }
 
     # Guard against a project becoming its own parent
@@ -2092,17 +2231,38 @@ sub _api_gate_refusal {
 # A Bearer token that was presented but is bad (revoked/expired/inactive/no role)
 # is refused and never falls through to the LAN bypass.
 # Returns { username, user_id, via, lan } or sends a JSON error and detaches.
+#
+# Fine-grained access (Oct 2026): _api_gate($c, module => M, action => A,
+# sitename => S, record => R [, defer_site => 1]). With a module the identity step
+# accepts any logged-in / token user and Comserv::Util::AccessCheck decides
+# (admin/developer pass; others need user_site_roles + role_permissions rows;
+# legacy role list while role_permissions is empty). defer_site => 1 skips the
+# check here; the caller then runs _api_authorize / _sitename_for_write once the
+# site and record are known. Without a module the old behaviour is unchanged.
+# The LAN bypass (lan => 1) is NOT authorised per module (behaviour unchanged).
 sub _api_gate {
-    my ($self, $c) = @_;
-    my $id = _api_identity($c);
-    return { username => $id->{username}, user_id => $id->{user_id}, via => $id->{via}, lan => 0 }
-        if $id;
+    my ($self, $c, %opt) = @_;
+    my $id = _api_identity($c, ($opt{module} ? (any_role => 1) : ()));
+    if ($id) {
+        my $gate = { username => $id->{username}, user_id => $id->{user_id}, via => $id->{via}, lan => 0,
+                     roles => $id->{roles} || [], token => $id->{token} };
+        if ($opt{module} && !$opt{defer_site}) {
+            $self->_api_authorize($c, $gate, %opt,
+                sitename => ($opt{sitename} // $c->stash->{SiteName} // $c->session->{SiteName} // 'CSC'))
+                or return undef;
+        }
+        return $gate;
+    }
 
+    # no_lan => 1: session or Bearer token only (single-record reads added Oct 2026).
     my $auth = $c->req->header('Authorization') // '';
     return { username => undef, user_id => undef, via => 'lan', lan => 1 }
-        if $auth !~ /^Bearer\s+\S/ && _api_local_ok($c);
+        if !$opt{no_lan} && $auth !~ /^Bearer\s+\S/ && _api_local_ok($c);
 
-    my $err = _api_gate_refusal($c);
+    my $err = $opt{no_lan}
+        ? ($c->stash->{api_identity_error}
+           || { status => 401, error => 'Authentication required: log in, or send Authorization: Bearer <token>', code => 'unauthorized' })
+        : _api_gate_refusal($c);
     $c->res->header('WWW-Authenticate' => 'Bearer') if $err->{status} == 401;
     my $route = '/' . ($c->req->path // '');
     $route =~ s/[^A-Za-z0-9_\/.\-]/?/g;
@@ -2110,6 +2270,100 @@ sub _api_gate {
         "API write/todo access refused ($err->{status}) for $route from " . ($c->req->address // '?'));
     $self->_json_error($c, $err->{status}, $err->{error}, $err->{code});
     return undef;
+}
+
+# Runs Comserv::Util::AccessCheck for an authenticated gate. Returns the result on
+# success; otherwise logs, sends a 403 JSON error and detaches. LAN gates pass.
+sub _api_authorize {
+    my ($self, $c, $gate, %opt) = @_;
+    return { ok => 1, mode => 'lan' } if !$gate || $gate->{lan};
+    my $schema = $c->model('DBEncy');
+    my $r = Comserv::Util::AccessCheck->check($schema,
+        user     => { user_id => $gate->{user_id}, username => $gate->{username}, roles => $gate->{roles} },
+        module   => $opt{module}, action => $opt{action},
+        sitename => $opt{sitename} // '', record => $opt{record},
+        token    => $gate->{token});
+    return $r if $r->{ok};
+    my $route = '/' . ($c->req->path // '');
+    $route =~ s/[^A-Za-z0-9_\/.\-]/?/g;
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_authorize',
+        sprintf('Access refused (%s) user=%s via=%s module=%s action=%s site=%s route=%s',
+            $r->{code}, _api_log_name($gate->{username}), _api_log_name($gate->{via}),
+            _api_log_name($opt{module}), _api_log_name($opt{action}), _api_log_name($opt{sitename}), $route));
+    $self->_json_error($c, $r->{status} || 403, $r->{error}, $r->{code});
+    return undef;
+}
+
+sub _api_request_site {
+    my ($c) = @_;
+    return $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+}
+
+# Load the stored todo and run AccessCheck against ITS site and owner. Returns the
+# todo (or 1 when it does not exist: the route reports not-found itself), or undef
+# after sending the 403. LAN gates pass unchanged.
+sub _api_todo_guard {
+    my ($self, $c, $gate, $record_id, $action) = @_;
+    return 1 if !$gate || $gate->{lan};
+    my $todo = (defined $record_id && !ref $record_id && $record_id =~ /^\d+$/)
+        ? eval { $c->model('DBEncy')->resultset('Todo')->find($record_id) } : undef;
+    $self->_api_authorize($c, $gate, module => 'todo', action => $action,
+        sitename => ($todo ? ($todo->sitename // '') : _api_request_site($c)), record => $todo) or return undef;
+    return $todo || 1;
+}
+
+# group_of_poster for a new row: the caller's role on that site (admin/developer
+# first), not a hardcoded 'admin'. LAN bypass callers keep 'admin' (unchanged).
+sub _api_poster_group {
+    my ($self, $c, $gate, $sitename) = @_;
+    return 'admin' if !$gate || $gate->{lan};
+    return eval { Comserv::Util::AccessCheck->poster_group($c->model('DBEncy'),
+        { user_id => $gate->{user_id}, roles => $gate->{roles} }, $sitename) } || 'user';
+}
+
+# Scope columns of the Bearer token on this request (undef when none / not yet in DB).
+sub _api_token_scope {
+    my ($c, $schema) = @_;
+    my $v = $c->stash->{api_token_validation};
+    my $tid = $v ? $v->{api_token_id} : undef;
+    unless ($tid) {
+        my $auth = $c->req->header('Authorization') // '';
+        return undef unless $auth =~ /^Bearer\s+\S/;
+        my $vv = eval { Comserv::Util::ApiTokenValidator->validate_from_request($c) };
+        $tid = $vv && $vv->{valid} ? $vv->{api_token_id} : undef;
+    }
+    return undef unless $tid;
+    return Comserv::Util::AccessCheck->token_scope($schema || $c->model('DBEncy'), $tid, sub {
+        Comserv::Util::Logging->instance->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_token_scope', $_[0]) });
+}
+
+# recurrence_rule: <=255 chars, RRULE-like KEY=VALUE;... starting with FREQ=.
+# creator_timezone: a valid IANA name. Returns a list of error strings (empty = ok).
+our %RRULE_FREQ = map { $_ => 1 } qw(SECONDLY MINUTELY HOURLY DAILY WEEKLY MONTHLY YEARLY);
+sub _api_validate_recurrence {
+    my ($p) = @_;
+    return () unless ref $p eq 'HASH';
+    my @err;
+    if (exists $p->{recurrence_rule} && defined $p->{recurrence_rule} && $p->{recurrence_rule} ne '') {
+        my $r = $p->{recurrence_rule};
+        if (ref $r || length($r) > 255) {
+            push @err, 'recurrence_rule must be a string of at most 255 characters';
+        } else {
+            $r =~ s/^RRULE://i;
+            my @parts = split /;/, $r;
+            my $ok = @parts && !grep { !/^[A-Z]+=[A-Za-z0-9,:+\-]+$/ } @parts;
+            $ok &&= $parts[0] =~ /^FREQ=([A-Z]+)$/ && $RRULE_FREQ{$1};
+            push @err, 'recurrence_rule must look like FREQ=WEEKLY;BYDAY=MO,WE (KEY=VALUE pairs separated by ;)' unless $ok;
+            $p->{recurrence_rule} = $r if $ok;
+        }
+    }
+    if (exists $p->{creator_timezone} && defined $p->{creator_timezone} && $p->{creator_timezone} ne '') {
+        my $tz = $p->{creator_timezone};
+        my $ok = !ref($tz) && length($tz) <= 64 && $tz =~ m{^[A-Za-z0-9_+\-/]+$}
+              && eval { require DateTime::TimeZone; DateTime::TimeZone->is_valid_name($tz) };
+        push @err, 'creator_timezone must be a valid IANA time zone name, e.g. America/Vancouver' unless $ok;
+    }
+    return @err;
 }
 
 # Actor for the log rows: the authenticated user; body actor/username only for the
@@ -2147,7 +2401,7 @@ to recover a leftover open log. Same payload shape as open_log already_active.
 sub api_todo_work_status :Path('todo/work_status') :Args(0) {
     my ($self, $c) = @_;
     $c->res->content_type('application/json');
-    my $gate = $self->_api_gate($c) or return;
+    my $gate = $self->_api_gate($c, module => 'todo', action => 'read', defer_site => 1) or return;
 
     unless (($c->req->method || '') =~ /^(GET|HEAD)$/i) {
         $c->res->status(405);
@@ -2157,6 +2411,16 @@ sub api_todo_work_status :Path('todo/work_status') :Args(0) {
 
     my $record_id = $c->req->query_parameters->{record_id}
                  || $c->req->params->{record_id};
+    if ($record_id) {
+        $self->_api_todo_guard($c, $gate, $record_id, 'read') or return;
+    } else {
+        # The site-wide list cannot be filtered per owner, so own_only callers need a record_id.
+        my $r = $self->_api_authorize($c, $gate, module => 'todo', action => 'read', sitename => _api_request_site($c)) or return;
+        if ($r->{own_only}) {
+            $self->_json_error($c, 403, 'Your role may only read its own todos: pass record_id', 'own_only');
+            return;
+        }
+    }
 
     my $res = eval {
         Comserv::Util::TodoLog->work_status($c,
@@ -2199,7 +2463,7 @@ site owner. Pass C<actor> explicitly; do not rely on the default for attributabl
 sub api_todo_open_log :Path('todo/open_log') :Args(0) {
     my ($self, $c) = @_;
     $c->res->content_type('application/json');
-    my $gate = $self->_api_gate($c) or return;
+    my $gate = $self->_api_gate($c, module => 'todo', action => 'update', defer_site => 1) or return;
 
     my $data = $self->_api_json_body($c);
     my $record_id = $data->{record_id};
@@ -2208,6 +2472,7 @@ sub api_todo_open_log :Path('todo/open_log') :Args(0) {
         $c->res->body(encode_json({ success => 0, error => 'Missing record_id' }));
         return;
     }
+    $self->_api_todo_guard($c, $gate, $record_id, 'update') or return;
     my $body_actor = $data->{actor} // $data->{username};
     my $username   = _api_actor($gate, $body_actor);
     my $via_note   = _api_via_note($gate, $body_actor);
@@ -2260,7 +2525,7 @@ Mirrors Todo::close_log SQL.
 sub api_todo_close_log :Path('todo/close_log') :Args(0) {
     my ($self, $c) = @_;
     $c->res->content_type('application/json');
-    my $gate = $self->_api_gate($c) or return;
+    my $gate = $self->_api_gate($c, module => 'todo', action => 'update', defer_site => 1) or return;
 
     my $data = $self->_api_json_body($c);
     my $record_id = $data->{record_id};
@@ -2269,6 +2534,7 @@ sub api_todo_close_log :Path('todo/close_log') :Args(0) {
         $c->res->body(encode_json({ success => 0, error => 'Missing record_id' }));
         return;
     }
+    $self->_api_todo_guard($c, $gate, $record_id, 'update') or return;
     my $body_actor = $data->{actor} // $data->{username};
     my $username   = _api_actor($gate, $body_actor);
     my $via_note   = _api_via_note($gate, $body_actor);
@@ -2281,6 +2547,7 @@ sub api_todo_close_log :Path('todo/close_log') :Args(0) {
             username  => $username,
             summary   => ($notes // ''),
             note      => $via_note,
+            lock_date => $data->{lock_date},
         );
     };
     if ($@ || !$res || !$res->{success}) {
@@ -2318,7 +2585,7 @@ Mirrors Todo::done_with_log SQL.
 sub api_todo_done_with_log :Path('todo/done_with_log') :Args(0) {
     my ($self, $c) = @_;
     $c->res->content_type('application/json');
-    my $gate = $self->_api_gate($c) or return;
+    my $gate = $self->_api_gate($c, module => 'todo', action => 'update', defer_site => 1) or return;
 
     my $data = $self->_api_json_body($c);
     my $record_id = $data->{record_id};
@@ -2327,6 +2594,7 @@ sub api_todo_done_with_log :Path('todo/done_with_log') :Args(0) {
         $c->res->body(encode_json({ success => 0, error => 'Missing record_id' }));
         return;
     }
+    $self->_api_todo_guard($c, $gate, $record_id, 'update') or return;
     my $body_actor = $data->{actor} // $data->{username};
     my $username   = _api_actor($gate, $body_actor);
     my $via_note   = _api_via_note($gate, $body_actor);
@@ -2339,6 +2607,7 @@ sub api_todo_done_with_log :Path('todo/done_with_log') :Args(0) {
             username  => $username,
             summary   => ($notes // ''),
             note      => $via_note,
+            lock_date => $data->{lock_date},
         );
     };
     if ($@ || !$res || !$res->{success}) {
@@ -2645,10 +2914,22 @@ sub api_todo_duplicates :Path('todo/duplicates') :Args(0) {
 sub api_todo_rank :Path('todo/rank') :Args(0) {
     my ($self, $c) = @_;
     $c->res->content_type('application/json');
-    my $gate = $self->_api_gate($c) or return;
+    my $gate = $self->_api_gate($c, module => 'todo', action => 'update', defer_site => 1) or return;
 
     my $data = $self->_api_json_body($c);
     my $apply = ($data->{apply} && "$data->{apply}" eq '1') ? 1 : 0;
+    {
+        # Ranking touches many todos of a site: read for a dry run, update to apply.
+        # own_only roles are refused (the batch is not limited to their records).
+        my $rsite = (defined $data->{sitename} && !ref $data->{sitename} && $data->{sitename} ne '')
+            ? $data->{sitename} : _api_request_site($c);
+        my $r = $self->_api_authorize($c, $gate, module => 'todo', action => ($apply ? 'update' : 'read'),
+            sitename => $rsite) or return;
+        if ($r->{own_only}) {
+            $self->_json_error($c, 403, 'Ranking covers other users\' todos; your role is limited to its own', 'own_only');
+            return;
+        }
+    }
     if ($apply) {
         my $body_actor = $data->{actor} // $data->{username};
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_rank',
@@ -2693,6 +2974,34 @@ sub api_todo_rank :Path('todo/rank') :Args(0) {
 
     my $limit = ($data->{limit} && $data->{limit} =~ /^\d+$/) ? $data->{limit} : 200;
     @$rows = @$rows[0 .. ($#$rows < $limit - 1 ? $#$rows : $limit - 1)];
+
+    # apply=1 writes to every todo in the batch: each STORED todo must pass the
+    # update check for its own site. If any fails the whole apply is refused
+    # (nothing written, no AI call), and the refused record_ids are reported.
+    if ($apply && !$gate->{lan}) {
+        my $schema = $c->model('DBEncy');
+        my @denied;
+        for my $row (@$rows) {
+            my $rid = $row->{record_id};
+            my $t = (defined $rid && $rid =~ /^\d+$/) ? eval { $schema->resultset('Todo')->find($rid) } : undef;
+            my $r = Comserv::Util::AccessCheck->check($schema,
+                user => { user_id => $gate->{user_id}, username => $gate->{username}, roles => $gate->{roles} },
+                module => 'todo', action => 'update', sitename => ($t ? ($t->sitename // '') : ''),
+                record => $t, token => $gate->{token});
+            push @denied, $rid unless $t && $r->{ok};
+        }
+        if (@denied) {
+            my @shown = map { _api_log_name($_) } @denied[0 .. ($#denied < 49 ? $#denied : 49)];
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_todo_rank',
+                'todo/rank apply refused for ' . _api_log_name($gate->{username}) . ': ' . scalar(@denied)
+                . ' todo(s) not allowed: ' . join(',', @shown));
+            $c->res->status(403);
+            $c->res->body(encode_json({ success => 0, code => 'forbidden',
+                error => 'apply refused: you may not update ' . scalar(@denied) . ' of the todos in scope (nothing was written)',
+                denied_record_ids => \@shown }));
+            $c->detach();
+        }
+    }
 
     my @all_changes;
     my $total_proposed = 0;
@@ -3117,11 +3426,23 @@ sub api_db_apply_grants :Path('db/apply_grants') :Args(0) {
 # Owner sitename for a write: explicit param, else the related project's
 # sitename (3d work stays 3d even if the agent hit workstation/CSC), else
 # the request Host's SiteName, else CSC. CSC is the coder, not the default owner.
+#
+# With ($gate, module => M, action => A) it also refuses (403, detach) a site the
+# caller has no permission on (Comserv::Util::AccessCheck). LAN gates unchanged.
 sub _sitename_for_write {
+    my ($self, $c, $params, $related, $gate, %opt) = @_;
+    my $site = $self->_sitename_for_write_pick($c, $params, $related);
+    if ($gate && $opt{module}) {
+        $self->_api_authorize($c, $gate, %opt, sitename => $site) or return undef;
+    }
+    return $site;
+}
+
+sub _sitename_for_write_pick {
     my ($self, $c, $params, $related) = @_;
     $params //= {};
     my $given = $params->{sitename};
-    if (defined $given && $given ne '') {
+    if (defined $given && !ref $given && $given ne '') {
         return $given;
     }
     if ($related) {
@@ -3159,6 +3480,7 @@ sub _api_roles_list {
 sub _api_identity {
     my ($c, %opt) = @_;
     my %ok = map { lc($_) => 1 } @{ $opt{allowed_roles} || \@API_ALLOWED_ROLES };
+    my $any = $opt{any_role} ? 1 : 0;   # AccessCheck decides; used by _api_gate with a module
     delete $c->stash->{api_identity_error};
 
     my $fail = sub {
@@ -3174,7 +3496,7 @@ sub _api_identity {
         my $s = $c->session || {};
         if ($s->{username} && $s->{user_id}) {
             my $roles = _api_roles_list($s->{roles});
-            if (grep { $ok{$_} } @$roles) {
+            if ($any || grep { $ok{$_} } @$roles) {
                 return { username => $s->{username}, user_id => $s->{user_id},
                          roles => $roles, via => 'session' };
             }
@@ -3198,11 +3520,13 @@ sub _api_identity {
             if lc($user->status // '') ne 'active';
         my $roles = _api_roles_list($user->roles);
         return $fail->(403, 'Token user has no role permitted for this endpoint', 'forbidden')
-            unless grep { $ok{$_} } @$roles;
+            unless $any || grep { $ok{$_} } @$roles;
+        my $scope = Comserv::Util::AccessCheck->token_scope($c->model('DBEncy'), $row->id, sub {
+            Comserv::Util::Logging->instance->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_identity', $_[0]) });
         my $tname = defined $v->{token_name} && length $v->{token_name} ? $v->{token_name} : $v->{api_token_id};
         $tname =~ s/[^A-Za-z0-9_.\-]/_/g;
         return { username => $user->username, user_id => $user->id,
-                 roles => $roles, via => "token:$tname" };
+                 roles => $roles, via => "token:$tname", token => $scope };
     }
 
     return $fail->(403, 'Your account has no role permitted for this endpoint', 'forbidden') if $session_denied;
@@ -3460,6 +3784,21 @@ sub api_admin_bot_token :Path('admin/bot_token') :Args(0) {
     $tname =~ s/[^\w .:@\-]/_/g;
     $tname = substr($tname, 0, 100);
 
+    # Optional scope: comma lists (or JSON arrays) of sites / modules / actions, and own_only.
+    # Omitted = the token inherits its user's rights; set = intersection with them.
+    my %scope;
+    for my $k (qw(scope_sites scope_modules scope_actions)) {
+        my ($v, $e) = Comserv::Util::AccessCheck->normalise_scope($data->{$k}, $k);
+        return $self->_json_error($c, 400, $e, 'validation_error') if $e;
+        $scope{$k} = $v if defined $v;
+    }
+    if (defined $data->{own_only} && $data->{own_only} ne '') {
+        return $self->_json_error($c, 400, 'own_only must be 0 or 1', 'validation_error')
+            unless !ref($data->{own_only}) && $data->{own_only} =~ /^[01]$/
+                || JSON::MaybeXS::is_bool($data->{own_only});
+        $scope{own_only} = $data->{own_only} ? 1 : 0;
+    }
+
     my $schema = $c->model('DBEncy');
     my $user   = $schema->resultset('User')->search({ username => $uname }, { rows => 1 })->single;
     if (my $problem = _api_bot_user_problem($user)) {
@@ -3482,6 +3821,7 @@ sub api_admin_bot_token :Path('admin/bot_token') :Args(0) {
             is_active  => 1,
             created_at => Comserv::Util::AppTime->now_dt,
             expires_at => $expires_at,
+            %scope,
         });
     };
     unless ($row) {
@@ -3491,7 +3831,8 @@ sub api_admin_bot_token :Path('admin/bot_token') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_admin_bot_token',
         'Bot API token minted: token_id=' . $row->id . ' for user=' . $user->username
-        . " by admin=$admin->{username}, expires_in_days=$days, name=" . _api_log_name($tname));
+        . " by admin=$admin->{username}, expires_in_days=$days, name=" . _api_log_name($tname)
+        . ', scope=' . join(' ', map { "$_=" . _api_log_name($scope{$_}) } sort keys %scope));
 
     $c->res->status(200);
     $c->res->body(encode_json({
@@ -3502,6 +3843,7 @@ sub api_admin_bot_token :Path('admin/bot_token') :Args(0) {
         username   => $user->username,
         token_name => $tname,
         expires_at => _api_dt_str($expires_at),
+        (map { $_ => $scope{$_} } qw(scope_sites scope_modules scope_actions own_only)),
         warning    => 'Store this token in the bot\'s own secret file now. It is shown once and cannot be retrieved later.',
     }));
     $c->detach();
@@ -3543,6 +3885,8 @@ sub api_admin_bot_tokens :Path('admin/bot_tokens') :Args(0) {
             last_used_at => _api_dt_str($t->last_used_at),
             is_active    => $t->is_active ? 1 : 0,
             bot_eligible => _api_is_bot_user($u) ? 1 : 0,
+            (map { my $sc = $_; map { ($_ => ($sc ? $sc->{$_} : undef)) } qw(scope_sites scope_modules scope_actions own_only) }
+                Comserv::Util::AccessCheck->token_scope($c->model('DBEncy'), $t->id)),
         };
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_admin_bot_tokens',

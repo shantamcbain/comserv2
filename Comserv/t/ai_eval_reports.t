@@ -421,4 +421,22 @@ SKIP: {
     is($p->status, 'reverted', 'resolves: status reverted (undo)');
 }
 
+subtest 'daily_eval top-level sections fill key metrics (Nov 3 2026)' => sub {
+    my $m = Comserv::Model::AI2::EvalReports->new;
+    my ($r, $e) = $m->validate_payload({ report_date => '2026-11-03', source => 'daily_eval',
+        app => { real_calls => 11, ok => 11 }, openrouter => { balance_usd => 14.45, month_usd => 3.92 },
+        grok_bot => { latest_pct => 4.0 } });
+    is_deeply($e, [], 'no errors');
+    ok($r->{metrics_json}, 'sections kept as metrics');
+    my $k = $m->key_metrics(JSON->new->decode($r->{metrics_json}));
+    is($k->{bot_pct_left}, 96, 'bot left = 100 - used');
+    is($k->{openrouter_balance}, 14.45, 'balance');
+    is($k->{openrouter_month}, 3.92, 'month');
+    is($k->{chat_calls}, 11, 'calls from app');
+    is($k->{chat_usable}, 11, 'usable from app');
+    $k = $m->key_metrics({ bot => { percent_left => 57 }, chat => { calls => 7, usable => 1 } });
+    is($k->{bot_pct_left}, 57, 'old layout still read');
+    is($k->{chat_calls}, 7, 'old chat layout');
+};
+
 done_testing();
