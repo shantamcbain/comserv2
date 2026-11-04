@@ -858,6 +858,10 @@
     var tbody = table ? table.querySelector('tbody') : null;
     var inc3 = box.querySelector('[data-update-all-4003]');
     var buttons = box.querySelectorAll('[data-update-all-mode]');
+    // No form here on purpose: the card sits inside the Working Tree form, and a
+    // nested <form> is dropped by the parser. Buttons are links, so a click always
+    // navigates; when this script runs we upgrade it to an AJAX POST in place.
+    var form = null;
 
     function cell(tr, text) { var td = document.createElement('td'); td.textContent = text == null ? '' : String(text); tr.appendChild(td); }
     function render(data) {
@@ -880,21 +884,60 @@
         });
         table.hidden = false;
     }
-    Array.prototype.forEach.call(buttons, function (btn) {
-        btn.addEventListener('click', function () {
-            var mode = btn.getAttribute('data-update-all-mode');
+    function run(mode) {
             if (mode === 'update' && !window.confirm('Merge main into every registered branch now? Running -r dev servers will restart. Run Preview first if unsure.')) { return; }
             var body = new URLSearchParams();
             body.set('mode', mode); body.set('csrf', csrf);
             if (inc3 && inc3.checked) { body.set('include_4003', '1'); }
-            summary.textContent = mode === 'update' ? 'Updating...' : 'Previewing...';
+            if (summary) { summary.textContent = mode === 'update' ? 'Updating...' : 'Previewing...'; }
             Array.prototype.forEach.call(buttons, function (b) { b.disabled = true; });
             fetch(url, { method: 'POST', credentials: 'same-origin', body: body,
-                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
-                .then(function (r) { return r.json(); })
+                         headers: { 'Content-Type': 'application/x-www-form-urlencoded',
+                                    'Accept': 'application/json' } })
+                .then(function (r) {
+                    // A 302 to /user/login (or any HTML error page) is not JSON. Without this guard the
+                    // card shows only "Request failed: SyntaxError" and looks like a dead button.
+                    var ct = (r.headers.get('content-type') || '').toLowerCase();
+                    if (ct.indexOf('json') === -1) {
+                        throw new Error('HTTP ' + r.status + ' ' + (ct || 'no content-type') +
+                                        ' — you are probably signed out. Reload the Git page and sign in again.');
+                    }
+                    return r.json();
+                })
                 .then(render)
-                .catch(function (e) { summary.textContent = 'Request failed: ' + e; })
+                .catch(function (e) { if (summary) { summary.textContent = 'Request failed: ' + e; } })
                 .then(function () { Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; }); });
+    }
+    // Only take over the submit when the JS path can actually finish. Any doubt,
+    // any throw: fall back to the browser's native POST so the click is never lost.
+    // (Shanta 2026-11-03: a preventDefault() followed by a throw left the buttons
+    // disabled and the card dead — no request, no message, nothing.)
+    // Self-reporting: the card shows any uncaught script error inline.
+    window.addEventListener('error', function (e) {
+        if (!summary) { return; }
+        summary.textContent = 'JS ERROR: ' + (e.message || 'unknown')
+            + ' @ ' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || '?');
+    });
+    // Links always navigate — there is no form to be swallowed by the outer one.
+    // When this script runs we POST in place for a nicer result, and any failure
+    // falls back to the plain link so the action is never lost.
+    Array.prototype.forEach.call(buttons, function (btn) {
+        btn.addEventListener('click', function (ev) {
+            if (!url || !window.fetch) { return; }
+            var mode = btn.getAttribute('data-update-all-mode') || 'preview';
+            if (mode === 'update' && !window.confirm('Merge main into every registered branch now? Running -r dev servers will restart. Run Preview first if unsure.')) {
+                ev.preventDefault();
+                return;
+            }
+            ev.preventDefault();
+            try {
+                run(mode);
+            } catch (e) {
+                if (btn.href) { window.location = btn.href; }
+            }
         });
     });
+    if (summary && !summary.textContent) {
+        summary.textContent = 'Ready — click Preview.';
+    }
 })();

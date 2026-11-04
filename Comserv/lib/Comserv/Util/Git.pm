@@ -2826,7 +2826,17 @@ sub update_all_from_main {
             # Predict git's own refusal: main changes a file that is dirty here.
             my %d = map { ($_ => 1) } @dirty;
             my $ch = $self->_run($c, 'diff', '--name-only', 'HEAD...main', { repo => $dir });
-            my @hit = grep { $d{$_} } _lines($ch->{output});
+            my @cand = grep { $d{$_} } _lines($ch->{output});
+            # A dirty file whose working copy ALREADY equals main's version is not a
+            # blocker: the merge would leave the file exactly as it is. Without this,
+            # a mode-only typechange (.zencoder/scripts/updateprompt.pl shows " T" in
+            # every worktree) blocked the whole branch even though nothing could be
+            # lost. Measured 2026-11-03: 12 of 16 branches were skipped for this.
+            my @hit;
+            for my $f (@cand) {
+                my $same = $self->_run($c, 'diff', '--quiet', 'main', '--', $f, { repo => $dir });
+                push @hit, $f unless $same->{success};
+            }
             if (@hit) {
                 $row->{action} = 'would_skip_local_changes'; $row->{files} = \@hit;
                 $row->{reason} = 'main changes files with uncommitted edits here';
