@@ -1,0 +1,6 @@
+<div id="2026-11-04-merge-main-into-cssnavigation" class="cl-entry">
+<h3>2026-11-04 — Merge main into CSSNavigation</h3>
+<p class="doc-body"><strong>What.</strong> Resolved the merge of <code>main</code> into <code>CSSNavigation</code>: kept this branch's <code>.hermes.md</code> context, merged the newer tracked model matrix sections, adopted main's superset todo-update field list in <code>Controller/Api.pm</code> (recurrence plus scheduling/time-zone fields), adopted main's newer AI trial state file, and kept <code>root/config/worktrees.json</code> untracked so each worktree keeps its own local registry copy.</p>
+<p class="doc-body"><strong>Why.</strong> Branch context files are per-worktree identity documents and must not inherit another branch's identity; the todo field lists are additive, so the wider set serves both intents; the trial state and worktree registry are runtime data, not source.</p>
+<p class="doc-body"><strong>Files.</strong> <code>.hermes.md</code>, <code>.hermes/models.md</code>, <code>Comserv/lib/Comserv/Controller/Api.pm</code>, <code>Comserv/data/ai_trials/gpt_56_luna.state.json</code>, <code>Comserv/root/config/worktrees.json</code> (untracked, kept on disk).</p>
+</div>

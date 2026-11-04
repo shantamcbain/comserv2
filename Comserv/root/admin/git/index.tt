@@ -1,9 +1,12 @@
 [% META title = 'Git Dashboard' %]
 [%# File: root/admin/git/index.tt
     Single entry point for all git functionality. Route: Admin::Git::index (/admin/git).
-    Compact vertical layout: a top summary strip (Repository + branch dropdown +
-    push/pull) sits on one row; only the Working Tree card is open by default;
-    branches / commits / stashes are collapsed <details> to save vertical space.
+    Compact vertical layout: a top summary strip (Host + Repository + branch
+    dropdown + Remote) sits on one row. EVERY card on this page — strip cards,
+    New Branch + Worktree, Working Tree, Update-all, Develop Servers, Merge,
+    Branches, Commits, Stashes — is a native <details> that starts CLOSED, so the
+    page opens as a short list of headings; the only card that re-opens itself is
+    Update-all, and only to show a result the server just computed.
     Styles: /static/css/git-dashboard.css (loaded via Header.tt on this route).
     JS: /static/js/git-dashboard.js (js_load.tt). No inline <script>/<style>.
 %]
@@ -11,7 +14,7 @@
 
 [%# Absolute-URL building for branch links (RELATIVE-URL TRAP: a relative path
     resolves against the current page origin, so the Open button would reopen
-    the SAME server instead of the branch's own port). Build the full URL. #]
+    the SAME server instead of the branch's own port). Build the full URL. %]
 [% SET scheme = c.req.uri.scheme %]
 [% SET host = c.req.uri.host %]
 
@@ -33,9 +36,9 @@
             <h1><i class="fas fa-code-branch"></i> Git Dashboard <span class="git-current-branch git-current-branch--head" title="Branch this dashboard is operating on">
                 <i class="fas fa-code-branch"></i> <strong>[% current_branch | html %]</strong></span></h1>
 
-            <div class="admin-panel" data-create-worktree-panel="1">
-                <div class="admin-panel-header"><h3><i class="fas fa-plus"></i> New Branch + Worktree</h3></div>
-                <div class="admin-panel-body">
+            <details class="git-collapse git-new-branch" data-create-worktree-panel="1">
+                <summary><i class="fas fa-plus"></i> New Branch + Worktree</summary>
+                <div class="git-collapse-body">
                     <form data-create-worktree-form="1" class="git-inline">
                         <label>Branch
                             <input type="text" name="branch" required pattern="[A-Za-z0-9._/-]+"
@@ -50,7 +53,7 @@
                         <span data-create-worktree-status="1" class="section-info"></span>
                     </form>
                 </div>
-            </div>
+            </details>
 
             [% IF debug_msg && c.session.debug_mode == 1 %]
                 <div class="admin-alert admin-alert-info">
@@ -95,8 +98,8 @@
             <div class="git-strip">
 
                 [%# ---- Host / target selector (run git on local or a remote host over SSH) ---- %]
-                <div class="git-card git-card--fit">
-                    <h4>Host</h4>
+                <details class="git-collapse git-card git-card--fit">
+                    <summary>Host</summary>
                     <div class="git-inline">
                         <select name="target" class="form-control git-select" id="git-target-select"
                                 title="Run git on this host">
@@ -114,12 +117,12 @@
                     <div class="git-inline" style="margin-top:8px;">
                         <a class="admin-btn admin-btn-sm admin-btn-primary" href="/admin/git?target=openbafang">OpenBafangTool git</a>
                     </div>
-                </div>
+                </details>
 
                 [%# ---- Repository + branch selector (replaces the old Branches card) ---- %]
-                <div class="git-card git-card--grow">
-                    <h4>Repository <span class="git-current-branch git-current-branch--head" title="Branch this dashboard is operating on">
-                        <i class="fas fa-code-branch"></i> <strong>[% current_branch | html %]</strong></span></h4>
+                <details class="git-collapse git-card git-card--grow">
+                    <summary>Repository <span class="git-current-branch git-current-branch--head" title="Branch this dashboard is operating on">
+                        <i class="fas fa-code-branch"></i> <strong>[% current_branch | html %]</strong></span></summary>
                     <div class="git-inline">
                         [% IF !git_external && current_branch && current_branch != 'main' && current_branch != 'master' %]
                         <span class="section-info"><i class="fas fa-lock"></i> Worktree checkout — stays on <code class="code-inline">[% current_branch | html %]</code>. Cannot switch to main (already checked out in the primary repo). Merge main into this branch below.</span>
@@ -184,12 +187,12 @@
                     [% IF c.session.debug_mode == 1 %]
                     <div class="git-branch-meta">Repo: <code class="code-inline">[% repo_path | html %]</code></div>
                     [% END %]
-                </div>
+                </details>
 
                 [%# ---- Remote actions: GitHub upstream, or the primary main checkout (:3001) ---- %]
                 [% IF git_external OR tracking.upstream OR current_branch == 'main' OR current_branch == 'master' %]
-                <div class="git-card git-card--fit">
-                    <h4>Remote</h4>
+                <details class="git-collapse git-card git-card--fit">
+                    <summary>Remote</summary>
                     <div class="git-inline">
                         [% UNLESS git_external %]
                         <form method="post" action="[% c.uri_for('/admin/git_pull') %]" class="inline-form">
@@ -218,15 +221,17 @@
                             </button>
                         </form>
                     </div>
-                </div>
+                </details>
                 [% END %]
 
             </div>
 
-            [%# ====== Working Tree (the only open card) ====== %]
-            <div class="admin-panel git-worktree">
-                <div class="admin-panel-header"><h3>Working Tree</h3></div>
-                <div class="admin-panel-body">
+            [%# ====== Working Tree (collapsed like every other card — open it to work) ====== %]
+            <details class="git-collapse git-worktree">
+                <summary>Working Tree
+                    [% IF git_status.has_changes %]<span class="git-count">[% git_status.staged_files.size + git_status.modified_files.size + git_status.untracked_files.size %] changed file(s)</span>[% ELSE %]<span class="git-count">clean</span>[% END %]
+                </summary>
+                <div class="git-collapse-body">
                     [% IF git_status.has_changes %]
                     [% INCLUDE admin/git/junk_warning.tt %]
                     <form method="post" action="[% c.uri_for('/admin/git/action') %]"
@@ -333,30 +338,63 @@
                         <p><i class="fas fa-check"></i> Working tree clean.</p>
                     [% END %]
                 </div>
-            </div>
+            </details>
 
             [%# ====== Update all branches from main (Oct 31 2026, Shanta) ====== %]
             [%# Admin-only POST + CSRF to /admin/git/update_all_from_main; driven by git-dashboard.js (data-git-update-all).
-               No stash, no force, no rebase. Proxmox/:4016 always skipped; :4003 only when the box is ticked. #]
-            <details class="git-collapse git-update-all">
+               No stash, no force, no rebase. Every registered worktree is merged — no branch or port is exempt. %]
+            <details class="git-collapse git-update-all"[% IF update_all_result %] open[% END %]>
                 <summary>Update all branches from main</summary>
                 <div class="git-collapse-body" data-git-update-all="1"
                      data-update-all-url="[% c.uri_for('/admin/git/update_all_from_main') %]"
                      data-csrf="[% update_all_csrf | html %]">
-                    <p>Merges main into every registered worktree. A branch with uncommitted files is still merged when main
-                       does not touch those files; otherwise git refuses and the row says so (nothing is stashed or forced).
-                       A conflict is aborted and the branch is left as it was. Proxmox (:4016) is always skipped.
+                    [%# NOT a <form>: the Working Tree card above already opens a form and
+                       closes it at line ~331, so this card sits INSIDE it. A nested <form>
+                       is silently dropped by the HTML parser — the start tag vanishes and
+                       the buttons join the outer form, which is why Preview/Update did
+                       nothing when clicked. Links cannot be swallowed that way. %]
+                    <p>Merges main into <strong>every</strong> registered worktree — Proxmox (:4016) and 3d (:4003) included;
+                       nothing is skipped to keep a branch out of sync. A branch with uncommitted files is still merged when main
+                       does not touch those files. If main does touch them, the merge is retried with git's own
+                       <code>--autostash</code>: everything is merged, then your edits are re-applied on top &mdash; an edit that
+                       collides stays in the worktree as a conflict and in <code>git stash list</code>, and that row is flagged
+                       <strong>&#9873; needs manual</strong>. Nothing is force-pushed and no branch is reset.
                        Dev servers started with <code>-r</code> restart on their own when their files change.</p>
-                    <label><input type="checkbox" data-update-all-4003="1"> Include :4003 (3d)</label>
                     <div class="git-actions">
-                        <button type="button" class="admin-btn admin-btn-sm" data-update-all-mode="preview">
-                            <i class="fas fa-eye"></i> Preview</button>
-                        <button type="button" class="admin-btn admin-btn-sm admin-btn-primary" data-update-all-mode="update">
-                            <i class="fas fa-code-branch"></i> Update all from main</button>
+                        <a class="admin-btn admin-btn-sm" rel="nofollow" data-update-all-mode="preview"
+                           href="[% c.uri_for('/admin/git/update_all_from_main', { mode => 'preview', csrf => update_all_csrf }) %]">
+                            <i class="fas fa-eye"></i> Preview</a>
+                        <a class="admin-btn admin-btn-sm admin-btn-primary" rel="nofollow" data-update-all-mode="update"
+                           href="[% c.uri_for('/admin/git/update_all_from_main', { mode => 'update', csrf => update_all_csrf }) %]">
+                            <i class="fas fa-code-branch"></i> Update all from main</a>
                     </div>
-                    <div data-update-all-summary="1" class="git-merge-status"></div>
+                    <div data-update-all-summary="1" class="git-merge-status">[% update_all_result ? update_all_result.summary : '' %]</div>
+                    <div class="git-merge-status" style="font-size:11px;opacity:.65">
+                        Card build [% update_all_build %] &middot; form mode (works without JS)
+                    </div>
+                    [% IF update_all_result && update_all_result.rows && update_all_result.rows.size %]
+                    <table class="data-table" data-update-all-table="1">
+                        <thead><tr><th>Worktree</th><th>Branch</th><th>Port</th><th>Result</th><th>Manual</th><th>Behind / ahead</th>
+                            <th>Before (undo point)</th><th>Files / reason</th><th>Auto-restart</th></tr></thead>
+                        <tbody>
+                        [% FOREACH r IN update_all_result.rows %]
+                            <tr>
+                                <td>[% r.key %]</td>
+                                <td>[% r.branch %]</td>
+                                <td>[% IF r.port %]:[% r.port %][% END %]</td>
+                                <td>[% r.action | html %][% IF r.autostash %] (autostash)[% END %][% IF r.tree %]<br><small style="opacity:.7;">[% r.tree | html %]</small>[% END %]</td>
+                                <td style="white-space:nowrap;">[% IF r.needs_manual %]<span style="color:#dc3545;font-weight:bold;">&#9873; needs manual</span>[% END %]</td>
+                                <td>[% r.behind %][% IF r.ahead %] / [% r.ahead %][% END %]</td>
+                                <td>[% IF r.pre_merge_commit %][% r.pre_merge_commit.substr(0, 10) %][% END %]</td>
+                                <td>[% IF r.reason %][% r.reason | html %][% ELSIF r.dirty_files && r.dirty_files.size %]uncommitted kept: [% r.dirty_files.join(', ') | html %][% END %][% IF r.manual_files && r.manual_files.size %] <strong>conflict in: [% r.manual_files.join(', ') | html %]</strong>[% END %][% IF r.stash %] <em>stash: [% r.stash.substr(0, 60) | html %]</em>[% END %]</td>
+                                <td>[% IF r.will_restart %]yes[% END %]</td>
+                            </tr>
+                        [% END %]
+                        </tbody>
+                    </table>
+                    [% END %]
                     <table class="data-table" data-update-all-table="1" hidden>
-                        <thead><tr><th>Worktree</th><th>Branch</th><th>Port</th><th>Result</th><th>Behind / ahead</th>
+                        <thead><tr><th>Worktree</th><th>Branch</th><th>Port</th><th>Result</th><th>Manual</th><th>Behind / ahead</th>
                             <th>Before (undo point)</th><th>Files / reason</th><th>Auto-restart</th></tr></thead>
                         <tbody></tbody>
                     </table>
@@ -365,10 +403,10 @@
 
             [%# ====== Develop Servers (zenflow worktree registry) ====== %]
             [%# Highlight uses current_worktree (from app_workflow = worktree dir key) to mark the active server row.
-               This matches b.name even when live git branch (current_branch) differs (e.g. feature branch in a named worktree slot). #]
-            [%# Single source of truth = stash.worktree_list (Comserv::Util::Git->build_worktree_list,\n               which reads root/config/worktrees.json). Mirrors the planning tab's "Branch Servers"\n               panel. Open/Stop/Restart buttons POST to /admin/branch_server_action (handled in\n               git-dashboard.js). No inline <script>. #]
+               This matches b.name even when live git branch (current_branch) differs (e.g. feature branch in a named worktree slot). %]
+            [%# Single source of truth = stash.worktree_list (Comserv::Util::Git->build_worktree_list,\n               which reads root/config/worktrees.json). Mirrors the planning tab's "Branch Servers"\n               panel. Open/Stop/Restart buttons POST to /admin/branch_server_action (handled in\n               git-dashboard.js). No inline <script>. %]
             [% IF worktree_list && worktree_list.size %]
-            <details class="git-collapse git-dev-servers" open>
+            <details class="git-collapse git-dev-servers">
                 <summary>Develop Servers <span class="git-count">([% worktree_list.size %])</span></summary>
                 <div class="git-collapse-body">
                     <table class="data-table git-dev-server-table">
@@ -478,7 +516,7 @@
 
             [%# Live console modal for a branch server's startup log. Shown by the Open
                button (git-dashboard.js) so you can watch the server boot and read any
-               command-line errors. Markup only — JS + /admin/branch_server_log drive it. #]
+               command-line errors. Markup only — JS + /admin/branch_server_log drive it. %]
             <div id="git-dev-console" class="git-dev-console-overlay" style="display:none;">
                 <div class="git-dev-console">
                     <div class="git-dev-console-header">

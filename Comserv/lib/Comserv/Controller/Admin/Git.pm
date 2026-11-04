@@ -865,6 +865,12 @@ sub index :Path('/admin/git') :Args(0) {
         # tab's "Branch Servers" panel shows, so the two can never drift.
         worktree_list   => $self->git_service->build_worktree_list,
         update_all_csrf => $self->_update_all_csrf_token($c),
+        # One-shot: the previous "Update all from main" result, rendered server-side
+        # so the card works as a plain form POST (no JS required).
+        update_all_result => delete $c->session->{git_update_all_result},
+        # Visible marker so "did my browser get the new card?" is answerable by eye,
+        # not by grepping a log that may be blind on this path.
+        update_all_build => scalar(localtime) . ' pid ' . $$,
         template        => 'admin/git/index.tt',
     );
 
@@ -2342,9 +2348,9 @@ sub _catch_up_note {
 =head2 update_all_from_main
 
 POST /admin/git/update_all_from_main (admin-only, session CSRF token). Oct 31 2026 (Shanta).
-Params: mode=preview|update, include_4003=1 (optional), csrf. Brings main into every registered
+Params: mode=preview|update, csrf. Brings main into every registered
 worktree via Comserv::Util::Git->update_all_from_main (no stash, no force, no rebase; conflicts
-aborted; Proxmox/:4016 always skipped). Returns JSON { success, rows, summary, restart_ports, dry_run }.
+aborted; no branch or port is special-cased). Returns JSON { success, rows, summary, restart_ports, dry_run }.
 
 =cut
 
@@ -2374,14 +2380,34 @@ sub _update_all_csrf_ok {
 sub update_all_from_main :Path('/admin/git/update_all_from_main') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
-    return unless $self->admin_auth->require_admin_access($c, 'git_merge');
-    unless ($c->request->method eq 'POST') {
+    # JSON endpoints must never answer an auth failure with a 302 redirect to
+    # /user/login — fetch().json() then throws "Unexpected token '<'" on the
+    # HTML login page and the card just says "Request failed". Same defect was
+    # fixed in `merge` (2026-08-26); this action still had the redirect, which
+    # is why Preview/Update silently failed on an expired admin session.
+    unless ($self->admin_auth->check_admin_access($c, 'git_merge')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({
+            success => 0,
+            error   => 'Administrator access required: your session expired. Sign in again, then reload the Git page.',
+        }));
+        return;
+    }
+    unless ($c->request->method =~ /^(?:POST|GET)$/) {
         $c->response->body(encode_json({ success => 0, error => 'POST required' }));
         return;
     }
     unless ($self->_update_all_csrf_ok($c)) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
             'update_all_from_main: CSRF token missing or wrong');
+        if (!$self->_wants_json($c)) {
+            $c->session->{git_update_all_result} = {
+                summary => 'Security token expired. The page was reloaded — try again.',
+                rows    => [],
+            };
+            $c->response->redirect($c->uri_for('/admin/git'));
+            return;
+        }
         $c->response->body(encode_json({ success => 0, error => 'Security token expired. Reload the Git page and try again.' }));
         return;
     }
@@ -2390,17 +2416,38 @@ sub update_all_from_main :Path('/admin/git/update_all_from_main') :Args(0) {
     my $res = eval {
         $self->git_service->update_all_from_main($c, {
             dry_run      => $dry,
-            include_4003 => ($c->req->param('include_4003') ? 1 : 0),
         });
     };
     if (!$res) {
         my $err = $@ || 'unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
             "update_all_from_main died: $err");
+        if (!$self->_wants_json($c)) {
+            $c->session->{git_update_all_result} = { summary => "Update all failed: $err", rows => [] };
+            $c->response->redirect($c->uri_for('/admin/git'));
+            return;
+        }
         $c->response->body(encode_json({ success => 0, error => 'Update all failed; see the application log.' }));
         return;
     }
+    # A plain browser form submit gets a redirect + server-rendered rows, so the
+    # button works with no JS at all. fetch() callers keep the JSON contract.
+    unless ($self->_wants_json($c)) {
+        $c->session->{git_update_all_result} = $res;
+        $c->response->redirect($c->uri_for('/admin/git'));
+        return;
+    }
     $c->response->body(encode_json({ success => 1, %$res }));
+}
+
+# True when the caller is fetch()/XHR and expects JSON rather than a page.
+sub _wants_json {
+    my ($self, $c) = @_;
+    my $accept = $c->req->header('Accept') // '';
+    return 1 if $accept =~ m{json}i;
+    my $xrw = $c->req->header('X-Requested-With') // '';
+    return 1 if $xrw =~ m{XMLHttpRequest}i;
+    return 0;
 }
 
 =head2 merge_to_main
