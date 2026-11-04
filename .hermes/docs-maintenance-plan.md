@@ -1,7 +1,7 @@
 # Documentation Maintenance Plan — Comserv2
 
 Owned by: the Documentation expert (`.hermes.md` role).
-Status: active. Last refreshed: 2026-10-27 (Proxmox: pool summary graphs; session stopped, not done).
+Status: active. Last refreshed: 2026-10-28 (Proxmox: merge conflict cleanup; merge state verified).
 
 Purpose: keep every documentation surface accurate, consistent, and in sync with the
 code — and to give a repeatable process so the docs don't drift again.
