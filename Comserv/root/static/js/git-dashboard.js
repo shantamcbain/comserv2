@@ -936,6 +936,15 @@
                     // card shows only "Request failed: SyntaxError" and looks like a dead button.
                     var ct = (r.headers.get('content-type') || '').toLowerCase();
                     if (ct.indexOf('json') === -1) {
+                        // 404 is NOT an auth problem: the card markup comes from the template on
+                        // disk, but Catalyst compiles controller actions at startup. A worktree
+                        // whose dev server predates the merged endpoint renders this card and
+                        // then 404s every click. Say that instead of blaming the session.
+                        if (r.status === 404) {
+                            throw new Error('HTTP 404 ' + (ct || 'no content-type') +
+                                            ' — this action is not loaded in the running server' +
+                                            ' (stale pre-merge code). Restart that worktree\'s dev server, then reload this page.');
+                        }
                         throw new Error('HTTP ' + r.status + ' ' + (ct || 'no content-type') +
                                         ' — you are probably signed out. Reload the Git page and sign in again.');
                     }
