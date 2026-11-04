@@ -2892,8 +2892,19 @@ sub update_all_from_main {
             push @dirty, $p if length $p;
         }
         $row->{dirty_files} = [ @dirty[0 .. ($#dirty < 19 ? $#dirty : 19)] ] if @dirty;
+        $row->{dirty_count} = scalar @dirty;
+        $row->{tree} = @dirty ? scalar(@dirty) . ' uncommitted' : 'tree clean';
 
-        if ($row->{behind} == 0) { $row->{action} = 'uptodate'; next; }
+        if ($row->{behind} == 0) {
+            # 'uptodate' was read as "identical to main" and hid a branch that is clean
+            # but carries its own commits (git-dev was 0 behind / 1 ahead and displayed
+            # as up to date). Report the ahead count and the tree state separately.
+            $row->{action} = $row->{ahead} ? 'ahead_only' : 'in_sync';
+            $row->{reason} = $row->{ahead}
+                ? $row->{ahead} . ' commit(s) main does not have - nothing to merge'
+                : 'nothing to merge';
+            next;
+        }
         $row->{will_restart} = $listening->($port) ? 1 : 0;
 
         if ($dry) {
@@ -2997,6 +3008,11 @@ sub update_all_from_main {
             $row->{reason} .= $ab->{success} ? ' (aborted)' : ' (ABORT FAILED - check this worktree)';
         }
     }
+
+    # No fallback: $row->{tree} is set at the one place the tree is actually
+    # inspected (status --porcelain). Rows that were skipped, missing, never a
+    # feature branch, or failed before that point leave it unset, and the view
+    # then shows nothing rather than claiming "tree clean" for an unknown state.
 
     my %n; $n{ $_->{action} }++ for @rows;
     my @restart = map { $_->{port} } grep { $_->{will_restart} } @rows;
