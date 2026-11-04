@@ -382,11 +382,11 @@
                                 <td>[% r.key %]</td>
                                 <td>[% r.branch %]</td>
                                 <td>[% IF r.port %]:[% r.port %][% END %]</td>
-                                <td>[% r.action %][% IF r.autostash %] (autostash)[% END %]</td>
+                                <td>[% r.action | html %][% IF r.autostash %] (autostash)[% END %][% IF r.tree %]<br><small style="opacity:.7;">[% r.tree | html %]</small>[% END %]</td>
                                 <td style="white-space:nowrap;">[% IF r.needs_manual %]<span style="color:#dc3545;font-weight:bold;">&#9873; needs manual</span>[% END %]</td>
                                 <td>[% r.behind %][% IF r.ahead %] / [% r.ahead %][% END %]</td>
                                 <td>[% IF r.pre_merge_commit %][% r.pre_merge_commit.substr(0, 10) %][% END %]</td>
-                                <td>[% IF r.reason %][% r.reason %][% ELSIF r.dirty_files && r.dirty_files.size %]uncommitted kept: [% r.dirty_files.join(', ') %][% END %][% IF r.manual_files && r.manual_files.size %] <strong>conflict in: [% r.manual_files.join(', ') %]</strong>[% END %][% IF r.stash %] <em>stash: [% r.stash.substr(0, 60) %]</em>[% END %]</td>
+                                <td>[% IF r.reason %][% r.reason | html %][% ELSIF r.dirty_files && r.dirty_files.size %]uncommitted kept: [% r.dirty_files.join(', ') | html %][% END %][% IF r.manual_files && r.manual_files.size %] <strong>conflict in: [% r.manual_files.join(', ') | html %]</strong>[% END %][% IF r.stash %] <em>stash: [% r.stash.substr(0, 60) | html %]</em>[% END %]</td>
                                 <td>[% IF r.will_restart %]yes[% END %]</td>
                             </tr>
                         [% END %]

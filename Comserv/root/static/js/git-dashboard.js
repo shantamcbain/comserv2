@@ -906,7 +906,7 @@
         data.rows.forEach(function (r) {
             var tr = document.createElement('tr');
             cell(tr, r.key); cell(tr, r.branch); cell(tr, r.port ? ':' + r.port : '');
-            cell(tr, r.action + (r.autostash ? ' (autostash)' : ''));
+            cell(tr, r.action + (r.autostash ? ' (autostash)' : '') + (r.tree ? ' \u2014 ' + r.tree : ''));
             cell(tr, r.needs_manual ? '\u2691 needs manual' : '');
             cell(tr, (r.behind != null ? r.behind : '') + (r.ahead != null ? ' / ' + r.ahead : ''));
             cell(tr, r.pre_merge_commit ? r.pre_merge_commit.substring(0, 10) : '');
