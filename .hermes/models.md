@@ -1,8 +1,8 @@
 # Hermes model preferences (tracked — no secrets)
 
-This file is the **branch-aware recommendation matrix**. Agents read it from the
-checkout; humans apply it with `hermes config set` or a dedicated profile
-(`hermes -p <name>`). Do **not** commit API keys or OAuth tokens.
+This file is the branch-aware recommendation matrix. Agents read it from the
+checkout; humans apply it with `hermes config set` or a dedicated profile.
+Never commit API keys or OAuth tokens.
 
 Last probed free-coder reliability (workstation, **2026-09-08** — live code-gen probe,
 not a PONG):
@@ -23,9 +23,7 @@ not a PONG):
 - **Never hy3 / hy3-free / muse-spark.**
 - Ollama (`gemma4-64k` etc.) = **last** (slow if cold). Delegation needs ≥64K context.
 
----
-
-## Default (coding / main / general Catalyst)
+## Default coding stack
 
 | Slot | Preference |
 |------|------------|
@@ -34,7 +32,11 @@ not a PONG):
 | **Primary fallback order** | Live Hermes chain, Nov 2 2026: `supergrok / grok-4.7` → `openrouter / particle-ai/particle-1` (probation) → `xai / grok-4.7` → `openrouter / openai/gpt-5.6-luna` (probation, stop reached) → `openrouter / cohere/north-mini-code:free`. Free-first probe order when SuperGrok is unavailable: `ling-3.0-flash-fin:free` → `north-mini-code:free` → `nemotron-3.5-lightning:free` → `deepseek-v4-flash` → `deepseek-v4-pro` → `glm-5.3-flash`; **Ollama last**. The source of truth is `@HERMES_CHAIN_DEFAULT` in `Util/AI/ModelChains.pm`, not this row. |
 | Aliases | `code` → Director; `cheap` / `delegate` → Coder; `local` → Ollama last-resort |
 
-Apply sketch (Director session on default profile):
+Live configuration belongs in `~/.hermes/config.yaml` or a profile, not this file.
+
+## Per-branch overrides
+
+Launch sketch (default profile):
 
 ```bash
 hermes config set model.provider xai-oauth
@@ -44,62 +46,48 @@ hermes config set delegation.model nemotron-3.5-lightning-free
 # fallback_providers: edit list — fast free first, Ollama last, no hy3
 ```
 
----
+### CSSNavigation
 
-## Per-branch overrides (intent only — live config via profile or manual set)
-
-Branches may prefer cheaper or domain-tuned stacks. Process (Director+Coder) is
-unchanged; only SKUs change.
+| Slot | Preference | Why |
+|------|------------|-----|
+| Director | Default coding stack; escalate only for theme-system architecture | CSS, Perl/Catalyst theme paths, and focused UI work |
+| Coder | `nemotron-3.5-lightning-free` | Narrow, testable patches after the Director work order is complete |
+| Domain | Preserve the 640px class-only navigation contract and canonical theme JSON source | Avoid regressions and configuration drift |
 
 ### Documentation
 
 | Slot | Preference | Why |
 |------|------------|-----|
-| Director | Free-first OK: `nemotron-3.5-lightning-free` or `laguna-s-2.1-free`; escalate to composer only for hard architecture/docs system design | Mostly `.tt` / META / theming / changelog prose |
-| Coder | Same free tier (lightning preferred) | Mechanical META, PageVersion, changelog `.inc`, var(--*) passes |
-| Avoid | Paid pro tiers by default; Ollama unless offline | Cost and cold-start |
-| Profile hint | `hermes -p documentation` (create profile once; own config/skills) | Isolates fallbacks from coding profile |
-
-Launch:
-
-```bash
-cd ~/.comserv/worktrees/Documentation/Comserv && hermes -p documentation chat
-# If profile missing, use default profile but READ this section and prefer free Director.
-```
+| Director | Free-first `nemotron-3.5-lightning-free`; escalate for hard docs architecture | Mostly `.tt`, META, theming, and changelog prose |
+| Coder | Same free tier | Mechanical documentation edits |
 
 ### schema
 
 | Slot | Preference |
 |------|------------|
-| Director | Strong (composer / deepseek-v4-pro for nasty DDL) — Result class + schema-compare only |
-| Coder | Free for boilerplate Result stubs only after Director work order; never invent hand-DDL |
+| Director | Strong composer / deepseek-v4-pro for difficult DDL |
+| Coder | Free only for boilerplate Result work after a Director order |
 
 ### ai / aisystem / aichatsystem-*
 
 | Slot | Preference |
 |------|------------|
-| Director | composer or strong coding model — Router, V2 JS, voice |
-| Coder | lightning/laguna for narrow file patches with CODER_READY |
+| Director | Composer or strong coding model |
+| Coder | Lightning/laguna for narrow patches with `CODER_READY` |
 
 ### InventoryAccounting / 3d / DockerHA / planning / git-dev
 
 | Slot | Preference |
 |------|------------|
-| Director | Default coding stack unless task is pure prose |
+| Director | Default coding stack unless pure prose |
 | Coder | Default free coder |
-| Domain | Honor branch `.hermes.md` domain rules (DB, HA, printing_3d, etc.) |
+| Domain | Honor each branch's database, HA, printing, or planning rules |
 
----
+## Storage rule
 
-## How much belongs in the branch vs home dir
+| In git | In `~/.hermes` only |
+|--------|---------------------|
+| This matrix and process rules | API keys, OAuth, active config, session DB, memories, cron |
+| Branch context and app hooks | Optional profiles and installed skills |
 
-| In **git** (this checkout) | In **`~/.hermes`** only |
-|----------------------------|-------------------------|
-| Process (director-coder.md) | API keys, OAuth, live config.yaml |
-| This models.md matrix | Session DB, memories, cron |
-| Branch `.hermes.md` domain + “use row X from models.md” | Optional profiles (`profiles/documentation/`) |
-| App hooks (Logging/TodoLog) | Installed skills copies (unless vendored later) |
-
-**Rule:** branches teach *what to prefer*; the machine profile *enforces* it.
-When opening a branch worktree, either switch profile or have Director apply the
-row above before long runs.
+Branches document what to prefer; the machine profile enforces it.

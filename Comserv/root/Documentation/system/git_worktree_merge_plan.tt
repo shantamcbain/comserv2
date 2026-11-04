@@ -280,8 +280,11 @@
             swallowed the surrounding markup &mdash; every click was a no-op until both were fixed.)</p>
             <p class="doc-body">Rules the preview and the merge both obey:</p>
             <ul class="doc-body">
-                <li>Every registered worktree is visited. <strong>Proxmox (<code>:4016</code>) is always skipped</strong>
-                    (<code>skipped_proxmox</code>) &mdash; it is not a Comserv checkout to merge.</li>
+                <li>Every registered worktree is visited and merged &mdash; <strong>including Proxmox (<code>:4016</code>) and
+                    3d (<code>:4003</code>)</strong>. There is no per-port exemption: a hard-coded skip of two branches is what let
+                    them drift (Proxmox was 108 commits behind main when the exemption was removed on 2026-11-04). The only
+                    opt-out is an explicit key in <code>update_all_skip</code> in <code>worktrees.json</code>, which is data and is
+                    empty by default.</li>
                 <li>A branch with uncommitted files <strong>is still merged</strong> when <code>main</code> does not touch those
                     files (<code>would_ff</code> / <code>would_merge</code>).</li>
                 <li>A dirty file that <code>main</code> does change only blocks the branch if the working copy really differs:

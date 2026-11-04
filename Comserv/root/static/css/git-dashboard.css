@@ -48,8 +48,9 @@
     font-size: 0.85rem;
 }
 
-/* Collapsible section built on native <details> — zero JS, remembers nothing,
-   but starts collapsed so only the Working Tree is open by default. */
+/* Collapsible section built on native <details> — zero JS, remembers nothing.
+   EVERY card on the page is one of these and starts CLOSED (page opens as a
+   list of headings); only Update-all re-opens itself to show a fresh result. */
 .git-collapse {
     border: 1px solid var(--border-color, #ddd);
     border-radius: 6px;
@@ -82,8 +83,31 @@
 }
 .git-collapse .git-collapse-body { padding: 0.25rem 0.75rem 0.6rem; }
 
-/* Working tree is the always-open card; keep it visually primary. */
+/* Working tree keeps its table dense; it is a normal closed card now. */
 .git-worktree { margin-bottom: 0.75rem; }
+.git-worktree > summary { font-size: 1rem; }
+
+/* Strip cards are <details> too: no extra bottom margin inside the flex row,
+   and their summary mimics the old uppercase <h4> label. */
+.git-strip .git-collapse { margin-bottom: 0; }
+.git-collapse.git-card > summary {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted-color, #666);
+}
+/* The branch pill in the Repository summary is a value, not a label: keep it
+   in normal case and in the text colour. */
+.git-collapse.git-card > summary .git-current-branch {
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--text-color, #222);
+    font-weight: 600;
+}
+/* Strip cards have raw body children (no .git-collapse-body wrapper). */
+.git-collapse.git-card > *:not(summary) { padding-left: 0.6rem; padding-right: 0.6rem; }
+.git-collapse.git-card > *:not(summary):last-child { padding-bottom: 0.55rem; }
 
 /* Dense list — small line-height, no bullet gutters. */
 .git-list {
