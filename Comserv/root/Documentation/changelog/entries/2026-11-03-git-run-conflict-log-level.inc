@@ -1,6 +1,0 @@
-<div id="2026-11-03-git-run-conflict-log-level" class="cl-entry">
-<h3>2026-11-03 - git_run log level for merge conflicts and no-op aborts</h3>
-<p class="doc-body"><strong>What.</strong> <code>Comserv::Util::Git::_run</code> now logs a non-zero <code>git merge</code> that reports <code>CONFLICT</code> / <code>Automatic merge failed</code> at <strong>warn</strong> instead of <strong>error</strong>, and treats <code>git merge --abort</code> returning <code>There is no merge to abort (MERGE_HEAD missing)</code> as benign (info).</p>
-<p class="doc-body"><strong>Why.</strong> <code>merge_branch</code> already classifies these as expected, user-resolvable preconditions and returns <code>reason=conflict</code> with the conflicting file list plus a fix hint. <code>_run</code> double-logged the same command at ERROR, so every worktree merge conflict created a fresh <code>git_run</code> error-audit todo (2646 / 2647, 2026-10-31 to 11-01, up to 14 occurrences) even though the UI had already told the operator what to do. Merge Abort is deliberately idempotent, so a version-dependent no-op exit 128 is not a failure either.</p>
-<p class="doc-body"><strong>Files.</strong> <code>Comserv/lib/Comserv/Util/Git.pm</code>.</p>
-</div>
