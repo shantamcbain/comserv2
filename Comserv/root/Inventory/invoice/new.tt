@@ -346,6 +346,9 @@
   <button type="button" onclick="openItemPopup('/Inventory/item/add?popup=1', 'item')" style="font-size:0.85em;">
     + Add New Item (opens popup)
   </button>
+  <button type="button" onclick="openItemPopup('/Inventory/location/add?popup=1', 'location')" style="font-size:0.85em;margin-left:6px;">
+    + Add New Location (opens popup)
+  </button>
 </p>
 
 <table id="lines-table" border="1" cellpadding="5" style="border-collapse:collapse;width:100%;">
@@ -586,6 +589,7 @@ function openItemPopup(url, type) {
       clearInterval(timer);
       if (type === 'item')     refreshItemsAjax();
       if (type === 'supplier') refreshSuppliersAjax();
+      if (type === 'location') refreshLocationsAjax();
     }
   }, 600);
 }
@@ -612,6 +616,30 @@ function refreshItemsAjax() {
       });
     })
     .catch(function(e) { console.warn('refreshItemsAjax failed', e); });
+}
+
+function refreshLocationsAjax() {
+  var before = {};
+  locations.forEach(function(l) { before[String(l.id)] = 1; });
+  fetch('/Inventory/api/locations')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var added = data.filter(function(l) { return !before[String(l.id)]; });
+      locations = data;
+      document.querySelectorAll('[name^="location_id_"]').forEach(function(sel) {
+        var cur = sel.value;
+        sel.innerHTML = '<option value="">— none —</option>';
+        data.forEach(function(l) {
+          var opt = document.createElement('option');
+          opt.value = l.id;
+          opt.textContent = l.name;
+          if (String(l.id) === String(cur)) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        if (!cur && added.length === 1) sel.value = added[0].id;
+      });
+    })
+    .catch(function(e) { console.warn('refreshLocationsAjax failed', e); });
 }
 
 function refreshSuppliersAjax() {

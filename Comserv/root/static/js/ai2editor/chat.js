@@ -1418,6 +1418,12 @@ function ensureThinkingStyles(doc) {
                       pagePath: currentFilePath() || window.location.pathname
                   });
               }
+              if (data.invoice_action && window.ComservChat && ComservChat.featureInvoice
+                  && typeof ComservChat.featureInvoice.handleServerResult === 'function') {
+                  ComservChat.featureInvoice.handleServerResult(data.invoice_action, {
+                      host: document.getElementById('chat-messages')
+                  });
+              }
               if (!skipTodoCreate && extracted.actions && extracted.actions.length && window.ComservChat.featureTodo.handleAction) {
                   extracted.actions.forEach(function (a) {
                       if (a.action === 'create_todo' || a.action === 'create_project') {

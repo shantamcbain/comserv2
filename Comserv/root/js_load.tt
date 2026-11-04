@@ -190,6 +190,7 @@
 <script src="/static/js/ai-chat/model-select.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai-chat/tooltips.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai-chat/feature-todo.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai-chat/feature-invoice.js?v=[% cv %]" defer></script>
 
 [% IF c.request.uri.match('/ai/usage') %]
 <script src="/static/js/ai/usage-monitor.js?v=[% cv %]" defer></script>

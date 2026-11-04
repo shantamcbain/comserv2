@@ -1755,13 +1755,18 @@ sub location_add :Path('/Inventory/location/add') :Args(0) {
             $c->stash->{error_msg} = "Failed to create location: $@";
         } else {
             $c->flash->{success_msg} = 'Location created successfully';
-            $c->res->redirect($c->uri_for('/Inventory/locations'));
+            if ($c->req->params->{popup}) {
+                $c->res->redirect($c->uri_for('/Inventory/location/add', { popup => 1, done => 1 }));
+            } else {
+                $c->res->redirect($c->uri_for('/Inventory/locations'));
+            }
             return;
         }
     }
 
     $c->stash(
         sitename => $sitename,
+        is_popup => $c->req->params->{popup} ? 1 : 0,
         template => 'Inventory/locations/add.tt',
     );
 }
@@ -3398,6 +3403,22 @@ sub api_suppliers :Path('/Inventory/api/suppliers') :Args(0) {
     $c->detach;
 }
 
+sub api_locations :Path('/Inventory/api/locations') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $c->req->params->{sitename} || $self->_sitename($c);
+    my @locations;
+    eval {
+        @locations = $self->_schema($c)->resultset('Accounting::InventoryLocation')->search(
+            { sitename => $sitename },
+            { order_by => 'name' }
+        )->all;
+    };
+    my @result = map { { id => $_->id, name => $_->name } } @locations;
+    $c->res->content_type('application/json');
+    $c->res->body(do { require JSON; JSON::encode_json(\@result) });
+    $c->detach;
+}
+
 sub api_items_with_accounts :Path('/Inventory/api/items_with_accounts') :Args(0) {
     my ($self, $c) = @_;
     my $sitename = $c->req->params->{sitename} || $self->_sitename($c);
@@ -3697,7 +3718,7 @@ sub invoice_edit :Path('/Inventory/invoice/edit') :Args(1) {
 
         my %lines_by_idx;
         for my $key (keys %$params) {
-            if ($key =~ /^(item_id|description|quantity|unit_cost|account_id|location_id)_(\d+)$/) {
+            if ($key =~ /^(item_id|description|quantity|unit_cost|account_id|location_id|new_for_supplier|new_item_name)_(\d+)$/) {
                 $lines_by_idx{$2}{$1} = $params->{$key};
             }
         }
@@ -3729,7 +3750,26 @@ sub invoice_edit :Path('/Inventory/invoice/edit') :Args(1) {
                 my $line_total_sum = 0;
                 for my $idx (sort { $a <=> $b } keys %lines_by_idx) {
                     my $l = $lines_by_idx{$idx};
-                    next unless ($l->{item_id} || $l->{description});
+                    next unless ($l->{item_id} || $l->{description} || $l->{new_for_supplier});
+                    if ($l->{new_for_supplier}) {
+                        my $new_name = $l->{new_item_name} || $l->{description} || '';
+                        $new_name =~ s/^\s+|\s+$//g;
+                        die "Line needs a description to create a new item\n" unless length $new_name >= 2;
+                        require Comserv::Model::AI2::InvoiceCreate;
+                        my $brain = Comserv::Model::AI2::InvoiceCreate->new;
+                        my $created = $brain->_create_chat_item($c, $schema, {
+                            sitename    => $sitename,
+                            user        => $c->session->{username} || 'ai',
+                            name        => $new_name,
+                            description => $l->{description} || $new_name,
+                            unit_cost   => $l->{unit_cost},
+                            supplier_id => $params->{supplier_id},
+                        });
+                        die "Could not create the inventory item\n" unless $created && $created->{id};
+                        $l->{item_id} = $created->{id};
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                            'invoice_edit', "new item #$created->{id} '$new_name' for supplier $params->{supplier_id} on invoice $id");
+                    }
                     my $qty  = $l->{quantity}  || 1;
                     my $cost = $l->{unit_cost} || 0;
                     my $lt   = $qty * $cost;
@@ -3866,6 +3906,20 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
                 if ($sl) {
                     my $old_qty = $sl->quantity_on_hand || 0;
                     $sl->update({ quantity_on_hand => $old_qty + $line->quantity });
+                    if (defined $line->unit_cost && $line->unit_cost > 0) {
+                        my $priced = eval {
+                            my $item_row = $schema->resultset('Accounting::InventoryItem')->find($line->item_id);
+                            $item_row->update({
+                                unit_cost  => $line->unit_cost,
+                                updated_at => $self->_now(),
+                            }) if $item_row;
+                            1;
+                        };
+                        if (!$priced) {
+                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                                'invoice_post', "unit_cost update failed for item " . $line->item_id . ": $@");
+                        }
+                    }
                     push @stock_log, "$item_nm: $old_qty → " . ($old_qty + $line->quantity);
                     $stock_updated++;
                 } else {
