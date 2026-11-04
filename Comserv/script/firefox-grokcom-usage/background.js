@@ -74,10 +74,42 @@ browser.storage.local.get({ lastKey: null, current: null }).then(function (st) {
     lastKey = st.lastKey || (st.current ? payloadKey(st.current) : null);
 });
 
-browser.runtime.onMessage.addListener(function (msg) {
+// Oct 31 2026 (v1.4.7, Shanta): Firefox throttles background tabs, so a grok.com usage tab
+// left in the background kept showing old numbers. Remember which tabs reported the usage
+// panel and reload them every RELOAD_MS so the meter stays fresh. A tab is skipped while it
+// is the active tab of the focused window (you are looking at it, so it is fresh anyway).
+var RELOAD_MS = 5 * 60 * 1000;
+var usageTabs = {};   // tabId -> { href, at }
+
+browser.runtime.onMessage.addListener(function (msg, sender) {
     if (!msg || msg.type !== 'grokcom_usage' || !msg.payload) return;
+    if (sender && sender.tab && sender.tab.id != null) {
+        usageTabs[sender.tab.id] = { href: msg.payload.href || sender.tab.url || '', at: Date.now() };
+    }
     record(msg.payload, 'page');
 });
+
+browser.tabs.onRemoved.addListener(function (tabId) { delete usageTabs[tabId]; });
+
+function reloadUsageTabs() {
+    Object.keys(usageTabs).forEach(function (k) {
+        var id = Number(k), info = usageTabs[k];
+        browser.tabs.get(id).then(function (tab) {
+            if (!tab || !/^https:\/\/([a-z0-9-]+\.)?grok\.com\//.test(tab.url || '')) { delete usageTabs[k]; return; }
+            // Only a tab that is still on the page that showed the usage numbers.
+            if (info.href && tab.url !== info.href) return;
+            if (tab.active) {
+                return browser.windows.get(tab.windowId).then(function (w) {
+                    if (!w.focused) return browser.tabs.reload(id);
+                });
+            }
+            return browser.tabs.reload(id);
+        }).then(function () {
+            return browser.storage.local.set({ lastReload: { tab: id, at: new Date().toISOString() } });
+        }).catch(function () { delete usageTabs[k]; });
+    });
+}
+window.setInterval(reloadUsageTabs, RELOAD_MS);
 
 window.setInterval(function () {
     browser.storage.local.get({ current: null }).then(function (st) {

@@ -112,6 +112,12 @@ reader" discipline.
   - Changelog fragment `2026-10-05-fix-usage-monitor-templates.inc`.
   - Verified `/ai/usage` now returns 200; followed comserv2-session-doc-sync.
 
+- 2026-11-01: Git merge-state audit cleanup (main worktree).
+  - Added merge-target preflight for active `MERGE_HEAD` and unmerged index entries; routed main→worktree merges through the shared guarded service path.
+  - Made Merge Abort idempotent and preserved stderr for real failures; closed audit todos #2521, #2537, and #2643 after compile/test verification.
+  - Changelog fragment `2026-11-01-git-merge-state-preflight.inc`; handoff `.hermes/plans/2026-11-01-git-audit-root-cause-fixes.md`.
+  - No commit or server restart performed; propagation to other branch worktrees remains Next.
+
 ---
 
 ## 4. Backlog (prioritized)
@@ -162,3 +168,9 @@ branch. P3 needs a quick owner sign-off.
 ## 7. Recent session — Proxmox pool summary (2026-10-27)
 
 `/proxmox` on :4016 now lists each configured server as a card and, under Summary, draws one history chart per node metric. Each chart uses the page width, labels the value axis and the time axis for the selected Hour/Day/Week/Month/Year window, and shows a color key for each signed-in server. Only servers with a stored API token get a line. ProxmoxDevelopment and workstation still have no token. Handoff: `.hermes/plans/proxmox-pool-summary-graphs.md`. Tracking row is under project #79; left In Progress, clock stopped.
+
+---
+
+## 8. Recent session — Update-all-from-main + work-log clock (2026-11-04)
+
+`/admin/git`'s "Update all from main" card now works: the card's buttons sat in a `<form>` nested inside the page's outer form, and seven `[%#` comments ended with `#]` instead of `%]`, swallowing the markup between them — every click was a no-op. Preview also skipped 12 of 16 worktrees because a mode-only typechange (`.zencoder/scripts/updateprompt.pl`) counted as a dirty blocker; each candidate is now re-checked with `git diff --quiet main`, and `Comserv/root/config/worktrees.json` is untracked in all 26 repos. The work-log clock survives midnight (`_duration_hms` adds elapsed days from `start_date`), `close_log` refuses to bill over 12h, and `reap_orphan_logs` closes clocks left on finished todos. Docs: `system/git_worktree_merge_plan.tt` v0.5 §3.7, `TODO_SYSTEM_DOCUMENTATION.tt` clock rules, changelog `2026-11-04-git-update-all-and-worklog-clocks.inc`. Todo #2006 closed to status 2 (resume point in the log). Not verified through the running `:4004` — restart owed.

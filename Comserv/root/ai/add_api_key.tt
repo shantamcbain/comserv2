@@ -163,31 +163,61 @@
             <input type="hidden" name="id" value="[% key_id %]">
             [% END %]
             
+            [%# Oct 30 2026: any provider. Known list + Other (free slug). The key value is never sent back to this page. %]
+            [% known_slugs = {} %][% FOREACH kp IN known_providers %][% known_slugs.${kp.0} = 1 %][% END %]
             <div class="form-group">
                 <label for="service">AI Service Provider *</label>
-                <select id="service" name="service" required [% IF key_id %]disabled[% END %]>
-                    <option value="">Select a service...</option>
-                    <option value="grok" [% IF service == 'grok' %]selected[% END %]>Grok (X.AI)</option>
-                    <option value="ollama" [% IF service == 'ollama' %]selected[% END %]>Ollama (ollama.com — web search)</option>
-                    <option value="brave" [% IF service == 'brave' %]selected[% END %]>Brave Search (precise results for ENCY/BMaster)</option>
-                    <option value="searxng" [% IF service == 'searxng' %]selected[% END %]>SearXNG (self-hosted search)</option>
-                    <option value="openai" [% IF service == 'openai' %]selected[% END %]>OpenAI</option>
-                    <option value="claude" [% IF service == 'claude' %]selected[% END %]>Claude (Anthropic)</option>
-                    <option value="gemini" [% IF service == 'gemini' %]selected[% END %]>Gemini (Google)</option>
-                    <option value="anthropic" [% IF service == 'anthropic' %]selected[% END %]>Anthropic</option>
-                    <option value="cohere" [% IF service == 'cohere' %]selected[% END %]>Cohere</option>
-                </select>
                 [% IF key_id %]
-                <input type="hidden" name="service" value="[% service %]">
-                <span class="form-help">Service cannot be changed when editing. Delete and create a new key to change service.</span>
+                <input type="text" id="service" value="[% service | html %]" disabled>
+                <input type="hidden" name="service" value="[% service | html %]">
+                <span class="form-help">Provider and key type cannot be changed when editing. Delete and add a new key instead.</span>
                 [% ELSE %]
-                <span class="form-help">Choose the AI service provider for this API key.</span>
+                <select id="service" name="service" required onchange="document.getElementById('service_other_group').style.display = (this.value === 'other') ? 'block' : 'none';">
+                    <option value="">Select a provider...</option>
+                    [% FOREACH kp IN known_providers %]
+                    <option value="[% kp.0 | html %]" [% IF service == kp.0 %]selected[% END %]>[% kp.1 | html %]</option>
+                    [% END %]
+                    <option value="other">Other (type its name)</option>
+                </select>
+                <span class="form-help">Calls made with your own key are billed to your account with that provider.</span>
                 [% END %]
             </div>
-            
+            [% UNLESS key_id %]
+            <div class="form-group" id="service_other_group" style="display:none">
+                <label for="service_other">Provider name (Other)</label>
+                <input type="text" id="service_other" name="service_other" maxlength="64" pattern="[a-z0-9_.\-]{2,64}"
+                       placeholder="e.g. mistral, together, my-vllm">
+                <span class="form-help">2-64 characters: lowercase letters, digits, _ . -</span>
+            </div>
+            [% END %]
+            <div class="form-group">
+                <label for="key_type">Key type</label>
+                [% IF key_id %]
+                <input type="text" id="key_type" value="[% (key_type || 'chat') | html %]" disabled>
+                [% ELSE %]
+                <select id="key_type" name="key_type">
+                    [% FOREACH kt IN key_types %]
+                    <option value="[% kt | html %]" [% IF (key_type || 'chat') == kt %]selected[% END %]>[% kt | html %]</option>
+                    [% END %]
+                </select>
+                <span class="form-help">chat = used for AI answers; management/billing = read usage and billing only.</span>
+                [% END %]
+            </div>
+            <div class="form-group">
+                <label for="base_url">Base URL (optional, OpenAI-compatible)</label>
+                <input type="text" id="base_url" name="base_url" maxlength="255" value="[% base_url | html %]"
+                       placeholder="https://api.example.com/v1">
+                <span class="form-help">https only. http is allowed only for localhost or a private LAN address (e.g. http://192.168.1.50:11434/v1).
+                    Leave empty for the provider's normal address.</span>
+            </div>
+            <div class="form-group">
+                <label for="label">Label (optional)</label>
+                <input type="text" id="label" name="label" maxlength="128" value="[% label | html %]" placeholder="e.g. my work key">
+            </div>
+
             <div class="form-group">
                 <label for="api_key">API Key *</label>
-                <input type="password" id="api_key" name="api_key" required
+                <input type="password" id="api_key" name="api_key" autocomplete="off" [% UNLESS key_id %]required[% END %]
                        placeholder="[% IF key_id %]Enter new API key to update[% ELSE %]Enter your API key[% END %]">
                 <span class="form-help">
                     [% IF key_id %]

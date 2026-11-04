@@ -1,0 +1,20 @@
+[%# Activity check-off. Forms work without JS; dashboard.js posts the same form. %]
+[% IF hk_plan.activities.size %]
+    <ul class="hk-activities">
+        [% FOREACH a IN hk_plan.activities %]
+            <li>
+                <form method="post" action="[% c.uri_for('/healthkitchen/plan') %]/[% hk_plan.id %]" class="hk-activity[% IF a.done %] hk-activity-is-done[% END %]">
+                    <input type="hidden" name="hk_action" value="activity_done" />
+                    <input type="hidden" name="activity_id" value="[% a.id %]" />
+                    <label>
+                        <input type="checkbox" name="done" value="1" class="hk-activity-done"[% IF a.done %] checked[% END %] />
+                        [% a.activity_text | html %]
+                    </label>
+                    <button type="submit" class="btn btn-sm btn-secondary">Save</button>
+                </form>
+            </li>
+        [% END %]
+    </ul>
+[% ELSE %]
+    <p class="doc-muted">No activities on this plan.</p>
+[% END %]

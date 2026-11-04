@@ -1,0 +1,37 @@
+[% PageVersion = 'calendar/clients.tt,v 0.01 2026/11/04 csc Exp - Calendar clients/devices list (phase 1, no sending yet)' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+<div class="container" style="max-width:900px;padding:12px;">
+  <h2>My calendars, mail readers and devices</h2>
+  <p>List what you use and what the Comserv calendar may do with each. Alerts are not sent yet;
+     this list will decide the order later (Grok Bot is always tried last because it costs the most).</p>
+  [% IF status_msg %]<div class="alert alert-success">[% status_msg | html %]</div>[% END %]
+  [% IF error_msg %]<div class="alert alert-danger">[% error_msg | html %]</div>[% END %]
+  <table class="table table-sm">
+    <tr><th>Type</th><th>Name</th><th>On</th><th>May read feed</th><th>May alert</th><th>Order</th><th>Push set</th><th></th></tr>
+    [% FOREACH cl IN clients %]
+    <tr>
+      <td>[% cl.client_type | html %]</td><td>[% cl.label | html %]</td>
+      [% FOREACH f IN ['enabled','may_read','may_alert'] %]
+      <td><form method="post" action="/calendar/clients" style="display:inline;">
+        <input type="hidden" name="action" value="toggle"><input type="hidden" name="id" value="[% cl.id %]">
+        <input type="hidden" name="field" value="[% f %]">
+        <button class="btn btn-sm btn-link" type="submit">[% IF cl.$f %]Yes[% ELSE %]No[% END %]</button></form></td>
+      [% END %]
+      <td>[% cl.sweep_order %]</td><td>[% IF cl.has_push %]yes (encrypted)[% ELSE %]-[% END %]</td>
+      <td><form method="post" action="/calendar/clients" onsubmit="return confirm('Remove?');">
+        <input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="[% cl.id %]">
+        <button class="btn btn-sm btn-outline-danger" type="submit">Remove</button></form></td>
+    </tr>
+    [% END %]
+  </table>
+  <h4>Add one</h4>
+  <form method="post" action="/calendar/clients">
+    <input type="hidden" name="action" value="add">
+    <select name="client_type">[% FOREACH t IN client_types %]<option value="[% t %]">[% t %]</option>[% END %]</select>
+    <input type="text" name="label" placeholder="Name, e.g. Thunderbird on laptop" maxlength="100">
+    <label><input type="checkbox" name="may_read" value="1" checked> may read feed</label>
+    <label><input type="checkbox" name="may_alert" value="1"> may alert</label>
+    <button class="btn btn-primary" type="submit">Add</button>
+  </form>
+  <p style="margin-top:14px;"><a href="/calendar/subscribe">Subscribe link</a> &middot; <a href="/todo/month">Back to calendar</a></p>
+</div>
