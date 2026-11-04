@@ -41,14 +41,62 @@ Time (AppTime):
 # ---------------------------------------------------------------------------
 # Internal: compute duration hms between an open log's start_time and now.
 sub _duration_hms {
-    my ($raw_start, $now_hms) = @_;
+    my ($raw_start, $now_hms, $start_date, $today) = @_;
     $raw_start = defined $raw_start ? "$raw_start" : '';
     my $start_hms = ($raw_start =~ /^\d{1,2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
     my ($sh, $sm) = ($start_hms =~ /^(\d+):(\d+)/);
     my ($eh, $em) = ($now_hms   =~ /^(\d{2}):(\d{2})/);
-    my $dur_mins  = (($eh // 9) * 60 + ($em // 0)) - (($sh // 9) * 60 + ($sm // 0));
+
+    # Day count from the stored start_date. A log left open past midnight has an
+    # end clock time EARLIER than its start; treating that as "0 minutes" and
+    # flooring to 1 under-billed whole sessions (todo 2006, 2026-11-03: opened
+    # 15:39, closed 01:38, billed 1 minute). Days are always added now, so a same-day
+    # span adds nothing, a midnight crossing adds one day, a three-day span adds
+    # three - and the caller's stale guard then refuses to bill absurd spans.
+    my $days = 0;
+    if (defined $start_date && defined $today) {
+        my ($sy, $smo, $sd) = $start_date =~ /^(\d{4})-(\d{2})-(\d{2})/;
+        my ($ty, $tmo, $td) = $today      =~ /^(\d{4})-(\d{2})-(\d{2})/;
+        if (defined $sy && defined $ty) {
+            my $s_epoch = eval { require Time::Local; Time::Local::timegm(0, 0, 12, $sd, $smo - 1, $sy) };
+            my $t_epoch = eval { require Time::Local; Time::Local::timegm(0, 0, 12, $td, $tmo - 1, $ty) };
+            if (defined $s_epoch && defined $t_epoch) {
+                my $d = int(($t_epoch - $s_epoch) / 86400);
+                $days = $d if $d > 0;
+            }
+        }
+    }
+
+    my $dur_mins = (($eh // 9) * 60 + ($em // 0)) - (($sh // 9) * 60 + ($sm // 0))
+                 + ($days * 24 * 60);
     $dur_mins = 1 if !defined $dur_mins || $dur_mins <= 0;
     return (sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60), $dur_mins);
+}
+
+# Internal: close work logs whose todo is already done/closed. A todo at status 3
+# must never appear as having work in progress - the branch that finished the work
+# forgot to stop the clock (Shanta, 2026-11-04). Returns how many were reaped.
+sub reap_orphan_logs {
+    my ($class, $c) = @_;
+    return 0 unless $c;
+    my $dbh = eval { $c->model('DBEncy')->storage->dbh } or return 0;
+    my $rows = eval {
+        $dbh->selectall_arrayref(
+            "SELECT l.record_id FROM log l JOIN todo t ON t.record_id = l.todo_record_id
+              WHERE l.end_time = '00:00:00' AND l.status <> 3 AND t.status IN ('3','4')"
+        );
+    } || [];
+    my $n = 0;
+    for my $r (@$rows) {
+        my $ok = eval {
+            $dbh->do("UPDATE log SET end_time = start_time, time = '00:00:00', status = 3,
+                      comments = CONCAT(IFNULL(comments,''), '\nauto-closed: todo was already done') 
+                      WHERE record_id = ?", undef, $r->[0]);
+            1;
+        };
+        $n++ if $ok;
+    }
+    return $n;
 }
 
 # Internal: UTC clock for log writes + user-local ymd for last_mod day labels.
@@ -214,6 +262,8 @@ sub work_status {
 # ===========================================================================
 sub toggle_start {
     my ($class, $c, %args) = @_;
+    # Starting work is a good moment to clear clocks left open on finished todos.
+    __PACKAGE__->reap_orphan_logs($c);
     my $record_id = $args{record_id} or die "Missing record_id\n";
     my $username  = $args{username} // 'api';
     my $summary   = $args{summary} // '';
@@ -358,7 +408,17 @@ sub lock_occurrence {
 
         my $open_row = _open_log_row($dbh, $record_id);
         if ($open_row) {
-            my ($dur_hms, $dur_mins) = _duration_hms($open_row->{start_time}, $now_hms);
+            my ($dur_hms, $dur_mins) = _duration_hms(
+                $open_row->{start_time}, $now_hms, $open_row->{start_date}, $lock_date
+            );
+            # A log left open for half a day or more is not a work session: the
+            # window was closed instead of the clock. Record the close honestly and
+            # bill nothing rather than inventing hours (Shanta, 2026-11-04).
+            if ($dur_mins > 720) {
+                $log_comments .= "\nauto-closed stale log: $dur_mins min elapsed, 0 billed";
+                $dur_hms  = '00:00:00';
+                $dur_mins = 0;
+            }
             $dbh->do(
                 'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, start_date=?, comments=? WHERE record_id=?',
                 undef, $now_hms, $dur_hms, $username, $today, $lock_date, $log_comments, $open_row->{record_id}
@@ -399,6 +459,8 @@ sub lock_occurrence {
 # ===========================================================================
 sub close_log {
     my ($class, $c, %args) = @_;
+    # A todo already at status 3 must never keep an open clock; sweep those first.
+    __PACKAGE__->reap_orphan_logs($c);
     my $record_id = $args{record_id} or die "Missing record_id\n";
     my $username  = $args{username} // 'api';
     my $summary   = $args{summary} // '';

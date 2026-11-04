@@ -1,0 +1,27 @@
+/* Theme: sunfire */
+:root {
+  --accent-color: #FF6600;
+  --background-color: #FFF8F0;
+  --body-font: Verdana, Helvetica, sans-serif;
+  --border-color: #D4A574;
+  --button-bg: #8B2500;
+  --button-border: #6B1D00;
+  --button-hover-bg: #FF6600;
+  --button-text: #ffffff;
+  --font-size-base: 18px;
+  --font-size-large: 22px;
+  --font-size-small: 14px;
+  --font-size-xlarge: 28px;
+  --header-font: Verdana, Helvetica, sans-serif;
+  --link-color: #8B2500;
+  --link-hover-color: #FF6600;
+  --nav-bg: #2C1810;
+  --nav-hover-bg: rgba(255, 102, 0, 0.25);
+  --nav-text: #ffffff;
+  --primary-color: #8B2500;
+  --secondary-color: #FFF8F0;
+  --success-color: #339933;
+  --table-header-bg: #F5E6D3;
+  --text-color: #2C1810;
+  --warning-color: #CC3300;
+}

@@ -228,7 +228,7 @@ $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no 
     ($o, $er) = $MC->validate_structure({ %pc, chain_chat => ['openrouter|openai/gpt-5.6-luna'] }); ok !$o && "@$er" =~ /never be a fallback/, 'probation model in an app chain rejected';
     ($o, $er) = $MC->validate_structure({ %pc, hermes_emergency_chain => ['openrouter|openai/gpt-5.6-luna'] }); ok !$o && "@$er" =~ /never be a fallback/, 'probation model in the emergency chain rejected';
     ($o, $er) = $MC->validate_structure({ %pc, hermes_fallback_chain => ['supergrok|grok-4.7', 'openrouter|qwen/qwen3-coder', 'openrouter|openai/gpt-5.6-luna', 'openrouter|cohere/north-mini-code:free'] });
-    ok !$o && "@$er" =~ /only paid step/, 'a second paid step next to the probation model rejected';
+    ok !$o && "@$er" =~ /only with other probation models/, 'a second (non-probation) paid step next to the probation model rejected';
     ($o, $er) = $MC->validate_structure({ %pc, trials => { x => { %{ $lu }, probation => 0 } } }); ok !$o && "@$er" =~ /never be a fallback/, 'without probation the model may not be in the chain';
     ($o, $er) = $MC->validate_structure({ %pc, trials => { x => { %{ $lu }, hard_cap_usd => 0 } } }); ok !$o && "@$er" =~ /hard_cap_usd/, 'probation still needs a $ limit';
     ($o, $er) = $MC->validate_structure({ %pc, trials => { x => { %{ $lu }, selectable_by => 'fallback' } } }); ok !$o && "@$er" =~ /selectable_by/, 'selectable_by checked';
@@ -288,7 +288,7 @@ $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no 
 
     # chain consistency: luna (begun, not stopped) is a chain paid step and in allowed_paid; its spend is NOT excluded from the OpenRouter caps
     { my %cc = $g->chain_context; is join(',', map { $_->{model} } @{ $cc{chain} }), 'grok-4.7,openai/gpt-5.6-luna,cohere/north-mini-code:free', 'active probation: luna is in the Hermes chain';
-      ok $cc{allowed_paid}{$model}, 'luna is an allowed paid chain step'; ok !%{ $cc{probation_out} }, 'nothing removed from the chain';
+      ok $cc{allowed_paid}{$model}, 'luna is an allowed paid chain step'; ok !grep({ $_ ne 'particle-ai/particle-1' } keys %{ $cc{probation_out} }), 'nothing but the un-begun particle-1 probation (Nov 2 2026) removed from the chain';
       my $tx = $g->trial_exclusions; ok !$tx->{models}{$model} && !$tx->{usd} && !$tx->{by_window}, 'probation spend is not excluded from the caps and luna is not exempt from thrash'; }
 
     # the probation limit ($5 of its own spend) stops it: stopped model is an offender again
@@ -304,7 +304,7 @@ $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no 
     ok !$g2->{trial_active}{$model} && $g2->{trial_stopped}{$model}, 'a stopped trial stays stopped on a later guard run';
     { my %cc = $g2->chain_context; is join(',', map { $_->{model} } @{ $cc{chain} }), 'grok-4.7,cohere/north-mini-code:free', 'stopped probation: luna is OUT of the Hermes chain (north-mini follows Super Grok)';
       ok !$cc{allowed_paid}{$model}, 'and not an allowed paid step'; like $cc{probation_out}{$model}, qr/probation gpt_56_luna stopped: probation limit reached/, 'reason recorded'; }
-    is_deeply [ keys %{ $g2->probation_blocked($MC->load(undef, path => "$root/data/ai_model_chains.json", logger => sub {})) } ], [$model], 'probation_blocked names luna';
+    is_deeply [ grep { $_ ne 'particle-ai/particle-1' } keys %{ $g2->probation_blocked($MC->load(undef, path => "$root/data/ai_model_chains.json", logger => sub {})) } ], [$model], 'probation_blocked names luna (particle-1 not begun in this test tree)';
     # approval starts a new window (script/ai_trial.pl approve, run in a copy of the tree so the live state is untouched)
     { my $r2 = File::Temp::tempdir(CLEANUP => 1); mkdir "$r2/script"; mkdir "$r2/data"; mkdir "$r2/data/ai_trials";
       system('cp', "$FindBin::Bin/../script/ai_trial.pl", "$r2/script/ai_trial.pl"); system('ln', '-s', "$FindBin::Bin/../lib", "$r2/lib");

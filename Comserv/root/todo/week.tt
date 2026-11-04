@@ -59,7 +59,7 @@
     
     .week-day-header {
         background-color: var(--primary-color, #4CAF50);
-        color: var(--nav-text, white);
+        color: var(--nav-text, var(--text-color, #000));
         text-align: center;
         padding: 8px 4px;
         font-weight: bold;

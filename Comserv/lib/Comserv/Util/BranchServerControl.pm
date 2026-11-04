@@ -336,6 +336,8 @@ sub open_or_start {
 sub hermes_port_for {
     my ($self, $branch, $app_port) = @_;
     $app_port = int($app_port || 0);
+    my $ext = eval { Comserv::Util::Git->external_repo($branch) };
+    return int($ext->{hermes_port}) if $ext && $ext->{hermes_port};
     return 9119 if !$branch || $branch eq 'main' || $app_port == 3001;
     my $cfg = eval { Comserv::Util::Git->_worktree_config() } || {};
     my $override = eval { $cfg->{branches}{$branch}{hermes_port} };
@@ -345,6 +347,8 @@ sub hermes_port_for {
 
 sub hermes_cwd_for {
     my ($self, $branch) = @_;
+    my $ext = eval { Comserv::Util::Git->external_repo($branch) };
+    return $ext->{repo} if $ext && $ext->{repo} && -d $ext->{repo};
     return '/home/shanta/PycharmProjects/comserv2' if !$branch || $branch eq 'main';
     my $base = eval { Comserv::Util::Git->worktree_base_dir } // "$ENV{HOME}/.comserv/worktrees";
     my $direct = "$base/$branch/Comserv";

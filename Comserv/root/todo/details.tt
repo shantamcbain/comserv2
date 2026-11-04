@@ -168,6 +168,9 @@
         <td><strong>[% record.get_column('subject') | html %]</strong></td></tr>
     <tr><th align="left">Description</th>
         <td style="white-space:pre-wrap">[% record.get_column('description') | html %]</td></tr>
+    <tr><th align="left">Reminders</th>
+        <td>[% IF reminder_offsets.size %][% reminder_human | html %] <small style="color:#666;">([% reminder_offsets.join(',') | html %])</small>[% ELSE %]<span style="color:#666;">none</span>[% END %]
+        [% IF c.flash.reminder_warning %]<div class="alert alert-warning" style="margin-top:4px;">[% c.flash.reminder_warning | html %]</div>[% END %]</td></tr>
     <tr><th align="left">Status</th>
         <td>[% record.get_column('status') | html %]</td></tr>
     <tr><th align="left">Priority</th>
