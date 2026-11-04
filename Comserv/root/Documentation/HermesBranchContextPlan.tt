@@ -171,7 +171,7 @@ are owned here. Keep it short — the domain block from §3.1 is the reference.&
             <ul class="doc-body">
                 <li><code>Util/Git.pm -&gt; build_worktree_list</code> now emits <code>hermes_cmd</code> for <code>main</code> and every branch: <code>cd &lt;worktree-git-root&gt; &amp;&amp; hermes chat</code> (never <code>-w</code>).</li>
                 <li><code>root/admin/git/index.tt</code> gains a "Hermes" button per row (next to Open/Stop/Restart) with <code>data-hermes-branch</code> + <code>data-hermes-cmd</code>. Also fixed the Open button to build the absolute <code>scheme://host:port/path</code> URL (RELATIVE-URL TRAP rule).</li>
-                <li><code>root/static/js/git-dashboard.js</code> copies <code>hermes_cmd</code> to the clipboard and shows it in the dev console for manual copy.</li>
+                <li><code>root/static/js/git-dashboard.js</code> opens that branch's Hermes dashboard (<code>http://&lt;host&gt;:&lt;hermes_port&gt;/</code>) on the click. It also copies <code>hermes_cmd</code> and shows it in the dev console. Do not open the git page from this button — that uses the one allowed popup and the dashboard never appears. An external repo row (not a Comserv worktree) uses <code>worktrees.json</code> <code>external_repos</code> for cwd and port; OpenBafangTool is <code>:9120</code> in <code>/home/shanta/dev/OpenBafangTool</code>.</li>
             </ul>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>

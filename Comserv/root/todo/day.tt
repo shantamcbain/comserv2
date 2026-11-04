@@ -1,5 +1,5 @@
 
-[% PageVersion = 'todo/day.tt, v  0.28 2026/06/13 shanta Exp shanta - User prefs DB sync for calendar colours and lane width.' %]
+[% PageVersion = 'todo/day.tt, v  0.30 2026/10/30 shanta Exp shanta - Stop/Done locks a recurring block to this date.' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -84,6 +84,14 @@
    IF !next_date AND next_day;
       next_date = next_day;
    END;
+
+   # Keep an embed filter across day navigation. Does not touch the session filter.
+   day_qs = '';
+   IF c.req.params.filter == 'schedule';
+      day_qs = '?embed=1&filter=schedule';
+   ELSIF c.req.params.embed.defined;
+      day_qs = '?embed=1';
+   END;
 %]
 
 [%# Suppress the standalone-page <link>/<script> block whenever this template is
@@ -107,25 +115,25 @@
 
 .gcal-day-nav {
     display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-    padding: 6px 0 8px; border-bottom: 2px solid #e0e0e0; margin-bottom: 0;
+    padding: 6px 0 8px; border-bottom: 2px solid var(--border-color, #ddd); margin-bottom: 0;
 }
 .gcal-day-nav .gcal-nav-btn {
-    padding: 4px 10px; border: 1px solid #dadce0; border-radius: 4px;
-    background: #fff; cursor: pointer; font-size: 0.82em; color: #3c4043;
+    padding: 4px 10px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;
+    background: var(--background-color, #fff); cursor: pointer; font-size: 0.82em; color: var(--text-color, #000);
     text-decoration: none; line-height: 1.4;
 }
-.gcal-day-nav .gcal-nav-btn:hover { background: #f1f3f4; }
+.gcal-day-nav .gcal-nav-btn:hover { background: var(--table-header-bg, #f2f2f2); }
 .gcal-day-nav .gcal-today-btn {
-    padding: 4px 10px; border: 1px solid #dadce0; border-radius: 4px;
-    background: #fff; cursor: pointer; font-size: 0.82em; color: #3c4043;
+    padding: 4px 10px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;
+    background: var(--background-color, #fff); cursor: pointer; font-size: 0.82em; color: var(--text-color, #000);
     font-weight: 600; text-decoration: none;
 }
 .gcal-day-nav .gcal-date-label {
-    font-size: 1em; font-weight: 600; color: #3c4043; margin: 0 4px;
+    font-size: 1em; font-weight: 600; color: var(--text-color, #000); margin: 0 4px;
 }
 .gcal-view-select {
-    font-size: 0.82em; padding: 3px 6px; border: 1px solid #dadce0;
-    border-radius: 4px; background: #fff; color: #3c4043; cursor: pointer;
+    font-size: 0.82em; padding: 3px 6px; border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px; background: var(--background-color, #fff); color: var(--text-color, #000); cursor: pointer;
     margin-left: auto;
     /* Override the global base.css `select { width:100% }` — without this the
        Day/Week/Month dropdown expands to fill the nowrap/overflow nav and gets
@@ -135,15 +143,15 @@
 
 .gcal-sites-bar, .gcal-legend-bar {
     display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
-    padding: 5px 0 5px; border-bottom: 1px solid #e8e8e8; margin-bottom: 0;
+    padding: 5px 0 5px; border-bottom: 1px solid var(--border-color, #ddd); margin-bottom: 0;
 }
-.gcal-legend-bar { font-size: 0.77em; color: #5f6368; padding: 4px 0 6px; }
-.gcal-legend-label { font-weight: 600; color: #3c4043; margin-right: 2px; white-space: nowrap; }
+.gcal-legend-bar { font-size: 0.77em; color: var(--text-muted-color, #6c757d); padding: 4px 0 6px; }
+.gcal-legend-label { font-weight: 600; color: var(--text-color, #000); margin-right: 2px; white-space: nowrap; }
 .gcal-legend-sep { color: #dadce0; margin: 0 4px; }
 .gcal-user-chip {
     display: inline-flex; align-items: center; gap: 4px;
     padding: 1px 8px 1px 5px; border-radius: 10px;
-    background: #f8f9fa; border: 1px solid #dadce0; font-size: 0.95em;
+    background: var(--table-header-bg, #f2f2f2); border: 1px solid var(--border-color, #ddd); font-size: 0.95em;
 }
 .gcal-user-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .gcal-fixed-legend-chip {
@@ -169,21 +177,21 @@
     cursor: pointer; border: none; padding: 0; margin: 0;
 }
 .gcal-legend-hint {
-    font-size: 0.72em; color: #9aa0a6; margin-left: 6px; white-space: nowrap;
+    font-size: 0.72em; color: var(--text-muted-color, #6c757d); margin-left: 6px; white-space: nowrap;
 }
 
 .gcal-grid-outer {
     display: flex; overflow-y: auto; max-height: 68vh;
-    border: 1px solid #e0e0e0; border-radius: 4px; margin-top: 0;
+    border: 1px solid var(--border-color, #ddd); border-radius: 4px; margin-top: 0;
     position: relative;
 }
 .gcal-time-col {
     width: 52px; flex-shrink: 0; position: sticky; left: 0; z-index: 2;
-    background: #fff;
+    background: var(--background-color, #fff);
 }
 .gcal-hour-label {
     height: 60px; display: flex; align-items: flex-start; justify-content: flex-end;
-    padding-right: 6px; font-size: 0.67em; color: #70757a; padding-top: 3px;
+    padding-right: 6px; font-size: 0.67em; color: var(--text-muted-color, #6c757d); padding-top: 3px;
     box-sizing: border-box; white-space: nowrap;
 }
 .gcal-events-area {
@@ -193,7 +201,7 @@
 .gcal-events-area::before {
     content: '';
     position: absolute; left: var(--gcal-fixed-pct, 15%); top: 0; bottom: 0; width: 1px;
-    background: #c5c9ce; z-index: 2; pointer-events: none;
+    background: var(--border-color, #ddd); z-index: 2; pointer-events: none;
 }
 .gcal-lane-resizer {
     position: absolute;
@@ -206,10 +214,10 @@
     background: rgba(26, 115, 232, 0.25);
 }
 .gcal-hour-rule {
-    position: absolute; left: 0; right: 0; height: 1px; background: #e0e0e0; z-index: 0;
+    position: absolute; left: 0; right: 0; height: 1px; background: var(--border-color, #ddd); z-index: 0;
 }
 .gcal-half-rule {
-    position: absolute; left: 0; right: 0; height: 1px; background: #f1f1f1; z-index: 0;
+    position: absolute; left: 0; right: 0; height: 1px; background: var(--table-header-bg, #f2f2f2); z-index: 0;
 }
 .gcal-now-line {
     position: absolute; left: 0; right: 0; height: 2px; background: #ea4335; z-index: 12; pointer-events: none;
@@ -243,6 +251,19 @@
 .gcal-ev.is-fixed-ev .gcal-ev-actions { flex-wrap: wrap; }
 
 .gcal-ev.is-done { opacity: 0.45 !important; }
+.hk-day-lock {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    z-index: 40;
+    font-size: 0.72em;
+    padding: 1px 6px;
+    border: 0;
+    border-radius: 3px;
+    background: var(--background-color, #fff);
+    color: #1a73e8;
+    cursor: pointer;
+}
 .gcal-ev.dragging { opacity: 0.35; cursor: grabbing; }
 .gcal-ev-row {
     display: flex; flex-wrap: wrap; align-items: center;
@@ -290,7 +311,7 @@
     color: var(--text-color, #333);
 }
 .todo-popup .popup-details {
-    font-size: 0.85em; color: #666; line-height: 1.35;
+    font-size: 0.85em; color: var(--text-muted-color, #6c757d); line-height: 1.35;
     border-top: none; padding-top: 0; margin-top: 0;
 }
 .todo-popup .popup-details div { margin-bottom: 1px; }
@@ -362,7 +383,11 @@
 
     .todo-item-day.overdue {
         border-left: 4px solid var(--warning-color, #ff9800);
+        /* Tint of the warning colour — never the raw colour, which is pure red in
+           most themes and would paint the whole row unreadable. */
         background-color: var(--warning-color, #fff3cd);
+        background-color: color-mix(in srgb, var(--warning-color, #ff9800) 18%, var(--background-color, #fff));
+        color: var(--text-color, #000);
     }
 
     .todo-subject {
@@ -420,10 +445,10 @@
     .time-slot {
         padding: 6px 6px 6px 4px;
         border-right: 3px solid #4CAF50;
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: 1px solid var(--border-color, #ddd);
         font-size: 0.72em;
-        background-color: #f0f4f8;
-        color: #444;
+        background-color: var(--table-header-bg, #f2f2f2);
+        color: var(--text-color, #000);
         display: flex;
         flex-direction: column;
         align-items: flex-end;
@@ -433,13 +458,13 @@
 
     .time-slot .ts-start {
         font-weight: bold;
-        color: #222;
+        color: var(--text-color, #000);
         line-height: 1.3;
         white-space: nowrap;
     }
 
     .time-slot .ts-end {
-        color: #888;
+        color: var(--text-muted-color, #6c757d);
         font-size: 0.9em;
         line-height: 1.2;
         white-space: nowrap;
@@ -447,7 +472,7 @@
 
     .time-content {
         padding: 4px 8px;
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: 1px solid var(--border-color, #ddd);
         min-height: 32px;
         box-sizing: border-box;
     }
@@ -463,9 +488,9 @@
     }
 
     .add-todo-inline button {
-        border: 1px dashed #ccc;
+        border: 1px dashed var(--border-color, #ddd);
         background: none;
-        color: #999;
+        color: var(--text-muted-color, #6c757d);
         cursor: pointer;
         width: 100%;
         text-align: left;
@@ -558,21 +583,23 @@
     .todo-popup .popup-action-btn {
         font-size: 0.82em; padding: 3px 10px; border-radius: 4px; cursor: pointer;
         border: 1px solid var(--primary-color, #4CAF50);
-        background: var(--primary-color, #4CAF50); color: #fff;
+        background: var(--primary-color, #4CAF50);
+        /* theme primary is pale in the default/CSC/APIS themes: white on it is invisible */
+        color: var(--nav-text, var(--text-color, #000));
         text-decoration: none; white-space: nowrap; line-height: 1.6;
     }
     .todo-popup .popup-action-btn:hover { opacity: 0.85; }
     .todo-popup .popup-action-btn.btn-done {
-        background: #43a047; border-color: #43a047;
+        background: #43a047; border-color: #43a047; color: #fff;
     }
     .todo-popup .popup-action-btn.btn-log {
-        background: #1a73e8; border-color: #1a73e8;
+        background: #1a73e8; border-color: #1a73e8; color: #fff;
     }
     .todo-popup .popup-action-btn.btn-view {
-        background: #757575; border-color: #757575;
+        background: #757575; border-color: #757575; color: #fff;
     }
     .todo-popup .popup-action-btn.btn-start {
-        background: #0d6efd; border-color: #0d6efd;
+        background: #0d6efd; border-color: #0d6efd; color: #fff;
     }
     .gcal-ev-btn-active {
         background: rgba(253,126,20,0.9) !important;
@@ -904,6 +931,21 @@ function gcalMakeSiteColorSwatch(site) {
     return label;
 }
 
+/* Readable ink (black or white) for an arbitrary event background colour.
+   Event colours are data, not theme colours: a light site colour (e.g. a pale
+   accent) used to leave the fixed white event text unreadable. */
+function gcalInk(color) {
+    var m = String(color || '').trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (!m) return '';
+    var h = m[1];
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    function lin(c) { c = c / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+    var L = 0.2126 * lin(parseInt(h.substr(0, 2), 16))
+          + 0.7152 * lin(parseInt(h.substr(2, 2), 16))
+          + 0.0722 * lin(parseInt(h.substr(4, 2), 16));
+    return L > 0.45 ? '#000' : '#fff';
+}
+
 function gcalColorizeEvents() {
     document.querySelectorAll('.gcal-ev[data-site]').forEach(function(el) {
         if (_gcalIsFixed(el)) return;
@@ -911,6 +953,8 @@ function gcalColorizeEvents() {
         var col = gcalSiteColor(site);
         el.style.background = col;
         el.style.borderLeft = '3px solid ' + col;
+        var ink = gcalInk(col);
+        if (ink) el.style.color = ink;
     });
     document.querySelectorAll('.gcal-site-dot[data-site]').forEach(function(dot) {
         dot.style.background = gcalSiteColor(dot.getAttribute('data-site'));
@@ -1271,14 +1315,14 @@ function gcalNavigateDay(dir) {
     var d = m ? new Date(m[1] + 'T00:00:00') : new Date();
     d.setDate(d.getDate() + dir);
     var nd = d.toISOString().slice(0,10);
-    var href = (base || '/todo/day') + '/' + nd + window.location.hash;
+    var href = (base || '/todo/day') + '/' + nd + window.location.search + window.location.hash;
     window.location.href = href;
 }
 
 function gcalGoToday() {
     var today = new Date().toISOString().slice(0,10);
     var base = window.location.pathname.replace(/\/\d{4}-\d{2}-\d{2}.*/, '') || '/todo/day';
-    window.location.href = base + '/' + today;
+    window.location.href = base + '/' + today + window.location.search;
 }
 
 var _gcalDragged = null;
@@ -1596,10 +1640,11 @@ document.addEventListener('DOMContentLoaded', function() {
         <option value="/todo/month/[% date %]">Month</option>
     </select>
     [% ELSE %]
-    <a class="gcal-today-btn" href="/todo/day/[% today || date %]">Today</a>
-    <a class="gcal-nav-btn" href="/todo/day/[% previous_date %]">&#8249;</a>
+    <a class="gcal-today-btn" href="/todo/day/[% today || date %][% day_qs %]">Today</a>
+    <a class="gcal-nav-btn" href="/todo/day/[% previous_date %][% day_qs %]">&#8249;</a>
     <span class="gcal-date-label">[% date %]</span>
-    <a class="gcal-nav-btn" href="/todo/day/[% next_date %]">&#8250;</a>
+    <a class="gcal-nav-btn" href="/todo/day/[% next_date %][% day_qs %]">&#8250;</a>
+    [% UNLESS c.req.params.filter == 'schedule' %]
     <a class="gcal-nav-btn" href="/todo/addtodo" style="margin-left:4px;">+ New</a>
     <select class="gcal-view-select" onchange="window.location=this.value" style="margin-left:0;">
         <option value="/todo/day/[% date %]" selected>Day</option>
@@ -1608,6 +1653,8 @@ document.addEventListener('DOMContentLoaded', function() {
         <option value="/todo">List</option>
     </select>
     [% END %]
+    [% END %]
+    [% UNLESS c.req.params.filter == 'schedule' %]
     [% IF ap_all_sitenames.size > 0 %]
     <span style="font-size:0.82em;color:#70757a;white-space:nowrap;margin-left:8px;flex-shrink:0;">Site:</span>
     <select id="gcal-site-filter" onchange="gcalSiteFilterChange(this)" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;">
@@ -1648,6 +1695,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <option value="errors">Errors Only</option>
     </select>
     <button type="button" class="gcal-nav-btn" onclick="gcalRescheduleTodos(this)" style="flex-shrink:0;white-space:nowrap;" title="Re-stack today's todos from the current time. Uses Site and User filters. Each user has their own timeline.">&#9851; Reschedule</button>
+    [% END %]
     [% END %]
 </div>
 <div class="gcal-legend-bar" id="gcal-legend-bar"
@@ -1703,7 +1751,8 @@ document.addEventListener('DOMContentLoaded', function() {
             [% SET ts       = todo.sitename || '' %]
             [% SET tdev     = todo.developer || todo.username_of_poster || '' %]
             [% SET tproj    = proj_name_map.${todo.project_id} || '' %]
-            [% SET tdone    = (todo.status == 3 OR todo.status == 4
+            [% SET tlocked  = occurrence_locked.${todo.record_id} %]
+            [% SET tdone    = tlocked OR (todo.status == 3 OR todo.status == 4
                                 OR todo.status == 'DONE' OR todo.status == 'Completed'
                                 OR todo.status == 'completed' OR todo.status == 'Closed'
                                 OR todo.status == 'closed' OR todo.status == 'Done') %]
@@ -1766,12 +1815,18 @@ document.addEventListener('DOMContentLoaded', function() {
                  data-end-min="[% tenm %]"
                  data-dur-min="[% test %]"
                  data-date="[% date %]"
+                 [% IF c.req.params.filter == 'schedule' %]data-hk-lock="1"[% END %]
                  [% IF todo.creator_timezone %]data-creator-tz="[% todo.creator_timezone %]"[% END %]
                  style="top:[% tpx %]px; height:[% tht %]px; left:0.3%; width:99.4%;">
                 [% SET tcard_wrap_g = "data-todo-id='" _ todo.record_id _ "' data-todo-date='" _ date _ "' data-is-recurring='" _ isrec _ "' draggable='true'" %]
                 [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 tc_calendar=1
                     tc_drag_class='gcal-ev-card'
                     tc_wrapper_extra=tcard_wrap_g %]
+                [% IF isrec == '1' %]
+                <button type="button" class="hk-day-lock" data-day-lock="1"
+                    data-record-id="[% todo.record_id %]" data-lock-date="[% date %]"
+                    data-kind="[% tlocked ? 'locked' : 'done' %]">[% IF tlocked %]Done this day[% ELSE %]Done today[% END %]</button>
+                [% END %]
             </div>
         [% END %]
     </div>
@@ -1825,6 +1880,56 @@ document.addEventListener('DOMContentLoaded', function() {
     </table>
 </div>
 [% END %]
+
+<script>
+(function () {
+    function lockDay(id, date, kind) {
+        if (!id || !date) return;
+        var url = kind === 'stop' ? '/todo/close_log' : '/todo/done_with_log';
+        fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ record_id: parseInt(id, 10), lock_date: date, notes: '' })
+        }).then(function (r) { return r.json(); }).then(function (d) {
+            if (d && (d.ok || d.locked)) {
+                window.location.reload();
+            } else {
+                window.alert((d && d.error) || 'Could not lock this day');
+            }
+        }).catch(function () {
+            window.alert('Could not lock this day');
+        });
+    }
+    document.addEventListener('click', function (e) {
+        var dayBtn = e.target.closest('[data-day-lock]');
+        if (dayBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (dayBtn.getAttribute('data-kind') === 'locked') return;
+            lockDay(dayBtn.getAttribute('data-record-id'), dayBtn.getAttribute('data-lock-date'), 'done');
+            return;
+        }
+        var lockCard = e.target.closest('.gcal-ev[data-hk-lock="1"]');
+        if (lockCard && !e.target.closest('[data-start-btn]')) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (lockCard.classList.contains('is-done')) return;
+            lockDay(lockCard.getAttribute('data-todo-id'), lockCard.getAttribute('data-date'), 'done');
+            return;
+        }
+        var card = e.target.closest('.gcal-ev[data-is-recurring="1"]');
+        if (!card) return;
+        var doneBtn = e.target.closest('[data-done-btn]');
+        var stopBtn = e.target.closest('[data-start-btn][data-is-active="1"]');
+        if (!doneBtn && !stopBtn) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        var btn = doneBtn || stopBtn;
+        lockDay(btn.getAttribute('data-record-id'), card.getAttribute('data-date'), doneBtn ? 'done' : 'stop');
+    }, true);
+})();
+</script>
 
 <div id="gcal-notes-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:8px;padding:24px;min-width:340px;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,0.25);">

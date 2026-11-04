@@ -524,7 +524,7 @@ sub error_audit_meta {
 
     my $path = '';
     if ($c && blessed($c) && $c->can('req') && $c->req) {
-        $path = $c->req->path // '';
+        $path = _redact_path($c->req->path // '');
     }
 
     my $subject = "[Error] $ctrl_action";
@@ -547,10 +547,20 @@ sub error_audit_meta {
 }
 
 # Log a message with detailed context (file, line, subroutine, etc.)
+# Calendar feed tokens are in the URL path; access/error logs store the path redacted.
+sub _redact_path {
+    my ($p) = @_;
+    return $p unless defined $p;
+    $p =~ s{(\bcalendar/feed/)[^\s/?#"'<>]+}{$1\[REDACTED\]}g;
+    return $p;
+}
+
 sub log_with_details {
     my ($self, $c, $level, $file, $line, $subroutine, $message) = @_;
     $message //= 'No message provided';
     $level   //= 'INFO';
+    # Calendar feed tokens travel in the URL path: never write them to any log.
+    $message = _redact_path($message);
 
     # Format the log message with a timestamp
     my $timestamp = _get_timestamp();
@@ -1265,7 +1275,7 @@ sub log_access {
         $c->model('DBEncy')->resultset('AccessLog')->create({
             timestamp          => _get_timestamp(),
             sitename           => ($c->stash ? ($c->stash->{SiteName} || 'CSC') : 'CSC'),
-            path               => substr($c->req->path // '', 0, 512),
+            path               => substr(_redact_path($c->req->path // ''), 0, 512),
             request_method     => $req{request_method},
             status_code        => $status_code,
             ip_address         => $req{ip_address},
