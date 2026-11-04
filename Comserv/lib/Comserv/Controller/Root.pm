@@ -237,6 +237,22 @@ sub auto :Private {
     # endpoints) — guests must never reach these (CSC-20260831-3242 / 6513 / 4599).
     if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site(?:/|$)|themetest|file/admin|Weather/(?:configuration|test_config|save_configuration|poll|test_location|lookup_postal)(?:/|$))}) {
         unless ($c->user_exists && $c->check_user_roles('admin')) {
+            # A JSON/XHR caller (the Git dashboard's fetch handlers) must never be
+            # answered with a 302 to an HTML login page: the browser follows it,
+            # fetch().json() throws "Unexpected token '<'", and the button looks
+            # dead. 2026-11-03: this is exactly why "Update all from main" seemed
+            # not to work on an expired session. Return JSON 403 instead; normal
+            # page GETs keep the redirect.
+            my $wants_json = (($c->req->header('Accept') // '') =~ m{application/json}i)
+                          || (($c->req->header('X-Requested-With') // '') =~ m{XMLHttpRequest}i);
+            if ($wants_json && $c->req->method ne 'GET') {
+                $c->response->status(403);
+                $c->response->content_type('application/json');
+                $c->response->body(
+                    '{"success":false,"error":"Administrator access required: your session expired. '
+                  . 'Sign in again, then reload the page."}');
+                return 0;
+            }
             $c->response->redirect($c->uri_for('/user/login'));
             return 0;
         }

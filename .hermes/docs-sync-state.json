@@ -1,9 +1,9 @@
 {
-  "branch": "aisystem",
-  "head_sha": "3cd825463",
-  "date": "2026-11-02",
-  "last_doc_commit": "c0d77cc13",
-  "changelog_entry": "Comserv/root/Documentation/changelog/entries/2026-11-02-aisystem-merge-trial-state.inc",
-  "todos_touched": [2645, 2647, 2648],
-  "note": "Completed the halted main->aisystem merge (3cd825463): gpt_56_luna trial-state conflict resolved to the newer aisystem snapshot, committed stash-conflict markers stripped out of kimi_k27_code.state.json. Docs written but NOT committed: Documentation/system/git_worktree_merge_plan.tt (v0.4), Documentation/AISYSTEMPlan.tt (v1.06, new trials/probation/overrun-guard section), changelog 2026-11-02-aisystem-merge-trial-state.inc. Todo 2645 closed as In Progress (2) because Admin/Git.pm merge_abort still logs success=N without error_msg; 2647 and 2648 done. Open clocks 2311, 2469, 2595, 2644 belong to other threads and were left running. .hermes/models.md resolved: two committed conflict blocks removed (kept the 2026-09-08 probe notes, fallback order row now reflects @HERMES_CHAIN_DEFAULT, opencode-free references dropped from the coder row and the config sketch)."
+  "branch": "git-dev",
+  "head_sha": "df118592d",
+  "date": "2026-11-04",
+  "last_doc_commit": "docs commit in this session: git_worktree_merge_plan.tt v0.5 (§3.7 bulk update) + TODO_SYSTEM_DOCUMENTATION.tt work-log clock rules",
+  "changelog_entry": "Comserv/root/Documentation/changelog/entries/2026-11-04-git-update-all-and-worklog-clocks.inc",
+  "todos_touched": [2006],
+  "note": "Session on git-dev: (1) Update-all-from-main card fixed - nested <form> plus seven [%# ... #] comments that only terminate on %] swallowed the markup, so clicks were no-ops; card now works without JS and answers a JSON 403 instead of a login redirect. (2) Preview skipped 12 of 16 worktrees because a mode-only typechange (.zencoder/scripts/updateprompt.pl) counted as a dirty blocker; Util::Git now re-checks each candidate with git diff --quiet main, and worktrees.json is untracked in all 26 repos via git rm --cached + .git/info/exclude. (3) Work-log clock: _duration_hms adds elapsed days from start_date before subtracting (15:39->01:38 bills 599 min, was 1), close_log refuses spans over 12h, new reap_orphan_logs closes open logs on status-3/4 todos. Data corrected: log 2110 -> end 17:38:07 / 01:58:00; logs 2031, 2082, 2094 closed with 0 billed. Seven plain-text .inc fragments consolidated into one cl-entry. NOT verified through the running :4004 (process predates Util/Git.pm and Util/TodoLog.pm changes) - a restart plus one Preview/Update pass is owed. Nothing merged yet. InventoryAccounting still mid-merge with U Comserv/data/ai_trials/gpt_56_luna.state.json. Left running by others: logs 2084 (todo 2311), 2086 and 2111 (no todo). Pre-existing nested duplicate tree Comserv/Comserv (7 tracked files) still present."
 }
