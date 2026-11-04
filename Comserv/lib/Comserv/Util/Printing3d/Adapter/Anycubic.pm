@@ -76,16 +76,25 @@ sub fetch_info {
     unless ($res && $res->{success}) {
         my $status = $res ? ($res->{status} || 0) : 0;
         my $body = ($res && $res->{content}) ? $res->{content} : '';
-        my $timed_out = ($status == 599 && $body =~ /timed?\s*out/i) ? 1 : 0;
+        my $reason = ($res && $res->{reason}) ? $res->{reason} : '';
+        $reason =~ s/\s+/ /g;
+        $reason = substr($reason, 0, 80);
+        # HTTP::Tiny uses 599 for timeout, refused, and reset. A Kobra that
+        # just booted answers with one of those. That is not proof DHCP moved
+        # it: the 0.15s discover sweep misses a slow accept, and follow then
+        # marks the farm row offline. The printers page hides Control for
+        # offline, so the printer looks gone while it is still at this IP.
+        my $transient = ($status == 599 || $body =~ /timed?\s*out|refused|reset/i) ? 1 : 0;
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fetch_info',
-            "host=$safe http=$status" . ($timed_out ? ' timeout' : ''));
+            "host=$safe http=$status" . ($transient ? ' transient' : '')
+            . ($reason ? " reason=$reason" : ''));
         return {
             ok          => 0,
-            error       => $timed_out ? 'timeout' : ('HTTP ' . $status),
+            error       => $transient ? 'timeout' : ('HTTP ' . $status),
             url         => $url,
             host        => $safe,
             http_status => $status,
-            timeout     => $timed_out,
+            timeout     => $transient,
         };
     }
     my $raw = $res->{content} || '';

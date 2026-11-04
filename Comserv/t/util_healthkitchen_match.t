@@ -60,4 +60,25 @@ is( ref $got->{herbs}, 'ARRAY', 'match_for_symptoms dataset passthrough' );
     is( $r->{not_in_pantry}[0]{name}, 'Missing herb', 'ENCY herb outside pantry listed as not_in_pantry' );
 }
 
+{
+    my $base = $hk->generic_menu();
+    is( scalar @$base, 4, 'general menu has four slots with no symptoms' );
+    is( $base->[0]{meal_slot}, 'breakfast', 'general menu starts at breakfast' );
+    my $tight = $hk->tighten_menu( $base, {
+        formulas      => [],
+        herbs         => [],
+        not_in_pantry => [ { name => 'Off pantry' } ],
+    } );
+    is( scalar @$tight, 4, 'tighten keeps the general menu' );
+    is( $tight->[0]{basis}, 'general', 'no match leaves the slot general' );
+    ok( index( $tight->[0]{free_text}, 'Off pantry' ) < 0, 'off-pantry name is not copied onto the menu' );
+    my $over = $hk->tighten_menu( $base, {
+        formulas => [ { formula_id => 1, name => 'Golden milk' } ],
+        herbs    => [],
+    } );
+    is( $over->[0]{basis}, 'tightened', 'a pantry formula tightens the first slot' );
+    is( $over->[0]{free_text}, 'Golden milk', 'tightened slot uses the match' );
+    is( $over->[1]{basis}, 'general', 'untouched slots stay general' );
+}
+
 done_testing;

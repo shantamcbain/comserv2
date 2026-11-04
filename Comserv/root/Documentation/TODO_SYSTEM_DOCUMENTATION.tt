@@ -178,6 +178,16 @@ $c->stash(
 2. **View Logs**: Calendar views show time logs alongside todos
 3. **Track Progress**: Monitor accumulated time on todos
 
+##### Work-log clock rules (code of record: `Util/TodoLog.pm`, 2026-11-04)
+
+- **Start** (`POST /api/todo/open_log`) is what makes a todo *active*: it opens the log and moves the todo to status 5 in one action, so two people or two AIs cannot work the same todo by accident. `POST /api/todo/update` records no time and is **not** Start.
+- **Status vocabulary**: `1` new, `2` in progress (clock stopped), `3` done, `4` cancelled, `5` in progress **with the clock running**. A row at 5 with no open log is a dangling clock, not active work.
+- **Stop** (`POST /api/todo/close_log`) closes the log and returns the todo to 2. **Done** (`POST /api/todo/done_with_log`) closes the log and moves it to 3. Both take `actor` — never leave the field to default.
+- **Midnight is not a bug.** A log left open past midnight has an end clock time earlier than its start; the duration adds the elapsed days from the stored `start_date` before subtracting, so a session opened 15:39 and closed 01:38 bills 9h59m instead of 1 minute.
+- **A clock left running is a discipline failure, not hours worked.** `close_log` refuses to bill a span over 12 hours: it records the close with `00:00:00` and a comment naming the elapsed time.
+- **A finished todo cannot still be clocked on.** `TodoLog::reap_orphan_logs` closes any open log whose todo is already status 3 or 4 (`end_time = start_time`, time 0, comment `auto-closed: todo was already done`) and runs on both `toggle_start` and `close_log`.
+- **Close the clock at the end of every session**, or it bills all night.
+
 ### For Developers
 
 #### Extending Functionality

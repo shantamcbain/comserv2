@@ -87,6 +87,8 @@ sub safe { my ($u) = @_; $ctrl->_safe_return_path(ctx(), $u) }
 
 # ---- 1. accepted values ---------------------------------------------------------
 is(safe('/'),                    '/',                 'root accepted');
+is(safe('/user/forgot_password'), '', 'forgot_password is not a post-login destination');
+is(safe('/user/reset_password?token=x'), '', 'reset_password is not a post-login destination');
 is(safe('/Documentation/x?a=1&b=2'), '/Documentation/x?a=1&b=2', 'local path + query accepted');
 is(safe('/3d/store#frag'),       '/3d/store',         'fragment dropped');
 is(safe('http://workstation.local:3001/Cart/checkout?x=1'), '/Cart/checkout?x=1', 'same-host absolute URL reduced to a path');

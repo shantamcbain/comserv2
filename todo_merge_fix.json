@@ -1,0 +1,16 @@
+{
+  "subject": "Fix merge fail from main - resolve remaining merge conflicts",
+  "description": "The merge from main into DockerHA completed but may have unresolved conflicts. Need to:",
+  "steps": [
+    "Review merge conflict logs from 2026-10-16 (planning merge into main)",
+    "Check AI2 Chat.pm, Router.pm, GitFix.pm for residual conflict markers",
+    "Verify HelpDesk templates (new_ticket.tt, ticket_view.tt) are properly merged",
+    "Test AI Usage Monitor page (/ai/usage) after 2026-10-05 fixes",
+    "Run comprehensive test to ensure server starts properly on worktree port",
+    "Verify that ModelPick/user-pick path works correctly alongside quota classification"
+  ],
+  "priority": "high",
+  "type": "merge_resolution",
+  "created": "2026-10-27",
+  "status": "in_progress"
+}

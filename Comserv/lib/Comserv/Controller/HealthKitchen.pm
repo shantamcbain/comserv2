@@ -2,6 +2,7 @@ package Comserv::Controller::HealthKitchen;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use JSON::MaybeXS qw(encode_json);
 use Comserv::Util::MembershipHelper;
 use Comserv::Util::HealthKitchen;
 
@@ -101,10 +102,28 @@ sub index :Path('/healthkitchen') :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'index',
         'HealthKitchen index' );
+    if ( $c->req->method eq 'POST' && ( $c->req->params->{hk_action} // '' ) eq 'build_today' ) {
+        my $res = $self->hk->build_today_plan($c);
+        if ( $res->{ok} ) {
+            $c->flash->{success_msg} = 'Today\'s menu saved from your pantry match.';
+            $c->response->redirect( $c->uri_for( '/healthkitchen/plan/' . $res->{id} ) );
+        }
+        else {
+            $c->flash->{error_msg} = $res->{error} || 'Could not build today\'s menu.';
+            $c->response->redirect( $c->uri_for('/healthkitchen') );
+        }
+        $c->detach;
+        return;
+    }
+    my $recipes = $self->hk->list_recipes($c);
+    my $n = @$recipes;
+    my $preview_end = $n > 5 ? 4 : ( $n ? $n - 1 : -1 );
     $c->stash(
-        hk_short   => $self->hk->short_list($c),
-        hk_recipes => $self->hk->list_recipes($c),
-        template   => 'healthkitchen/index.tt',
+        hk_short    => $self->hk->short_list($c),
+        hk_recipes  => $preview_end >= 0 ? [ @{$recipes}[ 0 .. $preview_end ] ] : [],
+        hk_recipe_n => $n,
+        hk_today    => $self->hk->today_dashboard($c),
+        template    => 'healthkitchen/index.tt',
     );
 }
 
@@ -350,6 +369,50 @@ sub symptoms :Local :Args(0) {
     );
 }
 
+sub plan :Local :Args(1) {
+    my ( $self, $c, $id ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'plan',
+        "HealthKitchen plan id=$id" );
+    unless ( $id && $id =~ /^\d+$/ ) {
+        $c->flash->{error_msg} = 'Plan not found.';
+        $c->response->redirect( $c->uri_for('/healthkitchen') );
+        $c->detach;
+        return;
+    }
+    if ( $c->req->method eq 'POST' && ( $c->req->params->{hk_action} // '' ) eq 'activity_done' ) {
+        my $res = $self->hk->set_activity_done(
+            $c, $id, $c->req->params->{activity_id}, $c->req->params->{done} ? 1 : 0
+        );
+        if ( $c->req->params->{ajax} ) {
+            $c->res->status( $res->{ok} ? 200 : 400 );
+            $c->res->content_type('application/json; charset=utf-8');
+            $c->res->body( encode_json($res) );
+            $c->detach;
+            return;
+        }
+        if ( $res->{ok} ) {
+            $c->flash->{success_msg} = $res->{done} ? 'Marked done.' : 'Cleared.';
+        }
+        else {
+            $c->flash->{error_msg} = $res->{error} || 'Could not update activity.';
+        }
+        $c->response->redirect( $c->uri_for( '/healthkitchen/plan/' . $id ) );
+        $c->detach;
+        return;
+    }
+    my $plan = $self->hk->load_plan( $c, $id );
+    unless ($plan) {
+        $c->flash->{error_msg} = 'Plan not found.';
+        $c->response->redirect( $c->uri_for('/healthkitchen') );
+        $c->detach;
+        return;
+    }
+    $c->stash(
+        hk_plan  => $plan,
+        template => 'healthkitchen/plan.tt',
+    );
+}
+
 sub mealplans :Local :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'mealplans',
@@ -518,6 +581,7 @@ sub history :Local :Args(0) {
         my $act = $p->{hk_action} // '';
         my $res = $act eq 'consent'    ? $self->hk->grant_consent($c)
                 : $act eq 'revoke'     ? $self->hk->revoke_consent($c)
+                : $act eq 'chart'      ? $self->hk->save_chart( $c, $p )
                 : $act eq 'delete'     ? $self->hk->delete_history( $c, $p->{id} )
                 : $act eq 'delete_all' ? $self->hk->delete_all_history( $c, $p->{confirm} )
                 :                        $self->hk->save_history( $c, $p );
@@ -543,6 +607,7 @@ sub history :Local :Args(0) {
         hk_consent    => $consent ? 1 : 0,
         hk_history    => $hist,
         hk_edit       => $edit,
+        hk_chart      => $consent ? $self->hk->get_chart($c) : {},
         hk_types      => [@Comserv::Util::HealthKitchen::HISTORY_TYPES],
         hk_statuses   => [@Comserv::Util::HealthKitchen::HISTORY_STATUS],
         template      => 'healthkitchen/history.tt',
@@ -566,19 +631,12 @@ sub history_export :Local :Args(0) {
 
 sub history_admin :Local :Args(1) {
     my ( $self, $c, $subject_id ) = @_;
-    unless ( $self->_is_admin($c) ) {
-        $c->response->status(403);
-        $c->response->body('Forbidden');
-        $c->detach;
-        return;
-    }
-    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'history_admin',
-        "Admin view of shared health history for user $subject_id" );
-    $c->stash(
-        hk_subject => $subject_id,
-        hk_history => $self->hk->admin_shared_history( $c, $subject_id ),
-        template   => 'healthkitchen/history_admin.tt',
-    );
+    $self->logging->log_with_details( $c, 'warn', __FILE__, __LINE__, 'history_admin',
+        "Refused history_admin for subject $subject_id; no practitioner grant exists" );
+    $c->response->status(403);
+    $c->response->body('Only the chart owner can see this. No practitioner has been granted access.');
+    $c->detach;
+    return;
 }
 
 __PACKAGE__->meta->make_immutable;
