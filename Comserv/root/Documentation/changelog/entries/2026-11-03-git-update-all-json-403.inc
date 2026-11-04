@@ -1,0 +1,7 @@
+<div id="2026-11-03-git-update-all-json-403" class="cl-entry">
+<h3>2026-11-03 - Git Desktop "Update all from main" answers JSON, not a login redirect</h3>
+<p class="doc-body"><strong>What.</strong> <code>Root::auto</code> LAYER 0 now answers a JSON/XHR write to a protected <code>/admin</code> path with a <strong>403 JSON</strong> body instead of a 302 to <code>/user/login</code>; plain page GETs keep the redirect. <code>Admin::Git::update_all_from_main</code> switched from <code>require_admin_access</code> (which redirects) to <code>check_admin_access</code> + explicit JSON 403, matching the <code>merge</code> action. <code>git-dashboard.js</code> sends <code>Accept: application/json</code> and refuses to parse a non-JSON response.</p>
+<p class="doc-body"><strong>Why.</strong> "Update all from main" appeared dead: with an expired admin session the fetch was answered by a 302 to the HTML login page, <code>r.json()</code> threw, and the only feedback was a truncated <em>Request failed: SyntaxError</em> in the card summary. The failure was invisible in the application log because the request never reached the Git controller.</p>
+<p class="doc-body"><strong>Proof.</strong> Catalyst::Test dispatch probe: XHR POST -&gt; 403 <code>application/json</code> with a readable message; non-JSON POST -&gt; 302; page GET -&gt; 302 (unchanged).</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/lib/Comserv/Controller/Root.pm</code>, <code>Comserv/lib/Comserv/Controller/Admin/Git.pm</code>, <code>Comserv/root/static/js/git-dashboard.js</code>.</p>
+</div>
