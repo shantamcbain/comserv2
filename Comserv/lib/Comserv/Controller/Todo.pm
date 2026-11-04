@@ -14,6 +14,9 @@ use Comserv::Util::PointSystem;
 use Comserv::Util::Priority ();
 use Comserv::Util::ProjectDependencies;
 use Comserv::Util::TodoLog;
+use Comserv::Util::UserPreferences;
+use Comserv::Util::CalendarFeed;
+use Comserv::Util::TodoDescription;
 use Comserv::Util::TodoRanking;
 use Comserv::Util::TodoTypes qw(recurring_matches_date is_valid_todo_type);
 BEGIN { extends 'Catalyst::Controller'; }
@@ -215,10 +218,28 @@ sub _get_user_accessible_sites {
     return @sites ? \@sites : [$c->session->{SiteName}];
 }
 
+# Saved subset of the user's SiteNames (pref calendar.visible_sites), limited to
+# the sites the user really has ($all_sites). Empty list = no preference.
+sub _calendar_visible_sites {
+    my ($self, $c, $all_sites) = @_;
+    my $uid = $c->session->{user_id} or return [];
+    my $pref = eval { Comserv::Util::UserPreferences->new->get($c, $uid, 'calendar.visible_sites') };
+    return [] unless ref $pref eq 'ARRAY' && @$pref;
+    my %mine = map { $_ => 1 } @{ $all_sites || [] };
+    return [ grep { $mine{$_} } @$pref ];
+}
+
 sub _get_filtered_calendar_sites {
     my ($self, $c, $all_sites) = @_;
     my $session = $c->session;
     my $saved_filter = $session->{cal_filter_site} // '';
+    # One todo, many sites (Nov 2026): with no single-site filter picked, show the
+    # subset of the user's own SiteNames saved in user prefs (calendar.visible_sites),
+    # so a todo is filed once and shows on every site the user follows.
+    unless ($saved_filter) {
+        my $vis = $self->_calendar_visible_sites($c, $all_sites);
+        return $vis if @$vis;
+    }
     my $filter_site = $saved_filter ? $saved_filter : ($session->{SiteName} || '');
     return $all_sites unless $filter_site && $filter_site ne '';
     return (grep { $_ eq $filter_site } @$all_sites) ? [$filter_site] : $all_sites;
@@ -687,6 +708,8 @@ sub details :Path('/todo/details') :Args {
             todo_intervals    => \@intervals,
             ai_conversations  => \@ai_conversations,
             error_source      => \%error_source,
+            reminder_offsets  => (Comserv::Util::CalendarFeed->load_reminders($c->model('DBEncy'), $todo->record_id)->{$todo->record_id} || []),
+            reminder_human    => Comserv::Util::CalendarFeed->offsets_human(Comserv::Util::CalendarFeed->load_reminders($c->model('DBEncy'), $todo->record_id)->{$todo->record_id}),
             return_to         => $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo')),
         );
 
@@ -813,6 +836,7 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         time_of_day     => $c->request->params->{time_of_day},
         sites           => $add_sites,
         is_csc          => $add_is_csc,
+        description_template => Comserv::Util::TodoDescription->template,
         template        => 'todo/addtodo.tt'
     );
 
@@ -956,6 +980,8 @@ sub edit :Path('/todo/edit') :Args(1) {
 
     $c->stash(
         record           => $todo,
+        reminder_offsets_str => join(',', @{ Comserv::Util::CalendarFeed->load_reminders($c->model('DBEncy'), $todo->record_id)->{$todo->record_id} || [] }),
+        description_template => Comserv::Util::TodoDescription->template,
         current_status   => $current_status,
         current_priority => $current_priority,
         projects         => $projects,
@@ -1132,6 +1158,7 @@ sub modify :Path('/todo/modify') :Args(1) {
                 ? ($form_data->{is_fixed} ? 1 : 0)
                 : ($todo->get_column('is_fixed') // (($form_data->{todo_type} // $todo->get_column('todo_type') // 'task') =~ /^(appointment|meeting)$/ ? 1 : 0)),
         });
+        $self->_save_reminders_from_form($c, $todo->record_id, $form_data->{reminder_offsets});
     };
     if ($@) {
         $self->logging->log_with_details(
@@ -1317,6 +1344,23 @@ sub _perform_todo_delete {
     $c->detach();
 }
 
+# Reminder offsets from the add/edit form (e.g. "-PT60M,-PT15M"). Invalid entries
+# are dropped and reported in the flash; the todo itself is always saved.
+sub _save_reminders_from_form {
+    my ($self, $c, $todo_id, $raw) = @_;
+    return unless defined $raw;
+    my $res = Comserv::Util::CalendarFeed->save_reminders($c->model('DBEncy'), $todo_id, $raw,
+        Comserv::Util::AppTime->now_utc);
+    my @notes;
+    push @notes, 'Reminder value(s) not understood and skipped: ' . join(', ', @{ $res->{rejected} })
+        . ' (use e.g. -PT60M, -PT15M, -P1D).' if $res->{rejected} && @{ $res->{rejected} };
+    push @notes, 'Reminders were not saved: ' . $res->{error} unless $res->{ok};
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_save_reminders_from_form',
+        "todo $todo_id: " . join(' ', @notes)) if @notes;
+    $c->flash->{reminder_warning} = join(' ', @notes) if @notes;
+    return $res;
+}
+
 sub create :Local {
     my ( $self, $c ) = @_;
     
@@ -1492,6 +1536,7 @@ sub create :Local {
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create', 
             "Successfully created todo with ID: " . $todo->id);
+        $self->_save_reminders_from_form($c, $todo->id, $params->{reminder_offsets});
             
     };
     
@@ -2560,6 +2605,7 @@ sub month :Path('/todo/month') :Args {
         next_month_date => $next_month_date,
         today => $today,
         ap_all_sitenames => $calendar_sites_m,
+        cal_visible_sites => $self->_calendar_visible_sites($c, $calendar_sites_m),
         cal_filter_site  => do { my $sf = $c->session->{cal_filter_site} // ''; $sf ? $sf : ($c->session->{SiteName} || '') },
         cal_filter_user  => ($c->session->{cal_filter_user} // ''),
         is_csc           => $month_is_csc,
