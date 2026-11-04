@@ -1845,9 +1845,9 @@ sub api_todo_update :Path('todo/update') :Args(0) {
         estimated_man_hours accumulative_time comments
         developer owner reporter company_code
         parent_id parent_todo sort_order is_blocking blocked_by_todo_id
-        plan_id share billable todo_type
+        plan_id share billable todo_type is_recurring recurrence_rule
     );
-    my @nullable = qw(parent_id blocked_by_todo_id plan_id scheduled_date comments);
+    my @nullable = qw(parent_id blocked_by_todo_id plan_id scheduled_date comments recurrence_rule);
 
     my $current_user = $gate->{lan} ? ($c->session->{username} || 'system') : $gate->{username};
 
