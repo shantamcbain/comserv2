@@ -7676,9 +7676,11 @@ sub manage_api_keys :Local :Args(0) {
     my @api_keys;
     try {
         my $schema = $c->model('DBEncy')->schema;
+        require Comserv::Util::AI::UserKeys;
+        my $v2 = Comserv::Util::AI::UserKeys->v2_columns_present($schema);
         my $keys_rs = $schema->resultset('UserApiKeys')->search(
             { user_id => $user_id },
-            { order_by => { -asc => 'service' } }
+            { order_by => { -asc => 'service' }, columns => [ grep { $_ ne 'api_key_encrypted' } @{ Comserv::Util::AI::UserKeys->columns_for($schema) } ] }
         );
         
         my $key_count = $keys_rs->count;
@@ -7689,6 +7691,9 @@ sub manage_api_keys :Local :Args(0) {
             push @api_keys, {
                 id => $key->id,
                 service => $key->service,
+                key_type => ($v2 ? ($key->get_column('key_type') // 'chat') : 'chat'),
+                label    => ($v2 ? $key->get_column('label') : undef),
+                base_url => ($v2 ? $key->get_column('base_url') : undef),
                 is_active => $key->is_active,
                 created_at => $key->created_at->strftime('%Y-%m-%d %H:%M'),
                 updated_at => $key->updated_at->strftime('%Y-%m-%d %H:%M')
@@ -7732,7 +7737,9 @@ sub add_api_key :Local :Args(0) {
     $c->stash(
         template => 'ai/add_api_key.tt',
         page_title => 'Add API Key',
-        username => $username
+        username => $username,
+        known_providers => do { require Comserv::Util::AI::UserKeys; \@Comserv::Util::AI::UserKeys::KNOWN },
+        key_types => \@Comserv::Util::AI::UserKeys::KEY_TYPES,
     );
 }
 
@@ -7768,7 +7775,10 @@ sub edit_api_key :Local :Args(1) {
     
     try {
         my $schema = $c->model('DBEncy')->schema;
-        my $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
+        require Comserv::Util::AI::UserKeys;
+        my $v2 = Comserv::Util::AI::UserKeys->v2_columns_present($schema);
+        my $key_obj = ($key_id =~ /^\d+$/) ? $schema->resultset('UserApiKeys')->search({ id => $key_id },
+            { columns => [ grep { $_ ne 'api_key_encrypted' } @{ Comserv::Util::AI::UserKeys->columns_for($schema) } ] })->first : undef;
         
         unless ($key_obj) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
@@ -7791,7 +7801,12 @@ sub edit_api_key :Local :Args(1) {
             page_title => 'Edit API Key',
             username => $username,
             key_id => $key_obj->id,
-            service => $key_obj->service
+            service => $key_obj->service,
+            key_type => ($v2 ? ($key_obj->get_column('key_type') // 'chat') : 'chat'),
+            label    => ($v2 ? $key_obj->get_column('label') : undef),
+            base_url => ($v2 ? $key_obj->get_column('base_url') : undef),
+            known_providers => \@Comserv::Util::AI::UserKeys::KNOWN,
+            key_types => \@Comserv::Util::AI::UserKeys::KEY_TYPES,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
@@ -7809,128 +7824,84 @@ Save or update user API key
 
 sub save_api_key :Local :Args(0) {
     my ($self, $c) = @_;
-    
-    unless ($c->session->{username}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'save_api_key', "Unauthorized access attempt - no session");
+    # Oct 30 2026 (Shanta): any provider slug, key_type, optional OpenAI-compatible base_url, label.
+    # Validation: Comserv::Util::AI::UserKeys->validate_form. A user can only create/update their OWN rows.
+    # The key value is never logged, flashed or put back in the form.
+    unless ($c->session->{username} && $c->session->{user_id}) {
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
-    
-    my $user_id = $c->session->{user_id};
+    unless (uc($c->request->method // '') eq 'POST') {
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+        return;
+    }
+    require Comserv::Util::AI::UserKeys;
+    my $UK = 'Comserv::Util::AI::UserKeys';
+    my $user_id  = $c->session->{user_id};
     my $username = $c->session->{username};
-    my $service = $c->request->params->{service};
-    my $api_key = $c->request->params->{api_key};
-    my $key_id = $c->request->params->{id};
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-        'save_api_key', "User $username attempting to " . ($key_id ? "update key ID $key_id" : "add new key") . " for service: $service");
-    
-    # Validation
-    unless ($service) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'save_api_key', "Validation failed: service missing for user $username");
-        $c->flash->{error_msg} = 'Service is required';
-        $c->response->redirect($c->uri_for($key_id ? '/ai/edit_api_key/' . $key_id : '/ai/add_api_key'));
+    my $p        = $c->request->params;
+    my $key_id   = $p->{id};
+    $key_id = undef unless defined $key_id && $key_id =~ /^\d+$/;
+    my $back = $c->uri_for($key_id ? "/ai/edit_api_key/$key_id" : '/ai/add_api_key');
+
+    my ($v, $errs) = $UK->validate_form($p, editing => ($key_id ? 1 : 0));
+    if (@$errs) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'save_api_key',
+            "API key form rejected for user $username: " . join('; ', @$errs));
+        $c->flash->{error_msg} = join(' ', @$errs);
+        $c->response->redirect($back);
         return;
     }
-    
-    # For new keys, api_key is required. For edits, it's optional (keep existing if blank)
-    if (!$key_id && !$api_key) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'save_api_key', "Validation failed: API key missing for new key, user $username");
-        $c->flash->{error_msg} = 'API key is required';
-        $c->response->redirect($c->uri_for('/ai/add_api_key'));
-        return;
-    }
-    
+    my $ok = 0;
     try {
         my $schema = $c->model('DBEncy')->schema;
-        
-        my $key_obj;
-        if ($key_id) {
-            # Update existing key
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'save_api_key', "Looking up existing key ID $key_id for user $user_id");
-            
-            $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
-            
-            unless ($key_obj) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-                    'save_api_key', "Key ID $key_id not found in database");
-                $c->flash->{error_msg} = 'API key not found';
-                $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
-                return;
-            }
-            
-            unless ($key_obj->user_id == $user_id) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-                    'save_api_key', "Access denied: User $user_id attempted to update key $key_id owned by user " . $key_obj->user_id);
-                $c->flash->{error_msg} = 'API key not found or access denied';
-                $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
-                return;
-            }
-            
-            # Only update api_key if provided
-            if ($api_key && length($api_key) > 0) {
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                    'save_api_key', "Updating API key for service $service");
-                $key_obj->set_api_key($api_key);
-            } else {
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                    'save_api_key', "No new API key provided, keeping existing key for service $service");
-            }
-            
-            $key_obj->update;
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                'save_api_key', "API key ID $key_id updated successfully for service $service, user $username");
-            
-            $c->flash->{status_msg} = "API key for $service updated successfully";
-            
-        } else {
-            # Create new key
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'save_api_key', "Creating new API key for service $service, user $user_id");
-            
-            # Check for duplicate
-            my $existing = $schema->resultset('UserApiKeys')->search({
-                user_id => $user_id,
-                service => $service
-            })->first;
-            
-            if ($existing) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                    'save_api_key', "Duplicate key attempt: User $user_id already has key for service $service");
-                $c->flash->{error_msg} = "You already have an API key for $service. Please edit the existing key instead.";
-                $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
-                return;
-            }
-            
-            my $tmp = $schema->resultset('UserApiKeys')->new({});
-            my $encrypted = $tmp->encrypt_api_key($api_key);
-
-            $key_obj = $schema->resultset('UserApiKeys')->create({
-                user_id => $user_id,
-                service => $service,
-                is_active => '1',
-                api_key_encrypted => $encrypted
-            });
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                'save_api_key', "API key created successfully for service $service, user $username, key ID: " . $key_obj->id);
-            
-            $c->flash->{status_msg} = "API key for $service added successfully";
+        my $rs = $schema->resultset('UserApiKeys');
+        my $v2 = $UK->v2_columns_present($schema);
+        my %old_enum = map { ($_ => 1) } qw(grok ollama brave searxng openai claude gemini anthropic cohere openrouter);
+        if (!$v2 && (!$old_enum{ $v->{service} } || $v->{key_type} ne 'chat' || $v->{base_url} || $v->{label})) {
+            $c->flash->{error_msg} = 'Custom providers, key types, base URLs and labels need the user_api_keys update '
+                . '(the schema-compare update of Result/UserApiKeys.pm). Ask the admin to apply it.';
+            return;
         }
-        
+        my $attr = { columns => $UK->columns_for($schema) };
+        my %extra = $v2 ? (key_type => $v->{key_type}, base_url => $v->{base_url}, label => $v->{label}) : ();
+        if ($key_id) {
+            my $row = $rs->search({ id => $key_id, user_id => $user_id }, $attr)->first;   # own rows only
+            unless ($row) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'save_api_key',
+                    "User $user_id tried to update key id $key_id that is not theirs or does not exist");
+                $c->flash->{error_msg} = 'API key not found';
+                return;
+            }
+            my %upd = $v2 ? (base_url => $v->{base_url}, label => $v->{label}) : ();
+            $upd{api_key_encrypted} = $row->encrypt_api_key($v->{api_key}) if $v->{api_key};
+            $row->update(\%upd) if %upd;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'save_api_key',
+                "API key id $key_id updated by user $username (service " . $row->service . ($v->{api_key} ? ', new key' : ', key kept') . ')');
+            $c->flash->{status_msg} = 'API key for ' . $row->service . ' updated';
+        } else {
+            my %dup = (user_id => $user_id, service => $v->{service}, ($v2 ? (key_type => $v->{key_type} eq 'chat' ? ['chat', undef] : $v->{key_type}) : ()));
+            if ($rs->search(\%dup, $attr)->first) {
+                $c->flash->{error_msg} = "You already have a $v->{key_type} key for $v->{service}. Edit that one instead.";
+                return;
+            }
+            my $row = $rs->create({ user_id => $user_id, service => $v->{service}, is_active => '1',
+                                    api_key_encrypted => $rs->new({})->encrypt_api_key($v->{api_key}), %extra });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'save_api_key',
+                "API key id " . $row->id . " created by user $username (service $v->{service}, type $v->{key_type}"
+                . ($v->{base_url} ? ", base_url $v->{base_url}" : '') . ')');
+            $c->flash->{status_msg} = "API key for $v->{service} added. Calls made with it are billed to your own account.";
+        }
+        $ok = 1;
     } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-            'save_api_key', "Failed to save API key for service $service, user $username: $error");
-        $c->flash->{error_msg} = "Failed to save API key: $error";
+        # DB errors can quote the statement's bind values; log only the first line, never flash it.
+        my ($first) = split /\n/, "$_";
+        $first =~ s/\b[A-Za-z0-9_\-]{24,}\b/<redacted>/g;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'save_api_key',
+            "Failed to save API key for user $username: $first");
+        $c->flash->{error_msg} = 'Could not save the API key (server error; see the log).';
     };
-    
-    $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+    $c->response->redirect($ok ? $c->uri_for('/ai/manage_api_keys') : (($c->flash->{error_msg} // "") =~ /not found/ ? $c->uri_for('/ai/manage_api_keys') : $back));
 }
 
 =head2 delete_api_key

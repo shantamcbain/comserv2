@@ -15,29 +15,31 @@ has 'schema' => (
     handles => ['resultset'],
 );
 
-# Add method to read theme mappings from JSON
+# Read the site-to-theme mapping from the canonical definitions file.
 sub get_theme_from_json {
     my ($self, $c, $site_name) = @_;
-    
-    my $json_path = $c->path_to('root', 'static', 'config', 'theme_mappings.json');
-    
+
+    require Comserv::Util::ThemePaths;
+    my $json_path = Comserv::Util::ThemePaths->definitions_file($c);
     return 'default' unless -f $json_path;
-    
-    my $json_text = read_file($json_path);
-    my $theme_map = decode_json($json_text);
-    
-    # Normalize site name for lookup
-    $site_name = uc($site_name || 'DEFAULT');
-    
-    # Check if site exists in mapping, otherwise return default
-    my $theme = $theme_map->{sites}{$site_name} || 
-                $theme_map->{sites}{'DEFAULT'} || 
-                'default';
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-        'get_theme_from_json', "Selected theme for $site_name: $theme");
-    
-    return $theme;
+
+    try {
+        my $config = decode_json(read_file($json_path));
+        my $site_themes = $config->{site_themes} || {};
+        my $themes = $config->{themes} || {};
+        my $normalized_site = lc($site_name || 'default');
+        my $theme = $site_themes->{$normalized_site} || 'default';
+        $theme = 'default' unless exists $themes->{$theme};
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'get_theme_from_json', "Selected theme for $normalized_site: $theme");
+        return $theme;
+    }
+    catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'get_theme_from_json', "Error loading canonical theme definitions: $_");
+        return 'default';
+    };
 }
 
 # Enhanced theme validation method

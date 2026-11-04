@@ -41,14 +41,62 @@ Time (AppTime):
 # ---------------------------------------------------------------------------
 # Internal: compute duration hms between an open log's start_time and now.
 sub _duration_hms {
-    my ($raw_start, $now_hms) = @_;
+    my ($raw_start, $now_hms, $start_date, $today) = @_;
     $raw_start = defined $raw_start ? "$raw_start" : '';
     my $start_hms = ($raw_start =~ /^\d{1,2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
     my ($sh, $sm) = ($start_hms =~ /^(\d+):(\d+)/);
     my ($eh, $em) = ($now_hms   =~ /^(\d{2}):(\d{2})/);
-    my $dur_mins  = (($eh // 9) * 60 + ($em // 0)) - (($sh // 9) * 60 + ($sm // 0));
+
+    # Day count from the stored start_date. A log left open past midnight has an
+    # end clock time EARLIER than its start; treating that as "0 minutes" and
+    # flooring to 1 under-billed whole sessions (todo 2006, 2026-11-03: opened
+    # 15:39, closed 01:38, billed 1 minute). Days are always added now, so a same-day
+    # span adds nothing, a midnight crossing adds one day, a three-day span adds
+    # three - and the caller's stale guard then refuses to bill absurd spans.
+    my $days = 0;
+    if (defined $start_date && defined $today) {
+        my ($sy, $smo, $sd) = $start_date =~ /^(\d{4})-(\d{2})-(\d{2})/;
+        my ($ty, $tmo, $td) = $today      =~ /^(\d{4})-(\d{2})-(\d{2})/;
+        if (defined $sy && defined $ty) {
+            my $s_epoch = eval { require Time::Local; Time::Local::timegm(0, 0, 12, $sd, $smo - 1, $sy) };
+            my $t_epoch = eval { require Time::Local; Time::Local::timegm(0, 0, 12, $td, $tmo - 1, $ty) };
+            if (defined $s_epoch && defined $t_epoch) {
+                my $d = int(($t_epoch - $s_epoch) / 86400);
+                $days = $d if $d > 0;
+            }
+        }
+    }
+
+    my $dur_mins = (($eh // 9) * 60 + ($em // 0)) - (($sh // 9) * 60 + ($sm // 0))
+                 + ($days * 24 * 60);
     $dur_mins = 1 if !defined $dur_mins || $dur_mins <= 0;
     return (sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60), $dur_mins);
+}
+
+# Internal: close work logs whose todo is already done/closed. A todo at status 3
+# must never appear as having work in progress - the branch that finished the work
+# forgot to stop the clock (Shanta, 2026-11-04). Returns how many were reaped.
+sub reap_orphan_logs {
+    my ($class, $c) = @_;
+    return 0 unless $c;
+    my $dbh = eval { $c->model('DBEncy')->storage->dbh } or return 0;
+    my $rows = eval {
+        $dbh->selectall_arrayref(
+            "SELECT l.record_id FROM log l JOIN todo t ON t.record_id = l.todo_record_id
+              WHERE l.end_time = '00:00:00' AND l.status <> 3 AND t.status IN ('3','4')"
+        );
+    } || [];
+    my $n = 0;
+    for my $r (@$rows) {
+        my $ok = eval {
+            $dbh->do("UPDATE log SET end_time = start_time, time = '00:00:00', status = 3,
+                      comments = CONCAT(IFNULL(comments,''), '\nauto-closed: todo was already done') 
+                      WHERE record_id = ?", undef, $r->[0]);
+            1;
+        };
+        $n++ if $ok;
+    }
+    return $n;
 }
 
 # Internal: UTC clock for log writes + user-local ymd for last_mod day labels.
@@ -214,6 +262,8 @@ sub work_status {
 # ===========================================================================
 sub toggle_start {
     my ($class, $c, %args) = @_;
+    # Starting work is a good moment to clear clocks left open on finished todos.
+    __PACKAGE__->reap_orphan_logs($c);
     my $record_id = $args{record_id} or die "Missing record_id\n";
     my $username  = $args{username} // 'api';
     my $summary   = $args{summary} // '';
@@ -277,13 +327,140 @@ sub toggle_start {
     return $result;
 }
 
+# A recurring template is the clock. Stop/Done must not close it.
+# The log row for that calendar day is the lock.
+sub _is_occurrence_template {
+    my ($todo) = @_;
+    return 0 unless $todo;
+    return 1 if eval { $todo->is_recurring };
+    my $comments = eval { $todo->comments } // '';
+    return $comments =~ /hk_day_slot:/ ? 1 : 0;
+}
+
+sub occurrence_lock_marker {
+    my ($class, $date) = @_;
+    return undef unless defined $date && $date =~ /^(\d{4}-\d{2}-\d{2})$/;
+    return "occurrence_lock:$1";
+}
+
+sub locked_on_date {
+    my ($class, $c, $date, $ids) = @_;
+    my $marker = $class->occurrence_lock_marker($date) or return {};
+    my @ids = grep { defined $_ && $_ =~ /^\d+$/ } @{ $ids || [] };
+    return {} unless @ids && $c;
+    my $dbh = eval { $c->model('DBEncy')->storage->dbh };
+    return {} unless $dbh;
+    my $in = join(',', @ids);
+    my $sth = $dbh->prepare(
+        "SELECT DISTINCT todo_record_id FROM log WHERE comments LIKE ? AND todo_record_id IN ($in)"
+    );
+    $sth->execute('%' . $marker . '%');
+    my %locked;
+    while ( my ($id) = $sth->fetchrow_array ) {
+        $locked{$id} = 1;
+    }
+    return \%locked;
+}
+
+# Write one completed log for this calendar day. Do not change the template
+# status to done, and do not replace the template comments.
+sub lock_occurrence {
+    my ($class, $c, %args) = @_;
+    my $record_id = $args{record_id} or die "Missing record_id\n";
+    my $username  = $args{username} // 'api';
+    my $kind      = ($args{kind} // '') eq 'stop' ? 'stop' : 'done';
+    my ( $today, $now_hms ) = _clock($c);
+    my $lock_date = $class->occurrence_lock_marker($args{lock_date})
+        ? $args{lock_date}
+        : $today;
+    my $marker = $class->occurrence_lock_marker($lock_date);
+
+    my $result = try {
+        my ($dbh, $todo, $proj_code) = _todo_ctx($c, $record_id);
+        die "Not a recurring occurrence\n" unless _is_occurrence_template($todo);
+
+        my $existing = $dbh->selectrow_hashref(
+            'SELECT record_id FROM log WHERE todo_record_id=? AND comments LIKE ? LIMIT 1',
+            undef, $record_id, '%' . $marker . '%'
+        );
+        my $st = eval { $todo->status } // '';
+        if ("$st" eq '5') {
+            $dbh->do(
+                'UPDATE todo SET status=1, last_mod_by=?, last_mod_date=? WHERE record_id=?',
+                undef, $username, $today, $record_id
+            );
+            $st = 1;
+        }
+        if ($existing) {
+            return {
+                success => 1, already_locked => 1, locked => 1,
+                log_id => $existing->{record_id}, lock_date => $lock_date,
+                todo_status => $st,
+            };
+        }
+
+        my $summary = $args{summary} // '';
+        $summary = ($kind eq 'stop' ? 'Stopped' : 'Done')
+            . " $lock_date: " . ($todo->subject // '')
+            if $summary eq '';
+        $summary .= " [$args{note}]" if defined $args{note} && length $args{note};
+        my $log_comments = "$marker $kind\n$summary";
+
+        my $open_row = _open_log_row($dbh, $record_id);
+        if ($open_row) {
+            my ($dur_hms, $dur_mins) = _duration_hms(
+                $open_row->{start_time}, $now_hms, $open_row->{start_date}, $lock_date
+            );
+            # A log left open for half a day or more is not a work session: the
+            # window was closed instead of the clock. Record the close honestly and
+            # bill nothing rather than inventing hours (Shanta, 2026-11-04).
+            if ($dur_mins > 720) {
+                $log_comments .= "\nauto-closed stale log: $dur_mins min elapsed, 0 billed";
+                $dur_hms  = '00:00:00';
+                $dur_mins = 0;
+            }
+            $dbh->do(
+                'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, start_date=?, comments=? WHERE record_id=?',
+                undef, $now_hms, $dur_hms, $username, $today, $lock_date, $log_comments, $open_row->{record_id}
+            );
+            return {
+                success => 1, locked => 1, log_id => $open_row->{record_id},
+                lock_date => $lock_date, duration_mins => $dur_mins, todo_status => $st,
+            };
+        }
+
+        $dbh->do(
+            'INSERT INTO log (todo_record_id, username, sitename, project_code, abstract, details, start_date, due_date, start_time, end_time, time, status, priority, last_mod_by, last_mod_date, group_of_poster, comments) VALUES (?,?,?,?,?,?,?,?,?,?,?,3,?,?,?,?,?)',
+            undef,
+            $record_id, $username, (eval { $todo->sitename } || ''), $proj_code,
+            "Locked $lock_date: " . ($todo->subject // ''),
+            $summary,
+            $lock_date, $lock_date,
+            $now_hms, $now_hms, '00:01:00',
+            (eval { $todo->priority } // 5), $username, $today,
+            ($c->session->{group} || ''), $log_comments
+        );
+        my $new_id = $dbh->last_insert_id(undef, undef, 'log', 'record_id');
+        return {
+            success => 1, locked => 1, log_id => ($new_id // 0),
+            lock_date => $lock_date, duration_mins => 1, todo_status => $st,
+        };
+    } catch {
+        die $_;
+    };
+    return $result;
+}
+
 # ===========================================================================
 # PUBLIC: close_log — stop work WITHOUT marking done. Graceful when no log
 # is open (returns graceful flag; caller logs at warn, never error).
+# A recurring template is locked to lock_date (or viewer today) instead.
 #   { success, log_id, duration_mins, todo_status } or { success=>0, graceful=>1 }
 # ===========================================================================
 sub close_log {
     my ($class, $c, %args) = @_;
+    # A todo already at status 3 must never keep an open clock; sweep those first.
+    __PACKAGE__->reap_orphan_logs($c);
     my $record_id = $args{record_id} or die "Missing record_id\n";
     my $username  = $args{username} // 'api';
     my $summary   = $args{summary} // '';
@@ -301,6 +478,17 @@ sub close_log {
         }
         die $@ if $@;
         $todo or die "Todo not found\n";
+
+        if ( _is_occurrence_template($todo) ) {
+            return $class->lock_occurrence($c,
+                record_id => $record_id,
+                username  => $username,
+                summary   => $summary,
+                note      => $args{note},
+                lock_date => $args{lock_date},
+                kind      => 'stop',
+            );
+        }
 
         my $open_row = _open_log_row($dbh, $record_id);
         unless ($open_row) {
@@ -354,6 +542,17 @@ sub done_with_log {
 
     my $result = try {
         my ($dbh, $todo, undef) = _todo_ctx($c, $record_id);
+
+        if ( _is_occurrence_template($todo) ) {
+            return $class->lock_occurrence($c,
+                record_id => $record_id,
+                username  => $username,
+                summary   => $summary,
+                note      => $args{note},
+                lock_date => $args{lock_date},
+                kind      => 'done',
+            );
+        }
 
         my $done_summary = $summary ne '' ? $summary
                            : ('Done: ' . ($todo->subject // '') . " by $username");

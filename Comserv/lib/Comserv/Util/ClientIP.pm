@@ -76,12 +76,40 @@ sub is_trusted_proxy {
     return 0;
 }
 
+# 192.168/16 (the office LAN, OPNsense 192.168.1.1): the LAN a NAT gateway forwards Cloudflare
+# traffic from (ZeroTier 172.30.x and the Docker 172.16-29 ranges are handled
+# by is_trusted_proxy / stay untrusted).
+my @LAN_GATEWAY_V4 = qw(192.168.0.0/16);
+sub is_lan_gateway {
+    my ($class, $addr) = @_;
+    $addr = $class->normalize($addr);
+    return 0 unless defined $addr && $addr =~ /\./;
+    my $n = _ip4_num($addr);
+    for my $c (@{ $class->_cidrs(\@LAN_GATEWAY_V4) }) {
+        return 1 if ($n & $c->[1]) == $c->[0];
+    }
+    return 0;
+}
+
 # Pure function (used by the tests): ($address, $cf_connecting_ip, $x_forwarded_for)
 sub pick {
     my ($class, $addr, $cf, $xff) = @_;
     my $peer = $class->normalize($addr);
     return 'unknown' unless defined $peer;
-    return $peer unless $class->is_trusted_proxy($peer);
+    unless ($class->is_trusted_proxy($peer)) {
+        # Production path is client -> Cloudflare -> LAN gateway (OPNsense NAT,
+        # 192.168.1.1) -> app, so EVERY visitor arrives from the gateway's LAN
+        # address. Treating that as the client put all customers in one login /
+        # register throttle bucket: 30 bot failures (or 5 sign-ups an hour)
+        # locked everyone out. For a LAN-gateway peer, use CF-Connecting-IP
+        # (only that header - never X-Forwarded-For) when it is a valid public IP.
+        if ($class->is_lan_gateway($peer)) {
+            my $cfip = $class->normalize($cf);
+            return $cfip if defined $cfip && !$class->is_lan_gateway($cfip)
+                         && !$class->is_trusted_proxy($cfip);
+        }
+        return $peer;
+    }
     my $cfip = $class->normalize($cf);
     return $cfip if defined $cfip;
     if (defined $xff) {
