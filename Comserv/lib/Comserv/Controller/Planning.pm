@@ -1724,6 +1724,68 @@ full-page injection.
 
 =cut
 
+=head2 branch_sync
+
+GET C</planning/branch_sync> — JSON, read-only: the live git state of every worktree in
+C<root/config/worktrees.json> (current branch, commits ahead of / behind C<main>, uncommitted file count,
+merge-in-progress flag). It backs the Branch Servers card's Refresh button and its fill-on-load, so the card
+never has to be left and re-entered to see a branch move relative to main. Mutates nothing; a git failure becomes
+a C<missing> row or a zero count rather than an error page.
+
+=cut
+
+sub branch_sync :Path('/planning/branch_sync') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $roles = $c->stash->{user_roles} || $c->session->{roles} || [];
+    $roles = [$roles] unless ref $roles eq 'ARRAY';
+    my $can = $c->stash->{is_admin} || grep { lc($_) =~ /^(admin|developer|editor)$/ } @$roles;
+    unless ($can) {
+        $c->response->status(403);
+        return $c->response->body(encode_json({ success => 0, error => 'admin/developer role required' }));
+    }
+
+    require Comserv::Util::Git;
+    my $git  = Comserv::Util::Git->new(logging => $self->logging);
+    my $reg  = $git->worktree_branches;
+    my $base = $reg->{base_dir} // '';
+
+    my @out;
+    for my $key (sort keys %{ $reg->{branches} }) {
+        my $ent  = $reg->{branches}{$key};
+        my $port = ref $ent eq 'HASH' ? $ent->{port} : $ent;
+        my $dir  = (length $base ? "$base/$key/Comserv" : '');
+        my %row  = (
+            key   => $key,
+            port  => (defined $port && $port =~ /^\d+$/) ? $port + 0 : undef,
+            label => (ref $ent eq 'HASH' ? ($ent->{label} // $key) : $key),
+        );
+
+        # Not a checkout on this host (or the registry points somewhere that is not here).
+        unless (length $dir && -e "$dir/.git") { $row{missing} = 1; push @out, \%row; next; }
+
+        my $b = $git->_run($c, 'branch', '--show-current', { repo => $dir });
+        (my $branch = $b->{output} // '') =~ s/\s+\z//;
+        $row{branch} = length $branch ? $branch : undef;
+
+        $row{ahead} = $row{behind} = 0;
+        my $ab = $git->_run($c, 'rev-list', '--left-right', '--count', 'main...HEAD', { repo => $dir });
+        if ($ab->{success} && ($ab->{output} // '') =~ /^(\d+)\s+(\d+)/) {
+            $row{behind} = $1 + 0;   # in main, missing here
+            $row{ahead}  = $2 + 0;   # here, missing in main
+        }
+
+        my $st = $git->_run($c, 'status', '--porcelain', { repo => $dir });
+        $row{dirty} = scalar( grep { /\S/ } split /\n/, ($st->{output} // '') );
+        $row{merge_in_progress} = Comserv::Util::Git::_worktree_merge_in_progress($dir) ? 1 : 0;
+
+        push @out, \%row;
+    }
+
+    return $c->response->body(encode_json({ success => 1, branches => \@out }));
+}
+
 sub daily_priorities :Path('/planning/daily-priorities') :Args {
     my ($self, $c, @args) = @_;
     # Populate the same stash daily_impl builds (focus queue, remaining, etc.)
