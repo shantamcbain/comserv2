@@ -55,4 +55,15 @@ is($P->from_c(FC->new(FReq->new(address => '203.0.113.9', h => { 'CF-Connecting-
 is($P->from_c(FC->new(FReq->new(address => '127.0.0.1',   h => { 'CF-Connecting-IP' => '1.2.3.4' }))), '1.2.3.4',     'from_c: trusted proxy');
 is($P->from_c(FC->new(FReq->new(address => '127.0.0.1',   h => {}))), '127.0.0.1', 'from_c: no headers');
 is($P->from_c(undef), 'unknown', 'from_c: no context');
+# 4. LAN-gateway peer (prod: Cloudflare -> OPNsense NAT 192.168.1.1 -> app): every
+#    visitor must not share one throttle bucket. CF-Connecting-IP only, never XFF.
+is($P->pick('192.168.1.1', '198.51.100.77', undef),         '198.51.100.77', 'LAN gateway: CF-Connecting-IP used');
+is($P->pick('::ffff:192.168.1.1', '198.51.100.78', undef),  '198.51.100.78', 'LAN gateway (v4-mapped): CF-Connecting-IP used');
+is($P->pick('192.168.1.1', undef, '198.51.100.79'),         '192.168.1.1',   'LAN gateway: XFF alone ignored');
+is($P->pick('192.168.1.1', '127.0.0.1', undef),             '192.168.1.1',   'LAN gateway: CF header claiming localhost ignored');
+is($P->pick('192.168.1.1', '192.168.1.199', undef),         '192.168.1.1',   'LAN gateway: CF header claiming LAN ignored');
+is($P->pick('192.168.1.1', 'garbage', undef),               '192.168.1.1',   'LAN gateway: bad CF header ignored');
+isnt($P->pick('192.168.1.1', '203.0.113.1', undef), $P->pick('192.168.1.1', '203.0.113.2', undef), 'LAN gateway: two visitors get two buckets');
+is($P->pick('172.30.131.126', '198.51.100.80', undef),      '172.30.131.126','ZeroTier peer still untrusted');
+
 done_testing;

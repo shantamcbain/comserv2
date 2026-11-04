@@ -1,0 +1,37 @@
+[% PageVersion = 'calendar/subscribe.tt,v 0.01 2026/11/04 csc Exp - Calendar feed subscribe URL (phase 1)' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+<div class="container" style="max-width:820px;padding:12px;">
+  <h2>Subscribe to my calendar</h2>
+  <p>Add your Comserv todos to Thunderbird, the Comserv Android app or another calendar.
+     The link is private: anyone who has it can read <strong>your own</strong> todos (read only).
+     Reminders you set on a todo come through as calendar alarms.</p>
+  [% IF status_msg %]<div class="alert alert-success">[% status_msg | html %]</div>[% END %]
+  [% IF error_msg %]<div class="alert alert-danger">[% error_msg | html %]</div>[% END %]
+  [% IF transport_note %]<div class="alert alert-warning">[% transport_note | html %]</div>[% END %]
+
+  [% IF feed_url %]
+  <div class="card" style="padding:10px;margin-bottom:12px;">
+    <label for="cal-feed-url"><strong>Your feed link (shown once):</strong></label>
+    <div style="display:flex;gap:6px;">
+      <input id="cal-feed-url" type="text" readonly value="[% feed_url | html %]" style="flex:1;font-family:monospace;">
+      <button type="button" class="btn btn-primary" onclick="var i=document.getElementById('cal-feed-url');i.select();if(navigator.clipboard){navigator.clipboard.writeText(i.value);}this.textContent='Copied';">Copy</button>
+    </div>
+    <small>Thunderbird: File &rarr; New &rarr; Calendar &rarr; On the Network &rarr; paste this link.</small>
+  </div>
+  [% END %]
+
+  <p>[% IF has_token %]You have an active feed link[% FOREACH t IN token_info %] (created [% t.created_at | html %][% IF t.last_used_at %], last used [% t.last_used_at | html %][% END %])[% END %].
+     It cannot be shown again; make a new one if you lost it.[% ELSE %]You have no active feed link.[% END %]</p>
+
+  <form method="post" action="/calendar/subscribe" style="display:inline;">
+    <input type="hidden" name="action" value="regenerate">
+    <button type="submit" class="btn btn-primary">[% IF has_token %]Make a new link (old one stops working)[% ELSE %]Make my feed link[% END %]</button>
+  </form>
+  [% IF has_token %]
+  <form method="post" action="/calendar/subscribe" style="display:inline;" onsubmit="return confirm('Stop the current feed link now?');">
+    <input type="hidden" name="action" value="revoke">
+    <button type="submit" class="btn btn-outline-danger">Revoke link</button>
+  </form>
+  [% END %]
+  <p style="margin-top:14px;"><a href="/calendar/clients">My calendars and devices</a> &middot; <a href="/todo/month">Back to calendar</a></p>
+</div>

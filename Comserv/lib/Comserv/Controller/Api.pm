@@ -589,11 +589,7 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         sort_order todo_type billable estimated_man_hours comments
         company_code time_of_day scheduled_date scheduled_start scheduled_end
         plan_id point_rate role_category is_fixed is_recurring
-<<<<<<< HEAD
         recurrence_rule creator_timezone
-=======
-        recurrence_rule
->>>>>>> healthkitchen
     );
 
     my %create = (
@@ -1880,11 +1876,8 @@ sub api_todo_update :Path('todo/update') :Args(0) {
         developer owner reporter company_code
         parent_id parent_todo sort_order is_blocking blocked_by_todo_id
         plan_id share billable todo_type
-<<<<<<< HEAD
+        time_of_day scheduled_start scheduled_end is_fixed is_recurring
         recurrence_rule creator_timezone
-=======
-        time_of_day scheduled_start scheduled_end is_fixed is_recurring recurrence_rule
->>>>>>> healthkitchen
     );
     my @nullable = qw(parent_id blocked_by_todo_id plan_id scheduled_date comments recurrence_rule creator_timezone);
 

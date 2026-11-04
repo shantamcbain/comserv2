@@ -36,37 +36,50 @@ sub COMPONENT {
     }
 
     # Use RemoteDB to select the best connection for 'shanta_forager' database
+    # Production/staging: wait for the real DB (MariaDB may still be booting
+    # after a power blip) and never fall back to SQLite. If it is still not
+    # reachable after <DBReadiness> startup_wait_s, die so plackup exits
+    # non-zero and Docker (restart: unless-stopped) restarts the container.
+    require Comserv::Util::DbReadiness;
+    my $is_prod = Comserv::Util::DbReadiness->is_production;
     my $connection_info;
-    eval {
-        $connection_info = $remote_db->get_connection_info('shanta_forager');
-    };
+    if ($is_prod) {
+        my $ready = Comserv::Util::DbReadiness->settings(eval { $app->config } || {});
+        $connection_info = Comserv::Util::DbReadiness->wait_for(
+            sub {
+                my $ci = $remote_db->get_connection_info('shanta_forager');
+                die "only a SQLite connection is configured\n"
+                    if $ci && (($ci->{config}{db_type} // '') =~ /sqlite/i);
+                $ci;
+            },
+            timeout  => $ready->{startup_wait_s},
+            on_retry => sub {
+                my ($n, $err, $delay) = @_;
+                $err = defined $err ? $err : ''; $err =~ s/\s+\z//;
+                warn "DBForager: database 'shanta_forager' not reachable (attempt $n: $err); retrying in ${delay}s\n";
+            },
+        );
+        die "DBForager FATAL: database 'shanta_forager' not reachable after $ready->{startup_wait_s}s in "
+          . "production; refusing SQLite fallback (exiting so Docker restarts the container)\n"
+            unless $connection_info;
+    } else {
+        eval {
+            $connection_info = $remote_db->get_connection_info('shanta_forager');
+        };
+    }
 
-    # Fallback to SQLite if primary connections fail
+    # Same rule as DBEncy: MariaDB only. Do not open a local SQLite file.
     if ($@ || !$connection_info) {
         my $error = $@ || "No connection info returned from RemoteDB";
-        
-        # Write error to STDERR for debugging  (bypasses logging system if broken)
-        warn "\n=== DBForager CRITICAL ERROR ===\n";
-        warn "Failed to get connection from RemoteDB\n";
-        warn "Error: $error\n";
-        warn "===============================\n\n";
-        
-        $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
-            "DBForager CRITICAL: Failed to get connection from RemoteDB: $error");
-        $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
-            "DBForager CRITICAL: Falling back to SQLite offline mode - APPLICATION WILL HAVE LIMITED FUNCTIONALITY");
-        
-        # Create a fallback SQLite connection
-        $connection_info = {
-            connection_name => 'sqlite_forager_fallback',
-            config => {
-                db_type => 'sqlite',
-                database_path => 'data/forager_offline.db',
-                description => 'SQLite Fallback - Forager Database (offline mode)',
-                priority => 999
-            },
-            database_name => 'shanta_forager'
-        };
+        $logger->log_with_details(undef, 'critical', __FILE__, __LINE__, 'COMPONENT',
+            "DBForager CRITICAL: no MariaDB connection for shanta_forager: $error");
+        die "DBForager: no MariaDB connection for shanta_forager: $error";
+    }
+    if (($connection_info->{config}{db_type} // '') =~ /^sqlite$/i) {
+        my $name = $connection_info->{connection_name} // 'unknown';
+        $logger->log_with_details(undef, 'critical', __FILE__, __LINE__, 'COMPONENT',
+            "DBForager CRITICAL: refused SQLite connection '$name'; application database is MariaDB only");
+        die "DBForager: refused SQLite connection '$name'";
     }
 
     # Extract connection details from RemoteDB
@@ -149,6 +162,7 @@ sub COMPONENT {
             : (mysql_auto_reconnect => 1);  # mysql fallback: DBD::mysql attr name
         $connect_info = {
             dsn => $dsn,
+            AutoInactiveDestroy => 1,   # forked children never close the parent's socket
             user => $conn->{username},
             password => $conn->{password},
             %driver_attrs,

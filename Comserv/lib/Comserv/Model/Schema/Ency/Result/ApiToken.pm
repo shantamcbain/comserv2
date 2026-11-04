@@ -74,6 +74,13 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
         documentation => '1 = token may only touch records its user owns; NULL/0 = inherit',
     },
+    # Calendar feed (Nov 2026): last client IP that used the token. Not in the
+    # default select list below, written only inside eval (works before Schema Compare).
+    last_used_ip => {
+        data_type => 'varchar',
+        size => 45,
+        is_nullable => 1,
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
