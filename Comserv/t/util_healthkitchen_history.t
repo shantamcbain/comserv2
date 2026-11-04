@@ -23,10 +23,14 @@ ok( !eval { $bad->_enc('secret'); 1 }, 'encryption failure dies instead of stori
 # input cleaning: private by default
 my $h = $hk->_clean_history_args( { entry_type => 'bogus', visibility => 'public', label => '  Gout ', ency_disease_id => 'x' } );
 is( $h->{entry_type}, 'condition', 'unknown type -> condition' );
-is( $h->{visibility}, 'private', 'visibility private unless site_admin' );
+is( $h->{visibility}, 'private', 'visibility is always private' );
 is( $h->{label}, 'Gout', 'label trimmed' );
 ok( !defined $h->{ency_disease_id}, 'non-numeric id dropped' );
-is( $hk->_clean_history_args( { visibility => 'site_admin' } )->{visibility}, 'site_admin', 'explicit share kept' );
+is( $hk->_clean_history_args( { visibility => 'site_admin' } )->{visibility}, 'private', 'site-admin share is not a grant' );
+my $chart = $hk->chart_document( { birth_year => '1955', allergies => ' peanut ', week_goal => 'steady energy' } );
+is( $chart->{doc}{birth_year}, '1955', 'chart keeps a birth year' );
+is( $chart->{doc}{allergies}, 'peanut', 'chart trims allergies' );
+ok( $hk->chart_document( { birth_year => '55' } )->{error}, 'bad birth year rejected' );
 
 # matching inputs
 my $in = $hk->history_matching_inputs( [

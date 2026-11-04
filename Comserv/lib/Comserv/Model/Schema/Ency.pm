@@ -121,6 +121,12 @@ __PACKAGE__->register_class('HealthKitchen::IntakeLog',     'Comserv::Model::Sch
 __PACKAGE__->register_class('HealthKitchen::HealthConsent', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::HealthConsent');
 __PACKAGE__->register_class('HealthKitchen::HealthHistory', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::HealthHistory');
 __PACKAGE__->register_class('HealthKitchen::HealthAudit', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::HealthAudit');
+__PACKAGE__->register_class('HealthKitchen::UserHealthPlan', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserHealthPlan');
+__PACKAGE__->register_class('HealthKitchen::UserMealSlot', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserMealSlot');
+__PACKAGE__->register_class('HealthKitchen::UserHealthActivity', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserHealthActivity');
+__PACKAGE__->register_class('UserHealthPlan', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserHealthPlan');
+__PACKAGE__->register_class('UserMealSlot', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserMealSlot');
+__PACKAGE__->register_class('UserHealthActivity', 'Comserv::Model::Schema::Ency::Result::HealthKitchen::UserHealthActivity');
 
 # Register Inventory system classes
 __PACKAGE__->register_class('InventoryItem', 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItem');

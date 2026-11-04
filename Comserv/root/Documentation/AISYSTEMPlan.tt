@@ -4,8 +4,8 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "planning,ai"
-   page_version = "1.05"
-   last_updated = "2026-10-01"
+   page_version = "1.06"
+   last_updated = "2026-11-02"
    site_specific = "false"
    project_id = "280"
    project_code = "AISYSTEM"
@@ -628,6 +628,36 @@
                 <li>Effectiveness card "replace" excluded, "watch" demoted (same verdict code, not recomputed).</li>
                 <li>Never free→paid past the soft caps (spend from <code>ai_usage_logs</code> via DBIx::Class, excluding <code>_api_snapshot</code>); Super Grok guard lock respected.</li>
                 <li>Everything exhausted → honest message, Ledger status <code>all_exhausted</code>, reason <code>all_exhausted</code>. No invented content.</li>
+            </ul>
+
+            <h3 class="doc-h3">Trials, probation, and the overrun guard (2026-11-02)</h3>
+            <ul class="doc-body">
+                <li>State per model: <code>data/ai_trials/&lt;name&gt;.state.json</code> —
+                    <code>name</code>, <code>model</code>, a spend baseline (<code>balance_usd</code> / <code>day_usd</code> /
+                    <code>week_usd</code> / <code>month_usd</code> captured at <code>baseline_at</code>), <code>last_spent</code>,
+                    <code>tasks_done</code>, and <code>stopped</code> / <code>stopped_at</code> when the trial ended.
+                    <code>script/ai_trial.pl</code> is the only writer; the files are append-only snapshots, so the newer
+                    state always wins a merge (see <a href="[% c.uri_for('/Documentation/system/git_worktree_merge_plan') %]" class="doc-link">the merge plan</a>).</li>
+                <li><code>HermesOverrunGuard::trial_flags</code> reads those files <em>directly</em>, never through a fresh
+                    OpenRouter reading or <code>state.db</code>. Reason: <code>trial_tick</code> only runs with an ok reading
+                    and returns early when <code>state.db</code> is unreadable, which used to drop the active probation model
+                    from <code>trial_active</code> and flag it as an enforcement offender. A malformed state file is logged and
+                    skipped, never fatal.</li>
+                <li>Trip/restore hysteresis: a tripped guard is restored only after <code>$CLEAR_RUNS</code> consecutive runs
+                    whose reading is authoritative and under every cap (<code>clear_streak</code>). A
+                    <code>live_only</code> / <code>stale</code> reading (agent.log day estimate with no week or month figure) may
+                    still <em>trip</em> the guard but can never <em>clear</em> one — that is what let the guard un-trip while the
+                    day was still $6.31 over $3.</li>
+                <li>Chain composition rule: the paid steps of <code>hermes_fallback_chain</code> may hold probation/trial models
+                    <em>and other probation models</em>, never an ordinary paid OpenRouter step while Super Grok is unavailable.</li>
+                <li>Current default chain (Nov 2 2026): <code>supergrok|grok-4.7</code> →
+                    <code>openrouter|particle-ai/particle-1</code> (probation) → <code>xai|grok-4.7</code> →
+                    <code>openrouter|openai/gpt-5.6-luna</code> (probation, stop reached) →
+                    <code>openrouter|cohere/north-mini-code:free</code>. <code>gpt_56_luna</code> is
+                    <strong>stopped</strong> at 10 of 10 sessions awaiting audit approval; <code>kimi_k27_code</code> stopped on the
+                    spend cap. <code>opencode-free</code> is dead for agent use and must not appear in any chain.</li>
+                <li><code>data/ai_trials/</code> is now gitignored. The three existing state files are still tracked, so a
+                    deliberate state change needs <code>git add -f</code>; untracking them is a separate decision.</li>
             </ul>
 
             <h3 class="doc-h3">Ledger and usage_live</h3>

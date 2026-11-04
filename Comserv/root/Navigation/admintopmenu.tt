@@ -40,6 +40,7 @@
                 <a href="/navigation/add_link?menu=Admin&amp;category=Admin_links&amp;submenu=admin_links&amp;return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Admin Link</a>
                 <a href="/admin/site_modules"><i class="icon-settings"></i>Site Modules</a>
                 <a href="/admin/site_modules/approval_queue"><i class="icon-settings"></i>Add-on Approval Queue</a>
+                [% IF c.stash.is_global_admin %]<a href="/admin/role_permissions"><i class="icon-settings"></i>Role Permissions</a>[% END %]
                 <a href="/admin/docker-containers"><i class="icon-docker"></i>Docker Containers</a>
                 <a href="/admin/docker-containers-old"><i class="icon-docker"></i>Docker Containers (Old)</a>
                 <a href="/planning/daily"><i class="icon-calendar"></i>Daily Plan</a>
@@ -340,6 +341,7 @@
                     <a href="/site/list_domains"><i class="icon-domain"></i>All Sites</a>
                     <a href="/admin/site_modules"><i class="icon-settings"></i>Site Modules</a>
                     <a href="/admin/site_modules/approval_queue"><i class="icon-settings"></i>Add-on Approval Queue</a>
+                    [% IF c.stash.is_global_admin %]<a href="/admin/role_permissions"><i class="icon-settings"></i>Role Permissions</a>[% END %]
                 </div>
                 
                 <!-- System Configuration -->
@@ -430,6 +432,9 @@
                 <a href="/admin/users"><i class="icon-user-admin"></i>User Administration</a>
                 [% IF c.session.roles.grep('admin').size %]
                     <a href="/user/add_user"><i class="icon-add"></i>Add New User</a>
+                [% END %]
+                [% IF c.stash.is_global_admin %]
+                    <a href="/admin/role_permissions"><i class="icon-settings"></i>Role Permissions</a>
                 [% END %]
             </div>
         </div>
