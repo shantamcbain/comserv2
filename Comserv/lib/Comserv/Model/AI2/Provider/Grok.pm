@@ -210,16 +210,12 @@ sub resolve_prepaid_key {
         return $self->_remember_source('supergrok_file', $k) if $k;
     }
     my $schema = eval { $c && $c->model('DBEncy')->schema } or return undef;
-    my $uid = eval { $c->session->{user_id} };
+    # Oct 30 2026: was "first active row of ANY user" (could pick another user's own key). Now the shared lookup:
+    # own row -> site row -> owner/system row.
+    require Comserv::Util::AI::UserKeys;
     for my $svc (qw(supergrok xai-oauth)) {
-        my $key_obj = $schema->resultset('UserApiKeys')->search(
-            { service => $svc, is_active => '1' }
-        )->first;
-        $key_obj ||= $uid ? $schema->resultset('UserApiKeys')->search(
-            { user_id => $uid, service => $svc, is_active => '1' }
-        )->first : undef;
-        next unless $key_obj && $key_obj->api_key_encrypted;
-        my $dbk = eval { $key_obj->get_api_key() } || next;
+        my $r = Comserv::Util::AI::UserKeys->get_user_key($c, $svc, schema => $schema, allow_owner => 1);
+        my $dbk = $r->{key} or next;
         return $self->_remember_source('db_supergrok', $dbk);
     }
     return undef;

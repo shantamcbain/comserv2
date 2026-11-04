@@ -50,6 +50,7 @@ use constant DEFAULT_SOURCE    => 'AI usage monitor';
 use constant TODO_PROJECT_CODE => 'AISYSTEM';
 use constant MAX_PROPOSALS     => 50;
 use constant MAX_MARKDOWN      => 1_000_000;
+use constant METRIC_SECTIONS   => qw(app chat bot grok_bot openrouter hermes super_grok supergrok helpdesk failover trend ops thrash safe_auto_fixes data_sources);
 use constant MIN_TOKEN_LEN     => 16;
 use constant TOKEN_ENV         => 'AI_EVAL_INGEST_TOKEN';
 use constant TOKEN_FILE_NAME   => 'ai_eval_ingest_token';
@@ -224,6 +225,13 @@ sub validate_payload {
         $metrics = ref $data->{metrics_json} ? $data->{metrics_json}
                  : eval { JSON->new->decode($data->{metrics_json}) };
         push @err, 'metrics_json is not valid JSON' unless defined $metrics;
+    }
+    # Nov 3 2026: the daily_eval routine sends its numbers as top-level sections
+    # (app/openrouter/grok_bot/...) instead of under "metrics"; keep them as metrics
+    # so the list columns and detail view are filled.
+    if (!defined $metrics) {
+        my %sec = map { ref $data->{$_} eq 'HASH' ? ($_ => $data->{$_}) : () } METRIC_SECTIONS;
+        $metrics = \%sec if %sec;
     }
     if (defined $metrics) {
         if (ref $metrics eq 'HASH') {
@@ -443,17 +451,26 @@ sub flatten_metrics {
 sub _dig { my ($h, @p) = @_; for (@p) { return undef unless ref $h eq 'HASH'; $h = $h->{$_} } return $h }
 
 # A few headline numbers for the list view / usage card.
+sub _num { my $v = shift; return (defined $v && !ref $v && $v =~ /^-?\d+(?:\.\d+)?$/) ? $v : undef }
+sub _first { for (@_) { return $_ if defined } undef }
+
+# Accepts both the original layout (bot/chat) and the daily_eval routine's layout
+# (grok_bot.latest_pct used, app.real_calls/ok) - Nov 3 2026.
 sub key_metrics {
     my ($self, $m) = @_;
+    my $bot_used = _num(_first(_dig($m, qw(grok_bot latest_pct)), _dig($m, qw(grok_bot plan_usage_pct))));
+    my $bot_left = _first(_num(_dig($m, qw(bot percent_left))), _num(_dig($m, qw(grok_bot percent_left))),
+                          (defined $bot_used ? sprintf('%g', 100 - $bot_used) : undef),
+                          _num(_dig($m, qw(bot spoken_percent_left))));
     return {
-        bot_pct_left       => _dig($m, qw(bot percent_left)),
+        bot_pct_left       => $bot_left,
         openrouter_balance => _dig($m, qw(openrouter balance_usd)),
         openrouter_month   => _dig($m, qw(openrouter month_usd)),
-        chat_calls         => _dig($m, qw(chat calls)),
-        chat_usable        => _dig($m, qw(chat usable)),
-        chat_zero_token    => _dig($m, qw(chat zero_token_ok)),
-        chat_404           => _dig($m, qw(chat http_404)),
-        hermes_sessions    => _dig($m, qw(hermes sessions)),
+        chat_calls         => _first(_dig($m, qw(chat calls)), _dig($m, qw(app real_calls))),
+        chat_usable        => _first(_dig($m, qw(chat usable)), _dig($m, qw(app ok))),
+        chat_zero_token    => _first(_dig($m, qw(chat zero_token_ok)), _dig($m, qw(app zero_token_ok))),
+        chat_404           => _first(_dig($m, qw(chat http_404)), _dig($m, qw(app http_404))),
+        hermes_sessions    => _first(_dig($m, qw(hermes sessions)), _dig($m, qw(hermes sessions_1d))),
     };
 }
 

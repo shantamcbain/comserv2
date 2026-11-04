@@ -18,7 +18,7 @@ use Time::Local qw(timelocal);
 our @CONSUMERS = (
     { id => 'grok_bot',   label => 'Grok Bot',   unit => '%', cycle_days => 7 },
     { id => 'supergrok',  label => 'Super Grok', unit => '%', cycle_days => 7 },
-    { id => 'openrouter', label => 'OpenRouter (Hermes, app, AI editor)', unit => '$', cycle_days => 7, cap => 11.50 },
+    { id => 'openrouter', label => 'OpenRouter (Hermes, app, AI editor)', unit => '$', cycle_days => 7, cap => (eval { require Comserv::Util::AI::ModelChains; Comserv::Util::AI::ModelChains->channel_caps(undef, 'openrouter')->{week} } // 0) },   # shared ~/.comserv/ai_caps.json
     { id => 'ollama',     label => 'Ollama (local)', unit => 'calls', cycle_days => 7 },
 );
 our %CONSUMER = map { ($_->{id} => $_) } @CONSUMERS;

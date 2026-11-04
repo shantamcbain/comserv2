@@ -8,11 +8,15 @@ use Data::Dumper;
 use JSON::MaybeXS;
 use Comserv::Util::Logging;
 use Comserv::Util::AccessControl;
+use Comserv::Util::AccessCheck;
 use Comserv::Util::ApiTokenValidator;
 use Comserv::Util::PointSystem;
 use Comserv::Util::Priority ();
 use Comserv::Util::ProjectDependencies;
 use Comserv::Util::TodoLog;
+use Comserv::Util::UserPreferences;
+use Comserv::Util::CalendarFeed;
+use Comserv::Util::TodoDescription;
 use Comserv::Util::TodoRanking;
 use Comserv::Util::TodoTypes qw(recurring_matches_date is_valid_todo_type);
 BEGIN { extends 'Catalyst::Controller'; }
@@ -214,17 +218,85 @@ sub _get_user_accessible_sites {
     return @sites ? \@sites : [$c->session->{SiteName}];
 }
 
+# Saved subset of the user's SiteNames (pref calendar.visible_sites), limited to
+# the sites the user really has ($all_sites). Empty list = no preference.
+sub _calendar_visible_sites {
+    my ($self, $c, $all_sites) = @_;
+    my $uid = $c->session->{user_id} or return [];
+    my $pref = eval { Comserv::Util::UserPreferences->new->get($c, $uid, 'calendar.visible_sites') };
+    return [] unless ref $pref eq 'ARRAY' && @$pref;
+    my %mine = map { $_ => 1 } @{ $all_sites || [] };
+    return [ grep { $mine{$_} } @$pref ];
+}
+
 sub _get_filtered_calendar_sites {
     my ($self, $c, $all_sites) = @_;
     my $session = $c->session;
     my $saved_filter = $session->{cal_filter_site} // '';
+    # One todo, many sites (Nov 2026): with no single-site filter picked, show the
+    # subset of the user's own SiteNames saved in user prefs (calendar.visible_sites),
+    # so a todo is filed once and shows on every site the user follows.
+    unless ($saved_filter) {
+        my $vis = $self->_calendar_visible_sites($c, $all_sites);
+        return $vis if @$vis;
+    }
     my $filter_site = $saved_filter ? $saved_filter : ($session->{SiteName} || '');
     return $all_sites unless $filter_site && $filter_site ne '';
     return (grep { $_ eq $filter_site } @$all_sites) ? [$filter_site] : $all_sites;
 }
 
+# Web guard for JSON todo actions: loads the stored todo, runs AccessCheck for its
+# site and owner. Returns 1, or sends {"ok":0,...} with 403 and returns 0.
+sub _web_todo_guard {
+    my ($self, $c, $record_id, $action, $legacy) = @_;
+    my $todo = (defined $record_id && !ref $record_id && $record_id =~ /^\d+$/)
+        ? eval { $c->model('DBEncy')->resultset('Todo')->find($record_id) } : undef;
+    my $acc = Comserv::Util::AccessCheck->check_session($c, module => 'todo', action => $action,
+        record => $todo, ($todo ? (sitename => ($todo->sitename // '')) : ()), legacy_roles => $legacy);
+    return 1 if $acc->{ok};
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_web_todo_guard',
+        "Todo $action refused ($acc->{code}) for " . ($c->session->{username} // 'Guest'));
+    $c->response->status(403);
+    $c->response->content_type('application/json');
+    $c->response->body(JSON::MaybeXS::encode_json({ ok => 0, success => 0, error => $acc->{error} || 'Not allowed' }));
+    return 0;
+}
+
+# Page version: on refusal flash the reason and redirect (detaches).
+sub _web_todo_guard_page {
+    my ($self, $c, $record_id, $action, $legacy, $back) = @_;
+    my $todo = (defined $record_id && !ref $record_id && $record_id =~ /^\d+$/)
+        ? eval { $c->model('DBEncy')->resultset('Todo')->find($record_id) } : undef;
+    my $acc = Comserv::Util::AccessCheck->check_session($c, module => 'todo', action => $action,
+        record => $todo, ($todo ? (sitename => ($todo->sitename // '')) : ()), legacy_roles => $legacy);
+    return 1 if $acc->{ok};
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_web_todo_guard_page',
+        "Todo $action refused ($acc->{code}) for " . ($c->session->{username} // 'Guest'));
+    $c->flash->{error_msg} = $acc->{error} || 'You do not have permission for this todo.';
+    $c->response->redirect($c->uri_for($back || '/todo'));
+    $c->detach();
+}
+
+# Site-level check (no single record): create on a target site, bulk actions.
+sub _web_site_guard {
+    my ($self, $c, $action, $sitename, $legacy) = @_;
+    return Comserv::Util::AccessCheck->check_session($c, module => 'todo', action => $action,
+        (defined $sitename && $sitename ne '' ? (sitename => $sitename) : ()), legacy_roles => $legacy);
+}
+
+# own_only read (role_permissions): the caller sees only their own todos.
+sub _own_only_user {
+    my ($self, $c) = @_;
+    my $acc = $c->stash->{todo_access} or return undef;
+    return undef unless $acc->{ok} && $acc->{own_only};
+    return { user_id => $c->session->{user_id}, username => $c->session->{username} };
+}
+
 sub _apply_user_filter {
     my ($self, $c, $todos) = @_;
+    if (my $u = $self->_own_only_user($c)) {
+        $todos = [ grep { Comserv::Util::AccessCheck->owns('todo', $_, $u) } @$todos ];
+    }
     my $filter_user = $c->session->{cal_filter_user} // '';
     return $todos unless $filter_user && $filter_user ne '';
     my @filtered = grep {
@@ -274,8 +346,13 @@ sub begin :Private {
         $c->detach;
     }
 
-    # Check if the user has the 'admin' or 'developer' role
-    unless (grep { $_ eq 'admin' || $_ eq 'developer' } @$roles) {
+    # Shared data-driven check (Comserv::Util::AccessCheck): admin/developer pass;
+    # while role_permissions is empty only admin/developer pass (old behaviour);
+    # once it has rows, a user_site_roles role with a todo/read row passes too.
+    my $acc = Comserv::Util::AccessCheck->check_session($c, module => 'todo', action => 'read',
+        legacy_roles => [qw(admin developer)]);
+    $c->stash(todo_access => $acc);
+    unless ($acc->{ok}) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
 
         # Stash the current path for potential use
@@ -438,6 +515,9 @@ sub todo :Path('/todo') :Args(0) {
 
     # Fetch todos with the applied filters (no DB ordering — we rank in Perl
     # via the shared TodoRanking score so the main list matches the Focus Queue).
+    if (my $u = $self->_own_only_user($c)) {
+        $search_conditions = { -and => [ $search_conditions, Comserv::Util::AccessCheck->own_where('todo', $u) ] };
+    }
     my @todos = $rs->search(
         $search_conditions,
         { order_by => { -asc => ['record_id'] } }
@@ -539,6 +619,8 @@ sub details :Path('/todo/details') :Args {
 
     # Fetch the todo with the given record_id
     my $todo = $rs->find($record_id);
+    # The stored record's site and owner decide (not just the request site).
+    $self->_web_todo_guard_page($c, $record_id, 'read', [qw(admin developer)]) if $todo;
 
     # Check if the todo was found
     if (defined $todo) {
@@ -626,6 +708,8 @@ sub details :Path('/todo/details') :Args {
             todo_intervals    => \@intervals,
             ai_conversations  => \@ai_conversations,
             error_source      => \%error_source,
+            reminder_offsets  => (Comserv::Util::CalendarFeed->load_reminders($c->model('DBEncy'), $todo->record_id)->{$todo->record_id} || []),
+            reminder_human    => Comserv::Util::CalendarFeed->offsets_human(Comserv::Util::CalendarFeed->load_reminders($c->model('DBEncy'), $todo->record_id)->{$todo->record_id}),
             return_to         => $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo')),
         );
 
@@ -655,6 +739,14 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
     $self->logging->log_with_details(
         $c, 'info', __FILE__, __LINE__, 'addtodo', 'Initiating addtodo subroutine'
     );
+    {
+        my $acc = $self->_web_site_guard($c, 'create', undef, [qw(admin developer)]);
+        unless ($acc->{ok}) {
+            $c->flash->{error_msg} = $acc->{error} || 'You may not add todos on this site.';
+            $c->response->redirect($c->uri_for('/todo'));
+            $c->detach();
+        }
+    }
 
     # Fetch project data from the Project Controller
     my $project_controller = $c->controller('Project');
@@ -744,6 +836,7 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         time_of_day     => $c->request->params->{time_of_day},
         sites           => $add_sites,
         is_csc          => $add_is_csc,
+        description_template => Comserv::Util::TodoDescription->template,
         template        => 'todo/addtodo.tt'
     );
 
@@ -755,6 +848,15 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
 
 sub debug :Local {
     my ($self, $c) = @_;
+
+    # Dev-only diagnostic: development server (CATALYST_ENV=development) AND a
+    # global admin (stored users.roles). Anything else gets a plain 404.
+    unless (($ENV{CATALYST_ENV} // '') eq 'development'
+            && Comserv::Util::AccessCheck->is_global_admin($c->model('DBEncy'), $c->session->{user_id})) {
+        $c->response->status(404);
+        $c->response->body('Not found');
+        return;
+    }
 
     # Print the @INC path
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', "INC: " . join(", ", @INC));
@@ -771,6 +873,7 @@ sub debug :Local {
 
 sub edit :Path('/todo/edit') :Args(1) {
     my ($self, $c, $record_id) = @_;
+    $self->_web_todo_guard_page($c, $record_id, 'update', [qw(admin developer)], '/todo/details?record_id=' . (($record_id // '') =~ /^(\d+)$/ ? $1 : ''));
 
     # Log the entry into the edit action
     $self->logging->log_with_details(
@@ -877,6 +980,8 @@ sub edit :Path('/todo/edit') :Args(1) {
 
     $c->stash(
         record           => $todo,
+        reminder_offsets_str => join(',', @{ Comserv::Util::CalendarFeed->load_reminders($c->model('DBEncy'), $todo->record_id)->{$todo->record_id} || [] }),
+        description_template => Comserv::Util::TodoDescription->template,
         current_status   => $current_status,
         current_priority => $current_priority,
         projects         => $projects,
@@ -899,6 +1004,7 @@ sub edit :Path('/todo/edit') :Args(1) {
 }
 sub modify :Path('/todo/modify') :Args(1) {
     my ( $self, $c, $record_id ) = @_;
+    $self->_web_todo_guard_page($c, $record_id, 'update', [qw(admin developer)], '/todo/details?record_id=' . (($record_id // '') =~ /^(\d+)$/ ? $1 : ''));
 
     # Log the entry into the modify action
     $self->logging->log_with_details(
@@ -1052,6 +1158,7 @@ sub modify :Path('/todo/modify') :Args(1) {
                 ? ($form_data->{is_fixed} ? 1 : 0)
                 : ($todo->get_column('is_fixed') // (($form_data->{todo_type} // $todo->get_column('todo_type') // 'task') =~ /^(appointment|meeting)$/ ? 1 : 0)),
         });
+        $self->_save_reminders_from_form($c, $todo->record_id, $form_data->{reminder_offsets});
     };
     if ($@) {
         $self->logging->log_with_details(
@@ -1188,8 +1295,12 @@ sub _perform_todo_delete {
 
     my $roles = $c->stash->{user_roles} || $c->session->{roles} || [];
     $roles = [$roles] unless ref $roles eq 'ARRAY';
-    my $can_delete = $c->stash->{is_admin}
-        || grep { lc($_) =~ /^(admin|developer|editor)$/ } @$roles;
+    my $del_todo = ($record_id && $record_id =~ /^\d+$/)
+        ? eval { $c->model('DBEncy')->resultset('Todo')->find($record_id) } : undef;
+    my $acc = Comserv::Util::AccessCheck->check_session($c, module => 'todo', action => 'delete',
+        record => $del_todo, ($del_todo ? (sitename => ($del_todo->sitename // '')) : ()),
+        legacy_roles => [qw(admin developer editor)]);
+    my $can_delete = $acc->{ok};
     unless ($can_delete) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete',
             'Delete denied for ' . ($c->session->{username} || 'Guest'));
@@ -1233,6 +1344,23 @@ sub _perform_todo_delete {
     $c->detach();
 }
 
+# Reminder offsets from the add/edit form (e.g. "-PT60M,-PT15M"). Invalid entries
+# are dropped and reported in the flash; the todo itself is always saved.
+sub _save_reminders_from_form {
+    my ($self, $c, $todo_id, $raw) = @_;
+    return unless defined $raw;
+    my $res = Comserv::Util::CalendarFeed->save_reminders($c->model('DBEncy'), $todo_id, $raw,
+        Comserv::Util::AppTime->now_utc);
+    my @notes;
+    push @notes, 'Reminder value(s) not understood and skipped: ' . join(', ', @{ $res->{rejected} })
+        . ' (use e.g. -PT60M, -PT15M, -P1D).' if $res->{rejected} && @{ $res->{rejected} };
+    push @notes, 'Reminders were not saved: ' . $res->{error} unless $res->{ok};
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_save_reminders_from_form',
+        "todo $todo_id: " . join(' ', @notes)) if @notes;
+    $c->flash->{reminder_warning} = join(' ', @notes) if @notes;
+    return $res;
+}
+
 sub create :Local {
     my ( $self, $c ) = @_;
     
@@ -1241,6 +1369,18 @@ sub create :Local {
     # Retrieve and validate required fields
     my @required_fields = ('subject', 'start_date', 'due_date', 'priority', 'status');
     my $params = $c->request->params;
+
+    # Create needs the create permission on the TARGET site.
+    {
+        my $target = $params->{sitename} || $c->session->{SiteName} || 'default_site';
+        my $acc = $self->_web_site_guard($c, 'create', $target, [qw(admin developer)]);
+        unless ($acc->{ok}) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create', "Todo create refused ($acc->{code}) on $target");
+            $c->flash->{error_msg} = $acc->{error} || 'You may not add todos on that site.';
+            $c->response->redirect($c->uri_for('/todo'));
+            $c->detach();
+        }
+    }
     
     # Log all received parameters for debugging
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create', 
@@ -1396,6 +1536,7 @@ sub create :Local {
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create', 
             "Successfully created todo with ID: " . $todo->id);
+        $self->_save_reminders_from_form($c, $todo->id, $params->{reminder_offsets});
             
     };
     
@@ -1429,6 +1570,8 @@ sub update_time :Path('/todo/update_time') :Args(0) {
     
     # Get parameters
     my $record_id = $c->request->params->{record_id};
+    # Shared check against the stored todo (site + own_only); legacy = any logged-in user, as before.
+    $self->_web_todo_guard($c, $record_id, 'update', ['*']) or return;
     my $time_of_day = $c->request->params->{time_of_day};
     
     # Validate parameters
@@ -1521,6 +1664,8 @@ sub update_recurring_time :Path('/todo/update_recurring_time') :Args(0) {
     my ($self, $c) = @_;
 
     my $record_id      = $c->request->params->{record_id};
+    # Shared check against the stored todo (site + own_only); legacy = any logged-in user, as before.
+    $self->_web_todo_guard($c, $record_id, 'update', ['*']) or return;
     my $time_of_day    = $c->request->params->{time_of_day};
     my $mode           = $c->request->params->{mode} // 'all';
     my $exception_date = $c->request->params->{exception_date};
@@ -1623,6 +1768,8 @@ sub update_status :Path('/todo/update_status') :Args(0) {
     my ($self, $c) = @_;
 
     my $record_id = $c->request->params->{record_id};
+    # Shared check against the stored todo (site + own_only); legacy = any logged-in user, as before.
+    $self->_web_todo_guard($c, $record_id, 'update', ['*']) or return;
     my $status    = $c->request->params->{status};
 
     unless ($record_id && defined $status) {
@@ -1794,6 +1941,8 @@ sub update_priority :Path('/todo/update_priority') :Args(0) {
     my ($self, $c) = @_;
 
     my $record_id = $c->request->params->{record_id};
+    # Shared check against the stored todo (site + own_only); legacy = any logged-in user, as before.
+    $self->_web_todo_guard($c, $record_id, 'update', ['*']) or return;
     my $priority  = $c->request->params->{priority};
 
     unless ($record_id && defined $priority && $priority =~ /^\d+$/) {
@@ -1835,6 +1984,8 @@ sub update_time_and_date :Path('/todo/update_time_and_date') :Args(0) {
     
     # Get parameters
     my $record_id = $c->request->params->{record_id};
+    # Shared check against the stored todo (site + own_only); legacy = any logged-in user, as before.
+    $self->_web_todo_guard($c, $record_id, 'update', ['*']) or return;
     my $time_of_day = $c->request->params->{time_of_day};
     my $start_date = $c->request->params->{start_date};
     
@@ -1922,6 +2073,8 @@ sub update_display_date :Path('/todo/update_display_date') :Args(0) {
     
     # Get parameters
     my $record_id = $c->request->params->{record_id};
+    # Shared check against the stored todo (site + own_only); legacy = any logged-in user, as before.
+    $self->_web_todo_guard($c, $record_id, 'update', ['*']) or return;
     my $time_of_day = $c->request->params->{time_of_day};
     my $display_date = $c->request->params->{display_date};
     
@@ -2120,6 +2273,17 @@ sub day :Path('/todo/day') :Args {
         # Overdue items are intentionally NOT pushed into today's day view.
     }
 
+    # Request filter only. Does not change the session calendar filter.
+    # filter=schedule is the Health Kitchen day: recurring personal blocks.
+    if ( ($c->req->param('filter') // '') eq 'schedule' ) {
+        @today_todos = grep {
+            my $comments = eval { $_->comments } // '';
+            $comments =~ /hk_day_slot:/;
+        } @today_todos;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
+            "filter=schedule -> " . scalar(@today_todos) . " day blocks");
+    }
+
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
         "Branch='$cur_branch' scope=" . scalar(keys %branch_scope)
         . " -> " . scalar(@today_todos) . " scheduled todos (overdue excluded from day view)");
@@ -2177,6 +2341,14 @@ sub day :Path('/todo/day') :Args {
         %active_todos = map { $_ => 1 } @$rows if $rows;
     };
 
+    my %occurrence_locked;
+    eval {
+        my @ids = map { $_->record_id } @today_todos;
+        %occurrence_locked = %{ Comserv::Util::TodoLog->locked_on_date($c, $date, \@ids) };
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'day',
+        "occurrence lock lookup failed: $@") if $@;
+
     $c->stash(
         todos                  => \@today_todos,
         overdue_todos          => \@overdue_todos,
@@ -2192,6 +2364,7 @@ sub day :Path('/todo/day') :Args {
         cal_filter_site  => do { my $sf = $c->session->{cal_filter_site} // ''; $sf ? $sf : ($c->session->{SiteName} || '') },
         cal_filter_user        => ($c->session->{cal_filter_user} // ''),
         active_todos           => \%active_todos,
+        occurrence_locked      => \%occurrence_locked,
         template               => 'todo/day.tt',
     );
 
@@ -2432,6 +2605,7 @@ sub month :Path('/todo/month') :Args {
         next_month_date => $next_month_date,
         today => $today,
         ap_all_sitenames => $calendar_sites_m,
+        cal_visible_sites => $self->_calendar_visible_sites($c, $calendar_sites_m),
         cal_filter_site  => do { my $sf = $c->session->{cal_filter_site} // ''; $sf ? $sf : ($c->session->{SiteName} || '') },
         cal_filter_user  => ($c->session->{cal_filter_user} // ''),
         is_csc           => $month_is_csc,
@@ -2441,320 +2615,18 @@ sub month :Path('/todo/month') :Args {
     $c->forward($c->view('TT'));
 }
 
-# REST API Endpoints (Dev-only: comserv_server.pl, NOT Starman production)
-# All API methods return JSON and require admin/developer roles
+# The old dev-only REST routes (api_todo_read, api_todo_update /api/todo/update/<id>,
+# api_project_read /api/project/<id>) were removed Oct 2026: they skipped the site and
+# own_only checks. Api.pm serves /api/todo/<id>, /api/todo/update/<id> and
+# /api/project/<id> with the same response shape, gated by Comserv::Util::AccessCheck.
 
-sub _api_dev_only_check {
-    my ($self, $c) = @_;
-    
-    unless ($ENV{CATALYST_ENV} && $ENV{CATALYST_ENV} eq 'development') {
-        $c->res->status(403);
-        $c->res->content_type('application/json');
-        $c->res->body(encode_json({
-            success => 0,
-            error => 'API endpoints are development-only (comserv_server.pl). Not available in production.',
-            code => 'api_dev_only'
-        }));
-        $c->detach();
-    }
-}
-
-sub _api_validate_token {
-    my ($self, $c) = @_;
-    
-    my $result = Comserv::Util::ApiTokenValidator->validate_from_request($c);
-    
-    unless ($result->{valid}) {
-        $self->_api_error($c, $result->{error}, 'invalid_token', $result->{code});
-    }
-    
-    my $schema = $c->model('DBEncy');
-    my $api_token = $schema->resultset('ApiToken')->find($result->{api_token_id});
-    my $user = $api_token->user if $api_token;
-    
-    $c->stash->{api_user} = $user;
-    $c->stash->{api_user_id} = $result->{user_id};
-    $c->stash->{api_token} = $api_token;
-    
-    return 1;
-}
-
-sub _api_error {
-    my ($self, $c, $error, $code, $status) = @_;
-    $status //= 400;
-    
-    $c->res->status($status);
-    $c->res->content_type('application/json');
-    $c->res->body(encode_json({
-        success => 0,
-        error => $error,
-        code => $code
-    }));
-    $c->detach();
-}
-
-sub _api_success {
-    my ($self, $c, $message, $data) = @_;
-    
-    $c->res->status(200);
-    $c->res->content_type('application/json');
-    my $response = {
-        success => 1,
-        message => $message,
-    };
-    $response = { %$response, %$data } if $data;
-    $c->res->body(encode_json($response));
-    $c->detach();
-}
-
-=head2 api_todo_create
-
-POST /api/todo/create - Create a new todo via API
-
-Required JSON fields: subject, start_date, due_date, priority, status
-Optional JSON fields: description, project_id, assigned_to
-
-Dev-only: comserv_server.pl only, requires admin/developer role
-=cut
-
-sub api_todo_create :Local :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->_api_dev_only_check($c);
-    $self->_api_validate_token($c);
-    
-    my $params;
-    eval {
-        my $body = $c->request->body;
-        $params = decode_json($body) if $body;
-    };
-    if ($@) {
-        $self->_api_error($c, "Invalid JSON: $@", 'json_parse_error', 400);
-    }
-    
-    my $schema = $c->model('DBEncy');
-    my $current_user = $c->stash->{api_user}->username || 'system';
-    
-    my @required = qw(subject start_date due_date priority status);
-    my @missing = grep { !defined $params->{$_} || $params->{$_} eq '' } @required;
-    if (@missing) {
-        $self->_api_error($c, "Missing required fields: " . join(', ', @missing), 'validation_error');
-    }
-    
-    my $start_date = $params->{start_date};
-    my $due_date = $params->{due_date};
-    if ($start_date gt $due_date) {
-        $self->_api_error($c, "Start date cannot be after due date", 'date_validation_error');
-    }
-    
-    my $project_id = $params->{project_id} || 1;
-    eval {
-        my $project = $schema->resultset('Project')->find($project_id);
-        unless ($project) {
-            die "Project $project_id not found";
-        }
-    };
-    if ($@) {
-        $self->_api_error($c, "Invalid project_id: $@", 'invalid_project');
-    }
-    
-    my $sitename = $c->session->{SiteName} || 'default';
-    
-    my $todo = $schema->resultset('Todo')->create({
-        subject => $params->{subject},
-        description => $params->{description} || '',
-        project_id => $project_id,
-        start_date => $start_date,
-        due_date => $due_date,
-        priority => $params->{priority},
-        status => $params->{status},
-        assigned_to => $params->{assigned_to} || $current_user,
-        sitename => $sitename,
-        date_time_posted => Comserv::Util::AppTime->now_utc,
-        posted_by => $current_user,
-    });
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_create',
-        "Todo created via API: ID=$todo->id, Subject=$params->{subject}, Project=$project_id");
-    
-    $self->_api_success($c, 'Todo created successfully', {
-        todo_id => $todo->id,
-        todo => $self->_todo_to_hash($todo)
-    });
-}
-
-=head2 api_todo_read
-
-GET /api/todo/:id - Retrieve a single todo by ID
-=cut
-
-sub api_todo_read :Local :Args(1) {
-    my ($self, $c, $todo_id) = @_;
-    
-    $self->_api_dev_only_check($c);
-    $self->_api_validate_token($c);
-    
-    my $schema = $c->model('DBEncy');
-    my $todo = $schema->resultset('Todo')->find($todo_id);
-    
-    unless ($todo) {
-        $self->_api_error($c, "Todo not found: $todo_id", 'not_found', 404);
-    }
-    
-    $self->_api_success($c, 'Todo retrieved', {
-        todo => $self->_todo_to_hash($todo)
-    });
-}
-
-=head2 api_todo_update
-
-PUT /api/todo/:id - Update a todo (partial update allowed)
-=cut
-
-sub api_todo_update :Path('/api/todo/update') :Args(1) {
-    my ($self, $c, $todo_id) = @_;
-
-    # Identity first (session / Bearer token user with an allowed role), then the same
-    # LAN check as Api.pm (_api_local_ok honours COMSERV_API_LAN_BYPASS_WRITES; the old
-    # wider 192.168/16, 172.16/12, 10/8 list is gone). A presented-but-bad token is
-    # refused, never downgraded to the LAN bypass.
-    require Comserv::Controller::Api;
-    my ($actor, $via);
-    if (my $id = Comserv::Controller::Api::_api_identity($c)) {
-        ($actor, $via) = ($id->{username}, $id->{via});
-    }
-    else {
-        my $auth  = $c->req->header('Authorization') // '';
-        if ($auth !~ /^Bearer\s+\S/ && Comserv::Controller::Api::_api_local_ok($c)) {
-            ($actor, $via) = (q{system}, q{lan});
-        }
-        else {
-            my $ierr = Comserv::Controller::Api::_api_gate_refusal($c);
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_todo_update',
-                "API todo update refused ($ierr->{status}) from " . ($c->req->address // '?'));
-            $self->_api_error($c, $ierr->{error}, $ierr->{code} || 'unauthorized', $ierr->{status});
-        }
-    }
-
-    my $params;
-    eval {
-        my $body = $c->request->body;
-        if ($body) {
-            if (ref($body) && $body->can('seek')) {
-                seek($body, 0, 0);
-                my $raw = do { local $/; <$body> };
-                $params = decode_json($raw) if $raw && $raw =~ /\S/;
-            } else {
-                $params = decode_json($body);
-            }
-        }
-        $params ||= {};
-    };
-    if ($@) {
-        $self->_api_error($c, "Invalid JSON: $@", 'json_parse_error', 400);
-    }
-
-    my $schema = $c->model('DBEncy');
-    my $todo   = $schema->resultset('Todo')->find($todo_id);
-
-    unless ($todo) {
-        $self->_api_error($c, "Todo not found: $todo_id", 'not_found', 404);
-    }
-
-    my %allowed = map { $_ => 1 } qw(status priority description developer comments);
-    my %update;
-    for my $field (keys %$params) {
-        $update{$field} = $params->{$field} if $allowed{$field};
-    }
-
-    if (%update) {
-        $update{last_mod_by}   = $actor;
-        $update{last_mod_date} = Comserv::Util::AppTime->today_ymd_for($c);
-        $todo->update(\%update);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_update',
-            "Todo updated via API: record_id=$todo_id, Fields=" . join(',', keys %update)
-            . " by $actor (via: $via)");
-    }
-
-    $self->_api_success($c, 'Todo updated successfully', {
-        todo => $self->_todo_to_hash($todo)
-    });
-}
-
-=head2 api_project_read
-
-GET /api/project/:id - Retrieve a project by ID
-=cut
-
-sub api_project_read :Path('/api/project') :Args(1) {
-    my ($self, $c, $project_id) = @_;
-    
-    $self->_api_dev_only_check($c);
-    $self->_api_validate_token($c);
-    
-    my $schema = $c->model('DBEncy');
-    my $project = $schema->resultset('Project')->find($project_id);
-    
-    unless ($project) {
-        $self->_api_error($c, "Project not found: $project_id", 'not_found', 404);
-    }
-    
-    $self->_api_success($c, 'Project retrieved', {
-        project => $self->_project_to_hash($project)
-    });
-}
-
-=head2 Helper: _todo_to_hash
-
-Convert Todo DBIx::Class object to hashref for JSON serialization
-=cut
-
-sub _todo_to_hash {
-    my ($self, $todo) = @_;
-    
-    return {
-        id                => $todo->id,
-        subject           => $todo->subject,
-        description       => $todo->description,
-        project_id        => $todo->project_id,
-        start_date        => $todo->start_date  ? "${\$todo->start_date}" : undef,
-        due_date          => $todo->due_date    ? "${\$todo->due_date}"   : undef,
-        priority          => $todo->priority,
-        status            => $todo->status,
-        developer         => $todo->developer,
-        sitename          => $todo->sitename,
-        date_time_posted  => $todo->date_time_posted || undef,
-        username_of_poster => $todo->username_of_poster,
-        accumulative_time => $todo->accumulative_time || 0,
-    };
-}
-
-=head2 Helper: _project_to_hash
-
-Convert Project DBIx::Class object to hashref for JSON serialization
-=cut
-
-sub _project_to_hash {
-    my ($self, $project) = @_;
-    
-    return {
-        id => $project->id,
-        name => $project->name,
-        project_code => $project->project_code,
-        description => $project->description,
-        sitename => $project->sitename,
-        status => $project->status,
-    };
-}
 
 sub quick_close :Path('quick_close') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
 
     my $username = $c->session->{username} // '';
-    my $roles    = $c->session->{roles} || [];
-    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
-    unless ($username && $username ne 'anonymous' && grep { /^(admin|developer|editor|devops)$/i } @rl) {
+    unless ($username && $username ne 'anonymous') {
         $c->response->status(403);
         $c->response->body('{"ok":0,"error":"Admin role required"}');
         return;
@@ -2768,6 +2640,17 @@ sub quick_close :Path('quick_close') :Args(0) {
     unless ($record_id) {
         $c->response->status(400);
         $c->response->body('{"ok":0,"error":"Missing record_id"}');
+        return;
+    }
+
+    # Shared data-driven check: same legacy roles as before while role_permissions is empty.
+    my $qc_todo = $record_id =~ /^\d+$/ ? eval { $c->model('DBEncy')->resultset('Todo')->find($record_id) } : undef;
+    my $qc_acc = Comserv::Util::AccessCheck->check_session($c, module => 'todo', action => 'update',
+        record => $qc_todo, ($qc_todo ? (sitename => ($qc_todo->sitename // '')) : ()),
+        legacy_roles => [qw(admin developer editor devops)]);
+    unless ($qc_acc->{ok}) {
+        $c->response->status(403);
+        $c->response->body(JSON::MaybeXS::encode_json({ ok => 0, error => $qc_acc->{error} || 'Not allowed' }));
         return;
     }
 
@@ -2868,6 +2751,7 @@ sub quick_priority :Path('quick_priority') :Args(0) {
     my $data;
     eval { require JSON; $data = JSON::decode_json($body) if $body; };
     my $record_id = $data->{record_id} if $data;
+    $self->_web_todo_guard($c, $record_id, 'update', ['*']) or return;
     my $priority  = $data->{priority}  if $data;
     unless ($record_id && defined $priority && $priority =~ /^\d+$/) {
         $c->response->status(400);
@@ -2894,9 +2778,10 @@ sub triage_stale :Path('triage_stale') :Args(0) {
     $c->response->content_type('application/json');
 
     my $username = $c->session->{username} // '';
-    my $roles    = $c->session->{roles} || [];
-    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
-    unless ($username && $username ne 'anonymous' && grep { /^(admin)$/i } @rl) {
+    # Global admin from the stored users.roles (not session roles, which include
+    # site roles merged at login): triage touches todos on every site.
+    unless ($username && $username ne 'anonymous'
+            && Comserv::Util::AccessCheck->is_global_admin($c->model('DBEncy'), $c->session->{user_id})) {
         $c->response->status(403);
         $c->response->body('{"ok":0,"error":"Admin role required"}');
         return;
@@ -3591,11 +3476,11 @@ sub reschedule :Path('reschedule') :Args(0) {
     $c->response->content_type('application/json');
 
     my $username = $c->session->{username} // '';
-    my $roles    = $c->session->{roles} || [];
-    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
-    my $is_admin = grep { /^(admin)$/i } @rl;
-
-    unless ($username && $username ne 'anonymous' && $is_admin) {
+    # Bulk reschedule touches many todos of the site: update on the site, and own_only
+    # roles are refused. Legacy: admin only (as before; global admin from users.roles,
+    # a site admin on its own site).
+    my $acc = $self->_web_site_guard($c, 'update', undef, [qw(admin)]);
+    unless ($username && $username ne 'anonymous' && $acc->{ok} && !$acc->{own_only}) {
         $c->response->status(403);
         $c->response->body('{"ok":0,"error":"Admin role required"}');
         return;
@@ -3634,9 +3519,7 @@ sub open_log :Path('open_log') :Args(0) {
     $c->response->content_type('application/json');
 
     my $username = $c->session->{username} // '';
-    my $roles    = $c->session->{roles} || [];
-    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
-    unless ($username && $username ne 'anonymous' && grep { /^(admin|developer|editor|devops)$/i } @rl) {
+    unless ($username && $username ne 'anonymous') {
         $c->response->status(403);
         $c->response->body('{"ok":0,"error":"Admin role required"}');
         return;
@@ -3655,6 +3538,9 @@ sub open_log :Path('open_log') :Args(0) {
         $c->response->body('{"ok":0,"error":"Missing record_id"}');
         return;
     }
+    # Shared data-driven check against the stored todo (site + own_only); same
+    # legacy role list as before while role_permissions is empty.
+    $self->_web_todo_guard($c, $record_id, 'update', [qw(admin developer editor devops)]) or return;
 
     # Clock lives inside TodoLog (UTC HMS + viewer today).
     my $res = eval {
@@ -3692,9 +3578,7 @@ sub close_log :Path('close_log') :Args(0) {
     $c->response->content_type('application/json');
 
     my $username = $c->session->{username} // '';
-    my $roles    = $c->session->{roles} || [];
-    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
-    unless ($username && $username ne 'anonymous' && grep { /^(admin|developer|editor|devops)$/i } @rl) {
+    unless ($username && $username ne 'anonymous') {
         $c->response->status(403);
         $c->response->body('{"ok":0,"error":"Admin role required"}');
         return;
@@ -3710,6 +3594,9 @@ sub close_log :Path('close_log') :Args(0) {
         $c->response->body('{"ok":0,"error":"Missing record_id"}');
         return;
     }
+    # Shared data-driven check against the stored todo (site + own_only); same
+    # legacy role list as before while role_permissions is empty.
+    $self->_web_todo_guard($c, $record_id, 'update', [qw(admin developer editor devops)]) or return;
 
     # Clock lives inside TodoLog (UTC HMS + viewer today).
     my $res = eval {
@@ -3717,6 +3604,7 @@ sub close_log :Path('close_log') :Args(0) {
             record_id => $record_id,
             username  => ($username || $data->{actor} // 'api'),
             summary   => ($data->{notes} // $data->{summary} // ''),
+            lock_date => $data->{lock_date},
         );
     };
     if ($@ || !$res || !$res->{success}) {
@@ -3741,6 +3629,8 @@ sub close_log :Path('close_log') :Args(0) {
             : "Closed log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
     $c->response->body('{"ok":1,"duration_mins":' . ($res->{duration_mins} // 0)
         . ',"todo_status":' . ($res->{todo_status}//2)
+        . ',"locked":' . ($res->{locked} ? 1 : 0)
+        . ',"already_locked":' . ($res->{already_locked} ? 1 : 0)
         . ',"recovered":' . ($res->{recovered} ? 1 : 0) . '}');
 }
 
@@ -3749,9 +3639,7 @@ sub done_with_log :Path('done_with_log') :Args(0) {
     $c->response->content_type('application/json');
 
     my $username = $c->session->{username} // '';
-    my $roles    = $c->session->{roles} || [];
-    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
-    unless ($username && $username ne 'anonymous' && grep { /^(admin|developer|editor|devops|user|normal)$/i } @rl) {
+    unless ($username && $username ne 'anonymous') {
         $c->response->status(403);
         $c->response->body('{"ok":0,"error":"Login required"}');
         return;
@@ -3761,12 +3649,20 @@ sub done_with_log :Path('done_with_log') :Args(0) {
     my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
     my $data;
     eval { require JSON; $data = JSON::decode_json($body) if $body; };
+    $data = {
+        record_id => $c->req->param('record_id'),
+        lock_date => $c->req->param('lock_date'),
+        notes     => $c->req->param('notes'),
+    } unless ref $data eq 'HASH' && $data->{record_id};
     my $record_id = $data->{record_id} if $data;
     unless ($record_id) {
         $c->response->status(400);
         $c->response->body('{"ok":0,"error":"Missing record_id"}');
         return;
     }
+    # Shared data-driven check against the stored todo (site + own_only); same
+    # legacy role list as before while role_permissions is empty.
+    $self->_web_todo_guard($c, $record_id, 'update', [qw(admin developer editor devops user normal)]) or return;
 
     my $notes = $data->{notes} // '';
 
@@ -3776,6 +3672,7 @@ sub done_with_log :Path('done_with_log') :Args(0) {
             record_id => $record_id,
             username  => ($username || $data->{actor} // 'api'),
             summary   => ($notes // ''),
+            lock_date => $data->{lock_date},
         );
     };
     if ($@ || !$res || !$res->{success}) {
@@ -3788,7 +3685,10 @@ sub done_with_log :Path('done_with_log') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'done_with_log',
         "Todo $record_id marked done by $username" . ($res->{log_closed} ? " (log closed)" : " (completed log inserted)"));
-    $c->response->body('{"ok":1,"already_done":' . ($res->{already_done} ? 1 : 0) . ',"todo_status":' . ($res->{todo_status}//3) . '}');
+    $c->response->body('{"ok":1,"already_done":' . ($res->{already_done} ? 1 : 0)
+        . ',"locked":' . ($res->{locked} ? 1 : 0)
+        . ',"already_locked":' . ($res->{already_locked} ? 1 : 0)
+        . ',"todo_status":' . ($res->{todo_status}//3) . '}');
 }
 
 sub next_step :Path('next_step') :Args(0) {
@@ -3796,9 +3696,7 @@ sub next_step :Path('next_step') :Args(0) {
     $c->response->content_type('application/json');
 
     my $username = $c->session->{username} // '';
-    my $roles    = $c->session->{roles} || [];
-    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
-    unless ($username && $username ne 'anonymous' && grep { /^(admin|developer|editor|devops)$/i } @rl) {
+    unless ($username && $username ne 'anonymous') {
         $c->response->status(403);
         $c->response->body('{"ok":0,"error":"Admin role required"}');
         return;
@@ -3809,6 +3707,7 @@ sub next_step :Path('next_step') :Args(0) {
     my $data;
     eval { require JSON; $data = JSON::decode_json($body) if $body; };
     my $record_id = $data->{record_id} if $data;
+    $self->_web_todo_guard($c, $record_id, 'update', [qw(admin developer editor devops)]) or return;
     unless ($record_id) {
         $c->response->status(400);
         $c->response->body('{"ok":0,"error":"Missing record_id"}');
