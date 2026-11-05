@@ -86,6 +86,7 @@ sub _stash_mode {
     $c->stash->{hk_prefs_ready}    = $self->hk->prefs_cols_ready($c) ? 1 : 0;
     $c->stash->{hk_factor_ready}   = $self->hk->factor_ready($c) ? 1 : 0;
     $self->hk->ensure_sourcing_seed($c) if $c->stash->{hk_factor_ready};
+    $self->hk->ensure_ency_herb_seed($c);
     $c->stash->{hk_sourcing_enums} = $self->hk->sourcing_enums;
 }
 

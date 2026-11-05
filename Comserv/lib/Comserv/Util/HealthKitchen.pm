@@ -2981,6 +2981,26 @@ sub missing_seed_rows {
 
 # Insert-if-missing by unique key once the table exists. Never updates existing rows.
 # Called on HealthKitchen requests; cheap after the first successful pass.
+# ENCY herb/symptom seed (Util::HealthKitchen::EncyHerbSeed). Once per process.
+our $HERB_SEEDED = 0;
+sub ensure_ency_herb_seed {
+    my ( $self, $c ) = @_;
+    return { ok => 1, skipped => 'already seeded' } if $HERB_SEEDED;
+    my $res = { ok => 0 };
+    try {
+        require Comserv::Util::HealthKitchen::EncyHerbSeed;
+        $res = { ok => 1, %{ Comserv::Util::HealthKitchen::EncyHerbSeed::ensure( $c->model('DBEncy')->schema ) } };
+        $HERB_SEEDED = 1;
+        $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'ensure_ency_herb_seed',
+            join ' ', map {"$_=$res->{$_}"} sort keys %$res );
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, 'ensure_ency_herb_seed',
+            "herb seed failed (will retry next request): $_" );
+    };
+    return $res;
+}
+
 sub ensure_sourcing_seed {
     my ( $self, $c ) = @_;
     return { ok => 1, inserted => 0, skipped => 'already seeded' } if $SOURCING_SEEDED;
