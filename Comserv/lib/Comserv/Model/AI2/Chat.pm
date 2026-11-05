@@ -90,6 +90,7 @@ sub build_agent_prompt {
         documentation => "You are the AI Editor documentation agent. Prefer docs/changelog/planning guidance; avoid code file rewrites unless asked.",
         analyze => "You are the AI Editor Analyze worker. Read loaded [FILE:] buffers and auto-attached pipeline files (the controller and related sources for the page/template). Return root cause + short plan. Use the controller source to understand exactly how data reaches the template. Never rewrite files, never emit ## FIX / full-file patches, never ask the user to paste files already provided.",
         nav      => "You are a navigation assistant. Help the user find the right page or feature in Comserv.",
+        consignment => "You are the Comserv Consignment agent (id=consignment). Shanta's consignment is fixed: a partner store (Monashee Coop, 30%) takes our goods and sells them, we receive retail LESS 30%, the partner never issues an invoice, each reported sale creates a REPLACEMENT consignment, and only the stock shortfall is queued to 3D print. The server has already resolved partners, items, retail prices and stock for this turn - use that data, never ask the user for an SKU, an item id or a price. If an item genuinely has no match, say so and ask which product they mean. Accounting side: the sale lands in accounts payable and cash payments are applied oldest first.",
         investigator => "You are a cost-effective investigator using only cheap or free models. Your job is to search logs, code, git history, usage data, and reports to answer questions about what happened. Be efficient and produce a clear report with findings, relevant paths, commits if possible, and direct quotes. Use [READ_FILE: path] if you need more. For git describe what to look up (recent commits, diffs on current branch, etc.).",
     );
     return $agent{$aid} if exists $agent{$aid};
@@ -152,6 +153,28 @@ sub build_system_prompt {
                 'build_system_prompt', "InvoiceCreate chat_contract failed: $@");
         }
         push @parts, $inv_contract if $inv_contract;
+
+        # Consignment contract + LIVE partner/item data. The rules are static
+        # (Shanta: partner sells, retail less commission, replacement consignment
+        # per sale, print only the shortfall). The live block is resolved by the
+        # server so a small model never has to ask for an SKU or a price again.
+        my $cons_block = eval {
+            require Comserv::Model::AI2::Consignment;
+            my $cbrain = eval { $c->model('AI2::Consignment') };
+            $cbrain = Comserv::Model::AI2::Consignment->new if !$cbrain || !ref $cbrain;
+            my $q = defined $args{prompt} ? $args{prompt} : '';
+            my @out = ($cbrain->chat_contract($c));
+            if ($q && $cbrain->detect_intent($q)) {
+                my $live = $cbrain->context_block($c, prompt => $q);
+                push @out, $live if $live;
+            }
+            join("\n\n", grep { defined && length } @out);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                'build_system_prompt', "Consignment context failed: $@");
+        }
+        push @parts, $cons_block if $cons_block;
 
         my $sched_contract = eval {
             require Comserv::Model::AI2::Scheduler;
@@ -396,6 +419,34 @@ sub process {
             provider       => $inv_hit->{provider} // 'ai2-invoice',
             invoice_action => $inv_hit->{invoice_action},
             thinking       => \@thinking,
+        };
+    }
+
+    # Consignment AGENT. Shanta's consignment model is fixed (partner sells,
+    # retail less commission, replacement consignment per sale, print the
+    # shortfall). Free models asked the user for the SKU and the price that
+    # the server can look up, so resolve partner + item here instead.
+    my $cons_hit = (!$editor_todo_skip) && eval {
+        require Comserv::Model::AI2::Consignment;
+        my $cbrain = eval { $c->model('AI2::Consignment') };
+        $cbrain = Comserv::Model::AI2::Consignment->new if !$cbrain || !ref $cbrain;
+        $cbrain->try_chat_create($c, $prompt);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+            "Consignment try_chat_create threw: $@");
+    }
+    if ($cons_hit && $cons_hit->{handled}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+            'Consignment agent handled chat (no LLM)');
+        push @thinking, 'Handled by Consignment agent (no LLM)';
+        return {
+            success            => 1,
+            response           => $cons_hit->{response} // '',
+            model              => $cons_hit->{model} // '(consignment)',
+            provider           => $cons_hit->{provider} // 'ai2-consignment',
+            consignment_action => $cons_hit->{consignment_action},
+            thinking           => \@thinking,
         };
     }
 
