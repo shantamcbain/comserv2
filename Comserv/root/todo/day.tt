@@ -115,25 +115,25 @@
 
 .gcal-day-nav {
     display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-    padding: 6px 0 8px; border-bottom: 2px solid #e0e0e0; margin-bottom: 0;
+    padding: 6px 0 8px; border-bottom: 2px solid var(--border-color, #ddd); margin-bottom: 0;
 }
 .gcal-day-nav .gcal-nav-btn {
-    padding: 4px 10px; border: 1px solid #dadce0; border-radius: 4px;
-    background: #fff; cursor: pointer; font-size: 0.82em; color: #3c4043;
+    padding: 4px 10px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;
+    background: var(--background-color, #fff); cursor: pointer; font-size: 0.82em; color: var(--text-color, #000);
     text-decoration: none; line-height: 1.4;
 }
-.gcal-day-nav .gcal-nav-btn:hover { background: #f1f3f4; }
+.gcal-day-nav .gcal-nav-btn:hover { background: var(--table-header-bg, #f2f2f2); }
 .gcal-day-nav .gcal-today-btn {
-    padding: 4px 10px; border: 1px solid #dadce0; border-radius: 4px;
-    background: #fff; cursor: pointer; font-size: 0.82em; color: #3c4043;
+    padding: 4px 10px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;
+    background: var(--background-color, #fff); cursor: pointer; font-size: 0.82em; color: var(--text-color, #000);
     font-weight: 600; text-decoration: none;
 }
 .gcal-day-nav .gcal-date-label {
-    font-size: 1em; font-weight: 600; color: #3c4043; margin: 0 4px;
+    font-size: 1em; font-weight: 600; color: var(--text-color, #000); margin: 0 4px;
 }
 .gcal-view-select {
-    font-size: 0.82em; padding: 3px 6px; border: 1px solid #dadce0;
-    border-radius: 4px; background: #fff; color: #3c4043; cursor: pointer;
+    font-size: 0.82em; padding: 3px 6px; border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px; background: var(--background-color, #fff); color: var(--text-color, #000); cursor: pointer;
     margin-left: auto;
     /* Override the global base.css `select { width:100% }` — without this the
        Day/Week/Month dropdown expands to fill the nowrap/overflow nav and gets
@@ -143,15 +143,15 @@
 
 .gcal-sites-bar, .gcal-legend-bar {
     display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
-    padding: 5px 0 5px; border-bottom: 1px solid #e8e8e8; margin-bottom: 0;
+    padding: 5px 0 5px; border-bottom: 1px solid var(--border-color, #ddd); margin-bottom: 0;
 }
-.gcal-legend-bar { font-size: 0.77em; color: #5f6368; padding: 4px 0 6px; }
-.gcal-legend-label { font-weight: 600; color: #3c4043; margin-right: 2px; white-space: nowrap; }
+.gcal-legend-bar { font-size: 0.77em; color: var(--text-muted-color, #6c757d); padding: 4px 0 6px; }
+.gcal-legend-label { font-weight: 600; color: var(--text-color, #000); margin-right: 2px; white-space: nowrap; }
 .gcal-legend-sep { color: #dadce0; margin: 0 4px; }
 .gcal-user-chip {
     display: inline-flex; align-items: center; gap: 4px;
     padding: 1px 8px 1px 5px; border-radius: 10px;
-    background: #f8f9fa; border: 1px solid #dadce0; font-size: 0.95em;
+    background: var(--table-header-bg, #f2f2f2); border: 1px solid var(--border-color, #ddd); font-size: 0.95em;
 }
 .gcal-user-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .gcal-fixed-legend-chip {
@@ -177,21 +177,21 @@
     cursor: pointer; border: none; padding: 0; margin: 0;
 }
 .gcal-legend-hint {
-    font-size: 0.72em; color: #9aa0a6; margin-left: 6px; white-space: nowrap;
+    font-size: 0.72em; color: var(--text-muted-color, #6c757d); margin-left: 6px; white-space: nowrap;
 }
 
 .gcal-grid-outer {
     display: flex; overflow-y: auto; max-height: 68vh;
-    border: 1px solid #e0e0e0; border-radius: 4px; margin-top: 0;
+    border: 1px solid var(--border-color, #ddd); border-radius: 4px; margin-top: 0;
     position: relative;
 }
 .gcal-time-col {
     width: 52px; flex-shrink: 0; position: sticky; left: 0; z-index: 2;
-    background: #fff;
+    background: var(--background-color, #fff);
 }
 .gcal-hour-label {
     height: 60px; display: flex; align-items: flex-start; justify-content: flex-end;
-    padding-right: 6px; font-size: 0.67em; color: #70757a; padding-top: 3px;
+    padding-right: 6px; font-size: 0.67em; color: var(--text-muted-color, #6c757d); padding-top: 3px;
     box-sizing: border-box; white-space: nowrap;
 }
 .gcal-events-area {
@@ -201,7 +201,7 @@
 .gcal-events-area::before {
     content: '';
     position: absolute; left: var(--gcal-fixed-pct, 15%); top: 0; bottom: 0; width: 1px;
-    background: #c5c9ce; z-index: 2; pointer-events: none;
+    background: var(--border-color, #ddd); z-index: 2; pointer-events: none;
 }
 .gcal-lane-resizer {
     position: absolute;
@@ -214,10 +214,10 @@
     background: rgba(26, 115, 232, 0.25);
 }
 .gcal-hour-rule {
-    position: absolute; left: 0; right: 0; height: 1px; background: #e0e0e0; z-index: 0;
+    position: absolute; left: 0; right: 0; height: 1px; background: var(--border-color, #ddd); z-index: 0;
 }
 .gcal-half-rule {
-    position: absolute; left: 0; right: 0; height: 1px; background: #f1f1f1; z-index: 0;
+    position: absolute; left: 0; right: 0; height: 1px; background: var(--table-header-bg, #f2f2f2); z-index: 0;
 }
 .gcal-now-line {
     position: absolute; left: 0; right: 0; height: 2px; background: #ea4335; z-index: 12; pointer-events: none;
@@ -260,7 +260,7 @@
     padding: 1px 6px;
     border: 0;
     border-radius: 3px;
-    background: #fff;
+    background: var(--background-color, #fff);
     color: #1a73e8;
     cursor: pointer;
 }
@@ -311,7 +311,7 @@
     color: var(--text-color, #333);
 }
 .todo-popup .popup-details {
-    font-size: 0.85em; color: #666; line-height: 1.35;
+    font-size: 0.85em; color: var(--text-muted-color, #6c757d); line-height: 1.35;
     border-top: none; padding-top: 0; margin-top: 0;
 }
 .todo-popup .popup-details div { margin-bottom: 1px; }
@@ -383,7 +383,11 @@
 
     .todo-item-day.overdue {
         border-left: 4px solid var(--warning-color, #ff9800);
+        /* Tint of the warning colour — never the raw colour, which is pure red in
+           most themes and would paint the whole row unreadable. */
         background-color: var(--warning-color, #fff3cd);
+        background-color: color-mix(in srgb, var(--warning-color, #ff9800) 18%, var(--background-color, #fff));
+        color: var(--text-color, #000);
     }
 
     .todo-subject {
@@ -441,10 +445,10 @@
     .time-slot {
         padding: 6px 6px 6px 4px;
         border-right: 3px solid #4CAF50;
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: 1px solid var(--border-color, #ddd);
         font-size: 0.72em;
-        background-color: #f0f4f8;
-        color: #444;
+        background-color: var(--table-header-bg, #f2f2f2);
+        color: var(--text-color, #000);
         display: flex;
         flex-direction: column;
         align-items: flex-end;
@@ -454,13 +458,13 @@
 
     .time-slot .ts-start {
         font-weight: bold;
-        color: #222;
+        color: var(--text-color, #000);
         line-height: 1.3;
         white-space: nowrap;
     }
 
     .time-slot .ts-end {
-        color: #888;
+        color: var(--text-muted-color, #6c757d);
         font-size: 0.9em;
         line-height: 1.2;
         white-space: nowrap;
@@ -468,7 +472,7 @@
 
     .time-content {
         padding: 4px 8px;
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: 1px solid var(--border-color, #ddd);
         min-height: 32px;
         box-sizing: border-box;
     }
@@ -484,9 +488,9 @@
     }
 
     .add-todo-inline button {
-        border: 1px dashed #ccc;
+        border: 1px dashed var(--border-color, #ddd);
         background: none;
-        color: #999;
+        color: var(--text-muted-color, #6c757d);
         cursor: pointer;
         width: 100%;
         text-align: left;
@@ -579,21 +583,23 @@
     .todo-popup .popup-action-btn {
         font-size: 0.82em; padding: 3px 10px; border-radius: 4px; cursor: pointer;
         border: 1px solid var(--primary-color, #4CAF50);
-        background: var(--primary-color, #4CAF50); color: #fff;
+        background: var(--primary-color, #4CAF50);
+        /* theme primary is pale in the default/CSC/APIS themes: white on it is invisible */
+        color: var(--nav-text, var(--text-color, #000));
         text-decoration: none; white-space: nowrap; line-height: 1.6;
     }
     .todo-popup .popup-action-btn:hover { opacity: 0.85; }
     .todo-popup .popup-action-btn.btn-done {
-        background: #43a047; border-color: #43a047;
+        background: #43a047; border-color: #43a047; color: #fff;
     }
     .todo-popup .popup-action-btn.btn-log {
-        background: #1a73e8; border-color: #1a73e8;
+        background: #1a73e8; border-color: #1a73e8; color: #fff;
     }
     .todo-popup .popup-action-btn.btn-view {
-        background: #757575; border-color: #757575;
+        background: #757575; border-color: #757575; color: #fff;
     }
     .todo-popup .popup-action-btn.btn-start {
-        background: #0d6efd; border-color: #0d6efd;
+        background: #0d6efd; border-color: #0d6efd; color: #fff;
     }
     .gcal-ev-btn-active {
         background: rgba(253,126,20,0.9) !important;
@@ -925,6 +931,21 @@ function gcalMakeSiteColorSwatch(site) {
     return label;
 }
 
+/* Readable ink (black or white) for an arbitrary event background colour.
+   Event colours are data, not theme colours: a light site colour (e.g. a pale
+   accent) used to leave the fixed white event text unreadable. */
+function gcalInk(color) {
+    var m = String(color || '').trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (!m) return '';
+    var h = m[1];
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    function lin(c) { c = c / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+    var L = 0.2126 * lin(parseInt(h.substr(0, 2), 16))
+          + 0.7152 * lin(parseInt(h.substr(2, 2), 16))
+          + 0.0722 * lin(parseInt(h.substr(4, 2), 16));
+    return L > 0.45 ? '#000' : '#fff';
+}
+
 function gcalColorizeEvents() {
     document.querySelectorAll('.gcal-ev[data-site]').forEach(function(el) {
         if (_gcalIsFixed(el)) return;
@@ -932,6 +953,8 @@ function gcalColorizeEvents() {
         var col = gcalSiteColor(site);
         el.style.background = col;
         el.style.borderLeft = '3px solid ' + col;
+        var ink = gcalInk(col);
+        if (ink) el.style.color = ink;
     });
     document.querySelectorAll('.gcal-site-dot[data-site]').forEach(function(dot) {
         dot.style.background = gcalSiteColor(dot.getAttribute('data-site'));

@@ -24,7 +24,8 @@ use JSON ();
 our @PURPOSES = qw(chat docs coding title);
 
 # Slug grammar: provider|model. Providers the Router can dispatch.
-our $SLUG_RE = qr/^(?:openrouter|external|supergrok|grok|ollama)\|[A-Za-z0-9._:\/~+\-]+$/;
+# Oct 31 2026 (Shanta): xai = paid x.ai direct API (cash, shared caps with OpenRouter).
+our $SLUG_RE = qr/^(?:openrouter|external|supergrok|grok|ollama|xai)\|[A-Za-z0-9._:\/~+\-]+$/;
 # "ollama|auto" = first installed chat-capable Ollama tag at call time.
 our $OLLAMA_AUTO = 'ollama|auto';
 
@@ -51,7 +52,7 @@ our %KNOB_DEFAULTS = (
 # (within the OpenRouter caps) and only then to free north-mini, which is always the LAST step
 # (it is easily overwhelmed when it suddenly replaces a smarter model). The emergency list is used
 # only when every step of the chain is unusable. Both live in data/ai_model_chains.json.
-our @HERMES_CHAIN_DEFAULT     = ('supergrok|grok-4.7', 'openrouter|openai/gpt-5.6-luna', 'openrouter|cohere/north-mini-code:free');   # Oct 28 2026: luna (on probation) replaced qwen3-coder
+our @HERMES_CHAIN_DEFAULT     = ('supergrok|grok-4.7', 'openrouter|particle-ai/particle-1', 'xai|grok-4.7', 'openrouter|openai/gpt-5.6-luna', 'openrouter|cohere/north-mini-code:free');   # Oct 28 2026: luna (on probation) replaced qwen3-coder; Nov 2 2026: particle-1 (probation, price drop) first paid step
 our @HERMES_EMERGENCY_DEFAULT = ('ollama|gemma4-64k:latest', 'openrouter|nvidia/nemotron-3.5-lightning:free');
 our $HERMES_NORTH_RE          = qr/north-mini-code/i;
 our $HERMES_BANNED_RE         = qr/grok|glm|v4-pro/i;     # never as an openrouter step (grok only via Super Grok)
@@ -245,7 +246,7 @@ sub _chain_models_in_use {
 }
 
 sub _validate_trials {
-    my ($class, $d) = @_;
+    my ($class, $d, %vo) = @_;   # vo{all_trials}: the full trials set when only one trial is checked (Nov 2 2026)
     return () unless exists $d->{trials};
     return ('trials must be an object') unless ref $d->{trials} eq 'HASH';
     my @e; my $used = $class->_chain_models_in_use($d); my $used_np = $class->_chain_models_in_use($d, skip_hermes_fallback => 1);
@@ -263,8 +264,10 @@ sub _validate_trials {
         push @e, "trials.$name: $m may only be in hermes_fallback_chain while on probation" if $prob && $used_np->{$m};
         if ($prob && $m !~ /:free\z/) {
             my $ch = ref $d->{hermes_fallback_chain} eq 'ARRAY' ? $d->{hermes_fallback_chain} : [];
-            push @e, "trials.$name: a probation model must be the only paid step of hermes_fallback_chain, before north-mini"
-                if grep { !ref && m{^openrouter\|(.+)\z} && $1 !~ /:free\z/ && $1 ne $m } @$ch;
+            # Nov 2 2026 (Shanta): several probation models may share the paid steps (particle-1 + luna); any OTHER paid OpenRouter step is still refused.
+            my %probm = map { ($_->{model} => 1) } grep { ref $_ eq 'HASH' && defined $_->{model} && defined $_->{probation} && !ref $_->{probation} && $_->{probation} =~ /^(?:1|true)\z/ } values %{ $vo{all_trials} || $d->{trials} };
+            push @e, "trials.$name: a probation model may share the paid steps of hermes_fallback_chain only with other probation models"
+                if grep { !ref && m{^openrouter\|(.+)\z} && $1 !~ /:free\z/ && !$probm{$1} } @$ch;
         }
         push @e, "trials.$name.provider must be openrouter" unless ($t->{provider} // '') eq 'openrouter';
         my $sel = $t->{selectable_by} // '';
@@ -299,7 +302,7 @@ sub trial {
     my ($class, $loaded, $name) = @_;
     my $d = ref $loaded eq 'HASH' && $loaded->{data} ? $loaded->{data} : $loaded;
     return undef unless ref $d eq 'HASH' && ref $d->{trials} eq 'HASH' && ref $d->{trials}{$name} eq 'HASH';
-    return undef if $class->_validate_trials({ %$d, trials => { $name => $d->{trials}{$name} } });
+    return undef if $class->_validate_trials({ %$d, trials => { $name => $d->{trials}{$name} } }, all_trials => $d->{trials});
     return { %{ $d->{trials}{$name} }, name => $name };
 }
 
@@ -315,7 +318,7 @@ sub hermes_chain {
 }
 
 # hermes_cash_steps($loaded) -> list of { slug, channel, provider, model }: the opt-in x.ai direct / OpenRouter grok
-# steps tried BEFORE the paid qwen step on the daily lock. Empty unless hermes_daily_lock_cash.enabled is true.
+# steps tried BEFORE the paid chain step (probation model) on the daily lock. Empty unless hermes_daily_lock_cash.enabled is true.
 sub hermes_cash_steps {
     my ($class, $loaded) = @_;
     my $d = ref $loaded eq 'HASH' && $loaded->{data} ? $loaded->{data} : $loaded;
