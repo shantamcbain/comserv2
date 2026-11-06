@@ -1,0 +1,54 @@
+[% META
+   title = "Session workday standard"
+   description = "How a session starts, how time is logged, and what is left running at the end of the day."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "system"
+   page_version = "0.1"
+   last_updated = "Fri Nov 06 2026"
+   site_specific = "false"
+   project_id = "138"
+   project_code = "PLANNING"
+%]
+[% PageVersion = 'Documentation/SessionWorkdayStandard.tt,v 0.1 2026/11/06 hermes-agent Exp shanta' %]
+<div class="container">
+<h1 class="doc-h1">Session workday standard</h1>
+<p class="doc-muted">Last updated Fri Nov 06 2026. Version 0.1. Status: in use on main.</p>
+
+<div id="toc" class="row">
+<div class="col-100">
+<p class="doc-h3">Contents</p>
+<p class="doc-navrow"><a class="doc-navlink" href="#why">Why</a></p>
+<p class="doc-navrow"><a class="doc-navlink" href="#prompt">First prompt</a></p>
+<p class="doc-navrow"><a class="doc-navlink" href="#check">Interval check</a></p>
+<p class="doc-navrow"><a class="doc-navlink" href="#day">End of day</a></p>
+</div>
+</div>
+
+<h2 id="why" class="doc-h2">Why</h2>
+<p class="doc-body">A Hermes dashboard left up overnight keeps the host lock. The next morning's open binds a port and is observe-only. A todo set to status 5 with no log row has no time. An open log left for days bills nothing honest until it is closed. The check names those. It does not invent hours.</p>
+<p class="doc-backtop"><a href="#toc">Back to top</a></p>
+
+<h2 id="prompt" class="doc-h2">First prompt</h2>
+<p class="doc-body">On the first prompt of a session:</p>
+<ol class="doc-body">
+<li>Say what the prompt is about.</li>
+<li>Read sitename, username, and roles. <code>GET /api/workday/check</code> returns them when the caller is logged in. A LAN call has no user, so the role class is guest.</li>
+<li>Guest and normal get an assist log: what the assistant did. Developer and admin get a work log: what was done on the todo.</li>
+<li>Search for a todo about the question. Do not create a twin.</li>
+<li>Start that todo with <code>POST /api/todo/open_log</code> before any other write. Prove it with <code>work_status</code>.</li>
+<li>If the task is not finished, Stop with <code>close_log</code>. If it is finished, Done with <code>done_with_log</code>. Do not leave status 5.</li>
+<li>Close the session: docs, the plan, and the todo log.</li>
+</ol>
+<p class="doc-backtop"><a href="#toc">Back to top</a></p>
+
+<h2 id="check" class="doc-h2">Interval check</h2>
+<p class="doc-body"><code>script/workday_standard.pl --check</code> is read-only. It reports open logs older than 12 hours, status-5 todos with no log row, Hermes processes, branch servers other than :4006, and branch HEADs older than 14 days that are still ahead of main. Exit 2 means something was found. The same report is <code>GET /api/workday/check</code>.</p>
+<p class="doc-body">On this workstation the check runs every 30 minutes from the user crontab, against the main checkout. Other workstations get the script on the next merge. Add the same crontab line there. The health evaluator does not run from a PycharmProjects checkout, so cron is the interval.</p>
+<p class="doc-backtop"><a href="#toc">Back to top</a></p>
+
+<h2 id="day" class="doc-h2">End of day</h2>
+<p class="doc-body"><code>script/workday_standard.pl --end-of-day</code> and <code>POST /api/workday/end_of_day</code> with <code>confirm:1</code> stop every registered branch server except :4006 and signal Hermes dashboard, gateway, and TUI processes. :4006 stays. Todo logs are not closed by that action, because closing a 166-hour clock would bill time that was not work. Close those with <code>close_log</code> and say they were left open.</p>
+<p class="doc-body">The 22:00 crontab line on this host runs that stop. Change the hour in crontab if the day ends earlier.</p>
+<p class="doc-footer">Files: Comserv/lib/Comserv/Util/WorkdayStandard.pm, Comserv/script/workday_standard.pl, Comserv/lib/Comserv/Controller/Api.pm.</p>
+</div>
