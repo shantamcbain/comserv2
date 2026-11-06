@@ -69,6 +69,14 @@
                     <strong>Error:</strong> [% c.flash.error_msg | html %]
                 </div>
             [% END %]
+            [%# A ?target= that is not registered (or whose checkout is gone) resolves to NO
+               repo. Say so loudly — silently showing the local Comserv checkout under a URL
+               that names another repo is how a write ends up in the wrong tree. %]
+            [% IF git_target_error %]
+                <div class="admin-alert admin-alert-danger" id="git-target-error">
+                    <strong>Target not usable:</strong> [% git_target_error | html %]
+                </div>
+            [% END %]
             [% IF guard_hits && guard_hits.size %]
                 <div class="admin-alert admin-alert-danger" id="git-guard-hits">
                     <strong>Secret guard — how to fix</strong>
@@ -113,10 +121,6 @@
                     </div>
 
                     <div class="git-branch-meta" id="git-target-path">[% IF git_external %]external: <code class="code-inline">[% repo_path | html %]</code>[% ELSIF git_target == 'local' || !git_target %]local: <code class="code-inline">[% repo_path | html %]</code>[% END %]</div>
-
-                    <div class="git-inline" style="margin-top:8px;">
-                        <a class="admin-btn admin-btn-sm admin-btn-primary" href="/admin/git?target=openbafang">OpenBafangTool git</a>
-                    </div>
                 </details>
 
                 [%# ---- Repository + branch selector (replaces the old Branches card) ---- %]
@@ -419,26 +423,11 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr[% IF git_target == 'openbafang' %] class="git-dev-current"[% END %]>
-                                <td>
-                                    <code>OpenBafangTool · besst-uart-support</code>
-                                    [% IF git_target == 'openbafang' %]<span class="status-badge">current</span>[% END %]
-                                </td>
-                                <td><code>hermes :9120</code></td>
-                                <td><code class="git-dev-cmd" title="/home/shanta/dev/OpenBafangTool">/home/shanta/dev/OpenBafangTool</code></td>
-                                <td class="git-dev-actions">
-                                    <a class="admin-btn admin-btn-sm admin-btn-primary" href="/admin/git?target=openbafang">Git</a>
-
-                                    <button type="button" class="admin-btn admin-btn-sm"
-                                            data-hermes-branch="openbafang"
-                                            data-port="9120"
-                                            data-hermes-port="9120"
-                                            data-hermes-cwd="/home/shanta/dev/OpenBafangTool"
-                                            data-hermes-cmd="cd '/home/shanta/dev/OpenBafangTool' &amp;&amp; hermes dashboard --isolated --host 0.0.0.0 --port 9120 --no-open --skip-build">Hermes</button>
-                                </td>
-                            </tr>
+                            [%# Registry-driven rows only. Externals (repos that are not Comserv
+                               worktrees) come from the SAME builder — a hardcoded row here once
+                               advertised OpenBafangTool while external_repos in worktrees.json
+                               was empty, so the Git/Hermes buttons pointed at nothing. %]
                             [% FOREACH b IN worktree_list %]
-                            [% NEXT IF b.external %]
                             <tr[% IF b.name == current_worktree %] class="git-dev-current"[% END %]>
                                 [% IF b.external %]
                                 <td>
