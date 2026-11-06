@@ -157,6 +157,10 @@ sub _git_list {
     # and messages are still passed as discrete argv elements (no shell).
     if (my $t = $c->stash->{git_target}) {
         my $tinfo = $self->git_service->resolve_target($c, $t);
+        # Unregistered/broken target: refuse rather than falling through to the
+        # Comserv checkout below (that is the wrong repo, and this path feeds
+        # _validate_paths for writes).
+        return ('', -1) if $tinfo->{error};
         if ($tinfo->{mode} eq 'ssh') {
             my $r = $self->git_service->_ssh_exec_git($c, $tinfo, @argv);
             return ($r->{output}, $r->{exit_code});
@@ -270,6 +274,17 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
 
     # Route every op below to the selected target (local or remote-over-SSH).
     $self->_bind_target($c);
+
+    # A target that cannot be resolved (unregistered key, missing external checkout)
+    # stops here: never let a write land in the Comserv checkout because the URL
+    # named a repo that no longer exists in root/config/worktrees.json.
+    if (my $terr = $self->git_service->resolve_target($c, $c->stash->{git_target} // '')->{error}) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'dashboard_action',
+            "target error: $terr");
+        $c->flash->{error_msg} = $terr;
+        $c->response->redirect($self->_git_back($c));
+        return;
+    }
 
     # Every write is POST + confirm.
     unless ($c->req->method eq 'POST' && $c->req->param('confirm')) {
@@ -841,8 +856,13 @@ sub index :Path('/admin/git') :Args(0) {
     }
 
     $c->stash(
-        repo_path       => ($tinfo->{repo} || $self->repo_path($c)),
+        # Resolved ONCE for the whole request. When the selector names a target that
+        # is not registered, resolve_target returns { mode=>'unknown', repo=>undef,
+        # error=>... } — surface that in the UI instead of quietly showing the local
+        # Comserv checkout under a URL that claims another repo.
+        repo_path       => $tinfo->{repo},
         git_external    => $tinfo->{external} ? 1 : 0,
+        git_target_error => $tinfo->{error},
         current_branch  => $self->get_current_branch($c),
         # current_worktree = registry key from app_workflow (path-based worktree dir name under ~/.comserv/worktrees/).
         # Used to highlight the matching row in Develop Servers / Branch Servers list (b.name).

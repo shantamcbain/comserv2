@@ -299,13 +299,24 @@ sub resolve_target {
                 publish  => 1,
             };
         }
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_target',
-            "Unknown git target '$target' -> falling back to local");
+        # UNKNOWN TARGET FAILS CLOSED. This used to fall back to the local repo, so
+        # /admin/git?target=<typo-or-lost-registry-key> quietly showed -- and committed
+        # to -- the Comserv checkout while the URL claimed another repo. An empty
+        # `external_repos` in worktrees.json is the usual cause (that file is gitignored
+        # and hand-edited, so an outside rewrite can drop a key with no trace). Return a
+        # target with NO repo so every op fails with this reason instead.
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_target',
+            "Unknown git target '$target' — no %TARGET_HOSTS entry and no matching "
+          . "external_repos key in root/config/worktrees.json; refusing to fall back to "
+          . "the local repo");
         return {
-            mode  => 'local',
-            repo  => $self->repo_path($c),
+            mode  => 'unknown',
+            repo  => undef,
             host  => '', user => '', port => 22,
-            label => 'Local (this app host)',
+            label => "Unknown target '$target'",
+            key   => $target,
+            error => "Unknown git target '$target': register it under external_repos in "
+                   . "root/config/worktrees.json (label, repo, hermes_port) or add a host row.",
         };
     }
 
@@ -505,13 +516,26 @@ sub _run {
     }
 
     # If the caller didn't pass an explicit target, honor the one bound for this
-    # request (set once by the controller from the dashboard's target selector).
+    # request (set once by _bind_target from the dashboard's target selector).
     # This lets the whole subsystem route to a remote host with a single line of
     # controller code rather than threading target through every public method.
+    # ONLY the stashed binding counts: a raw `target` request param is a BRANCH on
+    # some endpoints (POST /admin/git/merge uses source=main&target=<branch>), and
+    # reading it here resolved a branch name as a host target. With unknown targets
+    # now failing closed that would turn every merge into "repository path could not
+    # be resolved"; before it silently fell back to local. _bind_target is the one
+    # and only binding point.
     unless ($opts{target} || $opts{repo}) {
-        my $req_target = $c->stash->{git_target}
-                      // ($c->req ? $c->req->param('target') : undef);
+        my $req_target = $c->stash->{git_target};
         $tinfo = $self->resolve_target($c, $req_target) if defined $req_target;
+    }
+
+    # An unresolvable target must never run git anywhere: report the reason and stop.
+    if (my $terr = $tinfo->{error}) {
+        $result->{error} = $terr;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_run',
+            "target error: $terr (refused '" . ($argv[0] // '') . "')");
+        return $result;
     }
 
     if ($tinfo->{mode} eq 'ssh') {
@@ -2102,6 +2126,20 @@ sub _save_worktree_config {
     my ($self, $cfg) = @_;
     my $file = __FILE__;
     $file =~ s{lib/Comserv/Util/Git\.pm$}{root/config/worktrees.json};
+
+    # Never let a caller erase keys it does not own. worktrees.json is gitignored and
+    # hand-edited, so a dropped key has no history to restore from. Callers own
+    # base_dir/branches (create_worktree/remove_worktree); everything else registered
+    # on disk — external_repos (git+Hermes targets that are not Comserv worktrees) and
+    # update_all_skip — is copied back unless the caller changed it explicitly.
+    if (ref $cfg eq 'HASH') {
+        my $disk = eval { _worktree_json_fresh() } || {};
+        for my $k (sort keys %$disk) {
+            next if exists $cfg->{$k};
+            $cfg->{$k} = $disk->{$k};
+        }
+    }
+
     my $ok = eval {
         open my $fh, '>', $file or die $!;
         print $fh encode_json($cfg);
