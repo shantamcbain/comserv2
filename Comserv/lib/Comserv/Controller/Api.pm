@@ -2388,6 +2388,96 @@ sub _api_via_note {
     return $note;
 }
 
+=head2 api_workday_check
+
+GET /api/workday/check
+
+Read-only workstation report: open logs older than 12 hours, status-5 todos
+with no log row, Hermes processes, branch servers other than :4006, and
+branch HEADs that are 14 days old and still ahead of main.
+
+=cut
+
+sub api_workday_check :Path('workday/check') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    my $gate = $self->_api_gate($c, module => 'todo', action => 'read', defer_site => 1) or return;
+    unless (($c->req->method || '') =~ /^(GET|HEAD)$/i) {
+        $c->res->status(405);
+        $c->res->body(encode_json({ success => 0, error => 'GET only' }));
+        return;
+    }
+    my $r = $self->_api_authorize($c, $gate, module => 'todo', action => 'read', sitename => _api_request_site($c)) or return;
+    if ($r->{own_only}) {
+        $self->_json_error($c, 403, 'Your role may not read the workstation workday report', 'own_only');
+        return;
+    }
+    require Comserv::Util::WorkdayStandard;
+    my $ws = eval { Comserv::Util::TodoLog->work_status($c) };
+    my $rows = ($ws && ref $ws->{active} eq 'ARRAY') ? $ws->{active} : [];
+    my $report = eval { Comserv::Util::WorkdayStandard->check(work_rows => $rows) };
+    if ($@ || !$report) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_workday_check', "check failed: $@");
+        $c->res->status(500);
+        $c->res->body(encode_json({ success => 0, error => "$@" }));
+        return;
+    }
+    my $n = $report->{counts} || {};
+    my @roles = @{ $gate->{roles} || [] };
+    my $role = Comserv::Util::WorkdayStandard->role_class(@roles);
+    $report->{session} = {
+        sitename  => ($c->stash->{SiteName} || $c->session->{SiteName} || ''),
+        username  => ($gate->{username} || ''),
+        roles     => \@roles,
+        role_class => $role,
+        log_style => Comserv::Util::WorkdayStandard->log_style($role),
+        via       => ($gate->{via} || ''),
+    };
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_workday_check',
+        sprintf('stale_logs=%d no_log=%d hermes=%d extra_servers=%d stale_commits=%d',
+            $n->{stale_logs} // 0, $n->{started_without_log} // 0,
+            $n->{hermes} // 0, $n->{extra_servers} // 0, $n->{stale_commits} // 0));
+    $c->res->body(encode_json($report));
+}
+
+=head2 api_workday_end_of_day
+
+POST /api/workday/end_of_day { confirm: 1 }
+
+Stops every registered branch server except :4006 and signals Hermes
+dashboard/gateway processes on this host. Does not close todo logs.
+
+=cut
+
+sub api_workday_end_of_day :Path('workday/end_of_day') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    my $gate = $self->_api_gate($c, module => 'todo', action => 'update', defer_site => 1) or return;
+    my $data = $self->_api_json_body($c);
+    unless ($data->{confirm}) {
+        $self->_json_error($c, 400, 'confirm:1 required', 'confirm');
+        return;
+    }
+    require Comserv::Util::WorkdayStandard;
+    my $ws = eval { Comserv::Util::TodoLog->work_status($c) };
+    my $rows = ($ws && ref $ws->{active} eq 'ARRAY') ? $ws->{active} : [];
+    my $res = eval {
+        Comserv::Util::WorkdayStandard->end_of_day(confirm => 1, work_rows => $rows);
+    };
+    if ($@ || !$res) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_workday_end_of_day', "end_of_day failed: $@");
+        $c->res->status(500);
+        $c->res->body(encode_json({ success => 0, error => "$@" }));
+        return;
+    }
+    $self->logging->log_with_details($c, ($res->{success} ? 'info' : 'warn'), __FILE__, __LINE__,
+        'api_workday_end_of_day',
+        'stopped=' . scalar(@{ $res->{stopped} || [] })
+        . ' hermes=' . scalar(@{ $res->{hermes_signaled} || [] })
+        . ' errors=' . scalar(@{ $res->{errors} || [] }));
+    $c->res->body(encode_json($res));
+}
+
 =head2 api_todo_work_status
 
 GET /api/todo/work_status              — all todos currently being worked (status 5 / open log)
