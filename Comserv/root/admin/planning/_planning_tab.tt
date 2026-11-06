@@ -45,6 +45,7 @@
                     <select id="bs-select" style="flex:1;min-width:180px;padding:4px 8px;border:1px solid #fd7e14;border-radius:4px;font-family:monospace;font-size:0.9em;">
                         <option value="">— select a branch —</option>
                         [% FOREACH b IN all_branches %]
+                        [% NEXT IF b.external %][%# externals have no Catalyst port to open %]
                         <option value="[% scheme %]://[% open_host %]:[% b.port %][% b.url %]"
                             [% IF b.name == cur_branch %]selected[% END %]>
                             [% b.label %] :[% b.port %][% IF b.name == cur_branch %] ←[% END %]
@@ -86,6 +87,7 @@
                         <th style="padding:4px 8px;"></th>
                     </tr>
                     [% FOREACH b IN all_branches %]
+                    [% NEXT IF b.external %][%# externals render below: no port, no server to start %]
                     <tr style="border-bottom:1px solid var(--border-color);[% IF b.name == cur_branch %]background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));[% END %]">
                         <td style="padding:5px 8px;white-space:nowrap;"><code>[% b.label %]</code>
                             [% IF b.name == cur_branch %]<span style="color:#fd7e14;font-size:0.8em;"> ← current</span>[% END %]
@@ -105,18 +107,25 @@
                         </td>
                     </tr>
                     [% END %]
+                    [%# Repos that are not Comserv worktrees (worktrees.json external_repos).
+                       Registry-driven, never hardcoded: a hardcoded OpenBafangTool row here
+                       kept offering a /admin/git?target=openbafang link after the registry
+                       entry was lost, and the Git page then silently served the local repo. %]
+                    [% FOREACH x IN all_branches %]
+                    [% NEXT UNLESS x.external %]
                     <tr style="border-bottom:1px solid var(--border-color);">
-                        <td style="padding:5px 8px;white-space:nowrap;"><code>OpenBafangTool · besst-uart-support</code></td>
+                        <td style="padding:5px 8px;white-space:nowrap;"><code>[% x.label | html %]</code></td>
                         <td style="padding:5px 8px;white-space:nowrap;"><code>git</code></td>
                         <td style="padding:5px 8px;white-space:nowrap;font-size:0.85em;color:var(--text-muted-color);">external repo</td>
                         <td style="padding:5px 8px;">
-                            <code style="font-size:0.82em;user-select:all;cursor:text;color:var(--text-muted-color);">/home/shanta/dev/OpenBafangTool</code>
+                            <code style="font-size:0.82em;user-select:all;cursor:text;color:var(--text-muted-color);">[% x.repo | html %]</code>
                         </td>
                         <td style="padding:5px 8px;white-space:nowrap;">
-                            <a href="/admin/git?target=openbafang"
+                            <a href="/admin/git?target=[% x.git_target | html %]"
                                style="padding:2px 8px;background:var(--primary-color);color:#fff;border-radius:3px;font-size:0.78em;text-decoration:none;">Git</a>
                         </td>
                     </tr>
+                    [% END %]
                 </table>
                 [% END %]
             </div>
