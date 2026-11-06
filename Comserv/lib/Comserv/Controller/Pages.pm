@@ -194,35 +194,13 @@ sub create :Path('/pages/create') :Args(0) {
                 created_by => $c->session->{username} || 'admin'
             };
             
-            my $exists = $c->model('DBEncy')->resultset('Page')->search(
-                {
-                    sitename  => $page_data->{sitename},
-                    page_code => $page_data->{page_code},
-                },
-                { rows => 1 }
-            )->single;
-
-            if ($exists) {
-                $c->stash(
-                    error_msg => "Page code '$page_data->{page_code}' already exists for site '$page_data->{sitename}'.",
-                    form_data => $params
-                );
-            } else {
-            eval {
-                my $page = $c->model('DBEncy')->resultset('Page')->create($page_data);
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create', "Page created: " . $page->page_code);
-                
+            # Nov 5 2026: shared with the AI draft path (create_page_record).
+            my $res = $self->create_page_record($c, $page_data);
+            if ($res->{success}) {
                 $c->flash->{success_message} = 'Page created successfully';
-                $c->response->redirect($c->uri_for('/page', $page->page_code));
-            };
-            
-            if ($@) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', "Error creating page: $@");
-                $c->stash(
-                    error_msg => "Error creating page: $@",
-                    form_data => $params
-                );
-            }
+                $c->response->redirect($c->uri_for('/page', $res->{page}->page_code));
+            } else {
+                $c->stash(error_msg => $res->{error}, form_data => $params);
             }
         }
     }
@@ -244,6 +222,129 @@ sub create :Path('/pages/create') :Args(0) {
         is_csc => ($current_sitename eq 'CSC'),
         template => 'pages/create.tt'
     );
+}
+
+# ------------------------------------------------------------------
+# Shared page create (Nov 5 2026). Used by /pages/create and the AI draft
+# path so every page is made the same way (DBIx::Class, duplicate check,
+# logging). Returns { success, page } or { success => 0, error, exists }.
+# ------------------------------------------------------------------
+sub create_page_record {
+    my ($self, $c, $data) = @_;
+    for my $f (qw(sitename page_code title)) {
+        return { success => 0, error => "Missing $f" } unless defined $data->{$f} && $data->{$f} =~ /\S/;
+    }
+    my %row = %$data;
+    delete $row{submenu} unless $self->ensure_page_submenu_column($c);
+    my $rs = $c->model('DBEncy')->resultset('Page');
+    my $exists = $rs->search({ sitename => $row{sitename}, page_code => $row{page_code} }, { rows => 1 })->single;
+    return { success => 0, exists => 1,
+             error => "Page code '$row{page_code}' already exists for site '$row{sitename}'." } if $exists;
+    my $page = eval { $rs->create(\%row) };
+    if ($@ || !$page) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_page_record', "Error creating page: $@");
+        return { success => 0, error => "Error creating page: $@" };
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_page_record',
+        'Page created: ' . $page->page_code . ' status=' . ($page->status // ''));
+    return { success => 1, page => $page };
+}
+
+# ------------------------------------------------------------------
+# AI help for the editor (phases 1-4). JSON only. Same rights as
+# /pages/create and /pages/edit: admin, and non-CSC admins only for their
+# own site. AI output is a preview; only ai_draft saves, and always as a
+# NEW page with status 'draft' (never overwrites an existing page).
+# ------------------------------------------------------------------
+sub _ai_json {
+    my ($self, $c, $data, $status) = @_;
+    $c->response->status($status) if $status;
+    $c->stash(json => $data);
+    $c->forward('View::JSON');
+}
+
+sub _ai_guard {
+    my ($self, $c, $sitename) = @_;
+    unless ($self->_check_admin_access($c)) {
+        $self->_ai_json($c, { success => 0, error => 'Page edit rights required' }, 403);
+        return;
+    }
+    unless (($c->request->method // '') eq 'POST') {
+        $self->_ai_json($c, { success => 0, error => 'POST required' }, 405);
+        return;
+    }
+    my $current = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $site = (defined $sitename && $sitename =~ /\S/) ? $sitename : $current;
+    if ($current ne 'CSC' && $site ne $current) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'ai_guard',
+            "Non-CSC admin from site '$current' tried AI page help for site '$site'");
+        $self->_ai_json($c, { success => 0, error => "You can only work on pages for your own site ($current)" }, 403);
+        return;
+    }
+    return $site;
+}
+
+sub _page_assist {
+    my ($self, $c) = @_;
+    require Comserv::Model::AI2::PageAssist;
+    my $m = eval { $c->model('AI2::PageAssist') };
+    return ($m && ref $m) ? $m : Comserv::Model::AI2::PageAssist->new;
+}
+
+sub ai_assist :Path('/pages/ai_assist') :Args(0) {
+    my ($self, $c) = @_;
+    my $p = $c->request->params;
+    defined(my $site = $self->_ai_guard($c, $p->{sitename})) or return;
+    my $r = eval { $self->_page_assist($c)->assist($c, action => $p->{action}, text => $p->{text},
+                   title => $p->{title}, notes => $p->{notes}, page_code => $p->{page_code}) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ai_assist', "assist threw: $@");
+        $r = { success => 0, error => 'AI assist failed' };
+    }
+    $self->_ai_json($c, $r);
+}
+
+sub ai_write :Path('/pages/ai_write') :Args(0) {
+    my ($self, $c) = @_;
+    my $p = $c->request->params;
+    defined(my $site = $self->_ai_guard($c, $p->{sitename})) or return;
+    my $r = eval { $self->_page_assist($c)->write_page($c, topic => $p->{topic}, notes => $p->{notes}, sitename => $site) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ai_write', "write_page threw: $@");
+        $r = { success => 0, error => 'AI writer failed' };
+    }
+    if ($r && $r->{success}) {
+        my $l = eval { $self->_page_assist($c)->suggest_links($c, sitename => $site, text => $r->{page}{body}, title => $r->{page}{title}) };
+        $r->{placement} = $l->{placement} if $l && $l->{success};
+    }
+    $self->_ai_json($c, $r);
+}
+
+sub ai_links :Path('/pages/ai_links') :Args(0) {
+    my ($self, $c) = @_;
+    my $p = $c->request->params;
+    defined(my $site = $self->_ai_guard($c, $p->{sitename})) or return;
+    my $r = eval { $self->_page_assist($c)->suggest_links($c, sitename => $site, text => $p->{text},
+                   title => $p->{title}, page_code => $p->{page_code}) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ai_links', "suggest_links threw: $@");
+        $r = { success => 0, error => 'Link suggestions failed' };
+    }
+    $self->_ai_json($c, $r);
+}
+
+# Phase 4: save an AI-written page as a NEW draft through create_page_record.
+sub ai_draft :Path('/pages/ai_draft') :Args(0) {
+    my ($self, $c) = @_;
+    my $p = $c->request->params;
+    defined(my $site = $self->_ai_guard($c, $p->{sitename})) or return;
+    require Comserv::Model::AI2::PageCreate;
+    my $r = eval { Comserv::Model::AI2::PageCreate->new->save_draft($c, $self, { %$p, sitename => $site }) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ai_draft', "save_draft threw: $@");
+        $r = { success => 0, error => 'Draft save failed' };
+    }
+    $self->_ai_json($c, $r);
 }
 
 # Admin: Edit existing page
@@ -823,15 +924,17 @@ sub hide_forager_page :Path('/admin/hide_forager_page') :Args(0) {
 sub ensure_page_submenu_column {
     my ($self, $c) = @_;
     return 1 if $self->{_page_submenu_col};
-    my $nav = $c->controller('Navigation');
-    return 0 unless $nav && $nav->can('column_exists');
-    $self->{_page_submenu_col} = $nav->column_exists($c, 'page', 'submenu') ? 1 : 0;
+    # DBIx::Class probe (no raw SQL): selecting the column fails if it is missing.
+    $self->{_page_submenu_col} = eval {
+        $c->model('DBEncy')->resultset('Page')->search({}, { columns => ['submenu'], rows => 1 })->first; 1;
+    } ? 1 : 0;
+    # Nov 5 2026 (phase 5): no runtime ALTER TABLE. The submenu column is
+    # defined in Result/Page.pm; add it with the app's schema compare. Until
+    # then submenu values are simply not saved (and we log it once).
     unless ($self->{_page_submenu_col}) {
-        eval {
-            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
-            $dbh->do("ALTER TABLE page ADD COLUMN submenu varchar(64) DEFAULT '' AFTER menu");
-            $self->{_page_submenu_col} = 1;
-        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'ensure_page_submenu_column',
+            'page.submenu column missing; run schema compare (Result/Page.pm) to add it')
+            unless $self->{_page_submenu_warned}++;
     }
     return $self->{_page_submenu_col};
 }

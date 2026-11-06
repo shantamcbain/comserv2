@@ -9,6 +9,7 @@ package Comserv::Util::AI::HermesOverrunGuard;
 # evaluator loop in script/comserv_server.pl. flock + min interval = idempotent.
 
 use strict;
+use Comserv::Util::AppTime ();
 use warnings;
 use JSON::PP ();
 use HTTP::Tiny;
@@ -145,7 +146,7 @@ sub new {
 
 sub _now { my $s = shift; defined $s->{now} ? $s->{now} : time }
 
-sub pt { my $e = shift // time; local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset(); strftime('%a %b %d %H:%M PT', localtime $e) }
+sub pt { my $e = shift // time; local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); strftime('%a %b %d %H:%M PT', localtime $e) }
 
 # ---- pure decision ---------------------------------------------------------
 # in: thrash (int|undef), openrouter {ok,day_usd,...}, state {tripped}, caps, thrash_n,
@@ -666,7 +667,7 @@ sub supergrok_daily_off {
     return 0 unless ref $sg eq 'HASH' && $sg->{off_today} && ($sg->{mode} // 'grok') ne 'grok';
     # Oct 11 2026: the lock lasts for the WORK day (starts day_start_hour PT, default 5).
     my $h = (defined $sg->{day_start_hour} && $sg->{day_start_hour} =~ /^\d+$/) ? $sg->{day_start_hour} : 5;
-    my $today = do { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset(); my $d = POSIX::strftime('%Y-%m-%d', localtime(($now // time) - $h * 3600)); $d };
+    my $today = do { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); my $d = POSIX::strftime('%Y-%m-%d', localtime(($now // time) - $h * 3600)); $d };
     POSIX::tzset();
     return (($sg->{lock_date} // '') eq $today) ? 1 : 0;
 }
@@ -858,7 +859,7 @@ sub parse_api_calls {
     if (defined $opt{anchor}) {
         # Local readings are in the workstation's zone, not the process zone:
         # Comserv.pm sets TZ=UTC inside the app, which made both readings equal.
-        local $ENV{TZ} = $opt{tz} // $ENV{HERMES_LOG_TZ} // 'America/Vancouver';
+        local $ENV{TZ} = $opt{tz} // $ENV{HERMES_LOG_TZ} // Comserv::Util::AppTime->app_tz;
         POSIX::tzset();
         my $ref = $opt{anchor};
         for my $i (reverse 0 .. $#lines) {
@@ -1450,6 +1451,10 @@ sub chain_context {
     my $path = $s->{chains_file} // "$s->{app_root}/data/ai_model_chains.json";
     my $ld = eval { Comserv::Util::AI::ModelChains->load(undef, path => $path, logger => sub { $s->log_line("ai_model_chains: $_[1]") }) };
     return () unless $ld;
+    # Nov 5 2026: an invalid or missing chains file silently fell back to perl_default; log it as an error.
+    if (($ld->{source} // "") ne "file") {
+        eval { require Comserv::Util::Logging; Comserv::Util::Logging->instance->log_with_details(undef, "error", __FILE__, __LINE__, "chain_context", "ai_model_chains: $path not used (source=" . ($ld->{source} // "?") . "); Hermes chain is on Perl defaults") };
+    }
     my @chain = Comserv::Util::AI::ModelChains->hermes_chain($ld);
     # Oct 28 2026: a PROBATION model (trials.*.probation) is a chain step only while its probation is begun and not stopped; once it
     # hits its limit (10 sessions / $5) it is out of the chain until Shanta approves the audit (script/ai_trial.pl approve).
@@ -2071,15 +2076,8 @@ sub run {
         return $d;
     }
 
-    # Oct 28 2026 hysteresis (Shanta: flapping trip/restore): count consecutive runs that are authoritatively clear; a trip is restored
-    # only after $CLEAR_RUNS of them. Any over / unknown / live-estimate-only reading resets the count. State is shared, so a server
-    # running older code that restores on its own cannot be stopped here; the next run of this code re-trips (see report).
-    if ($st->{tripped} && !$shielded) {
-        if ($d->{action} eq 'restore') {
-            $st->{clear_streak} = ($st->{clear_streak} // 0) + 1;
-            if ($st->{clear_streak} < $CLEAR_RUNS) { $d->{action} = 'hold'; $d->{clear_streak} = $st->{clear_streak}; $d->{clear_runs_needed} = $CLEAR_RUNS }
-        } else { $st->{clear_streak} = 0 }
-    }
+    # Nov 4 2026: the Oct 28 streak block that stood here was removed; it duplicated the Oct 31 block below, which then
+    # zeroed the streak on every run (action already "hold"), so a trip could never restore. One streak block remains.
     # Oct 23: 30-minute cool-down between a trip and a restore.
     if ($d->{action} eq 'restore' && $st->{since} && $t - $st->{since} < $COOLDOWN_S) {
         $d->{action} = 'hold';

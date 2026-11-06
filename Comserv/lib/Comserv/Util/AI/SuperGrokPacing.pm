@@ -16,6 +16,7 @@ package Comserv::Util::AI::SuperGrokPacing;
 # Pure: callers pass readings, a units callback and the job sources.
 
 use strict;
+use Comserv::Util::AppTime ();
 use warnings;
 use POSIX qw(strftime floor);
 use Time::Local qw(timelocal);
@@ -97,7 +98,7 @@ sub day_start_hour {
 sub pt_date {
     my ($e, $h) = @_;
     $h //= $DAY_START_HOUR;
-    local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+    local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset();
     my @l = localtime $e;
     my $d = ($l[2] < $h) ? strftime('%Y-%m-%d', localtime(timelocal(0, 0, 12, @l[3, 4, 5]) - 86400))
                          : strftime('%Y-%m-%d', @l);
@@ -144,7 +145,7 @@ sub daily_budget {
 sub day_start {
     my ($now, $h) = @_;
     $h //= $DAY_START_HOUR;
-    local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+    local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset();
     my @l = localtime $now;
     my $t = timelocal(0, 0, $h, @l[3, 4, 5]);
     if ($t > $now) { my @y = localtime(timelocal(0, 0, 12, @l[3, 4, 5]) - 86400); $t = timelocal(0, 0, $h, @y[3, 4, 5]) }
@@ -161,7 +162,7 @@ sub burn_alerts {
     # 2026-10-18: after midnight the 05:00-05:00 work day still belongs to the
     # previous calendar day; its alerts are no longer "today" - send nothing.
     if (defined $in{day_from} && defined $in{now}) {
-        local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+        local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset();
         my ($d0, $d1) = (strftime('%Y-%m-%d', localtime $in{day_from}), strftime('%Y-%m-%d', localtime $in{now}));
         POSIX::tzset();
         return \@a if $d0 ne $d1;
@@ -169,7 +170,7 @@ sub burn_alerts {
     my $rise = $in{used} - $in{used_day_start};
     my $basis = $in{used_basis} // 'estimate';
     if ($rise > $c->{day_rise_pts}) {
-        my $day = defined $in{day_from} ? do { local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+        my $day = defined $in{day_from} ? do { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset();
             my $x = strftime('%a %b %d', localtime $in{day_from}); POSIX::tzset(); $x } : 'today';
         push @a, { kind => 'day_rise', level => 'critical', value => sprintf('%.1f', $rise), basis => $basis,
                    message => sprintf('Super Grok burned %.0f points in the %s work day (since %s; limit %s): now %.0f%% used (%s). Slow down or stop the big sessions.',
@@ -190,18 +191,18 @@ sub burn_alerts {
     return \@a;
 }
 
-sub _tz { local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset(); }
+sub _tz { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); }
 
 sub pt {
     my ($e) = @_;
     return '' unless defined $e && $e > 0;
-    local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+    local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset();
     return strftime('%a %b %d %H:%M PT', localtime $e);
 }
 
 # Default anchor: the Thu Oct 8 2026 10:31 PT reset.
 sub default_anchor {
-    local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+    local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset();
     return timelocal(0, 31, 10, 8, 9, 2026);
 }
 
@@ -298,7 +299,7 @@ sub pacing {
     my $hours_left = $days_left * 24;
     my $target_day = $days_left > 0 ? $left / ($days_left < 0.25 ? 0.25 : $days_left) : $left;
     my $mtok_day = $rate > 0 ? $target_day / $rate : undef;
-    my $dow = do { local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset(); (localtime $now)[6] };   # 1 Mon, 2 Tue
+    my $dow = do { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); (localtime $now)[6] };   # 1 Mon, 2 Tue
     my $status = $delta > $PACE_BAND ? 'ahead' : $delta < -$PACE_BAND ? 'behind' : 'on_pace';
     my %o = (
         cycle_start => $cs, cycle_start_pt => pt($cs), reset_at => $reset, reset_pt => pt($reset),

@@ -7,6 +7,7 @@ use strict;
 use warnings;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
+use Comserv::Util::AppTime ();
 use Getopt::Long;
 use JSON::PP ();
 use POSIX qw(strftime);
@@ -33,7 +34,7 @@ for my $r (@rows) {
         $r->{calls}, $r->{quota_pct}, $r->{usd}, $r->{median_turn_s} // '-', $oc;
 }
 if ($inbox) {
-    my $date = do { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset(); strftime('%Y-%m-%d', localtime) };
+    my $date = do { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); strftime('%Y-%m-%d', localtime) };
     my $dir = "$root/data/ai_eval_inbox";
     mkdir $dir unless -d $dir;
     my $f = "$dir/$date-model-scorecard.json";
