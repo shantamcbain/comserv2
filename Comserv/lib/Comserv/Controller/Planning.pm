@@ -587,7 +587,6 @@ sub daily :Path('/planning/daily') :Args {
             {
                 order_by => [
                     { -asc  => 'priority'      },
-                    { -desc => 'is_blocking'   },
                     { -desc => 'last_mod_date' },
                 ],
                 rows => 2000,
@@ -673,10 +672,14 @@ sub daily :Path('/planning/daily') :Args {
                 || $a->{ap_score} <=> $b->{ap_score}
                 || $a->{priority} <=> $b->{priority}
         } @scored;
+        # Pre-filter universe. A blocker filed on this project is still
+        # looked up here so it can be inserted next to the todo it blocks.
+        my @focus_universe = @all_sorted;
 
-        # Branch worktrees: RANK, do not exclusive-filter. Active (status 5)
-        # first, then this branch's projects, blocking above blocked. main
-        # keeps the global score order. Escape hatch: ?filter_project=all.
+        # Branch worktrees show this branch's todos. A blocker is not a
+        # member of the list unless the todo it blocks is already in it,
+        # and then it sits immediately before that todo. main shows every
+        # branch, with the same adjacency. Escape hatch: ?filter_project=all.
         my $cur_branch = $c->stash->{app_workflow} || 'main';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
             "Branch focus check: cur_branch='" . ($cur_branch // '')
@@ -716,6 +719,7 @@ sub daily :Path('/planning/daily') :Args {
             } @all_sorted;
             @all_sorted = grep {
                 Comserv::Util::FocusRanking::todo_matches_branch($_, $cur_branch, \%branch_scope)
+                    || Comserv::Util::FocusRanking::is_active_work($_)
             } @all_sorted;
             if (@active_rows) {
                 my %_have = map { ($_->{record_id} // 0) => 1 } @all_sorted;
@@ -807,6 +811,13 @@ sub daily :Path('/planning/daily') :Args {
                         . "apply_order returned nothing (rows=" . scalar(@all_sorted) . ")");
                 }
             }
+            my $before_place = scalar @all_sorted;
+            @all_sorted = @{ Comserv::Util::FocusRanking::apply_blocker_placement(
+                \@all_sorted, \@focus_universe
+            ) };
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
+                "Blocker placement '$cur_branch': $before_place -> " . scalar(@all_sorted)
+                . " (blocker kept only beside the todo it blocks)");
         }
         elsif ($filter_project && !$show_all_projects) {
             @all_sorted = grep {
@@ -814,6 +825,16 @@ sub daily :Path('/planning/daily') :Args {
                 || ($_->{project_parent_id} // '') eq $filter_project
                 || ($_->{parent_id} // '') eq $filter_project
             } @all_sorted;
+            @all_sorted = @{ Comserv::Util::FocusRanking::apply_blocker_placement(
+                \@all_sorted, \@focus_universe
+            ) };
+        }
+        else {
+            # main shows every branch. The blocker still sits immediately
+            # before the todo it blocks, not at the top because is_blocking.
+            @all_sorted = @{ Comserv::Util::FocusRanking::place_blockers_before_blocked(
+                \@all_sorted
+            ) };
         }
 
         my $focus_total = scalar @all_sorted;
@@ -1577,17 +1598,6 @@ sub daily_impl :Private {
             next if Comserv::Util::TodoTypes::is_calendar_fixture($h);
             next if ($h->{is_recurring} // 0);
             Comserv::Util::TodoRanking::score_todo($h, { now_epoch => $now_epoch });
-            # Branch filter AFTER scoring so in-progress-any-branch still shows.
-            if (%scope) {
-                my $in_scope = ($scope{ $h->{project_id} // '' } ? 1 : 0)
-                    || (($h->{status} // '') eq '5')
-                    || ($h->{in_progress} ? 1 : 0);
-                next unless $in_scope;
-            }
-            # Pass the decorated column hash (has every real column PLUS ap_score /
-            # project_name / blocking_names / etc. set by score_todo) to the template,
-            # exactly like Controller/Todo.pm. Passing the bare DBIx row left those
-            # fields undef and (with the is_recurring skip) could empty the queue.
             my $tod       = $h->{time_of_day} // '';
             my $time_min  = 9 * 60;   # default when no time set (matches _reschedule_time_min)
             $time_min = $1 * 60 + $2 if $tod =~ /^(\d{1,2}):(\d{2})/;
@@ -1599,23 +1609,34 @@ sub daily_impl :Private {
                 time_min    => $time_min,
             };
         }
-        # Priorities are work only — lunch/breaks/appointments stay on the calendar.
-        # Sort mirrors sub daily's branch queue: Active (any branch) first,
-        # then this branch's projects, blockers directly above the todo they
-        # block, then score, then priority.
-        @scored = sort {
-            my $a_act = ((($a->{todo}{status} // '') eq '5') || $a->{in_progress}) ? 1 : 0;
-            my $b_act = ((($b->{todo}{status} // '') eq '5') || $b->{in_progress}) ? 1 : 0;
-            my $a_br  = $scope{ $a->{todo}{project_id} // '' } ? 1 : 0;
-            my $b_br  = $scope{ $b->{todo}{project_id} // '' } ? 1 : 0;
-            my $a_blocked = ($a->{todo}{blocked_by_todo_id} && !$a->{todo}{blocker_done}) ? 1 : 0;
-            my $b_blocked = ($b->{todo}{blocked_by_todo_id} && !$b->{todo}{blocker_done}) ? 1 : 0;
-            $b_act <=> $a_act
-                || $b_br <=> $a_br
-                || $a_blocked <=> $b_blocked
-                || ($a->{score} // 0) <=> ($b->{score} // 0)
-                || ($a->{pri} // 5) <=> ($b->{pri} // 5)
-        } @scored;
+        # Same rule as sub daily: a blocker is kept only when the todo it
+        # blocks is in this list, and it sits immediately before that todo.
+        my @impl_universe = map { $_->{todo} } @scored;
+        my @impl_kept;
+        if ($cur_branch ne 'main' && %scope) {
+            @impl_kept = grep {
+                Comserv::Util::FocusRanking::todo_matches_branch($_, $cur_branch, \%scope)
+                    || Comserv::Util::FocusRanking::is_active_work($_)
+            } @impl_universe;
+            @impl_kept = @{ Comserv::Util::FocusRanking::apply_blocker_placement(
+                \@impl_kept, \@impl_universe
+            ) };
+        }
+        else {
+            @impl_kept = @{ Comserv::Util::FocusRanking::place_blockers_before_blocked(
+                \@impl_universe
+            ) };
+        }
+        my %impl_wrap = map { $_->{todo}{record_id} => $_ } @scored;
+        @scored = map {
+            $impl_wrap{ $_->{record_id} } || {
+                todo        => $_,
+                score       => $_->{ap_score},
+                pri         => $_->{priority},
+                in_progress => $_->{in_progress} ? 1 : 0,
+                time_min    => 9 * 60,
+            }
+        } @impl_kept;
         @active_priorities = map { $_->{todo} } @scored[0..($#scored > 19 ? 19 : $#scored)];
 
         # Remaining (eligible but not in top 20) — same branch scope as the
