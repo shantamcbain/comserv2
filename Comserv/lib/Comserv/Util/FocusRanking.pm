@@ -25,7 +25,8 @@ See project 240 TODOLIST-UI, Phase 5 / 5b / 6.
 
 use parent qw(Exporter);
 our @EXPORT_OK = qw(score_todo passes_filters in_branch_scope is_active_work
-                    todo_matches_branch cmp_branch_focus);
+                    todo_matches_branch cmp_branch_focus subject_branch
+                    place_blockers_before_blocked apply_blocker_placement);
 
 # Scoring is owned by TodoRanking (single source of truth for ap_score).
 use Comserv::Util::TodoRanking ();
@@ -159,14 +160,34 @@ sub is_active_work {
     return 0;
 }
 
+# A leading [Branch] tag names the branch that owns the work. Used when a
+# row was filed on the wrong project_id (schema and planning share 138).
+# Unknown brackets ([Error], [URGENT]) are not branch tags.
+sub subject_branch {
+    my ($t) = @_;
+    $t //= {};
+    my $sub = $t->{subject} // '';
+    return '' unless $sub =~ /^\[([A-Za-z0-9_-]+)\]/;
+    my $tag = lc($1);
+    return $tag if $tag =~ /^(?:planning|aisystem|3d|git|dockerha|inventoryaccounting|schema|helpdesk|documentation)$/;
+    return '';
+}
+
 # Branch identity via project id tree, parent, name, or code keywords.
-# Do NOT match a bare "ai" substring (hits "daily"). 
+# Do NOT match a bare "ai" substring (hits "daily").
+# A [Branch] tag wins over project_id: the row belongs to the named branch,
+# not to the project it was mis-filed on.
 sub todo_matches_branch {
     my ($t, $branch, $scope) = @_;
     $t      //= {};
     $scope  //= {};
     $branch = lc($branch // '');
     return 0 unless $branch && $branch ne 'main';
+
+    my $named = subject_branch($t);
+    if ($named ne '') {
+        return $named eq $branch ? 1 : 0;
+    }
 
     my $pid = $t->{project_id} // '';
     return 1 if $pid ne '' && $scope->{$pid};
@@ -195,8 +216,10 @@ sub todo_matches_branch {
     return 0;
 }
 
-# Sort: Active first, then this branch's projects, then blocking above blocked,
-# then ap_score. Used on worktree servers only.
+# Sort: Active first, then this branch's projects, then ap_score.
+# is_blocking is NOT a sort key. A blocker is placed immediately before the
+# todo it blocks by place_blockers_before_blocked, and only in a list that
+# already contains that todo (apply_blocker_placement).
 sub cmp_branch_focus {
     my ($a, $b, $ctx) = @_;
     $a   //= {};
@@ -209,14 +232,125 @@ sub cmp_branch_focus {
     my $b_act = is_active_work($b) ? 1 : 0;
     my $a_br  = todo_matches_branch($a, $branch, $scope) ? 1 : 0;
     my $b_br  = todo_matches_branch($b, $branch, $scope) ? 1 : 0;
-    my $a_blocked = ($a->{blocked_by_todo_id} && !$a->{blocker_done}) ? 1 : 0;
-    my $b_blocked = ($b->{blocked_by_todo_id} && !$b->{blocker_done}) ? 1 : 0;
 
     return $b_act <=> $a_act
         || $b_br <=> $a_br
-        || $a_blocked <=> $b_blocked
         || ($a->{ap_score} // 0) <=> ($b->{ap_score} // 0)
         || ($a->{priority} // 5) <=> ($b->{priority} // 5);
+}
+
+# Reorder so each blocker sits immediately before the todos in this list
+# that name it. The group lands at the first blocked row, not at the top.
+# A blocker with nothing it blocks in this list stays where it was.
+sub place_blockers_before_blocked {
+    my ($rows) = @_;
+    return [] unless $rows && ref($rows) eq 'ARRAY' && @$rows;
+
+    my %by_id;
+    for my $t (@$rows) {
+        next unless ref($t) eq 'HASH' && defined $t->{record_id} && $t->{record_id} ne '';
+        $by_id{ $t->{record_id} } = $t;
+    }
+    my %direct;
+    for my $t (@$rows) {
+        next unless ref($t) eq 'HASH';
+        my $bid = $t->{blocked_by_todo_id} || next;
+        next unless $by_id{$bid};
+        next if $t->{blocker_done};
+        push @{ $direct{$bid} }, $t->{record_id};
+    }
+    return [@$rows] unless %direct;
+
+    my %emitted;
+    my @out;
+    my $emit;
+    $emit = sub {
+        my ($id) = @_;
+        return if $emitted{$id};
+        my $row = $by_id{$id} || return;
+        my $parent = $row->{blocked_by_todo_id} || 0;
+        if ($parent && $by_id{$parent} && !$row->{blocker_done}) {
+            $emit->($parent);
+        }
+        return if $emitted{$id};
+        push @out, $row;
+        $emitted{$id} = 1;
+        for my $dep (@{ $direct{$id} || [] }) {
+            $emit->($dep);
+        }
+    };
+
+    for my $t (@$rows) {
+        next unless ref($t) eq 'HASH';
+        my $id = $t->{record_id};
+        next if !defined $id || $emitted{$id};
+        # Defer a blocker until its first blocked row, so it does not float up.
+        next if $direct{$id};
+        my $bid = $t->{blocked_by_todo_id} || 0;
+        if ($bid && $by_id{$bid} && !$t->{blocker_done}) {
+            $emit->($bid);
+            next;
+        }
+        push @out, $t;
+        $emitted{$id} = 1;
+    }
+    for my $t (@$rows) {
+        my $id = $t->{record_id};
+        next if !defined $id || $emitted{$id};
+        $emit->($id);
+    }
+    return \@out;
+}
+
+# Branch list: keep rows that belong here. A blocker whose blocked todos are
+# not in this list is dropped, even if its own project_id matches — unless
+# it is started (status 5). Started work stays visible so it is not started
+# again. A blocker that is not a member is inserted when a kept row names it.
+# Then the blocker is placed immediately before those rows.
+# $all is the pre-filter universe (needed to find the blocker row). Caller logs.
+sub apply_blocker_placement {
+    my ($kept, $all) = @_;
+    $kept = [] unless $kept && ref($kept) eq 'ARRAY';
+    $all  = ($all && ref($all) eq 'ARRAY' && @$all) ? $all : $kept;
+
+    my %by_id;
+    for my $t (@$all) {
+        next unless ref($t) eq 'HASH' && defined $t->{record_id} && $t->{record_id} ne '';
+        $by_id{ $t->{record_id} } = $t;
+    }
+    my %kept_id = map { ($_->{record_id} // '') => 1 } grep { ref($_) eq 'HASH' } @$kept;
+
+    my %deps;
+    for my $t (@$all) {
+        next unless ref($t) eq 'HASH';
+        my $bid = $t->{blocked_by_todo_id} || next;
+        next if $t->{blocker_done};
+        push @{ $deps{$bid} }, $t;
+    }
+
+    my @members;
+    for my $t (@$kept) {
+        next unless ref($t) eq 'HASH';
+        my $id = $t->{record_id};
+        my $d  = $deps{$id};
+        if ($t->{is_blocking} && $d && @$d && !is_active_work($t)) {
+            next unless grep { $kept_id{ $_->{record_id} } } @$d;
+        }
+        push @members, $t;
+    }
+    %kept_id = map { ($_->{record_id} // '') => 1 } @members;
+
+    for my $t (@members) {
+        my $bid = $t->{blocked_by_todo_id} || next;
+        next if $t->{blocker_done};
+        next if $kept_id{$bid};
+        my $blocker = $by_id{$bid} || next;
+        my $bs = $blocker->{status} // '';
+        next if $bs eq '3' || $bs eq '4' || $bs =~ /^(?:done|completed|closed)$/i;
+        push @members, $blocker;
+        $kept_id{$bid} = 1;
+    }
+    return place_blockers_before_blocked(\@members);
 }
 
 # Re-export the scorer so callers import from one place.
