@@ -157,4 +157,45 @@ sub score {
     ok(Comserv::Util::FocusRanking::cmp_branch_focus($plan, $other, $ctx) < 0, 'planning ranks above 3d on planning branch');
 }
 
+{
+    my $blocker = {
+        record_id => 2280, project_id => 138, status => '1', is_blocking => 1,
+        subject => 'Schema W0.1 G0+G1',
+    };
+    my $started = { %$blocker, status => '5' };
+    my $acc = {
+        record_id => 2282, project_id => 138, status => 'open', is_blocking => 0,
+        blocked_by_todo_id => 2280,
+        subject => '[InventoryAccounting] Author AccountingPostgresMigrationPlan',
+    };
+    my $plan = { record_id => 2616, project_id => 138, status => '2', subject => 'Attention order' };
+    my $universe = [$blocker, $acc, $plan];
+    my $planning_kept = [ grep {
+        Comserv::Util::FocusRanking::todo_matches_branch($_, 'planning', { 138 => 1 })
+    } @$universe ];
+    my $placed = Comserv::Util::FocusRanking::apply_blocker_placement($planning_kept, $universe);
+    my @ids = map { $_->{record_id} } @$placed;
+    ok(!(grep { $_ == 2280 } @ids), 'idle blocker is not in the planning list');
+    ok(!(grep { $_ == 2282 } @ids), 'accounting row is not a planning member');
+    ok((grep { $_ == 2616 } @ids), 'planning work stays');
+
+    my $started_kept = [ grep {
+        Comserv::Util::FocusRanking::todo_matches_branch($_, 'planning', { 138 => 1 })
+            || Comserv::Util::FocusRanking::is_active_work($_)
+    } ($started, $acc, $plan) ];
+    my $started_placed = Comserv::Util::FocusRanking::apply_blocker_placement(
+        $started_kept, [$started, $acc, $plan]
+    );
+    my @sids = map { $_->{record_id} } @$started_placed;
+    ok((grep { $_ == 2280 } @sids), 'started blocker stays on the list');
+
+    my $acct_kept = [ grep {
+        Comserv::Util::FocusRanking::todo_matches_branch($_, 'inventoryaccounting', {})
+    } @$universe ];
+    my $acct_placed = Comserv::Util::FocusRanking::apply_blocker_placement($acct_kept, $universe);
+    my @aids = map { $_->{record_id} } @$acct_placed;
+    is($aids[0], 2280, 'blocker sits immediately before the accounting todo');
+    is($aids[1], 2282, 'blocked accounting todo follows its blocker');
+}
+
 done_testing();
