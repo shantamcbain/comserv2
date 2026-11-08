@@ -414,6 +414,39 @@ sub plan :Local :Args(1) {
     );
 }
 
+# POST: build the whole-food week plan (recipes + 7-day meal plan) from this site's inventory.
+sub week_plan :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'week_plan', 'HealthKitchen week plan' );
+    unless ( $c->req->method eq 'POST' && $c->session->{user_id} && $self->hk->meal_plan_ready($c) ) {
+        $c->flash->{error_msg} = 'Log in and use the form to build a week plan.';
+        $c->response->redirect( $c->uri_for( $self->action_for('mealplans') ) );
+        $c->detach;
+        return;
+    }
+    my $start = $c->req->params->{start_date} // '';
+    $start = '' unless $start =~ /^\d{4}-\d{2}-\d{2}$/;
+    require Comserv::Util::HealthKitchen::WeekPlan;
+    my $res = eval {
+        Comserv::Util::HealthKitchen::WeekPlan::build_week( $c->model('DBEncy')->schema,
+            site => $self->hk->sitename($c), user_id => $c->session->{user_id},
+            username => $c->session->{username}, start_date => $start || undef );
+    };
+    if ($res) {
+        my @need = map { $_->{label} } grep { !$_->{optional} } @{ $res->{shopping} };
+        $c->flash->{success_msg} = "Week plan ready: $res->{recipes_created} new recipes, $res->{entries_created} meals."
+            . ( @need ? ' Shopping list: ' . join( ', ', @need ) . '.' : '' );
+    }
+    else {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'week_plan', "failed: $@" );
+        $c->flash->{error_msg} = 'Could not build the week plan.';
+    }
+    $c->response->redirect( $res && $res->{plan_id}
+        ? $c->uri_for( $self->action_for('mealplan'), $res->{plan_id} )
+        : $c->uri_for( $self->action_for('mealplans') ) );
+    $c->detach;
+}
+
 sub mealplans :Local :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'mealplans',
