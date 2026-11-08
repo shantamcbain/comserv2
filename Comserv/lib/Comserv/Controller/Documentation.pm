@@ -1921,6 +1921,7 @@ sub _format_title {
 
 # Determine which category a page belongs to based on its name and path
 # --- Page-table docs (page rows shown in the documentation index) ---------
+# Only rows with page_type='documentation' are docs; regular pages stay out.
 # Category mapping, no schema change: a 'doc:<category>' tag in keywords wins;
 # otherwise 3D printer pages go to 'printing_3d'; everything else 'site_pages'.
 sub _page_doc_categories { return {
@@ -1941,7 +1942,7 @@ sub _page_table_docs {
     my @out;
     my @rows = eval {
         my $rs = $c->model('DBEncy')->resultset('Page')->search(
-            { sitename => $site_name, status => 'active' },
+            { sitename => $site_name, status => 'active', page_type => 'documentation' },
             { order_by => [ 'link_order', 'id' ] });
         map { { $_->get_columns } } $rs->all;
     };
@@ -1966,7 +1967,7 @@ sub _page_table_docs {
             site  => $r->{sitename},
             roles => $public ? [] : \@roles,
             category => $cat,
-            source => 'page',
+            source => 'page', source_label => 'Page (editable)',
             link_order => $r->{link_order} // 0,
         };
         if (defined $query) {
