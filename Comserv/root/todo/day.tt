@@ -107,6 +107,12 @@
 <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
 <link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css?v=20260806b">
 <script src="/static/js/todo_drag_drop.js"></script>
+[%# ?embed=1 sets no_wrapper, so js_load.tt never runs and the shared card
+    Start/Done handler is missing (dead buttons in the HealthKitchen Today iframe).
+    Load it here only in that case so wrapped pages do not load it twice. %]
+[% IF c.stash.no_wrapper %]
+<script src="/static/js/planning/daily-plan-utils.js?v=20261108a" defer></script>
+[% END %]
 [% END %]
 
 <style>
