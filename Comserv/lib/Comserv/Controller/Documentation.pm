@@ -596,6 +596,16 @@ sub index :Path('/Documentation') :Args(0) {
         push @{$categorized_pages->{$category}}, $page_data;
     }
     
+    # Page-table rows for this site (shown alongside .tt docs)
+    my @page_docs = $self->_page_table_docs($c, $site_name, $user_role, $is_admin);
+    my %page_cat_seen;
+    foreach my $pd (@page_docs) {
+        push @{$categorized_pages->{$pd->{category}}}, $pd;
+        $structured_pages->{$pd->{path}} = $pd;
+        push @sorted_pages, $pd->{path};
+        $page_cat_seen{$pd->{category}} = 1;
+    }
+
     # Filter categories based on user role and site
     my %filtered_categories;
     foreach my $category_key (keys %{$self->documentation_categories}) {
@@ -646,6 +656,14 @@ sub index :Path('/Documentation') :Args(0) {
         }
     }
     
+    # Categories that only exist for page-table rows
+    foreach my $pc (keys %page_cat_seen) {
+        next if $filtered_categories{$pc};
+        $filtered_categories{$pc} = $self->documentation_categories->{$pc}
+            || $self->_page_doc_categories->{$pc}
+            || { title => ucfirst($pc =~ s/_/ /gr), roles => ['public'], display_order => 900 };
+    }
+
     # Sort categories by display order
     my @sorted_categories = sort {
         ($filtered_categories{$a}{display_order} || 999) 
@@ -1902,6 +1920,72 @@ sub _format_title {
 }
 
 # Determine which category a page belongs to based on its name and path
+# --- Page-table docs (page rows shown in the documentation index) ---------
+# Only rows with page_type='documentation' are docs; regular pages stay out.
+# Category mapping, no schema change: a 'doc:<category>' tag in keywords wins;
+# otherwise 3D printer pages go to 'printing_3d'; everything else 'site_pages'.
+sub _page_doc_categories { return {
+    printing_3d => { title => '3D Printing / Maintenance', description => 'Printer maintenance pages from the page system (editable in the page editor)', roles => ['public','normal','editor','admin','developer'], site_filter => 'all', display_order => 5 },
+    site_pages  => { title => 'Site Pages', description => 'Pages from the page system for this site', roles => ['public','normal','editor','admin','developer'], site_filter => 'all', display_order => 6 },
+}; }
+
+sub _page_doc_category {
+    my ($self, $row) = @_;
+    my $kw = $row->{keywords} // '';
+    return lc($1) if $kw =~ /\bdoc:([A-Za-z0-9_\-]+)/;
+    return 'printing_3d' if ($row->{page_code} // '') =~ /printer|3d|filament|kobra|bambu/i;
+    return 'site_pages';
+}
+
+sub _page_table_docs {
+    my ($self, $c, $site_name, $user_role, $is_admin, $query) = @_;
+    my @out;
+    my @rows = eval {
+        my $rs = $c->model('DBEncy')->resultset('Page')->search(
+            { sitename => $site_name, status => 'active', page_type => 'documentation' },
+            { order_by => [ 'link_order', 'id' ] });
+        map { { $_->get_columns } } $rs->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_page_table_docs', "Page table read failed: $@");
+        return ();
+    }
+    my @sess = ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') ? @{$c->session->{roles}} : ();
+    foreach my $r (@rows) {
+        my @roles = grep { length } map { s/^\s+|\s+$//gr } split /,/, ($r->{roles} // 'public');
+        @roles = ('public') unless @roles;
+        my $public = grep { lc($_) eq 'public' } @roles;
+        unless ($public || $is_admin) {
+            my %have = map { lc($_) => 1 } ($user_role, @sess);
+            next unless grep { $have{lc $_} } @roles;
+        }
+        my $cat = $self->_page_doc_category($r);
+        my $item = {
+            title => $r->{title} || $r->{page_code},
+            path  => 'page:' . $r->{page_code},
+            url   => $c->uri_for('/page/' . $r->{page_code})->as_string,
+            site  => $r->{sitename},
+            roles => $public ? [] : \@roles,
+            category => $cat,
+            source => 'page', source_label => 'Page (editable)',
+            link_order => $r->{link_order} // 0,
+        };
+        if (defined $query) {
+            my $body = $r->{body} // '';
+            (my $text = $body) =~ s/<[^>]*>/ /g; $text =~ s/\s+/ /g;
+            my $mt = ($item->{title} =~ /\Q$query\E/i) || ($r->{page_code} =~ /\Q$query\E/i);
+            my $mb = ($text =~ /\Q$query\E/i) || (($r->{keywords}//'') =~ /\Q$query\E/i);
+            next unless $mt || $mb;
+            my $pos = CORE::index(lc $text, lc $query);
+            my $start = $pos > 100 ? $pos - 100 : 0;
+            $item->{excerpt} = $pos >= 0 ? '...' . substr($text, $start, 250) . '...' : $item->{path};
+            $item->{relevance} = $mt ? 10 : 5;
+        }
+        push @out, $item;
+    }
+    return @out;
+}
+
 sub _determine_page_category {
     my ($self, $page_name, $path) = @_;
     
@@ -2088,6 +2172,12 @@ sub search :Path('/documentation/search') :Args(0) {
             }
         }
         
+        # Page-table rows (titles + bodies)
+        foreach my $pd ($self->_page_table_docs($c, $site_name, $user_role, $is_admin, $query)) {
+            next if $category && $category ne $pd->{category};
+            push @search_results, $pd;
+        }
+
         # Sort results by relevance
         @search_results = sort { $b->{relevance} <=> $a->{relevance} || $a->{title} cmp $b->{title} } @search_results;
         

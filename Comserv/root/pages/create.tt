@@ -70,6 +70,19 @@
         </div>
         
         <div class="form-group">
+            <label for="page_type">Page type:</label>
+            [% pt = form_data.page_type || 'standard' %]
+            [% IF pt == 'standard' || pt == 'documentation' %]
+            <select name="page_type" id="page_type">
+                <option value="standard" [% IF pt == 'standard' %]selected[% END %]>Regular page</option>
+                <option value="documentation" [% IF pt == 'documentation' %]selected[% END %]>Documentation (shown in /Documentation)</option>
+            </select>
+            [% ELSE %]
+            <input type="text" value="[% pt | html %]" readonly title="System page type; not changeable here">
+            [% END %]
+        </div>
+
+        <div class="form-group">
             <label for="link_order">Link Order:</label>
             <input type="number" name="link_order" id="link_order" value="[% form_data.link_order || 0 %]">
         </div>
