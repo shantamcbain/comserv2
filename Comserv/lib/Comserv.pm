@@ -69,6 +69,9 @@ __PACKAGE__->config(
         dirs => [ 'static', 'LegacyStaticPages' ],
         ignore_dirs => [ 'config' ],
         ignore => [ qr{^config/} ],
+        mime_types => {
+            apk => 'application/vnd.android.package-archive',
+        },
     },
     # Force-disable stack traces in production even if CATALYST_DEBUG is accidentally set
     'Plugin::StackTrace' => { enable => $ENV{CATALYST_DEBUG} // 0 ? 1 : 0 },
