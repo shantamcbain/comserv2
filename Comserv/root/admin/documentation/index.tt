@@ -256,6 +256,7 @@
                             <div class="file-card">
                                 <div class="file-title">
                                     <a href="[% page.url %]">[% page.title %]</a>
+                                    [% IF page.source == 'page' %]<span class="role-badge" style="background:#2e7d32;color:#fff">Page (editable)</span>[% ELSE %]<span class="role-badge" style="background:#607d8b;color:#fff">.tt file</span>[% END %]
                                 </div>
                                 <div class="file-meta">
                                     <strong>Path:</strong> [% page.path %]<br>
