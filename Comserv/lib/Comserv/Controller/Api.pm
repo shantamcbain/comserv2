@@ -3781,6 +3781,44 @@ sub api_app_version :Path('app/version') :Args(0) {
     $c->detach();
 }
 
+=head2 api_app_download
+
+GET /api/app/download - Direct download for the Android APK with correct APK MIME type.
+
+Returns: APK file stream with application/vnd.android.package-archive
+=cut
+
+sub api_app_download :Path('app/download') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $nfs_path = '/data/nfs/inventory-apks/ComservInventory.apk';
+    my $local_path = $c->path_to('root/static/app/ComservInventory.apk')->stringify;
+
+    my $target_path = (-r $nfs_path) ? $nfs_path : ((-r $local_path) ? $local_path : '');
+
+    unless ($target_path && -r $target_path) {
+        $c->res->status(404);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => 'APK file not found' }));
+        $c->detach();
+    }
+
+    $c->res->status(200);
+    $c->res->content_type('application/vnd.android.package-archive');
+    $c->res->header('Content-Disposition' => 'attachment; filename="ComservInventory.apk"');
+    $c->res->header('Content-Length' => -s $target_path);
+
+    open my $fh, '<:raw', $target_path or do {
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => 'Could not open APK file' }));
+        $c->detach();
+    };
+
+    $c->res->body($fh);
+    $c->detach();
+}
+
 # ----------------------------------------------------------------------------
 # Bot API tokens (todo API auth plan, step 3). Admin SESSION only: no Bearer token,
 # no LAN bypass. Nothing here creates a user; it only mints/lists/revokes tokens for
