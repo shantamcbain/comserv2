@@ -41,6 +41,15 @@ ok($r->{port} >= 4001, "port >= 4001 (got $r->{port})");
 ok(-d $wt_dir, "worktree dir created: $wt_dir");
 ok(-f "$wt_dir/Comserv/script/comserv_server.pl", "worktree has app script at Comserv/script/");
 
+# The registry is excluded from git. A new checkout must still see the branch
+# list, so its app dir gets a link to the registry the primary tree reads. The
+# git root is $wt_dir and the app is $wt_dir/Comserv — the link must NOT land
+# at the git root, where no app reads it.
+is(readlink("$wt_dir/Comserv/root/config/worktrees.json"), $jf,
+   'new checkout links worktrees.json where its app reads it');
+ok(!-e "$wt_dir/root/config/worktrees.json",
+   'no registry link at the git root, one level above the app');
+
 # 2) JSON updated
 my $mid = decode_json(_slurp($jf));
 ok($mid->{branches}{$branch}, "JSON has entry for $branch");

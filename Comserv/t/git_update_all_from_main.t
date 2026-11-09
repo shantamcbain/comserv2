@@ -103,4 +103,11 @@ is $t3->{action}, 'fast_forwarded', ':4003 updated when ticked';
 my ($p3) = grep { $_->{key} eq 'Proxmox' } @{ $r3->{rows} };
 is $p3->{action}, 'skipped_proxmox', 'Proxmox still skipped';
 
+# ---- all branches already current: the summary must say so, not print nothing
+my $quiet = $git->update_all_from_main($c, {
+    config => { base_dir => $base, branches => { current => { port => 4107 } } },
+    port_listening => sub { 0 },
+});
+like $quiet->{summary}, qr/Nothing to merge/, 'summary names the empty result instead of a bare prefix';
+
 done_testing;

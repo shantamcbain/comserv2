@@ -2035,6 +2035,12 @@ sub create_worktree {
         return $res;
     }
 
+    # The registry is excluded from git, so the new checkout does not receive it.
+    # Link it at the file that checkout's app reads: the git root is
+    # <base>/<branch>/Comserv and the app is its Comserv/ subdir. Never replaces
+    # an existing copy.
+    $self->_ensure_worktree_config_link($c, "$wt_dir/Comserv");
+
     # 3) port + 4) persist to JSON
     # next_free_port already skips every port claimed in the current JSON. But between
     # reading the config and writing it back, another request (on a different worker)
@@ -2118,6 +2124,37 @@ sub remove_worktree {
         "Removed worktree branch='$branch' dir=$wt_dir");
     $res->{success} = 1;
     return $res;
+}
+
+# Point a checkout at the one excluded registry the primary tree already reads.
+# worktrees.json is not in git, so a new worktree does not receive a copy and
+# its Develop Servers list is only the hardcoded main row. A symlink shares the
+# file without putting it back in a merge. Never replaces an existing file or link.
+# Returns 1 when the checkout already has a registry or the link was created.
+sub _ensure_worktree_config_link {
+    my ($self, $c, $app_dir) = @_;
+    return 0 unless $app_dir;
+    my $canonical = '/home/shanta/PycharmProjects/comserv2/Comserv/root/config/worktrees.json';
+    return 0 unless -e $canonical;
+    my $dest = "$app_dir/root/config/worktrees.json";
+    return 1 if $dest eq $canonical;
+    return 1 if -l $dest || -e $dest;
+    unless (-d "$app_dir/root/config") {
+        if ($self && $self->can('logging')) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'wt_cfg_link',
+                "worktrees.json link skipped: $app_dir/root/config missing");
+        }
+        return 0;
+    }
+    unless (symlink $canonical, $dest) {
+        my $err = $!;
+        if ($self && $self->can('logging')) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'wt_cfg_link',
+                "worktrees.json link failed: $dest -> $canonical: $err");
+        }
+        return 0;
+    }
+    return 1;
 }
 
 # Write the in-memory worktree config back to root/config/worktrees.json and
@@ -3056,6 +3093,10 @@ sub update_all_from_main {
     my @restart = map { $_->{port} } grep { $_->{will_restart} } @rows;
     my $summary = join(', ', map { "$n{$_} $_" } sort keys %n);
     $summary = ($dry ? 'Preview (nothing changed): ' : 'Update all from main: ') . $summary;
+    if (!$n{merged} && !$n{fast_forwarded} && !$n{failed} && !$n{conflict}
+            && !$n{blocked} && !$n{skipped_local_changes} && !$n{missing}) {
+        $summary .= '. Nothing to merge: every registered branch already contains local main';
+    }
     $summary .= '. Will auto-restart (-r): ' . join(', ', map { ":$_" } @restart) if @restart && $dry;
     $summary .= '. Auto-restarted (-r): '    . join(', ', map { ":$_" } @restart) if @restart && !$dry;
     # Name the worktrees that need a human. A dirty worktree refuses with the
