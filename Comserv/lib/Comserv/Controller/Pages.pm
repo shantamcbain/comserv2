@@ -188,6 +188,7 @@ sub create :Path('/pages/create') :Args(0) {
                 description => $params->{description},
                 keywords => $params->{keywords},
                 link_order => $params->{link_order} || 0,
+                page_type => (($params->{page_type} // '') eq 'documentation' ? 'documentation' : 'standard'),
                 status => $params->{status} || 'active',
                 roles => $params->{roles} || 'public',
                 share_with => $params->{share_with} || '',
@@ -328,6 +329,7 @@ sub edit :Path('/pages/edit') :Args(1) {
                     description => $params->{description},
                     keywords => $params->{keywords},
                     link_order => $params->{link_order},
+                    ((($params->{page_type} // '') =~ /^(standard|documentation)$/) ? (page_type => $params->{page_type}) : ()),
                     status => $params->{status},
                     roles => $params->{roles},
                     share_with => $params->{share_with} || ''
