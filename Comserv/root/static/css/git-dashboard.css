@@ -252,3 +252,7 @@
     padding: 10px 16px;
     border-top: 1px solid var(--border-color, #ddd);
 }
+/* Launcher/HTTP failure shown in place of the boot log (showDevError). */
+.git-dev-console-log.git-dev-console-error {
+    color: #ff8a80;
+}
