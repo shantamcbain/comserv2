@@ -4,8 +4,8 @@
    roles = "admin,developer,devops"
    TemplateType = "Documentation"
    category = "git,ai-systems,hermes,development-plan"
-   page_version = "0.3"
-   last_updated = "Wed Aug 19 19:30:00 UTC 2026"
+   page_version = "0.5"
+   last_updated = "Mon Nov 9 07:50:00 UTC 2026"
    project_id   = "238"
    project_code = "GITWT-NEW"
    site_specific = "false"
@@ -15,10 +15,20 @@
     <h1 class="doc-h1">Hermes Branch Context — per-branch AI guidance + in-app Hermes launch</h1>
 
     <div class="last-updated" doc-muted>
-        Last Updated: 2026-08-19 |
-        Version: 0.3 |
-        Status: In-Process |
+        Last Updated: 2026-11-09 |
+        Version: 0.5 |
+        Status: In-Process — launcher verified live, browser click owed |
         Tracked in project: <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-info">
+                <p class="doc-body"><strong>Now (2026-11-09).</strong> The Git-page Hermes button launches <code>hermes dashboard --isolated</code> for that worktree and returns immediately. It does not wait for :9119, and it does not hold the single :3001 process while the dashboard boots. The boot log gets a timestamped command line before the spawn. A launcher error is written into the dev console. The launcher was run for real on 2026-11-09 (:9103 for <code>3d</code>, while :9119 stayed up) and returned in 0.00 s.</p>
+                <p class="doc-body"><strong>Blocked by.</strong> Nothing in code. The remaining check is a click in a logged-in browser: hard-refresh <code>/admin/git</code>, stop :9119, click Hermes on a branch. Requests without an admin session get a 302 to login, so this cannot be checked from the shell.</p>
+                <p class="doc-body"><strong>Next.</strong> Stop :9119 yourself, hard-refresh <code>/admin/git</code>, and click Hermes for a branch. Confirm <code>/tmp/hermes-dash-&lt;branch&gt;.log</code> opens with a <code>hermes start</code> line and the console shows boot output. Do not start or stop :3001.</p>
+            </div>
+        </div>
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
@@ -167,12 +177,24 @@ are owned here. Keep it short — the domain block from §3.1 is the reference.&
     <div class="row">
         <div class="col-100">
             <h2 id="button" class="doc-h2">4. Hermes launch button on the Git dashboard</h2>
-            <p class="doc-body">Mirrors the existing server "Open" button in the Develop Servers card (<code>root/admin/git/index.tt</code>). Implemented in the same change as the domain files:</p>
+            <p class="doc-body">Mirrors the existing server "Open" button in the Develop Servers card (<code>root/admin/git/index.tt</code>). The button starts that branch's own dashboard. It does not open a chat, and it does not reuse main's dashboard.</p>
             <ul class="doc-body">
-                <li><code>Util/Git.pm -&gt; build_worktree_list</code> now emits <code>hermes_cmd</code> for <code>main</code> and every branch: <code>cd &lt;worktree-git-root&gt; &amp;&amp; hermes chat</code> (never <code>-w</code>).</li>
-                <li><code>root/admin/git/index.tt</code> gains a "Hermes" button per row (next to Open/Stop/Restart) with <code>data-hermes-branch</code> + <code>data-hermes-cmd</code>. Also fixed the Open button to build the absolute <code>scheme://host:port/path</code> URL (RELATIVE-URL TRAP rule).</li>
-                <li><code>root/static/js/git-dashboard.js</code> opens that branch's Hermes dashboard (<code>http://&lt;host&gt;:&lt;hermes_port&gt;/</code>) on the click. It also copies <code>hermes_cmd</code> and shows it in the dev console. Do not open the git page from this button — that uses the one allowed popup and the dashboard never appears. An external repo row (not a Comserv worktree) uses <code>worktrees.json</code> <code>external_repos</code> for cwd and port; OpenBafangTool is <code>:9120</code> in <code>/home/shanta/dev/OpenBafangTool</code>.</li>
+                <li><code>Util/Git.pm -&gt; build_worktree_list</code> emits <code>hermes_cmd</code>, <code>hermes_port</code>, and <code>hermes_cwd</code>. The command is <code>hermes dashboard --isolated --host 0.0.0.0 --port &lt;9100 + app_port % 100&gt; --no-open --skip-build</code> from the worktree git root. main stays on :9119. Never add <code>-w</code>.</li>
+                <li><code>root/admin/git/index.tt</code> has a Hermes button per row with <code>data-hermes-branch</code>, <code>data-port</code>, <code>data-hermes-port</code>, <code>data-hermes-cwd</code>, and <code>data-hermes-cmd</code>.</li>
+                <li><code>root/static/js/git-dashboard.js</code> opens <code>http://&lt;host&gt;:&lt;hermes_port&gt;/</code>, copies the command, and shows the dev console. <code>POST /admin/branch_server_action</code> with <code>action=hermes</code> calls <code>BranchServerControl::open_or_start_hermes</code>.</li>
+                <li>An external repo row uses <code>worktrees.json</code> <code>external_repos</code> for cwd and port. OpenBafangTool is <code>:9120</code> in <code>/home/shanta/dev/OpenBafangTool</code>.</li>
             </ul>
+            <h3 id="button-9119" class="doc-h3">4.1 Independent of :9119 (2026-11-07)</h3>
+            <p class="doc-body"><code>--isolated</code> is what keeps a branch dashboard off the fleet server. In the Hermes CLI, that flag returns before any attach-or-refuse check against the host backend. A branch launch does not wait for :9119, and it does not refuse because :9119 is down. A throwaway <code>timeout</code> launch on unused port 9113 printed <code>HERMES_DASHBOARD_READY</code> while :9119 was left running and was not contacted.</p>
+            <p class="doc-body">The Nov 7 stuck console was Comserv, not the CLI. :3001 is one Twiggy process. <code>open_or_start_hermes</code> used a blocking <code>flock</code> and then slept up to 20 seconds for the port. While that handler ran, the log poll could not be served, so the console stayed on "(waiting for output…)" and a second click could not get through. The log file was only created by the shell redirect, which never ran if the handler was still waiting on the lock.</p>
+            <p class="doc-body">Current behaviour:</p>
+            <ul class="doc-body">
+                <li>The startup lock is <code>flock</code> with <code>LOCK_EX|LOCK_NB</code>. A second click gets <code>a Hermes start for &lt;branch&gt; is already in progress</code> at once.</li>
+                <li>The request writes one line to <code>/tmp/hermes-dash-&lt;branch&gt;.log</code> (timestamp, branch, port, binary, cwd, command) and then spawns. It does not wait for the port. The console poll shows that line, then the dashboard's own output.</li>
+                <li>A JSON error or a non-JSON HTTP status is written into the console. It is not only an alert, and the next poll does not wipe it.</li>
+                <li>The binary is <code>/home/shanta/.local/bin/hermes</code> when that file is executable. No new environment key. Login-shell <code>bash -l</code> is not used.</li>
+            </ul>
+            <p class="doc-body"><strong>Verified 2026-11-09:</strong> <code>perl -c</code> on <code>BranchServerControl.pm</code>, <code>prove t/branch_server_control.t</code> (30 tests), and <code>node --check root/static/js/git-dashboard.js</code>. Live launch from the running :3001 instance for <code>3d</code> on :9103: returned in 0.00 s, log line written first, <code>HERMES_DASHBOARD_READY port=9103</code>, HTTP 302 on :9103, :9119 untouched on its original pid; that test dashboard was then stopped. The browser click with :9119 stopped still needs an admin session.</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
@@ -206,7 +228,7 @@ are owned here. Keep it short — the domain block from §3.1 is the reference.&
             <ul class="doc-body">
                 <li><code>perl -c lib/Comserv/Util/Git.pm</code> passes with <code>PERL5LIB=lib</code> (DONE).</li>
                 <li>Each worktree <code>.hermes.md</code> exists and opens by re-including the global rules. <strong>Actually created 2026-08-19</strong> for all 7 active worktrees (planning, InventoryAccounting, 3d, DockerHA, ai, aichatsystem-ef4e, git); the prior "DONE 2026-08-17" claim was false — the files did not exist on disk then. Verify each: <code>grep -l "PycharmProjects/comserv2/.hermes.md" ~/.comserv/worktrees/*/Comserv/.hermes.md</code>.</li>
-                <li>On the live Git dashboard (<code>/admin/git</code>), click "Hermes" on a worktree row &#8594; clipboard contains <code>cd ~/.comserv/worktrees/&lt;branch&gt;/Comserv &amp;&amp; hermes chat</code> (no <code>-w</code>) and the dev console shows it.</li>
+                <li>On the live Git dashboard (<code>/admin/git</code>), hard-refresh, then click Hermes on a worktree row. The dev console must show a <code>hermes start</code> line from <code>/tmp/hermes-dash-&lt;branch&gt;.log</code> within one poll, then boot output. The launch must work with :9119 stopped. A second click during startup must say already in progress, and the Git page must stay responsive. This browser check was not run on 2026-11-07.</li>
                 <li>Running that command in the worktree loads the branch <code>.hermes.md</code> (and through it the global rules) — confirm by asking Hermes "what branch am I on / what are my domain constraints".</li>
                 <li><code>hermes update</code> then a fresh <code>hermes chat</code> in the worktree uses new code with no branch restart.</li>
             </ul>
