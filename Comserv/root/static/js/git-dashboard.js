@@ -209,6 +209,7 @@
             devTitle.textContent = 'Starting ' + branch + ' on port ' + port + '…';
             devCmd.textContent = cmd || '';
             devLog.textContent = '(waiting for output…)';
+            devLog.classList.remove('git-dev-console-error');
             devLog.scrollTop = 0;
             if (devOpenLink && url) { devOpenLink.href = url; devOpenLink.style.display = ''; }
             else if (devOpenLink) { devOpenLink.style.display = 'none'; }
@@ -222,13 +223,24 @@
                     credentials: 'same-origin'
                 }).then(function (r) { return r.text(); })
                   .then(function (text) {
-                      if (devLog) {
+                      // A launcher error shown by showDevError must not be
+                      // replaced by the next poll: the log file may be absent.
+                      if (devLog && !devLog.classList.contains('git-dev-console-error')) {
                           devLog.textContent = text || '(no output yet)';
                           devLog.scrollTop = devLog.scrollHeight;
                       }
                   })
                   .catch(function () {});
             }, 1500);
+        }
+
+        // Launcher errors are shown IN the console, where the user is already
+        // looking, instead of only in a modal alert.
+        function showDevError(message) {
+            if (!devLog) { return; }
+            devLog.textContent = message;
+            devLog.classList.add('git-dev-console-error');
+            devLog.scrollTop = devLog.scrollHeight;
         }
 
         // Close buttons inside the console.
@@ -304,8 +316,15 @@
 
         var devServerButtons = document.querySelectorAll('.git-dev-actions button');
         for (var ds = 0; ds < devServerButtons.length; ds++) {
-            devServerButtons[ds].addEventListener('click', function () {
+            devServerButtons[ds].addEventListener('click', function (ev) {
+                if (ev) {
+                    ev.preventDefault();
+                    ev.stopImmediatePropagation();
+                }
                 var el = this;
+                if (el.getAttribute('data-inflight') === '1') { return; }
+                el.setAttribute('data-inflight', '1');
+                var clearInflight = function () { el.removeAttribute('data-inflight'); };
                 var openBranch = el.getAttribute('data-open-branch');
                 if (openBranch) {
                     var url = el.getAttribute('data-url') || '';
@@ -329,7 +348,8 @@
                         })
                         .catch(function () {
                             if (branchTab && !branchTab.closed) { branchTab.close(); }
-                        });
+                        })
+                        .then(clearInflight);
                     return;
                 }
                 // "Hermes" button: copy the branch's Hermes launch command to the
@@ -349,6 +369,7 @@
                         hport = String(9100 + (appPortN % 100));
                     } else if (!hport) {
                         window.alert('Hermes for ' + hermesBranch + ': button has no app port.');
+                        clearInflight();
                         return;
                     }
                     var hcwd = el.getAttribute('data-hermes-cwd') || '';
@@ -375,7 +396,9 @@
                         var url = window.location.protocol + '//' + window.location.hostname
                             + ':' + port + '/';
                         if (devOpenLink) { devOpenLink.href = url; devOpenLink.style.display = ''; }
-                        if (url === hermesUrl) { return; }
+                        // Always navigate. A same-URL early return left the tab on
+                        // "Unable to connect" after the port came up, so Start
+                        // looked like it needed a second click.
                         if (tab && !tab.closed) { tab.location = url; }
                         else { window.open(url, 'hermes-' + hermesBranch); }
                     }
@@ -405,9 +428,17 @@
                             if (res && res.running) { goHermes(port); }
                             else { waitReady(port); }
                         })
-                        .catch(function () {
+                        .catch(function (err) {
+                            // Never leave the console at "waiting for output…":
+                            // the launcher's error (JSON message or HTTP status)
+                            // is the only clue the user gets.
+                            showDevError('Hermes for ' + hermesBranch + ' did not start: '
+                                + ((err && err.message) || 'unknown error')
+                                + '\n(The dashboard command is on the clipboard; '
+                                + 'logs go to /tmp/hermes-dash-' + hermesBranch + '.log)');
                             if (devOpenLink) { devOpenLink.href = hermesUrl; devOpenLink.style.display = ''; }
-                        });
+                        })
+                        .then(clearInflight);
                     return;
                 }
                 var action = el.getAttribute('data-branch-action');
@@ -424,7 +455,10 @@
                             }
                             if (res && res.running) { bits.push('listening on :' + res.port); }
                             window.alert(bits.join(' '));
-                        });
+                        })
+                        .then(clearInflight);
+                } else {
+                    clearInflight();
                 }
             });
         }
@@ -923,7 +957,6 @@
         table.hidden = false;
     }
     function run(mode) {
-            if (mode === 'update' && !window.confirm('Merge main into every registered branch now? Running -r dev servers will restart. Run Preview first if unsure.')) { return; }
             var body = new URLSearchParams();
             body.set('mode', mode); body.set('csrf', csrf);
             if (summary) { summary.textContent = mode === 'update' ? 'Updating...' : 'Previewing...'; }
