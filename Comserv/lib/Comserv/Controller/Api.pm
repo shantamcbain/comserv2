@@ -15,6 +15,7 @@ use Comserv::Util::DocumentationConfig;
 use Comserv::Util::ModelCatalog;
 use Comserv::Util::TodoLog;
 use Comserv::Util::AccessCheck;
+use Comserv::Util::ApkDownload;
 
 # Resolve the default model for the AI Focus-Tune picker from the SAME shared
 # catalog every other AI surface uses (ModelCatalog::default_for) — NEVER a
@@ -3758,27 +3759,66 @@ No auth required (clients hit this before login to decide whether to update).
 
 sub api_app_version :Path('app/version') :Args(0) {
     my ($self, $c) = @_;
+    my $meta = $self->_app_version_meta($c);
+    my $status = delete $meta->{_status} || 200;
+    $c->res->status($status);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json($meta));
+    $c->detach();
+}
 
-    my $path = $c->path_to('root/static/app/version.json')->stringify;
-    my $json;
+# Phone-app button. Redirects to the versioned static URL so a version
+# bump in version.json changes the download URL without editing the nav.
+sub api_app_apk :Path('app/apk') :Args(0) {
+    my ($self, $c) = @_;
+    my $meta = $self->_app_version_meta($c);
+    if (($meta->{_status} || 200) != 200 || !$meta->{apkUrl}) {
+        $c->res->status($meta->{_status} || 500);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => $meta->{error} || 'apk url missing' }));
+        $c->detach();
+    }
+    $c->res->redirect($meta->{apkUrl});
+    $c->detach();
+}
+
+sub _app_version_meta {
+    my ($self, $c) = @_;
+    my $tree = $c->path_to('root/static/app/version.json')->stringify;
+    my $pub = eval { Comserv::Util::ApkDownload::publish_latest_build(tree_meta => $tree) };
+    if ($@ || (ref $pub eq 'HASH' && $pub->{error})) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_app_version',
+            $@ || $pub->{error});
+    } elsif (ref $pub eq 'HASH' && $pub->{changed}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_app_version',
+            "published apk $pub->{versionName} from $pub->{source}");
+    }
+    my $path = Comserv::Util::ApkDownload::meta_path($tree);
+    my $data;
     if (-r $path) {
         local $/;
-        open my $fh, '<', $path or do {
-            $c->res->status(500);
-            $c->res->content_type('application/json');
-            $c->res->body(encode_json({ success => 0, error => 'version file unreadable' }));
-            $c->detach();
-        };
-        $json = <$fh>;
-        close $fh;
+        my $raw;
+        if (open my $fh, '<', $path) {
+            $raw = <$fh>;
+            close $fh;
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_app_version',
+                "version file unreadable: $!");
+            return { success => 0, error => 'version file unreadable', _status => 500 };
+        }
+        $data = eval { decode_json($raw) };
+        if ($@ || ref $data ne 'HASH') {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_app_version',
+                "version json invalid: $@");
+            return { success => 0, error => 'version file invalid', _status => 500 };
+        }
     } else {
-        $json = q{{"versionCode":1,"versionName":"1.0","apkUrl":"","releaseNotes":""}};
+        $data = { versionCode => 1, versionName => '1.0', apkUrl => '', releaseNotes => '' };
     }
-
-    $c->res->status(200);
-    $c->res->content_type('application/json');
-    $c->res->body($json);
-    $c->detach();
+    my $apk = $data->{apkUrl} || '/static/app/ComservInventory.apk';
+    $data->{apkUrl} = Comserv::Util::ApkDownload::with_version_query($apk, $data->{versionName});
+    $data->{success} = JSON::MaybeXS::true();
+    return $data;
 }
 
 # ----------------------------------------------------------------------------

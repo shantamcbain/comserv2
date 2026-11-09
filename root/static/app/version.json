@@ -1,0 +1,6 @@
+{
+  "versionCode": 7,
+  "versionName": "1.6",
+  "apkUrl": "/api/app/download",
+  "releaseNotes": "Fix custom domain URL in updater & Settings, dynamic version display."
+}

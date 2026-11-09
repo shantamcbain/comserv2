@@ -22,8 +22,15 @@ use lib $ENV{CATALYST_HOME} ? "$ENV{CATALYST_HOME}/lib" : "$FindBin::Bin/../lib"
 use lib $ENV{CATALYST_HOME} ? $ENV{CATALYST_HOME} : "$FindBin::Bin/..";
 
 use Comserv;
+use Comserv::Util::ApkDownload;
 use Comserv::Util::PortlessHost;
 use Plack::Builder;
+use Plack::MIME;
+use Plack::Util;
+
+# The image's Plack::MIME map has no .apk entry. Without this, File.pm
+# falls back to text/plain and Android saves ComservInventory.apk.txt.
+Plack::MIME->add_type('.apk' => Comserv::Util::ApkDownload::CONTENT_TYPE);
 
 # Survives plackup -R restarts: marks Twiggy mode for WebSocket terminal detection.
 my $_app_root = $ENV{CATALYST_HOME} ? $ENV{CATALYST_HOME} : "$FindBin::Bin/..";
@@ -81,11 +88,51 @@ my $wrapped = builder {
         sub { Comserv::Util::PortlessHost::normalize_env($_[0]); $inner->($_[0]) };
     };
 
+    # Outside Static so an .apk response is rewritten even when an old
+    # Plack::MIME map would have labeled it text/plain.
+    enable sub {
+        my $inner = shift;
+        sub {
+            my $env = shift;
+            my $path = $env->{PATH_INFO} || '';
+            if (Comserv::Util::ApkDownload::is_apk($path)) {
+                my $pub = eval { Comserv::Util::ApkDownload::publish_latest_build() };
+                warn "apk publish failed: " . ($@ || $pub->{error}) if $@ || (ref $pub eq 'HASH' && $pub->{error});
+            }
+            my $res = $inner->($env);
+            my $fix = sub {
+                my $r = shift;
+                return $r unless Comserv::Util::ApkDownload::is_apk($path);
+                return $r unless ref $r eq 'ARRAY' && ($r->[0] || 0) == 200;
+                my $h = Plack::Util::headers($r->[1]);
+                $h->set('Content-Type', Comserv::Util::ApkDownload::CONTENT_TYPE);
+                my $disp = Comserv::Util::ApkDownload::disposition_for($path);
+                $h->set('Content-Disposition', $disp) if $disp;
+                return $r;
+            };
+            if (ref $res eq 'CODE') {
+                return sub {
+                    my $respond = shift;
+                    $res->(sub { $respond->($fix->($_[0])) });
+                };
+            }
+            return $fix->($res);
+        };
+    };
+
     # Static file serving for the navigation/menu bar (CSS/JS) + general assets
-    # This must come BEFORE the main app so static requests are handled first
+    # This must come BEFORE the main app so static requests are handled first.
+    # content_type is required: the coderef replaces Plack::MIME, and a missing
+    # .apk entry otherwise becomes text/plain; charset=utf-8.
     enable 'Plack::Middleware::Static',
         path => qr{^/(static|css|js|images|favicon|root|assets)},
-        root => "$FindBin::Bin/../root";
+        root => "$FindBin::Bin/../root",
+        content_type => sub {
+            my ($file) = @_;
+            return Comserv::Util::ApkDownload::CONTENT_TYPE
+                if Comserv::Util::ApkDownload::is_apk($file);
+            return Plack::MIME->mime_type($file) || 'text/plain';
+        };
 
     $app;
 };
