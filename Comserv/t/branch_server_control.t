@@ -30,6 +30,8 @@ like($cmd, qr/\bdashboard --isolated\b/, 'launch is --isolated, so no attach/ref
 like($cmd, qr/--port 9103\b/, 'launch binds the branch port');
 unlike($cmd, qr/--port 9119\b/, 'branch launch never targets the fleet dashboard port');
 like($cmd, qr{cd '/w/3d/Comserv'}, 'launch cds into the worktree git root');
+like($cmd, qr/\bsetsid nohup '\/usr\/bin\/hermes' dashboard\b/, 'dashboard runs in its own session, so a dev-server Ctrl-C does not kill it');
+like($cmd, qr{< /dev/null}, 'detached dashboard never reads the dev server terminal');
 
 # --- lock: a second concurrent start is refused immediately ------------------
 my $lock = $Comserv::Util::BranchServerControl::HERMES_LOG_DIR . '/hermes-dash-main.start.lock';

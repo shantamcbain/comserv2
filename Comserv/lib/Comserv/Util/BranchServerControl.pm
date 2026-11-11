@@ -484,12 +484,21 @@ sub open_or_start_hermes {
 
 # The exact shell line the console shows. cd + env pinning keep the isolated
 # dashboard in its own worktree; --isolated keeps it off the host backend.
+#
+# setsid gives the dashboard its own session and process group. Without it the
+# dashboard joined the dev server's foreground process group in its terminal
+# (ps: pgid = the comserv_server.pl pid, STAT "Sl+"). The dashboard installs its
+# own SIGINT handler, so the Ctrl-C used to restart a dev server also shut down
+# every Hermes dashboard that server had started; the next Hermes click then had
+# to cold-start it behind the single-process dev server, and the console sat at
+# "(waiting for output…)". nohup alone only covers SIGHUP. stdin is /dev/null
+# so the detached process never holds the terminal.
 sub hermes_launch_command {
     my ($self, $branch, $cwd, $bin, $hport) = @_;
     return "cd '$cwd'"
         . " && env -u HERMES_SESSION_ID -u HERMES_UPDATE_POST_SWAP -u HERMES_UPDATE_REEXEC"
-        . " TERMINAL_CWD='$cwd' nohup '$bin' dashboard --isolated --host 0.0.0.0"
-        . " --port $hport --no-open --skip-build >> '$HERMES_LOG_DIR/hermes-dash-$branch.log' 2>&1 &";
+        . " TERMINAL_CWD='$cwd' setsid nohup '$bin' dashboard --isolated --host 0.0.0.0"
+        . " --port $hport --no-open --skip-build < /dev/null >> '$HERMES_LOG_DIR/hermes-dash-$branch.log' 2>&1 &";
 }
 
 sub _write_log_header {
