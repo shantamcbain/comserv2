@@ -1,6 +1,6 @@
 {
-  "versionCode": 18,
-  "versionName": "2.7",
+  "versionCode": 19,
+  "versionName": "2.8",
   "apkUrl": "/api/app/download",
-  "releaseNotes": "v2.7 Live Dev Server (Port 3001) Integration for Grok/Hermes/AI Agent changes across any SiteName, Voice Control, Real-time Workstation Remote Navigation & Persistent Keystore Signing."
+  "releaseNotes": "v2.8 Server Environment Selector (Dev Port 3001 Live AI Changes vs Prod Port 5000), explicit target display, and rich Changelog support."
 }
