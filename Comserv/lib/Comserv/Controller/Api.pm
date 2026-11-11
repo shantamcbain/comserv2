@@ -733,6 +733,178 @@ sub api_inventory_stock_unreserve :Path('inventory/stock/unreserve') :Args(0) {
     $c->controller('Inventory::PurchaseOrder')->api_stock_unreserve($c);
 }
 
+# Session gate for the phone barcode routes. Existing inventory aliases keep
+# the LAN bypass. App-context work can later point this at ModuleAccess.
+sub _api_inventory_session_gate {
+    my ($self, $c) = @_;
+    my $uid = eval { $c->session->{user_id} };
+    unless (defined $uid && $uid ne '' && $uid) {
+        $self->_json_error($c, 401, 'Not authenticated. Please log in first.', 'not_authenticated');
+        return;
+    }
+
+    my $hdr = eval { $c->req->header('X-Sitename') };
+    my $sent = defined $hdr && $hdr =~ /\S/;
+    my $resolved;
+    if ($sent) {
+        my $clean = $hdr;
+        $clean =~ s/[^a-zA-Z0-9._-]//g;
+        if (length $clean) {
+            my $site_model = eval { $c->model('Site') };
+            if ($site_model && $site_model->can('get_site_details_by_name')) {
+                my $row = eval { $site_model->get_site_details_by_name($c, $clean) };
+                $resolved = $clean if $row;
+            } elsif (($c->stash->{SiteName} // '') eq $clean) {
+                $resolved = $clean;
+            }
+        }
+        unless ($resolved) {
+            $self->_json_error($c, 400, 'Unknown site.', 'unknown_site');
+            return;
+        }
+    } else {
+        $resolved = $c->stash->{SiteName} || $c->session->{SiteName};
+        unless ($resolved) {
+            my $root = eval { $c->controller('Root') };
+            if ($root && $root->can('fetch_and_set')) {
+                eval { $root->fetch_and_set($c, 'SiteName') };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                        '_api_inventory_session_gate', "fetch_and_set failed: $@");
+                }
+                $resolved = $c->stash->{SiteName};
+            }
+        }
+        unless ($resolved) {
+            $self->_json_error($c, 400, 'Unknown site.', 'unknown_site');
+            return;
+        }
+    }
+    $c->stash->{SiteName} = $resolved;
+    $c->session->{SiteName} = $resolved;
+
+    my $allowed = $self->_session_is_admin($c);
+    if (eval { require Comserv::Util::ModuleAccess; 1 }) {
+        my $mod = 'Comserv::Util::ModuleAccess';
+        if ($mod->can('inventory_access')) {
+            $allowed = $mod->inventory_access($c) ? 1 : 0;
+        } elsif ($mod->can('allows')) {
+            $allowed = $mod->allows($c, 'inventory') ? 1 : 0;
+        } elsif ($mod->can('can_access')) {
+            $allowed = $mod->can_access($c, 'inventory') ? 1 : 0;
+        }
+    }
+    unless ($allowed) {
+        $self->_json_error($c, 403, 'Forbidden.', 'forbidden');
+        return;
+    }
+    return $resolved;
+}
+
+sub _api_read_json {
+    my ($self, $c) = @_;
+    my $body = eval { $c->request->body };
+    return {} unless $body;
+    my $raw = '';
+    my $p;
+    eval {
+        if (ref($body) && $body->can('seek')) {
+            seek($body, 0, 0);
+            $raw = do { local $/; <$body> };
+        } else {
+            $raw = "$body";
+        }
+        $p = (defined $raw && $raw =~ /\S/) ? decode_json($raw) : {};
+    };
+    if ($@ || (defined $raw && $raw =~ /\S/ && ref $p ne 'HASH')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_read_json',
+            "JSON parse failed: $@");
+        $self->_json_error($c, 400, 'Invalid JSON.', 'json_parse_error');
+        return;
+    }
+    return $p || {};
+}
+
+sub api_inventory_item_by_barcode :Path('inventory/item/by_barcode') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $inv = eval { $c->controller('Inventory') };
+    unless ($inv) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_inventory_item_by_barcode',
+            'Inventory controller missing');
+        $self->_json_error($c, 500, 'Inventory controller missing.', 'server_error');
+        return;
+    }
+    require Comserv::Util::InventoryBarcode;
+    my $r = Comserv::Util::InventoryBarcode->by_barcode(
+        $c, $site, $inv, $c->req->params->{barcode}, $c->req->params->{barcode_type});
+    $self->_json_ok($c, $r);
+}
+
+sub api_inventory_product_lookup :Path('inventory/product_lookup') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $barcode = $c->req->params->{barcode};
+    unless (defined $barcode && $barcode =~ /\S/) {
+        $self->_json_error($c, 400, 'barcode is required', 'barcode_required');
+        return;
+    }
+    require Comserv::Util::ProductLookup;
+    my $r = Comserv::Util::ProductLookup->lookup($c,
+        barcode  => $barcode,
+        save     => $c->req->params->{save} ? 1 : 0,
+        sitename => $site,
+    );
+    $self->_json_ok($c, $r);
+}
+
+sub api_inventory_item_ency_links :Path('inventory/item/ency_links') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    require Comserv::Util::InventoryBarcode;
+    my $method = uc($c->req->method || 'GET');
+    my $r;
+    if ($method eq 'GET') {
+        $r = Comserv::Util::InventoryBarcode->ency_links($c, $site, $c->req->params->{item_id});
+    } elsif ($method eq 'POST') {
+        my $p = $self->_api_read_json($c) or return;
+        $r = Comserv::Util::InventoryBarcode->ency_links_update($c, $site, $p);
+    } else {
+        $self->_json_error($c, 405, 'GET or POST required', 'method_not_allowed');
+        return;
+    }
+    unless ($r && $r->{ok}) {
+        $self->_json_error($c, ($r->{status} || 400), ($r->{error} || 'Request failed'), ($r->{code} || 'bad_request'));
+        return;
+    }
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
+}
+
+sub api_inventory_photo_upload :Path('inventory/photo/upload') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    unless (uc($c->req->method || '') eq 'POST') {
+        $self->_json_error($c, 405, 'POST required', 'method_not_allowed');
+        return;
+    }
+    my $item_id = $c->req->param('item_id');
+    $item_id = $c->req->params->{item_id} unless defined $item_id;
+    my $upload = eval { $c->req->upload('photo') };
+    require Comserv::Util::ItemImage;
+    my $r = Comserv::Util::ItemImage->save($c, $upload, $site, $item_id);
+    unless ($r && $r->{ok}) {
+        $self->_json_error($c, ($r->{status} || 400), ($r->{error} || 'Upload failed'), ($r->{code} || 'bad_request'));
+        return;
+    }
+    $self->_json_ok($c, {
+        item_id      => $r->{item_id},
+        image_path   => $r->{image_path},
+        bytes        => $r->{bytes},
+        content_type => $r->{content_type},
+    });
+}
+
 =head2 api_list_documentation
 
 GET /api/documentation - List all documentation pages (Bypass keyword/token for local/workstation.local)
@@ -2423,6 +2595,23 @@ sub api_workday_check :Path('workday/check') :Args(0) {
         return;
     }
     my $n = $report->{counts} || {};
+    # Freshness: docs vs code, projects vs their rows, todos whose state has drifted.
+    # Read-only, branch-scoped, and never allowed to break the existing report.
+    my $fresh = eval {
+        require Comserv::Util::FreshnessSource;
+        Comserv::Util::FreshnessSource->build($c);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_workday_check',
+            "freshness audit failed: $@");
+        $report->{freshness} = { success => 0, error => "$@" };
+    } elsif ($fresh) {
+        $report->{freshness} = $fresh;
+        my $ft = $fresh->{totals}{findings} // 0;
+        $report->{ok} = 0 if $ft;
+        $n->{freshness} = $ft;
+        $report->{counts} = $n;
+    }
     my @roles = @{ $gate->{roles} || [] };
     my $role = Comserv::Util::WorkdayStandard->role_class(@roles);
     $report->{session} = {
@@ -2638,6 +2827,10 @@ sub api_todo_close_log :Path('todo/close_log') :Args(0) {
             summary   => ($notes // ''),
             note      => $via_note,
             lock_date => $data->{lock_date},
+            # Corrected end time: the caller supplies the real or estimated
+            # minutes (session evidence, or the day end as a last resort). Without
+            # it the clock bills elapsed time, capped at one day.
+            duration_mins => $data->{duration_mins},
         );
     };
     if ($@ || !$res || !$res->{success}) {
@@ -3816,6 +4009,41 @@ sub api_app_download :Path('app/download') :Args(0) {
     };
 
     $c->res->body($fh);
+    $c->detach();
+}
+
+our %PENDING_REMOTE_NAV;
+
+sub api_browser_navigate :Path('browser/navigate') :Args(0) {
+    my ($self, $c) = @_;
+    my $raw = $c->req->body ? do { local $/; my $b = $c->req->body; <$b> } : '{}';
+    my $json_data = eval { decode_json($raw) } || {};
+    my $target_url = $json_data->{target_url} || $c->req->param('target_url') || '/';
+
+    $PENDING_REMOTE_NAV{global} = {
+        target_url => $target_url,
+        timestamp  => time()
+    };
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => 1, target_url => $target_url, message => "Navigation command sent to workstation browser" }));
+    $c->detach();
+}
+
+sub api_browser_poll :Path('browser/poll') :Args(0) {
+    my ($self, $c) = @_;
+    my $cmd = $PENDING_REMOTE_NAV{global};
+    if ($cmd && (time() - $cmd->{timestamp} < 30)) {
+        delete $PENDING_REMOTE_NAV{global};
+        $c->res->status(200);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ pending => 1, target_url => $cmd->{target_url} }));
+        $c->detach();
+    }
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ pending => 0 }));
     $c->detach();
 }
 

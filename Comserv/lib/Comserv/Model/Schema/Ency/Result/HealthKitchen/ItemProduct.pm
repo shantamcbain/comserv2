@@ -10,6 +10,8 @@ __PACKAGE__->table('hk_item_product');
 # upc is only used for personal pantry rows; site inventory items keep their
 # barcode in inventory_items.barcode/barcode_type. Sourcing attributes live in
 # Accounting::InventoryItemAttributes (inventory_item_attributes).
+# ingredients_text / ingredients_source are Result-only until Schema Compare
+# adds the columns. Readers must tolerate the columns being absent.
 __PACKAGE__->add_columns(
     id         => { data_type => 'integer', is_auto_increment => 1, is_nullable => 0 },
     sitename   => { data_type => 'varchar', size => 255, is_nullable => 0 },
@@ -19,6 +21,10 @@ __PACKAGE__->add_columns(
     upc        => { data_type => 'varchar', size => 32,  is_nullable => 1 },
     size_value => { data_type => 'decimal', size => [12, 3], is_nullable => 1 },
     size_unit  => { data_type => 'varchar', size => 20,  is_nullable => 1 },
+    ingredients_text   => { data_type => 'text', is_nullable => 1,
+                            comment => 'Label ingredients as printed, in order' },
+    ingredients_source => { data_type => 'varchar', size => 32, is_nullable => 1,
+                            comment => 'manual | open_food_facts | searxng' },
     created_at => { data_type => 'datetime', is_nullable => 1, set_on_create => 1 },
     updated_at => { data_type => 'datetime', is_nullable => 1, set_on_create => 1, set_on_update => 1 },
 );
