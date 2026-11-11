@@ -2414,6 +2414,39 @@ sub product_ready {
     return $self->table_ready( $c, 'HealthKitchen::ItemProduct' );
 }
 
+# Result has the columns as soon as the file is saved. The live table does not,
+# until Schema Compare adds them. Probe the table; do not crash callers.
+sub ingredients_columns_ready {
+    my ( $self, $c ) = @_;
+    return 0 unless $c;
+    return $c->stash->{_hk_ingredients_ready} if exists $c->stash->{_hk_ingredients_ready};
+    my $ready = 0;
+    my $src = eval { $c->model('DBEncy')->source('HealthKitchen::ItemProduct') };
+    if ( $src && $src->has_column('ingredients_text') && $src->has_column('ingredients_source') ) {
+        my $ok = eval {
+            $c->model('DBEncy')->resultset('HealthKitchen::ItemProduct')->search(
+                {}, { rows => 1, columns => ['ingredients_text'] }
+            )->next;
+            1;
+        };
+        if ($ok) {
+            $ready = 1;
+        } else {
+            $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, 'ingredients_columns_ready',
+                "hk_item_product ingredients columns are not in the database yet: $@" );
+        }
+    }
+    $c->stash->{_hk_ingredients_ready} = $ready ? 1 : 0;
+    return $c->stash->{_hk_ingredients_ready};
+}
+
+sub _product_select_cols {
+    my ( $self, $c ) = @_;
+    my @cols = qw(id sitename item_kind item_id brand upc size_value size_unit);
+    push @cols, qw(ingredients_text ingredients_source) if $self->ingredients_columns_ready($c);
+    return \@cols;
+}
+
 # Pure validation; returns ( \%clean, $error ).
 sub validate_link_args {
     my ( $self, $a ) = @_;
@@ -2574,6 +2607,23 @@ sub save_item_product {
         return { ok => 0, error => $serr } if $serr;
     }
     my ( $ok, $err ) = ( 0, 'Could not save product details.' );
+    my $ing_ready = $self->ingredients_columns_ready($c);
+    my %ing;
+    if ( exists $args->{ingredients_text} || exists $args->{ingredients} || exists $args->{ingredients_source} ) {
+        if ($ing_ready) {
+            if ( exists $args->{ingredients_text} || exists $args->{ingredients} ) {
+                my $text = exists $args->{ingredients_text} ? $args->{ingredients_text} : undef;
+                if ( !defined $text && ref $args->{ingredients} eq 'ARRAY' ) {
+                    $text = join( ', ', grep { defined && length } @{ $args->{ingredients} } );
+                }
+                $ing{ingredients_text} = $text;
+            }
+            $ing{ingredients_source} = $args->{ingredients_source} if exists $args->{ingredients_source};
+        } else {
+            $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, 'save_item_product',
+                'ingredients_text/ingredients_source not in hk_item_product yet; skipped. Run Schema Compare.' );
+        }
+    }
     try {
         die "item not yours\n" unless $self->_item_owned( $c, $kind, $iid );
         my $schema = $c->model('DBEncy');
@@ -2583,12 +2633,12 @@ sub save_item_product {
             my %key = ( sitename => $site, item_kind => $kind, item_id => $iid );
             # Site items: barcode lives on inventory_items; hk_item_product.upc is pantry-only.
             my %data = ( brand => $brand, size_value => $sv, size_unit => $su,
-                         upc => ( $kind eq 'pantry' && length $upc ? $upc : undef ) );
+                         upc => ( $kind eq 'pantry' && length $upc ? $upc : undef ), %ing );
             if ( $kind eq 'inventory' && length $upc ) {
                 my $item = $schema->resultset('Accounting::InventoryItem')->find($iid);
                 $item->update( { barcode => $upc, barcode_type => $self->barcode_type_for($upc) } ) if $item;
             }
-            my $row = $rs->search( \%key )->single;
+            my $row = $rs->search( \%key, { columns => $self->_product_select_cols($c) } )->single;
             if ($row) { $row->update( \%data ) }
             else      { $rs->create( { %key, %data } ) }
             if ($src) {
@@ -2659,7 +2709,10 @@ sub attach_links_and_products {
     }
     if ( $self->product_ready($c) ) {
         try {
-            for my $p ( $schema->resultset('HealthKitchen::ItemProduct')->search( { sitename => $site } )->all ) {
+            for my $p ( $schema->resultset('HealthKitchen::ItemProduct')->search(
+                { sitename => $site },
+                { columns => $self->_product_select_cols($c) }
+            )->all ) {
                 my $r = $by{ $p->item_kind . ':' . $p->item_id } or next;
                 $r->{product} = {
                     brand      => $p->brand,
@@ -2667,6 +2720,10 @@ sub attach_links_and_products {
                     size_value => $p->size_value,
                     size_unit  => $p->size_unit,
                 };
+                if ( $self->ingredients_columns_ready($c) ) {
+                    $r->{product}{ingredients_text}   = $p->get_column('ingredients_text');
+                    $r->{product}{ingredients_source} = $p->get_column('ingredients_source');
+                }
             }
         }
         catch {

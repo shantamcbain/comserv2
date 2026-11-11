@@ -275,7 +275,7 @@ sub resolve_target {
         my $ext = $self->external_repo($target);
         if ($ext) {
             my $repo = $ext->{repo} || '';
-            unless ($repo =~ m{^/} && -d "$repo/.git") {
+            unless ($repo =~ m{^/} && -e "$repo/.git") {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_target',
                     "External repo '$ext->{key}' path missing or not a git checkout: $repo");
                 return {
@@ -998,7 +998,7 @@ sub get_tracking_info {
     # it to Comserv main.
     my $ext_key = ($c && $c->stash) ? ($c->stash->{git_target} // '') : '';
     my $ext = $self->external_repo($ext_key);
-    if ($ext && $ext->{repo} && -d "$ext->{repo}/.git") {
+    if ($ext && $ext->{repo} && -e "$ext->{repo}/.git") {
         my $current = $self->get_current_branch($c);
         if (defined $current && length $current && $current ne 'unknown') {
             my $origin_ref = "origin/$current";
@@ -1925,7 +1925,7 @@ sub build_worktree_list {
             my $repo = $b->{repo} || '';
             next unless $repo =~ m{^/};
             my $live = '';
-            if (-d "$repo/.git" && open my $fh, '-|', 'git', '-C', $repo, 'branch', '--show-current') {
+            if (-e "$repo/.git" && open my $fh, '-|', 'git', '-C', $repo, 'branch', '--show-current') {
                 $live = <$fh> // '';
                 close $fh;
                 chomp $live;

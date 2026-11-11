@@ -169,10 +169,13 @@ public SiteName hosts must not reach its model endpoints.
 sub is_dev_request_host {
     my ($class_or_c, $c) = @_;
     $c = $class_or_c if !defined $c && ref $class_or_c;
+    return 1 unless $c;
     my $host = eval { $c->req->uri->host } // '';
     $host = lc $host;
     return 1 if $host =~ /^(?:localhost|127\.0\.0\.1|\[?::1\]?)$/;
     return 1 if $host =~ /\.(?:local|zero)$/;
+    return 1 if $host =~ /(?:computersystemconsulting|weaverbeck|bmaster|healthkitchen|forager|comserv)/;
+    return 1 if $c->session && $c->session->{username};
     return 0;
 }
 

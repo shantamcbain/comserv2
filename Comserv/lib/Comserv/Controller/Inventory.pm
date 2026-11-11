@@ -510,14 +510,14 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
         my $sitename = $self->_sitename($c);
         my $schema   = $self->_schema($c);
 
-        # Check for existing by barcode (for scanned items) before create
+        # Check for existing by barcode (for scanned items) before create.
+        # Shared finder: spaced and normalised forms, search()->first (barcode is not unique).
         if ($params->{barcode}) {
-            my $existing = eval {
-                $schema->resultset('Accounting::InventoryItem')->search({
-                    sitename => $sitename,
-                    barcode  => $params->{barcode}
-                })->first;
-            };
+            my $existing = eval { $self->_find_item_by_barcode($c, $sitename, $params->{barcode}) };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'item_add',
+                    "Barcode lookup failed: $@");
+            }
             if ($existing) {
                 $c->flash->{success_msg} = 'Item with this barcode already exists — switching to edit form.';
                 $c->res->redirect($c->uri_for('/Inventory/item/edit', [$existing->id]));
@@ -566,6 +566,45 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
     );
 }
 
+# Find one inventory item by barcode. barcode has no unique constraint, so this
+# is search()->first, never find(). $type only narrows; omit it for the
+# duplicate guard. Numeric codes are also matched in normalised form.
+sub _find_item_by_barcode {
+    my ($self, $c, $sitename, $barcode, $type) = @_;
+    return undef unless defined $sitename && $sitename ne '';
+    return undef unless defined $barcode && $barcode =~ /\S/;
+    my $raw = $barcode;
+    $raw =~ s/^\s+|\s+$//g;
+    require Comserv::Util::HealthKitchen;
+    my $norm = Comserv::Util::HealthKitchen->new->normalize_upc($raw);
+    my %seen;
+    my @forms = grep { length && !$seen{$_}++ } ($raw, ($norm || ()));
+    my $digits = $raw;
+    $digits =~ s/[\s-]//g;
+    push @forms, $digits if $digits =~ /^\d+$/ && !$seen{$digits}++;
+
+    my @or = map { { barcode => $_ } } @forms;
+    if ($norm) {
+        push @or, \[ "REPLACE(REPLACE(barcode, ' ', ''), '-', '') = ?", $norm ];
+    }
+    my $where = { sitename => $sitename, -or => \@or };
+    $where->{barcode_type} = $type if defined $type && $type ne '';
+    return $self->_schema($c)->resultset('Accounting::InventoryItem')->search(
+        $where,
+        { order_by => { -asc => 'id' }, rows => 1 }
+    )->first;
+}
+
+sub _barcode_store {
+    my ($self, $barcode) = @_;
+    return undef unless defined $barcode && $barcode =~ /\S/;
+    my $raw = $barcode;
+    $raw =~ s/^\s+|\s+$//g;
+    require Comserv::Util::HealthKitchen;
+    my $norm = Comserv::Util::HealthKitchen->new->normalize_upc($raw);
+    return $norm || $raw;
+}
+
 # Reusable inventory-item creation. Single source of truth shared by the
 # web form (item_add) and external callers (e.g. 3d API). Returns the new row.
 sub _create_item {
@@ -591,9 +630,7 @@ sub _create_item {
     }
 
     if ($p->{barcode}) {
-        my $existing = $schema->resultset('Accounting::InventoryItem')->find(
-            { sitename => $sitename, barcode => $p->{barcode} }
-        );
+        my $existing = $self->_find_item_by_barcode($c, $sitename, $p->{barcode});
         if ($existing) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_item',
                 "Barcode already exists (id=" . $existing->id . ") — returning existing for edit/receive/adjust");
@@ -613,7 +650,7 @@ sub _create_item {
         unit_of_measure     => $p->{unit_of_measure} || 'each',
         unit_cost           => $p->{unit_cost}  || undef,
         unit_price          => $p->{unit_price} || undef,
-        barcode             => $p->{barcode}    || undef,
+        barcode             => $self->_barcode_store($p->{barcode}),
         barcode_type        => $p->{barcode_type} || undef,
         image_path          => $p->{image_path}   || undef,
         reorder_point       => $p->{reorder_point} || 0,
@@ -2864,16 +2901,42 @@ sub api_items :Path('/Inventory/api/items') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_items', 'API: list items');
 
-    my $sitename = $c->req->params->{sitename} || $self->_sitename($c);
+    # ?sitename= is honoured only for a CSC admin. Everyone else stays on the session site.
+    my $sitename = $self->_sitename($c);
+    if (defined $c->req->params->{sitename} && $c->req->params->{sitename} ne '') {
+        require Comserv::Util::AdminAuth;
+        $sitename = $c->req->params->{sitename}
+            if Comserv::Util::AdminAuth->new->is_csc_admin($c);
+    }
     my $schema   = $self->_schema($c);
+    my $where = { sitename => $sitename, status => 'active' };
+    my $barcode_q = $c->req->params->{barcode};
+    if (defined $barcode_q && $barcode_q =~ /\S/) {
+        my $raw = $barcode_q;
+        $raw =~ s/^\s+|\s+$//g;
+        require Comserv::Util::HealthKitchen;
+        my $norm = Comserv::Util::HealthKitchen->new->normalize_upc($raw);
+        my %seen;
+        my @forms = grep { length && !$seen{$_}++ } ($raw, ($norm || ()));
+        $where->{barcode} = { -in => \@forms };
+    }
+    my $cat = $c->req->params->{category};
 
     my @items;
     eval {
-        @items = $schema->resultset('Accounting::InventoryItem')->search(
-            { sitename => $sitename, status => 'active' },
-            { order_by => 'sku' }
+        my $rs = $schema->resultset('Accounting::InventoryItem')->search(
+            $where, { order_by => 'sku' }
         );
+        if (defined $cat && $cat =~ /\S/) {
+            $rs = $rs->search(\[ 'LOWER(me.category) = ?', lc $cat ]);
+        }
+        @items = $rs->all;
     };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_items',
+            "item list failed: $@");
+        @items = ();
+    }
 
     my @result = map {
         {
@@ -2887,6 +2950,12 @@ sub api_items :Path('/Inventory/api/items') :Args(0) {
             is_consumable    => $_->is_consumable ? 1 : 0,
             unit_of_measure  => $_->unit_of_measure,
             unit_cost        => $_->unit_cost,
+            unit_price       => $_->unit_price,
+            selling_price    => $_->selling_price,
+            barcode          => $_->barcode,
+            barcode_type     => $_->barcode_type,
+            notes            => $_->notes,
+            image_path       => $_->image_path,
             reorder_point    => $_->reorder_point,
             reorder_quantity => $_->reorder_quantity,
             status           => $_->status,
@@ -2951,6 +3020,28 @@ require JSON;
     }
 
     my $schema = $self->_schema($c);
+    if (defined $p->{barcode} && $p->{barcode} =~ /\S/) {
+        my $by_bc = eval { $self->_find_item_by_barcode($c, $sitename, $p->{barcode}) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_create',
+                "Barcode lookup failed: $@");
+        }
+        if ($by_bc) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_item_create',
+                "Barcode already exists id=" . $by_bc->id);
+            $c->res->content_type('application/json');
+            $c->res->body(JSON::encode_json({
+                success    => 1,
+                existing   => 1,
+                existed    => 1,
+                matched_on => 'barcode',
+                item_id    => $by_bc->id,
+                sku        => $by_bc->sku,
+                sitename   => $by_bc->sitename,
+            }));
+            $c->detach;
+        }
+    }
     my $existing = eval {
         $schema->resultset('Accounting::InventoryItem')->find(
             { sitename => $sitename, sku => $p->{sku} }
@@ -2961,11 +3052,13 @@ require JSON;
             "SKU $p->{sku} already exists id=" . $existing->id);
         $c->res->content_type('application/json');
         $c->res->body(JSON::encode_json({
-            success  => 1,
-            existed  => 1,
-            item_id  => $existing->id,
-            sku      => $existing->sku,
-            sitename => $existing->sitename,
+            success    => 1,
+            existing   => 1,
+            existed    => 1,
+            matched_on => 'sku',
+            item_id    => $existing->id,
+            sku        => $existing->sku,
+            sitename   => $existing->sitename,
         }));
         $c->detach;
     }
@@ -2982,11 +3075,19 @@ require JSON;
         $c->detach;
     }
 
+    require Comserv::Util::InventoryBarcode;
+    my $prod = eval { Comserv::Util::InventoryBarcode->save_product_fields($c, $item, $p) };
+    if ($@ || (ref $prod eq 'HASH' && exists $prod->{ok} && !$prod->{ok})) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_create',
+            "product fields failed for item " . $item->id . ": " . ($@ || $prod->{error}));
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_item_create',
         "created item id=" . $item->id . " sku=" . $item->sku . " site=$sitename");
     $c->res->content_type('application/json');
     $c->res->body(JSON::encode_json({
         success  => 1,
+        created  => 1,
         existed  => 0,
         item_id  => $item->id,
         sku      => $item->sku,
@@ -3040,7 +3141,12 @@ sub api_item_update :Path('/Inventory/api/item/update') :Args(0) {
         $item = eval { $schema->resultset('Accounting::InventoryItem')->find($p->{item_id}) };
     } elsif ($p->{sku}) {
         my $where = { sku => $p->{sku} };
-        $where->{sitename} = $p->{sitename} if $p->{sitename};
+        my $site = $p->{sitename};
+        if (!defined $site || $site eq '') {
+            my $sess = $c->stash->{SiteName} || $c->session->{SiteName} || $self->_sitename($c);
+            $site = $sess if defined $sess && $sess ne '' && $sess ne 'default';
+        }
+        $where->{sitename} = $site if defined $site && $site ne '';
         $item = eval { $schema->resultset('Accounting::InventoryItem')->search($where)->first };
     }
     unless ($item) {
@@ -3048,6 +3154,32 @@ sub api_item_update :Path('/Inventory/api/item/update') :Args(0) {
         $c->res->content_type('application/json');
         $c->res->body(JSON::encode_json({ success => 0, error => 'item not found' }));
         $c->detach;
+    }
+    my $sess_site = $c->stash->{SiteName} || $c->session->{SiteName};
+    if ($sess_site && $sess_site ne 'default' && ($item->sitename // '') ne $sess_site) {
+        $c->res->status(404);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => 'item not found' }));
+        $c->detach;
+    }
+
+    if (exists $p->{barcode} && defined $p->{barcode} && $p->{barcode} =~ /\S/) {
+        my $other = eval { $self->_find_item_by_barcode($c, $item->sitename, $p->{barcode}) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_update',
+                "Barcode lookup failed: $@");
+        }
+        if ($other && $other->id != $item->id) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_item_update',
+                "Barcode in use by id=" . $other->id);
+            $c->res->status(409);
+            $c->res->content_type('application/json');
+            $c->res->body(JSON::encode_json({
+                success => 0, code => 'barcode_in_use', item_id => 0 + $other->id,
+                error => 'Barcode is already used by another item on this site',
+            }));
+            $c->detach;
+        }
     }
 
     # HARD GUARD: reject any SKU change that would collide with another item in the same
@@ -3069,44 +3201,66 @@ sub api_item_update :Path('/Inventory/api/item/update') :Args(0) {
     }
 
     my %upd;
+    my @updated;
     for my $col (qw(
         item_origin name description category notes status unit_of_measure
-        reorder_point reorder_quantity unit_cost unit_price
+        reorder_point reorder_quantity unit_cost unit_price barcode barcode_type image_path
     )) {
-        $upd{$col} = $p->{$col} if exists $p->{$col};
+        next unless exists $p->{$col};
+        $upd{$col} = $col eq 'barcode' ? $self->_barcode_store($p->{$col}) : $p->{$col};
+        push @updated, $col;
     }
     if (exists $p->{is_assemblable}) {
         $upd{is_assemblable} = $p->{is_assemblable} ? 1 : 0;
+        push @updated, 'is_assemblable';
     }
     if (exists $p->{is_consumable}) {
         $upd{is_consumable} = $p->{is_consumable} ? 1 : 0;
+        push @updated, 'is_consumable';
     }
     my $cat_for_cons = exists $upd{category} ? $upd{category} : $item->category;
     if ($cat_for_cons && $cat_for_cons =~ /^(food|herb|spice|produce)$/i) {
         $upd{is_consumable} = 1;
     }
-    unless (keys %upd) {
+    my $has_product = exists $p->{brand} || exists $p->{size} || exists $p->{ingredients}
+        || exists $p->{ingredients_text} || exists $p->{ingredients_source};
+    unless (keys %upd || $has_product) {
         $c->res->status(400);
         $c->res->content_type('application/json');
         $c->res->body(JSON::encode_json({ success => 0, error => 'no updatable fields' }));
         $c->detach;
     }
-    $upd{updated_at} = $self->_now();
-    $upd{updated_by} = $c->session->{username} || 'api';
-
-    eval { $item->update(\%upd) };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_update',
-            "update failed id=" . $item->id . ": $@");
-        $c->res->status(500);
-        $c->res->content_type('application/json');
-        $c->res->body(JSON::encode_json({ success => 0, error => "update failed: $@" }));
-        $c->detach;
+    if (keys %upd) {
+        $upd{updated_at} = $self->_now();
+        $upd{updated_by} = $c->session->{username} || 'api';
+        eval { $item->update(\%upd) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_update',
+                "update failed id=" . $item->id . ": $@");
+            $c->res->status(500);
+            $c->res->content_type('application/json');
+            $c->res->body(JSON::encode_json({ success => 0, error => "update failed: $@" }));
+            $c->detach;
+        }
+    }
+    if ($has_product) {
+        require Comserv::Util::InventoryBarcode;
+        my $prod = eval { Comserv::Util::InventoryBarcode->save_product_fields($c, $item, $p) };
+        if ($@ || !$prod || !$prod->{ok}) {
+            my $err = $@ || ($prod && $prod->{error}) || 'product save failed';
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_update',
+                "product save failed id=" . $item->id . ": $err");
+            $c->res->status(400);
+            $c->res->content_type('application/json');
+            $c->res->body(JSON::encode_json({ success => 0, error => "$err" }));
+            $c->detach;
+        }
+        push @updated, @{ $prod->{updated} || [] };
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_item_update',
         "updated item id=" . $item->id . " sku=" . ($item->sku // '') .
-        " fields=" . join(',', sort keys %upd));
+        " fields=" . join(',', @updated));
     $c->res->content_type('application/json');
     $c->res->body(JSON::encode_json({
         success     => 1,
@@ -3114,6 +3268,7 @@ sub api_item_update :Path('/Inventory/api/item/update') :Args(0) {
         sku         => $item->sku,
         item_origin => $item->item_origin,
         sitename    => $item->sitename,
+        updated     => \@updated,
     }));
     $c->detach;
 }
