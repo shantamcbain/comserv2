@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.6",
+  "versionCode": 18,
+  "versionName": "2.7",
   "apkUrl": "/api/app/download",
-  "releaseNotes": "Fix custom domain URL in updater & Settings, dynamic version display."
+  "releaseNotes": "v2.7 Live Dev Server (Port 3001) Integration for Grok/Hermes/AI Agent changes across any SiteName, Voice Control, Real-time Workstation Remote Navigation & Persistent Keystore Signing."
 }
