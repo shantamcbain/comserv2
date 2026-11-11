@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.6",
+  "versionCode": 19,
+  "versionName": "2.8",
   "apkUrl": "/api/app/download",
-  "releaseNotes": "Fix custom domain URL in updater & Settings, dynamic version display."
+  "releaseNotes": "v2.8 Server Environment Selector (Dev Port 3001 Live AI Changes vs Prod Port 5000), explicit target display, and rich Changelog support."
 }
