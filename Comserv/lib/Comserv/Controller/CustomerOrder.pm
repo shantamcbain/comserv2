@@ -49,6 +49,34 @@ sub _now {
     return Comserv::Util::AppTime->now_utc;
 }
 
+# A typed part description is enough. The full paragraph is kept in notes
+# because inventory_customer_order_lines.description is varchar(500).
+sub _normalize_line {
+    my ($self, $l) = @_;
+    return undef unless ref $l eq 'HASH';
+    my $notes = defined $l->{notes_line} ? $l->{notes_line} : ($l->{notes} || '');
+    my $desc  = $l->{description} || '';
+    $notes =~ s/^\s+|\s+$//g;
+    $desc  =~ s/^\s+|\s+$//g;
+    my $item_id = $l->{item_id} || '';
+    return undef unless ($item_id || length $desc || length $notes);
+    if (length($desc) > 500) {
+        $notes = length($notes) ? $desc . "\n" . $notes : $desc;
+        $desc  = substr($desc, 0, 120);
+    }
+    if (!length($desc) && length($notes)) {
+        my ($first) = split /\n/, $notes, 2;
+        $first =~ s/^\s+|\s+$//g;
+        $desc = substr($first, 0, 120);
+    }
+    return {
+        item_id     => $item_id,
+        description => $desc,
+        quantity    => $l->{quantity} || 1,
+        notes       => $notes,
+    };
+}
+
 # -------------------------------------------------------------------------
 # Public: Customer Order Form
 # -------------------------------------------------------------------------
@@ -72,13 +100,9 @@ sub order_new :Path('/CustomerOrder/new') :Args(0) {
         my @initial_lines;
         for my $idx (sort { $a <=> $b } keys %lines_by_idx) {
             my $l = $lines_by_idx{$idx};
-            next unless ($l->{item_id} || $l->{description});
-            push @initial_lines, {
-                item_id     => $l->{item_id} || '',
-                description => $l->{description} || '',
-                quantity    => $l->{quantity} || 1,
-                notes       => $l->{notes_line} || '',
-            };
+            my $norm = $self->_normalize_line($l);
+            next unless $norm;
+            push @initial_lines, $norm;
         }
 
         unless ($params->{customer_name}) {
@@ -87,7 +111,7 @@ sub order_new :Path('/CustomerOrder/new') :Args(0) {
             $c->stash->{initial_lines} = \@initial_lines;
         }
         elsif (!@initial_lines) {
-            $c->stash->{error_msg} = 'Add at least one item (use + Add Line, then pick an item).';
+            $c->stash->{error_msg} = 'Add at least one line: pick an item, or describe the part.';
             $c->stash->{submitted} = $params;
             $c->stash->{initial_lines} = \@initial_lines;
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'order_new',

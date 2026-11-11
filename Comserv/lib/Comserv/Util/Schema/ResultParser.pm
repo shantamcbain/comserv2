@@ -319,6 +319,24 @@ sub parse_result_file_columns {
                 my $block = substr($def, $hstart+1, $j-$hstart-2);
                 $val = $self->_parse_result_inner_hash($block);
                 pos($def) = $j;
+            }
+            elsif ($def =~ /\G\s*\[/gc) {
+                # Arrayref literals (size => [10, 4], extra => [qw(a b)]). Without
+                # this branch the bareword fallback fails and the attribute lands
+                # as undef -- every decimal column then reported a blank size, and
+                # a table sync issued "MODIFY col decimal" (i.e. decimal(10,0)).
+                my $astart = pos($def)-1; my $adepth = 1; my $j = pos($def);
+                while ($j < length($def) && $adepth > 0) {
+                    my $ch = substr($def, $j, 1);
+                    $adepth++ if $ch eq '[';
+                    $adepth-- if $ch eq ']';
+                    $j++;
+                }
+                my $inner = substr($def, $astart+1, $j-$astart-2);
+                my @items;
+                while ($inner =~ /(-?\d+(?:\.\d+)?)/g) { push @items, $1 + 0; }
+                $val = \@items;
+                pos($def) = $j;
             } else {
                 if ($def =~ /\G\s*(\w+(?:\([^)]*\))?)/gc) { $val = $1; }
             }

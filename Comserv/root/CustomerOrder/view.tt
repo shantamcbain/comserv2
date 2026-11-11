@@ -36,7 +36,7 @@
 [% IF line_list.size %]
 <table border="1" cellpadding="6" style="width:100%;border-collapse:collapse;">
   <thead>
-    <tr><th>Item</th><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Notes</th></tr>
+    <tr><th>Item</th><th>Short title</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Part description</th></tr>
   </thead>
   <tbody>
   [% FOREACH ln IN line_list %]
@@ -46,7 +46,7 @@
     <td style="text-align:right">[% ln.quantity %]</td>
     <td style="text-align:right">$[% ln.unit_price || '0.00' %]</td>
     <td style="text-align:right">$[% ln.line_total || '0.00' %]</td>
-    <td>[% ln.notes | html %]</td>
+    <td>[% IF ln.notes %]<pre>[% ln.notes | html %]</pre>[% ELSE %]—[% END %]</td>
   </tr>
   [% END %]
   </tbody>

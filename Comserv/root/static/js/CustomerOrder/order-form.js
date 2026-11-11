@@ -130,10 +130,12 @@
         tdLt.innerHTML = '$<span id="lt_' + idx + '">0.00</span>';
 
         var tdNotes = document.createElement('td');
-        var notes = document.createElement('input');
-        notes.type = 'text';
+        var notes = document.createElement('textarea');
         notes.name = 'notes_line_' + idx;
-        notes.style.width = '120px';
+        notes.id = 'notes_line_' + idx;
+        notes.rows = 5;
+        notes.cols = 36;
+        notes.setAttribute('aria-label', 'Describe the part');
         notes.value = prefill.notes || '';
         tdNotes.appendChild(notes);
 

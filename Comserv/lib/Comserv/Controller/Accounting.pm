@@ -174,6 +174,12 @@ sub index :Path('/Accounting') :Args(0) {
         $pg_db_name = $reg->db_name if $reg;
     };
 
+    my $open_consignments = 0;
+    eval {
+        $open_consignments = $self->_schema($c)->resultset('Accounting::InventoryConsignment')
+            ->search({ sitename => $sitename, status => 'open' })->count;
+    };
+
     $c->stash(
         acct_count      => $acct_count,
         entry_count     => $entry_count,
@@ -183,6 +189,7 @@ sub index :Path('/Accounting') :Args(0) {
         supplier_count  => $supplier_count,
         location_count  => $location_count,
         low_stock       => $low_stock,
+        open_consignments => $open_consignments,
         sitename        => $sitename,
         pg_db_name      => $pg_db_name,
         template        => 'Accounting/index.tt',

@@ -1,0 +1,111 @@
+[% PageVersion = 'root/Inventory/consignment/count_review.tt,v 1.02 2026/11/06 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+<div class="app-container" data-read-poll="[% count.status == 'reading' ? 1 : 0 %]">
+<div class="content-container">
+
+[% SET loc  = count.location %]
+[% SET item = count.item %]
+
+<h2 style="color:var(--text-color);margin-top:0">Verify the count text — [% loc.name | html %]</h2>
+
+<div style="background:var(--secondary-color);border:1px solid var(--border-color);border-radius:4px;padding:10px 14px;margin-bottom:1em;color:var(--text-color)">
+  <div>
+    <strong>Count #</strong>[% count.id %]
+    &nbsp;·&nbsp; <strong>Item:</strong> [% item.name | html %]
+    &nbsp;·&nbsp; <strong>Source:</strong> [% count.source | html %]
+    [% IF count.engine %] &nbsp;·&nbsp; <strong>Read by:</strong> [% count.engine | html %][% END %]
+    [% IF count.confidence %] &nbsp;·&nbsp; <strong>Confidence:</strong> [% count.confidence %][% END %]
+    &nbsp;·&nbsp; <strong>Status:</strong> [% count.status | html %]
+  </div>
+  [% IF count.image_path && count.status == 'draft' %]
+  <div style="margin-top:4px;font-size:var(--font-size-small)">
+    Photo held as draft evidence — it is deleted the moment you apply this count.
+  </div>
+  [% ELSIF count.image_deleted_at %]
+  <div style="margin-top:4px;font-size:var(--font-size-small)">Photo deleted [% count.image_deleted_at %] (the text below is the record).</div>
+  [% END %]
+</div>
+
+[% IF count.status == 'reading' %]
+<div class="card" style="border:1px solid var(--border-color);border-radius:4px;padding:12px;background:var(--bg-color,#fff)">
+  <h3 style="margin-top:0;color:var(--text-color)">Reading the photo&hellip;</h3>
+  <p style="color:var(--text-color)">
+    The count is being read on this machine, so this page refreshes itself until the text is ready.
+    A warm read takes about 20 seconds; the first one after an idle spell can take a couple of minutes
+    while the model loads.
+  </p>
+  <p style="color:var(--text-color);font-size:var(--font-size-small)">
+    Nothing is written to stock until you see the text and tick &ldquo;the text is correct&rdquo;.
+    You can close this page — the count will be waiting in the container's history.
+  </p>
+</div>
+[% ELSIF count.status == 'failed' %]
+<div class="card" style="border:1px solid var(--border-color);border-radius:4px;padding:12px;background:var(--bg-color,#fff)">
+  <h3 style="margin-top:0;color:var(--danger-color,#b00)">The photo could not be read</h3>
+  <p style="color:var(--text-color)">[% count.notes || 'The reading model returned nothing usable.' | html %]</p>
+  <form method="POST" action="[% c.uri_for('/Inventory/consignment/count/review', [count.id]) %]">
+    <button type="submit" name="do" value="retry" class="btn btn-primary">Read the photo again</button>
+    <button type="submit" name="do" value="discard" class="btn"
+            onclick="return confirm('Discard this count and delete its photo?')">Discard and delete the photo</button>
+  </form>
+  <p style="margin-top:0.8em;color:var(--text-color);font-size:var(--font-size-small)">
+    Or <a href="[% c.uri_for('/Inventory/consignment/count', [count.placement_id]) %]">type the count instead</a> —
+    that skips the model entirely.
+  </p>
+</div>
+[% ELSIF count.status == 'draft' %]
+<div class="card" style="border:1px solid var(--border-color);border-radius:4px;padding:12px;background:var(--bg-color,#fff);margin-bottom:1em">
+  <h3 style="margin-top:0;color:var(--text-color)">1. Check every colour</h3>
+  <table class="table" style="width:100%;border-collapse:collapse;color:var(--text-color);font-size:var(--font-size-small)">
+    <tr style="background-color:var(--table-header-bg)">
+      <th style="text-align:left;padding:4px 8px">Colour</th>
+      <th style="text-align:right;padding:4px 8px">Maintained</th>
+      <th style="text-align:right;padding:4px 8px">Counted</th>
+      <th style="text-align:right;padding:4px 8px">Change</th>
+    </tr>
+    [% FOREACH l IN lines %]
+    <tr>
+      <td style="padding:4px 8px">[% l.colour | html %]</td>
+      <td style="padding:4px 8px;text-align:right">[% l.qty_expected %]</td>
+      <td style="padding:4px 8px;text-align:right">[% l.qty_counted %]</td>
+      <td style="padding:4px 8px;text-align:right">[% IF l.qty_delta < 0 %]<span style="color:var(--danger-color,#b00)">[% l.qty_delta %]</span>[% ELSE %][% l.qty_delta %][% END %]</td>
+    </tr>
+    [% END %]
+  </table>
+  <p style="color:var(--text-color);font-size:var(--font-size-small);margin-bottom:0">
+    Negative change = that many units left the container (they become the sale).
+    Anything short of the maintained quantity is queued for top-up or picked from other stock.
+  </p>
+</div>
+
+<div class="card" style="border:1px solid var(--border-color);border-radius:4px;padding:12px;background:var(--bg-color,#fff)">
+  <h3 style="margin-top:0;color:var(--text-color)">2. The text — correct it if the read was wrong</h3>
+  <form method="POST" action="[% c.uri_for('/Inventory/consignment/count/review', [count.id]) %]">
+    <textarea name="raw_text" rows="2" class="form-control"
+              style="width:100%;font-family:var(--mono-font,monospace);margin-bottom:0.7em">[% raw_text | html %]</textarea>
+    <label style="display:block;margin-bottom:0.8em;color:var(--text-color)">
+      <input type="checkbox" name="confirm" value="1">
+      The text is correct — apply it (adjust stock, raise the draft sales invoice, queue the top-up,
+      and delete the photo)
+    </label>
+    <button type="submit" name="do" value="apply" class="btn btn-primary">Apply the count</button>
+    <button type="submit" name="do" value="save" class="btn">Save text only</button>
+    <button type="submit" name="do" value="discard" class="btn"
+            onclick="return confirm('Discard this draft count and delete its photo?')">Discard</button>
+  </form>
+</div>
+[% ELSE %]
+<div class="doc-info" style="border:1px solid var(--border-color);border-radius:4px;padding:12px;color:var(--text-color)">
+  This count is <strong>[% count.status | html %]</strong> and can no longer be edited.
+  Its verified text is: <code>[% raw_text | html %]</code>.
+</div>
+[% END %]
+
+<p style="margin-top:1.2em">
+  <a href="[% c.uri_for('/Inventory/consignment/count', [count.placement_id]) %]">&larr; Back to the container</a>
+  &nbsp;·&nbsp;
+  <a href="[% c.uri_for('/Inventory/consignment') %]">All consignments</a>
+</p>
+
+</div>
+</div>
