@@ -1,0 +1,35 @@
+{
+  "default": { "name_suffix": " bot", "email_domain": "workstation.local" },
+  "by_path_prefix": {
+    "/.grok/worktrees/": { "name": "Grok Bot", "email": "grok-bot@workstation.local" }
+  },
+  "worktrees": {
+    "main":                { "name": "CSC developer",          "email": "csc-developer@workstation.local" },
+    "codeguard":           { "name": "Code Guard",             "email": "codeguard@workstation.local" },
+    "aisystem":            { "name": "Chat-with-AI fixer",     "email": "aisystem@workstation.local" },
+    "ai":                  { "name": "Chat-with-AI fixer",     "email": "ai@workstation.local" },
+    "aichatsystem-ef4e":   { "name": "Chat-with-AI fixer",     "email": "aichatsystem-ef4e@workstation.local" },
+    "helpdesk":            { "name": "HelpDesk",               "email": "helpdesk@workstation.local" },
+    "helpdesk-spam":       { "name": "HelpDesk",               "email": "helpdesk-spam@workstation.local" },
+    "healthkitchen":       { "name": "Health & Diet",          "email": "healthkitchen@workstation.local" },
+    "Bmaster":             { "name": "Beemaster",              "email": "Bmaster@workstation.local" },
+    "mailnewletter":       { "name": "Beemaster Newsletter",   "email": "mailnewletter@workstation.local" },
+    "DockerHA":            { "name": "Docker fixer",           "email": "dockerfix@workstation.local" },
+    "cgi-bin-legacy":      { "name": "cgi-bin converter",      "email": "cgi-bin-legacy@workstation.local" },
+    "errlog-fix":          { "name": "Error Audit fixer",      "email": "errlog-fix@workstation.local" },
+    "planning":            { "name": "Planning",               "email": "planning@workstation.local" },
+    "schema":              { "name": "Schema",                 "email": "schema@workstation.local" },
+    "Documentation":       { "name": "Documentation",          "email": "Documentation@workstation.local" },
+    "InventoryAccounting": { "name": "Inventory & Accounting", "email": "InventoryAccounting@workstation.local" },
+    "CSSNavigation":       { "name": "CSS Navigation",         "email": "CSSNavigation@workstation.local" },
+    "ency":                { "name": "Ency",                   "email": "ency@workstation.local" },
+    "git":                 { "name": "Git tools",              "email": "git@workstation.local" },
+    "3d":                  { "name": "3D",                     "email": "3d@workstation.local" },
+    "deployflow":          { "name": "deployflow worktree",    "email": "deployflow@workstation.local" },
+    "herbs-then-web":      { "name": "herbs-then-web worktree","email": "herbs-then-web@workstation.local" },
+    "login-return":        { "name": "login-return worktree",  "email": "login-return@workstation.local" },
+    "mail-connect":        { "name": "mail-connect worktree",  "email": "mail-connect@workstation.local" },
+    "todo-search":         { "name": "todo-search worktree",   "email": "todo-search@workstation.local" },
+    "hermes":              { "name": "Hermes",                 "email": "hermes@workstation.local" }
+  }
+}

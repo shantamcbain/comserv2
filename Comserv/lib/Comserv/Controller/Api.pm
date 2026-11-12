@@ -3994,6 +3994,129 @@ sub api_app_version :Path('app/version') :Args(0) {
     $c->detach();
 }
 
+sub api_inventory_item_by_barcode :Path('inventory/item_by_barcode') :Args(0) {
+    my ($self, $c) = @_;
+    my $barcode = $c->req->param('barcode') || $c->req->param('upc') || '';
+    $barcode =~ s/^\s+|\s+$//g;
+
+    unless ($barcode) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => \0, error => 'Barcode parameter required' }));
+        $c->detach();
+    }
+
+    my $item = eval { $c->model('DBEncy')->resultset('InventoryItem')->find({ barcode => $barcode }) };
+    if ($item) {
+        $c->res->status(200);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({
+            success => \1,
+            source  => 'comserv_db',
+            item    => {
+                id          => $item->id,
+                sku         => $item->sku,
+                name        => $item->name,
+                category    => $item->category,
+                description => $item->description,
+                barcode     => $item->barcode,
+                image_path  => $item->image_path
+            }
+        }));
+        $c->detach();
+    }
+
+    require HTTP::Tiny;
+    my $http = HTTP::Tiny->new(timeout => 5);
+    my $off_url = "https://world.openfoodfacts.org/api/v0/product/$barcode.json";
+    my $res = $http->get($off_url);
+    if ($res->{success} && $res->{content}) {
+        my $map = eval { decode_json($res->{content}) };
+        if ($map && $map->{status} && $map->{status} == 1) {
+            my $p = $map->{product} || {};
+            my $pname = $p->{product_name} || $p->{product_name_en} || '';
+            my $pcat  = $p->{categories} || $p->{category} || 'Pantry';
+            $pcat =~ s/,.*//;
+            my $pimg  = $p->{image_url} || $p->{image_front_url} || '';
+            my $pbrand = $p->{brands} || '';
+            my $pingredients = $p->{ingredients_text} || $p->{ingredients_text_en} || '';
+            my $nutr = $p->{nutriments} || {};
+            my $kcal = $nutr->{'energy-kcal_100g'} || $nutr->{'energy-kcal'} || 0;
+            my $prot = $nutr->{'proteins_100g'} || $nutr->{'proteins'} || 0;
+            my $carb = $nutr->{'carbohydrates_100g'} || $nutr->{'carbohydrates'} || 0;
+            my $sod  = $nutr->{'sodium_100g'} || $nutr->{'sodium'} || 0;
+
+            my $pdesc = $pbrand ? "Brand: $pbrand." : "";
+            if ($pingredients) {
+                $pdesc .= " Ingredients: $pingredients.";
+            }
+
+            if ($pname) {
+                $c->res->status(200);
+                $c->res->content_type('application/json');
+                $c->res->body(encode_json({
+                    success => \1,
+                    source  => 'open_food_facts',
+                    item    => {
+                        sku         => "SKU-$barcode",
+                        name        => $pname,
+                        category    => $pcat,
+                        description => $pdesc,
+                        barcode     => $barcode,
+                        image_path  => $pimg,
+                        ingredients => $pingredients,
+                        nutrition   => {
+                            calories => $kcal,
+                            protein  => $prot,
+                            carbs    => $carb,
+                            sodium   => $sod
+                        }
+                    }
+                }));
+                $c->detach();
+            }
+        }
+    }
+
+    my $upc_url = "https://api.upcitemdb.com/prod/trial/lookup?upc=$barcode";
+    my $upc_res = $http->get($upc_url);
+    if ($upc_res->{success} && $upc_res->{content}) {
+        my $upc_map = eval { decode_json($upc_res->{content}) };
+        if ($upc_map && $upc_map->{items} && ref($upc_map->{items}) eq 'ARRAY' && @{$upc_map->{items}}) {
+            my $first = $upc_map->{items}->[0];
+            my $title = $first->{title} || '';
+            my $cat   = $first->{category} || 'General';
+            $cat =~ s/>.*//;
+            my $desc  = $first->{description} || "Barcode: $barcode";
+            my $imgs  = $first->{images} || [];
+            my $img   = ref($imgs) eq 'ARRAY' && @$imgs ? $imgs->[0] : '';
+
+            if ($title) {
+                $c->res->status(200);
+                $c->res->content_type('application/json');
+                $c->res->body(encode_json({
+                    success => \1,
+                    source  => 'upcitemdb',
+                    item    => {
+                        sku         => "SKU-$barcode",
+                        name        => $title,
+                        category    => $cat,
+                        description => $desc,
+                        barcode     => $barcode,
+                        image_path  => $img
+                    }
+                }));
+                $c->detach();
+            }
+        }
+    }
+
+    $c->res->status(404);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => \0, error => "Barcode $barcode not found in Comserv or public UPC database." }));
+    $c->detach();
+}
+
 =head2 api_app_server_info
 
 GET /api/app/server-info - Which server is delivering this page.

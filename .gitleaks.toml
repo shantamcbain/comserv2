@@ -98,17 +98,41 @@ secretGroup = 1
 entropy = 3.0
 [rules.allowlist]
 stopwords = ["your","example","changeme","replace","placeholder","dummy","xxx","redacted","fake","sample","test","here","paste","insert","set_me","todo","secret_value"]
-paths = ['''(^|/)Comserv/t/''', '''(^|/)t/.*\.t$''', '''(^|/)root/Documentation/.*\.tt$''']
+paths = ['''(^|/)Comserv/t/''', '''(^|/)t/.*\.t$''']
 
 [[rules]]
 id = "assign-credential-literal"
-description = "Hard-coded credential assignment (KEY=literal / key: literal) in .env/YAML/shell/Perl"
-regex = '''(?i)(?:^|[\s$])(?:[A-Z0-9_]*_)?(?:password|passwd|api_token|api_key|secret|secret_key|client_secret|access_token)\s*(?:=|:)\s*['"]?([A-Za-z0-9+/_\-.!@#%^&*=]{12,})['"]?\s*(?:#.*)?$'''
+description = "Hard-coded credential assignment (KEY=literal / key: literal), unquoted, any file type"
+# (?m) is required: without it ^ and $ only match the start/end of the whole file,
+# so the old rule almost never fired on a real file.
+regex = '''(?im)(?:password|passwd|pwd|passphrase|secret|secret_key|api_token|api_key|client_secret|access_token|auth_token)[ \t]*(?:=|:)[ \t]*([A-Za-z0-9+/_\-.!@#%^&*=]{10,})[ \t]*(?:#.*)?$'''
 secretGroup = 1
-entropy = 3.3
+entropy = 3.0
 [rules.allowlist]
 stopwords = ["your","example","changeme","replace","placeholder","dummy","xxx","redacted","fake","sample","test","here","paste","insert","set_me","todo","secret_value"]
-regexes = ['''^(\$|<|\$\{)''']
+regexes = ['''^(\$|<|\$\{|%|@|\[%)''']
+
+# Quoted literal: password='x', password="x", --from-literal=password='x', password => 'x', "password": "x"
+# Applies to every file type including .tt / .md / Documentation (docs are where the real leak was).
+[[rules]]
+id = "quoted-credential-literal"
+description = "Quoted credential literal (password='...', --from-literal=password='...', \"password\": \"...\") in any file"
+regex = '''(?i)(?:password|passwd|pwd|passphrase|secret|secret_key|api_token|api_key|apikey|client_secret|access_token|auth_token)['"]?[ \t]*(?:=>|==?|:)[ \t]*['"]([^'"\s]{8,})['"]'''
+secretGroup = 1
+entropy = 3.0
+[rules.allowlist]
+stopwords = ["your","example","changeme","replace","placeholder","dummy","xxx","redacted","fake","sample","test","here","paste","insert","set_me","todo","secret_value","from ~/.comserv"]
+regexes = ['''^(\$|<|\$\{|%|@|\[%|\{\{)''']
+
+# mysql / mysqldump / mariadb command lines with -pVALUE glued on
+[[rules]]
+id = "mysql-cli-inline-password"
+description = "mysql/mariadb/mysqldump command with -p<password> on the command line"
+regex = '''(?i)\b(?:mysql|mysqldump|mysqladmin|mariadb|mariadb-dump)\b[^\n]*?[ \t]-p['"]?([^\s'"$<\\]{6,})'''
+secretGroup = 1
+entropy = 2.8
+[rules.allowlist]
+stopwords = ["your","example","changeme","replace","placeholder","dummy","xxx","redacted","fake","sample","test","here","paste","insert","set_me","todo","secret_value"]
 
 [[rules]]
 id = "dsn-embedded-password"
