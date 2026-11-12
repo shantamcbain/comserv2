@@ -582,9 +582,30 @@ sub _recipe_hash {
     };
 }
 
+# Max batches per "Mark made". Config: HealthKitchen.max_recipe_batches
+# (comserv.conf / .yml <HealthKitchen> max_recipe_batches N </HealthKitchen>).
+# Default 10; values outside 1..1000 fall back to the default.
+our $DEFAULT_MAX_BATCHES = 10;
+
+sub max_batches {
+    my ( $class, $c ) = @_;
+    my $cfg = eval { $c->config->{HealthKitchen}{max_recipe_batches} };
+    return ( defined $cfg && $cfg =~ /^\d+$/ && $cfg >= 1 && $cfg <= 1000 ) ? $cfg + 0 : $DEFAULT_MAX_BATCHES;
+}
+
+# Returns the batch count (positive integer <= cap) or undef. Absent/empty = 1.
+sub valid_batches {
+    my ( $class, $c, $raw ) = @_;
+    return 1 if !defined $raw || $raw eq '';
+    return undef unless $raw =~ /^[1-9][0-9]{0,5}$/;
+    return $raw <= $class->max_batches($c) ? $raw + 0 : undef;
+}
+
 sub consume_recipe {
     my ( $self, $c, $recipe_id, $batches ) = @_;
-    $batches ||= 1;
+    $batches = $self->valid_batches( $c, $batches );
+    return { ok => 0, error => 'Batches must be a whole number from 1 to ' . $self->max_batches($c) . '.' }
+        unless defined $batches;
     return { ok => 0, error => 'Recipe tables are not created yet. Run schema-compare.' }
         unless $self->recipe_ready($c);
     return { ok => 0, error => 'Invalid recipe.' }
@@ -608,44 +629,66 @@ sub consume_recipe {
     return { ok => 0, error => 'Recipe not found.' } unless $recipe;
 
     my $use_inv = $self->site_has_inventory($c);
-    my @deducted;
-    my @skipped;
-    my $ok = 1;
-    for my $ln ( $recipe->lines ) {
-        my $qty = $ln->quantity;
-        unless ( defined $qty && $qty > 0 ) {
-            push @skipped, { name => $ln->name_raw, reason => 'no numeric quantity' };
-            next;
+    my ( @deducted, @skipped );
+    # All-or-nothing: every deduction runs in one transaction. A failed
+    # deduction (helper returns !ok or dies) throws, so earlier lines roll back.
+    # Lines with no numeric quantity are not deductions; they are reported as
+    # skipped and do not abort the make.
+    my $failed;
+    my $txn_ok = eval { $c->model('DBEncy')->txn_do( sub {
+        for my $ln ( $recipe->lines ) {
+            my $qty = $ln->quantity;
+            unless ( defined $qty && $qty > 0 ) {
+                push @skipped, { name => $ln->name_raw, reason => 'no numeric quantity' };
+                next;
+            }
+            my $need = $qty * $batches;
+            my $name = $ln->name_raw || 'ingredient';
+            my $via  = ( $use_inv && $ln->inventory_item_id ) ? 'inventory' : 'pantry';
+            my $shown = $need;
+            if ( $via eq 'inventory' ) {
+                # Stock counts containers; grams convert via the item's net_weight_g.
+                my ( $units, $why ) = $self->stock_units_for_line( $c, $ln, $need );
+                unless ( defined $units ) {
+                    push @skipped, { name => $name, reason => $why };
+                    next;
+                }
+                $need = $units;
+            }
+            my $res  = $via eq 'inventory'
+                ? $self->_deduct_inventory( $c, $ln->inventory_item_id, $need, $recipe, $name )
+                : $self->_deduct_pantry( $c, $name, $need, $ln->unit );
+            if ( ref $res eq 'HASH' && !$res->{ok} && $res->{untracked} ) {
+                push @skipped, { name => $name, reason => $res->{error} || 'not tracked' };
+                next;
+            }
+            unless ( ref $res eq 'HASH' && $res->{ok} ) {
+                $failed = { name => $name, reason => ( ref $res eq 'HASH' && $res->{error} ) || "$via deduct failed" };
+                die "hk_deduct_failed\n";
+            }
+            push @deducted, { name => $name, qty => $shown, unit => $ln->unit, via => $via,
+                              ( $via eq 'inventory' ? ( stock_units => 0 + sprintf( '%.3f', $need ) ) : () ) };
         }
-        my $need = $qty * $batches;
-        my $name = $ln->name_raw || 'ingredient';
-        if ( $use_inv && $ln->inventory_item_id ) {
-            my $res = $self->_deduct_inventory( $c, $ln->inventory_item_id, $need, $recipe, $name );
-            if ( $res->{ok} ) {
-                push @deducted, { name => $name, qty => $need, unit => $ln->unit, via => 'inventory' };
-            }
-            else {
-                $ok = 0;
-                push @skipped, { name => $name, reason => $res->{error} || 'inventory deduct failed' };
-            }
-        }
-        else {
-            my $res = $self->_deduct_pantry( $c, $name, $need, $ln->unit );
-            if ( $res->{ok} ) {
-                push @deducted, { name => $name, qty => $need, unit => $ln->unit, via => 'pantry' };
-            }
-            else {
-                $ok = 0;
-                push @skipped, { name => $name, reason => $res->{error} || 'pantry deduct failed' };
-            }
-        }
+    } ); 1 };
+    unless ($txn_ok) {
+        my $why = $failed ? "$failed->{name}: $failed->{reason}" : 'database error';
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'consume_recipe',
+            'recipe ' . $recipe->id . " make rolled back ($why): $@" );
+        return {
+            ok         => 0,
+            rolled_back => 1,
+            name       => $recipe->name,
+            error      => "Nothing deducted (all-or-nothing). $why",
+            deducted   => [],
+            skipped    => [ $failed ? $failed : () ],
+        };
     }
 
     $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'consume_recipe',
         'Marked recipe ' . $recipe->id . " made x$batches inventory=" . ( $use_inv ? 1 : 0 ) );
 
     return {
-        ok       => $ok || ( @deducted ? 1 : 0 ),
+        ok       => 1,
         deducted => \@deducted,
         skipped  => \@skipped,
         via      => $use_inv ? 'inventory' : 'pantry',
@@ -653,14 +696,45 @@ sub consume_recipe {
     };
 }
 
+# Grams -> fraction of a stocked container (item.net_weight_g, owner site only).
+# Returns (units) or (undef, reason). Whole-unit lines (each/container/unit/
+# no unit) pass through; any other unit is skipped rather than guessed.
+sub stock_units_for_line {
+    my ( $self, $c, $ln, $need ) = @_;
+    my $unit = lc( $ln->unit // '' );
+    $unit =~ s/^\s+|\s+$//g;
+    return ($need) if $unit eq '' || $unit =~ /^(each|ea|container|unit|units|pkg|package)$/;
+    return ( undef, "unit '$unit' has no stock conversion" ) unless $unit =~ /^(g|gram|grams)$/;
+    my $item = eval {
+        $c->model('DBEncy')->resultset('InventoryItem')->search(
+            { 'me.id' => $ln->inventory_item_id, 'me.sitename' => $self->sitename($c) } )->first;
+    };
+    return ( undef, 'inventory item not on this site' ) unless $item;
+    my $net = eval { $item->net_weight_g };
+    return ( undef, 'net weight (g) not set on inventory item; not deducted' )
+        unless defined $net && $net > 0;
+    # Stock columns are decimal(12,3) (inventory_stock_levels.quantity_on_hand,
+    # inventory_transactions.quantity), so round the container fraction to those
+    # 3 decimals here. Formatting it at 4 decimals only in the reply made the
+    # reported amount differ from what the DB actually stored.
+    my $units = 0 + sprintf( '%.3f', $need / $net );
+    return ( undef, 'less than 0.001 of a container; not deducted' ) unless $units > 0;
+    return ($units);
+}
+
 sub _deduct_inventory {
     my ( $self, $c, $item_id, $need, $recipe, $name ) = @_;
+    my $untracked;
     my $schema   = $c->model('DBEncy');
     my $sitename = $self->sitename($c);
     my $now      = strftime( '%Y-%m-%d %H:%M:%S', localtime );
     my $err;
     my $ok = 0;
     try {
+        # Stock is only touched for an item that belongs to this site.
+        my $own = $schema->resultset('InventoryItem')->search(
+            { 'me.id' => $item_id, 'me.sitename' => $sitename } )->count;
+        die "Inventory item $item_id is not on site $sitename\n" unless $own;
         my $sl_rs = $schema->resultset('InventoryStockLevel')->search(
             { item_id => $item_id },
             { order_by => 'id' }
@@ -694,6 +768,7 @@ sub _deduct_inventory {
         }
         else {
             $err = 'No stock row for this SKU. Receive it in Inventory first.';
+            $untracked = 1;
         }
     }
     catch {
@@ -701,16 +776,17 @@ sub _deduct_inventory {
         $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, '_deduct_inventory',
             "deduct inventory item $item_id failed: $err" );
     };
-    return { ok => 0, error => $err || 'Inventory deduct failed.' } unless $ok;
+    return { ok => 0, untracked => $untracked, error => $err || 'Inventory deduct failed.' } unless $ok;
     return { ok => 1 };
 }
 
 sub _deduct_pantry {
     my ( $self, $c, $name, $need, $unit ) = @_;
-    return { ok => 0, error => 'Pantry tables are not created yet.' }
+    return { ok => 0, untracked => 1, error => 'Pantry tables are not created yet.' }
         unless $self->pantry_ready($c);
     my $row;
     my $err;
+    my $untracked;
     try {
         $row = $c->model('DBEncy')->resultset('HealthKitchen::UserPantryQty')->search(
             {
@@ -724,7 +800,8 @@ sub _deduct_pantry {
             $row->update( { qty => $have - $need } );
         }
         else {
-            $err = "No pantry row named $name. Add it first.";
+            $err = "No pantry row named $name; not deducted.";
+            $untracked = 1;
         }
     }
     catch {
@@ -732,7 +809,7 @@ sub _deduct_pantry {
         $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, '_deduct_pantry',
             "pantry update failed: $err" );
     };
-    return { ok => 0, error => $err } if $err || !$row;
+    return { ok => 0, untracked => $untracked, error => $err } if $err || !$row;
     return { ok => 1 };
 }
 
@@ -3038,6 +3115,26 @@ sub missing_seed_rows {
 
 # Insert-if-missing by unique key once the table exists. Never updates existing rows.
 # Called on HealthKitchen requests; cheap after the first successful pass.
+# ENCY herb/symptom seed (Util::HealthKitchen::EncyHerbSeed). Once per process.
+our $HERB_SEEDED = 0;
+sub ensure_ency_herb_seed {
+    my ( $self, $c ) = @_;
+    return { ok => 1, skipped => 'already seeded' } if $HERB_SEEDED;
+    my $res = { ok => 0 };
+    try {
+        require Comserv::Util::HealthKitchen::EncyHerbSeed;
+        $res = { ok => 1, %{ Comserv::Util::HealthKitchen::EncyHerbSeed::ensure( $c->model('DBEncy')->schema ) } };
+        $HERB_SEEDED = 1;
+        $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'ensure_ency_herb_seed',
+            join ' ', map {"$_=$res->{$_}"} sort keys %$res );
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'warning', __FILE__, __LINE__, 'ensure_ency_herb_seed',
+            "herb seed failed (will retry next request): $_" );
+    };
+    return $res;
+}
+
 sub ensure_sourcing_seed {
     my ( $self, $c ) = @_;
     return { ok => 1, inserted => 0, skipped => 'already seeded' } if $SOURCING_SEEDED;

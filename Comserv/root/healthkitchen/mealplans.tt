@@ -25,6 +25,10 @@
     [% ELSE %]
         <div class="content-section">
             <h2>New plan</h2>
+            <form method="post" action="[% c.uri_for('/healthkitchen/week_plan') %]" style="margin-bottom:1em">
+                <label>Build a whole-food week from my inventory, starting <input type="date" name="start_date" required /></label>
+                <button type="submit" class="btn btn-sm btn-primary">Build week plan</button>
+            </form>
             <form method="post" action="[% c.uri_for('/healthkitchen/mealplans') %]">
                 <label>Name <input type="text" name="name" required maxlength="255" /></label>
                 <label>From <input type="date" name="start_date" /></label>

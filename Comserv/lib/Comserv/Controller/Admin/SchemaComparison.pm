@@ -1622,10 +1622,14 @@ sub get_result_field_info {
         die "Field '$field_name' not found in Result file '$result_file_path'";
     }
 
-    # Normalize ResultParser output to match the expected return format
+    # Normalize ResultParser output to match the expected return format.
+    # size arrives as an array ref for decimal([p, s]) / enum lists; the callers
+    # below build "TYPE(size)", so flatten it to the DB parser's "p,s" string form.
+    my $size = $col_info->{size};
+    $size = join(',', @$size) if ref $size eq 'ARRAY';
     return {
         data_type => $col_info->{data_type} || $col_info->{type} || '',
-        size      => $col_info->{size} // '',
+        size      => $size // '',
         is_nullable => ($col_info->{is_nullable} // '') eq 'YES' ? 1
                      : ($col_info->{is_nullable} // '') eq 'NO'  ? 0
                      : ($col_info->{is_nullable} ? 1 : 0),
@@ -2374,7 +2378,7 @@ sub get_table_result_comparison_v2 {
             $result_field->{is_auto_increment} //= 0;
             $result_field->{default_value} //= undef;
             $result_field->{extra} = defined $result_field->{extra} ? "$result_field->{extra}" : '';
-            if (defined $result_field->{size}) {
+            if (defined $result_field->{size} && ref $result_field->{size} ne 'ARRAY') {
                 $result_field->{size} = 0 + $result_field->{size};
             }
         }
@@ -3389,9 +3393,16 @@ sub schema_compare_table :Path('/admin/schema_compare/server') :Args(5) {
             foreach my $col_name (keys %{ $schema_info->{columns} }) {
                 my $c = $schema_info->{columns}{$col_name};
                 my $dt = $c->{data_type} // $c->{type} // 'varchar';
-                my $sz = (defined $c->{size}       && $c->{size} ne '')
-                      || (defined $c->{data_length} && $c->{data_length} ne '')
-                    ? '(' . ($c->{size} // $c->{data_length} // '255') . ')' : '';
+                # decimal precision/scale arrives as an array ref (size => [10, 2])
+                # and enum lists too; flatten before it reaches the template, which
+                # can only print a scalar. Interpolating the ref showed an empty
+                # Size cell, so the row looked like it had no value to correct.
+                my $sz_raw = (defined $c->{size} && !ref $c->{size} && $c->{size} ne '')
+                    ? $c->{size}
+                    : (ref $c->{size} eq 'ARRAY' && @{ $c->{size} })
+                        ? join(',', @{ $c->{size} })
+                        : (defined $c->{data_length} && $c->{data_length} ne '') ? $c->{data_length} : undef;
+                my $sz = defined $sz_raw ? '(' . $sz_raw . ')' : '';
                 # DBIx::Class documents is_nullable as defaulting to false, but
                 # in this codebase many Result files simply OMIT the key on
                 # columns that are nullable in the database. Inferring NOT NULL

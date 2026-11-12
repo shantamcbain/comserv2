@@ -69,6 +69,13 @@ __PACKAGE__->add_columns(
         is_nullable   => 0,
         default_value => 'each',
     },
+    # Grams in one stocked unit (container). Health Kitchen recipe lines in g
+    # deduct grams / net_weight_g of a unit. NULL = unknown -> line skipped.
+    net_weight_g => {
+        data_type   => 'decimal',
+        size        => [ 10, 2 ],
+        is_nullable => 1,
+    },
     unit_cost => {
         data_type   => 'decimal',
         size        => [10, 2],
