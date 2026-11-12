@@ -393,4 +393,120 @@ sub _extract_balanced_parens {
     return '';
 }
 
+
+# Flatten one parsed Result-file column into UI-safe scalar attributes.
+# Template Toolkit cannot print ARRAY/HASH refs (those cells render empty),
+# and schema_compare_table previously hard-coded Result extra/comment to ''.
+#
+# Returns:
+#   name, data_type,
+#   size            -- '(10,2)' / '(50)' / ''  (empty when undeclared; for comparison)
+#   is_nullable     -- 'YES' / 'NO' / undef     (undef = not declared; do not compare)
+#   nullable        -- 'YES' / 'NO' / '--'      (display; em-dash when undeclared)
+#   default_value   -- scalar or undef
+#   default_val     -- display ('NULL' when undef)
+#   extra           -- 'auto_increment', 'enum(a,b)', 'unsigned', ... never a ref
+#   comment         -- comment // docs // documentation, or ''
+sub format_column_for_display {
+    my ($self, $col, $name) = @_;
+    $col = {} unless ref($col) eq 'HASH';
+
+    my $dt = $col->{data_type} // $col->{type} // 'varchar';
+
+    my $sz_raw;
+    my $size_in = $col->{size};
+    $size_in = $col->{data_length} if !defined $size_in || $size_in eq '';
+    if (ref($size_in) eq 'ARRAY' && @{$size_in}) {
+        $sz_raw = join(',', @{$size_in});
+    }
+    elsif (defined $size_in && !ref($size_in) && $size_in ne '') {
+        $sz_raw = $size_in;
+    }
+    my $size = defined $sz_raw ? '(' . $sz_raw . ')' : '';
+
+    my $nullable;
+    if (defined $col->{is_nullable} && $col->{is_nullable} ne '') {
+        $nullable = ($col->{is_nullable} =~ /^(0|no|false)$/i) ? 'NO' : 'YES';
+    }
+    elsif ($col->{is_auto_increment}) {
+        $nullable = 'NO';
+    }
+    else {
+        $nullable = undef;
+    }
+
+    my $default = $col->{default_value};
+    $default = $$default if ref($default) eq 'SCALAR';
+    $default = undef if ref($default);
+
+    my @extra;
+    push @extra, 'auto_increment' if $col->{is_auto_increment};
+    my $ex = $col->{extra};
+    if (ref($ex) eq 'HASH') {
+        if (ref($ex->{list}) eq 'ARRAY' && @{$ex->{list}}) {
+            push @extra, 'enum(' . join(',', @{ $ex->{list} }) . ')';
+        }
+        for my $k (sort keys %$ex) {
+            next if $k eq 'list';
+            my $v = $ex->{$k};
+            next if ref $v;
+            next unless defined $v && $v ne '';
+            if ($v eq '1' || lc($v) eq 'true') {
+                push @extra, $k;
+            }
+            else {
+                push @extra, "$k=$v";
+            }
+        }
+    }
+    elsif (defined $ex && !ref($ex) && $ex ne '') {
+        push @extra, $ex;
+    }
+
+    my $comment = $col->{comment} // $col->{docs} // $col->{documentation} // '';
+    $comment = '' if ref $comment;
+
+    return {
+        name          => $name // '',
+        data_type     => $dt,
+        size          => $size,
+        is_nullable   => $nullable,
+        nullable      => defined $nullable ? $nullable : "\x{2014}",
+        default_value => $default,
+        default_val   => defined $default ? $default : 'NULL',
+        extra         => join(' ', @extra),
+        comment       => $comment,
+        is_auto_increment => $col->{is_auto_increment} ? 1 : 0,
+        is_primary_key    => $col->{is_primary_key} ? 1 : 0,
+        docs              => $comment,
+    };
+}
+
+# Parse a Result file and return an ordered, TT-safe field list for table previews.
+sub preview_fields {
+    my ($self, $path) = @_;
+    my $empty = { columns => {}, fields => [], primary_keys => [], field_count => 0, table_name => undef };
+    return $empty unless $path && -f $path;
+    my $schema = eval { $self->get_result_file_schema($path) };
+    return $empty unless $schema && ref($schema->{columns}) eq 'HASH';
+
+    my @pks = @{ $schema->{primary_keys} || [] };
+    my %pk  = map { $_ => 1 } @pks;
+    my @fields;
+    for my $cname (sort keys %{ $schema->{columns} }) {
+        my $cinfo = $schema->{columns}{$cname} || {};
+        $cinfo->{is_primary_key} = 1 if $pk{$cname};
+        my $disp = $self->format_column_for_display($cinfo, $cname);
+        $disp->{is_primary_key} = $pk{$cname} ? 1 : 0;
+        push @fields, $disp;
+    }
+    return {
+        columns      => $schema->{columns},
+        fields       => \@fields,
+        primary_keys => \@pks,
+        field_count  => scalar(@fields),
+        table_name   => $schema->{table_name},
+    };
+}
+
 1;

@@ -5,6 +5,49 @@
     JS via schema-compare.js (event delegation on data-action attributes)
 %]
 
+[% BLOCK result_fields_preview %]
+    [% IF fields && fields.size %]
+    <div class="table-container orphan-fields-wrap">
+        <table class="data-table orphan-fields-table" style="margin: 0; font-size: 0.9em;">
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th>Type</th>
+                    <th>Size</th>
+                    <th>Nullable</th>
+                    <th>Default</th>
+                    <th>Extra</th>
+                    <th>Flags / Docs</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOREACH field IN fields %]
+                <tr>
+                    <td><code>[% field.name | html %]</code></td>
+                    <td>[% field.data_type | html %]</td>
+                    <td><code>[% field.item('size') || '—' %]</code></td>
+                    <td>
+                        [% IF field.nullable == 'YES' %]<span class="prop nullable">YES</span>
+                        [% ELSIF field.nullable == 'NO' %]<span class="prop not-null">NO</span>
+                        [% ELSE %]—[% END %]
+                    </td>
+                    <td><code>[% field.default_val || field.default_value || '—' %]</code></td>
+                    <td><code>[% field.extra || '—' %]</code></td>
+                    <td>
+                        [% IF field.is_primary_key %]<span class="prop primary">PK</span> [% END %]
+                        [% IF field.comment %]<span class="text-muted">[% field.comment | html %]</span>
+                        [% ELSIF field.docs %]<span class="text-muted">[% field.docs | html %]</span>[% END %]
+                    </td>
+                </tr>
+                [% END %]
+            </tbody>
+        </table>
+    </div>
+    [% ELSE %]
+    <p class="text-muted" style="margin: 0;">No column definitions parsed from this Result file.</p>
+    [% END %]
+[% END %]
+
 [% SET fetch_url = c.uri_for('/schema-comparison/create_table_from_result') %]
 
 <div class="app-container">
@@ -129,8 +172,17 @@
                                     <td>[% table.row_count || 0 %]</td>
                                     <td>[% table.size %]</td>
                                     <td>[% table.result_name | html %]
+                                        [% IF table.field_count %]
+                                            <span class="text-muted">([% table.field_count %] fields)</span>
+                                        [% END %]
                                         [% IF table.result_rel_path %]
                                             <a href="#" onclick="openAI2EditorWindow('[% table.result_rel_path | html %]');return false" class="btn btn-sm btn-secondary" title="Edit result file in AI editor"><i class="fas fa-edit"></i> Edit</a>
+                                        [% END %]
+                                        [% IF table.fields && table.fields.size %]
+                                        <details class="result-settings-toggle">
+                                            <summary>Result file settings</summary>
+                                            [% PROCESS result_fields_preview fields=table.fields %]
+                                        </details>
                                         [% END %]
                                     </td>
                                     <td class="action-cell">
@@ -225,36 +277,7 @@
                                 </div>
                             </div>
                             [% IF res.fields && res.fields.size %]
-                            <div class="table-container orphan-fields-wrap">
-                                <table class="data-table orphan-fields-table" style="margin: 0; font-size: 0.9em;">
-                                    <thead>
-                                        <tr>
-                                            <th>Field</th>
-                                            <th>Type</th>
-                                            <th>Size</th>
-                                            <th>Nullable</th>
-                                            <th>Default</th>
-                                            <th>Flags / Docs</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        [% FOREACH field IN res.fields %]
-                                        <tr>
-                                            <td><code>[% field.name | html %]</code></td>
-                                            <td>[% field.data_type | html %]</td>
-                                            <td>[% IF field.size.defined %][% field.size %][% ELSE %]—[% END %]</td>
-                                            <td>[% IF field.is_nullable %]<span class="prop nullable">NULL</span>[% ELSE %]<span class="prop not-null">NOT NULL</span>[% END %]</td>
-                                            <td><code>[% IF field.default_value.defined %][% field.default_value | html %][% ELSE %]—[% END %]</code></td>
-                                            <td>
-                                                [% IF field.is_primary_key %]<span class="prop primary">PK</span> [% END %]
-                                                [% IF field.is_auto_increment %]<span class="prop">AI</span> [% END %]
-                                                [% IF field.docs %]<span class="text-muted">[% field.docs | html %]</span>[% END %]
-                                            </td>
-                                        </tr>
-                                        [% END %]
-                                    </tbody>
-                                </table>
-                            </div>
+                            [% PROCESS result_fields_preview fields=res.fields %]
                             [% ELSIF res.columns %]
                             <div class="table-container orphan-fields-wrap">
                                 <table class="data-table orphan-fields-table" style="margin: 0; font-size: 0.9em;">

@@ -3439,16 +3439,22 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
     # Track which result table names were matched (for debugging)
     my %matched_result_names;
 
+    my $preview_parser = Comserv::Util::Schema::ResultParser->new();
     foreach my $tname (sort keys %db_tables) {
         my $tinfo = $db_tables{$tname};
         if (exists $result_mapping->{lc($tname)}) {
             $matched_result_names{lc($tname)} = 1;
+            my $rpath = $result_mapping->{lc($tname)}{result_path};
+            my $preview = $preview_parser->preview_fields($rpath);
             push @both, {
                 %$tinfo,
                 has_result  => 1,
                 result_name => $result_mapping->{lc($tname)}{result_name},
-                result_path => $result_mapping->{lc($tname)}{result_path},
-                result_rel_path => $result_mapping->{lc($tname)}{result_path} =~ s{^\Q$app_root\E/?}{}r,
+                result_path => $rpath,
+                result_rel_path => ($rpath // '') =~ s{^\Q$app_root\E/?}{}r,
+                fields      => $preview->{fields} || [],
+                field_count => $preview->{field_count} || 0,
+                primary_keys => $preview->{primary_keys} || [],
             };
         } else {
             push @table_only, {
@@ -3469,31 +3475,10 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
             my $rname = $result_mapping->{$tname}{result_name};
             my $rel   = $rpath =~ s{^\Q$app_root\E/?}{}r;
 
-            my $columns = {};
-            my @fields  = ();
-            my @pks     = ();
-            my $schema  = eval { $orphan_parser->get_result_file_schema($rpath) };
-            if ($schema && ref($schema->{columns}) eq 'HASH') {
-                $columns = $schema->{columns};
-                @pks = @{ $schema->{primary_keys} || [] };
-                my %pk_lookup = map { $_ => 1 } @pks;
-                foreach my $cname (sort keys %$columns) {
-                    my $cinfo = $columns->{$cname} || {};
-                    $cinfo->{is_primary_key} = 1 if $pk_lookup{$cname};
-                    # Flatten for Template Toolkit: ordered list with name + attrs
-                    push @fields, {
-                        name            => $cname,
-                        data_type       => $cinfo->{data_type} // '',
-                        size            => $cinfo->{size},
-                        is_nullable     => defined $cinfo->{is_nullable} ? $cinfo->{is_nullable} : 1,
-                        is_auto_increment => $cinfo->{is_auto_increment} ? 1 : 0,
-                        is_primary_key  => $cinfo->{is_primary_key} ? 1 : 0,
-                        default_value   => defined $cinfo->{default_value} ? $cinfo->{default_value} : undef,
-                        docs            => $cinfo->{docs} // $cinfo->{documentation} // $cinfo->{comment} // '',
-                    };
-                    $columns->{$cname} = $cinfo;
-                }
-            }
+            my $preview = $orphan_parser->preview_fields($rpath);
+            my $columns = $preview->{columns} || {};
+            my @fields  = @{ $preview->{fields} || [] };
+            my @pks     = @{ $preview->{primary_keys} || [] };
 
             push @orphaned_result_files, {
                 result_name => $rname,
@@ -3597,44 +3582,11 @@ sub schema_compare_table :Path('/admin/schema_compare/server') :Args(5) {
         }
 
         if ($result_file_path) {
-            my $schema_info = $parser->get_result_file_schema($result_file_path);
-            foreach my $col_name (keys %{ $schema_info->{columns} }) {
-                my $c = $schema_info->{columns}{$col_name};
-                my $dt = $c->{data_type} // $c->{type} // 'varchar';
-                # decimal precision/scale arrives as an array ref (size => [10, 2])
-                # and enum lists too; flatten before it reaches the template, which
-                # can only print a scalar. Interpolating the ref showed an empty
-                # Size cell, so the row looked like it had no value to correct.
-                my $sz_raw = (defined $c->{size} && !ref $c->{size} && $c->{size} ne '')
-                    ? $c->{size}
-                    : (ref $c->{size} eq 'ARRAY' && @{ $c->{size} })
-                        ? join(',', @{ $c->{size} })
-                        : (defined $c->{data_length} && $c->{data_length} ne '') ? $c->{data_length} : undef;
-                my $sz = defined $sz_raw ? '(' . $sz_raw . ')' : '';
-                # DBIx::Class documents is_nullable as defaulting to false, but
-                # in this codebase many Result files simply OMIT the key on
-                # columns that are nullable in the database. Inferring NOT NULL
-                # from an absent key therefore flags ~14 populated nullable
-                # columns (files.*, workshop.*) as drift and offers an "Update
-                # Table" button that would ALTER them to NOT NULL -- which can
-                # fail or reject existing rows. Absent means UNKNOWN: record
-                # undef and let _fields_equivalent skip the nullability check
-                # rather than guess destructively.
-                my $nullable;
-                if (defined $c->{is_nullable}) {
-                    $nullable = ($c->{is_nullable} =~ /^(0|no|false)$/i) ? 'NO' : 'YES';
-                } elsif ($c->{is_auto_increment}) {
-                    $nullable = 'NO';   # auto-increment is always NOT NULL
-                } else {
-                    $nullable = undef;  # not declared -> do not compare
-                }
-                $result_columns{ lc($col_name) } = {
-                    name          => $col_name,
-                    data_type     => $dt,
-                    size          => $sz,
-                    is_nullable   => $nullable,
-                    default_value => $c->{default_value},
-                };
+            # preview_fields flattens ARRAY/HASH attrs to scalars so TT can
+            # print them, and fills extra/comment (previously hard-coded '').
+            my $preview = $parser->preview_fields($result_file_path);
+            foreach my $disp (@{ $preview->{fields} }) {
+                $result_columns{ lc($disp->{name}) } = $disp;
             }
         }
     }
@@ -3686,11 +3638,11 @@ sub schema_compare_table :Path('/admin/schema_compare/server') :Args(5) {
                 source       => 'Result',
                 name         => $r->{name},
                 data_type    => $r->{data_type},
-                size         => $r->{size},
-                nullable     => $r->{is_nullable},
-                default_val  => (defined $r->{default_value} ? $r->{default_value} : 'NULL'),
-                extra        => '',
-                comment      => '',
+                size         => (($r->{size} // '') ne '' ? $r->{size} : "\x{2014}"),
+                nullable     => $r->{nullable} // "\x{2014}",
+                default_val  => $r->{default_val} // (defined $r->{default_value} ? $r->{default_value} : 'NULL'),
+                extra        => $r->{extra} // '',
+                comment      => $r->{comment} // '',
                 status       => $match ? 'Match' : 'Result',
                 has_result   => $d ? 1 : 0,
                 has_diff     => $match ? 0 : 1,
