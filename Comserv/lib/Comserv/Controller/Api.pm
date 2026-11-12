@@ -3952,25 +3952,209 @@ No auth required (clients hit this before login to decide whether to update).
 sub api_app_version :Path('app/version') :Args(0) {
     my ($self, $c) = @_;
 
+    my $hostname = eval {
+        require Comserv::Util::SystemInfo;
+        Comserv::Util::SystemInfo::get_server_hostname();
+    } || 'workstation';
+
+    my $workflow = eval {
+        require Comserv::Util::SystemInfo;
+        Comserv::Util::SystemInfo->get_app_workflow($c->config->{home});
+    } || 'main';
+
+    my $git_head = eval {
+        require Comserv::Util::Git;
+        Comserv::Util::Git->current_head_str($c);
+    } || 'main';
+
+    my $client_ip = eval { $c->req->address } || '';
+
     my $path = $c->path_to('root/static/app/version.json')->stringify;
-    my $json;
+    my $json_data = {};
     if (-r $path) {
         local $/;
-        open my $fh, '<', $path or do {
-            $c->res->status(500);
-            $c->res->content_type('application/json');
-            $c->res->body(encode_json({ success => 0, error => 'version file unreadable' }));
-            $c->detach();
-        };
-        $json = <$fh>;
+        open my $fh, '<', $path;
+        my $raw = <$fh>;
         close $fh;
-    } else {
-        $json = q{{"versionCode":1,"versionName":"1.0","apkUrl":"","releaseNotes":""}};
+        $json_data = eval { decode_json($raw) } || {};
     }
+
+    $json_data->{serverInfo} = {
+        domain   => eval { $c->req->uri->host } || 'dev.computersystemconsulting.ca',
+        clientIp => $client_ip,
+        server   => "$hostname (Docker):" . (eval { $c->req->uri->port } || 3001),
+        workflow => $workflow,
+        git      => $git_head,
+        dbEnv    => ($ENV{DATABASE_ENVIRONMENT} || 'PRODUCTION'),
+    };
 
     $c->res->status(200);
     $c->res->content_type('application/json');
-    $c->res->body($json);
+    $c->res->body(encode_json($json_data));
+    $c->detach();
+}
+
+=head2 api_app_server_info
+
+GET /api/app/server-info - Which server is delivering this page.
+
+Reports the same facts the web debug bar prints (root/pagetop.tt): domain,
+client IP, server identifier, workflow (worktree name), the live git
+branch/commit of the checkout that is running, the build stamp, the database
+environment/user and the port that answered.  Also returns the worktree/port
+table the admin git page renders (root/config/worktrees.json) with a live
+"is a server listening" flag, so the phone can switch target ports and see
+which worktrees are actually up.
+
+Logged-in session required.  Servers that predate this action answer 404 and
+the app simply hides the badge.
+
+=head3 JSON
+
+  { success, domain, clientIp, server, serverHost, serverIp, workflow, port,
+    git: {branch, commit}, build: {branch, commit, date, host},
+    dbEnv, dbUser,
+    targets: [ {name, label, port, host, url, running} ] }
+
+=cut
+
+my $_app_server_info_cache;            # { at => epoch, targets => [...] }
+my $_app_server_info_cache_ttl = 15;   # seconds — ports change rarely, phones poll
+
+# Which of these TCP ports on this box actually has a listener right now.
+# Localhost connect failures are immediate (ECONNREFUSED), so the whole sweep
+# costs milliseconds even with every port down.
+sub _app_ports_listening {
+    my ($ports) = @_;
+    my %up;
+    require IO::Socket::INET;
+    for my $p (@$ports) {
+        next unless defined $p && $p =~ /^\d+$/ && $p > 0;
+        my $sock = IO::Socket::INET->new(
+            PeerAddr => '127.0.0.1',
+            PeerPort => $p,
+            Proto    => 'tcp',
+            Timeout  => 0.2,
+        );
+        if ($sock) { $up{$p} = 1; close $sock; }
+    }
+    return \%up;
+}
+
+# The worktree/port list from root/config/worktrees.json — the exact source the
+# admin git dashboard reads — annotated with a live listening check.
+sub _app_server_targets {
+    my $now = time;
+    if (!$_app_server_info_cache
+        || ($now - $_app_server_info_cache->{at}) > $_app_server_info_cache_ttl) {
+        my $list = eval { Comserv::Util::Git->new->build_worktree_list() } || [];
+        my @ports = map  { $_->{port} }
+                    grep { ref $_ eq 'HASH' && ($_->{port} // 0) > 0 } @$list;
+        my $up    = _app_ports_listening(\@ports);
+        my @built;
+        for my $t (@$list) {
+            next unless ref $t eq 'HASH';
+            next if $t->{external};                    # non-Comserv repo: no Catalyst port
+            my $port = int($t->{port} // 0);
+            next unless $port > 0;
+            push @built, {
+                name    => $t->{name}  // '',
+                label   => $t->{label} // ($t->{name} // ''),
+                port    => $port,
+                host    => $t->{host}  // 'workstation.local',
+                url     => $t->{url}   // '/',
+                running => $up->{$port} ? \1 : \0,
+            };
+        }
+        $_app_server_info_cache = { at => $now, targets => \@built };
+    }
+    return $_app_server_info_cache->{targets};
+}
+
+sub api_app_server_info :Path('app/server-info') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username} && $c->session->{user_id}) {
+        $c->res->status(401);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => 'not_authenticated' }));
+        $c->detach();
+    }
+
+    require Comserv::Util::SystemInfo;
+    require Comserv::Util::Git;
+
+    my $home = $c->config->{home} // '';
+    my $sys  = eval { Comserv::Util::SystemInfo::get_system_info() } || {};
+
+    my $workflow   = eval { Comserv::Util::SystemInfo->get_app_workflow($home) } || 'main';
+    my $identifier = eval { Comserv::Util::Logging->get_system_identifier() } || '';
+
+    # Live checkout, not the baked image stamp: a worktree server must report the
+    # branch it actually runs (Root::auto does the same overlay for the debug bar).
+    my ($git_branch, $git_commit) = ('', '');
+    my $git_root = -e "$home/../.git" ? "$home/.."
+                 : (-e "$home/.git"   ? $home : '');
+    if ($git_root) {
+        for my $args (['--abbrev-ref', 'HEAD'], ['--short', 'HEAD']) {
+            my $out = '';
+            if (open my $fh, '-|', 'git', '-C', $git_root, 'rev-parse', @$args) {
+                $out = <$fh> // '';
+                close $fh;
+            }
+            chomp $out;
+            if ($args->[0] eq '--abbrev-ref') { $git_branch = $out } else { $git_commit = $out }
+        }
+    }
+
+    my $build = {};
+    my $version_file = $home ? "$home/version.json" : '';
+    if ($version_file && -r $version_file) {
+        $build = eval {
+            local $/;
+            open my $fh, '<', $version_file or die "open: $!";
+            my $raw = <$fh>;
+            close $fh;
+            decode_json($raw);
+        } || {};
+    }
+
+    my $db_env = eval {
+        require Comserv::Util::DatabaseEnv;
+        Comserv::Util::DatabaseEnv->new->get_active_environment($c);
+    } || $c->stash->{active_db_environment} || 'production';
+
+    my $db_user = $c->stash->{active_db_user}
+        // $c->config->{db_username}
+        // $c->config->{db_user}
+        // $ENV{COMSERV_DB_USER}
+        // '';
+
+    my $port = $c->req->uri->port // 0;
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success    => \1,
+        domain     => '' . $c->req->uri->host,
+        clientIp   => '' . $c->req->address,
+        server     => $identifier,
+        serverHost => $sys->{hostname} // '',
+        serverIp   => $sys->{ip}       // '',
+        workflow   => $workflow,
+        sitename   => $c->stash->{SiteName} // $c->session->{SiteName} // '',
+        port       => 0 + $port,
+        git        => { branch => $git_branch, commit => $git_commit },
+        build      => {
+            branch => $build->{branch}     // '',
+            commit => $build->{commit}     // '',
+            date   => $build->{build_date} // '',
+            host   => $build->{build_host} // '',
+        },
+        dbEnv   => $db_env,
+        dbUser  => $db_user,
+        targets => _app_server_targets(),
+    }));
     $c->detach();
 }
 
