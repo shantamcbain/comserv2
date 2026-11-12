@@ -205,7 +205,7 @@ sub classify_prompt_for_routing {
         $tier = 'free' unless $complexity eq 'high';
     }
 
-    if ($p =~ /\b(root cause|deep analysis|evaluate|review|why|how does|complex)\b/) {
+    if ($p =~ /\b(root cause|deep analysis|evaluate|review|why|how does|how do (?:we|i)|change|update|add|make|complex)\b/) {
         $complexity = 'high';
         $notes .= 'high complexity keywords; ';
     }
@@ -219,16 +219,21 @@ sub classify_prompt_for_routing {
     my $guard = $self->supergrok_guard($c);
     my $sg_available = !$guard->{locked} && $self->_external_default_available($c, 'supergrok|grok-4.6');
     if ($sg_available) {
-        # Point 3: always do a live spend/estimate before allowing SuperGrok (not just failover)
-        my $fresh_spend = eval { $self->openrouter_spend($c) } || {};
-        my $spend_ok = $fresh_spend->{ok} && (($fresh_spend->{day} || 0) < 1.0);  # conservative live check
-        if ($spend_ok && ($complexity eq 'high' || $agent =~ /programming|code/ || $phase =~ /implement/ || $agent =~ /analyze|documentation/)) {
+        # Nov 8 2026: SuperGrok is its own prepaid allowance; OpenRouter spend no
+        # longer decides it (its guard + pacing do). Real questions (TaskTier) and
+        # page questions qualify alongside high complexity. Who may USE it is
+        # still the roles-only route_override_allowed check in select_model.
+        require Comserv::Util::AI::TaskTier;
+        my $substantive = $ctx{page_question} || Comserv::Util::AI::TaskTier->is_substantive($prompt);
+        if ($complexity eq 'high' || $substantive || $agent =~ /programming|code/ || $phase =~ /implement/ || $agent =~ /analyze|documentation/) {
             $use_sg = 1;
             $tier = 'supergrok';
-            $notes .= 'supergrok available (guard ok + live spend ok) and suitable; ';
+            $notes .= 'supergrok available (guard ok) and suitable; ';
         } else {
-            $notes .= 'live spend high or guard marginal — skipping supergrok; ';
+            $notes .= "skipping supergrok: complexity=$complexity, not a substantive question; ";
         }
+    } else {
+        $notes .= 'skipping supergrok: ' . ($guard->{locked} ? 'guard locked (' . ($guard->{reason} // 'allowance') . ')' : 'credential or model not available') . '; ';
     }
 
     # Early OpenRouter / daily quota check (symmetric to supergrok guard).
@@ -240,9 +245,9 @@ sub classify_prompt_for_routing {
     if ($or_spend->{ok}) {
         if (($or_spend->{day} || 0) >= $day_cap) {
             $or_over = 1;
-            $tier = 'free';
-            $use_sg = 0;
-            $notes .= 'openrouter daily cap reached or exceeded — forcing free/cheap only; ';
+            # OpenRouter cap limits OpenRouter paid use only, not SuperGrok.
+            $tier = 'free' unless $use_sg;
+            $notes .= 'openrouter daily cap reached — no paid OpenRouter; ';
         }
     }
     if ($guard->{locked}) {
@@ -393,6 +398,69 @@ sub _external_default_available {
 # Returns ($provider, $model) — provider is one of
 # ollama|grok|supergrok|openrouter (never the generic bucket "external").
 # -------------------------------------------------------------------
+# route_override_allowed($c): admin/developer/editor roles only. Fails closed.
+# TODO: paid-member entitlement deferred pending Shanta's policy on what counts
+# as paid (plan models, grace, expiry). Do not infer it from ai_models_allowed.
+sub route_override_allowed {
+    my ($self, $c) = @_;
+    my $ok = eval {
+        my $s = $c->session || {};
+        my $roles = $s->{roles} // [];
+        $roles = [ split /\s*,\s*/, $roles ] unless ref $roles;
+        (grep { defined && /^(admin|developer|editor)$/i } @$roles) ? 1 : 0;
+    };
+    return $ok ? 1 : 0;
+}
+
+# Task tier + weak-model list live in Util::AI::TaskTier (kept out of this large file).
+require Comserv::Util::AI::TaskTier;
+our $WEAK_MODEL_RE = $Comserv::Util::AI::TaskTier::WEAK_MODEL_RE;
+sub is_substantive_prompt { return Comserv::Util::AI::TaskTier->is_substantive($_[0]) }
+
+# _ollama_has($c, $model): reachable Ollama host lists this tag.
+sub _ollama_has {
+    my ($self, $c, $model) = @_;
+    my $ol = eval { $c->model('AI2::Provider::Ollama') } or return 0;
+    my ($h, $p) = eval { $ol->resolve_host($c) };
+    return 0 unless $h && eval { $ol->check_connection($c, $h, $p) };
+    my $list = eval { $ol->list_models($c, $h, $p) } || [];
+    return (grep { (ref $_ ? ($_->{name} // '') : $_) eq $model } @$list) ? 1 : 0;
+}
+
+# capable_chain_pick($c) -> [provider, model] or undef. First chain_coding step
+# that is not weak, not removed, circuit not open, and actually servable.
+sub capable_chain_pick {
+    my ($self, $c, %o) = @_;
+    require Comserv::Util::AI::ModelChains;
+    require Comserv::Util::AI::ModelHealth;
+    my $ld = $o{chains} || Comserv::Util::AI::ModelChains->load($c);
+    my $health = $o{health} || eval { Comserv::Util::AI::ModelHealth->new(path => Comserv::Util::AI::ModelHealth->default_path($c)) };
+    my $states = $health ? (eval { $health->state_all->{models} } || {}) : {};
+    require Comserv::Util::AI::FreeModel;
+    my $paid_ok = exists $o{paid_ok} ? ($o{paid_ok} ? 1 : 0) : $self->route_override_allowed($c);
+    for my $slug (Comserv::Util::AI::ModelChains->chain($ld, 'coding')) {
+        my ($prov, $model) = split /\|/, $slug, 2;
+        next unless $prov && $model;
+        next if $model =~ $WEAK_MODEL_RE;
+        next if (($states->{$slug} || {})->{state} // 'closed') eq 'open';
+        # Code Guard: paid steps only for roles allowed by route_override_allowed
+        # (availability / an API key is not permission). Others: free/local only.
+        unless (Comserv::Util::AI::FreeModel->is_free_step($prov, $model)) {
+            next unless $paid_ok;
+        }
+        if ($prov eq 'ollama') {
+            next if $model eq 'auto';
+            my $up = $o{ollama_up} // eval { $self->_ollama_has($c, $model) };
+            next unless $up;
+            return [ 'ollama', $model ];
+        }
+        next unless $prov eq 'openrouter';
+        next unless $o{available} ? $o{available}->($slug) : $self->_external_default_available($c, $slug);
+        return [ 'openrouter', $model ];
+    }
+    return undef;
+}
+
 sub select_model {
     my ($self, $c, %ctx) = @_;
 
@@ -408,6 +476,7 @@ sub select_model {
     # This is the core of the upgrade: map to Supergrok (daily OK?), paid available,
     # or free if it will do the job without spending.
     my $cl = $self->classify_prompt_for_routing($c, $prompt, agent_id => $agent_id, phase => $phase, %ctx);
+    eval { $c->stash->{ai2_route_cl} = $cl } if ref $c;   # Chat.pm reads fallback_reason
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'select_model',
         sprintf("classify tier=%s use_sg=%s agent=%s phase=%s complexity=%s sg_available=%s or_over=%s sg_locked=%s quota_note=%s notes=%s",
             $cl->{tier} // '', $cl->{use_supergrok} // 0, $agent_id, $phase, $cl->{complexity} // '', 
@@ -434,8 +503,26 @@ sub select_model {
     my $editor_read_phase = ($is_editor_agent && lc($phase // '') =~ /^(analyze|plan|clarify)$/) ? 1 : 0;
     my $ignore_cheap = ($auto_pin && !$ctx{user_picked})
         || ($is_editor_agent && $is_cheap_default && !$editor_read_phase);
+    # Nov 8 2026: the classifier verdict must reach the call. When it chose
+    # SuperGrok and the guard + credential allow it, a widget default (not a
+    # real user pick) no longer overrides it, and ModelPick does not run.
+    my $sg_guard = $self->supergrok_guard($c) || {};
+    my $sg_avail = $self->_external_default_available($c, 'supergrok|grok-4.6') ? 1 : 0;
+    my $sg_want  = ($cl->{use_supergrok} || ($cl->{tier} // '') eq 'supergrok') ? 1 : 0;
+    # Nov 8 2026 (Shanta): override only for admin/developer/editor
+    # (paid-member entitlement deferred, see route_override_allowed). Everyone else keeps the
+    # previous routing (widget default / ModelPick).
+    $sg_want = 0 if $sg_want && !$self->route_override_allowed($c);
+    my $sg_ok    = $sg_want && !$sg_guard->{locked} && !$cl->{supergrok_locked} && $sg_avail;
+    if ($sg_want && !$sg_ok) {
+        $cl->{fallback_reason} = $sg_guard->{locked} || $cl->{supergrok_locked}
+            ? 'SuperGrok allowance is used up' : 'SuperGrok is not available right now';
+    }
     if ($requested && $requested !~ /^(auto|router|let.?router|'')$/i
-        && !$route_auto && !$ignore_cheap) {
+        && !$route_auto && !$ignore_cheap
+        && !($sg_ok && !$ctx{user_picked})
+        # a weak widget default (not a real pick) does not answer substantive work
+        && !(!$ctx{user_picked} && $requested =~ $WEAK_MODEL_RE && is_substantive_prompt($prompt))) {
         my ($prov, $model) = $self->_detect_provider($requested);
         ($prov, $model) = $self->_prefer_supergrok($c, $prov, $model);
         return ($prov, $model);
@@ -455,6 +542,23 @@ sub select_model {
         return ('openrouter', 'cohere/north-mini-code:free');
     }
 
+    if ($sg_ok && !$is_editor_agent) {
+        my $sg_model = (($cl->{domain} // '') =~ /code|programming/) ? 'grok-build-0.1' : 'grok-4.6';
+        $cl->{selected} = "supergrok/$sg_model";
+        return ('supergrok', $sg_model);
+    }
+    # Nov 8 2026 (Shanta: "good answers done by the most cost effective model
+    # for the job"): substantive / page / code questions take the cheapest
+    # capable step of the curated chain_coding (ordered cheapest-first in
+    # data/ai_model_chains.json), skipping known-weak small models and open
+    # circuits. Trivial chit-chat still goes to ModelPick (free is fine).
+    if (!$ctx{user_picked} && is_substantive_prompt($prompt)) {
+        my $cap = $self->capable_chain_pick($c);
+        if ($cap) {
+            $cl->{selected} = join('/', @$cap);
+            return @$cap;
+        }
+    }
     # No explicit pick: choose from models that are actually up.
     # Do not hardcode a Grok slug — prepaid budget and the live lists decide.
     my $pick = eval {

@@ -100,6 +100,22 @@
             display: flex !important;
         }
 
+        /* Nov 8 2026: ai-chat.css has a narrow-screen rule (.chat-panel height 65vh,
+           top:auto) that beat the rules above in this small popup and left a big
+           empty area under the tabs. Higher specificity: the panel fills the
+           popup and the message list takes the spare height with its own scroll. */
+        body.ai-widget-popup .chat-panel {
+            top: 38px !important; bottom: 0 !important;
+            height: calc(100% - 38px) !important;
+            min-height: 0 !important; max-height: none !important;
+            border-radius: 0 !important;
+            display: flex !important; flex-direction: column !important;
+        }
+        body.ai-widget-popup .chat-messages {
+            flex: 1 1 auto !important; min-height: 0 !important;
+            max-height: none !important; overflow-y: auto !important;
+        }
+
         /* Form fill panel */
         #form-fill-panel {
             display: none;

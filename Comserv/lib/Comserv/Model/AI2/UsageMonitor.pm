@@ -347,7 +347,10 @@ sub _eff_quality {
         else {
             # Pre-migration: tally metadata.grounding, bounded scan newest first.
             my $q = $rs->search({ 'me.metadata' => { -like => '%"grounding"%' } }, {
-                columns  => [ $agent_col, 'me.provider', 'me.model', 'me.metadata' ],
+                # Nov 8 2026: select+as so get_column('agent') works (was
+                # "No such column 'agent'" on every pre-migration tally).
+                select   => [ $agent_col, 'me.provider', 'me.model', 'me.metadata' ],
+                as       => [qw(agent provider model metadata)],
                 order_by => { -desc => 'me.id' },
                 rows     => METADATA_SCAN_ROWS,
             });

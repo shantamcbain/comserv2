@@ -41,7 +41,7 @@ $r = request(GET '/calendar/clients');
 ok($r->is_redirect, 'clients page needs login');
 
 # Logged-out POSTs are refused before the origin check; the origin rule itself is
-# covered in t/calendar_feed.t (origin_ok). A cross-site POST is refused too:
+# covered in t/calendar_feed.t and t/util_origin_check.t (Comserv::Util::OriginCheck). A cross-site POST is refused too:
 $r = request(POST '/calendar/visible_sites', [ sites => 'CSC' ], Origin => 'https://evil.example');
 is($r->code, 403, 'cross-site POST refused');
 

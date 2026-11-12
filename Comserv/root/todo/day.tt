@@ -107,6 +107,16 @@
 <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
 <link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css?v=20260806b">
 <script src="/static/js/todo_drag_drop.js"></script>
+[%# ?embed=1 sets no_wrapper, so js_load.tt never runs and the shared card
+    Start/Done handler is missing (dead buttons in the HealthKitchen Today iframe).
+    Load it here only in that case so wrapped pages do not load it twice. %]
+[% IF c.stash.no_wrapper %]
+<script src="/static/js/planning/daily-plan-utils.js?v=20261108a" defer></script>
+[% END %]
+[%# In-place "Mark made" confirm after Done on a recipe-linked HK slot card. %]
+[% IF hk_recipe_cards.size %]
+<script src="/static/js/healthkitchen/recipe-confirm.js?v=20261108a" defer></script>
+[% END %]
 [% END %]
 
 <style>
@@ -1816,12 +1826,23 @@ document.addEventListener('DOMContentLoaded', function() {
                  data-dur-min="[% test %]"
                  data-date="[% date %]"
                  [% IF c.req.params.filter == 'schedule' %]data-hk-lock="1"[% END %]
+                 [% SET hkr = hk_recipe_cards.${todo.record_id} %][% IF hkr %]data-hk-recipe-id="[% hkr.id %]" data-hk-recipe-name="[% hkr.name | html %]"[% END %]
                  [% IF todo.creator_timezone %]data-creator-tz="[% todo.creator_timezone %]"[% END %]
                  style="top:[% tpx %]px; height:[% tht %]px; left:0.3%; width:99.4%;">
                 [% SET tcard_wrap_g = "data-todo-id='" _ todo.record_id _ "' data-todo-date='" _ date _ "' data-is-recurring='" _ isrec _ "' draggable='true'" %]
                 [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 tc_calendar=1
                     tc_drag_class='gcal-ev-card'
+                    tc_subject_override=(hkr ? hkr.name : '')
                     tc_wrapper_extra=tcard_wrap_g %]
+                [% IF hkr %]
+                <details class="hk-recipe-info">
+                    <summary>Ingredients ([% hkr.ingredients.size %])</summary>
+                    <ul class="hk-recipe-ingredients">
+                    [% FOREACH ing IN hkr.ingredients %]<li>[% ing | html %]</li>[% END %]
+                    </ul>
+                    <a href="[% hkr.url %]" target="_top" class="hk-recipe-view">view recipe</a>
+                </details>
+                [% END %]
                 [% IF isrec == '1' %]
                 <button type="button" class="hk-day-lock" data-day-lock="1"
                     data-record-id="[% todo.record_id %]" data-lock-date="[% date %]"
@@ -1893,6 +1914,11 @@ document.addEventListener('DOMContentLoaded', function() {
             body: JSON.stringify({ record_id: parseInt(id, 10), lock_date: date, notes: '' })
         }).then(function (r) { return r.json(); }).then(function (d) {
             if (d && (d.ok || d.locked)) {
+                var hkEv = document.querySelector('.gcal-ev[data-todo-id="' + id + '"][data-hk-recipe-id]');
+                if (kind === 'done' && hkEv && window.HkRecipeConfirm) {
+                    window.HkRecipeConfirm.open(hkEv, function () { window.location.reload(); });
+                    return;
+                }
                 window.location.reload();
             } else {
                 window.alert((d && d.error) || 'Could not lock this day');
@@ -1902,6 +1928,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     document.addEventListener('click', function (e) {
+        // Recipe ingredients / in-place "Mark made" panel: never a Done click.
+        if (e.target.closest('.hk-recipe-info, .hk-recipe-confirm')) return;
         var dayBtn = e.target.closest('[data-day-lock]');
         if (dayBtn) {
             e.preventDefault();
