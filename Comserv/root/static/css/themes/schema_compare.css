@@ -1181,6 +1181,21 @@
     display: flex;
     flex-wrap: wrap;
     gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.server-section-title {
+    color: var(--text-color, #212529);
+    margin: 1rem 0 0.5rem;
+}
+.db-compare-pick {
+    border-top: 1px solid var(--border-color, #dee2e6);
+    color: var(--text-color, #212529);
+}
+.db-compare-pick label {
+    cursor: pointer;
+}
+.db-compare-bar {
+    margin: 0.5rem 0 1.5rem;
 }
 
 /* ===== Database cards (databases.tt) ===== */
