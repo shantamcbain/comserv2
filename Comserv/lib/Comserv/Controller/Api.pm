@@ -679,6 +679,75 @@ sub api_inventory_item_update :Path('inventory/item/update') :Args(0) {
     $c->controller('Inventory')->api_item_update($c);
 }
 
+# GET /api/app/context — everything the Android app needs to know about where it
+# is: the site this domain + login resolves to, the sites the user may use, and
+# who they are. The phone must never guess a site: a guessed site shows another
+# site's supplier list and files items in the wrong place.
+sub api_app_context :Path('app/context') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    # Same gate as the other inventory app routes: a live session (or a token)
+    # from a real client; LAN/local calls pass, which is how the build is tested.
+    $self->_api_authenticate_inventory($c);
+
+    my $username = eval { $c->session->{username} } || '';
+    my $inv      = $c->controller('Inventory');
+    my ($sites, $current) = $inv->_app_site_names($c);
+
+    # A shared host name that resolves to no site: use the user's own site rather
+    # than any hardcoded default.
+    $current = $sites->[0] // '' unless defined $current && length $current;
+
+    my ($item_count, $supplier_count) = (0, 0);
+    eval {
+        my $schema = $inv->_schema($c);
+        $item_count = $schema->resultset('Accounting::InventoryItem')
+            ->search({ sitename => $current, status => 'active' })->count if length $current;
+        $supplier_count = $schema->resultset('Accounting::InventorySupplier')
+            ->search({ sitename => $current, status => 'active' })->count if length $current;
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_app_context',
+        "context user=" . ($username || '?') . " site=" . ($current || '?') . " domain=" . ($c->req->uri->host // '?'));
+
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json({
+        success        => 1,
+        sitename       => $current,
+        user           => $username,
+        domain         => scalar($c->req->uri->host // ''),
+        sites          => $sites,
+        item_count     => $item_count,
+        supplier_count => $supplier_count,
+    }));
+    $c->detach;
+}
+
+sub api_inventory_item_find :Path('inventory/item/find') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate_inventory($c);
+    $c->controller('Inventory')->api_item_find($c);
+}
+
+sub api_inventory_sites :Path('inventory/sites') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate_inventory($c);
+    $c->controller('Inventory')->api_sites($c);
+}
+
+sub api_inventory_suppliers :Path('inventory/suppliers') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate_inventory($c);
+    $c->controller('Inventory')->api_suppliers($c);
+}
+
+sub api_inventory_supplier_create :Path('inventory/supplier/create') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate_inventory($c);
+    $c->controller('Inventory')->api_supplier_create($c);
+}
+
 sub api_inventory_bom_add :Path('inventory/bom/add') :Args(0) {
     my ($self, $c) = @_;
     $self->_api_authenticate_inventory($c);
@@ -1866,6 +1935,14 @@ sub _api_authenticate {
     my $address  = $c->req->address // '';
     my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
     return undef if $is_local;
+
+    # The Android app logs in exactly like the web app and carries that session
+    # cookie. Without this, every inventory call from outside the LAN answered 401
+    # and the app showed empty lists (e.g. "no suppliers") as if the data were gone.
+    my $uid = eval { $c->session->{user_id} };
+    if (defined $uid && $uid ne '') {
+        return eval { $c->session->{username} } || 1;
+    }
 
     my $validation = Comserv::Util::ApiTokenValidator->validate_from_request($c);
     unless ($validation->{valid}) {
@@ -3969,7 +4046,16 @@ sub api_app_version :Path('app/version') :Args(0) {
 
     my $client_ip = eval { $c->req->address } || '';
 
-    my $path = $c->path_to('root/static/app/version.json')->stringify;
+    # The APK on the NFS share is the only build artifact that exists; its
+    # version.json is written by the Android build that produced it. Read that
+    # one first so the app is always offered the build it can actually install,
+    # and fall back to the checkout copy only when NFS is not mounted. A tracked
+    # copy in root/static/app/ shadows the real build when it is a plain file
+    # (that is how the app ended up told "1.3.1 (25)" while running 2.10 (21)).
+    my $path = '/data/nfs/inventory-apks/version.json';
+    unless (-r $path) {
+        $path = $c->path_to('root/static/app/version.json')->stringify;
+    }
     my $json_data = {};
     if (-r $path) {
         local $/;
@@ -4128,6 +4214,26 @@ sub api_log_error :Path('log/error') :Args(0) {
     my $screen   = $json_data->{screen} || 'AndroidApp';
     my $username = $c->session->{username} || $json_data->{username} || 'Guest';
 
+    # What a developer needs when the phone only shows "unknown error": the
+    # call that failed, its status, the raw body, and which build sent it.
+    my $endpoint = $json_data->{endpoint} || '';
+    my $status   = $json_data->{status}   || '';
+    my $resp     = $json_data->{response} || '';
+    my $app_ver  = $json_data->{app_version} || '';
+    my $base_url = $json_data->{base_url} || '';
+
+    my $detail = '';
+    $detail .= " endpoint=$endpoint" if $endpoint;
+    $detail .= " status=$status"     if $status;
+    $detail .= " app=$app_ver"        if $app_ver;
+    $detail .= " base=$base_url"      if $base_url;
+    if ($resp) {
+        my $clip = $resp;
+        $clip =~ s/\s+/ /g;
+        $clip = substr($clip, 0, 800) . (length($resp) > 800 ? '…' : '');
+        $detail .= " response=$clip";
+    }
+
     require Comserv::Util::Logging;
     eval {
         Comserv::Util::Logging->instance->log_with_details(
@@ -4136,7 +4242,7 @@ sub api_log_error :Path('log/error') :Args(0) {
             "AndroidApp::$screen",
             0,
             "mobile_app_error",
-            "[$username] $msg" . ($stack ? "\nStack: $stack" : "")
+            "[$username]$detail $msg" . ($stack ? "\nStack: " . substr($stack, 0, 3000) : "")
         );
     };
 
