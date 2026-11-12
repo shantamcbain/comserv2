@@ -108,31 +108,37 @@ sub set_metadata {
     my ($self, $metadata_hash) = @_;
     return unless ref($metadata_hash) eq 'HASH';
     $self->metadata(encode_json($metadata_hash));
+    return;  # Return value to maintain consistency with other methods
 }
 
 sub encrypt_api_key {
+    use Comserv::Util::Encryption;
     my ($self, $plain_key) = @_;
     return unless $plain_key;
     
-    my $encryption_key = $ENV{API_KEY_ENCRYPTION_KEY} || 'default-encryption-key-change-in-production';
-    
-    my $cipher = Crypt::CBC->new(
-        -key    => $encryption_key,
-        -cipher => 'Cipher::AES',
-        -salt   => 1,
-        -pbkdf  => 'pbkdf2',
-    );
-    
-    my $encrypted = $cipher->encrypt($plain_key);
-    return encode_base64($encrypted, '');
+    # Use standard Comserv::Util::Encryption module for consistency
+    # Use 'user_api_keys' namespace to differentiate from other encrypted data
+    return Comserv::Util::Encryption->encrypt($plain_key, 'user_api_keys');
 }
 
 sub decrypt_api_key {
+    use Comserv::Util::Encryption;
     my ($self) = @_;
     return unless $self->api_key_encrypted;
     
+    # Use standard Comserv::Util::Encryption module for consistency
+    my $encrypted = $self->api_key_encrypted;
+    
+    # If the encrypted data has 'ENC:' prefix, use the Encryption module
+    if ($encrypted =~ /^ENC:/) {
+        return Comserv::Util::Encryption->decrypt($encrypted, 'user_api_keys');
+    }
+    
+    # Fallback: try legacy decryption for backward compatibility
+    # This maintains compatibility with existing data encrypted with the old system
     my $encryption_key = $ENV{API_KEY_ENCRYPTION_KEY} || 'default-encryption-key-change-in-production';
     
+    use Crypt::CBC;
     my $cipher = Crypt::CBC->new(
         -key    => $encryption_key,
         -cipher => 'Cipher::AES',
@@ -142,7 +148,7 @@ sub decrypt_api_key {
     
     my $decrypted;
     eval {
-        my $encrypted = decode_base64($self->api_key_encrypted);
+        my $encrypted = decode_base64($encrypted);
         $decrypted = $cipher->decrypt($encrypted);
     };
     if ($@) {
