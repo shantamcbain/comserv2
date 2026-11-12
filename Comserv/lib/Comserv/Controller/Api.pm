@@ -4117,6 +4117,35 @@ sub api_inventory_item_by_barcode :Path('inventory/item_by_barcode') :Args(0) {
     $c->detach();
 }
 
+sub api_log_error :Path('log/error') :Args(0) {
+    my ($self, $c) = @_;
+    my $raw = $c->req->body ? do { local $/; my $b = $c->req->body; <$b> } : '{}';
+    my $json_data = eval { decode_json($raw) } || {};
+
+    my $level    = $json_data->{level} || 'error';
+    my $msg      = $json_data->{message} || 'Mobile app error';
+    my $stack    = $json_data->{stack_trace} || '';
+    my $screen   = $json_data->{screen} || 'AndroidApp';
+    my $username = $c->session->{username} || $json_data->{username} || 'Guest';
+
+    require Comserv::Util::Logging;
+    eval {
+        Comserv::Util::Logging->instance->log_with_details(
+            $c,
+            $level,
+            "AndroidApp::$screen",
+            0,
+            "mobile_app_error",
+            "[$username] $msg" . ($stack ? "\nStack: $stack" : "")
+        );
+    };
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => \1, message => 'Error logged to Comserv admin logs' }));
+    $c->detach();
+}
+
 =head2 api_app_server_info
 
 GET /api/app/server-info - Which server is delivering this page.
