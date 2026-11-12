@@ -85,13 +85,13 @@ sub get_active_plan {
     try {
         $membership = $self->schema->resultset('UserMembership')->search(
             {
-                user_id => $user_id,
-                site_id => $site_id,
-                status  => [ 'active', 'grace' ],
+                'me.user_id' => $user_id,
+                'me.site_id' => $site_id,
+                'me.status'  => [ 'active', 'grace' ],
             },
             {
                 prefetch => 'plan',
-                order_by => { -desc => 'started_at' },
+                order_by => { -desc => 'me.started_at' },
                 rows     => 1,
             }
         )->single;
