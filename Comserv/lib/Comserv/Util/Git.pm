@@ -2035,6 +2035,12 @@ sub create_worktree {
         return $res;
     }
 
+    # Per-worktree git identity (author/committer label for this bot). Non-fatal.
+    # Mapping: root/config/bot_identities.json (default "<branch> bot <branch@workstation.local>").
+    eval { require Comserv::Util::BotIdentity; Comserv::Util::BotIdentity->apply($wt_dir, $branch) }
+        or do { $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_worktree',
+                    "Could not set per-worktree git identity for '$branch'") };
+
     # The registry is excluded from git, so the new checkout does not receive it.
     # Link it at the file that checkout's app reads: the git root is
     # <base>/<branch>/Comserv and the app is its Comserv/ subdir. Never replaces
