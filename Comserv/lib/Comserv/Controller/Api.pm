@@ -733,6 +733,178 @@ sub api_inventory_stock_unreserve :Path('inventory/stock/unreserve') :Args(0) {
     $c->controller('Inventory::PurchaseOrder')->api_stock_unreserve($c);
 }
 
+# Session gate for the phone barcode routes. Existing inventory aliases keep
+# the LAN bypass. App-context work can later point this at ModuleAccess.
+sub _api_inventory_session_gate {
+    my ($self, $c) = @_;
+    my $uid = eval { $c->session->{user_id} };
+    unless (defined $uid && $uid ne '' && $uid) {
+        $self->_json_error($c, 401, 'Not authenticated. Please log in first.', 'not_authenticated');
+        return;
+    }
+
+    my $hdr = eval { $c->req->header('X-Sitename') };
+    my $sent = defined $hdr && $hdr =~ /\S/;
+    my $resolved;
+    if ($sent) {
+        my $clean = $hdr;
+        $clean =~ s/[^a-zA-Z0-9._-]//g;
+        if (length $clean) {
+            my $site_model = eval { $c->model('Site') };
+            if ($site_model && $site_model->can('get_site_details_by_name')) {
+                my $row = eval { $site_model->get_site_details_by_name($c, $clean) };
+                $resolved = $clean if $row;
+            } elsif (($c->stash->{SiteName} // '') eq $clean) {
+                $resolved = $clean;
+            }
+        }
+        unless ($resolved) {
+            $self->_json_error($c, 400, 'Unknown site.', 'unknown_site');
+            return;
+        }
+    } else {
+        $resolved = $c->stash->{SiteName} || $c->session->{SiteName};
+        unless ($resolved) {
+            my $root = eval { $c->controller('Root') };
+            if ($root && $root->can('fetch_and_set')) {
+                eval { $root->fetch_and_set($c, 'SiteName') };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                        '_api_inventory_session_gate', "fetch_and_set failed: $@");
+                }
+                $resolved = $c->stash->{SiteName};
+            }
+        }
+        unless ($resolved) {
+            $self->_json_error($c, 400, 'Unknown site.', 'unknown_site');
+            return;
+        }
+    }
+    $c->stash->{SiteName} = $resolved;
+    $c->session->{SiteName} = $resolved;
+
+    my $allowed = $self->_session_is_admin($c);
+    if (eval { require Comserv::Util::ModuleAccess; 1 }) {
+        my $mod = 'Comserv::Util::ModuleAccess';
+        if ($mod->can('inventory_access')) {
+            $allowed = $mod->inventory_access($c) ? 1 : 0;
+        } elsif ($mod->can('allows')) {
+            $allowed = $mod->allows($c, 'inventory') ? 1 : 0;
+        } elsif ($mod->can('can_access')) {
+            $allowed = $mod->can_access($c, 'inventory') ? 1 : 0;
+        }
+    }
+    unless ($allowed) {
+        $self->_json_error($c, 403, 'Forbidden.', 'forbidden');
+        return;
+    }
+    return $resolved;
+}
+
+sub _api_read_json {
+    my ($self, $c) = @_;
+    my $body = eval { $c->request->body };
+    return {} unless $body;
+    my $raw = '';
+    my $p;
+    eval {
+        if (ref($body) && $body->can('seek')) {
+            seek($body, 0, 0);
+            $raw = do { local $/; <$body> };
+        } else {
+            $raw = "$body";
+        }
+        $p = (defined $raw && $raw =~ /\S/) ? decode_json($raw) : {};
+    };
+    if ($@ || (defined $raw && $raw =~ /\S/ && ref $p ne 'HASH')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_read_json',
+            "JSON parse failed: $@");
+        $self->_json_error($c, 400, 'Invalid JSON.', 'json_parse_error');
+        return;
+    }
+    return $p || {};
+}
+
+sub api_inventory_item_by_barcode :Path('inventory/item/by_barcode') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $inv = eval { $c->controller('Inventory') };
+    unless ($inv) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_inventory_item_by_barcode',
+            'Inventory controller missing');
+        $self->_json_error($c, 500, 'Inventory controller missing.', 'server_error');
+        return;
+    }
+    require Comserv::Util::InventoryBarcode;
+    my $r = Comserv::Util::InventoryBarcode->by_barcode(
+        $c, $site, $inv, $c->req->params->{barcode}, $c->req->params->{barcode_type});
+    $self->_json_ok($c, $r);
+}
+
+sub api_inventory_product_lookup :Path('inventory/product_lookup') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $barcode = $c->req->params->{barcode};
+    unless (defined $barcode && $barcode =~ /\S/) {
+        $self->_json_error($c, 400, 'barcode is required', 'barcode_required');
+        return;
+    }
+    require Comserv::Util::ProductLookup;
+    my $r = Comserv::Util::ProductLookup->lookup($c,
+        barcode  => $barcode,
+        save     => $c->req->params->{save} ? 1 : 0,
+        sitename => $site,
+    );
+    $self->_json_ok($c, $r);
+}
+
+sub api_inventory_item_ency_links :Path('inventory/item/ency_links') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    require Comserv::Util::InventoryBarcode;
+    my $method = uc($c->req->method || 'GET');
+    my $r;
+    if ($method eq 'GET') {
+        $r = Comserv::Util::InventoryBarcode->ency_links($c, $site, $c->req->params->{item_id});
+    } elsif ($method eq 'POST') {
+        my $p = $self->_api_read_json($c) or return;
+        $r = Comserv::Util::InventoryBarcode->ency_links_update($c, $site, $p);
+    } else {
+        $self->_json_error($c, 405, 'GET or POST required', 'method_not_allowed');
+        return;
+    }
+    unless ($r && $r->{ok}) {
+        $self->_json_error($c, ($r->{status} || 400), ($r->{error} || 'Request failed'), ($r->{code} || 'bad_request'));
+        return;
+    }
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
+}
+
+sub api_inventory_photo_upload :Path('inventory/photo/upload') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    unless (uc($c->req->method || '') eq 'POST') {
+        $self->_json_error($c, 405, 'POST required', 'method_not_allowed');
+        return;
+    }
+    my $item_id = $c->req->param('item_id');
+    $item_id = $c->req->params->{item_id} unless defined $item_id;
+    my $upload = eval { $c->req->upload('photo') };
+    require Comserv::Util::ItemImage;
+    my $r = Comserv::Util::ItemImage->save($c, $upload, $site, $item_id);
+    unless ($r && $r->{ok}) {
+        $self->_json_error($c, ($r->{status} || 400), ($r->{error} || 'Upload failed'), ($r->{code} || 'bad_request'));
+        return;
+    }
+    $self->_json_ok($c, {
+        item_id      => $r->{item_id},
+        image_path   => $r->{image_path},
+        bytes        => $r->{bytes},
+        content_type => $r->{content_type},
+    });
+}
+
 =head2 api_list_documentation
 
 GET /api/documentation - List all documentation pages (Bypass keyword/token for local/workstation.local)
@@ -2423,6 +2595,23 @@ sub api_workday_check :Path('workday/check') :Args(0) {
         return;
     }
     my $n = $report->{counts} || {};
+    # Freshness: docs vs code, projects vs their rows, todos whose state has drifted.
+    # Read-only, branch-scoped, and never allowed to break the existing report.
+    my $fresh = eval {
+        require Comserv::Util::FreshnessSource;
+        Comserv::Util::FreshnessSource->build($c);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_workday_check',
+            "freshness audit failed: $@");
+        $report->{freshness} = { success => 0, error => "$@" };
+    } elsif ($fresh) {
+        $report->{freshness} = $fresh;
+        my $ft = $fresh->{totals}{findings} // 0;
+        $report->{ok} = 0 if $ft;
+        $n->{freshness} = $ft;
+        $report->{counts} = $n;
+    }
     my @roles = @{ $gate->{roles} || [] };
     my $role = Comserv::Util::WorkdayStandard->role_class(@roles);
     $report->{session} = {
@@ -2638,6 +2827,10 @@ sub api_todo_close_log :Path('todo/close_log') :Args(0) {
             summary   => ($notes // ''),
             note      => $via_note,
             lock_date => $data->{lock_date},
+            # Corrected end time: the caller supplies the real or estimated
+            # minutes (session evidence, or the day end as a last resort). Without
+            # it the clock bills elapsed time, capped at one day.
+            duration_mins => $data->{duration_mins},
         );
     };
     if ($@ || !$res || !$res->{success}) {
@@ -3759,25 +3952,434 @@ No auth required (clients hit this before login to decide whether to update).
 sub api_app_version :Path('app/version') :Args(0) {
     my ($self, $c) = @_;
 
+    my $hostname = eval {
+        require Comserv::Util::SystemInfo;
+        Comserv::Util::SystemInfo::get_server_hostname();
+    } || 'workstation';
+
+    my $workflow = eval {
+        require Comserv::Util::SystemInfo;
+        Comserv::Util::SystemInfo->get_app_workflow($c->config->{home});
+    } || 'main';
+
+    my $git_head = eval {
+        require Comserv::Util::Git;
+        Comserv::Util::Git->current_head_str($c);
+    } || 'main';
+
+    my $client_ip = eval { $c->req->address } || '';
+
     my $path = $c->path_to('root/static/app/version.json')->stringify;
-    my $json;
+    my $json_data = {};
     if (-r $path) {
         local $/;
-        open my $fh, '<', $path or do {
-            $c->res->status(500);
-            $c->res->content_type('application/json');
-            $c->res->body(encode_json({ success => 0, error => 'version file unreadable' }));
-            $c->detach();
-        };
-        $json = <$fh>;
+        open my $fh, '<', $path;
+        my $raw = <$fh>;
         close $fh;
-    } else {
-        $json = q{{"versionCode":1,"versionName":"1.0","apkUrl":"","releaseNotes":""}};
+        $json_data = eval { decode_json($raw) } || {};
     }
+
+    $json_data->{serverInfo} = {
+        domain   => eval { $c->req->uri->host } || 'dev.computersystemconsulting.ca',
+        clientIp => $client_ip,
+        server   => "$hostname (Docker):" . (eval { $c->req->uri->port } || 3001),
+        workflow => $workflow,
+        git      => $git_head,
+        dbEnv    => ($ENV{DATABASE_ENVIRONMENT} || 'PRODUCTION'),
+    };
 
     $c->res->status(200);
     $c->res->content_type('application/json');
-    $c->res->body($json);
+    $c->res->body(encode_json($json_data));
+    $c->detach();
+}
+
+sub api_inventory_item_by_barcode :Path('inventory/item_by_barcode') :Args(0) {
+    my ($self, $c) = @_;
+    my $barcode = $c->req->param('barcode') || $c->req->param('upc') || '';
+    $barcode =~ s/^\s+|\s+$//g;
+
+    unless ($barcode) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => \0, error => 'Barcode parameter required' }));
+        $c->detach();
+    }
+
+    my $item = eval { $c->model('DBEncy')->resultset('InventoryItem')->find({ barcode => $barcode }) };
+    if ($item) {
+        $c->res->status(200);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({
+            success => \1,
+            source  => 'comserv_db',
+            item    => {
+                id          => $item->id,
+                sku         => $item->sku,
+                name        => $item->name,
+                category    => $item->category,
+                description => $item->description,
+                barcode     => $item->barcode,
+                image_path  => $item->image_path
+            }
+        }));
+        $c->detach();
+    }
+
+    require HTTP::Tiny;
+    my $http = HTTP::Tiny->new(timeout => 5);
+    my $off_url = "https://world.openfoodfacts.org/api/v0/product/$barcode.json";
+    my $res = $http->get($off_url);
+    if ($res->{success} && $res->{content}) {
+        my $map = eval { decode_json($res->{content}) };
+        if ($map && $map->{status} && $map->{status} == 1) {
+            my $p = $map->{product} || {};
+            my $pname = $p->{product_name} || $p->{product_name_en} || '';
+            my $pcat  = $p->{categories} || $p->{category} || 'Pantry';
+            $pcat =~ s/,.*//;
+            my $pimg  = $p->{image_url} || $p->{image_front_url} || '';
+            my $pbrand = $p->{brands} || '';
+            my $pingredients = $p->{ingredients_text} || $p->{ingredients_text_en} || '';
+            my $nutr = $p->{nutriments} || {};
+            my $kcal = $nutr->{'energy-kcal_100g'} || $nutr->{'energy-kcal'} || 0;
+            my $prot = $nutr->{'proteins_100g'} || $nutr->{'proteins'} || 0;
+            my $carb = $nutr->{'carbohydrates_100g'} || $nutr->{'carbohydrates'} || 0;
+            my $sod  = $nutr->{'sodium_100g'} || $nutr->{'sodium'} || 0;
+
+            my $pdesc = $pbrand ? "Brand: $pbrand." : "";
+            if ($pingredients) {
+                $pdesc .= " Ingredients: $pingredients.";
+            }
+
+            if ($pname) {
+                $c->res->status(200);
+                $c->res->content_type('application/json');
+                $c->res->body(encode_json({
+                    success => \1,
+                    source  => 'open_food_facts',
+                    item    => {
+                        sku         => "SKU-$barcode",
+                        name        => $pname,
+                        category    => $pcat,
+                        description => $pdesc,
+                        barcode     => $barcode,
+                        image_path  => $pimg,
+                        ingredients => $pingredients,
+                        nutrition   => {
+                            calories => $kcal,
+                            protein  => $prot,
+                            carbs    => $carb,
+                            sodium   => $sod
+                        }
+                    }
+                }));
+                $c->detach();
+            }
+        }
+    }
+
+    my $upc_url = "https://api.upcitemdb.com/prod/trial/lookup?upc=$barcode";
+    my $upc_res = $http->get($upc_url);
+    if ($upc_res->{success} && $upc_res->{content}) {
+        my $upc_map = eval { decode_json($upc_res->{content}) };
+        if ($upc_map && $upc_map->{items} && ref($upc_map->{items}) eq 'ARRAY' && @{$upc_map->{items}}) {
+            my $first = $upc_map->{items}->[0];
+            my $title = $first->{title} || '';
+            my $cat   = $first->{category} || 'General';
+            $cat =~ s/>.*//;
+            my $desc  = $first->{description} || "Barcode: $barcode";
+            my $imgs  = $first->{images} || [];
+            my $img   = ref($imgs) eq 'ARRAY' && @$imgs ? $imgs->[0] : '';
+
+            if ($title) {
+                $c->res->status(200);
+                $c->res->content_type('application/json');
+                $c->res->body(encode_json({
+                    success => \1,
+                    source  => 'upcitemdb',
+                    item    => {
+                        sku         => "SKU-$barcode",
+                        name        => $title,
+                        category    => $cat,
+                        description => $desc,
+                        barcode     => $barcode,
+                        image_path  => $img
+                    }
+                }));
+                $c->detach();
+            }
+        }
+    }
+
+    $c->res->status(404);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => \0, error => "Barcode $barcode not found in Comserv or public UPC database." }));
+    $c->detach();
+}
+
+sub api_log_error :Path('log/error') :Args(0) {
+    my ($self, $c) = @_;
+    my $raw = $c->req->body ? do { local $/; my $b = $c->req->body; <$b> } : '{}';
+    my $json_data = eval { decode_json($raw) } || {};
+
+    my $level    = $json_data->{level} || 'error';
+    my $msg      = $json_data->{message} || 'Mobile app error';
+    my $stack    = $json_data->{stack_trace} || '';
+    my $screen   = $json_data->{screen} || 'AndroidApp';
+    my $username = $c->session->{username} || $json_data->{username} || 'Guest';
+
+    require Comserv::Util::Logging;
+    eval {
+        Comserv::Util::Logging->instance->log_with_details(
+            $c,
+            $level,
+            "AndroidApp::$screen",
+            0,
+            "mobile_app_error",
+            "[$username] $msg" . ($stack ? "\nStack: $stack" : "")
+        );
+    };
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => \1, message => 'Error logged to Comserv admin logs' }));
+    $c->detach();
+}
+
+=head2 api_app_server_info
+
+GET /api/app/server-info - Which server is delivering this page.
+
+Reports the same facts the web debug bar prints (root/pagetop.tt): domain,
+client IP, server identifier, workflow (worktree name), the live git
+branch/commit of the checkout that is running, the build stamp, the database
+environment/user and the port that answered.  Also returns the worktree/port
+table the admin git page renders (root/config/worktrees.json) with a live
+"is a server listening" flag, so the phone can switch target ports and see
+which worktrees are actually up.
+
+Logged-in session required.  Servers that predate this action answer 404 and
+the app simply hides the badge.
+
+=head3 JSON
+
+  { success, domain, clientIp, server, serverHost, serverIp, workflow, port,
+    git: {branch, commit}, build: {branch, commit, date, host},
+    dbEnv, dbUser,
+    targets: [ {name, label, port, host, url, running} ] }
+
+=cut
+
+my $_app_server_info_cache;            # { at => epoch, targets => [...] }
+my $_app_server_info_cache_ttl = 15;   # seconds — ports change rarely, phones poll
+
+# Which of these TCP ports on this box actually has a listener right now.
+# Localhost connect failures are immediate (ECONNREFUSED), so the whole sweep
+# costs milliseconds even with every port down.
+sub _app_ports_listening {
+    my ($ports) = @_;
+    my %up;
+    require IO::Socket::INET;
+    for my $p (@$ports) {
+        next unless defined $p && $p =~ /^\d+$/ && $p > 0;
+        my $sock = IO::Socket::INET->new(
+            PeerAddr => '127.0.0.1',
+            PeerPort => $p,
+            Proto    => 'tcp',
+            Timeout  => 0.2,
+        );
+        if ($sock) { $up{$p} = 1; close $sock; }
+    }
+    return \%up;
+}
+
+# The worktree/port list from root/config/worktrees.json — the exact source the
+# admin git dashboard reads — annotated with a live listening check.
+sub _app_server_targets {
+    my $now = time;
+    if (!$_app_server_info_cache
+        || ($now - $_app_server_info_cache->{at}) > $_app_server_info_cache_ttl) {
+        my $list = eval { Comserv::Util::Git->new->build_worktree_list() } || [];
+        my @ports = map  { $_->{port} }
+                    grep { ref $_ eq 'HASH' && ($_->{port} // 0) > 0 } @$list;
+        my $up    = _app_ports_listening(\@ports);
+        my @built;
+        for my $t (@$list) {
+            next unless ref $t eq 'HASH';
+            next if $t->{external};                    # non-Comserv repo: no Catalyst port
+            my $port = int($t->{port} // 0);
+            next unless $port > 0;
+            push @built, {
+                name    => $t->{name}  // '',
+                label   => $t->{label} // ($t->{name} // ''),
+                port    => $port,
+                host    => $t->{host}  // 'workstation.local',
+                url     => $t->{url}   // '/',
+                running => $up->{$port} ? \1 : \0,
+            };
+        }
+        $_app_server_info_cache = { at => $now, targets => \@built };
+    }
+    return $_app_server_info_cache->{targets};
+}
+
+sub api_app_server_info :Path('app/server-info') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username} && $c->session->{user_id}) {
+        $c->res->status(401);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => 'not_authenticated' }));
+        $c->detach();
+    }
+
+    require Comserv::Util::SystemInfo;
+    require Comserv::Util::Git;
+
+    my $home = $c->config->{home} // '';
+    my $sys  = eval { Comserv::Util::SystemInfo::get_system_info() } || {};
+
+    my $workflow   = eval { Comserv::Util::SystemInfo->get_app_workflow($home) } || 'main';
+    my $identifier = eval { Comserv::Util::Logging->get_system_identifier() } || '';
+
+    # Live checkout, not the baked image stamp: a worktree server must report the
+    # branch it actually runs (Root::auto does the same overlay for the debug bar).
+    my ($git_branch, $git_commit) = ('', '');
+    my $git_root = -e "$home/../.git" ? "$home/.."
+                 : (-e "$home/.git"   ? $home : '');
+    if ($git_root) {
+        for my $args (['--abbrev-ref', 'HEAD'], ['--short', 'HEAD']) {
+            my $out = '';
+            if (open my $fh, '-|', 'git', '-C', $git_root, 'rev-parse', @$args) {
+                $out = <$fh> // '';
+                close $fh;
+            }
+            chomp $out;
+            if ($args->[0] eq '--abbrev-ref') { $git_branch = $out } else { $git_commit = $out }
+        }
+    }
+
+    my $build = {};
+    my $version_file = $home ? "$home/version.json" : '';
+    if ($version_file && -r $version_file) {
+        $build = eval {
+            local $/;
+            open my $fh, '<', $version_file or die "open: $!";
+            my $raw = <$fh>;
+            close $fh;
+            decode_json($raw);
+        } || {};
+    }
+
+    my $db_env = eval {
+        require Comserv::Util::DatabaseEnv;
+        Comserv::Util::DatabaseEnv->new->get_active_environment($c);
+    } || $c->stash->{active_db_environment} || 'production';
+
+    my $db_user = $c->stash->{active_db_user}
+        // $c->config->{db_username}
+        // $c->config->{db_user}
+        // $ENV{COMSERV_DB_USER}
+        // '';
+
+    my $port = $c->req->uri->port // 0;
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success    => \1,
+        domain     => '' . $c->req->uri->host,
+        clientIp   => '' . $c->req->address,
+        server     => $identifier,
+        serverHost => $sys->{hostname} // '',
+        serverIp   => $sys->{ip}       // '',
+        workflow   => $workflow,
+        sitename   => $c->stash->{SiteName} // $c->session->{SiteName} // '',
+        port       => 0 + $port,
+        git        => { branch => $git_branch, commit => $git_commit },
+        build      => {
+            branch => $build->{branch}     // '',
+            commit => $build->{commit}     // '',
+            date   => $build->{build_date} // '',
+            host   => $build->{build_host} // '',
+        },
+        dbEnv   => $db_env,
+        dbUser  => $db_user,
+        targets => _app_server_targets(),
+    }));
+    $c->detach();
+}
+
+=head2 api_app_download
+
+GET /api/app/download - Direct download for the Android APK with correct APK MIME type.
+
+Returns: APK file stream with application/vnd.android.package-archive
+=cut
+
+sub api_app_download :Path('app/download') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $nfs_path = '/data/nfs/inventory-apks/ComservInventory.apk';
+    my $local_path = $c->path_to('root/static/app/ComservInventory.apk')->stringify;
+
+    my $target_path = (-r $nfs_path) ? $nfs_path : ((-r $local_path) ? $local_path : '');
+
+    unless ($target_path && -r $target_path) {
+        $c->res->status(404);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => 'APK file not found' }));
+        $c->detach();
+    }
+
+    $c->res->status(200);
+    $c->res->content_type('application/vnd.android.package-archive');
+    $c->res->header('Content-Disposition' => 'attachment; filename="ComservInventory.apk"');
+    $c->res->header('Content-Length' => -s $target_path);
+
+    open my $fh, '<:raw', $target_path or do {
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => 'Could not open APK file' }));
+        $c->detach();
+    };
+
+    $c->res->body($fh);
+    $c->detach();
+}
+
+our %PENDING_REMOTE_NAV;
+
+sub api_browser_navigate :Path('browser/navigate') :Args(0) {
+    my ($self, $c) = @_;
+    my $raw = $c->req->body ? do { local $/; my $b = $c->req->body; <$b> } : '{}';
+    my $json_data = eval { decode_json($raw) } || {};
+    my $target_url = $json_data->{target_url} || $c->req->param('target_url') || '/';
+
+    $PENDING_REMOTE_NAV{global} = {
+        target_url => $target_url,
+        timestamp  => time()
+    };
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => 1, target_url => $target_url, message => "Navigation command sent to workstation browser" }));
+    $c->detach();
+}
+
+sub api_browser_poll :Path('browser/poll') :Args(0) {
+    my ($self, $c) = @_;
+    my $cmd = $PENDING_REMOTE_NAV{global};
+    if ($cmd && (time() - $cmd->{timestamp} < 30)) {
+        delete $PENDING_REMOTE_NAV{global};
+        $c->res->status(200);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ pending => 1, target_url => $cmd->{target_url} }));
+        $c->detach();
+    }
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ pending => 0 }));
     $c->detach();
 }
 

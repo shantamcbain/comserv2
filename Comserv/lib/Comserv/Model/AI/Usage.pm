@@ -57,6 +57,13 @@ sub log {
 
         my $user_id     = $args{user_id}     // $c->session->{user_id};
         my $site_id     = $args{site_id}     // $c->session->{SiteID};
+        # Nov 8 2026: SiteID is often absent from the session (log showed site=-).
+        # Resolve it from SiteName so usage rows carry the site.
+        if (!$site_id) {
+            my $sn = $args{sitename} // eval { $c->session->{SiteName} } // eval { $c->stash->{SiteName} };
+            $site_id = eval { $schema->resultset('Site')->search({ name => $sn }, { rows => 1 })->get_column('id')->first } if $sn;
+        }
+        delete $args{sitename};
         my $guest_id    = $args{guest_session_id} // $c->session->{guest_session_id};
         my $provider    = $args{provider}    // 'ollama';
         my $model       = $args{model}       // 'unknown';

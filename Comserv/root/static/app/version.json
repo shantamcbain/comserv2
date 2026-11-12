@@ -1,6 +1,6 @@
 {
-  "versionCode": 2,
-  "versionName": "1.1",
-  "apkUrl": "/static/app/ComservInventory.apk",
-  "releaseNotes": "Initial inventory + barcode + photo app. LAN and ZeroTier support."
+  "versionCode": 25,
+  "versionName": "1.3.1",
+  "apkUrl": "/api/app/download",
+  "releaseNotes": "v1.3.1 Patch: Centralized Comserv2 backend error logging (POST /api/log/error) for item creation & app exception protection."
 }

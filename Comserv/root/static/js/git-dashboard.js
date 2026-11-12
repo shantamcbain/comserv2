@@ -304,8 +304,15 @@
 
         var devServerButtons = document.querySelectorAll('.git-dev-actions button');
         for (var ds = 0; ds < devServerButtons.length; ds++) {
-            devServerButtons[ds].addEventListener('click', function () {
+            devServerButtons[ds].addEventListener('click', function (ev) {
+                if (ev) {
+                    ev.preventDefault();
+                    ev.stopImmediatePropagation();
+                }
                 var el = this;
+                if (el.getAttribute('data-inflight') === '1') { return; }
+                el.setAttribute('data-inflight', '1');
+                var clearInflight = function () { el.removeAttribute('data-inflight'); };
                 var openBranch = el.getAttribute('data-open-branch');
                 if (openBranch) {
                     var url = el.getAttribute('data-url') || '';
@@ -329,7 +336,8 @@
                         })
                         .catch(function () {
                             if (branchTab && !branchTab.closed) { branchTab.close(); }
-                        });
+                        })
+                        .then(clearInflight);
                     return;
                 }
                 // "Hermes" button: copy the branch's Hermes launch command to the
@@ -349,6 +357,7 @@
                         hport = String(9100 + (appPortN % 100));
                     } else if (!hport) {
                         window.alert('Hermes for ' + hermesBranch + ': button has no app port.');
+                        clearInflight();
                         return;
                     }
                     var hcwd = el.getAttribute('data-hermes-cwd') || '';
@@ -375,7 +384,9 @@
                         var url = window.location.protocol + '//' + window.location.hostname
                             + ':' + port + '/';
                         if (devOpenLink) { devOpenLink.href = url; devOpenLink.style.display = ''; }
-                        if (url === hermesUrl) { return; }
+                        // Always navigate. A same-URL early return left the tab on
+                        // "Unable to connect" after the port came up, so Start
+                        // looked like it needed a second click.
                         if (tab && !tab.closed) { tab.location = url; }
                         else { window.open(url, 'hermes-' + hermesBranch); }
                     }
@@ -407,7 +418,8 @@
                         })
                         .catch(function () {
                             if (devOpenLink) { devOpenLink.href = hermesUrl; devOpenLink.style.display = ''; }
-                        });
+                        })
+                        .then(clearInflight);
                     return;
                 }
                 var action = el.getAttribute('data-branch-action');
@@ -424,7 +436,10 @@
                             }
                             if (res && res.running) { bits.push('listening on :' + res.port); }
                             window.alert(bits.join(' '));
-                        });
+                        })
+                        .then(clearInflight);
+                } else {
+                    clearInflight();
                 }
             });
         }
@@ -923,7 +938,6 @@
         table.hidden = false;
     }
     function run(mode) {
-            if (mode === 'update' && !window.confirm('Merge main into every registered branch now? Running -r dev servers will restart. Run Preview first if unsure.')) { return; }
             var body = new URLSearchParams();
             body.set('mode', mode); body.set('csrf', csrf);
             if (summary) { summary.textContent = mode === 'update' ? 'Updating...' : 'Previewing...'; }

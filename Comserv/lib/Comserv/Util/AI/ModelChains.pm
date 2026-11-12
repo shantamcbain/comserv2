@@ -110,6 +110,9 @@ sub validate_structure {
     for my $p (@PURPOSES) {
         my $k = "chain_$p";
         my $v = $d->{$k};
+        # Nov 8 2026: an ABSENT chain key is filled from perl_default by load()
+        # (%full merge), so it is not an error. Only a present-but-empty/bad one is.
+        next unless exists $d->{$k};
         unless (ref $v eq 'ARRAY' && @$v) { push @e, "$k must be a non-empty list"; next }
         my %seen;
         for my $s (@$v) {
@@ -245,6 +248,11 @@ sub _chain_models_in_use {
     return \%used;
 }
 
+# Free-model rule and the verified 0/0 list live in Util::AI::FreeModel (single source).
+require Comserv::Util::AI::FreeModel;
+our %ZERO_PRICED_FREE;
+*ZERO_PRICED_FREE = \%Comserv::Util::AI::FreeModel::ZERO_PRICED_FREE;   # alias, not a copy
+
 sub _validate_trials {
     my ($class, $d, %vo) = @_;   # vo{all_trials}: the full trials set when only one trial is checked (Nov 2 2026)
     return () unless exists $d->{trials};
@@ -267,7 +275,7 @@ sub _validate_trials {
             # Nov 2 2026 (Shanta): several probation models may share the paid steps (particle-1 + luna); any OTHER paid OpenRouter step is still refused.
             my %probm = map { ($_->{model} => 1) } grep { ref $_ eq 'HASH' && defined $_->{model} && defined $_->{probation} && !ref $_->{probation} && $_->{probation} =~ /^(?:1|true)\z/ } values %{ $vo{all_trials} || $d->{trials} };
             push @e, "trials.$name: a probation model may share the paid steps of hermes_fallback_chain only with other probation models"
-                if grep { !ref && m{^openrouter\|(.+)\z} && $1 !~ /:free\z/ && !$probm{$1} } @$ch;
+                if grep { !ref && m{^openrouter\|(.+)\z} && $1 !~ /:free\z/ && !$ZERO_PRICED_FREE{$1}  && !$probm{$1} } @$ch;
         }
         push @e, "trials.$name.provider must be openrouter" unless ($t->{provider} // '') eq 'openrouter';
         my $sel = $t->{selectable_by} // '';
