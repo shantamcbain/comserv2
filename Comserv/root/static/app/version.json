@@ -1,6 +1,6 @@
 {
-  "versionCode": 25,
-  "versionName": "1.3.1",
-  "apkUrl": "/api/app/download",
-  "releaseNotes": "v1.3.1 Patch: Centralized Comserv2 backend error logging (POST /api/log/error) for item creation & app exception protection."
+  "versionCode": 31,
+  "versionName": "3.3.2",
+  "apkUrl": "/static/app/ComservInventory.apk",
+  "releaseNotes": "3.3.2 - fix: the app no longer assumes CSC. On login and at every start it asks GET /api/app/context which site this domain and login belong to, stores that site, and every list (suppliers, items, counts) follows it - so SiteName Shanta shows Shanta's suppliers (Food Bank etc.), and any other site shows its own. Site picker on Add Item defaults to the resolved site."
 }

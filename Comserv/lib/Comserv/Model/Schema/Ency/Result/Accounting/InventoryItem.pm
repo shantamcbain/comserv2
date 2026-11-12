@@ -71,14 +71,19 @@ __PACKAGE__->add_columns(
     },
     # Grams in one stocked unit (container). Health Kitchen recipe lines in g
     # deduct grams / net_weight_g of a unit. NULL = unknown -> line skipped.
+    # 3 decimals: 1 lb = 453.592 g, this value is a DIVISOR in consume_recipe,
+    # and stock is held at 3 decimals (inventory_stock_levels.quantity_on_hand).
     net_weight_g => {
         data_type   => 'decimal',
-        size        => [ 10, 2 ],
+        size        => [ 10, 3 ],
         is_nullable => 1,
     },
+    # 4 decimals: Util::Manufacturing::Costing computes unit cost to 4 dp
+    # (sprintf '%.4f') and moving_average() feeds the STORED value back in on
+    # every receipt, so a 2-dp column compounds a rounding error per receipt.
     unit_cost => {
         data_type   => 'decimal',
-        size        => [10, 2],
+        size        => [12, 4],
         is_nullable => 1,
     },
     unit_price => {
@@ -102,9 +107,10 @@ __PACKAGE__->add_columns(
         size        => 500,
         is_nullable => 1,
     },
+    # 4 decimals: (10,0) was integer-only, so a 12.5% discount stored as 12 or 13.
     discount_percent => {
         data_type => 'decimal',
-        size => [10, 0],
+        size => [8, 4],
         is_nullable => 1,
         default_value => '0',
     },
@@ -234,9 +240,11 @@ __PACKAGE__->add_columns(
     },
 
     # Manufacturing costing (Util::Manufacturing::Costing)
+    # 4 decimals: a markup solved from cost+price is 33.3333...; storing 2 dp and
+    # repricing through ceil_to() silently under-prices. Display rounds to 2.
     markup_percent => {
         data_type   => 'decimal',
-        size        => [6, 2],
+        size        => [8, 4],
         is_nullable => 1,   # NULL = <Manufacturing> markup_percent default
     },
     manual_price => {

@@ -62,9 +62,21 @@ is_deeply $c->{kind}{extra}{list}, [ 'meal', 'drink' ], 'enum list still parses'
 
 # The real file that exposed the bug.
 my $real = $p->get_result_file_schema('lib/Comserv/Model/Schema/Ency/Result/Accounting/InventoryItem.pm');
-is_deeply $real->{columns}{net_weight_g}{size}, [ 10, 2 ],
-    'InventoryItem.net_weight_g carries [10,2] from the real Result file';
-is_deeply $real->{columns}{unit_cost}{size}, [ 10, 2 ], 'InventoryItem.unit_cost carries [10,2]';
+is_deeply $real->{columns}{net_weight_g}{size}, [ 10, 3 ],
+    'InventoryItem.net_weight_g carries [10,3] from the real Result file (grams, 3 dp = stock scale)';
+is_deeply $real->{columns}{unit_cost}{size}, [ 12, 4 ],
+    'InventoryItem.unit_cost carries [12,4] (Costing works to 4 dp)';
+
+# Storage scale must not be narrower than the scale the code computes in:
+# Costing.pm rounds cost/markup at 4 dp and moving_average() feeds the stored
+# value back in, so a narrower column compounds a rounding error per receipt.
+for my $spec ( [ unit_cost => 4 ], [ markup_percent => 4 ], [ discount_percent => 4 ], [ net_weight_g => 3 ] ) {
+    my ( $col, $min_scale ) = @$spec;
+    my $size = $real->{columns}{$col}{size};
+    my $scale = ref $size eq 'ARRAY' ? $size->[1] : ( split /,/, ( $size // '' ) )[1];
+    ok defined $scale && $scale >= $min_scale,
+        "$col scale $scale >= working precision $min_scale";
+}
 
 # Sweep: every decimal in every Result file must parse to a non-empty size
 # unless it genuinely declares none.
