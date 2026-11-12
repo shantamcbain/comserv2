@@ -92,10 +92,17 @@ sub is_enabled {
 }
 
 sub get_decrypted_api_key {
-    my ($self, $encryption_key) = @_;
+    use Comserv::Util::Encryption;
     my $encrypted = $self->api_key_encrypted;
     return undef unless $encrypted;
     
+    # Use standard Comserv::Util::Encryption module for consistency
+    # If the encrypted data has 'ENC:' prefix, use the Encryption module
+    if ($encrypted =~ /^ENC:/) {
+        return Comserv::Util::Encryption->decrypt($encrypted, 'ai_model_config');
+    }
+    
+    # Fallback: try legacy decryption for backward compatibility
     use Crypt::CBC;
     use Digest::MD5 qw(md5_hex);
     
@@ -108,18 +115,15 @@ sub get_decrypted_api_key {
 }
 
 sub set_encrypted_api_key {
-    my ($self, $api_key, $encryption_key) = @_;
+    use Comserv::Util::Encryption;
+    my ($self, $api_key) = @_;
     
-    use Crypt::CBC;
-    use Digest::MD5 qw(md5_hex);
+    # Use standard Comserv::Util::Encryption module for consistency
+    return 1 unless Comserv::Util::Encryption->encrypt($api_key, 'ai_model_config');
     
-    my $cipher = Crypt::CBC->new(
-        -key    => $encryption_key,
-        -cipher => 'Crypt::OpenSSL::AES'
-    );
-    
-    my $encrypted = $cipher->encrypt($api_key);
-    $self->api_key_encrypted($encrypted);
+    # Store the encrypted key with 'ENC:' prefix
+    my $encrypted = Comserv::Util::Encryption->encrypt($api_key, 'ai_model_config');
+    $self->api_key_encrypted($encrypted) if $encrypted;
     return 1;
 }
 

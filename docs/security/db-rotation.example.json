@@ -1,0 +1,25 @@
+{
+  "_comment": "Copy to ~/.comserv/secrets/db-rotation.json, chmod 600. Contains NO passwords, only names, hosts and command lines.",
+  "logins": ["comserv_app", "comserv_app_b"],
+  "primary_slot": "db_production_mysql",
+  "old_slots": ["db_production_mysql_fallback"],
+  "secrets_file": "dbi/db_production_mysql.json",
+  "grants": ["GRANT SELECT, INSERT, UPDATE, DELETE ON `ency`.* TO '{login}'@'{host}'"],
+  "verify_sql": "SELECT COUNT(*) FROM ency.app_secrets",
+  "min_healthy_nodes": 1,
+  "soak_seconds": 300,
+  "db_servers": [
+    { "name": "db1-docker-3307", "host": "192.168.1.20", "port": 3307, "database": "ency",
+      "admin_defaults_file": "~/.comserv/secrets/rotation-admin-db1.cnf", "account_hosts": ["%"] },
+    { "name": "db2-failover-EXAMPLE", "host": "192.168.1.21", "port": 3307, "database": "ency",
+      "admin_defaults_file": "~/.comserv/secrets/rotation-admin-db2.cnf", "account_hosts": ["%"],
+      "replicates_from": "db1-docker-3307" }
+  ],
+  "app_nodes": [
+    { "name": "workstation-dev", "secrets_dir": "~/.comserv/secrets",
+      "restart_cmd": "docker restart comserv2-web-dev", "health_cmd": "curl -fsS -o /dev/null http://127.0.0.1:3001/" },
+    { "name": "prod-node-1", "ssh": "ubuntu@192.168.1.199", "secrets_dir": "/home/ubuntu/.comserv/secrets",
+      "drain_cmd": "echo drain via balancer API here", "undrain_cmd": "echo undrain via balancer API here",
+      "restart_cmd": "docker restart comserv2-web-prod", "health_cmd": "curl -fsS -o /dev/null http://127.0.0.1:5000/" }
+  ]
+}

@@ -1895,7 +1895,7 @@ kubectl get namespaces
             <pre style="background-color: var(--card-bg, rgba(255,255,255,0.15)); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Create secrets in Kubernetes (avoid hardcoding passwords)
 kubectl create secret generic comserv-db-credentials \
   --from-literal=username=shanta_forager \
-  --from-literal=password='UA=nPF8*m+T#' \
+  --from-literal=password='<from ~/.comserv/secrets>' \
   -n comserv-prod
 
 # Verify secret was created
@@ -2040,7 +2040,7 @@ kubectl get pods -n comserv-prod
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">6.4.1 Export Data from Bare-Metal Database</h4>
                 <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># On the bare-metal database server (192.168.1.198)
 # Create full backup of both databases
-mysqldump -u shanta_forager -p'UA=nPF8*m+T#' \
+mysqldump -u shanta_forager -p'<DB_PASSWORD from ~/.comserv/secrets>' \
   --single-transaction \
   --lock-tables=false \
   --all-databases > /tmp/comserv_full_backup.sql
@@ -2329,7 +2329,7 @@ kubectl port-forward -n comserv-prod svc/comserv-service 8080:80 &
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 8.1: Verify Both Systems Are Healthy</h3>
             <pre style="background-color: var(--card-bg, rgba(255,255,255,0.15)); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Test bare-metal database
-mysql -h 192.168.1.198 -u shanta_forager -p'UA=nPF8*m+T#' -e "SHOW DATABASES; SHOW STATUS LIKE 'Uptime';"
+mysql -h 192.168.1.198 -u shanta_forager -p'<DB_PASSWORD from ~/.comserv/secrets>' -e "SHOW DATABASES; SHOW STATUS LIKE 'Uptime';"
 
 # Test Kubernetes database
 kubectl exec -it mariadb-0 -n comserv-prod -- mysql -u root -p$MYSQL_ROOT_PASSWORD -e "SHOW DATABASES; SHOW STATUS LIKE 'wsrep_cluster_size';"
@@ -2341,14 +2341,14 @@ kubectl logs -n comserv-prod deployment/comserv-app --tail=20
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 8.2: Final Data Sync (Zero-Second Downtime Approach)</h3>
             <pre style="background-color: var(--card-bg, rgba(255,255,255,0.15)); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># 1. Set bare-metal database to read-only (prepared state, not yet active)
-mysql -h 192.168.1.198 -u shanta_forager -p'UA=nPF8*m+T#' -e "SET GLOBAL read_only=1;"
+mysql -h 192.168.1.198 -u shanta_forager -p'<DB_PASSWORD from ~/.comserv/secrets>' -e "SET GLOBAL read_only=1;"
 
 # 2. Wait for K8s Galera cluster to catch up (should be < 1 second for small transactions)
 sleep 5
 
 # 3. Verify row counts match between systems
 # On bare-metal:
-mysql -h 192.168.1.198 -u shanta_forager -p'UA=nPF8*m+T#' ency -e "SELECT COUNT(*) FROM information_schema.tables;"
+mysql -h 192.168.1.198 -u shanta_forager -p'<DB_PASSWORD from ~/.comserv/secrets>' ency -e "SELECT COUNT(*) FROM information_schema.tables;"
 
 # On K8s:
 kubectl exec mariadb-0 -n comserv-prod -- mysql -u root -p$MYSQL_ROOT_PASSWORD ency -e "SELECT COUNT(*) FROM information_schema.tables;"
@@ -2405,7 +2405,7 @@ back Procedure (Days 1-3 After Cutover)</h2>
 kubectl scale deployment comserv-app --replicas=0 -n comserv-prod
 
 # STEP 2: Set bare-metal database to read-write
-mysql -h 192.168.1.198 -u shanta_forager -p'UA=nPF8*m+T#' -e "SET GLOBAL read_only=0;"
+mysql -h 192.168.1.198 -u shanta_forager -p'<DB_PASSWORD from ~/.comserv/secrets>' -e "SET GLOBAL read_only=0;"
 
 # STEP 3: Update application config to point back to bare-metal
 # Edit docker-compose.prod.yml or K8s config:
@@ -2416,7 +2416,7 @@ kubectl scale deployment comserv-app --replicas=3 -n comserv-prod
 
 # STEP 5: Verify rollback successful
 curl -I http://localhost:5000/health
-mysql -h 192.168.1.198 -u shanta_forager -p'UA=nPF8*m+T#' -e "SELECT 1;"
+mysql -h 192.168.1.198 -u shanta_forager -p'<DB_PASSWORD from ~/.comserv/secrets>' -e "SELECT 1;"
 
 # STEP 6: Investigate K8s issues while running on bare-metal
 # Check application logs, database logs, network connectivity

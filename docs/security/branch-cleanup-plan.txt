@@ -1,0 +1,131 @@
+BRANCH CLEANUP PLAN  (Code Guard for Shanta, 2026-10-26 PT)   STATUS: PLAN + dry-run script. Nothing deleted anywhere.
+Script: script/branch_cleanup.sh (dry-run by default; self-test: script/test_branch_cleanup.sh, uses a throwaway local repo, never GitHub)
+Raw tables (not in git): ~/.comserv/work/codeguard/reports/branch-inventory-remote.tsv and branch-inventory-local.tsv
+Measured read-only on 2026-10-26 with git ls-remote / for-each-ref / merge-base against the live GitHub list. gh CLI is not installed,
+so GitHub settings, pull-request refs and forks could NOT be checked from here.
+
+PROBLEM
+Shanta believes only main is on GitHub and worktree branches are not. Partly true, but GitHub also holds 49 other, mostly old branches,
+26 of which carry the commit Aikido flagged (06e153c1f). Nobody owns them, nothing cleans them, and every one is a copy of old secrets.
+
+EVIDENCE
+Remote (git ls-remote --heads origin, live):  50 branches, 0 tags. HEAD = main. (`git branch -r` shows 142 lines only because it also lists
+  89 mirror refs from a remote named local_main that points at this same repo, plus origin/HEAD. Real GitHub branches = 50.)
+  Last commit dates: oldest 2024-03-09, newest 2026-10-18 (origin/main). By author: Zencoder 20, Comserv Admin 13, shanta 8, shantamcbain 8, Shanta McBain 1.
+  - Merged into origin/main: 17 (main + 16). Of the 16, 14 are older than 60 days -> safe to delete. 2 (3d, planning) are registered worktrees -> keep.
+  - NOT merged: 30. Every one is older than 90 days (youngest 94 days, oldest 2024-08). 3 job-system-* branches and loggin/master2/sitetesting/
+    workstationfix carry only 1 to 43 commits; the 26 others (mostly Zencoder / Comserv Admin, Apr to Jul 2026) carry 2,000 to 3,800 commits each by
+    simple count, but most of that is already in main under different commit ids (patch-id comparison, table at the end).
+  - Keep: 5 = 3d, InventoryAccounting, planning (listed in Comserv/root/config/worktrees.json) and ai, aichatsystem-ef4e (checked out in a worktree but
+    not registered in worktrees.json).
+  - Commit 06e153c1f (Dec 2025, the Aikido hit) is NOT in origin/main or local main. It is in 26 live remote branches (all the 2026 Zencoder/Comserv
+    Admin ones above). The earlier figure of "73 remote branches" does not reproduce: today it is 26 on GitHub. Possible cause: it was counted
+    across origin/* plus the 89 local_main/* mirror refs, or against an older state. The password itself is also in 28 tracked files on origin/main,
+    so branch cleanup cannot remove it from main.
+  - origin/main is dated 2026-10-18. Local main is 157 commits AHEAD and 0 behind: nothing has been pushed to main since then. So every
+    newer worktree branch shows as "unmerged" against GitHub even where it is merged into local main.
+Local:  94 branches, 28 git worktrees (plus 2 detached ones under ~/.grok/worktrees, not ours).
+  - worktrees.json registers 16 branches. 13 of them are NOT on GitHub (Bmaster, CSSNavigation, DockerHA, Documentation, Proxmox, aisystem, codeguard, ency,
+    git, healthkitchen, helpdesk, mailnewletter, schema): Shanta is right for the live worktrees. Only 3 (3d, InventoryAccounting, planning) are on GitHub.
+  - 11 more worktrees are unregistered: ai, aichatsystem-ef4e, cgi-bin-legacy, deployflow, errlog-fix, git-dev, helpdesk-spam, herbs-then-web, login-return,
+    mail-connect, todo-search. Register them or retire them.
+  - Local categories (merged = into local main): 21 merged and stale > 60 days -> delete; 26 worktree branches (15 registered + 11 unregistered) -> keep;
+    2 merged but recent (fix-ai-generate-pipe-model, themes-nfs); 1 unmerged and recent (jobs-switch); 43 unmerged and older than 60 days
+    (22 Comserv Admin, 17 Zencoder, 4 Shanta) -> bundle, ask owner; main.
+  - Uncommitted work exists in several worktrees (Documentation 147 changed files, ~/.grok main 189, Proxmox 11, schema 10, healthkitchen 8):
+    never remove a worktree directory until its owner bot has committed or discarded.
+  - No GitHub Actions workflow refers to any of the old branches (only main, plus develop which does not exist).
+
+IMPACT
+- 49 extra branches are 49 extra places a leaked password lives; clones, forks and pull-request refs outlive any deletion.
+- 94 local branches and 28 worktrees with no registry for 11 of them is how bots lose track of who owns what.
+- Deleting branches does NOT: remove commits reachable from main or any other ref, remove other people's clones or forks, remove GitHub's
+  cached commit pages or pull-request refs (refs/pull/*), or invalidate a password. It only shrinks what is easy to find.
+  So password rotation (db-password-rotation-design.txt) is still required, and comes FIRST.
+
+SOLUTION
+Order matters:
+ 0. Rotate the database password (production first). Branch deletion is housekeeping after that, not a fix.
+ 1. Make the bundle backup (the script does it before any delete): git bundle create ~/.comserv/backups/branch-cleanup-<time>.bundle --all, verified,
+    with a sha256 and a name/sha restore list. Keep one copy off the workstation. Do NOT back up as tags on GitHub: that would keep the leaked commits there.
+ 2. Push main only after the secret scan is clean (it is 157 commits ahead); then re-run the dry-run so "merged" is measured against the real origin/main.
+ 3. Delete the DELETE-merged-stale remote branches (14 today: 3dprinting, Filemanagement, Forager, Master, Production, ProductionV1.0.0, ProjectManagement,
+    Proxmoxinterface, SiteSetup, Sitesetup, User, WorkShops, master, ve7tit). Names like Production/Master look important: Shanta confirms once.
+    Each is fully contained in main, so no work is lost; the restore list lets any one be recreated.
+ 4. Unmerged (30 remote, 43 local): never auto-deleted. For each, the owner bot (suggested owner in the table below) answers one of: "already in main"
+    (patch-id check below), "keep, here is why", "archive then delete". Names go into an approved list file; the script deletes only those, after the bundle.
+ 5. Registered and worktree branches: keep. Register or retire the 11 unregistered worktrees (Shanta decides; Code Guard lists them).
+ 6. Local clean-up: delete the 21 local merged-stale branches (same script, local section), `git worktree prune`, and remove the local_main remote
+    (git remote remove local_main) so `git branch -r` shows only GitHub.
+ 7. Keep it clean (GitHub settings, Shanta applies in the web UI; verify afterwards):
+    - Settings > General > "Automatically delete head branches" ON.
+    - Settings > Rules (or Branches): ruleset on main: block force pushes and deletion; require status check "secret-scan / scan" (workflow is on codeguard,
+      not on main yet); require PRs only if Shanta wants it, because bots commit directly to main today.
+    - A second ruleset: restrict branch CREATION to main (so worktree branches cannot be pushed by accident). Matches Shanta's "only main is pushed".
+    - Settings > Code security: Secret scanning ON and Push protection ON (both free for a public repo; check plan if private).
+    - Optional: a monthly Code Guard sweep runs script/branch_cleanup.sh dry-run and files one todo if it lists anything.
+ 8. The generated delete list is a file of exact commands (the script writes it on every dry-run): `git push origin --delete <name>` per branch and
+    `git branch -d <name>` per local branch. The script runs them one at a time and reports failures.
+
+HOW THE SCRIPT BEHAVES
+  script/branch_cleanup.sh                          dry-run: prints every branch with its category, the summary, writes the command file. Changes nothing.
+  script/branch_cleanup.sh --stale-days 90          change the age cut-off (default 60)
+  script/branch_cleanup.sh --keep-file F            extra names to never delete
+  script/branch_cleanup.sh --approved-unmerged F    unmerged branch names the owner approved
+  script/branch_cleanup.sh --execute                bundle all refs -> verify -> ask to type DELETE -> delete one by one. Aborts if the bundle fails.
+  script/branch_cleanup.sh --execute --yes          no typed confirmation (use only with Shanta's explicit OK for that run)
+  Never deletes: main, the remote default branch, any branch in worktrees.json or checked out in a worktree, any keep-file name, recent merged
+  branches, or unmerged branches without an approved name. Never force-pushes or rewrites history.
+  Verified: the self-test builds a throwaway bare repo and proves dry-run deletes nothing, a missing confirmation deletes nothing, merged-stale is
+  deleted, unmerged/keep/recent are not, and an approved unmerged branch is deleted only when listed.
+
+RISK / UNDO
+- A deleted remote branch is recreated with: git push origin <sha>:refs/heads/<name> (shas are in the restore list); the bundle restores all refs:
+  git bundle verify <file>; git fetch <file> '<name>:<name>'. Restore-list and bundle are mode 600 in ~/.comserv/backups.
+- "Merged" means all its commits are ancestors of main. Squash-merged work looks unmerged (safe: it is kept), never the reverse.
+- A bot may have a worktree whose branch you delete locally: the script refuses branches checked out in any worktree.
+- Risk of a surprise: a deploy script or a person may reference an old branch such as Production. None of the CI workflows do; grep deploy docs once.
+- Deleting remote branches does not clean main (28 files still hold the password), forks, clones, PR refs or GitHub caches: rotate the password.
+
+DECISIONS FOR SHANTA
+ 1. OK to push local main (157 commits) after the secret scan is clean? (changes what counts as merged)
+ 2. OK to delete the 14 merged-stale remote branches, including Production, ProductionV1.0.0, Master, master?
+ 3. Unmerged: ask each owner bot, or accept "archive in the bundle and delete" for everything older than 6 months that the patch-id check says is already in main?
+ 4. Register or retire the 11 unregistered worktrees; remove the local_main remote.
+ 5. Turn on the GitHub settings in step 7 (only Shanta can; gh is not installed here).
+
+UNMERGED BRANCHES ON GITHUB: what is really new (git cherry vs origin/main, measured 2026-10-26)
+  'ahead' = commits not ancestors of main; 'in main' = same change already in main under another commit id; 'new' = change not found in main.
+  Only 'new' needs an owner decision. Branches with new=0 or tiny are the easy ones. Suggested owner is a guess from the branch name.
+  branch                                     last        days  ahead in main   new  suggested owner
+  ency-53b0                                  2026-05-22   157   2956      0     0  ency (Zencoder worktree)
+  loggin                                     2025-02-14   619      1      0     1  Shanta
+  3dprinting-use-this-as-the-branc-41f3      2026-04-25   183   2325   2044     2  3d
+  api-bc05                                   2026-05-02   177   2494   2167     2  CSC developer
+  cssthemes-9195                             2026-06-07   141   3435   2921     2  CSSNavigation
+  docker-5c15                                2026-05-31   148   3186   2735     2  Docker fixer
+  dockerbug-ee56                             2026-05-29   150   3155   2710     2  Docker fixer
+  dockerdeploy                               2026-07-19    98   3751   3231     2  Docker fixer
+  helpdesk-7217                              2026-04-27   181   2434   2127     2  HelpDesk bot
+  infrastructuremanagement-d133              2026-06-06   142   3398   2894     2  Docker fixer / Proxmox
+  integrate-ai-into-main                     2026-07-01   116   3696   3177     2  Chat-with-AI fixer
+  inventory-system-104a                      2026-06-07   141   3294   2827     2  Inventory & Accounting
+  job-system-add-navigation-links-7bd2       2026-04-09   200     43     37     2  CSC developer
+  job-system-resume-file-upload-su-e417      2026-04-09   200     43     37     2  CSC developer
+  membership-1304                            2026-06-04   144   3359   2861     2  CSC developer
+  page-management-system-implement-41a1      2026-05-31   148   3192   2740     2  CSC developer
+  planning-system-continue-from-pl-bdac      2026-06-06   142   3134   2697     2  Planning
+  unified-mail-system-site-managed-2c53      2026-05-25   154   2980   2570     2  mailnewletter
+  v2migration                                2026-07-24    94   3772   3250     2  CSC developer
+  documentation-9122                         2026-05-23   156   2979   2567     3  Documentation
+  job-system-apply-sql-migration-0-689e      2026-04-09   200     43     36     3  CSC developer
+  master2                                    2024-11-13   712      3      0     3  Shanta
+  workstationfix                             2024-11-03   722      4      0     4  Shanta
+  bmaster-f0fd                               2026-05-17   162   2790   2396     5  Bmaster bot
+  new-task-bb05                              2026-05-26   153   3098   2659     5  CSC developer
+  sitetesting                                2024-08-22   794      6      0     5  Shanta
+  planningsystem-59ae                        2026-05-10   169   2683   2294     8  Planning
+  schema-management-enforce-result-f2fb      2026-06-09   139   3458   2935    10  schema / CSC developer
+  schema-managment-system-7eb3               2026-05-17   161   2880   2473    16  schema / CSC developer
+  bmaster-audio-inspection-voice-t-e4c5      2026-04-30   178   2489   2151    18  Bmaster bot
+  Total new commits across 30 branches: 115; branches with new=0: 1; with 1-5 new: 25.
