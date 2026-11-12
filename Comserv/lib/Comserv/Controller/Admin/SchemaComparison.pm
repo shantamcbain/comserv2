@@ -2669,6 +2669,37 @@ sub _is_width_only_type {
     return $normalized_type =~ /^(integer|boolean|bigint|smallint|mediumint)$/ ? 1 : 0;
 }
 
+=head2 _is_numeric_type
+
+True for column types whose DEFAULT is a NUMBER. Used only to decide how to
+compare defaults when the two sides spell the same value differently.
+
+=cut
+
+sub _is_numeric_type {
+    my ($self, $normalized_type) = @_;
+    return 0 unless defined $normalized_type;
+    return $normalized_type =~ /^(integer|boolean|bigint|smallint|mediumint|decimal|numeric|float|double|real)$/ ? 1 : 0;
+}
+
+=head2 _numeric_default
+
+A plain decimal literal -> its numeric value, else undef. Quoted or padded forms
+are accepted (C<0>, C<'0'>, C<0.0000>); anything else (NULL, CURRENT_TIMESTAMP,
+b'0', enum members) returns undef so the caller falls back to string comparison.
+
+=cut
+
+sub _numeric_default {
+    my ($self, $def) = @_;
+    return undef unless defined $def;
+    my $v = $def;
+    $v =~ s/^\s+|\s+$//g;
+    $v =~ s/^'(.*)'$/$1/;
+    return undef unless $v =~ /^-?\d+(?:\.\d+)?$/;
+    return 0 + $v;
+}
+
 =head2 _fields_equivalent
 
 Single comparison used by BOTH the Table row and the Result row so the two can
@@ -2717,6 +2748,15 @@ sub _fields_equivalent {
         s/\(\)$//;
         $_ = uc($_) if /^current_timestamp/i;
         $_ = 'NULL' if $_ eq '';
+    }
+    # Numeric defaults are compared as NUMBERS, not strings. MariaDB reports a
+    # DECIMAL default padded to the column scale ("0.0000" for DEFAULT 0), so a
+    # Result file declaring '0' would show permanent drift -- and "Update Table"
+    # could never clear it, because the ALTER re-normalises back to 0.0000.
+    if ( $d_def ne $r_def && $self->_is_numeric_type($d_type) ) {
+        my $d_num = $self->_numeric_default($d_def);
+        my $r_num = $self->_numeric_default($r_def);
+        return 1 if defined $d_num && defined $r_num && $d_num == $r_num;
     }
     return 0 unless $d_def eq $r_def;
 
