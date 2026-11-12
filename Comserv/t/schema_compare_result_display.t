@@ -142,4 +142,21 @@ for my $f (@{ $todo->{fields} }) {
 }
 is $blank, 0, 'no Todo Result display attr is a ref or a missing data_type/nullable';
 
+
+# qw/.../ enum lists and qw() unique constraints (todo #2731 false positives)
+my $queen = $p->preview_fields('lib/Comserv/Model/Schema/Ency/Result/Beekeeping/Queen.pm');
+ok $queen && $queen->{field_count}, 'Queen Result previews';
+my %q = map { $_->{name} => $_ } @{ $queen->{fields} || [] };
+is $q{temperament_rating}{extra}, 'enum(calm,moderate,aggressive,very_aggressive)',
+    'qw-style enum list on temperament_rating is flattened';
+is $q{health_status}{extra}, 'enum(healthy,diseased,injured,missing,dead)',
+    'qw-style enum list on health_status is flattened';
+
+my $rp = $p->get_result_file_schema('lib/Comserv/Model/Schema/Ency/Result/RolePermission.pm');
+my $uqs = $rp->{unique_constraints} || [];
+ok @$uqs, 'RolePermission declares a unique constraint';
+is_deeply $uqs->[0]{columns}, [qw(role module action sitename)],
+    'qw() unique columns are four names, not one smashed token';
+
 done_testing();
+

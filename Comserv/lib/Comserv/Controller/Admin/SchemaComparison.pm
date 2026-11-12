@@ -17,6 +17,8 @@ use File::Path qw(make_path);
 use File::Spec;
 use File::Find;
 use Comserv::Util::Schema::ResultParser;
+use Comserv::Util::Schema::Equivalence;
+use Comserv::Util::Schema::Inspector;
 use Comserv::Util::DatabaseCompare;
 use DBI;
 
@@ -2638,89 +2640,17 @@ sub normalize_field_value {
 
 sub normalize_data_type {
     my ($self, $data_type) = @_;
-    return '' unless defined $data_type;
-    $data_type = lc($data_type);
-    $data_type =~ s/\([^)]*\)//g;
-    $data_type =~ s/^\s+|\s+$//g;
-    $data_type =~ s/\s+(unsigned|signed|zerofill|binary)//g;
-    
-    my %mapping = (
-        'int' => 'integer', 'int4' => 'integer', 'integer' => 'integer',
-        'varchar' => 'varchar', 'text' => 'text', 'longtext' => 'text',
-        'tinyint' => 'boolean', 'bool' => 'boolean', 'boolean' => 'boolean',
-        'datetime' => 'datetime', 'timestamp' => 'timestamp', 'json' => 'json'
-    );
-    return $mapping{$data_type} || $data_type;
+    return Comserv::Util::Schema::Equivalence->normalize_data_type($data_type);
 }
-
-=head2 _is_width_only_type
-
-True for types whose parenthetical is a meaningless DISPLAY WIDTH rather than a
-real length. MariaDB always reports C<int(11)> / C<tinyint(4)> even though the
-storage size is fixed by the type alone, and DBIx::Class Result files
-conventionally declare C<< data_type => 'integer' >> with no size. Comparing
-those two literally produces a permanent false "Update needed".
-
-=cut
 
 sub _is_width_only_type {
     my ($self, $normalized_type) = @_;
-    return 0 unless defined $normalized_type;
-    return $normalized_type =~ /^(integer|boolean|bigint|smallint|mediumint)$/ ? 1 : 0;
+    return Comserv::Util::Schema::Equivalence->is_width_only_type($normalized_type);
 }
-
-=head2 _fields_equivalent
-
-Single comparison used by BOTH the Table row and the Result row so the two can
-never disagree. Normalizes the data type through C<normalize_data_type> (so
-MariaDB's C<int> matches a Result file's C<integer>) and ignores numeric display
-width. Returns true when the live column and the Result declaration mean the
-same thing.
-
-=cut
 
 sub _fields_equivalent {
     my ($self, $d, $r) = @_;
-    return 0 unless $d && $r;
-
-    my $d_type = $self->normalize_data_type($d->{data_type} // '');
-    my $r_type = $self->normalize_data_type($r->{data_type} // '');
-    return 0 unless $d_type eq $r_type;
-
-    # Display width on integer/boolean types is cosmetic — MariaDB reports
-    # int(11)/tinyint(4) regardless of what was requested.
-    unless ($self->_is_width_only_type($d_type)) {
-        my $d_size = lc($d->{size} // '');
-        my $r_size = lc($r->{size} // '');
-        $d_size =~ s/[()\s]//g;
-        $r_size =~ s/[()\s]//g;
-        return 0 unless $d_size eq $r_size;
-    }
-
-    # Nullability: only compare when the Result file actually DECLARES it.
-    # An absent is_nullable is unknown, not a claim of NOT NULL -- see the
-    # comment at the result_columns build site.
-    if (defined $r->{is_nullable} && $r->{is_nullable} ne '') {
-        return 0 unless lc($d->{is_nullable} // '') eq lc($r->{is_nullable});
-    }
-
-    # CURRENT_TIMESTAMP has several spellings across MariaDB versions and
-    # Result files (current_timestamp() vs CURRENT_TIMESTAMP).
-    my $d_def = $d->{default_value} // 'NULL';
-    my $r_def = $r->{default_value} // 'NULL';
-    for ($d_def, $r_def) {
-        s/^\s+|\s+$//g;
-        # MariaDB reports "ON UPDATE CURRENT_TIMESTAMP" in the Extra column,
-        # while Result files fold it into default_value. Compare only the
-        # DEFAULT portion so the two spellings agree.
-        s/\s*ON\s+UPDATE\s+CURRENT_TIMESTAMP\s*(\(\))?//i;
-        s/\(\)$//;
-        $_ = uc($_) if /^current_timestamp/i;
-        $_ = 'NULL' if $_ eq '';
-    }
-    return 0 unless $d_def eq $r_def;
-
-    return 1;
+    return Comserv::Util::Schema::Equivalence->fields_equivalent($d, $r);
 }
 
 sub clean_scalar_refs {
@@ -3339,6 +3269,8 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
     # database as empty.
     my %db_tables;  # name => { row_count, size_kb, size }
     my $is_pg = 0;
+    my $live_columns = {};  # lc(table) => { lc(col) => col hash }
+    my $live_keys    = {};  # lc(table) => { primary_keys, uniques }
     my ($dbh, $conn_name) = $self->_pick_live_connection(
         $remote_db, $all_conns, \@group_conns, $db_name
     );
@@ -3375,6 +3307,19 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
             if ($@) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'schema_compare_database',
                     "Table list failed for $db_name via $conn_name: $@");
+            }
+            # Bulk column + key catalog for tables-list drift flags (todo #2731).
+            # One information_schema pass, then the dbh is closed — comparison
+            # itself is pure Equivalence, no further live queries.
+            eval {
+                my $insp = Comserv::Util::Schema::Inspector->new();
+                my $cat  = $actual_db // $db_name;
+                $live_columns = $insp->list_all_columns($dbh, $cat, $is_pg) || {};
+                $live_keys    = $insp->list_all_keys($dbh, $cat, $is_pg) || {};
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'schema_compare_database',
+                    "Bulk catalog failed for $db_name via $conn_name: $@");
             }
             $dbh->disconnect;
         }
@@ -3446,21 +3391,45 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
             $matched_result_names{lc($tname)} = 1;
             my $rpath = $result_mapping->{lc($tname)}{result_path};
             my $preview = $preview_parser->preview_fields($rpath);
+            my $keys = $live_keys->{lc($tname)} || {};
+            my $cmp  = Comserv::Util::Schema::Equivalence->compare_table(
+                table_name          => $tinfo->{name},
+                has_table           => 1,
+                has_result          => 1,
+                db_columns          => $live_columns->{lc($tname)} || {},
+                result_columns      => $preview->{fields} || $preview->{columns} || {},
+                db_primary_keys     => $keys->{primary_keys} || [],
+                result_primary_keys => $preview->{primary_keys} || [],
+                db_uniques          => $keys->{uniques} || [],
+                result_uniques      => $preview->{unique_constraints} || [],
+            );
             push @both, {
                 %$tinfo,
-                has_result  => 1,
-                result_name => $result_mapping->{lc($tname)}{result_name},
-                result_path => $rpath,
+                has_result   => 1,
+                result_name  => $result_mapping->{lc($tname)}{result_name},
+                result_path  => $rpath,
                 result_rel_path => ($rpath // '') =~ s{^\Q$app_root\E/?}{}r,
-                fields      => $preview->{fields} || [],
-                field_count => $preview->{field_count} || 0,
+                fields       => $preview->{fields} || [],
+                field_count  => $preview->{field_count} || 0,
                 primary_keys => $preview->{primary_keys} || [],
+                has_problem  => $cmp->{has_problem} ? 1 : 0,
+                issue_count  => $cmp->{issue_count} || 0,
+                issues       => $cmp->{issues} || [],
             };
         } else {
+            my $cmp = Comserv::Util::Schema::Equivalence->compare_table(
+                table_name => $tinfo->{name},
+                has_table  => 1,
+                has_result => 0,
+                db_columns => $live_columns->{lc($tname)} || {},
+            );
             push @table_only, {
                 %$tinfo,
                 has_result  => 0,
                 result_name => undef,
+                has_problem => $cmp->{has_problem} ? 1 : 0,
+                issue_count => $cmp->{issue_count} || 0,
+                issues      => $cmp->{issues} || [],
             };
         }
     }
@@ -3490,6 +3459,12 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
                 primary_keys => [ @pks ],
                 field_count => scalar(@fields),
             };
+            my $cmp = Comserv::Util::Schema::Equivalence->compare_table(
+                table_name     => $tname,
+                has_table      => 0,
+                has_result     => 1,
+                result_columns => $preview->{fields} || $columns,
+            );
             push @result_only, {
                 name        => $tname,
                 row_count   => 0,
@@ -3505,6 +3480,9 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
                 fields      => [ @fields ],
                 primary_keys => [ @pks ],
                 field_count => scalar(@fields),
+                has_problem => $cmp->{has_problem} ? 1 : 0,
+                issue_count => $cmp->{issue_count} || 0,
+                issues      => $cmp->{issues} || [],
             };
         }
     }
@@ -3513,6 +3491,11 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
     my $db_table_count = scalar(keys %db_tables);
     my $matched_count = scalar(keys %matched_result_names);
     my $orphaned_count = scalar(@orphaned_result_files);
+    my $both_problem_count = scalar(grep { $_->{has_problem} } @both);
+    my $problem_table_count = $both_problem_count
+        + scalar(grep { $_->{has_problem} } @table_only)
+        + scalar(grep { $_->{has_problem} } @result_only);
+    my $listed_table_count = @both + @table_only + @result_only;
 
     $c->stash(
         template => 'admin/schema_compare/tables.tt',
@@ -3530,6 +3513,9 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
         matched_count     => $matched_count,
         orphaned_result_files => \@orphaned_result_files,
         orphaned_count      => $orphaned_count,
+        both_problem_count  => $both_problem_count,
+        problem_table_count => $problem_table_count,
+        listed_table_count  => $listed_table_count,
     );
 }
 

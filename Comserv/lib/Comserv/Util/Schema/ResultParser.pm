@@ -179,8 +179,8 @@ sub get_result_file_schema {
 
         while ($content =~ /__PACKAGE__->add_unique_constraint\s*\(\s*(?:['"]([^'"]+)['"]\s*=>\s*)?\[(.*?)\]\s*\)/gs) {
             my $name = $1 || 'unnamed';
-            my $cols = $2; $cols =~ s/['"\s]//g;
-            push @{$schema_info->{unique_constraints}}, { name => $name, columns => [split /,/, $cols] };
+            my $cols = $self->_parse_perl_list($2);
+            push @{$schema_info->{unique_constraints}}, { name => $name, columns => $cols };
         }
 
         while ($content =~ /__PACKAGE__->(belongs_to|has_many|has_one|might_have)\s*\(\s*['"]?(\w+)['"]?\s*=>\s*['"]?([^'",\s\)]+)['"]?\s*(?:,\s*(?:['"]?(\w+)['"]?|\{(.*?)\}))?/gs) {
@@ -199,6 +199,30 @@ sub get_result_file_schema {
 # Walks the block character-by-character, balancing [] and {} so array and
 # nested-hash values (e.g. enum `extra => { list => [ 'tt', 'md' ] }`) are
 # captured verbatim instead of being mis-parsed as an opaque string.
+
+# Parse the interior of a Perl list: [ 'a', 'b' ], [10, 2],
+# [qw/calm moderate/], [qw(role module)]. Used for enum lists, decimal
+# size arrays, and unique-constraint column lists.
+sub _parse_perl_list {
+    my ($self, $inner) = @_;
+    $inner = '' unless defined $inner;
+    $inner =~ s/^\s+|\s+$//g;
+    my @items;
+    if ($inner =~ /^\s*qw\s*(\S)(.*)\S\s*$/s) {
+        my $body = $2 // '';
+        $body =~ s/^\s+|\s+$//g;
+        for my $tok (split /\s+/, $body) {
+            $tok =~ s/^['"]|['"]$//g;
+            push @items, $tok if length $tok;
+        }
+        return \@items;
+    }
+    while ($inner =~ /(['"])\s*((?:(?!\1).)*)\s*\1|([+-]?\d+(?:\.\d+)?)/g) {
+        push @items, defined $3 ? $3 + 0 : $2;
+    }
+    return \@items;
+}
+
 sub _parse_result_inner_hash {
     my ($self, $block) = @_;
     $block = '' unless defined $block;
@@ -238,13 +262,7 @@ sub _parse_result_inner_hash {
                 $j++;
             }
             my $inner = substr($block, $i + 1, $j - $i - 2);
-            my @items;
-            # Quoted items, plus bare numbers: size => [10, 2] is unquoted, and
-            # the quoted-only scan returned an empty list for every decimal.
-            while ($inner =~ /(['"])\s*((?:(?!\1).)*)\s*\1|([+-]?\d+(?:\.\d+)?)/g) {
-                push @items, defined $3 ? $3 + 0 : $2;
-            }
-            $info->{$name} = \@items;
+            $info->{$name} = $self->_parse_perl_list($inner);
             $i = $j;
         }
         elsif ($ch eq '{') {
@@ -331,13 +349,7 @@ sub parse_result_file_columns {
                     $j++;
                 }
                 my $inner = substr($def, $astart + 1, $j - $astart - 2);
-                my @items;
-                while ($inner =~ /(['"])((?:(?!\1).)*)\1|([+-]?\d+(?:\.\d+)?)/g) {
-                    my $item = defined $3 ? $3 + 0 : $2;
-                    $item =~ s/^\s+|\s+$//g if defined $item && !ref $item;
-                    push @items, $item if defined $item && length $item;
-                }
-                $val = \@items;
+                $val = $self->_parse_perl_list($inner);
                 pos($def) = $j;
             }
             elsif ($def =~ /\G\s*\{/gc) {
@@ -501,11 +513,12 @@ sub preview_fields {
         push @fields, $disp;
     }
     return {
-        columns      => $schema->{columns},
-        fields       => \@fields,
-        primary_keys => \@pks,
-        field_count  => scalar(@fields),
-        table_name   => $schema->{table_name},
+        columns            => $schema->{columns},
+        fields             => \@fields,
+        primary_keys       => \@pks,
+        unique_constraints => $schema->{unique_constraints} || [],
+        field_count        => scalar(@fields),
+        table_name         => $schema->{table_name},
     };
 }
 

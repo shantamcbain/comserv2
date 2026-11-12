@@ -176,4 +176,202 @@ sub get_table_schema {
     return $info;
 }
 
+
+# ---------------------------------------------------------------------------
+# Bulk catalog — one query for every column / key in the database, so the
+# tables-list page can flag Result-vs-live drift without N+1 DESCRIBE calls.
+# Column hashes match _dbh_list_columns in SchemaComparison (size keeps its
+# parentheses; is_nullable is YES/NO) so the list and the field grid agree.
+# ---------------------------------------------------------------------------
+
+sub _row {
+    my ($row, @keys) = @_;
+    # information_schema column-name case varies by driver / FetchHashKeyName.
+    for my $k (@keys) {
+        return $row->{$k} if exists $row->{$k} && defined $row->{$k};
+        my $lc = lc $k;
+        return $row->{$lc} if exists $row->{$lc} && defined $row->{$lc};
+        my $uc = uc $k;
+        return $row->{$uc} if exists $row->{$uc} && defined $row->{$uc};
+    }
+    return undef;
+}
+
+sub list_all_columns {
+    my ($self, $dbh, $db_name, $is_pg) = @_;
+    my %by_table;    # lc(table) => { lc(col) => { ... } }
+    return \%by_table unless $dbh;
+
+    try {
+        if ($is_pg) {
+            my $sth = $dbh->prepare(q{
+                SELECT table_name, column_name, udt_name,
+                       character_maximum_length, numeric_precision, numeric_scale,
+                       is_nullable, column_default
+                  FROM information_schema.columns
+                 WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+                 ORDER BY table_name, ordinal_position
+            });
+            $sth->execute();
+            while (my $row = $sth->fetchrow_hashref) {
+                my $tname = _row($row, 'table_name') // next;
+                my $cname = _row($row, 'column_name') // next;
+                my $dt    = _row($row, 'udt_name') // '';
+                my $size  = '';
+                my $cml   = _row($row, 'character_maximum_length');
+                my $np    = _row($row, 'numeric_precision');
+                my $ns    = _row($row, 'numeric_scale');
+                if (defined $cml) {
+                    $size = '(' . $cml . ')';
+                }
+                elsif (defined $np) {
+                    $size = defined $ns ? "($np,$ns)" : "($np)";
+                }
+                my $def = _row($row, 'column_default');
+                $def =~ s/::[\w\s]+$// if defined $def;
+                my $null = _row($row, 'is_nullable') // 'YES';
+                $by_table{ lc($tname) }{ lc($cname) } = {
+                    name          => $cname,
+                    data_type     => $dt,
+                    size          => $size,
+                    is_nullable   => $null eq 'NO' ? 'NO' : 'YES',
+                    default_value => $def,
+                    extra         => '',
+                    comment       => '',
+                };
+            }
+            $sth->finish;
+        }
+        else {
+            my $sth = $dbh->prepare(q{
+                SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, COLUMN_TYPE,
+                       IS_NULLABLE, COLUMN_DEFAULT, EXTRA, COLUMN_COMMENT
+                  FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = ?
+                 ORDER BY TABLE_NAME, ORDINAL_POSITION
+            });
+            $sth->execute($db_name);
+            while (my $row = $sth->fetchrow_hashref) {
+                my $tname    = _row($row, 'TABLE_NAME') // next;
+                my $cname    = _row($row, 'COLUMN_NAME') // next;
+                my $type_raw = _row($row, 'COLUMN_TYPE') // '';
+                my ($data_type, $size) = $type_raw =~ /^(\w+)(\([^)]+\))?/;
+                $size //= '';
+                if ($data_type && $data_type =~ /^(enum|set)$/i) {
+                    $data_type = $type_raw;
+                    $size      = '';
+                }
+                my $null = _row($row, 'IS_NULLABLE') // 'YES';
+                $by_table{ lc($tname) }{ lc($cname) } = {
+                    name          => $cname,
+                    data_type     => $data_type // $type_raw,
+                    size          => $size,
+                    is_nullable   => $null eq 'NO' ? 'NO' : 'YES',
+                    default_value => _row($row, 'COLUMN_DEFAULT'),
+                    extra         => _row($row, 'EXTRA') // '',
+                    comment       => _row($row, 'COLUMN_COMMENT') // '',
+                };
+            }
+            $sth->finish;
+        }
+    } catch {
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__,
+            'list_all_columns', "bulk columns failed: $_");
+    };
+    return \%by_table;
+}
+
+sub list_all_keys {
+    my ($self, $dbh, $db_name, $is_pg) = @_;
+    my %by_table;    # lc(table) => { primary_keys => [], uniques => [ {name, columns} ] }
+    return \%by_table unless $dbh;
+
+    try {
+        if ($is_pg) {
+            my $sth = $dbh->prepare(q{
+                SELECT tc.table_name, tc.constraint_name, tc.constraint_type,
+                       kcu.column_name, kcu.ordinal_position
+                  FROM information_schema.table_constraints tc
+                  JOIN information_schema.key_column_usage kcu
+                    ON tc.constraint_name = kcu.constraint_name
+                   AND tc.table_schema    = kcu.table_schema
+                   AND tc.table_name      = kcu.table_name
+                 WHERE tc.table_schema NOT IN ('pg_catalog', 'information_schema')
+                   AND tc.constraint_type IN ('PRIMARY KEY', 'UNIQUE')
+                 ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position
+            });
+            $sth->execute();
+            my %pk;
+            my %uq;
+            while (my $row = $sth->fetchrow_hashref) {
+                my $tname = _row($row, 'table_name') // next;
+                my $cname = _row($row, 'column_name') // next;
+                my $kname = _row($row, 'constraint_name') // '';
+                my $ctype = _row($row, 'constraint_type') // '';
+                if ($ctype =~ /PRIMARY/i) {
+                    push @{ $pk{ lc($tname) } }, $cname;
+                }
+                else {
+                    push @{ $uq{ lc($tname) }{$kname} }, $cname;
+                }
+            }
+            $sth->finish;
+            for my $t (keys %pk, keys %uq) {
+                $by_table{$t} ||= { primary_keys => [], uniques => [] };
+            }
+            for my $t (keys %pk) {
+                $by_table{$t}{primary_keys} = $pk{$t};
+            }
+            for my $t (keys %uq) {
+                $by_table{$t}{uniques} = [
+                    map { { name => $_, columns => $uq{$t}{$_} } } sort keys %{ $uq{$t} }
+                ];
+            }
+        }
+        else {
+            my $sth = $dbh->prepare(q{
+                SELECT TABLE_NAME, INDEX_NAME, NON_UNIQUE, SEQ_IN_INDEX, COLUMN_NAME
+                  FROM information_schema.STATISTICS
+                 WHERE TABLE_SCHEMA = ?
+                 ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX
+            });
+            $sth->execute($db_name);
+            my %pk;
+            my %uq;
+            while (my $row = $sth->fetchrow_hashref) {
+                my $tname = _row($row, 'TABLE_NAME') // next;
+                my $cname = _row($row, 'COLUMN_NAME') // next;
+                my $kname = _row($row, 'INDEX_NAME') // '';
+                my $nu    = _row($row, 'NON_UNIQUE');
+                $nu = 1 unless defined $nu;
+                if ($kname eq 'PRIMARY') {
+                    push @{ $pk{ lc($tname) } }, $cname;
+                }
+                elsif ($nu == 0 || $nu eq '0') {
+                    push @{ $uq{ lc($tname) }{$kname} }, $cname;
+                }
+                # Non-unique indexes are intentionally ignored (do not flag
+                # extra live indexes the Result file never declared).
+            }
+            $sth->finish;
+            for my $t (keys %pk, keys %uq) {
+                $by_table{$t} ||= { primary_keys => [], uniques => [] };
+            }
+            for my $t (keys %pk) {
+                $by_table{$t}{primary_keys} = $pk{$t};
+            }
+            for my $t (keys %uq) {
+                $by_table{$t}{uniques} = [
+                    map { { name => $_, columns => $uq{$t}{$_} } } sort keys %{ $uq{$t} }
+                ];
+            }
+        }
+    } catch {
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__,
+            'list_all_keys', "bulk keys failed: $_");
+    };
+    return \%by_table;
+}
+
+
 1;
