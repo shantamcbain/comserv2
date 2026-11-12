@@ -147,7 +147,7 @@ sub available_groups {
             next;
         }
 
-        my $free = $m->{free} || $name =~ /:free$/i ? 1 : 0;
+        my $free = $self->is_free_step($prov, $name, catalog_free => $m->{free}) ? 1 : 0;
         # OpenRouter has no auto-fill. Unknown or non-zero price is not "available
         # budget" for an automatic pick.
         next if $prov eq 'openrouter' && !$free;
@@ -306,6 +306,13 @@ sub _largest_local {
         }
     }
     return $best;
+}
+
+# is_free_step($provider, $model): see Comserv::Util::AI::FreeModel (single rule).
+sub is_free_step {
+    my ($class, @a) = @_;
+    require Comserv::Util::AI::FreeModel;
+    return Comserv::Util::AI::FreeModel->is_free_step(@a);
 }
 
 sub _cap {
