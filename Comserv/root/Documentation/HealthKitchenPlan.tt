@@ -4,13 +4,13 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "plans"
-   page_version = "0.05"
-   last_updated = "2026-10-29"
+   page_version = "0.06"
+   last_updated = "2026-11-12"
    site_specific = "false"
    project_id = "296"
    project_code = "HEALTHKITCHEN"
 %]
-[% PageVersion = 'Documentation/HealthKitchenPlan.tt,v 0.05 2026/10/29 hermes-agent Exp shanta - meal owns the plate; calendar owns the clock' %]
+[% PageVersion = 'Documentation/HealthKitchenPlan.tt,v 0.06 2026/11/12 hermes-agent Exp shanta - a recipe is ingredients, steps, notes and a rating' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -53,7 +53,7 @@
     <div class="row">
         <div class="col-100">
             <h1 class="doc-h1">Health Kitchen Plan</h1>
-            <p class="doc-muted">Last Updated | Version 0.05 | Status: dashboard must show the real plate, not a meal name</p>
+            <p class="doc-muted">Last Updated | Version 0.06 | Status: the recipe must be a real recipe, not a prose blob</p>
             <p class="doc-body">
                 Working checklist (not served by Documentation):
                 <code class="doc-code">.hermes/plans/2026-09-23_100015-health-kitchen.md</code>
@@ -278,6 +278,8 @@ ENCY editors still own herb/formula truth; AI only stages suggestions.</pre></di
             <p class="doc-body">Junction Result + pantry UI + InventoryAccounting category ticket. <strong>GATE:</strong> a stocked SKU shows its ENCY herb page and is visible to the planner as available.</p>
             <p class="doc-body"><strong>Stock in:</strong> sitename inventory is filled by the existing AP receive path (<code class="doc-code">/Inventory/invoice</code>). Coop purchase-invoice <em>emails</em> are already classified on the InventoryAccounting worktree (<code class="doc-code">MailInvoiceClassifier</code> → <code class="doc-code">/mail/classify_invoices</code> → JSON). That classifier does <em>not</em> yet parse line items into <code class="doc-code">inventory_items</code>. Health Kitchen must not fork a second receive pipeline: when email→AP lines exist, pantry qty follows stock receive. Until then, seed SKUs + UserPantryQty overlay for personal use.</p>
 
+            <p class="doc-body"><strong>Stock out (2026-11-12):</strong> “Mark made” on a recipe runs <code class="doc-code">consume_recipe</code> inside one transaction — every line deducts or the whole make rolls back and the reply reports <code class="doc-code">rolled_back =&gt; 1</code>. Lines written in grams convert to a fraction of the stocked container through <code class="doc-code">inventory_items.net_weight_g</code>, rounded to the 3 decimals the stock columns hold (<code class="doc-code">inventory_stock_levels.quantity_on_hand</code> is <code class="doc-code">decimal(12,3)</code>); a line with no conversion, no net weight or no stock row is reported as skipped, never guessed. Batch counts are validated 1..<code class="doc-code">HealthKitchen.max_recipe_batches</code> (default 10).</p>
+
             <h3 id="first-drink" class="doc-h3">First daily drink (user 2026-09-23) — seed recipe, not coded yet</h3>
             <p class="doc-body">Morning pot: 4 demitasse; half the usual coffee dose; drink 2 cups. This is a <code class="doc-code">usbm_formula_tb</code> recipe whose components are inventory SKUs (some ENCY herbs). Votes Coffee is a supplier, not the coop.</p>
             <table class="doc-table">
@@ -327,6 +329,19 @@ ENCY editors still own herb/formula truth; AI only stages suggestions.</pre></di
 
             <h3 id="ws-knowledge" class="doc-h3">HK-KNOWLEDGE — augment, do not overwrite</h3>
             <p class="doc-body">Search/learning writes staging notes with source URL + UNVERIFIED. Editor applies to herb/formula. <strong>GATE:</strong> running refresh does not change <code class="doc-code">contra_indications</code> until an editor saves.</p>
+
+            <h3 id="ws-recipe" class="doc-h3">HK-RECIPE — a recipe that is a real recipe (opened 2026-11-12)</h3>
+            <p class="doc-body"><strong>Target shape.</strong> The international recipe format is schema.org <code class="doc-code">Recipe</code> (the vocabulary Google's recipe rich results and every large recipe publisher emit; RecipeML and CookLang are the other interchange formats, but schema.org is the one machine-consumed at scale). Its load-bearing parts: <code class="doc-code">recipeIngredient[]</code>, <code class="doc-code">recipeInstructions[]</code> as ordered <code class="doc-code">HowToStep</code> items groupable as <code class="doc-code">HowToSection</code>, <code class="doc-code">prepTime</code>/<code class="doc-code">cookTime</code>/<code class="doc-code">totalTime</code> as ISO 8601 durations, <code class="doc-code">recipeYield</code>, <code class="doc-code">recipeCategory</code>, <code class="doc-code">recipeCuisine</code>, equipment, nutrition, and <code class="doc-code">aggregateRating</code>.</p>
+            <p class="doc-body"><strong>What we already have.</strong> <code class="doc-code">ency_recipe</code> carries name, description, cuisine, cook time, yield, servings, image and notes; <code class="doc-code">ency_recipe_line</code> carries quantity, unit, name, optional flag and notes. That is roughly 60% of the shape. <strong>Missing:</strong> prep/total time, category, keywords, equipment, a rating of any kind, numbered procedure steps (today one free-text <code class="doc-code">instructions</code> blob), ingredient grouping and per-line prep notes, and a link from an ingredient to its ENCY entry.</p>
+            <p class="doc-body"><strong>Plan (additive, Result class first, DDL only through schema-compare).</strong></p>
+            <ul class="doc-body">
+                <li><code class="doc-code">RecipeStep</code> → <code class="doc-code">ency_recipe_step</code>: recipe_id, sort_order, section, name, text, time_min, image — one row per HowToStep, section gives HowToSection.</li>
+                <li><code class="doc-code">RecipeRating</code> → <code class="doc-code">ency_recipe_rating</code>: recipe_id, sitename, username, rating 1..5, review, unique on (recipe_id, sitename, username); <code class="doc-code">rating_avg</code>/<code class="doc-code">rating_count</code> cached on the header and recomputed inside the same transaction.</li>
+                <li><code class="doc-code">ency_recipe</code> additive columns: prep_time_min, total_time_min, recipe_category, keywords, equipment, <code class="doc-code">ency_herb_id</code> (primary ENCY entry, required before a recipe is published).</li>
+                <li><code class="doc-code">ency_recipe_line</code> additive columns: section, prep_note.</li>
+                <li>New page <code class="doc-code">/healthkitchen/recipe/&lt;id&gt;</code>: header block, ingredients grouped by section with every herb-linked ingredient pointing at <code class="doc-code">/ENCY/herb_detail/&lt;id&gt;</code>, numbered steps, notes, star rating, then the existing “Mark as made”. <code class="doc-code">recipes.tt</code> becomes a card index over it.</li>
+            </ul>
+            <p class="doc-body"><strong>GATE:</strong> a food recipe opens on its own page with grouped, ENCY-linked ingredients, numbered procedure steps, notes and a 1-5 star rating that aggregates across users; no part of the standard shape is left as an unparsed free-text blob.</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
@@ -367,6 +382,14 @@ ENCY editors still own herb/formula truth; AI only stages suggestions.</pre></di
                 <tr>
                     <td class="doc-td"><code class="doc-code">UserPantryQty</code> (D1 — required)</td>
                     <td class="doc-td">user_id, inventory_item_id, qty, unit — personal overlay; sitename inventory is separate household stock</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code class="doc-code">RecipeStep</code> — <code class="doc-code">ency_recipe_step</code>, in ency</td>
+                    <td class="doc-td">recipe_id, sort_order, section, name, text, time_min, image — one row per schema.org HowToStep</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code class="doc-code">RecipeRating</code> — <code class="doc-code">ency_recipe_rating</code>, in ency</td>
+                    <td class="doc-td">recipe_id, sitename, username, rating 1..5, review; unique (recipe_id, sitename, username)</td>
                 </tr>
             </table>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
@@ -534,6 +557,11 @@ ENCY editors still own herb/formula truth; AI only stages suggestions.</pre></di
                     <td class="doc-td">D11</td>
                     <td class="doc-td">Each cup is its own event</td>
                     <td class="doc-td">DECIDED 2026-10-30 — Done on the morning block locks the planned drink for that day. It is not every coffee. Each extra cup is another event: who drank it (you or a friend), and where it came from (home stock, or on the road). Home stock deducts inventory. A road cup and a friend’s cup do not. A friend’s cup is not your intake. Not clicking Done means that planned drink is not in what you had. A spoken line in the Android app can create the same event later. The app has no speech input yet. Voice is another way in, not a second record.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">D12</td>
+                    <td class="doc-td">Recipe ratings and standard shape</td>
+                    <td class="doc-td">DECIDED 2026-11-12 — a recipe is rated 1-5 stars with an optional written review, one rating per user per recipe, aggregated as schema.org <code class="doc-code">aggregateRating</code> (<code class="doc-code">ratingValue</code> + <code class="doc-code">ratingCount</code>) and cached on the header, recomputed inside the same transaction. Ingredient click-through goes to the ENCY herb entry that owns the write-up, and the recipe header also carries a primary ENCY entry (<code class="doc-code">ency_herb_id</code>) that must be set before a recipe counts as published. Open sub-question (D12c): whether the legacy <code class="doc-code">instructions</code> blob stays editable beside the new step rows or becomes read-only legacy once steps exist. Cost: two new tables and six new columns, all additive, all via schema-compare.</td>
                 </tr>
             </table>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>

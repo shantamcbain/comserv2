@@ -619,7 +619,7 @@ sub consume_recipe {
                 "me.username_of_poster" => $c->session->{username},
             },
             { prefetch => 'lines' }
-        )->single;
+        )->next;
     };
     if ( my $err = $@ ) {
         $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'consume_recipe',

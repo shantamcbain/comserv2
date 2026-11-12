@@ -367,6 +367,12 @@ rendered with the DB/table side missing, and “Add to Result” failed twice. F
   <td>The DB parser returns a decimal size as the scalar string <code>"10,2"</code>, not an array ref, so <code>ref($sz) eq 'ARRAY'</code> failed and the scalar branch emitted bare-list syntax. It passes <code>perl -c</code> (parses as two list elements) but silently sets <code>size</code> to <code>10</code> with a stray <code>2</code>, losing the scale.</td>
   <td>Size serialization normalized: <code>"p,q"</code> → <code>[p, q]</code>; plain integers stay scalars; anything else is quoted so bare-list syntax can never be emitted. The written <code>InventoryItem.pm</code> entry was corrected to <code>size =&gt; [10, 2]</code>.</td>
 </tr>
+<tr>
+  <td>5</td>
+  <td>Every <code>decimal</code> column showed no Size on the Result row (<code>net_weight_g</code>, <code>unit_cost</code>, <code>selling_price</code> …), so the value could neither be compared nor corrected; clicking “Update Table” ran <code>MODIFY COLUMN … decimal NULL</code> and MariaDB resolved it to <code>decimal(10,0)</code>.</td>
+  <td>The <em>read</em> direction had no array branch: Result files declare <code>size =&gt; [10, 2]</code>, and <code>ResultParser::parse_result_file_columns</code> fell through to the bareword branch, which cannot match a leading <code>[</code>, so size parsed as <code>undef</code>. The nested-hash branch had the same hole differently — it collected only quoted items, so <code>[10, 2]</code> became an empty list.</td>
+  <td>Parser now parses <code>[p, s]</code> (spaced or compact); <code>get_result_field_info</code> and <code>schema_compare_table</code> flatten the array to the DB parser's <code>"p,s"</code> form before the type is built or the template renders it; the comparison loop no longer runs <code>0 + $size</code> on a reference. Sweep of all 294 Result files: 218 of 219 decimal columns now carry a size (the exception, <code>Todo.point_rate</code>, declares none). Test <code>t/schema_result_parser_array_size.t</code>; changelog <code>changelog/entries/2026-11-12-schema-compare-decimal-size.inc</code>. Expect newly visible pre-existing drift (<code>net_weight_g</code> table (10,0) vs Result [10,2]; <code>markup_percent</code> (10,0) vs [6,2]).</td>
+</tr>
 </tbody>
 </table>
 
