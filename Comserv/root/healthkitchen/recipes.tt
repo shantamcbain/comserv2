@@ -43,7 +43,7 @@
         </form>
 
         [% FOREACH r IN hk_recipes %]
-            <div class="content-section">
+            <div class="content-section" id="recipe-[% r.id %]">
                 <h2>[% r.name | html %][% IF r.source == 'ai_generated' %] <small class="badge">AI draft</small>[% END %]</h2>
                 [% IF r.source == 'ai_generated' && r.notes %]<p class="alert alert-warning">[% r.notes | html %]</p>[% END %]
                 [% IF r.instructions %]<p style="white-space:pre-line">[% r.instructions | html %]</p>[% END %]
@@ -58,7 +58,7 @@
                     </ul>
                 [% END %]
                 <form method="post" action="[% c.uri_for('/healthkitchen/recipe_make') %]/[% r.id %]">
-                    <label>Batches <input type="number" name="batches" value="1" min="1" step="1" /></label>
+                    <label>Batches <input type="number" name="batches" value="1" min="1" max="[% hk_max_batches || 10 %]" step="1" /></label>
                     <button type="submit" class="btn btn-primary">Mark as made</button>
                 </form>
             </div>

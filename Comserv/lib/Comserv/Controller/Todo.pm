@@ -2284,6 +2284,23 @@ sub day :Path('/todo/day') :Args {
             "filter=schedule -> " . scalar(@today_todos) . " day blocks");
     }
 
+    # Health Kitchen day slots -> real recipes (name + ingredients on the card,
+    # in-place "Mark made" after Done). Read-only on GET: derived for display,
+    # nothing persisted. Owner + site scoped; only the user's own slot todos.
+    my %hk_recipe_cards;
+    eval {
+        require Comserv::Util::HealthKitchen::SlotRecipe;
+        my @hk = grep { ( eval { $_->comments } // '' ) =~ /hk_day_slot:|hk_recipe:/ } @today_todos;
+        if (@hk) {
+            %hk_recipe_cards = %{ Comserv::Util::HealthKitchen::SlotRecipe->cards_for_todos(
+                $c->model('DBEncy'), \@hk, $date, $c->session->{user_id},
+                {   username => $c->session->{username},
+                    sitename => ( $c->stash->{SiteName} || $c->session->{SiteName} ) } ) };
+        }
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'day',
+        "hk slot recipe lookup failed: $@") if $@;
+
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
         "Branch='$cur_branch' scope=" . scalar(keys %branch_scope)
         . " -> " . scalar(@today_todos) . " scheduled todos (overdue excluded from day view)");
@@ -2365,6 +2382,7 @@ sub day :Path('/todo/day') :Args {
         cal_filter_user        => ($c->session->{cal_filter_user} // ''),
         active_todos           => \%active_todos,
         occurrence_locked      => \%occurrence_locked,
+        hk_recipe_cards        => \%hk_recipe_cards,
         template               => 'todo/day.tt',
     );
 

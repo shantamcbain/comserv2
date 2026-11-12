@@ -103,25 +103,12 @@ sub _require_user {
     $c->detach;
 }
 
-# POSTs must come from our own pages. The app has no shared CSRF helper (User.pm's
-# csrf_token is per-form for registration), so: Origin or Referer MUST be present and
-# every one present must match the request host. Both missing = refused (fail closed).
+# POSTs must come from our own pages: scheme + host + effective port of every
+# Origin/Referer must match the request (shared helper Comserv::Util::OriginCheck).
 sub _same_origin {
     my ($self, $c) = @_;
-    return origin_ok($c->req->uri->host, $c->req->header('Origin'), $c->req->header('Referer'));
-}
-
-sub origin_ok {
-    my ($host, @hdrs) = @_;
-    $host = lc($host // '');
-    return 0 unless length $host;
-    my $seen = 0;
-    for my $v (@hdrs) {
-        next unless defined $v && length $v;
-        return 0 unless $v =~ m{^https?://([^/:?#]+)(?::\d+)?(?:[/?#]|$)}i && lc($1) eq $host;
-        $seen++;
-    }
-    return $seen ? 1 : 0;
+    require Comserv::Util::OriginCheck;
+    return Comserv::Util::OriginCheck->request_ok($c);
 }
 
 sub _feed_tokens {

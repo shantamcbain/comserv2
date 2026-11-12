@@ -1,0 +1,21 @@
+use strict; use warnings; use Test::More;
+use FindBin; use lib "$FindBin::Bin/../lib";
+use Comserv::Util::AI::FreeModel;
+use Comserv::Util::AI::ModelChains;
+use Comserv::Util::AI::TaskTier;
+use Comserv::Model::AI2::ModelPick;
+my $F = 'Comserv::Util::AI::FreeModel';
+ok  $F->is_free_step('ollama', 'qwen2.5-coder:14b'), 'local is free';
+ok  $F->is_free_step('openrouter', 'cohere/north-mini-code:free'), ':free is free';
+ok  $F->is_free_step('openrouter', 'stealth/crouton-alpha'), 'verified 0/0 is free';
+ok !$F->is_free_step('openrouter', 'stealth/ox-alpha'), 'unverified stealth is paid';
+ok !$F->is_free_step('openrouter', 'anthropic/claude-x'), 'paid is paid';
+ok  $F->is_free_step('openrouter', 'x/y', catalog_free => 1), 'catalog free flag honoured';
+ok !$F->is_free_step('supergrok', 'grok-4.6'), 'supergrok is not a free step';
+# single source: ModelChains and ModelPick see the same list
+ok $Comserv::Util::AI::ModelChains::ZERO_PRICED_FREE{'stealth/crouton-alpha'}, 'ModelChains alias sees the list';
+is \%Comserv::Util::AI::ModelChains::ZERO_PRICED_FREE, \%Comserv::Util::AI::FreeModel::ZERO_PRICED_FREE, 'same hash, not a copy';
+is(Comserv::Model::AI2::ModelPick->is_free_step('openrouter', 'stealth/crouton-alpha'), 1, 'ModelPick delegates');
+ok(Comserv::Util::AI::TaskTier->is_weak('nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'), 'nemotron nano is weak');
+ok(!Comserv::Util::AI::TaskTier->is_weak('cohere/north-mini-code:free'), 'north-mini-code is not weak');
+done_testing;
