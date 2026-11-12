@@ -1,6 +1,6 @@
 {
-  "versionCode": 2,
-  "versionName": "1.1",
-  "apkUrl": "/static/app/ComservInventory.apk",
-  "releaseNotes": "Initial inventory + barcode + photo app. LAN and ZeroTier support."
+  "versionCode": 19,
+  "versionName": "2.8",
+  "apkUrl": "/api/app/download",
+  "releaseNotes": "v2.8 Server Environment Selector (Dev Port 3001 Live AI Changes vs Prod Port 5000), explicit target display, and rich Changelog support."
 }
