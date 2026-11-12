@@ -209,6 +209,7 @@
             devTitle.textContent = 'Starting ' + branch + ' on port ' + port + '…';
             devCmd.textContent = cmd || '';
             devLog.textContent = '(waiting for output…)';
+            devLog.classList.remove('git-dev-console-error');
             devLog.scrollTop = 0;
             if (devOpenLink && url) { devOpenLink.href = url; devOpenLink.style.display = ''; }
             else if (devOpenLink) { devOpenLink.style.display = 'none'; }
@@ -222,13 +223,24 @@
                     credentials: 'same-origin'
                 }).then(function (r) { return r.text(); })
                   .then(function (text) {
-                      if (devLog) {
+                      // A launcher error shown by showDevError must not be
+                      // replaced by the next poll: the log file may be absent.
+                      if (devLog && !devLog.classList.contains('git-dev-console-error')) {
                           devLog.textContent = text || '(no output yet)';
                           devLog.scrollTop = devLog.scrollHeight;
                       }
                   })
                   .catch(function () {});
             }, 1500);
+        }
+
+        // Launcher errors are shown IN the console, where the user is already
+        // looking, instead of only in a modal alert.
+        function showDevError(message) {
+            if (!devLog) { return; }
+            devLog.textContent = message;
+            devLog.classList.add('git-dev-console-error');
+            devLog.scrollTop = devLog.scrollHeight;
         }
 
         // Close buttons inside the console.
@@ -416,7 +428,14 @@
                             if (res && res.running) { goHermes(port); }
                             else { waitReady(port); }
                         })
-                        .catch(function () {
+                        .catch(function (err) {
+                            // Never leave the console at "waiting for output…":
+                            // the launcher's error (JSON message or HTTP status)
+                            // is the only clue the user gets.
+                            showDevError('Hermes for ' + hermesBranch + ' did not start: '
+                                + ((err && err.message) || 'unknown error')
+                                + '\n(The dashboard command is on the clipboard; '
+                                + 'logs go to /tmp/hermes-dash-' + hermesBranch + '.log)');
                             if (devOpenLink) { devOpenLink.href = hermesUrl; devOpenLink.style.display = ''; }
                         })
                         .then(clearInflight);

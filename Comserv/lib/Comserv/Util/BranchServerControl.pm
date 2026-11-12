@@ -16,12 +16,45 @@ sub new { bless {}, shift }
 our $START_TIMEOUT = 20;
 our $START_POLL_INTERVAL = 0.25;
 
+# Hermes launches return as soon as the process is spawned: the dashboard page
+# reports "starting", and /admin/branch_server_log streams the boot output. A
+# worktree start can take longer than this request should ever occupy the
+# single-process web server.
+our $HERMES_BIN = '/home/shanta/.local/bin/hermes';
+
+# Overridable so tests can point the launcher at a stub and never start a real
+# dashboard. Deliberately NOT read from the environment: a branch launch must be
+# the same command however the web server was started.
+our $HERMES_LAUNCHER = undef;   # sub ($self, $cmd) -> exit code; undef = system()
+
+# Where the launcher writes its boot log. Overridable so tests never touch the
+# live console log of a running branch.
+our $HERMES_LOG_DIR = '/tmp';
+
+sub _spawn {
+    my ($self, $cmd) = @_;
+    return $HERMES_LAUNCHER->($self, $cmd) if $HERMES_LAUNCHER;
+    return system('/bin/bash', '-c', $cmd);
+}
+
+# Non-blocking startup lock. A second click while the first is still starting
+# must get an immediate "already in progress" answer, not sit on a blocking
+# flock that freezes the single-process (Twiggy) server for every other request
+# — including the log poll that feeds the browser console.
 sub _start_lock {
     my ($self, $path) = @_;
     sysopen(my $fh, $path, O_WRONLY | O_CREAT | O_APPEND, 0644)
         or return;
-    flock($fh, LOCK_EX) or do { close $fh; return; };
-    return $fh;
+    return $fh if flock($fh, LOCK_EX | LOCK_NB);
+    close $fh;
+    return;
+}
+
+sub _unlock {
+    my ($self, $fh) = @_;
+    return unless $fh;
+    flock($fh, LOCK_UN);
+    close $fh;
 }
 
 sub _wait_for_port {
@@ -199,7 +232,7 @@ sub start {
     my $lock = $self->_start_lock("/tmp/branch-$branch.start.lock");
     return {
         ok => 0, action => 'start', branch => $branch, port => $port, log => $log,
-        error => 'could not acquire branch startup lock',
+        error => "a start for $branch is already in progress",
     } unless $lock;
 
     if ($self->_port_listening($port)) {
@@ -385,7 +418,15 @@ sub _port_listening {
 }
 
 # Start (or reuse) an isolated Hermes dashboard bound to this worktree's git root.
-# --isolated is required: without it a second --port is refused while :9119 is up.
+# --isolated makes the launch independent of the fleet dashboard on :9119: the CLI
+# otherwise attaches to (or refuses behind) a host backend, which is what made a
+# branch launch hinge on main's dashboard being up. Keep it for every branch.
+#
+# The request returns as soon as the process is spawned and the log has its first
+# line. It must not wait for the port here: this app serves :3001 from ONE Twiggy
+# process, so sleeping in the handler blocks the very /admin/branch_server_log
+# poll that feeds the console — the console then sits at "(waiting for output…)"
+# with an empty log even though the dashboard is booting.
 sub open_or_start_hermes {
     my ($self, $branch, $app_port) = @_;
     $branch = '' unless defined $branch;
@@ -399,50 +440,83 @@ sub open_or_start_hermes {
     return { ok => 0, error => "bad hermes port $hport" }
         unless $hport >= 9100 && $hport < 9200;
 
+    my $log = "$HERMES_LOG_DIR/hermes-dash-$branch.log";
+    my %where = (branch => $branch, hermes_port => $hport, cwd => $cwd, log => $log);
+
     if ($self->_port_listening($hport)) {
-        return {
-            ok => 1, running => 1, started => 0,
-            branch => $branch, hermes_port => $hport, cwd => $cwd,
-        };
+        return { %where, ok => 1, running => 1, started => 0 };
     }
 
-    my $bin = -x '/home/shanta/.local/bin/hermes' ? '/home/shanta/.local/bin/hermes' : 'hermes';
-    my $log = "/tmp/hermes-dash-$branch.log";
-    my $lock = $self->_start_lock("/tmp/hermes-dash-$branch.start.lock");
+    my $lock = $self->_start_lock("$HERMES_LOG_DIR/hermes-dash-$branch.start.lock");
     return {
-        ok => 0, error => 'could not acquire Hermes startup lock',
-        branch => $branch, hermes_port => $hport, cwd => $cwd, log => $log,
+        %where, ok => 0,
+        error => "a Hermes start for $branch is already in progress",
     } unless $lock;
 
     if ($self->_port_listening($hport)) {
-        return {
-            ok => 1, running => 1, started => 0,
-            branch => $branch, hermes_port => $hport, cwd => $cwd,
-        };
+        $self->_unlock($lock);
+        return { %where, ok => 1, running => 1, started => 0 };
     }
 
-    # Pin TERMINAL_CWD to this worktree. Unset session/update leftovers so a
-    # spawn from 9119 cannot leak InventoryAccounting (or any other) cwd into
-    # the new isolated dashboard. bash -c not -l: login profiles often cd away.
-    # Use single quotes for reliable shell quoting of paths (avoids quotemeta regex escapes).
-    my $cmd = "cd '$cwd' && env -u HERMES_SESSION_ID -u HERMES_UPDATE_POST_SWAP -u HERMES_UPDATE_REEXEC TERMINAL_CWD='$cwd' nohup '$bin' dashboard --isolated --host 0.0.0.0 --port $hport --no-open --skip-build >> '$log' 2>&1 &";
-    my $rc = system('/bin/bash', '-c', $cmd);
+    my $bin = -x $HERMES_BIN ? $HERMES_BIN : 'hermes';
+    my $cmd = $self->hermes_launch_command($branch, $cwd, $bin, $hport);
+
+    # First line lands before the spawn, so the console always shows what was
+    # launched even if the process dies before it can print anything.
+    my $header_ok = $self->_write_log_header($log, $cmd, $branch, $hport, $bin, $cwd);
+    if (!$header_ok) {
+        $self->_unlock($lock);
+        return { %where, ok => 0, error => "could not write $log: $!" };
+    }
+
+    my $rc = $self->_spawn($cmd);
+    $self->_unlock($lock);
     if ($rc != 0) {
-        return {
-            ok => 0, error => "spawn exit $rc",
-            branch => $branch, hermes_port => $hport, cwd => $cwd, log => $log,
-        };
+        _log('error', "hermes spawn exit " . ($rc >> 8) . " for $branch:$hport");
+        return { %where, ok => 0, error => 'spawn failed (exit ' . ($rc >> 8) . ')', started => 0 };
     }
-    return {
-        ok => 1, running => 1, started => 1,
-        branch => $branch, hermes_port => $hport, cwd => $cwd, log => $log,
-    } if $self->_wait_for_port($hport);
 
     return {
-        ok => 0, running => 0, started => 1,
-        branch => $branch, hermes_port => $hport, cwd => $cwd, log => $log,
-        error => "Hermes dashboard did not listen on port $hport within ${START_TIMEOUT}s",
+        %where, ok => 1, running => 0, started => 1,
+        message => "Hermes dashboard for $branch is starting on port $hport",
     };
+}
+
+# The exact shell line the console shows. cd + env pinning keep the isolated
+# dashboard in its own worktree; --isolated keeps it off the host backend.
+#
+# setsid gives the dashboard its own session and process group. Without it the
+# dashboard joined the dev server's foreground process group in its terminal
+# (ps: pgid = the comserv_server.pl pid, STAT "Sl+"). The dashboard installs its
+# own SIGINT handler, so the Ctrl-C used to restart a dev server also shut down
+# every Hermes dashboard that server had started; the next Hermes click then had
+# to cold-start it behind the single-process dev server, and the console sat at
+# "(waiting for output…)". nohup alone only covers SIGHUP. stdin is /dev/null
+# so the detached process never holds the terminal.
+sub hermes_launch_command {
+    my ($self, $branch, $cwd, $bin, $hport) = @_;
+    return "cd '$cwd'"
+        . " && env -u HERMES_SESSION_ID -u HERMES_UPDATE_POST_SWAP -u HERMES_UPDATE_REEXEC"
+        . " TERMINAL_CWD='$cwd' setsid nohup '$bin' dashboard --isolated --host 0.0.0.0"
+        . " --port $hport --no-open --skip-build < /dev/null >> '$HERMES_LOG_DIR/hermes-dash-$branch.log' 2>&1 &";
+}
+
+sub _write_log_header {
+    my ($self, $log, $cmd, $branch, $hport, $bin, $cwd) = @_;
+    my $stamp = localtime();
+    eval {
+        open(my $fh, '>>', $log) or die "open $log: $!";
+        printf {$fh} "[%s] hermes start branch=%s port=%s bin=%s cwd=%s\n  cmd: %s\n",
+            $stamp, $branch, $hport, $bin, $cwd, $cmd;
+        close($fh) or die "close $log: $!";
+        1;
+    } or do {
+        my $err = $@ || 'unknown error';
+        chomp $err;
+        _log('error', "hermes log header failed for $branch: $err");
+        return 0;
+    };
+    return 1;
 }
 
 1;

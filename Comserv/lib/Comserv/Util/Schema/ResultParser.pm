@@ -239,7 +239,11 @@ sub _parse_result_inner_hash {
             }
             my $inner = substr($block, $i + 1, $j - $i - 2);
             my @items;
-            while ($inner =~ /['"]\s*([^'"]*)\s*['"]/g) { push @items, $1; }
+            # Quoted items, plus bare numbers: size => [10, 2] is unquoted, and
+            # the quoted-only scan returned an empty list for every decimal.
+            while ($inner =~ /(['"])\s*((?:(?!\1).)*)\s*\1|([+-]?\d+(?:\.\d+)?)/g) {
+                push @items, defined $3 ? $3 + 0 : $2;
+            }
             $info->{$name} = \@items;
             $i = $j;
         }
@@ -313,6 +317,29 @@ sub parse_result_file_columns {
             elsif ($def =~ /\G\s*(['"])((?:(?!\1).)*)\1/gc) { $val = $2; }
             elsif ($def =~ /\G\s*(\d+)/gc) { $val = $1 + 0; }
             elsif ($def =~ /\G\s*undef\b/gc) { $val = undef; }
+            # Array ref, e.g. size => [10, 2] or [ 'tt', 'md' ]. Without this
+            # branch the value fell through to the bareword branch, which cannot
+            # match '[', so every decimal's size parsed as undef: the schema
+            # compare panel showed no size on the Result side and "Add column"
+            # built DECIMAL with no scale (decimal(10,0)).
+            elsif ($def =~ /\G\s*\[/gc) {
+                my $astart = pos($def) - 1; my $adepth = 1; my $j = pos($def);
+                while ($j < length($def) && $adepth > 0) {
+                    my $ch = substr($def, $j, 1);
+                    $adepth++ if $ch eq '[';
+                    $adepth-- if $ch eq ']';
+                    $j++;
+                }
+                my $inner = substr($def, $astart + 1, $j - $astart - 2);
+                my @items;
+                while ($inner =~ /(['"])((?:(?!\1).)*)\1|([+-]?\d+(?:\.\d+)?)/g) {
+                    my $item = defined $3 ? $3 + 0 : $2;
+                    $item =~ s/^\s+|\s+$//g if defined $item && !ref $item;
+                    push @items, $item if defined $item && length $item;
+                }
+                $val = \@items;
+                pos($def) = $j;
+            }
             elsif ($def =~ /\G\s*\{/gc) {
                 my $hstart = pos($def)-1; my $hdepth=1; my $j=pos($def);
                 while ($j < length($def) && $hdepth>0) { my $ch=substr($def,$j,1); $hdepth++ if $ch eq '{'; $hdepth-- if $ch eq '}'; $j++; }

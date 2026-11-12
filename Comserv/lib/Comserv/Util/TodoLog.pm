@@ -38,6 +38,9 @@ Time (AppTime):
 
 =cut
 
+# A work log longer than a day is not a real session (Shanta, 2026-11-09).
+our $MAX_LOG_MIN = 1440;
+
 # ---------------------------------------------------------------------------
 # Internal: compute duration hms between an open log's start_time and now.
 sub _duration_hms {
@@ -134,6 +137,62 @@ sub _open_log_row {
          ORDER BY record_id DESC LIMIT 1",
         undef, $record_id
     );
+}
+
+# ===========================================================================
+# PUBLIC: close_log_window — decide what a close bills and when it ended.
+#   Pure, no DB. Inputs: start_time 'HH:MM:SS', now_hms, start_date, today,
+#   requested_mins (optional explicit duration), cap_mins.
+#   Returns { dur_hms, dur_mins, end_hms, source, crosses_midnight,
+#             elapsed_mins, note }
+#
+# Order of evidence (Shanta, 2026-11-09): an explicit duration from the caller
+# wins - that is where evidence from the branch's session applies. Otherwise the
+# elapsed clock is billed, but never more than a day: a span over MAX_LOG_MIN is
+# not a real work session, so it is capped and the row says so rather than
+# silently billing a week.
+# ===========================================================================
+sub close_log_window {
+    my ($class, %a) = @_;
+    my $cap = $a{cap_mins} // $MAX_LOG_MIN;
+    $cap = $MAX_LOG_MIN unless defined $cap && $cap =~ /^\d+$/ && $cap > 0;
+    my (undef, $elapsed_min) = _duration_hms($a{start_time}, $a{now_hms}, $a{start_date}, $a{today});
+
+    my ($billed, $source, $note) = ($elapsed_min, 'elapsed', '');
+    if (defined $a{requested_mins} && "$a{requested_mins}" =~ /^\d+$/) {
+        $billed = int($a{requested_mins});
+        $source = 'requested';
+        if ($billed > $cap) {
+            $billed = $cap;
+            $source = 'requested_capped';
+        }
+        $note = "clock corrected: billed ${billed} min, ${elapsed_min} min elapsed"
+            if $billed != $elapsed_min;
+    } elsif ($elapsed_min > $cap) {
+        $billed = $cap;
+        $source = 'capped';
+        $note = "clock capped: ${elapsed_min} min elapsed is over the ${cap} min day limit";
+    }
+
+    # End clock = start + billed time, wrapped inside one day. MySQL TIME cannot
+    # carry a day count, so the day stays in start_date/last_mod_date.
+    my ($sh, $sm, $ss) = ($a{start_time} // '') =~ /^(\d{1,2}):(\d{2})(?::(\d{2}))?/;
+    ($sh, $sm, $ss) = (9, 0, 0) unless defined $sh;
+    my $start_sec = $sh * 3600 + $sm * 60 + ($ss // 0);
+    my $end_sec   = $start_sec + $billed * 60;
+    my $crosses   = $end_sec >= 86400 ? 1 : 0;
+    $end_sec %= 86400;
+
+    return {
+        dur_hms          => sprintf('%02d:%02d:00', int($billed / 60), $billed % 60),
+        dur_mins         => $billed,
+        end_hms          => sprintf('%02d:%02d:%02d', int($end_sec / 3600),
+                                    int(($end_sec % 3600) / 60), $end_sec % 60),
+        source           => $source,
+        crosses_midnight => $crosses,
+        elapsed_mins     => $elapsed_min,
+        note             => $note,
+    };
 }
 
 # Internal: insert a completed (status=3) log row for a todo that had no open log.
@@ -506,13 +565,21 @@ sub close_log {
                      message => "No open log found for todo $record_id" };
         }
 
-        my ($dur_hms, $dur_mins) = _duration_hms($open_row->{start_time}, $now_hms);
+        my $win = $class->close_log_window(
+            start_time     => $open_row->{start_time},
+            now_hms        => $now_hms,
+            start_date     => $open_row->{start_date},
+            today          => $today,
+            requested_mins => $args{duration_mins},
+        );
+        my ($dur_hms, $dur_mins) = ($win->{dur_hms}, $win->{dur_mins});
         my $close_summary = $summary ne '' ? $summary
                             : ("Stopped: " . ($todo->subject // '') . " after ${dur_mins} min by $username");
         $close_summary .= " [$args{note}]" if defined $args{note} && length $args{note};
+        $close_summary .= ' [' . $win->{note} . ']' if $win->{note};
         $dbh->do(
             'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, comments=? WHERE record_id=?',
-            undef, $now_hms, $dur_hms, $username, $today, $close_summary, $open_row->{record_id}
+            undef, $win->{end_hms}, $dur_hms, $username, $today, $close_summary, $open_row->{record_id}
         );
         # Summary ALSO into the todo comments.
         $dbh->do("UPDATE todo SET status=2, last_mod_by=?, last_mod_date=?, comments=? WHERE record_id=?",
