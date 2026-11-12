@@ -1,6 +1,6 @@
 {
-  "versionCode": 19,
-  "versionName": "2.8",
+  "versionCode": 23,
+  "versionName": "3.2",
   "apkUrl": "/api/app/download",
-  "releaseNotes": "v2.8 Server Environment Selector (Dev Port 3001 Live AI Changes vs Prod Port 5000), explicit target display, and rich Changelog support."
+  "releaseNotes": "v3.2 Automatic 3-Stage Barcode Product Lookup (Comserv DB + Open Food Facts + UPCitemdb auto-fills Name, Category, SKU, Description & Photo)."
 }
