@@ -17,6 +17,7 @@ use File::Path qw(make_path);
 use File::Spec;
 use File::Find;
 use Comserv::Util::Schema::ResultParser;
+use Comserv::Util::DatabaseCompare;
 use DBI;
 
 sub begin :Private {
@@ -2839,18 +2840,22 @@ sub schema_compare :Private {
 
         # Live-check using the first connection in the group
         my $status = $self->_check_server_live($c, $remote_db, $group, $g->{conns});
+        my $live_databases = $self->_live_database_cards(
+            $c, $remote_db, $all_conns, $group, $g, $status
+        );
 
         push @servers, {
-            name         => $display_name,
-            server_group => $group,
-            ips          => \@group_ips,
-            db_count     => $db_count,
-            type_display => $type_display,
-            running      => $status->{running},
-            status       => $status->{status},
-            db_ok        => $status->{db_ok},
-            db_error     => $status->{db_error} || '',
-            routes       => $status->{routes} || [],
+            name            => $display_name,
+            server_group    => $group,
+            ips             => \@group_ips,
+            db_count        => $db_count,
+            type_display    => $type_display,
+            running         => $status->{running},
+            status          => $status->{status},
+            db_ok           => $status->{db_ok},
+            db_error        => $status->{db_error} || '',
+            routes          => $status->{routes} || [],
+            live_databases  => $live_databases,
         };
     }
 
@@ -3036,26 +3041,229 @@ sub _match_group_connections {
 # Fix: walk the matching connections in priority order and return a handle from
 # the first one that actually connects, together with its name.
 # Returns ($dbh, $conn_name); both undef if nothing connects.
+sub _safe_ident {
+    my ($self, $name) = @_;
+    return undef unless defined $name && $name =~ /\A[A-Za-z0-9_]+\z/;
+    return $name;
+}
+
+sub _endpoint_key {
+    my ($self, $cfg) = @_;
+    return '' unless $cfg && $cfg->{host};
+    my $port = $cfg->{port} // ($self->_is_postgresql($cfg) ? 5432 : 3306);
+    return lc($cfg->{host}) . ':' . $port;
+}
+
+# Other secret slots on the same host:port. db-server-1:3307 and
+# db-server-2:3307 are one Maria listener; only one of those logins
+# (shanta_forager in production_forager) is granted from this workstation.
+sub _same_endpoint_names {
+    my ($self, $all_conns, $conn_names) = @_;
+    my %have = map { $_ => 1 } @$conn_names;
+    my $endpoint = '';
+    for my $n (@$conn_names) {
+        $endpoint = $self->_endpoint_key($all_conns->{$n}{config});
+        last if $endpoint;
+    }
+    return () unless $endpoint;
+    my @extra;
+    for my $name (sort keys %$all_conns) {
+        next if $have{$name};
+        my $cfg = $all_conns->{$name}{config} or next;
+        next if ($cfg->{db_type} // 'mysql') eq 'sqlite';
+        push @extra, $name if $self->_endpoint_key($cfg) eq $endpoint;
+    }
+    return @extra;
+}
+
+sub _use_database {
+    my ($self, $dbh, $db_name, $is_pg) = @_;
+    return 1 if $is_pg;
+    my $ident = $self->_safe_ident($db_name) or return 0;
+    my $current = eval { $dbh->selectrow_array('SELECT DATABASE()') };
+    return 1 if defined $current && lc($current) eq lc($ident);
+    eval { $dbh->do("USE `$ident`") };
+    return $@ ? 0 : 1;
+}
+
+# Last resort: the Maria user that is actually granted. Passwords stay in
+# the secret files; this only retries shanta_forager passwords already stored
+# for other slots, against the host:port of the card the admin opened.
+sub _try_forager_login {
+    my ($self, $all_conns, $host, $port) = @_;
+    return (undef, undef) unless $host && $port;
+    my %seen;
+    for my $name (sort keys %$all_conns) {
+        my $cfg = $all_conns->{$name}{config} or next;
+        next unless ($cfg->{username} // '') eq 'shanta_forager';
+        next unless defined $cfg->{password} && $cfg->{password} ne '';
+        next if $seen{$cfg->{password}}++;
+        my $dsn = "DBI:MariaDB:host=$host;port=$port";
+        my $dbh = eval {
+            DBI->connect($dsn, 'shanta_forager', $cfg->{password}, {
+                RaiseError => 0, PrintError => 0, mariadb_connect_timeout => 8,
+            });
+        };
+        return ($dbh, $name) if $dbh;
+    }
+    return (undef, undef);
+}
+
+sub _group_host_port {
+    my ($self, $all_conns, $conn_names) = @_;
+    for my $n (@$conn_names) {
+        my $cfg = $all_conns->{$n}{config} or next;
+        next unless $cfg->{host};
+        my $port = $cfg->{port} // ($self->_is_postgresql($cfg) ? 5432 : 3306);
+        return ($cfg->{host}, $port, $self->_is_postgresql($cfg));
+    }
+    return ();
+}
+
 sub _pick_live_connection {
     my ($self, $remote_db, $all_conns, $conn_names, $db_name) = @_;
 
-    my @candidates = grep {
-        my $cfg = $all_conns->{$_}{config};
-        (lc($cfg->{database} // $_) eq lc($db_name))
-    } @$conn_names;
-
-    # Deterministic order: lowest priority number first, then name.
-    @candidates = sort {
+    my @pool = (@$conn_names, $self->_same_endpoint_names($all_conns, $conn_names));
+    my @matching = grep {
+        my $cfg = $all_conns->{$_}{config} || {};
+        lc($cfg->{database} // $_) eq lc($db_name // '')
+    } @pool;
+    my @rest = grep {
+        my $cfg = $all_conns->{$_}{config} || {};
+        lc($cfg->{database} // $_) ne lc($db_name // '')
+    } @pool;
+    my @ordered = (@matching, @rest);
+    @ordered = sort {
         ($all_conns->{$a}{priority} // 999) <=> ($all_conns->{$b}{priority} // 999)
         || $a cmp $b
-    } @candidates;
+    } @ordered;
 
-    for my $conn_name (@candidates) {
+    for my $conn_name (@ordered) {
         my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
         next unless $dbh;
+        my $cfg = $all_conns->{$conn_name}{config} || {};
+        my $is_pg = $self->_is_postgresql($cfg);
+        unless ($self->_use_database($dbh, $db_name, $is_pg)) {
+            $dbh->disconnect;
+            next;
+        }
         return ($dbh, $conn_name);
     }
+
+    my ($host, $port, $is_pg) = $self->_group_host_port($all_conns, $conn_names);
+    return (undef, undef) if $is_pg;
+    my ($dbh, $via) = $self->_try_forager_login($all_conns, $host, $port);
+    if ($dbh) {
+        unless ($self->_use_database($dbh, $db_name, 0)) {
+            $dbh->disconnect;
+            return (undef, undef);
+        }
+        return ($dbh, $via);
+    }
     return (undef, undef);
+}
+
+# One card per host:port:database. A failed login must still show that host
+# (192.168.1.198 must not disappear behind the ZeroTier address in the same group).
+sub _live_database_cards {
+    my ($self, $c, $remote_db, $all_conns, $group, $g, $status) = @_;
+
+    my %route;
+    for my $r (@{ $status->{routes} || [] }) {
+        $route{ lc(($r->{host} // '') . ':' . ($r->{port} // '')) } = $r;
+    }
+
+    my %by_ep;
+    for my $conn_name (@{ $g->{conns} || [] }) {
+        my $cfg = $all_conns->{$conn_name}{config} or next;
+        my $host = $cfg->{host} // '';
+        next unless length $host;
+        my $port = $cfg->{port} // ($self->_is_postgresql($cfg) ? 5432 : 3306);
+        my $ek = lc("$host:$port");
+        $by_ep{$ek} ||= {
+            host => $host, port => $port, conns => [], dbs => {},
+            engine => $self->_is_postgresql($cfg) ? 'postgresql' : 'mysql',
+        };
+        push @{ $by_ep{$ek}{conns} }, $conn_name;
+        $by_ep{$ek}{dbs}{ $cfg->{database} } = 1 if $cfg->{database};
+    }
+
+    my @cards;
+    for my $ek (sort keys %by_ep) {
+        my $ep = $by_ep{$ek};
+        my $rt = $route{$ek} || {};
+        my $err = $rt->{error} || '';
+        $err =~ s/\s+/ /g;
+        $err = substr($err, 0, 180);
+
+        if ($rt->{db_ok}) {
+            my ($conn_name, $rows, $cfg) = $self->_catalog_for_group(
+                $remote_db, $all_conns, $ep->{conns}
+            );
+            if ($conn_name && $rows) {
+                my $is_pg = $self->_is_postgresql($cfg);
+                for my $row (@$rows) {
+                    next unless $row->{name} && $row->{name} =~ /\A[A-Za-z0-9_]+\z/;
+                    push @cards, {
+                        key          => $conn_name . '|' . $row->{name},
+                        name         => $row->{name},
+                        host         => $ep->{host},
+                        port         => $ep->{port},
+                        server_group => $group,
+                        conn_name    => $conn_name,
+                        table_count  => $row->{table_count},
+                        row_count    => $row->{row_count},
+                        has_counts   => defined $row->{table_count} ? 1 : 0,
+                        comparable   => 1,
+                        engine       => $is_pg ? 'postgresql' : 'mysql',
+                        error        => '',
+                    };
+                }
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_live_database_cards',
+                    "$group $ep->{host}:$ep->{port} via $conn_name: " . scalar(@$rows) . ' databases');
+                next;
+            }
+            $err ||= $remote_db->last_connection_error || 'catalog query failed';
+        }
+
+        $err ||= $rt->{reachable} ? 'TCP open, MariaDB sent no greeting' : 'no TCP listener';
+        for my $db_name (sort keys %{ $ep->{dbs} }) {
+            push @cards, {
+                key          => '',
+                name         => $db_name,
+                host         => $ep->{host},
+                port         => $ep->{port},
+                server_group => $group,
+                comparable   => 0,
+                has_counts   => 0,
+                engine       => $ep->{engine},
+                error        => $err,
+            };
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_live_database_cards',
+            "$group $ep->{host}:$ep->{port} not usable: $err");
+    }
+
+    @cards = sort {
+        $a->{host} cmp $b->{host} || $a->{port} <=> $b->{port} || $a->{name} cmp $b->{name}
+    } @cards;
+    return \@cards;
+}
+
+sub _catalog_for_group {
+    my ($self, $remote_db, $all_conns, $conn_names) = @_;
+    for my $conn_name (@$conn_names) {
+        my $cfg = $all_conns->{$conn_name}{config} or next;
+        my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
+        next unless $dbh;
+        my $is_pg = $self->_is_postgresql($cfg);
+        my $rows = eval { Comserv::Util::DatabaseCompare->catalog_counts($dbh, $is_pg) };
+        my $err = $@;
+        $dbh->disconnect;
+        next if $err || !$rows || !@$rows;
+        return ($conn_name, $rows, $cfg);
+    }
+    return;
 }
 
 sub schema_compare_server :Path('/admin/schema_compare/server') :Args(1) {

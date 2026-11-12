@@ -299,8 +299,9 @@
       // ------------------------------------------------------------
       var serverCard = target.closest('[data-action="navigate-server"]');
       if (serverCard) {
-        // Don't navigate if clicking a refresh button inside the card
         if (target.closest('[data-action="refresh-server"]')) return;
+        if (target.closest('.db-compare-pick')) return;
+        if (target.closest('input, label, button[type="submit"]')) return;
         var srv = getParam(serverCard, 'server');
         if (srv) loadServerDatabases(srv);
         return;
@@ -318,10 +319,20 @@
       // ------------------------------------------------------------
       // Databases page actions
       // ------------------------------------------------------------
+      var compareBtn = target.closest('[data-action="compare-selected"]');
+      if (compareBtn) {
+        var checked = document.querySelectorAll('#db-compare-form input[name="db"]:checked');
+        if (checked.length < 2) {
+          e.preventDefault();
+          alert('Select at least two databases to compare.');
+        }
+        return;
+      }
+
       var dbCard = target.closest('[data-action="navigate-db"]');
       if (dbCard) {
-        // Don't navigate if clicking a refresh button inside the card
         if (target.closest('[data-action="refresh-db"]')) return;
+        if (target.closest('.db-compare-pick')) return;
         var srvName = getParam(dbCard, 'server');
         var dbName = getParam(dbCard, 'db');
         if (srvName && dbName) loadDatabaseTables(srvName, dbName);
