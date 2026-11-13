@@ -11,6 +11,7 @@ use strict;
 use warnings;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
+use Comserv::Util::AppTime ();
 use Getopt::Long;
 use JSON;
 use LWP::UserAgent;
@@ -47,12 +48,12 @@ for my $step (@plan) {
     last;
 }
 $doc ||= { ok => JSON::false, error => 'all sources failed', data => undef };
-my $date = do { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset(); strftime('%Y-%m-%d', localtime) };
+my $date = do { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); strftime('%Y-%m-%d', localtime) };
 $doc->{report_date} = $date;
 $doc->{source} = 'usage snapshot';
 $doc->{created_by} = 'script/ai_usage_snapshot.pl';
 $doc->{fetched_at_utc} = strftime('%Y-%m-%dT%H:%M:%SZ', gmtime);
-$doc->{fetched_at_pt} = do { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset(); strftime('%Y-%m-%d %H:%M %Z', localtime) };
+$doc->{fetched_at_pt} = do { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); strftime('%Y-%m-%d %H:%M %Z', localtime) };
 $doc->{attempts} = \@attempts;
 # Oct 13 2026 (Shanta): Grok Bot usage alongside Super Grok (pacing_json carries data.grok_bot).
 $doc->{grok_bot} = $doc->{data}{grok_bot} if ref $doc->{data} eq 'HASH' && $doc->{data}{grok_bot};

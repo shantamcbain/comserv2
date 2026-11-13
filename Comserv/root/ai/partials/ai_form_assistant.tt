@@ -26,16 +26,19 @@
 [%# ── Role check — use stash.is_admin (case-insensitive, pre-computed by auto) ── %]
 [%# Fall back to session roles grep for editor/developer (also try case-insensitive) %]
 [%# is_admin is a direct stash variable (most reliable); c.stash.is_admin also works %]
+[% ai_form_allow_user = ai_form_allow_user || 0 %]
 [% SET ai_form_ok = is_admin
                  || c.stash.is_admin
                  || c.session.is_admin
                  || c.session.roles.grep('(?i)editor').size
-                 || c.session.roles.grep('(?i)developer').size %]
+                 || c.session.roles.grep('(?i)developer').size
+                 || (ai_form_allow_user && c.session.username) %]
 
 [%# ── Defaults ────────────────────────────────────────────────────────────── %]
 [% ai_form_entity_label = ai_form_entity_label || 'record' %]
 [% ai_form_context      = ai_form_context      || ''       %]
 [% ai_form_fields       = ai_form_fields       || ''       %]
+[% ai_form_agent        = ai_form_agent        || ''       %]
 [% SET ai_form_show = 1 %]
 
 [% IF ai_form_ok && ai_form_show %]
@@ -49,15 +52,14 @@
         data-context="[% ai_form_context | html %]"
         data-fields="[% ai_form_fields | html %]"
         data-system="[% ai_form_system | html %]"
+        data-agent="[% ai_form_agent | html %]"
         style="display:none;"></span>
 
   <div style="margin-top:0.6em;display:flex;flex-wrap:wrap;gap:0.5em;align-items:center;">
     <input type="text" id="ai-form-entity-name"
            placeholder="Describe what to fill in (e.g. name / topic)…"
            size="38" style="padding:3px 6px;border:1px solid #ccc;border-radius:4px;" />
-    <select id="ai-form-model-sel" style="font-size:0.9em;padding:3px 5px;border:1px solid #ccc;border-radius:4px;">
-      <option value="">Loading models…</option>
-    </select>
+    <span style="font-size:0.85em;">Model: Chat with AI selector.</span>
     <button type="button" id="ai-form-ask-btn"
             style="padding:4px 12px;background:#0077cc;color:#fff;border:none;border-radius:4px;cursor:pointer;">
       Ask AI
@@ -95,9 +97,9 @@
       <input type="checkbox" id="ai-form-override" style="vertical-align:middle;">
       Override existing values (default: only fills empty fields)
     </label>
-    <label style="cursor:pointer;" title="Grok live web search — uses current data from the web">
+    <label style="cursor:pointer;" title="Sends use_search to /ai2/chat, the same flag Chat with AI uses">
       <input type="checkbox" id="ai-form-web-search" style="vertical-align:middle;">
-      Live web search (Grok only)
+      Live web search (same flag as Chat with AI)
     </label>
   </div>
 
@@ -150,122 +152,6 @@
 
     var SYSTEM = customSystem || DEFAULT_SYSTEM;
 
-    // ── Load model options ───────────────────────────────────────────────────
-    // Uses the SAME canonical source as every other AI surface: /ai2/providers
-    // (Router::get_available_models, already role-filtered once). Falls back to
-    // the v1 /ai/get_user_providers if that is unavailable.
-    // Hard rule: never invent a model tag. A hardcoded "stock" list
-    // (mistral:latest / phi4:latest / gemma3:4b) is not installed on most hosts
-    // and every request then 404s at Ollama.
-    var NON_CHAT = /embed|rerank|imagine|video|whisper|tts|clip|bge|nomic|:cloud$/i;
-
-    function optsFromProviders(providers) {
-        var opts = [];
-        (providers || []).forEach(function(p) {
-            (p.models || []).forEach(function(m) {
-                if (!m || !m.id) return;
-                if (NON_CHAT.test(m.id)) return;
-                if (m.disabled || m.unreachable || m.needs_key) return;
-                // Canonical (/ai2/providers) ids are already "provider|model".
-                // v1 (/ai/get_user_providers) ids are bare model names.
-                var val = m.id.indexOf('|') !== -1 ? m.id : (m.id + '|' + p.service);
-                opts.push({ val: val, label: m.label || (m.id + ' (' + p.service + ')') });
-            });
-        });
-        return opts;
-    }
-
-    // Ordering rule (matches the rest of the app): Ollama → SuperGrok → xAI
-    // Grok → OpenRouter; free first within a group. The canonical catalog is
-    // 400+ entries, so cap the dropdown — an uncapped list is unusable.
-    var FREE_ONLY = /:free$/i;
-    function sortOpts(opts) {
-        function rank(o) {
-            var p = (o.val.split('|')[1] || '').toLowerCase();
-            var group = p === 'ollama' ? 0 : (p === 'supergrok' ? 1
-                      : (p === 'grok' ? 2 : 3));
-            var free = FREE_ONLY.test(o.val) ? 0 : 1;
-            return group * 10 + free;
-        }
-        return opts.slice().sort(function(a, b) {
-            var d = rank(a) - rank(b);
-            return d !== 0 ? d : a.label.localeCompare(b.label);
-        });
-    }
-
-    var MAX_OPTS = 40;
-    function renderOpts(opts) {
-        var sel = document.getElementById('ai-form-model-sel');
-        if (!sel) return;
-        if (!opts.length) {
-            sel.innerHTML = '';
-            var none = document.createElement('option');
-            none.value = '';
-            none.textContent = '⚠ No models available — check AI provider config';
-            sel.appendChild(none);
-            return;
-        }
-        sel.innerHTML = '';
-        var sorted = sortOpts(opts);
-        var shown = sorted.slice(0, MAX_OPTS);
-        shown.forEach(function(o, i) {
-            var opt = document.createElement('option');
-            opt.value = o.val;
-            opt.textContent = o.label;
-            if (i === 0) opt.selected = true;
-            sel.appendChild(opt);
-        });
-        if (sorted.length > shown.length) {
-            var more = document.createElement('option');
-            more.disabled = true;
-            more.textContent = '… +' + (sorted.length - shown.length)
-                + ' more (showing first ' + MAX_OPTS + ')';
-            sel.appendChild(more);
-        }
-    }
-
-    function loadModelOptions() {
-        var sel = document.getElementById('ai-form-model-sel');
-        if (!sel) return;
-        sel.innerHTML = '<option value="">Loading models…</option>';
-        var ctl = new AbortController();
-        var tid = setTimeout(function() { ctl.abort(); }, 8000);
-        fetch('/ai2/providers', { method: 'GET', credentials: 'include', signal: ctl.signal })
-            .then(function(r) { clearTimeout(tid); return r.json(); })
-            .then(function(data) {
-                var opts = optsFromProviders(data && data.providers);
-                if (opts.length) { renderOpts(opts); return true; }
-                return fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
-                    .then(function(r2) { return r2.json(); })
-                    .then(function(d2) {
-                        renderOpts(optsFromProviders(d2 && d2.providers));
-                        return true;
-                    });
-            })
-            .catch(function(err) {
-                clearTimeout(tid);
-                var sel = document.getElementById('ai-form-model-sel');
-                if (!sel) return;
-                var isTimeout = err && err.name === 'AbortError';
-                // Same rule as the success path: no invented model tags. Show the
-                // real failure and let the user retry rather than offering a
-                // model that will 404 at Ollama.
-                sel.innerHTML = '';
-                var errOpt = document.createElement('option');
-                errOpt.value = '';
-                errOpt.textContent = isTimeout
-                    ? '⚠ Timed out loading models — retry the page'
-                    : '⚠ Could not load models — retry the page';
-                sel.appendChild(errOpt);
-                var statusEl2 = document.getElementById('ai-form-status');
-                if (statusEl2) {
-                    statusEl2.textContent = isTimeout
-                        ? 'Model list timed out. Reload the page to retry.'
-                        : 'Could not load the AI model list. Reload the page to retry.';
-                }
-            });
-    }
-    loadModelOptions();
 
     // ── Auto-detect name field ───────────────────────────────────────────────
     function autoDetectName() {
@@ -287,25 +173,52 @@
         if (f) f.addEventListener('change', autoDetectName);
     });
 
-    function getModelAndProvider() {
-        var sel = document.getElementById('ai-form-model-sel');
-        if (sel && sel.value) {
-            var val = sel.value;
-            var pipe = val.lastIndexOf('|');
-            if (pipe > 0) {
-                return {
-                    model: val.substring(0, pipe),
-                    provider: val.substring(pipe + 1) || 'ollama'
-                };
-            }
-            // Fallback when option value lacks |provider suffix (e.g. grok-4.3 alone)
-            var provider = /grok/i.test(val) ? 'grok' : 'ollama';
-            return { model: val, provider: provider };
-        }
-        // No selection / empty value: surface it rather than silently sending a
-        // hardcoded tag that is very likely not installed.
-        return { model: '', provider: '' };
+    function sharedChatModel() {
+        var sel = document.getElementById('ai-provider');
+        return (sel && sel.value) ? String(sel.value).trim() : '';
     }
+
+    // One access path. Model is the Chat with AI selector (empty = Router).
+    // Encyclopedia and Health Kitchen pages use the ency agent. Other forms
+    // use the agent the page named, or general.
+    function formAgentId() {
+        var meta = document.getElementById('ai-form-meta');
+        var named = meta ? (meta.getAttribute('data-agent') || '').trim() : '';
+        if (named) return named;
+        var path = (window.location.pathname || '').toLowerCase();
+        if (path.indexOf('/ency') === 0 || path.indexOf('/healthkitchen') === 0) return 'ency';
+        if (path.indexOf('/todo') === 0 || path.indexOf('/planning') === 0) return 'todo';
+        if (path.indexOf('/bmaster') === 0 || path.indexOf('/apiary') === 0) return 'bmaster';
+        if (path.indexOf('helpdesk') !== -1) return 'helpdesk';
+        return 'general';
+    }
+
+    function formAiRequest(promptText, signal) {
+        var model = sharedChatModel();
+        var web = document.getElementById('ai-form-web-search');
+        var body = {
+            prompt: promptText,
+            system: SYSTEM,
+            agent_id: formAgentId(),
+            page_path: window.location.pathname,
+            page_title: document.title,
+            use_search: (web && web.checked) ? 1 : 0
+        };
+        if (model) body.model = model;
+        return fetch('/ai2/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            signal: signal,
+            body: JSON.stringify(body)
+        }).then(function(r) {
+            return r.text().then(function(t) {
+                try { return JSON.parse(t); }
+                catch (e) { throw new Error('Server returned non-JSON (HTTP ' + r.status + ')'); }
+            });
+        });
+    }
+
 
     // ── Ask AI to fill ───────────────────────────────────────────────────────
     document.getElementById('ai-form-ask-btn').addEventListener('click', function() {
@@ -315,17 +228,11 @@
         var statusEl     = document.getElementById('ai-form-status');
         var btn          = document.getElementById('ai-form-ask-btn');
         var overrideAll  = document.getElementById('ai-form-override').checked;
-        var useSearch    = document.getElementById('ai-form-web-search').checked;
         var targetRaw    = (document.getElementById('ai-form-target-fields').value || '').trim();
         var targetFields = targetRaw
             ? targetRaw.split(/[\s,;]+/).map(function(f){return f.trim().toLowerCase();}).filter(Boolean)
             : [];
 
-        var mp = getModelAndProvider();
-        if (!mp.model || !mp.provider) {
-            statusEl.textContent = 'No AI model selected — pick one from the list (or reload the page if it is empty).';
-            return;
-        }
         var allFormFields = [];
         document.querySelectorAll('input[name]:not([type=hidden]):not([type=submit]):not([type=button]), textarea[name], select[name]')
             .forEach(function(el) { if (el.name) allFormFields.push(el.name); });
@@ -338,10 +245,10 @@
             : 'Return ONLY a raw JSON object. Fields available in this form: ' + fieldList + '. Fill fields you are confident about.';
 
         btn.disabled = true;
-        statusEl.textContent = 'Asking ' + mp.provider + '/' + mp.model + '\u2026';
+        statusEl.textContent = 'Asking ' + formAgentId() + '\u2026';
         document.getElementById('ai-form-raw').style.display = 'none';
 
-        var timeoutMs = mp.provider === 'grok' ? 90000 : 180000;
+        var timeoutMs = 120000;
         var controller = new AbortController();
         var tid = setTimeout(function() { controller.abort(); }, timeoutMs);
 
@@ -350,33 +257,11 @@
             promptText += ' Additionally, take into account this user comment/feedback: "' + userComment + '".';
         }
 
-        fetch('/ai/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            signal: controller.signal,
-            body: JSON.stringify({
-                prompt:           promptText,
-                system:           SYSTEM,
-                provider:         mp.provider,
-                model:            mp.model,
-                page_path:        window.location.pathname,
-                page_title:       document.title,
-                page_context:     'form_fill',
-                skip_role_prompt: true,
-                use_search:       (mp.provider === 'grok') && useSearch
-            })
-        })
-        .then(function(r) {
-            return r.text().then(function(t) {
-                try { return JSON.parse(t); }
-                catch(e) { throw new Error('Server returned non-JSON (HTTP ' + r.status + ')'); }
-            });
-        })
+        formAiRequest(promptText, controller.signal)
         .then(function(data) {
             clearTimeout(tid);
             btn.disabled = false;
-            var modelUsed = data.model || mp.model;
+            var modelUsed = data.model || 'router';
             if (!data.success) {
                 statusEl.textContent = 'AI error: ' + (data.error || 'unknown');
                 document.getElementById('ai-form-raw-text').textContent = JSON.stringify(data, null, 2);
@@ -473,30 +358,10 @@
             + 'Return ONLY raw JSON: {"corrections":[{"field":"name","current":"val","suggested":"val","reason":"why"}]}. '
             + 'If nothing is wrong return {"corrections":[]}.';
 
-        var mp  = getModelAndProvider();
-        if (!mp.model || !mp.provider) {
-            btn.disabled = false;
-            statusEl.textContent = 'No AI model selected — pick one from the list (or reload the page if it is empty).';
-            return;
-        }
         var ctl = new AbortController();
         setTimeout(function() { ctl.abort(); }, 60000);
 
-        fetch('/ai/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            signal: ctl.signal,
-            body: JSON.stringify({
-                prompt:     promptText,
-                system:     SYSTEM,
-                provider:   mp.provider,
-                model:      mp.model,
-                page_path:  window.location.pathname,
-                page_title: document.title
-            })
-        })
-        .then(function(r) { return r.json(); })
+        formAiRequest(promptText, ctl.signal)
         .then(function(data) {
             btn.disabled = false;
             if (!data.success) { statusEl.textContent = 'Review failed: ' + (data.error || 'unknown'); return; }

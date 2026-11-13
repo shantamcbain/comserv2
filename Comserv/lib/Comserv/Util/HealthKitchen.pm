@@ -526,6 +526,147 @@ sub add_pantry_item {
     return { ok => 1, row => $self->_pantry_row_hash($row) };
 }
 
+sub recipe_for_edit {
+    my ( $self, $c, $id ) = @_;
+    return unless $self->recipe_ready($c);
+    return unless defined $id && $id =~ /^\d+$/;
+    my $row = eval {
+        $c->model('DBEncy')->resultset('Recipe')->search({
+            id          => $id,
+            sitename    => $self->sitename($c),
+            recipe_kind => 'food_recipe',
+        })->single;
+    };
+    return if $@ || !$row;
+    my $user = $c->session->{username} || '';
+    my $admin = $c->session->{is_admin} || $c->stash->{is_admin};
+    return unless $admin || ( $row->username_of_poster && $row->username_of_poster eq $user );
+    my $hash = $self->_recipe_hash($row);
+    my @lines;
+    for my $ln ( @{ $hash->{lines} || [] } ) {
+        my $bit = $ln->{name} || '';
+        next unless length $bit;
+        if ( defined $ln->{quantity} && length( $ln->{quantity} ) && $ln->{unit} ) {
+            $bit = $ln->{quantity} . ' ' . $ln->{unit} . ' ' . $bit;
+        }
+        push @lines, $bit;
+    }
+    $hash->{ingredients_text} = join "\n", @lines;
+    return $hash;
+}
+
+sub save_recipe {
+    my ( $self, $c, $p ) = @_;
+    $p ||= {};
+    return { ok => 0, error => 'Recipe tables are not created yet. Run schema-compare.' }
+        unless $self->recipe_ready($c);
+    my $name = _hk_text( $p->{name}, 500 );
+    return { ok => 0, error => 'A recipe name is required.' } unless length $name;
+
+    my %fields = (
+        name          => $name,
+        description   => _hk_text( $p->{description}, 8000 ),
+        cuisine       => _hk_text( $p->{cuisine}, 100 ),
+        preparation   => _hk_text( $p->{preparation}, 8000 ),
+        instructions  => _hk_text( $p->{instructions}, 8000 ),
+        notes         => _hk_text( $p->{notes}, 8000 ),
+        yield_unit    => _hk_text( $p->{yield_unit}, 30 ),
+        cook_time_min => _hk_int( $p->{cook_time_min} ),
+        servings      => _hk_int( $p->{servings} ),
+        yield_amount  => _hk_dec( $p->{yield_amount} ),
+    );
+    my $user = $c->session->{username} || '';
+    my $id   = $p->{id};
+    my $row;
+    my $created = 0;
+    try {
+        my $rs = $c->model('DBEncy')->resultset('Recipe');
+        if ( defined $id && $id =~ /^\d+$/ ) {
+            $row = $rs->search({
+                id          => $id,
+                sitename    => $self->sitename($c),
+                recipe_kind => 'food_recipe',
+            })->single;
+            die 'Recipe not found' unless $row;
+            my $admin = $c->session->{is_admin} || $c->stash->{is_admin};
+            die 'You cannot edit this recipe'
+                unless $admin || ( $row->username_of_poster && $row->username_of_poster eq $user );
+            $row->update( \%fields );
+        }
+        else {
+            $row = $rs->create({
+                %fields,
+                recipe_kind        => 'food_recipe',
+                sitename           => $self->sitename($c),
+                status             => 'active',
+                username_of_poster => $user,
+                source             => 'healthkitchen',
+            });
+            $created = 1;
+        }
+        my $incoming = defined $p->{ingredients} ? $p->{ingredients} : '';
+        my $existing = '';
+        if ( !$created ) {
+            my $loaded = $self->recipe_for_edit( $c, $row->id );
+            $existing = $loaded->{ingredients_text} || '';
+        }
+        if ( $created || $incoming ne $existing ) {
+            $row->lines->delete;
+            my $ord = 0;
+            for my $line ( split /\r?\n/, $incoming ) {
+                my $parsed = _hk_ingredient_line($line);
+                next unless $parsed;
+                $ord++;
+                $row->create_related( 'lines', {
+                    sort_order        => $ord,
+                    ingredient_source => 'ad_hoc',
+                    name_raw          => $parsed->{name},
+                    quantity          => $parsed->{quantity},
+                    unit              => $parsed->{unit},
+                } );
+            }
+        }
+    }
+    catch {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'save_recipe',
+            "save_recipe failed: $_" );
+        $row = undef;
+    };
+    return { ok => 0, error => 'Could not save the recipe.' } unless $row;
+    return { ok => 1, id => $row->id, created => $created };
+}
+
+sub _hk_text {
+    my ( $v, $max ) = @_;
+    $v = '' unless defined $v;
+    $v =~ s/^\s+|\s+$//g;
+    return substr( $v, 0, $max ) if defined $max && length($v) > $max;
+    return $v;
+}
+
+sub _hk_int {
+    my ($v) = @_;
+    return undef unless defined $v && $v =~ /^\d+$/;
+    return $v + 0;
+}
+
+sub _hk_dec {
+    my ($v) = @_;
+    return undef unless defined $v && $v =~ /^\d+(?:\.\d+)?$/;
+    return $v + 0;
+}
+
+sub _hk_ingredient_line {
+    my ($line) = @_;
+    $line = '' unless defined $line;
+    $line =~ s/^\s+|\s+$//g;
+    return unless length $line;
+    if ( $line =~ /^(\d+(?:\.\d+)?)\s+([A-Za-z][A-Za-z.]{0,12})\s+(.+)$/ ) {
+        return { quantity => $1 + 0, unit => $2, name => substr( $3, 0, 255 ) };
+    }
+    return { quantity => undef, unit => undef, name => substr( $line, 0, 255 ) };
+}
+
 sub list_recipes {
     my ( $self, $c ) = @_;
     return [] unless $self->recipe_ready($c);
@@ -571,6 +712,10 @@ sub _recipe_hash {
         id          => $r->id,
         recipe_code => $r->recipe_code,
         name        => $r->name,
+        description => $r->description,
+        cuisine     => $r->cuisine,
+        cook_time_min => $r->cook_time_min,
+        servings    => $r->servings,
         preparation => $r->preparation,
         instructions => $r->instructions,
         yield_amount => $r->yield_amount,

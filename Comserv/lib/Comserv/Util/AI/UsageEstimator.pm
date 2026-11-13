@@ -10,6 +10,7 @@ package Comserv::Util::AI::UsageEstimator;
 # Readings are stored as spoken: no refund logic, conflicts are flagged only.
 
 use strict;
+use Comserv::Util::AppTime ();
 use warnings;
 use JSON::PP ();
 use POSIX qw(strftime);
@@ -32,7 +33,7 @@ sub readings_file { my ($root) = @_; ($root // '.') . '/data/ai_usage_readings.j
 sub pt {
     my ($e) = @_;
     return '' unless defined $e && $e > 0;
-    local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+    local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset();
     my $s = strftime('%a %b %d %H:%M PT', localtime $e);
     return $s;
 }
@@ -50,7 +51,7 @@ sub parse_time {
             if ($tz ne 'Z') { my ($sg, $oh, $om) = $tz =~ /([+-])(\d\d):?(\d\d)/; $e -= ($sg eq '-' ? -1 : 1) * ($oh * 3600 + $om * 60) }
             return $e;
         }
-        local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+        local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset();
         return timelocal($sec, $m, $h, $D, $M - 1, $Y);
     }
     return undef;

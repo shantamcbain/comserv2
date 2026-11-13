@@ -5,8 +5,9 @@ use warnings;
 use Test::More;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
+use Comserv::Util::AppTime ();
 use Time::Local qw(timelocal);
-local $ENV{TZ} = 'America/Los_Angeles';
+local $ENV{TZ} = Comserv::Util::AppTime->app_tz;
 use POSIX (); POSIX::tzset();
 use JSON::PP ();
 
@@ -99,7 +100,7 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
 # ---- burn alerts (Oct 8 2026) ----
 {
     my $P = 'Comserv::Util::AI::SuperGrokPacing';
-    local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+    local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset();
     my $ten = Time::Local::timelocal(0, 0, 10, 8, 9, 2026);
     my $seven_pm = Time::Local::timelocal(0, 5, 19, 8, 9, 2026);
     is $P->can('day_start')->($seven_pm), Time::Local::timelocal(0, 0, 5, 8, 9, 2026), 'day_start = 05:00 PT (work day, Oct 11 2026)';
@@ -119,7 +120,11 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
         [], 'after midnight: previous work day sends nothing';
     like $P->can('burn_alerts')->(used => 44, used_day_start => 16, day_from => $five, now => $seven_pm, used_basis => 'meter')->[0]{message},
         qr/\(meter\)/, 'message says which number was used';
-    is $a->[1]{kind}, 'work_window', '... work_window (>60% of budget by 09:00)';
+    is $a->[1]{kind}, 'work_window', '... work_window (>60% of budget after check_hour)';
+    like $a->[1]{message}, qr/^As of 19:05, 410% of today's Super Grok budget is gone/,
+        '... as of the compute time, not By 09:00 PT';
+    like $a->[1]{message}, qr/particle-1 \(`\/model code`\)/, '... suggests particle-1 /model code, not glm';
+    unlike $a->[1]{message}, qr/\boverrun\b|\bglm\b|\bPT\b/, '... no overrun/glm/PT in work_window text';
     my $nine = Time::Local::timelocal(0, 5, 9, 8, 9, 2026);
     my $eight = Time::Local::timelocal(0, 55, 8, 8, 9, 2026);
     $a = $P->can('burn_alerts')->(used => 4, used_day_start => 0, day_from => $five, now => $nine, budget_pct => 6);
@@ -187,7 +192,7 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
 # ---- daily budget (Oct 9 2026) ----
 {
     my $P = 'Comserv::Util::AI::SuperGrokPacing';
-    local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+    local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset();
     my $mid   = Time::Local::timelocal(0, 0, 0, 9, 9, 2026);
     my $reset = Time::Local::timelocal(0, 31, 10, 15, 9, 2026);
     my $now   = Time::Local::timelocal(0, 15, 8, 9, 9, 2026);
@@ -250,7 +255,7 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
 # Oct 18 2026: fresh grok.com meter (< 2 h) beats the token estimate for burn alerts.
 {
     my $P = 'Comserv::Util::AI::SuperGrokPacing';
-    local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+    local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset();
     my $now  = Time::Local::timelocal(0, 0, 15, 17, 9, 2026);       # Sat Oct 17 15:00 PT
     my $five = Time::Local::timelocal(0, 0, 5, 17, 9, 2026);
     my @rd = ({ at => $five - 600, value => 15, kind => 'used', source => 'addon' });
@@ -293,7 +298,7 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
 # Oct 22 2026: last week's 99 re-posted after the 10:31 reset (new 'at', value first seen 06:42).
 {
     my $P = 'Comserv::Util::AI::SuperGrokPacing';
-    local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset();
+    local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset();
     my $reset = Time::Local::timelocal(0, 31, 10, 22, 9, 2026);
     my $now   = Time::Local::timelocal(0, 40, 10, 22, 9, 2026);
     my $seen  = Time::Local::timelocal(0, 42, 6, 22, 9, 2026);
