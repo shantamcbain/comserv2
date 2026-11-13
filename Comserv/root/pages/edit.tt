@@ -56,6 +56,8 @@
         [% PROCESS 'pages/partials/html_editor.tt'
            body_content  = page.body
            body_label    = 'Page Content'
+           ai_assist     = 1
+           ai_page_code  = page.page_code
            body_required = 1
            preview_url   = c.uri_for('/page', page.page_code)
         %]

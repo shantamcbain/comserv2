@@ -12,8 +12,10 @@ Environment=CATALYST_DEBUG=1
 Environment=COMSERV_NO_HEALTH_LOG=1
 Environment=PERL5LIB=/home/shanta/perl5/lib/perl5
 Environment=PATH=/home/shanta/perl5/perlbrew/perls/perl-5.40.0/bin:/usr/local/bin:/usr/bin:/bin
-# Do not fight a hand-started server: skip if :4006 is already listening.
-ExecCondition=/bin/sh -c '! ss -ltn | grep -q ":4006 "'
+# Do not fight a hand-started server: skip if :4006 is still listening after 20 s.
+# The wait matters on "systemctl restart": the old listener can hold the port for a
+# few seconds after stop, and an instant check made every restart a silent skip.
+ExecCondition=/bin/sh -c 'i=0; while ss -ltn | grep -q ":4006 "; do i=$$((i+1)); [ $$i -ge 20 ] && exit 1; sleep 1; done; exit 0'
 ExecStart=/home/shanta/perl5/perlbrew/perls/perl-5.40.0/bin/perl script/comserv_server.pl -p 4006 -r
 Restart=on-failure
 RestartSec=30

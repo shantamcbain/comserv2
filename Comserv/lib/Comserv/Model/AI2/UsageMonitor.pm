@@ -1,4 +1,5 @@
 package Comserv::Model::AI2::UsageMonitor;
+use Comserv::Util::AppTime ();
 
 use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];
@@ -1832,7 +1833,7 @@ sub ai_health {
             $e->{csrf} = $c->session->{ai_eval_csrf};
         }
         require POSIX;
-        { local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset(); $e->{now_pt_input} = POSIX::strftime('%Y-%m-%d %H:%M', localtime); }
+        { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); $e->{now_pt_input} = POSIX::strftime('%Y-%m-%d %H:%M', localtime); }
         POSIX::tzset();
         $e;
     } || { errors => [ "usage_estimator: $@" ], consumers => [] };

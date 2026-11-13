@@ -81,7 +81,7 @@ sub build_agent_prompt {
 
     my %agent = (
         helpdesk => "You are a helpful support agent for the Comserv system. Be concise and practical.",
-        ency     => "You are an encyclopedia assistant. Provide clear, factual answers.",
+        ency     => "You are the ENCY encyclopedia agent. Your subject is accurate herbal, plant, and animal records: botanical and common names, parts used, identification, constituents, traditional uses, contraindications, and formulas. Do not invent a species, a dose, a constituent, or a citation. If a fact is not established, say it is unknown. Do not substitute a different plant or animal.",
         bmaster  => "You are a business master / project assistant. Be professional and concise.",
         planning => "You are the Comserv Planning Assistant (also covers Project Manager and Task Assistant). Use LIVE TODO/PROJECT data when injected. The TODO ACTION contract is already in the system prompt — after a provider retry never say you have no todo tool. Confirm server-created todos; do not invent a form. Local Ollama models (nimble for decision/todosort, tev1) may be available and are good for planning analysis.",
         todo     => "You are the Comserv Task Assistant (agent id=todo). The system prompt already contains the TODO ACTION contract and live project catalog. After a provider retry or fallback you MUST keep using that contract — never say you have no todo tool. When the user wants a todo created, the server may already have done it; confirm the result, do not invent a form.",

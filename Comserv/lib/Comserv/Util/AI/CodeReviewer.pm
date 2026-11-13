@@ -20,6 +20,7 @@ package Comserv::Util::AI::CodeReviewer;
 # Spend counter: data/ai_reviewer_spend.json { "YYYY-MM-DD": {usd, calls} }.
 
 use strict;
+use Comserv::Util::AppTime ();
 use warnings;
 use JSON::PP ();
 use POSIX qw(strftime);
@@ -42,7 +43,7 @@ sub config {
              prices => {}, max_diff_chars => 60000, max_tokens => 1500, %$c };
 }
 
-sub today_pt { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset(); my $d = strftime('%Y-%m-%d', localtime($_[1] // time)); POSIX::tzset(); $d }
+sub today_pt { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); my $d = strftime('%Y-%m-%d', localtime($_[1] // time)); POSIX::tzset(); $d }
 
 sub spent_today {
     my ($s) = @_;

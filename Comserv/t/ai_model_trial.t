@@ -210,8 +210,8 @@ $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no 
     my %other = map { $_->{model} => 1 } ($MC->hermes_chain($ld, emergency => 1), $MC->hermes_cash_steps($ld));
     for my $k (grep { /^chain_/ && ref $ld->{data}{$_} eq "ARRAY" } keys %{ $ld->{data} }) { $other{ (split /\|/, $_, 2)[1] } = 1 for @{ $ld->{data}{$k} } }
     ok !$other{'openai/gpt-5.6-luna'}, 'luna is in no app chain / emergency chain / cash step';
-    is join(' | ', map { $_->{provider} . '/' . $_->{model} } $MC->hermes_chain($ld)), 'supergrok/grok-4.7 | openrouter/openai/gpt-5.6-luna | openrouter/cohere/north-mini-code:free', 'Hermes chain: Super Grok, luna (first paid), north-mini last';
-    is_deeply [ map { $_->{tier} } $MC->hermes_chain($ld) ], [qw(supergrok paid free)], 'tiers';
+    is join(' | ', map { $_->{provider} . '/' . $_->{model} } $MC->hermes_chain($ld)), 'supergrok/grok-4.7 | openrouter/particle-ai/particle-1 | openrouter/openai/gpt-5.6-luna | openrouter/baidu/ernie-5.5-flash-preview:free | openrouter/cohere/north-mini-code:free', 'Hermes chain: Super Grok, particle-1, luna, ernie, north-mini last';
+    is_deeply [ map { $_->{tier} } $MC->hermes_chain($ld) ], [qw(supergrok paid paid free free)], 'tiers';
     my $E = $T->can('evaluate'); my %base = (trial => $lu, live_ok => 1, tasks_done => 0, alerted => 0, spent => 0);
     is $E->(%base)->{action}, 'run', 'fresh probation runs'; ok !$E->(%base, spent => 4.9)->{alert}, 'no early alert';
     is $E->(%base, spent => 4.9)->{action}, 'run', 'still running at $4.90 (no reserve rule)';
@@ -287,7 +287,7 @@ $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no 
     is_deeply [ map { $_->{model} } @$offs ], [ 'qwen/qwen3-coder' ], 'session_offenders lists qwen but not the active luna session';
 
     # chain consistency: luna (begun, not stopped) is a chain paid step and in allowed_paid; its spend is NOT excluded from the OpenRouter caps
-    { my %cc = $g->chain_context; is join(',', map { $_->{model} } @{ $cc{chain} }), 'grok-4.7,openai/gpt-5.6-luna,cohere/north-mini-code:free', 'active probation: luna is in the Hermes chain';
+    { my %cc = $g->chain_context; is join(',', map { $_->{model} } @{ $cc{chain} }), 'grok-4.7,openai/gpt-5.6-luna,baidu/ernie-5.5-flash-preview:free,cohere/north-mini-code:free', 'active probation: luna is in the Hermes chain';
       ok $cc{allowed_paid}{$model}, 'luna is an allowed paid chain step'; ok !grep({ $_ ne 'particle-ai/particle-1' } keys %{ $cc{probation_out} }), 'nothing but the un-begun particle-1 probation (Nov 2 2026) removed from the chain';
       my $tx = $g->trial_exclusions; ok !$tx->{models}{$model} && !$tx->{usd} && !$tx->{by_window}, 'probation spend is not excluded from the caps and luna is not exempt from thrash'; }
 
@@ -302,7 +302,7 @@ $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no 
     my $g2 = $G->new(home => $root, app_root => $root, now => $now + 60, base_urls => [], no_notify => 1); $g2->{state_db} = $db;
     $g2->trial_tick({ ok => 1, month_usd => 99, balance_usd => 0 });
     ok !$g2->{trial_active}{$model} && $g2->{trial_stopped}{$model}, 'a stopped trial stays stopped on a later guard run';
-    { my %cc = $g2->chain_context; is join(',', map { $_->{model} } @{ $cc{chain} }), 'grok-4.7,cohere/north-mini-code:free', 'stopped probation: luna is OUT of the Hermes chain (north-mini follows Super Grok)';
+    { my %cc = $g2->chain_context; is join(',', map { $_->{model} } @{ $cc{chain} }), 'grok-4.7,baidu/ernie-5.5-flash-preview:free,cohere/north-mini-code:free', 'stopped probation: luna is OUT of the Hermes chain (north-mini follows Super Grok)';
       ok !$cc{allowed_paid}{$model}, 'and not an allowed paid step'; like $cc{probation_out}{$model}, qr/probation gpt_56_luna stopped: probation limit reached/, 'reason recorded'; }
     is_deeply [ grep { $_ ne 'particle-ai/particle-1' } keys %{ $g2->probation_blocked($MC->load(undef, path => "$root/data/ai_model_chains.json", logger => sub {})) } ], [$model], 'probation_blocked names luna (particle-1 not begun in this test tree)';
     # approval starts a new window (script/ai_trial.pl approve, run in a copy of the tree so the live state is untouched)
@@ -329,7 +329,7 @@ $e = $ev->({ live_ok => 0 }); is $e->{action}, 'stop', 'no readable spend -> no 
     like $g3->{trial_stopped}{$model}, qr/10 of 10 sessions/, 'stop reason names the session limit';
     # not begun (no state file) -> unaudited -> not a chain step at all
     unlink $sf; my $g4 = $G->new(home => $root, app_root => $root, now => $now + 180, base_urls => [], no_notify => 1);
-    { my %cc = $g4->chain_context; is join(',', map { $_->{model} } @{ $cc{chain} }), 'grok-4.7,cohere/north-mini-code:free', 'no baseline: luna is not a chain step (fail closed)'; like $cc{probation_out}{$model}, qr/not begun/, 'reason'; }
+    { my %cc = $g4->chain_context; is join(',', map { $_->{model} } @{ $cc{chain} }), 'grok-4.7,baidu/ernie-5.5-flash-preview:free,cohere/north-mini-code:free', 'no baseline: luna is not a chain step (fail closed)'; like $cc{probation_out}{$model}, qr/not begun/, 'reason'; }
 }
 # ---- pick_target: luna only inside the caps; never while the OpenRouter day figure is over cap ----
 {
