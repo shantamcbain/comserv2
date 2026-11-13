@@ -13,6 +13,7 @@ our %ALLOWED_KEYS = (
     'ui.timezone'             => 'string',   # IANA TZ; display via AppTime
     'dev_server.saved_commands' => 'object',
     'calendar.visible_sites'  => 'array',    # subset of the user's SiteNames shown on the calendar
+    'healthkitchen.meal_slots' => 'object',  # { sitename => [ slot ] } (HealthKitchen::MealSlots)
 );
 
 sub new { bless {}, shift }
@@ -53,6 +54,10 @@ sub validate_value {
         return 1;
     }
 
+    if ($key eq 'healthkitchen.meal_slots') {
+        require Comserv::Util::HealthKitchen::MealSlots;
+        return Comserv::Util::HealthKitchen::MealSlots->valid_pref($value) ? 1 : 0;
+    }
     if ($key eq 'calendar.fixed_lane_pct') {
         my $n = $value;
         $n = 0 + $n if defined $n;

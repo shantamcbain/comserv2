@@ -12,6 +12,7 @@ package Comserv::Util::AI::StalePreflight;
 # oldest-pid selection for cmdline targets, default targets).
 
 use strict;
+use Comserv::Util::AppTime ();
 use warnings;
 use POSIX ();
 use File::Find ();
@@ -164,7 +165,7 @@ sub evaluate {
 sub pt {
     my ($e) = @_;
     return undef unless defined $e;
-    return DateTime->from_epoch(epoch => $e, time_zone => 'America/Vancouver')->strftime('%Y-%m-%d %H:%M:%S PT');
+    return DateTime->from_epoch(epoch => $e, time_zone => Comserv::Util::AppTime->app_tz_object($e))->strftime('%Y-%m-%d %H:%M:%S PT');
 }
 
 # check(port|pid|cmdline_re, worktree?, label?, dirs?, exts?, grace_s?)

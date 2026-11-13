@@ -679,6 +679,128 @@ sub api_inventory_item_update :Path('inventory/item/update') :Args(0) {
     $c->controller('Inventory')->api_item_update($c);
 }
 
+# GET /api/app/context — everything the Android app needs to know about where it
+# is: the site this domain + login resolves to, the sites the user may use, and
+# who they are. The phone must never guess a site: a guessed site shows another
+# site's supplier list and files items in the wrong place.
+# List-form git. No shell. Empty string if git is missing or the path is refused.
+sub _git_line {
+    my ($root, @args) = @_;
+    return '' unless defined $root && $root =~ m{^/[\w./-]+$} && -d $root;
+    my $pid = open(my $fh, '-|', 'git', '-C', $root, @args);
+    return '' unless $pid;
+    my $line = <$fh> // '';
+    close $fh;
+    chomp $line;
+    return $line;
+}
+
+# Which server is answering? Deliberately unauthenticated and data-free: the
+# phone must be able to show "dev :3001 main c17663f" (or "production, old
+# build") before anything else works — that is what makes a change testable.
+sub api_app_ping :Path('app/ping') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $root = $ENV{COMSERV_ROOT} || '/home/shanta/PycharmProjects/comserv2/Comserv';
+    $root =~ s{/Comserv/?$}{};
+    my ($branch, $commit) = ('', '');
+    # List-form open: no shell, so a quote in COMSERV_ROOT cannot run a command.
+    if ($root =~ m{^/[\w./-]+$} && -d $root) {
+        $branch = _git_line($root, 'rev-parse', '--abbrev-ref', 'HEAD');
+        $commit = _git_line($root, 'rev-parse', '--short', 'HEAD');
+    }
+
+    my $port = $c->req->uri->port || '';
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success => 1,
+        service => 'comserv2',
+        port    => "$port",
+        host    => scalar($c->req->uri->host // ''),
+        env     => ($port eq '5000' ? 'production' : ($port eq '3001' ? 'dev' : "port_$port")),
+        git     => { branch => $branch, commit => $commit },
+        pid     => $$,
+        time    => scalar(localtime),
+    }));
+    $c->detach;
+}
+
+sub api_app_context :Path('app/context') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    # Same gate as the other inventory app routes: a live session (or a token)
+    # from a real client; LAN/local calls pass, which is how the build is tested.
+    $self->_api_authenticate_inventory($c);
+
+    my $username = eval { $c->session->{username} } || '';
+    my $inv      = $c->controller('Inventory');
+    my ($sites, $current) = $inv->_app_site_names($c);
+
+    # A shared host name that resolves to no site: use the user's own site rather
+    # than any hardcoded default.
+    $current = $sites->[0] // '' unless defined $current && length $current;
+
+    my ($item_count, $supplier_count) = (0, 0);
+    eval {
+        my $schema = $inv->_schema($c);
+        $item_count = $schema->resultset('Accounting::InventoryItem')
+            ->search({ sitename => $current, status => 'active' })->count if length $current;
+        $supplier_count = $schema->resultset('Accounting::InventorySupplier')
+            ->search({ sitename => $current, status => 'active' })->count if length $current;
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_app_context',
+        "context user=" . ($username || '?') . " site=" . ($current || '?')
+        . " domain=" . ($c->req->uri->host // '?')
+        . " uid=" . ($c->session->{user_id} // '-')
+        . " cookie=" . ((defined $c->req->header('Cookie') && length $c->req->header('Cookie')) ? 'present' : 'NONE')
+        . " ua=" . substr($c->req->header('User-Agent') // '-', 0, 24)
+        . " app=" . ($c->req->header('X-App-Version') // '-'));
+
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json({
+        success        => 1,
+        sitename       => $current,
+        user           => $username,
+        # 0 means the request carried no live session: every API call will then be
+        # answered as an anonymous visitor on this host, which reads as CSC. The
+        # app must ask the user to log in again rather than silently show CSC.
+        authenticated  => (length($username) ? 1 : 0),
+        domain         => scalar($c->req->uri->host // ''),
+        sites          => $sites,
+        item_count     => $item_count,
+        supplier_count => $supplier_count,
+    }));
+    $c->detach;
+}
+
+sub api_inventory_item_find :Path('inventory/item/find') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate_inventory($c);
+    $c->controller('Inventory')->api_item_find($c);
+}
+
+sub api_inventory_sites :Path('inventory/sites') :Args(0) {
+    my ($self, $c) = @_;
+    # Deliberately not auth-gated: this returns site NAMES only (no inventory
+    # data) and the app needs it to offer the picker before a session is sorted.
+    # Gating it is why the picker came up empty on the phone.
+    $c->controller('Inventory')->api_sites($c);
+}
+
+sub api_inventory_suppliers :Path('inventory/suppliers') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate_inventory($c);
+    $c->controller('Inventory')->api_suppliers($c);
+}
+
+sub api_inventory_supplier_create :Path('inventory/supplier/create') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate_inventory($c);
+    $c->controller('Inventory')->api_supplier_create($c);
+}
+
 sub api_inventory_bom_add :Path('inventory/bom/add') :Args(0) {
     my ($self, $c) = @_;
     $self->_api_authenticate_inventory($c);
@@ -1865,10 +1987,31 @@ sub _api_authenticate {
 
     my $address  = $c->req->address // '';
     my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
-    return undef if $is_local;
+    if ($is_local) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_api_authenticate',
+            "allowed: LAN/local bypass from $address (no credentials needed)");
+        return undef;
+    }
+
+    # The Android app logs in exactly like the web app and carries that session
+    # cookie. Without this, every inventory call from outside the LAN answered 401
+    # and the app showed empty lists (e.g. "no suppliers") as if the data were gone.
+    my $uid = eval { $c->session->{user_id} };
+    if (defined $uid && $uid ne '') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_api_authenticate',
+            "allowed: live session uid=$uid user='" . (eval { $c->session->{username} } // '?')
+            . "' from $address");
+        return eval { $c->session->{username} } || 1;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_api_authenticate',
+        "no session for this request from $address (cookie="
+        . (defined $c->req->header('Cookie') ? 'present' : 'NONE') . ") - trying API token");
 
     my $validation = Comserv::Util::ApiTokenValidator->validate_from_request($c);
     unless ($validation->{valid}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_authenticate',
+            "denied: " . ($validation->{error} || 'no valid session or API token') . " from $address");
         $self->_json_error($c, $validation->{code} || 401,
             $validation->{error} || 'Authentication required', 'unauthorized');
     }
@@ -3952,25 +4095,415 @@ No auth required (clients hit this before login to decide whether to update).
 sub api_app_version :Path('app/version') :Args(0) {
     my ($self, $c) = @_;
 
-    my $path = $c->path_to('root/static/app/version.json')->stringify;
-    my $json;
+    my $hostname = eval {
+        require Comserv::Util::SystemInfo;
+        Comserv::Util::SystemInfo::get_server_hostname();
+    } || 'workstation';
+
+    my $workflow = eval {
+        require Comserv::Util::SystemInfo;
+        Comserv::Util::SystemInfo->get_app_workflow($c->config->{home});
+    } || 'main';
+
+    my $git_head = eval {
+        require Comserv::Util::Git;
+        Comserv::Util::Git->current_head_str($c);
+    } || 'main';
+
+    my $client_ip = eval { $c->req->address } || '';
+
+    # The APK on the NFS share is the only build artifact that exists; its
+    # version.json is written by the Android gradle publish, not by an agent.
+    # Read that one first. Never advertise a checkout versionCode higher than
+    # the published stamp: the phone updates only when versionCode is strictly
+    # greater, and Android will not install a lower code. Hand-bumping the
+    # git copy (Hermes did this) makes the update badge stick on an APK that
+    # is not actually newer.
+    my $nfs_path = '/data/nfs/inventory-apks/version.json';
+    my $checkout = $c->path_to('root/static/app/version.json')->stringify;
+    my $path = (-r $nfs_path) ? $nfs_path : $checkout;
+    my $json_data = {};
     if (-r $path) {
         local $/;
-        open my $fh, '<', $path or do {
-            $c->res->status(500);
-            $c->res->content_type('application/json');
-            $c->res->body(encode_json({ success => 0, error => 'version file unreadable' }));
-            $c->detach();
-        };
-        $json = <$fh>;
+        open my $fh, '<', $path;
+        my $raw = <$fh>;
         close $fh;
-    } else {
-        $json = q{{"versionCode":1,"versionName":"1.0","apkUrl":"","releaseNotes":""}};
+        $json_data = eval { decode_json($raw) } || {};
+    }
+
+    # A hand-edited checkout copy must not outrun the published stamp.
+    if (-r $nfs_path && -r $checkout) {
+        my $git_code = eval {
+            local $/;
+            open my $gfh, '<', $checkout or die $!;
+            my $graw = <$gfh>;
+            close $gfh;
+            my $g = decode_json($graw);
+            $g->{versionCode} // 0;
+        } || 0;
+        my $pub_code = $json_data->{versionCode} // 0;
+        if ($git_code && $pub_code && $git_code != $pub_code) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_app_version',
+                "checkout version.json code $git_code ignored; serving published $pub_code from $path");
+        }
+    }
+
+    $json_data->{serverInfo} = {
+        domain   => eval { $c->req->uri->host } || 'dev.computersystemconsulting.ca',
+        clientIp => $client_ip,
+        server   => "$hostname (Docker):" . (eval { $c->req->uri->port } || 3001),
+        workflow => $workflow,
+        git      => $git_head,
+        dbEnv    => ($ENV{DATABASE_ENVIRONMENT} || 'PRODUCTION'),
+    };
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json($json_data));
+    $c->detach();
+}
+
+sub api_inventory_item_by_barcode_alt :Path('inventory/item_by_barcode') :Args(0) {
+    my ($self, $c) = @_;
+    my $barcode = $c->req->param('barcode') || $c->req->param('upc') || '';
+    $barcode =~ s/^\s+|\s+$//g;
+
+    unless ($barcode) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => \0, error => 'Barcode parameter required' }));
+        $c->detach();
+    }
+
+    my $item = eval { $c->model('DBEncy')->resultset('InventoryItem')->find({ barcode => $barcode }) };
+    if ($item) {
+        $c->res->status(200);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({
+            success => \1,
+            source  => 'comserv_db',
+            item    => {
+                id          => $item->id,
+                sku         => $item->sku,
+                name        => $item->name,
+                category    => $item->category,
+                description => $item->description,
+                barcode     => $item->barcode,
+                image_path  => $item->image_path
+            }
+        }));
+        $c->detach();
+    }
+
+    require HTTP::Tiny;
+    my $http = HTTP::Tiny->new(timeout => 5);
+    my $off_url = "https://world.openfoodfacts.org/api/v0/product/$barcode.json";
+    my $res = $http->get($off_url);
+    if ($res->{success} && $res->{content}) {
+        my $map = eval { decode_json($res->{content}) };
+        if ($map && $map->{status} && $map->{status} == 1) {
+            my $p = $map->{product} || {};
+            my $pname = $p->{product_name} || $p->{product_name_en} || '';
+            my $pcat  = $p->{categories} || $p->{category} || 'Pantry';
+            $pcat =~ s/,.*//;
+            my $pimg  = $p->{image_url} || $p->{image_front_url} || '';
+            my $pbrand = $p->{brands} || '';
+            my $pingredients = $p->{ingredients_text} || $p->{ingredients_text_en} || '';
+            my $nutr = $p->{nutriments} || {};
+            my $kcal = $nutr->{'energy-kcal_100g'} || $nutr->{'energy-kcal'} || 0;
+            my $prot = $nutr->{'proteins_100g'} || $nutr->{'proteins'} || 0;
+            my $carb = $nutr->{'carbohydrates_100g'} || $nutr->{'carbohydrates'} || 0;
+            my $sod  = $nutr->{'sodium_100g'} || $nutr->{'sodium'} || 0;
+
+            my $pdesc = $pbrand ? "Brand: $pbrand." : "";
+            if ($pingredients) {
+                $pdesc .= " Ingredients: $pingredients.";
+            }
+
+            if ($pname) {
+                $c->res->status(200);
+                $c->res->content_type('application/json');
+                $c->res->body(encode_json({
+                    success => \1,
+                    source  => 'open_food_facts',
+                    item    => {
+                        sku         => "SKU-$barcode",
+                        name        => $pname,
+                        category    => $pcat,
+                        description => $pdesc,
+                        barcode     => $barcode,
+                        image_path  => $pimg,
+                        ingredients => $pingredients,
+                        nutrition   => {
+                            calories => $kcal,
+                            protein  => $prot,
+                            carbs    => $carb,
+                            sodium   => $sod
+                        }
+                    }
+                }));
+                $c->detach();
+            }
+        }
+    }
+
+    my $upc_url = "https://api.upcitemdb.com/prod/trial/lookup?upc=$barcode";
+    my $upc_res = $http->get($upc_url);
+    if ($upc_res->{success} && $upc_res->{content}) {
+        my $upc_map = eval { decode_json($upc_res->{content}) };
+        if ($upc_map && $upc_map->{items} && ref($upc_map->{items}) eq 'ARRAY' && @{$upc_map->{items}}) {
+            my $first = $upc_map->{items}->[0];
+            my $title = $first->{title} || '';
+            my $cat   = $first->{category} || 'General';
+            $cat =~ s/>.*//;
+            my $desc  = $first->{description} || "Barcode: $barcode";
+            my $imgs  = $first->{images} || [];
+            my $img   = ref($imgs) eq 'ARRAY' && @$imgs ? $imgs->[0] : '';
+
+            if ($title) {
+                $c->res->status(200);
+                $c->res->content_type('application/json');
+                $c->res->body(encode_json({
+                    success => \1,
+                    source  => 'upcitemdb',
+                    item    => {
+                        sku         => "SKU-$barcode",
+                        name        => $title,
+                        category    => $cat,
+                        description => $desc,
+                        barcode     => $barcode,
+                        image_path  => $img
+                    }
+                }));
+                $c->detach();
+            }
+        }
+    }
+
+    $c->res->status(404);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => \0, error => "Barcode $barcode not found in Comserv or public UPC database." }));
+    $c->detach();
+}
+
+sub api_log_error :Path('log/error') :Args(0) {
+    my ($self, $c) = @_;
+    my $raw = $c->req->body ? do { local $/; my $b = $c->req->body; <$b> } : '{}';
+    my $json_data = eval { decode_json($raw) } || {};
+
+    my $level    = $json_data->{level} || 'error';
+    my $msg      = $json_data->{message} || 'Mobile app error';
+    my $stack    = $json_data->{stack_trace} || '';
+    my $screen   = $json_data->{screen} || 'AndroidApp';
+    my $username = $c->session->{username} || $json_data->{username} || 'Guest';
+
+    # What a developer needs when the phone only shows "unknown error": the
+    # call that failed, its status, the raw body, and which build sent it.
+    my $endpoint = $json_data->{endpoint} || '';
+    my $status   = $json_data->{status}   || '';
+    my $resp     = $json_data->{response} || '';
+    my $app_ver  = $json_data->{app_version} || '';
+    my $base_url = $json_data->{base_url} || '';
+
+    my $detail = '';
+    $detail .= " endpoint=$endpoint" if $endpoint;
+    $detail .= " status=$status"     if $status;
+    $detail .= " app=$app_ver"        if $app_ver;
+    $detail .= " base=$base_url"      if $base_url;
+    if ($resp) {
+        my $clip = $resp;
+        $clip =~ s/\s+/ /g;
+        $clip = substr($clip, 0, 800) . (length($resp) > 800 ? '…' : '');
+        $detail .= " response=$clip";
+    }
+
+    require Comserv::Util::Logging;
+    # warn+ is what Logging writes to system_log. A client "info" trace would
+    # otherwise stay in the text log only. Do not INSERT here: that duplicated
+    # the row and dropped the username.
+    my $log_level = ($level =~ /^(warn|error|critical)$/i) ? lc($level) : 'warn';
+    eval {
+        Comserv::Util::Logging->instance->log_with_details(
+            $c,
+            $log_level,
+            "AndroidApp::$screen",
+            0,
+            "mobile_app_error",
+            "[$username]$detail $msg" . ($stack ? "\nStack: " . substr($stack, 0, 3000) : "")
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_log_error',
+            "mobile error log failed: $@");
     }
 
     $c->res->status(200);
     $c->res->content_type('application/json');
-    $c->res->body($json);
+    $c->res->body(encode_json({ success => \1, message => 'Error logged to Comserv admin logs' }));
+    $c->detach();
+}
+
+=head2 api_app_server_info
+
+GET /api/app/server-info - Which server is delivering this page.
+
+Reports the same facts the web debug bar prints (root/pagetop.tt): domain,
+client IP, server identifier, workflow (worktree name), the live git
+branch/commit of the checkout that is running, the build stamp, the database
+environment/user and the port that answered.  Also returns the worktree/port
+table the admin git page renders (root/config/worktrees.json) with a live
+"is a server listening" flag, so the phone can switch target ports and see
+which worktrees are actually up.
+
+Logged-in session required.  Servers that predate this action answer 404 and
+the app simply hides the badge.
+
+=head3 JSON
+
+  { success, domain, clientIp, server, serverHost, serverIp, workflow, port,
+    git: {branch, commit}, build: {branch, commit, date, host},
+    dbEnv, dbUser,
+    targets: [ {name, label, port, host, url, running} ] }
+
+=cut
+
+my $_app_server_info_cache;            # { at => epoch, targets => [...] }
+my $_app_server_info_cache_ttl = 15;   # seconds — ports change rarely, phones poll
+
+# Which of these TCP ports on this box actually has a listener right now.
+# Localhost connect failures are immediate (ECONNREFUSED), so the whole sweep
+# costs milliseconds even with every port down.
+sub _app_ports_listening {
+    my ($ports) = @_;
+    my %up;
+    require IO::Socket::INET;
+    for my $p (@$ports) {
+        next unless defined $p && $p =~ /^\d+$/ && $p > 0;
+        my $sock = IO::Socket::INET->new(
+            PeerAddr => '127.0.0.1',
+            PeerPort => $p,
+            Proto    => 'tcp',
+            Timeout  => 0.2,
+        );
+        if ($sock) { $up{$p} = 1; close $sock; }
+    }
+    return \%up;
+}
+
+# The worktree/port list from root/config/worktrees.json — the exact source the
+# admin git dashboard reads — annotated with a live listening check.
+sub _app_server_targets {
+    my $now = time;
+    if (!$_app_server_info_cache
+        || ($now - $_app_server_info_cache->{at}) > $_app_server_info_cache_ttl) {
+        my $list = eval { Comserv::Util::Git->new->build_worktree_list() } || [];
+        my @ports = map  { $_->{port} }
+                    grep { ref $_ eq 'HASH' && ($_->{port} // 0) > 0 } @$list;
+        my $up    = _app_ports_listening(\@ports);
+        my @built;
+        for my $t (@$list) {
+            next unless ref $t eq 'HASH';
+            next if $t->{external};                    # non-Comserv repo: no Catalyst port
+            my $port = int($t->{port} // 0);
+            next unless $port > 0;
+            push @built, {
+                name    => $t->{name}  // '',
+                label   => $t->{label} // ($t->{name} // ''),
+                port    => $port,
+                host    => $t->{host}  // 'workstation.local',
+                url     => $t->{url}   // '/',
+                running => $up->{$port} ? \1 : \0,
+            };
+        }
+        $_app_server_info_cache = { at => $now, targets => \@built };
+    }
+    return $_app_server_info_cache->{targets};
+}
+
+sub api_app_server_info :Path('app/server-info') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username} && $c->session->{user_id}) {
+        $c->res->status(401);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => 'not_authenticated' }));
+        $c->detach();
+    }
+
+    require Comserv::Util::SystemInfo;
+    require Comserv::Util::Git;
+
+    my $home = $c->config->{home} // '';
+    my $sys  = eval { Comserv::Util::SystemInfo::get_system_info() } || {};
+
+    my $workflow   = eval { Comserv::Util::SystemInfo->get_app_workflow($home) } || 'main';
+    my $identifier = eval { Comserv::Util::Logging->get_system_identifier() } || '';
+
+    # Live checkout, not the baked image stamp: a worktree server must report the
+    # branch it actually runs (Root::auto does the same overlay for the debug bar).
+    my ($git_branch, $git_commit) = ('', '');
+    my $git_root = -e "$home/../.git" ? "$home/.."
+                 : (-e "$home/.git"   ? $home : '');
+    if ($git_root) {
+        for my $args (['--abbrev-ref', 'HEAD'], ['--short', 'HEAD']) {
+            my $out = '';
+            if (open my $fh, '-|', 'git', '-C', $git_root, 'rev-parse', @$args) {
+                $out = <$fh> // '';
+                close $fh;
+            }
+            chomp $out;
+            if ($args->[0] eq '--abbrev-ref') { $git_branch = $out } else { $git_commit = $out }
+        }
+    }
+
+    my $build = {};
+    my $version_file = $home ? "$home/version.json" : '';
+    if ($version_file && -r $version_file) {
+        $build = eval {
+            local $/;
+            open my $fh, '<', $version_file or die "open: $!";
+            my $raw = <$fh>;
+            close $fh;
+            decode_json($raw);
+        } || {};
+    }
+
+    my $db_env = eval {
+        require Comserv::Util::DatabaseEnv;
+        Comserv::Util::DatabaseEnv->new->get_active_environment($c);
+    } || $c->stash->{active_db_environment} || 'production';
+
+    my $db_user = $c->stash->{active_db_user}
+        // $c->config->{db_username}
+        // $c->config->{db_user}
+        // $ENV{COMSERV_DB_USER}
+        // '';
+
+    my $port = $c->req->uri->port // 0;
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success    => \1,
+        domain     => '' . $c->req->uri->host,
+        clientIp   => '' . $c->req->address,
+        server     => $identifier,
+        serverHost => $sys->{hostname} // '',
+        serverIp   => $sys->{ip}       // '',
+        workflow   => $workflow,
+        sitename   => $c->stash->{SiteName} // $c->session->{SiteName} // '',
+        port       => 0 + $port,
+        git        => { branch => $git_branch, commit => $git_commit },
+        build      => {
+            branch => $build->{branch}     // '',
+            commit => $build->{commit}     // '',
+            date   => $build->{build_date} // '',
+            host   => $build->{build_host} // '',
+        },
+        dbEnv   => $db_env,
+        dbUser  => $db_user,
+        targets => _app_server_targets(),
+    }));
     $c->detach();
 }
 

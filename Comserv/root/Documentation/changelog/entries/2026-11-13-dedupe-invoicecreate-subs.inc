@@ -1,0 +1,6 @@
+<div id="2026-11-13-dedupe-invoicecreate-subs" class="cl-entry">
+<h3>2026-11-13 — InvoiceCreate: remove duplicate supplier helpers so the better copies run</h3>
+<p class="doc-body"><strong>What.</strong> <code>AI2::InvoiceCreate</code> defined <code>_auto_create_supplier</code> and <code>_web_lookup_supplier</code> twice. The later copy of each is deleted; the earlier copy is kept. Auto-create now treats a failed web lookup as an empty hash (<code>|| {}</code>) so a missing lookup no longer dies inside the create eval, and the supplier is still created from the name. The success log only adds <code>(web-enriched)</code> when a contact field was actually found.</p>
+<p class="doc-body"><strong>Why.</strong> In Perl the later definition wins, so the better earlier copies were dead code. The winning lookup used the DuckDuckGo Instant Answer API, which returns nothing for company lookups, an email regex with no capture group (so <code>$1</code> was stale), and a log line that stringified the supplier object instead of its id. A failed lookup returned undef and then crashed when the create eval dereferenced it, which cancelled supplier auto-create from Chat invoice entry.</p>
+<p class="doc-body"><strong>Files.</strong> <code>lib/Comserv/Model/AI2/InvoiceCreate.pm</code>.</p>
+</div>

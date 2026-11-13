@@ -78,6 +78,11 @@ sub is_secret {
     return 1 if $base =~ /secret/i;
     return 1 if $rel =~ m{(?:^|/)(?:\.ssh|secrets)(?:/|$)};
     return 1 if $base eq 'cookies.txt';
+    # Nov 8 2026 (Code Guard): config / credential paths are never readable,
+    # even by authorized readers.
+    return 1 if $rel =~ m{(?:^|/)(?:config|keys?|\.ssh|secrets?)(?:/|$)}i;
+    return 1 if $base =~ /\.(?:conf|cnf|ini|env|yml|yaml)$/i;
+    return 1 if $base =~ /(?:key|password|passwd|token)/i;
     return 0;
 }
 
@@ -317,6 +322,8 @@ sub load_paths {
 # First-turn context: open buffer + any files named in the user prompt.
 sub prepare_turn {
     my ($self, $c, %args) = @_;
+    return { page_context => '', user_files => '', files_read => [], skip => {}, denied => 1 }
+        unless $self->authorized($c);
     my $prompt = $args{prompt} // '';
     my @files;
     my %skip;
@@ -437,7 +444,16 @@ sub _is_privileged {
     return 0 unless $c && $c->can('session');
     my $roles = eval { $c->session->{roles} } || [];
     $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
-    return grep { $_ =~ /^(admin|developer|editor)$/i } @$roles ? 1 : 0;
+    # Nov 8 2026: parenthesised; "grep {..} @$roles ? 1 : 0" grepped (1)/(0) and was always false.
+    return (grep { $_ =~ /^(admin|developer|editor)$/i } @$roles) ? 1 : 0;
+}
+
+# authorized($c): the only callers allowed to read server source (logged in +
+# admin/developer/editor). Enforced inside prepare_turn / follow_up_context /
+# related_context so a caller bug cannot bypass it.
+sub authorized {
+    my ($self, $c) = @_;
+    return ($self->_logged_in($c) && $self->_is_privileged($c)) ? 1 : 0;
 }
 
 sub _logged_in {
@@ -550,11 +566,66 @@ sub list_app_outline {
     return @out ? join("\n", @out) : '(no allowlisted dirs found)';
 }
 
+# Nov 8 2026: curated "how this page behaves" code for page questions. Fixed
+# server-side list (never derived from page/template text, which is untrusted).
+# Each entry: [path, anchor regex, lines before, lines after]; the window is
+# found at read time so it does not drift with line numbers.
+my @TODO_CARD_ACTIONS = (
+    [ 'root/todo/todo_card.tt',                      qr/data-start-btn/,             5,  50 ],
+    [ 'root/static/js/planning/daily-plan-utils.js', qr/function startWorkTodoCard/, 30, 110 ],
+    [ 'root/todo/day.tt',                            qr/function lockDay/,           3,  50 ],
+    [ 'lib/Comserv/Controller/Todo.pm',              qr/^sub open_log /,             2, 170 ],
+);
+our %PAGE_EXTRA = (
+    'todo/day'      => [ @TODO_CARD_ACTIONS ],
+    'todo'          => [ @TODO_CARD_ACTIONS ],
+    'planning/daily'=> [ @TODO_CARD_ACTIONS ],
+    'healthkitchen' => [ @TODO_CARD_ACTIONS ],
+);
+
+# page_extra_specs($route) -> list of [path, re, before, after] for a route.
+sub page_extra_specs {
+    my ($self, $route) = @_;
+    $route //= ''; $route =~ s{^/+|/+$}{}g; $route = lc $route;
+    for my $k (sort { length($b) <=> length($a) } keys %PAGE_EXTRA) {
+        next unless $route eq $k || index($route, "$k/") == 0;
+        return @{ $PAGE_EXTRA{$k} };
+    }
+    return ();
+}
+
+# page_extra_context($c, $route, skip => {}) -> { blocks, files_read }. Authorized only.
+sub page_extra_context {
+    my ($self, $c, $route, %o) = @_;
+    return { blocks => '', files_read => [] } unless $self->authorized($c);
+    my $skip = $o{skip} || {};
+    my (@blocks, @files);
+    for my $e ($self->page_extra_specs($route)) {
+        my ($path, $re, $before, $after) = @$e;
+        next if $self->is_secret($path) || $skip->{lc "$path#$re"}++;
+        my ($rel, $err, $abs) = $self->_abs_under_root($c, $path);
+        next if $err || !$abs;
+        open my $fh, '<', $abs or next;
+        my $n = 0; my $hit;
+        while (my $l = <$fh>) { $n++; if ($l =~ $re) { $hit = $n; last } }
+        close $fh;
+        next unless $hit;
+        my $s = $hit - $before; $s = 1 if $s < 1;
+        my $got = $self->read_snippet($c, { path => $rel, start => $s, end => $hit + $after });
+        next unless $got && $got->{content};
+        push @blocks, $self->format_file_block($rel, $got->{content}, source => 'page-behaviour');
+        push @files, "$rel:$s-" . ($hit + $after);
+    }
+    return { blocks => join("\n\n", @blocks), files_read => \@files };
+}
+
 # Follow-up: if the model asked for files, load them for a second LLM turn.
 sub follow_up_context {
     my ($self, $c, $reply, $skip) = @_;
     $skip ||= {};
-    my $need = $self->extract_read_requests($reply // '');
+    # Code Guard: only authorized readers get files loaded; the fake-tool nudge
+    # below reads nothing, so it stays available.
+    my $need = $self->authorized($c) ? $self->extract_read_requests($reply // '') : [];
     my $loaded = @$need ? $self->load_paths($c, $need, skip => $skip) : {};
     if ($loaded->{blocks}) {
         my $user = "Loaded files you requested:\n\n"
@@ -655,6 +726,7 @@ sub related_specs {
 # Load related_specs within a char budget (total editor prompt cap 90K).
 sub related_context {
     my ($self, $c, %args) = @_;
+    return { blocks => '', files_read => [] } unless $self->authorized($c);
     my $budget = $args{budget} // 0;
     return { blocks => '', files_read => [] } if $budget < 2000;
     my $root = eval { abs_path(q{}.$c->path_to(q{})) };

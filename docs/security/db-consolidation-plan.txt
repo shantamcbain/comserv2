@@ -1,0 +1,116 @@
+DB CONSOLIDATION PLAN - get back to ONE MariaDB on 192.168.1.20
+Status: PROPOSAL (nothing applied). Written 2026-10-25 (PT) by Code Guard bot for Shanta McBain.
+Production changes need Shanta's explicit approval. Docker-side work is owned by the Docker fixer bot;
+this plan only asks it to perform steps, it does not take them over.
+
+1. WHAT EXISTS (observed read-only on 2026-10-25, via the app's own SSH path, user ubuntu -> db1/192.168.1.20)
+   Host db-production, booted 2026-10-16. Times below converted to PT (UTC-7) unless marked UTC.
+   Instance D  "docker"  : container csc-mysql, image mariadb:10.6 (app saw 10.6.25), published 0.0.0.0:3307->3306,
+                           volume csc-db_mysql_data, compose project csc-db in /opt/csc-db (compose file 2026-05-18,
+                           .env 2026-05-17). Created 2026-05-18 11:59 PT. Restarted 2026-10-25 05:15 PT (together with
+                           csc-postgres, no host reboot). Default DB name in compose is "csc"; "ency" lives inside it.
+                           This is what the app reads: connection db_production_mysql / production_server (ency),
+                           login comserv_app (primary, currently failing) -> falls back to shanta_forager.
+   Instance N  "native"  : mariadb.service (apt, 10.11.14-0ubuntu0.24.04.1), bind-address 127.0.0.1 only, port 3306,
+                           socket /run/mysqld/mysqld.sock, datadir /var/lib/mysql. Installed 2026-07-17 09:08 PT (dpkg),
+                           mariadb-backup installed 08:23 PT and "apt install --reinstall mariadb-server" 08:34 PT the same
+                           morning. Last (re)start 2026-10-22 23:24 PT. Datadir has an "ency" database directory
+                           (last table create/drop 2026-07-17 16:04 PT). Webmin (port 10000, MySQL module config last
+                           changed 2026-09-21 17:26 PT) talks to THIS instance, which is why Shanta sees rows
+                           cloudflare_api_token and cloudflare_email in Webmin that the app (instance D) cannot see.
+   Nothing in the repo, app config, DBI JSON or docs ever pointed the app at instance N (it is not reachable from
+   outside the host). Team docs/memory since 2026-08-30 state "the only application database is ency on
+   192.168.1.20:3307". So instance N was created by a host-level apt install (who: see apt history Requested-By)
+   and then used through Webmin - an accident of two servers named "mysql" on one host, not a deliberate design.
+
+2. WHICH IS CANONICAL: instance D (Docker, port 3307), unless the drift check proves otherwise.
+   Evidence: every app connection (prod container, dev, scripts, ContainerHealthMonitor, hardware_monitor, deploy.sh,
+   migration code) targets 192.168.1.20:3307; 248 tables there, app writes continuously; postgres companion csc-postgres
+   is in the same compose project; documented as the live Ency since 2026-08-30. Instance N only matters for any rows
+   written through Webmin since 2026-07-17 (known: app_secrets rows 1 and 2).
+   Decide with data, not assumption: run the drift check (section 3) first. If N turns out to hold NEWER data than D in
+   important tables, treat N rows as the differing set to merge into D (section 5), do not swap canonical.
+
+3. DRIFT CHECK (read-only; counts, max ids, newest timestamps, column hashes - never row values)
+   script/db_drift_check.pl (this branch).
+     On the workstation, instance D via the app:
+       perl -Ilib script/db_drift_check.pl snapshot --app --label docker3307 --out /tmp/D.json
+     On 192.168.1.20, instance N (needs a login Shanta provides, kept in a private my.cnf-style file outside the repo,
+     e.g. ~/.native.cnf with [client] user/password/host=127.0.0.1; or sudo mariadb via the unix socket if Shanta approves):
+       perl script/db_drift_check.pl snapshot --defaults-file ~/.native.cnf --db ency --label native3306 --out /tmp/N.json
+     Compare anywhere:  perl script/db_drift_check.pl compare /tmp/D.json /tmp/N.json
+   Notes: --timeout N caps every statement (default 20 s); --checksum is OFF by default because CHECKSUM TABLE reads whole
+   tables and was far too slow on production (a run of it did not finish in 3+ minutes) - use it only on a scratch restore.
+   Snapshot files are chmod 600 and contain table names/counts only (app_secrets: key NAMES and value LENGTHS).
+   Add a nightly run to the daily sweep once both servers are reachable (see section 8).
+
+4. BACKUP BOTH FIRST (before any change; nothing here modifies a database)
+   Instance D (from the host or any machine that can reach 3307; password via env or option file, never on the command line):
+     mysqldump --defaults-extra-file=~/.docker_ency.cnf --single-transaction --routines --triggers --events \
+       --databases ency | gzip > /srv/backups/ency_D_$(date +%F_%H%M).sql.gz
+     (also dump database shanta_forager only if still wanted - memory says it is not an application database)
+   Instance N (on the host):
+     sudo mariadb-dump --single-transaction --routines --triggers --events --all-databases | gzip > /srv/backups/N_all_$(date +%F_%H%M).sql.gz
+   Verify restore on a SCRATCH container (never on 3307):
+     docker run -d --name scratch-restore -e MARIADB_ROOT_PASSWORD=<throwaway> -p 3399:3306 mariadb:10.6
+     gunzip -c ency_D_*.sql.gz | docker exec -i scratch-restore mariadb -uroot -p...   # then run db_drift_check snapshot --checksum there
+     compare table counts to the live snapshot, then: docker rm -f scratch-restore
+   Copy dumps to a second location (workstation + offline disk). Record sha256sums. A backup that has not been restored once is not a backup.
+
+5. FREEZE, DIFF, MERGE
+   a. Announce a short write freeze (put the app in maintenance mode or stop the writers: web-prod, dev servers pointed at 3307,
+      cron jobs, ContainerHealthMonitor). Docker fixer bot to confirm nothing else writes.
+   b. Re-run both snapshots; take final dumps.
+   c. For each table the compare marks as differing, list rows only in N (primary-key anti-join done on the host with
+      the two dumps loaded in the scratch container side by side; review counts, not values, in logs).
+      Expected: app_secrets (2 rows), anything Shanta edited in Webmin.
+   d. Merge by INSERT ... SELECT of the N-only rows into D inside a transaction on a scratch copy first, verify with the
+      drift check, then replay on D. For app_secrets: keys cloudflare_api_token and cloudflare_email - NOTE the loader
+      matches key names EXACTLY (lower case, as spelled). Re-enter through the app's admin form if values must not be copied by hand.
+   e. Never copy values through chat or logs. Treat the Cloudflare token as exposed once it has been handled by any agent
+      session; rotate it after the merge if Shanta prefers (see docs/security/key-rotation-plan.txt).
+
+6. RE-POINT EVERYTHING TO ONE INSTANCE
+   - Webmin MySQL module (Servers -> MySQL): set it to the SAME server as the app (TCP host 127.0.0.1 port 3307 via the published
+     Docker port, or the docker network) instead of the native socket; give it the app's admin-level login created for that purpose
+     (not shanta_forager). Check on the Webmin Module Config page afterwards (it should show port 3307).
+   - Retire instance N: after verification and a 1-2 week hold, `sudo systemctl disable --now mariadb`, keep its datadir and the
+     final dump (do not delete). Alternatively keep it running but unreachable from Webmin and clearly named. Do NOT remove the apt package until the hold ends.
+   - Connection configs to confirm (names/hosts only): ~/.comserv/secrets/dbi/*.json (db_production_mysql, db_production_mysql_admin,
+     db_production_mysql_fallback, production_server, production_forager, docker_ency, local_ency, zerotier_ency, backup_*, db_dev_*),
+     db_config.json, docker-compose*.yml and .env files, K8s secrets, ContainerHealthMonitor.pl, hardware_monitor.pl, deploy.sh,
+     Admin.pm migration helpers. Remove entries that point at servers that are not active (192.168.1.21, 192.168.1.198 if unused,
+     YOUR_BACKUP_HOST placeholders).
+   - Login issue: the app is meant to use comserv_app (limited DML) but DBEncy logs "primary app user comserv_app was not used" and
+     falls back to shanta_forager (ALL PRIVILEGES on ency and shanta_forager). Fix by (re)creating/granting comserv_app on instance D
+     (host '%' as needed, SELECT/INSERT/UPDATE/DELETE on ency.*), set its password through the secrets mechanism in
+     docs/security/secrets-design.txt, then remove the fallback so a failure is loud. Rotate shanta_forager afterwards: a plaintext
+     password for it was found in a Hermes skill reference file under ~/.hermes/skills (value not reproduced here) and in
+     tool output of this review.
+
+7. VERIFY
+   - db_drift_check compare D vs final-N-merged-copy shows only the intended differences; app_secrets on D lists both keys.
+   - /api/secrets/compare?name=cloudflare reports source=db, length>0 (needs the CloudflareManager placeholder fix deployed).
+   - Webmin view of ency.app_secrets equals the app's view. Smoke test: login, todo create, Cloudflare cache admin page.
+   - Keep instance N dump + datadir untouched until the hold ends.
+
+8. GUARDRAILS (to prevent recurrence)
+   a. One documented connection source: a single file (docs + dbi JSON) states "app DB = 192.168.1.20:3307/ency". Anything else is a bug.
+   b. Startup identity check: at app start, read @@hostname, @@port, @@server_id (and a row in a small `db_identity` table or a stored
+      constant) and FAIL LOUDLY (not silently fall back) if they differ from the expected values in config. Log the identity once at startup.
+   c. Drift check in the daily sweep: run snapshot + compare of the app DB against any other reachable instance on the host and alert
+      on any difference; also alert when `ss -ltn` shows an extra MySQL/MariaDB listener (3306/3308-3310) on db hosts.
+   d. Host hygiene: remove or mask the native mariadb package/service on db hosts that run the Docker DB; record why in the runbook.
+   e. Webmin/DB admin access is a read path to the SAME database: set it up from the app's config, not by hand.
+   f. Changes to DB servers go through a ticket/todo with an owner (Docker fixer bot for container changes; Shanta approves production).
+
+9. ROLLBACK
+   - Before merge: nothing changed, discard scratch containers.
+   - After merge: restore D from the pre-merge dump (stop writers, drop ency, load dump, verify with drift check).
+   - After re-pointing: re-enable mariadb.service (kept, not removed) and restore the previous Webmin module config copy (take a copy first).
+
+10. OPEN QUESTIONS (need Shanta)
+   - A login for the native instance (or approval to use sudo mariadb on the host) to take the snapshot and the dump.
+   - Who ran the 2026-07-17 apt install (see /var/log/apt/history.log Requested-By) and why.
+   - Who restarted the Docker containers on 2026-10-25 05:15 PT.
+   - Approval for the write freeze window and for rotating shanta_forager and the Cloudflare token.

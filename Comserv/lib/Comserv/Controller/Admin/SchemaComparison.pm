@@ -17,6 +17,9 @@ use File::Path qw(make_path);
 use File::Spec;
 use File::Find;
 use Comserv::Util::Schema::ResultParser;
+use Comserv::Util::Schema::Equivalence;
+use Comserv::Util::Schema::Inspector;
+use Comserv::Util::DatabaseCompare;
 use DBI;
 
 sub begin :Private {
@@ -1622,11 +1625,14 @@ sub get_result_field_info {
         die "Field '$field_name' not found in Result file '$result_file_path'";
     }
 
-    # Normalize ResultParser output to match the expected return format
+    # Normalize ResultParser output to match the expected return format.
+    # size arrives as an array ref for decimal([p, s]) / enum lists; the callers
+    # below build "TYPE(size)", so flatten it to the DB parser's "p,s" string form.
+    my $size = $col_info->{size};
+    $size = join(',', @$size) if ref $size eq 'ARRAY';
     return {
         data_type => $col_info->{data_type} || $col_info->{type} || '',
-        size      => (ref $col_info->{size} eq 'ARRAY' ? join(',', @{ $col_info->{size} })
-                    : ($col_info->{size} // '')),
+        size      => $size // '',
         is_nullable => ($col_info->{is_nullable} // '') eq 'YES' ? 1
                      : ($col_info->{is_nullable} // '') eq 'NO'  ? 0
                      : ($col_info->{is_nullable} ? 1 : 0),
@@ -2378,9 +2384,10 @@ sub get_table_result_comparison_v2 {
             $result_field->{extra} = defined $result_field->{extra} ? "$result_field->{extra}" : '';
             if (ref $result_field->{size} eq 'ARRAY') {
                 # decimal/varchar precision arrives as [10, 4]; render it the way
-                # the DB side reports it so the two columns compare and display alike.
-                $result_field->{size} = '(' . join(',', @{ $result_field->{size} }) . ')';
-            } elsif (defined $result_field->{size} && $result_field->{size} =~ /^\d+$/) {
+                # the DB side reports it ("p,s") so the two columns compare and
+                # display alike.
+                $result_field->{size} = join(',', @{ $result_field->{size} });
+            } elsif (defined $result_field->{size}) {
                 $result_field->{size} = 0 + $result_field->{size};
             }
         }
@@ -2639,89 +2646,42 @@ sub normalize_field_value {
 
 sub normalize_data_type {
     my ($self, $data_type) = @_;
-    return '' unless defined $data_type;
-    $data_type = lc($data_type);
-    $data_type =~ s/\([^)]*\)//g;
-    $data_type =~ s/^\s+|\s+$//g;
-    $data_type =~ s/\s+(unsigned|signed|zerofill|binary)//g;
-    
-    my %mapping = (
-        'int' => 'integer', 'int4' => 'integer', 'integer' => 'integer',
-        'varchar' => 'varchar', 'text' => 'text', 'longtext' => 'text',
-        'tinyint' => 'boolean', 'bool' => 'boolean', 'boolean' => 'boolean',
-        'datetime' => 'datetime', 'timestamp' => 'timestamp', 'json' => 'json'
-    );
-    return $mapping{$data_type} || $data_type;
+    return Comserv::Util::Schema::Equivalence->normalize_data_type($data_type);
 }
-
-=head2 _is_width_only_type
-
-True for types whose parenthetical is a meaningless DISPLAY WIDTH rather than a
-real length. MariaDB always reports C<int(11)> / C<tinyint(4)> even though the
-storage size is fixed by the type alone, and DBIx::Class Result files
-conventionally declare C<< data_type => 'integer' >> with no size. Comparing
-those two literally produces a permanent false "Update needed".
-
-=cut
 
 sub _is_width_only_type {
     my ($self, $normalized_type) = @_;
-    return 0 unless defined $normalized_type;
-    return $normalized_type =~ /^(integer|boolean|bigint|smallint|mediumint)$/ ? 1 : 0;
+    return Comserv::Util::Schema::Equivalence->is_width_only_type($normalized_type);
 }
 
-=head2 _fields_equivalent
+=head2 _is_numeric_type
 
-Single comparison used by BOTH the Table row and the Result row so the two can
-never disagree. Normalizes the data type through C<normalize_data_type> (so
-MariaDB's C<int> matches a Result file's C<integer>) and ignores numeric display
-width. Returns true when the live column and the Result declaration mean the
-same thing.
+True for column types whose DEFAULT is a NUMBER. Thin delegate to
+C<Comserv::Util::Schema::Equivalence>; kept because tests and older callers
+use the controller's historical name.
 
 =cut
 
+sub _is_numeric_type {
+    my ($self, $normalized_type) = @_;
+    return Comserv::Util::Schema::Equivalence->is_numeric_type($normalized_type);
+}
+
+=head2 _numeric_default
+
+A plain decimal literal -> its numeric value, else undef. Thin delegate to
+C<Comserv::Util::Schema::Equivalence>.
+
+=cut
+
+sub _numeric_default {
+    my ($self, $def) = @_;
+    return Comserv::Util::Schema::Equivalence->numeric_default($def);
+}
+
 sub _fields_equivalent {
     my ($self, $d, $r) = @_;
-    return 0 unless $d && $r;
-
-    my $d_type = $self->normalize_data_type($d->{data_type} // '');
-    my $r_type = $self->normalize_data_type($r->{data_type} // '');
-    return 0 unless $d_type eq $r_type;
-
-    # Display width on integer/boolean types is cosmetic — MariaDB reports
-    # int(11)/tinyint(4) regardless of what was requested.
-    unless ($self->_is_width_only_type($d_type)) {
-        my $d_size = lc($d->{size} // '');
-        my $r_size = lc($r->{size} // '');
-        $d_size =~ s/[()\s]//g;
-        $r_size =~ s/[()\s]//g;
-        return 0 unless $d_size eq $r_size;
-    }
-
-    # Nullability: only compare when the Result file actually DECLARES it.
-    # An absent is_nullable is unknown, not a claim of NOT NULL -- see the
-    # comment at the result_columns build site.
-    if (defined $r->{is_nullable} && $r->{is_nullable} ne '') {
-        return 0 unless lc($d->{is_nullable} // '') eq lc($r->{is_nullable});
-    }
-
-    # CURRENT_TIMESTAMP has several spellings across MariaDB versions and
-    # Result files (current_timestamp() vs CURRENT_TIMESTAMP).
-    my $d_def = $d->{default_value} // 'NULL';
-    my $r_def = $r->{default_value} // 'NULL';
-    for ($d_def, $r_def) {
-        s/^\s+|\s+$//g;
-        # MariaDB reports "ON UPDATE CURRENT_TIMESTAMP" in the Extra column,
-        # while Result files fold it into default_value. Compare only the
-        # DEFAULT portion so the two spellings agree.
-        s/\s*ON\s+UPDATE\s+CURRENT_TIMESTAMP\s*(\(\))?//i;
-        s/\(\)$//;
-        $_ = uc($_) if /^current_timestamp/i;
-        $_ = 'NULL' if $_ eq '';
-    }
-    return 0 unless $d_def eq $r_def;
-
-    return 1;
+    return Comserv::Util::Schema::Equivalence->fields_equivalent($d, $r);
 }
 
 sub clean_scalar_refs {
@@ -2845,18 +2805,22 @@ sub schema_compare :Private {
 
         # Live-check using the first connection in the group
         my $status = $self->_check_server_live($c, $remote_db, $group, $g->{conns});
+        my $live_databases = $self->_live_database_cards(
+            $c, $remote_db, $all_conns, $group, $g, $status
+        );
 
         push @servers, {
-            name         => $display_name,
-            server_group => $group,
-            ips          => \@group_ips,
-            db_count     => $db_count,
-            type_display => $type_display,
-            running      => $status->{running},
-            status       => $status->{status},
-            db_ok        => $status->{db_ok},
-            db_error     => $status->{db_error} || '',
-            routes       => $status->{routes} || [],
+            name            => $display_name,
+            server_group    => $group,
+            ips             => \@group_ips,
+            db_count        => $db_count,
+            type_display    => $type_display,
+            running         => $status->{running},
+            status          => $status->{status},
+            db_ok           => $status->{db_ok},
+            db_error        => $status->{db_error} || '',
+            routes          => $status->{routes} || [],
+            live_databases  => $live_databases,
         };
     }
 
@@ -3042,26 +3006,229 @@ sub _match_group_connections {
 # Fix: walk the matching connections in priority order and return a handle from
 # the first one that actually connects, together with its name.
 # Returns ($dbh, $conn_name); both undef if nothing connects.
+sub _safe_ident {
+    my ($self, $name) = @_;
+    return undef unless defined $name && $name =~ /\A[A-Za-z0-9_]+\z/;
+    return $name;
+}
+
+sub _endpoint_key {
+    my ($self, $cfg) = @_;
+    return '' unless $cfg && $cfg->{host};
+    my $port = $cfg->{port} // ($self->_is_postgresql($cfg) ? 5432 : 3306);
+    return lc($cfg->{host}) . ':' . $port;
+}
+
+# Other secret slots on the same host:port. db-server-1:3307 and
+# db-server-2:3307 are one Maria listener; only one of those logins
+# (shanta_forager in production_forager) is granted from this workstation.
+sub _same_endpoint_names {
+    my ($self, $all_conns, $conn_names) = @_;
+    my %have = map { $_ => 1 } @$conn_names;
+    my $endpoint = '';
+    for my $n (@$conn_names) {
+        $endpoint = $self->_endpoint_key($all_conns->{$n}{config});
+        last if $endpoint;
+    }
+    return () unless $endpoint;
+    my @extra;
+    for my $name (sort keys %$all_conns) {
+        next if $have{$name};
+        my $cfg = $all_conns->{$name}{config} or next;
+        next if ($cfg->{db_type} // 'mysql') eq 'sqlite';
+        push @extra, $name if $self->_endpoint_key($cfg) eq $endpoint;
+    }
+    return @extra;
+}
+
+sub _use_database {
+    my ($self, $dbh, $db_name, $is_pg) = @_;
+    return 1 if $is_pg;
+    my $ident = $self->_safe_ident($db_name) or return 0;
+    my $current = eval { $dbh->selectrow_array('SELECT DATABASE()') };
+    return 1 if defined $current && lc($current) eq lc($ident);
+    eval { $dbh->do("USE `$ident`") };
+    return $@ ? 0 : 1;
+}
+
+# Last resort: the Maria user that is actually granted. Passwords stay in
+# the secret files; this only retries shanta_forager passwords already stored
+# for other slots, against the host:port of the card the admin opened.
+sub _try_forager_login {
+    my ($self, $all_conns, $host, $port) = @_;
+    return (undef, undef) unless $host && $port;
+    my %seen;
+    for my $name (sort keys %$all_conns) {
+        my $cfg = $all_conns->{$name}{config} or next;
+        next unless ($cfg->{username} // '') eq 'shanta_forager';
+        next unless defined $cfg->{password} && $cfg->{password} ne '';
+        next if $seen{$cfg->{password}}++;
+        my $dsn = "DBI:MariaDB:host=$host;port=$port";
+        my $dbh = eval {
+            DBI->connect($dsn, 'shanta_forager', $cfg->{password}, {
+                RaiseError => 0, PrintError => 0, mariadb_connect_timeout => 8,
+            });
+        };
+        return ($dbh, $name) if $dbh;
+    }
+    return (undef, undef);
+}
+
+sub _group_host_port {
+    my ($self, $all_conns, $conn_names) = @_;
+    for my $n (@$conn_names) {
+        my $cfg = $all_conns->{$n}{config} or next;
+        next unless $cfg->{host};
+        my $port = $cfg->{port} // ($self->_is_postgresql($cfg) ? 5432 : 3306);
+        return ($cfg->{host}, $port, $self->_is_postgresql($cfg));
+    }
+    return ();
+}
+
 sub _pick_live_connection {
     my ($self, $remote_db, $all_conns, $conn_names, $db_name) = @_;
 
-    my @candidates = grep {
-        my $cfg = $all_conns->{$_}{config};
-        (lc($cfg->{database} // $_) eq lc($db_name))
-    } @$conn_names;
-
-    # Deterministic order: lowest priority number first, then name.
-    @candidates = sort {
+    my @pool = (@$conn_names, $self->_same_endpoint_names($all_conns, $conn_names));
+    my @matching = grep {
+        my $cfg = $all_conns->{$_}{config} || {};
+        lc($cfg->{database} // $_) eq lc($db_name // '')
+    } @pool;
+    my @rest = grep {
+        my $cfg = $all_conns->{$_}{config} || {};
+        lc($cfg->{database} // $_) ne lc($db_name // '')
+    } @pool;
+    my @ordered = (@matching, @rest);
+    @ordered = sort {
         ($all_conns->{$a}{priority} // 999) <=> ($all_conns->{$b}{priority} // 999)
         || $a cmp $b
-    } @candidates;
+    } @ordered;
 
-    for my $conn_name (@candidates) {
+    for my $conn_name (@ordered) {
         my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
         next unless $dbh;
+        my $cfg = $all_conns->{$conn_name}{config} || {};
+        my $is_pg = $self->_is_postgresql($cfg);
+        unless ($self->_use_database($dbh, $db_name, $is_pg)) {
+            $dbh->disconnect;
+            next;
+        }
         return ($dbh, $conn_name);
     }
+
+    my ($host, $port, $is_pg) = $self->_group_host_port($all_conns, $conn_names);
+    return (undef, undef) if $is_pg;
+    my ($dbh, $via) = $self->_try_forager_login($all_conns, $host, $port);
+    if ($dbh) {
+        unless ($self->_use_database($dbh, $db_name, 0)) {
+            $dbh->disconnect;
+            return (undef, undef);
+        }
+        return ($dbh, $via);
+    }
     return (undef, undef);
+}
+
+# One card per host:port:database. A failed login must still show that host
+# (192.168.1.198 must not disappear behind the ZeroTier address in the same group).
+sub _live_database_cards {
+    my ($self, $c, $remote_db, $all_conns, $group, $g, $status) = @_;
+
+    my %route;
+    for my $r (@{ $status->{routes} || [] }) {
+        $route{ lc(($r->{host} // '') . ':' . ($r->{port} // '')) } = $r;
+    }
+
+    my %by_ep;
+    for my $conn_name (@{ $g->{conns} || [] }) {
+        my $cfg = $all_conns->{$conn_name}{config} or next;
+        my $host = $cfg->{host} // '';
+        next unless length $host;
+        my $port = $cfg->{port} // ($self->_is_postgresql($cfg) ? 5432 : 3306);
+        my $ek = lc("$host:$port");
+        $by_ep{$ek} ||= {
+            host => $host, port => $port, conns => [], dbs => {},
+            engine => $self->_is_postgresql($cfg) ? 'postgresql' : 'mysql',
+        };
+        push @{ $by_ep{$ek}{conns} }, $conn_name;
+        $by_ep{$ek}{dbs}{ $cfg->{database} } = 1 if $cfg->{database};
+    }
+
+    my @cards;
+    for my $ek (sort keys %by_ep) {
+        my $ep = $by_ep{$ek};
+        my $rt = $route{$ek} || {};
+        my $err = $rt->{error} || '';
+        $err =~ s/\s+/ /g;
+        $err = substr($err, 0, 180);
+
+        if ($rt->{db_ok}) {
+            my ($conn_name, $rows, $cfg) = $self->_catalog_for_group(
+                $remote_db, $all_conns, $ep->{conns}
+            );
+            if ($conn_name && $rows) {
+                my $is_pg = $self->_is_postgresql($cfg);
+                for my $row (@$rows) {
+                    next unless $row->{name} && $row->{name} =~ /\A[A-Za-z0-9_]+\z/;
+                    push @cards, {
+                        key          => $conn_name . '|' . $row->{name},
+                        name         => $row->{name},
+                        host         => $ep->{host},
+                        port         => $ep->{port},
+                        server_group => $group,
+                        conn_name    => $conn_name,
+                        table_count  => $row->{table_count},
+                        row_count    => $row->{row_count},
+                        has_counts   => defined $row->{table_count} ? 1 : 0,
+                        comparable   => 1,
+                        engine       => $is_pg ? 'postgresql' : 'mysql',
+                        error        => '',
+                    };
+                }
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_live_database_cards',
+                    "$group $ep->{host}:$ep->{port} via $conn_name: " . scalar(@$rows) . ' databases');
+                next;
+            }
+            $err ||= $remote_db->last_connection_error || 'catalog query failed';
+        }
+
+        $err ||= $rt->{reachable} ? 'TCP open, MariaDB sent no greeting' : 'no TCP listener';
+        for my $db_name (sort keys %{ $ep->{dbs} }) {
+            push @cards, {
+                key          => '',
+                name         => $db_name,
+                host         => $ep->{host},
+                port         => $ep->{port},
+                server_group => $group,
+                comparable   => 0,
+                has_counts   => 0,
+                engine       => $ep->{engine},
+                error        => $err,
+            };
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_live_database_cards',
+            "$group $ep->{host}:$ep->{port} not usable: $err");
+    }
+
+    @cards = sort {
+        $a->{host} cmp $b->{host} || $a->{port} <=> $b->{port} || $a->{name} cmp $b->{name}
+    } @cards;
+    return \@cards;
+}
+
+sub _catalog_for_group {
+    my ($self, $remote_db, $all_conns, $conn_names) = @_;
+    for my $conn_name (@$conn_names) {
+        my $cfg = $all_conns->{$conn_name}{config} or next;
+        my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
+        next unless $dbh;
+        my $is_pg = $self->_is_postgresql($cfg);
+        my $rows = eval { Comserv::Util::DatabaseCompare->catalog_counts($dbh, $is_pg) };
+        my $err = $@;
+        $dbh->disconnect;
+        next if $err || !$rows || !@$rows;
+        return ($conn_name, $rows, $cfg);
+    }
+    return;
 }
 
 sub schema_compare_server :Path('/admin/schema_compare/server') :Args(1) {
@@ -3133,6 +3300,8 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
     # database as empty.
     my %db_tables;  # name => { row_count, size_kb, size }
     my $is_pg = 0;
+    my $live_columns = {};  # lc(table) => { lc(col) => col hash }
+    my $live_keys    = {};  # lc(table) => { primary_keys, uniques }
     my ($dbh, $conn_name) = $self->_pick_live_connection(
         $remote_db, $all_conns, \@group_conns, $db_name
     );
@@ -3169,6 +3338,19 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
             if ($@) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'schema_compare_database',
                     "Table list failed for $db_name via $conn_name: $@");
+            }
+            # Bulk column + key catalog for tables-list drift flags (todo #2731).
+            # One information_schema pass, then the dbh is closed — comparison
+            # itself is pure Equivalence, no further live queries.
+            eval {
+                my $insp = Comserv::Util::Schema::Inspector->new();
+                my $cat  = $actual_db // $db_name;
+                $live_columns = $insp->list_all_columns($dbh, $cat, $is_pg) || {};
+                $live_keys    = $insp->list_all_keys($dbh, $cat, $is_pg) || {};
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'schema_compare_database',
+                    "Bulk catalog failed for $db_name via $conn_name: $@");
             }
             $dbh->disconnect;
         }
@@ -3233,22 +3415,52 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
     # Track which result table names were matched (for debugging)
     my %matched_result_names;
 
+    my $preview_parser = Comserv::Util::Schema::ResultParser->new();
     foreach my $tname (sort keys %db_tables) {
         my $tinfo = $db_tables{$tname};
         if (exists $result_mapping->{lc($tname)}) {
             $matched_result_names{lc($tname)} = 1;
+            my $rpath = $result_mapping->{lc($tname)}{result_path};
+            my $preview = $preview_parser->preview_fields($rpath);
+            my $keys = $live_keys->{lc($tname)} || {};
+            my $cmp  = Comserv::Util::Schema::Equivalence->compare_table(
+                table_name          => $tinfo->{name},
+                has_table           => 1,
+                has_result          => 1,
+                db_columns          => $live_columns->{lc($tname)} || {},
+                result_columns      => $preview->{fields} || $preview->{columns} || {},
+                db_primary_keys     => $keys->{primary_keys} || [],
+                result_primary_keys => $preview->{primary_keys} || [],
+                db_uniques          => $keys->{uniques} || [],
+                result_uniques      => $preview->{unique_constraints} || [],
+            );
             push @both, {
                 %$tinfo,
-                has_result  => 1,
-                result_name => $result_mapping->{lc($tname)}{result_name},
-                result_path => $result_mapping->{lc($tname)}{result_path},
-                result_rel_path => $result_mapping->{lc($tname)}{result_path} =~ s{^\Q$app_root\E/?}{}r,
+                has_result   => 1,
+                result_name  => $result_mapping->{lc($tname)}{result_name},
+                result_path  => $rpath,
+                result_rel_path => ($rpath // '') =~ s{^\Q$app_root\E/?}{}r,
+                fields       => $preview->{fields} || [],
+                field_count  => $preview->{field_count} || 0,
+                primary_keys => $preview->{primary_keys} || [],
+                has_problem  => $cmp->{has_problem} ? 1 : 0,
+                issue_count  => $cmp->{issue_count} || 0,
+                issues       => $cmp->{issues} || [],
             };
         } else {
+            my $cmp = Comserv::Util::Schema::Equivalence->compare_table(
+                table_name => $tinfo->{name},
+                has_table  => 1,
+                has_result => 0,
+                db_columns => $live_columns->{lc($tname)} || {},
+            );
             push @table_only, {
                 %$tinfo,
                 has_result  => 0,
                 result_name => undef,
+                has_problem => $cmp->{has_problem} ? 1 : 0,
+                issue_count => $cmp->{issue_count} || 0,
+                issues      => $cmp->{issues} || [],
             };
         }
     }
@@ -3263,31 +3475,10 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
             my $rname = $result_mapping->{$tname}{result_name};
             my $rel   = $rpath =~ s{^\Q$app_root\E/?}{}r;
 
-            my $columns = {};
-            my @fields  = ();
-            my @pks     = ();
-            my $schema  = eval { $orphan_parser->get_result_file_schema($rpath) };
-            if ($schema && ref($schema->{columns}) eq 'HASH') {
-                $columns = $schema->{columns};
-                @pks = @{ $schema->{primary_keys} || [] };
-                my %pk_lookup = map { $_ => 1 } @pks;
-                foreach my $cname (sort keys %$columns) {
-                    my $cinfo = $columns->{$cname} || {};
-                    $cinfo->{is_primary_key} = 1 if $pk_lookup{$cname};
-                    # Flatten for Template Toolkit: ordered list with name + attrs
-                    push @fields, {
-                        name            => $cname,
-                        data_type       => $cinfo->{data_type} // '',
-                        size            => $cinfo->{size},
-                        is_nullable     => defined $cinfo->{is_nullable} ? $cinfo->{is_nullable} : 1,
-                        is_auto_increment => $cinfo->{is_auto_increment} ? 1 : 0,
-                        is_primary_key  => $cinfo->{is_primary_key} ? 1 : 0,
-                        default_value   => defined $cinfo->{default_value} ? $cinfo->{default_value} : undef,
-                        docs            => $cinfo->{docs} // $cinfo->{documentation} // $cinfo->{comment} // '',
-                    };
-                    $columns->{$cname} = $cinfo;
-                }
-            }
+            my $preview = $orphan_parser->preview_fields($rpath);
+            my $columns = $preview->{columns} || {};
+            my @fields  = @{ $preview->{fields} || [] };
+            my @pks     = @{ $preview->{primary_keys} || [] };
 
             push @orphaned_result_files, {
                 result_name => $rname,
@@ -3299,6 +3490,12 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
                 primary_keys => [ @pks ],
                 field_count => scalar(@fields),
             };
+            my $cmp = Comserv::Util::Schema::Equivalence->compare_table(
+                table_name     => $tname,
+                has_table      => 0,
+                has_result     => 1,
+                result_columns => $preview->{fields} || $columns,
+            );
             push @result_only, {
                 name        => $tname,
                 row_count   => 0,
@@ -3314,6 +3511,9 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
                 fields      => [ @fields ],
                 primary_keys => [ @pks ],
                 field_count => scalar(@fields),
+                has_problem => $cmp->{has_problem} ? 1 : 0,
+                issue_count => $cmp->{issue_count} || 0,
+                issues      => $cmp->{issues} || [],
             };
         }
     }
@@ -3322,6 +3522,11 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
     my $db_table_count = scalar(keys %db_tables);
     my $matched_count = scalar(keys %matched_result_names);
     my $orphaned_count = scalar(@orphaned_result_files);
+    my $both_problem_count = scalar(grep { $_->{has_problem} } @both);
+    my $problem_table_count = $both_problem_count
+        + scalar(grep { $_->{has_problem} } @table_only)
+        + scalar(grep { $_->{has_problem} } @result_only);
+    my $listed_table_count = @both + @table_only + @result_only;
 
     $c->stash(
         template => 'admin/schema_compare/tables.tt',
@@ -3339,6 +3544,9 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
         matched_count     => $matched_count,
         orphaned_result_files => \@orphaned_result_files,
         orphaned_count      => $orphaned_count,
+        both_problem_count  => $both_problem_count,
+        problem_table_count => $problem_table_count,
+        listed_table_count  => $listed_table_count,
     );
 }
 
@@ -3391,37 +3599,11 @@ sub schema_compare_table :Path('/admin/schema_compare/server') :Args(5) {
         }
 
         if ($result_file_path) {
-            my $schema_info = $parser->get_result_file_schema($result_file_path);
-            foreach my $col_name (keys %{ $schema_info->{columns} }) {
-                my $c = $schema_info->{columns}{$col_name};
-                my $dt = $c->{data_type} // $c->{type} // 'varchar';
-                my $sz = (defined $c->{size}       && $c->{size} ne '')
-                      || (defined $c->{data_length} && $c->{data_length} ne '')
-                    ? '(' . ($c->{size} // $c->{data_length} // '255') . ')' : '';
-                # DBIx::Class documents is_nullable as defaulting to false, but
-                # in this codebase many Result files simply OMIT the key on
-                # columns that are nullable in the database. Inferring NOT NULL
-                # from an absent key therefore flags ~14 populated nullable
-                # columns (files.*, workshop.*) as drift and offers an "Update
-                # Table" button that would ALTER them to NOT NULL -- which can
-                # fail or reject existing rows. Absent means UNKNOWN: record
-                # undef and let _fields_equivalent skip the nullability check
-                # rather than guess destructively.
-                my $nullable;
-                if (defined $c->{is_nullable}) {
-                    $nullable = ($c->{is_nullable} =~ /^(0|no|false)$/i) ? 'NO' : 'YES';
-                } elsif ($c->{is_auto_increment}) {
-                    $nullable = 'NO';   # auto-increment is always NOT NULL
-                } else {
-                    $nullable = undef;  # not declared -> do not compare
-                }
-                $result_columns{ lc($col_name) } = {
-                    name          => $col_name,
-                    data_type     => $dt,
-                    size          => $sz,
-                    is_nullable   => $nullable,
-                    default_value => $c->{default_value},
-                };
+            # preview_fields flattens ARRAY/HASH attrs to scalars so TT can
+            # print them, and fills extra/comment (previously hard-coded '').
+            my $preview = $parser->preview_fields($result_file_path);
+            foreach my $disp (@{ $preview->{fields} }) {
+                $result_columns{ lc($disp->{name}) } = $disp;
             }
         }
     }
@@ -3473,11 +3655,11 @@ sub schema_compare_table :Path('/admin/schema_compare/server') :Args(5) {
                 source       => 'Result',
                 name         => $r->{name},
                 data_type    => $r->{data_type},
-                size         => $r->{size},
-                nullable     => $r->{is_nullable},
-                default_val  => (defined $r->{default_value} ? $r->{default_value} : 'NULL'),
-                extra        => '',
-                comment      => '',
+                size         => (($r->{size} // '') ne '' ? $r->{size} : "\x{2014}"),
+                nullable     => $r->{nullable} // "\x{2014}",
+                default_val  => $r->{default_val} // (defined $r->{default_value} ? $r->{default_value} : 'NULL'),
+                extra        => $r->{extra} // '',
+                comment      => $r->{comment} // '',
                 status       => $match ? 'Match' : 'Result',
                 has_result   => $d ? 1 : 0,
                 has_diff     => $match ? 0 : 1,

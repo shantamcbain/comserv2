@@ -14,6 +14,7 @@ use JSON::PP ();
 use POSIX qw(strftime);
 use Fcntl qw(:flock);
 use Comserv::Util::AI::TaskGrouper;
+use Comserv::Util::AppTime ();
 
 my $J = JSON::PP->new->canonical;
 our $CACHE_TTL = 600;
@@ -32,7 +33,7 @@ sub _write_json {
     rename "$f.tmp", $f or return "rename: $!";
     return undef;
 }
-sub _pt { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset(); my $r = strftime('%a %b %d %H:%M PT', localtime($_[0] // 0)); POSIX::tzset(); $r }
+sub _pt { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); my $r = strftime('%a %b %d %H:%M PT', localtime($_[0] // 0)); POSIX::tzset(); $r }
 
 sub ratings { my ($s) = @_; return _read_json($s->ratings_file) || {} }
 

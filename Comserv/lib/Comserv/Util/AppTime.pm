@@ -23,6 +23,12 @@ use Carp qw(croak);
 our $VERSION = '1.00';
 
 our $DEFAULT_USER_TZ = $ENV{COMSERV_DEFAULT_USER_TZ} || 'America/Vancouver';
+
+# ONE place for the app/operator zone (usage meters, daily resets, log stamps).
+# Override with COMSERV_APP_TZ. COMSERV_APP_TZ_FALLBACK_OFFSET is used only when
+# the system zone data cannot give an offset (e.g. "-0700").
+our $APP_TZ                 = $ENV{COMSERV_APP_TZ} || $DEFAULT_USER_TZ;
+our $APP_TZ_FALLBACK_OFFSET = $ENV{COMSERV_APP_TZ_FALLBACK_OFFSET} || q{-0700};
 our $STORAGE_TZ      = 'UTC';
 our $DEFAULT_FMT     = '%Y-%m-%d %H:%M:%S';
 our $DISPLAY_FMT     = '%Y-%m-%d %H:%M:%S %Z';
@@ -38,6 +44,50 @@ sub _load_dt {
 }
 
 sub new { bless {}, shift }
+
+# ---- app (operator) zone ----------------------------------------------------
+# Name of the app zone, for local $ENV{TZ} = ... blocks.
+sub app_tz { $APP_TZ }
+
+# UTC offset (+-HHMM) of the app zone at $epoch, from the SYSTEM tz database
+# (tzdata package, kept current by the OS). Perl DateTime::TimeZone ships its
+# own copy that can be out of date (2.64 still has Vancouver on -08:00 after
+# Nov 1 2026; BC stays on -07:00), so the system data is the source of truth.
+sub app_offset {
+    my ( $class, $epoch ) = @_;
+    require POSIX;
+    my $old = $ENV{TZ};
+    $ENV{TZ} = $APP_TZ; POSIX::tzset();
+    my $o = POSIX::strftime( q{%z}, localtime( $epoch // time ) );
+    if ( defined $old ) { $ENV{TZ} = $old } else { delete $ENV{TZ} }
+    POSIX::tzset();
+    return ( defined $o && $o =~ /^[+-]\d{4}$/ ) ? $o : $APP_TZ_FALLBACK_OFFSET;
+}
+
+# DateTime::TimeZone for the app zone at $epoch. Uses the named zone when the
+# Perl tz data agrees with the system; otherwise a fixed offset from the system.
+sub app_tz_object {
+    my ( $class, $epoch ) = @_;
+    _load_dt();
+    $epoch //= time;
+    my $sys = $class->app_offset($epoch);
+    my $tz  = eval { DateTime::TimeZone->new( name => $APP_TZ ) };
+    return $tz if $tz
+        && DateTime->from_epoch( epoch => $epoch, time_zone => $tz )->strftime(q{%z}) eq $sys;
+    return DateTime::TimeZone->new( name => $sys );
+}
+
+# strftime in the app zone (system tz data).
+sub app_strftime {
+    my ( $class, $fmt, $epoch ) = @_;
+    require POSIX;
+    my $old = $ENV{TZ};
+    $ENV{TZ} = $APP_TZ; POSIX::tzset();
+    my $s = POSIX::strftime( $fmt, localtime( $epoch // time ) );
+    if ( defined $old ) { $ENV{TZ} = $old } else { delete $ENV{TZ} }
+    POSIX::tzset();
+    return $s;
+}
 
 # ---- write / storage --------------------------------------------------------
 
@@ -226,7 +276,7 @@ sub normalize_tz {
     return $name if $class->is_valid_tz($name);
     # common aliases
     return 'America/Vancouver' if $name =~ /^(PT|PST|PDT|Pacific)$/i;
-    return 'America/Los_Angeles' if $name =~ /^(US\/Pacific)$/i;
+    return 'America/Vancouver' if $name =~ /^(US\/Pacific)$/i;
     return 'UTC' if $name =~ /^(UTC|GMT|Z)$/i;
     return $DEFAULT_USER_TZ;
 }

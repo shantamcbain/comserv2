@@ -1,6 +1,6 @@
 {
-  "versionCode": 19,
-  "versionName": "2.8",
+  "versionCode": 48,
+  "versionName": "3.4.15",
   "apkUrl": "/api/app/download",
-  "releaseNotes": "v2.8 Server Environment Selector (Dev Port 3001 Live AI Changes vs Prod Port 5000), explicit target display, and rich Changelog support."
+  "releaseNotes": "v3.4.15 WebView X-Debug-Mode header injection for live web debug bar & automatic target re-authentication on Dev/Prod Connection Test."
 }

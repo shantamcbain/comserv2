@@ -34,6 +34,20 @@ sub auto :Private {
         return 0;
     }
 
+    # Every Health Kitchen POST must be same-origin (scheme + host + port).
+    if ( $c->req->method eq 'POST' ) {
+        require Comserv::Util::OriginCheck;
+        unless ( Comserv::Util::OriginCheck->request_ok($c) ) {
+            $self->logging->log_with_details( $c, 'warn', __FILE__, __LINE__, 'auto',
+                'HealthKitchen POST refused (cross-site) path=' . ( $c->req->path // '' ) );
+            $c->res->status(403);
+            $c->res->content_type('text/plain; charset=utf-8');
+            $c->res->body('Request refused (cross-site).');
+            $c->detach;
+            return 0;
+        }
+    }
+
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split( /\s*,\s*/, $roles );
     my $is_admin = grep { lc($_) eq 'admin' || lc($_) eq 'site_admin' } @role_list;
@@ -86,6 +100,7 @@ sub _stash_mode {
     $c->stash->{hk_prefs_ready}    = $self->hk->prefs_cols_ready($c) ? 1 : 0;
     $c->stash->{hk_factor_ready}   = $self->hk->factor_ready($c) ? 1 : 0;
     $self->hk->ensure_sourcing_seed($c) if $c->stash->{hk_factor_ready};
+    $self->hk->ensure_ency_herb_seed($c);
     $c->stash->{hk_sourcing_enums} = $self->hk->sourcing_enums;
 }
 
@@ -123,8 +138,144 @@ sub index :Path('/healthkitchen') :Args(0) {
         hk_recipes  => $preview_end >= 0 ? [ @{$recipes}[ 0 .. $preview_end ] ] : [],
         hk_recipe_n => $n,
         hk_today    => $self->hk->today_dashboard($c),
+        $self->_meal_slot_stash($c),
         template    => 'healthkitchen/index.tt',
     );
+}
+
+# HealthKitchen.slots_source: 'mealslots' (default; slot cards from MealSlots)
+# or 'todos' (old embedded /todo/day?filter=schedule iframe).
+sub _slots_source {
+    my ( $self, $c ) = @_;
+    my $v = eval { $c->config->{HealthKitchen}{slots_source} } // 'mealslots';
+    return $v eq 'todos' ? 'todos' : 'mealslots';
+}
+
+sub _meal_slot_stash {
+    my ( $self, $c ) = @_;
+    my $src = $self->_slots_source($c);
+    return ( hk_slots_source => $src ) unless $src eq 'mealslots';
+    require Comserv::Util::HealthKitchen::MealSlots;
+    require Comserv::Util::AppTime;
+    my $MS    = 'Comserv::Util::HealthKitchen::MealSlots';
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
+    my $day   = eval { $MS->day( $c, $today ) } || { slots => [] };
+    my $sugg  = eval { $MS->suggestions( $c, $today ) } || [];
+    return ( hk_slots_source => $src, hk_day => $day, hk_slot_suggestions => $sugg );
+}
+
+sub _done {
+    my ( $self, $c, $res, $ok_msg ) = @_;
+    if ( $c->req->params->{ajax} ) {
+        $c->res->content_type('application/json; charset=utf-8');
+        $c->res->status( $res->{ok} ? 200 : 400 );
+        $c->res->body( encode_json( { map { $_ => $res->{$_} } grep { /^(ok|error|id|changes|pending)$/ } keys %$res } ) );
+    }
+    else {
+        if ( $res->{ok} ) { $c->flash->{success_msg} = $ok_msg }
+        else              { $c->flash->{error_msg}   = $res->{error} || 'Failed.' }
+        my $back = ( $c->req->params->{return} // '' ) eq 'slots' ? '/healthkitchen/slots' : '/healthkitchen';
+        $c->response->redirect( $c->uri_for($back) );
+    }
+    $c->detach;
+}
+
+sub _post_only {
+    my ( $self, $c ) = @_;
+    return 1 if $c->req->method eq 'POST';
+    $c->response->redirect( $c->uri_for('/healthkitchen') );
+    $c->detach;
+    return 0;
+}
+
+# Per-user meal/drink slot times (user pref healthkitchen.meal_slots, by site).
+sub slots :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    require Comserv::Util::HealthKitchen::MealSlots;
+    my $MS = 'Comserv::Util::HealthKitchen::MealSlots';
+    if ( $c->req->method eq 'POST' ) {
+        my $p = $c->req->params;
+        my @list;
+        for my $i ( 0 .. 19 ) {
+            my $key = $p->{"key_$i"} // '';
+            next unless length $key;
+            next if $p->{"remove_$i"};
+            push @list, { key => $key, kind => $p->{"kind_$i"}, label => $p->{"label_$i"},
+                start => $p->{"start_$i"}, end => $p->{"end_$i"},
+                ( length( $p->{"recipe_$i"} // '' ) ? ( recipe_name => $p->{"recipe_$i"} ) : () ),
+                ( length( $p->{"plan_$i"} // '' ) ? ( plan_slots => [ grep { length } split /\s*,\s*/, $p->{"plan_$i"} ] ) : () ) };
+        }
+        my $clean = $MS->clean_slots( \@list );
+        my $res;
+        if ( !$clean ) { $res = { ok => 0, error => 'Check the slots: key a-z0-9_, kind meal/drink, HH:MM end after start, plan slots breakfast/lunch/dinner/snack.' } }
+        else {
+            require Comserv::Util::UserPreferences;
+            my $up   = Comserv::Util::UserPreferences->new;
+            my $o    = $MS->owner($c);
+            my $all  = $up->get( $c, $o->{user_id}, $Comserv::Util::HealthKitchen::MealSlots::PREF_KEY ) || {};
+            $all = {} unless ref $all eq 'HASH';
+            $all->{ $o->{sitename} } = $clean;
+            $res = $up->set_many( $c, $o->{user_id}, { $Comserv::Util::HealthKitchen::MealSlots::PREF_KEY => $all } );
+        }
+        $c->req->params->{return} = 'slots';
+        return $self->_done( $c, $res, 'Meal times saved.' );
+    }
+    require Comserv::Util::AppTime;
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
+    $c->stash(
+        hk_slots            => $MS->slots_for($c),
+        hk_slot_suggestions => ( eval { $MS->suggestions( $c, $today ) } || [] ),
+        template            => 'healthkitchen/slots.tt',
+    );
+}
+
+# Start / Stop / Done on a slot card -> IntakeLog timing row.
+sub slot_log :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->_post_only($c) or return;
+    require Comserv::Util::HealthKitchen::MealLog;
+    my $p   = $c->req->params;
+    my $res = Comserv::Util::HealthKitchen::MealLog->slot_action( $c, $p->{action}, $p->{slot},
+        { recipe_id => $p->{recipe_id} } );
+    $self->_done( $c, $res, ucfirst( $p->{action} // 'logged' ) . ' logged.' );
+}
+
+# + Drink (out): count only, no inventory.
+sub drink_out :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->_post_only($c) or return;
+    require Comserv::Util::HealthKitchen::MealLog;
+    my $res = Comserv::Util::HealthKitchen::MealLog->drink_out( $c, $c->req->params );
+    $self->_done( $c, $res, 'Drink logged (no inventory change).' );
+}
+
+# + Meal out: description of a restaurant meal, no inventory.
+sub meal_out :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->_post_only($c) or return;
+    require Comserv::Util::HealthKitchen::MealLog;
+    my $res = Comserv::Util::HealthKitchen::MealLog->meal_out( $c, $c->req->params );
+    $self->_done( $c, $res, 'Meal logged (no inventory change).' );
+}
+
+# Idempotent recipe setup (Morning beverage grams + collagen, home Coffee, net weights).
+sub setup_apply :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->_post_only($c) or return;
+    require Comserv::Util::HealthKitchen::RecipeSetup;
+    my $res = eval { Comserv::Util::HealthKitchen::RecipeSetup->apply($c) };
+    unless ($res) {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'setup_apply', "failed: $@" );
+        $res = { ok => 0, error => 'Setup failed; nothing changed.' };
+    }
+    else {
+        $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'setup_apply',
+            'recipe setup: ' . join( '; ', @{ $res->{changes} || [] } ) . ' backup=' . ( $res->{backup} // '' ) );
+    }
+    $c->req->params->{return} = 'slots';
+    my $msg = 'Setup applied: ' . ( join( '; ', @{ $res->{changes} || [] } ) || 'already up to date' )
+        . ( @{ $res->{pending} || [] } ? '. Pending: ' . join( '; ', @{ $res->{pending} } ) : '' );
+    $self->_done( $c, $res, $msg );
 }
 
 sub pantry :Local :Args(0) {
@@ -175,7 +326,76 @@ sub recipes :Local :Args(0) {
         'HealthKitchen recipes' );
     $c->stash(
         hk_recipes => $self->hk->list_recipes($c),
+        hk_max_batches => $self->hk->max_batches($c),
         template   => 'healthkitchen/recipes.tt',
+    );
+}
+
+sub recipe_form :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    my $id = $c->req->params->{id};
+    my $form = {};
+    if ( defined $id && $id =~ /^\d+$/ ) {
+        $form = $self->hk->recipe_for_edit( $c, $id );
+        unless ($form) {
+            $c->flash->{error_msg} = 'Recipe not found, or you cannot edit it.';
+            $c->response->redirect( $c->uri_for( $self->action_for('recipes') ) );
+            $c->detach;
+            return;
+        }
+    }
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'recipe_form',
+        'HealthKitchen recipe form id=' . ( $form->{id} || 'new' ) );
+    $c->stash(
+        hk_recipe_form => $form,
+        template       => 'healthkitchen/recipe_form.tt',
+    );
+}
+
+sub recipe_save :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    unless ( $c->req->method eq 'POST' ) {
+        $c->response->redirect( $c->uri_for( $self->action_for('recipe_form') ) );
+        $c->detach;
+        return;
+    }
+    my $res = $self->hk->save_recipe( $c, { %{ $c->req->params } } );
+    if ( $res->{ok} ) {
+        $c->flash->{success_msg} = $res->{created} ? 'Recipe added.' : 'Recipe saved.';
+        my $detail = $self->action_for('recipe');
+        $c->response->redirect(
+            $detail
+            ? $c->uri_for( $detail, [ $res->{id} ] )
+            : $c->uri_for( $self->action_for('recipes') )
+        );
+    }
+    else {
+        $c->flash->{error_msg} = $res->{error} || 'Could not save the recipe.';
+        my $id = $c->req->params->{id};
+        $c->response->redirect( $c->uri_for(
+            $self->action_for('recipe_form'),
+            ( defined $id && $id =~ /^\d+$/ ) ? { id => $id } : ()
+        ) );
+    }
+    $c->detach;
+}
+
+sub recipe :Local :Args(1) {
+    my ( $self, $c, $recipe_id ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'recipe',
+        "HealthKitchen recipe $recipe_id" );
+    require Comserv::Util::HealthKitchen::RecipeDetail;
+    my $detail = Comserv::Util::HealthKitchen::RecipeDetail->detail( $c, $recipe_id );
+    unless ($detail) {
+        $c->flash->{error_msg} = 'Recipe not found.';
+        $c->response->redirect( $c->uri_for( $self->action_for('recipes') ) );
+        $c->detach;
+        return;
+    }
+    $c->stash(
+        hk_recipe      => $detail,
+        hk_max_batches => $self->hk->max_batches($c),
+        template       => 'healthkitchen/recipe.tt',
     );
 }
 
@@ -208,8 +428,48 @@ sub recipe_make :Local :Args(1) {
         $c->detach;
         return;
     }
-    my $batches = $c->req->params->{batches} || 1;
+    my $ajax = $c->req->params->{ajax} ? 1 : 0;
+    # CSRF: the app has no shared token helper, so POSTs must be same-origin
+    # (scheme + host + port; absent/null/malformed refused). Shared with Calendar.
+    require Comserv::Util::OriginCheck;
+    my $deny = !Comserv::Util::OriginCheck->request_ok($c)
+        ? [ 403, 'Request refused (cross-site).' ]
+        : !defined( $self->hk->valid_batches( $c, $c->req->params->{batches} ) )
+        ? [ 400, 'Batches must be a whole number from 1 to ' . $self->hk->max_batches($c) . '.' ]
+        : !( defined $recipe_id && $recipe_id =~ /^\d+$/ )
+        ? [ 400, 'Invalid recipe.' ]
+        : undef;
+    if ($deny) {
+        $self->logging->log_with_details( $c, 'warn', __FILE__, __LINE__, 'recipe_make',
+            "recipe_make refused: $deny->[1]" );
+        if ($ajax) {
+            $c->res->status( $deny->[0] );
+            $c->res->content_type('application/json; charset=utf-8');
+            $c->res->body( encode_json( { ok => 0, error => $deny->[1] } ) );
+        }
+        else {
+            $c->flash->{error_msg} = $deny->[1];
+            $c->response->redirect( $c->uri_for( $self->action_for('recipes') ) );
+        }
+        $c->detach;
+        return;
+    }
+    my $batches = $self->hk->valid_batches( $c, $c->req->params->{batches} );
     my $res     = $self->hk->consume_recipe( $c, $recipe_id, $batches );
+    if ($ajax) {
+        # In-place "Mark made" from a Health Kitchen day card (hk-recipe-confirm.js).
+        $c->res->content_type('application/json; charset=utf-8');
+        $c->res->body( encode_json( {
+            ok       => $res->{ok} ? 1 : 0,
+            name     => $res->{name},
+            via      => $res->{via},
+            deducted => $res->{deducted} || [],
+            skipped  => $res->{skipped}  || [],
+            ( $res->{error} ? ( error => "$res->{error}" ) : () ),
+        } ) );
+        $c->detach;
+        return;
+    }
     if ( $res->{ok} ) {
         my $via = $res->{via} eq 'inventory'
             ? 'site inventory (reorder short list)'
@@ -219,6 +479,11 @@ sub recipe_make :Local :Args(1) {
     }
     else {
         $c->flash->{error_msg} = $res->{error} || 'Could not mark recipe as made.';
+    }
+    if ( ( $c->req->params->{return} // '' ) eq 'home' ) {
+        $c->response->redirect( $c->uri_for('/healthkitchen') );
+        $c->detach;
+        return;
     }
     $c->response->redirect( $c->uri_for( $self->action_for('recipes') ) );
     $c->detach;
@@ -411,6 +676,39 @@ sub plan :Local :Args(1) {
         hk_plan  => $plan,
         template => 'healthkitchen/plan.tt',
     );
+}
+
+# POST: build the whole-food week plan (recipes + 7-day meal plan) from this site's inventory.
+sub week_plan :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'week_plan', 'HealthKitchen week plan' );
+    unless ( $c->req->method eq 'POST' && $c->session->{user_id} && $self->hk->meal_plan_ready($c) ) {
+        $c->flash->{error_msg} = 'Log in and use the form to build a week plan.';
+        $c->response->redirect( $c->uri_for( $self->action_for('mealplans') ) );
+        $c->detach;
+        return;
+    }
+    my $start = $c->req->params->{start_date} // '';
+    $start = '' unless $start =~ /^\d{4}-\d{2}-\d{2}$/;
+    require Comserv::Util::HealthKitchen::WeekPlan;
+    my $res = eval {
+        Comserv::Util::HealthKitchen::WeekPlan::build_week( $c->model('DBEncy')->schema,
+            site => $self->hk->sitename($c), user_id => $c->session->{user_id},
+            username => $c->session->{username}, start_date => $start || undef );
+    };
+    if ($res) {
+        my @need = map { $_->{label} } grep { !$_->{optional} } @{ $res->{shopping} };
+        $c->flash->{success_msg} = "Week plan ready: $res->{recipes_created} new recipes, $res->{entries_created} meals."
+            . ( @need ? ' Shopping list: ' . join( ', ', @need ) . '.' : '' );
+    }
+    else {
+        $self->logging->log_with_details( $c, 'error', __FILE__, __LINE__, 'week_plan', "failed: $@" );
+        $c->flash->{error_msg} = 'Could not build the week plan.';
+    }
+    $c->response->redirect( $res && $res->{plan_id}
+        ? $c->uri_for( $self->action_for('mealplan'), $res->{plan_id} )
+        : $c->uri_for( $self->action_for('mealplans') ) );
+    $c->detach;
 }
 
 sub mealplans :Local :Args(0) {

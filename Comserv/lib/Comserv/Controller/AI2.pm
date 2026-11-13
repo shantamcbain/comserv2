@@ -1074,6 +1074,30 @@ sub chat :Local :Args(0) {
         }
     }
 
+    # Page-create intent (Nov 5 2026): admins only; saves a NEW draft page
+    # through Controller::Pages::create_page_record. Never publishes.
+    my $page_hit = (!$is_guest_chat && !$skip_role_prompt && !$editor_skip_writes) && eval {
+        require Comserv::Model::AI2::PageCreate;
+        Comserv::Model::AI2::PageCreate->new->try_chat_create($c, prompt => $prompt);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'ai2_chat', "PageCreate try_chat_create threw: $@");
+    }
+    if ($page_hit && $page_hit->{handled}) {
+        $c->res->body(encode_json({
+            success         => $page_hit->{success} ? 1 : 0,
+            response        => $page_hit->{response} // '',
+            model           => $page_hit->{model} // '(page-create)',
+            provider        => $page_hit->{provider} // 'ai2-page',
+            needs_web_search=> 0,
+            page_action     => $page_hit->{page_action},
+            conversation_id => $conversation_id,
+            thinking        => [],
+        }));
+        return;
+    }
+
     # Invoice-create intent: BEFORE the LLM. Draft only; never posts GL.
     my $inv_hit = (!$is_guest_chat && !$skip_role_prompt && !$editor_skip_writes) && eval {
         require Comserv::Model::AI2::InvoiceCreate;
