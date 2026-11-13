@@ -120,7 +120,11 @@ is Comserv::Util::AI::SuperGrokPacing::model_weight('ollama/x'), 1.0, 'weight de
         [], 'after midnight: previous work day sends nothing';
     like $P->can('burn_alerts')->(used => 44, used_day_start => 16, day_from => $five, now => $seven_pm, used_basis => 'meter')->[0]{message},
         qr/\(meter\)/, 'message says which number was used';
-    is $a->[1]{kind}, 'work_window', '... work_window (>60% of budget by 09:00)';
+    is $a->[1]{kind}, 'work_window', '... work_window (>60% of budget after check_hour)';
+    like $a->[1]{message}, qr/^As of 19:05, 410% of today's Super Grok budget is gone/,
+        '... as of the compute time, not By 09:00 PT';
+    like $a->[1]{message}, qr/particle-1 \(`\/model code`\)/, '... suggests particle-1 /model code, not glm';
+    unlike $a->[1]{message}, qr/\boverrun\b|\bglm\b|\bPT\b/, '... no overrun/glm/PT in work_window text';
     my $nine = Time::Local::timelocal(0, 5, 9, 8, 9, 2026);
     my $eight = Time::Local::timelocal(0, 55, 8, 8, 9, 2026);
     $a = $P->can('burn_alerts')->(used => 4, used_day_start => 0, day_from => $five, now => $nine, budget_pct => 6);
