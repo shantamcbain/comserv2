@@ -1,22 +1,14 @@
 {
-  "branch": "healthkitchen",
-  "head_sha": "6cda5cc6a",
-  "date": "2026-11-12",
+  "branch": "aisystem",
+  "head_sha": "963b595d6",
+  "date": "2026-11-13",
   "uncommitted": true,
-  "last_doc_commit": "0b5be2495 (docs: update Hermes.md with AI guidance and Gitleaks config); this session's docs are uncommitted",
-  "changelog_entry": "Comserv/root/Documentation/changelog/entries/2026-11-12-schema-compare-decimal-size.inc",
+  "last_doc_commit": "963b595d6 feat(ai): update model chains and overrun guard for new AI system",
+  "changelog_entry": "Comserv/root/Documentation/changelog/entries/2026-11-13-editor-prompt-file-load.inc",
   "docs_updated": [
-    "Comserv/root/Documentation/SchemaMasterPlan.tt (section 11 defect 5 - Result-side decimal size)",
-    "Comserv/root/Documentation/HealthKitchenPlan.tt (HK-PANTRY stock-out paragraph)",
-    "Comserv/root/Documentation/changelog/entries/2026-11-12-schema-compare-decimal-size.inc",
-    "Comserv/root/Documentation/changelog/entries/2026-11-12-healthkitchen-recipe-make-hardening.inc"
+    "Comserv/root/Documentation/AISYSTEMPlan.tt (Now block, todo 2735)",
+    "Comserv/root/Documentation/changelog/entries/2026-11-13-editor-prompt-file-load.inc"
   ],
-  "todos_touched": [
-    "2469",
-    "2638",
-    "2691",
-    "2692",
-    "2706"
-  ],
-  "note": "Schema comparison showed every decimal column with a blank Result size, so Update Table emitted MODIFY ... decimal NULL and MariaDB resolved it to decimal(10,0); net_weight_g could not be corrected. Cause was the read direction: Result files declare size => [10, 2] and ResultParser had no array branch (the bareword branch cannot match a leading '['), so size parsed as undef; the nested-hash branch collected only quoted items and turned [10, 2] into an empty list. Fixed in ResultParser (array + nested-array parsing) and SchemaComparison (flatten to the DB parser's \"p,s\" form for the grid and the ALTER; no 0+$size on a reference). Verified through the real action, not the page: calling Admin::SchemaComparison::schema_compare_table in-process now yields Result sizes discount_percent (10,0), markup_percent (6,2), net_weight_g (10,2), print_time_hours (6,2), selling_price/unit_cost/unit_price (10,2), reorder_point blank (integer, correct); table side net_weight_g/markup_percent still (10,0) = real pre-existing drift to apply. Sweep of 294 Result files: 218/219 decimal columns carry a size (Todo.point_rate declares none). Test t/schema_result_parser_array_size.t. ALSO this session: a dashboard merge of main into healthkitchen left four conflicted files with markers in Git.pm and Api.pm, which made the app uncompilable, froze :4015 on 14:53 code and made the parser fixes look ineffective - root cause of the whole report. Resolved Git.pm (main's BotIdentity block + this branch's registry symlink), Api.pm (kept api_log_error), version.json (kept versionCode 25 / 1.3.1 over main's 23 / 3.2), the worktrees-json-symlink changelog (main's wording); t/util_git_create_worktree.t 15/15. HealthKitchen consume_recipe now rounds container fractions to 3 decimals to match the decimal(12,3) stock columns. Todo 2469 was still status 5 with a dead clock (accumulative_time 00:00:00) and no matching page (/healthkitchen/plan/id never existed; the UI is mealplans.tt/mealplan.tt) - stopped to status 2. 2638 is open again at status 1 (reopened after an earlier close) and genuinely needs a Director work order for the first-drink recipe; 2691/2692 status 2, 2706 status 3. Other branches still hold status-5 rows: 2311 (project 121 AI chat), 2595 (project 232 mail invoice sort), 2682 (project 310 3D STL pictures)."
+  "todos_touched": [2735],
+  "note": "Editor review briefs load named lib/root/script/t paths. How-to /ai2/ URL no longer forces DEFAULT_APP_PATHS. chat.js uncommitted. No editor window used. healthkitchen unchanged until merge. Open clocks 2311, 2595, 2682 are other projects; not closed."
 }

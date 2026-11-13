@@ -1,0 +1,10 @@
+{
+  "last_successful_report_date": "2026-11-06",
+  "last_successful_report_id": 68,
+  "compares_next_to": "2026-11-06",
+  "previous_report_date": "2026-11-05",
+  "previous_report_id": 67,
+  "updated_at_pt": "2026-11-06T07:20:00-07:00",
+  "inbox_path": "/home/shanta/.comserv/worktrees/aisystem/Comserv/Comserv/data/ai_eval_inbox/2026-11-06-ai-usage-monitor.json",
+  "via": "http://127.0.0.1:4006/ai/eval/ingest"
+}
