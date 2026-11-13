@@ -45,7 +45,7 @@ my $cards = $SR->cards_for_todos($schema, [$drink, $bfast, $plain], '2026-11-09'
 is $cards->{10}{name}, 'Morning beverage', 'fixed slot resolves (own recipe, not CSC/Mallory id 5)';
 is $cards->{10}{id}, 1, 'fixed slot picks owner+site recipe';
 is_deeply $cards->{10}{ingredients}, ['1 cup Coffee'], 'ingredients listed';
-is $cards->{10}{url}, '/healthkitchen/recipes#recipe-1', 'view recipe link';
+is $cards->{10}{url}, '/healthkitchen/recipe/1', 'view recipe link';
 is $cards->{11}{name}, 'Overnight oats', 'breakfast from plan, skipping first-drink recipe';
 is $SR->cards_for_todos($schema, [$tagd], '2026-11-09', 178, $me)->{13}{id}, 2, 'explicit own tag honoured';
 ok !exists $cards->{12}, 'untagged todo gets no card';
