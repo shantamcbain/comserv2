@@ -5,7 +5,7 @@ my $G = 'Comserv::Util::AI::HermesOverrunGuard'; my $MC = 'Comserv::Util::AI::Mo
 # Oct 26 2026: Hermes fallback chain (Super Grok > paid gpt-5.6-luna (probation) > free north-mini LAST), billing channels
 # (Super Grok / x.ai direct / OpenRouter) and sessions pinned on a disallowed model (Oct 25 $6.04 overrun).
 $Comserv::Util::AI::HermesOverrunGuard::COOLDOWN_S = 0;
-my $IDS = { map { ($_ => 1) } 'cohere/north-mini-code:free', 'nvidia/nemotron-3.5-lightning:free', 'openai/gpt-5.6-luna', 'x-ai/grok-4.7', 'deepseek/deepseek-v4.1-flash' };
+my $IDS = { map { ($_ => 1) } 'baidu/ernie-5.5-flash-preview:free', 'cohere/north-mini-code:free', 'nvidia/nemotron-3.5-lightning:free', 'openai/gpt-5.6-luna', 'particle-ai/particle-1', 'x-ai/grok-4.7', 'deepseek/deepseek-v4.1-flash' };
 my $SG_OFF = { mode => 'openrouter', locked => 1, off_today => 1 };
 my $SG_OK  = { mode => 'grok', remaining => 60, locked => 0, off_today => 0 };
 
@@ -13,8 +13,8 @@ my $SG_OK  = { mode => 'grok', remaining => 60, locked => 0, off_today => 0 };
 my $ld = $MC->load(undef, path => "$FindBin::Bin/../data/ai_model_chains.json", logger => sub {});
 is $ld->{source}, 'file', 'data file loads and validates';
 my @ch = $MC->hermes_chain($ld);
-is_deeply [ map { $_->{tier} } @ch ], [qw(supergrok paid paid paid free)], 'chain tiers: Super Grok, paid particle-1, paid x.ai, paid luna, free (Nov 2 2026)';
-like $ch[1]{slug}, qr{particle-ai/particle-1}, 'step 2 is paid particle-1 (probation, Nov 2 2026)'; like $ch[2]{slug}, qr{^xai\|grok-4\.7}, 'step 3 is paid x.ai grok-4.7'; like $ch[3]{slug}, qr{openai/gpt-5.6-luna}, 'step 4 is gpt-5.6-luna'; like $ch[-1]{slug}, qr/north-mini/, 'north-mini is LAST';
+is_deeply [ map { $_->{tier} } @ch ], [qw(supergrok paid paid free free)], 'chain tiers: Super Grok, paid particle-1, paid luna, free ernie, free north-mini last (Nov 12 2026)';
+like $ch[1]{slug}, qr{particle-ai/particle-1}, 'step 2 is paid particle-1 (probation, Nov 2 2026)'; like $ch[2]{slug}, qr{openai/gpt-5.6-luna}, 'step 3 is gpt-5.6-luna'; like $ch[3]{slug}, qr{ernie-5.5-flash-preview:free}, 'step 4 is ernie free'; like $ch[-1]{slug}, qr/north-mini/, 'north-mini is LAST';
 {
     my %d = %{ $MC->perl_default };
     my ($ok, $e) = $MC->validate_structure({ %d, hermes_fallback_chain => ['openrouter|cohere/north-mini-code:free', 'openrouter|openai/gpt-5.6-luna'] });
@@ -33,24 +33,26 @@ my %base = (or_ids => $IDS, health => {}, ollama_models => ['gemma4-64k:latest']
 
 # ---- pick_target follows the chain ----
 is $G->can('pick_target')->(%base, supergrok => $SG_OK)->{default}, 'grok-4.7', 'Super Grok has budget -> grok-4.7';
-is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1)->{provider}, 'xai', 'grok unavailable + room under caps -> paid x.ai grok-4.7 first (Oct 31 2026)';
-is $G->can('pick_target')->(%base, chain => [ grep { $_->{provider} ne 'xai' } @CH ], supergrok => $SG_OFF, paid_ok => 1)->{default}, 'openai/gpt-5.6-luna', 'without the x.ai step -> paid gpt-5.6-luna (probation)';
-is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 0)->{default}, 'cohere/north-mini-code:free', 'no room under caps -> north-mini';
-is $G->can('pick_target')->(%base, chain => [ grep { $_->{provider} ne 'xai' } @CH ], supergrok => $SG_OFF, paid_ok => 1, or_ids => { %$IDS, 'openai/gpt-5.6-luna' => 0 })->{default}, 'cohere/north-mini-code:free', 'luna not in the OpenRouter list -> north-mini';
-is $G->can('pick_target')->(%base, chain => [ grep { $_->{provider} ne 'xai' } @CH ], supergrok => $SG_OFF, paid_ok => 1, health => { 'openrouter|openai/gpt-5.6-luna' => { state => 'open' } })->{default}, 'cohere/north-mini-code:free', 'luna circuit open -> north-mini';
-is $G->can('pick_target')->(%base, chain => [ grep { $_->{provider} ne 'xai' } @CH ], supergrok => $SG_OFF, paid_ok => 1, health => { 'openrouter|openai/gpt-5.6-luna' => { state => 'open' }, 'openrouter|cohere/north-mini-code:free' => { state => 'open' } })->{provider},
-   'ollama-launch', 'north-mini only skipped when unusable: emergency tail after it';
+is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1)->{default}, 'particle-ai/particle-1', 'grok unavailable + room under caps -> particle-1 (Nov 12 2026)';
+is $G->can('pick_target')->(%base, chain => [ grep { ($_->{model} // '') ne 'particle-ai/particle-1' && $_->{provider} ne 'xai' } @CH ], supergrok => $SG_OFF, paid_ok => 1)->{default}, 'openai/gpt-5.6-luna', 'without particle-1 / x.ai -> paid gpt-5.6-luna (probation)';
+is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 0)->{default}, 'baidu/ernie-5.5-flash-preview:free', 'no room under caps -> first free (ernie)';
+is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 0, cap_exempt => { 'particle-ai/particle-1' => 1 })->{default}, 'particle-ai/particle-1', 'no room under caps but cap_exempt -> particle-1';
+is $G->can('pick_target')->(%base, chain => [ grep { ($_->{model} // '') ne 'particle-ai/particle-1' && $_->{provider} ne 'xai' } @CH ], supergrok => $SG_OFF, paid_ok => 1, or_ids => { %$IDS, 'openai/gpt-5.6-luna' => 0 })->{default}, 'baidu/ernie-5.5-flash-preview:free', 'luna not in the OpenRouter list -> ernie';
+is $G->can('pick_target')->(%base, chain => [ grep { ($_->{model} // '') ne 'particle-ai/particle-1' && $_->{provider} ne 'xai' } @CH ], supergrok => $SG_OFF, paid_ok => 1, health => { 'openrouter|openai/gpt-5.6-luna' => { state => 'open' } })->{default}, 'baidu/ernie-5.5-flash-preview:free', 'luna circuit open -> ernie';
+is $G->can('pick_target')->(%base, chain => [ grep { ($_->{model} // '') ne 'particle-ai/particle-1' && $_->{provider} ne 'xai' } @CH ], supergrok => $SG_OFF, paid_ok => 1, health => { 'openrouter|openai/gpt-5.6-luna' => { state => 'open' }, 'openrouter|baidu/ernie-5.5-flash-preview:free' => { state => 'open' }, 'openrouter|cohere/north-mini-code:free' => { state => 'open' } })->{provider},
+   'ollama-launch', 'free steps skipped when unusable: emergency tail after them';
 # thrash trips never move to a paid model (money safety)
-isnt $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1, kind => 'thrash')->{default}, 'openai/gpt-5.6-luna', 'thrash trip does not pick a paid model';
+is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1, kind => 'thrash')->{default}, 'baidu/ernie-5.5-flash-preview:free', 'thrash trip skips non-exempt paid models, uses first free';
+is $G->can('pick_target')->(%base, supergrok => $SG_OFF, paid_ok => 1, kind => 'thrash', cap_exempt => { 'particle-ai/particle-1' => 1 })->{default}, 'particle-ai/particle-1', 'thrash trip switch target is cap-exempt particle-1';
 my @order = map { $_->{name} } $G->can('candidate_order')->('caps', undef, $SG_OFF, chain => \@CH, emergency => \@EM);
-is $order[0], 'xai-oauth/grok-4.7', 'order: Super Grok first'; is $order[1], 'openrouter/particle-ai/particle-1', 'order: paid particle-1 second (Nov 2 2026)'; is $order[2], 'xai/grok-4.7', 'order: paid x.ai third'; is $order[3], 'openrouter/openai/gpt-5.6-luna', 'order: paid luna fourth';
+is $order[0], 'xai-oauth/grok-4.7', 'order: Super Grok first'; is $order[1], 'openrouter/particle-ai/particle-1', 'order: paid particle-1 second (Nov 2 2026)'; is $order[2], 'openrouter/openai/gpt-5.6-luna', 'order: paid luna third'; is $order[3], 'openrouter/baidu/ernie-5.5-flash-preview:free', 'order: ernie fourth';
 is $order[4], 'openrouter/cohere/north-mini-code:free', 'order: north-mini fifth (last chain step)';
 ok((grep { $order[$_] =~ /gemma4|nemotron|qwen2\.5-coder/ } 5 .. $#order) == @order - 5, 'emergency tail follows north-mini');
 # permanent fallback list
 my $fc = $G->can('fallback_chain')->(%base, supergrok => $SG_OK, paid_ok => 1);
 is_deeply [ map { "$_->{provider}/$_->{model}" } @$fc ],
-    [ 'xai/grok-4.7', 'openrouter/openai/gpt-5.6-luna', 'openrouter/cohere/north-mini-code:free', 'ollama-launch/gemma4-64k:latest', 'openrouter/nvidia/nemotron-3.5-lightning:free' ],
-    'fallback_providers: paid x.ai grok-4.7 > paid luna > north-mini > emergency (Oct 31 2026)';
+    [ 'openrouter/particle-ai/particle-1', 'openrouter/openai/gpt-5.6-luna', 'openrouter/baidu/ernie-5.5-flash-preview:free', 'openrouter/cohere/north-mini-code:free', 'ollama-launch/gemma4-64k:latest', 'openrouter/nvidia/nemotron-3.5-lightning:free' ],
+    'fallback_providers: particle-1 > luna > ernie > north-mini > emergency (Nov 12 2026)';
 $fc = $G->can('fallback_chain')->(%base, supergrok => $SG_OK, paid_ok => 0);
 ok !grep({ $_->{model} =~ /luna|grok/ } @$fc), 'no paid step in fallback_providers when caps have no room';
 
@@ -131,7 +133,7 @@ is $G->can('decide')->(thrash => 0, openrouter => $ok, state => {}, xai_direct =
                      set_cb => sub {}, ollama_url => 'http://127.0.0.1:9');
     my $r = $g2->run(force => 1, thrash => 0, thrash_by_class => { ok => 1, counts => {} }, openrouter => { ok => 1, day_usd => 0.1, week_usd => 1, month_usd => 2 }, live => $l);
     ok $r->{offenders} && @{ $r->{offenders} } >= 1, 'run lists the pinned OpenRouter grok session';
-ok !grep({ ($_->{provider} // '') eq 'xai' } @{ $r->{offenders} || [] }), 'x.ai grok-4.7 (chain paid step, shared caps have room) is not an offender (Oct 31 2026)';
+ok grep({ ($_->{provider} // '') eq 'xai' } @{ $r->{offenders} || [] }), 'x.ai grok-4.7 is an offender: not a Hermes chain step (xai_direct cap is 0)';
     my $gate = decode_json(do { local $/; open my $gf, '<', "$h/.hermes/overrun_gate.json" or die "no gate: $!"; <$gf> });
     is $gate->{active}, 1, 'gate active'; like $gate->{message}, qr{/model code}, 'gate tells the user how to re-point';
     ok((grep { $_->{session} eq 'sessA' } @{ $gate->{sessions} }), 'gate lists the OpenRouter grok session');
