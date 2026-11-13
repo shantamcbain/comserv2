@@ -683,6 +683,48 @@ sub api_inventory_item_update :Path('inventory/item/update') :Args(0) {
 # is: the site this domain + login resolves to, the sites the user may use, and
 # who they are. The phone must never guess a site: a guessed site shows another
 # site's supplier list and files items in the wrong place.
+# List-form git. No shell. Empty string if git is missing or the path is refused.
+sub _git_line {
+    my ($root, @args) = @_;
+    return '' unless defined $root && $root =~ m{^/[\w./-]+$} && -d $root;
+    my $pid = open(my $fh, '-|', 'git', '-C', $root, @args);
+    return '' unless $pid;
+    my $line = <$fh> // '';
+    close $fh;
+    chomp $line;
+    return $line;
+}
+
+# Which server is answering? Deliberately unauthenticated and data-free: the
+# phone must be able to show "dev :3001 main c17663f" (or "production, old
+# build") before anything else works — that is what makes a change testable.
+sub api_app_ping :Path('app/ping') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $root = $ENV{COMSERV_ROOT} || '/home/shanta/PycharmProjects/comserv2/Comserv';
+    $root =~ s{/Comserv/?$}{};
+    my ($branch, $commit) = ('', '');
+    # List-form open: no shell, so a quote in COMSERV_ROOT cannot run a command.
+    if ($root =~ m{^/[\w./-]+$} && -d $root) {
+        $branch = _git_line($root, 'rev-parse', '--abbrev-ref', 'HEAD');
+        $commit = _git_line($root, 'rev-parse', '--short', 'HEAD');
+    }
+
+    my $port = $c->req->uri->port || '';
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success => 1,
+        service => 'comserv2',
+        port    => "$port",
+        host    => scalar($c->req->uri->host // ''),
+        env     => ($port eq '5000' ? 'production' : ($port eq '3001' ? 'dev' : "port_$port")),
+        git     => { branch => $branch, commit => $commit },
+        pid     => $$,
+        time    => scalar(localtime),
+    }));
+    $c->detach;
+}
+
 sub api_app_context :Path('app/context') :Args(0) {
     my ($self, $c) = @_;
     require JSON;
@@ -709,13 +751,22 @@ sub api_app_context :Path('app/context') :Args(0) {
     };
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_app_context',
-        "context user=" . ($username || '?') . " site=" . ($current || '?') . " domain=" . ($c->req->uri->host // '?'));
+        "context user=" . ($username || '?') . " site=" . ($current || '?')
+        . " domain=" . ($c->req->uri->host // '?')
+        . " uid=" . ($c->session->{user_id} // '-')
+        . " cookie=" . ((defined $c->req->header('Cookie') && length $c->req->header('Cookie')) ? 'present' : 'NONE')
+        . " ua=" . substr($c->req->header('User-Agent') // '-', 0, 24)
+        . " app=" . ($c->req->header('X-App-Version') // '-'));
 
     $c->res->content_type('application/json');
     $c->res->body(JSON::encode_json({
         success        => 1,
         sitename       => $current,
         user           => $username,
+        # 0 means the request carried no live session: every API call will then be
+        # answered as an anonymous visitor on this host, which reads as CSC. The
+        # app must ask the user to log in again rather than silently show CSC.
+        authenticated  => (length($username) ? 1 : 0),
         domain         => scalar($c->req->uri->host // ''),
         sites          => $sites,
         item_count     => $item_count,
@@ -732,7 +783,9 @@ sub api_inventory_item_find :Path('inventory/item/find') :Args(0) {
 
 sub api_inventory_sites :Path('inventory/sites') :Args(0) {
     my ($self, $c) = @_;
-    $self->_api_authenticate_inventory($c);
+    # Deliberately not auth-gated: this returns site NAMES only (no inventory
+    # data) and the app needs it to offer the picker before a session is sorted.
+    # Gating it is why the picker came up empty on the phone.
     $c->controller('Inventory')->api_sites($c);
 }
 
@@ -1934,18 +1987,31 @@ sub _api_authenticate {
 
     my $address  = $c->req->address // '';
     my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
-    return undef if $is_local;
+    if ($is_local) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_api_authenticate',
+            "allowed: LAN/local bypass from $address (no credentials needed)");
+        return undef;
+    }
 
     # The Android app logs in exactly like the web app and carries that session
     # cookie. Without this, every inventory call from outside the LAN answered 401
     # and the app showed empty lists (e.g. "no suppliers") as if the data were gone.
     my $uid = eval { $c->session->{user_id} };
     if (defined $uid && $uid ne '') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_api_authenticate',
+            "allowed: live session uid=$uid user='" . (eval { $c->session->{username} } // '?')
+            . "' from $address");
         return eval { $c->session->{username} } || 1;
     }
 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_api_authenticate',
+        "no session for this request from $address (cookie="
+        . (defined $c->req->header('Cookie') ? 'present' : 'NONE') . ") - trying API token");
+
     my $validation = Comserv::Util::ApiTokenValidator->validate_from_request($c);
     unless ($validation->{valid}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_authenticate',
+            "denied: " . ($validation->{error} || 'no valid session or API token') . " from $address");
         $self->_json_error($c, $validation->{code} || 401,
             $validation->{error} || 'Authentication required', 'unauthorized');
     }
@@ -4047,15 +4113,15 @@ sub api_app_version :Path('app/version') :Args(0) {
     my $client_ip = eval { $c->req->address } || '';
 
     # The APK on the NFS share is the only build artifact that exists; its
-    # version.json is written by the Android build that produced it. Read that
-    # one first so the app is always offered the build it can actually install,
-    # and fall back to the checkout copy only when NFS is not mounted. A tracked
-    # copy in root/static/app/ shadows the real build when it is a plain file
-    # (that is how the app ended up told "1.3.1 (25)" while running 2.10 (21)).
-    my $path = '/data/nfs/inventory-apks/version.json';
-    unless (-r $path) {
-        $path = $c->path_to('root/static/app/version.json')->stringify;
-    }
+    # version.json is written by the Android gradle publish, not by an agent.
+    # Read that one first. Never advertise a checkout versionCode higher than
+    # the published stamp: the phone updates only when versionCode is strictly
+    # greater, and Android will not install a lower code. Hand-bumping the
+    # git copy (Hermes did this) makes the update badge stick on an APK that
+    # is not actually newer.
+    my $nfs_path = '/data/nfs/inventory-apks/version.json';
+    my $checkout = $c->path_to('root/static/app/version.json')->stringify;
+    my $path = (-r $nfs_path) ? $nfs_path : $checkout;
     my $json_data = {};
     if (-r $path) {
         local $/;
@@ -4063,6 +4129,23 @@ sub api_app_version :Path('app/version') :Args(0) {
         my $raw = <$fh>;
         close $fh;
         $json_data = eval { decode_json($raw) } || {};
+    }
+
+    # A hand-edited checkout copy must not outrun the published stamp.
+    if (-r $nfs_path && -r $checkout) {
+        my $git_code = eval {
+            local $/;
+            open my $gfh, '<', $checkout or die $!;
+            my $graw = <$gfh>;
+            close $gfh;
+            my $g = decode_json($graw);
+            $g->{versionCode} // 0;
+        } || 0;
+        my $pub_code = $json_data->{versionCode} // 0;
+        if ($git_code && $pub_code && $git_code != $pub_code) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_app_version',
+                "checkout version.json code $git_code ignored; serving published $pub_code from $path");
+        }
     }
 
     $json_data->{serverInfo} = {
@@ -4080,7 +4163,7 @@ sub api_app_version :Path('app/version') :Args(0) {
     $c->detach();
 }
 
-sub api_inventory_item_by_barcode :Path('inventory/item_by_barcode') :Args(0) {
+sub api_inventory_item_by_barcode_alt :Path('inventory/item_by_barcode') :Args(0) {
     my ($self, $c) = @_;
     my $barcode = $c->req->param('barcode') || $c->req->param('upc') || '';
     $barcode =~ s/^\s+|\s+$//g;
@@ -4235,16 +4318,24 @@ sub api_log_error :Path('log/error') :Args(0) {
     }
 
     require Comserv::Util::Logging;
+    # warn+ is what Logging writes to system_log. A client "info" trace would
+    # otherwise stay in the text log only. Do not INSERT here: that duplicated
+    # the row and dropped the username.
+    my $log_level = ($level =~ /^(warn|error|critical)$/i) ? lc($level) : 'warn';
     eval {
         Comserv::Util::Logging->instance->log_with_details(
             $c,
-            $level,
+            $log_level,
             "AndroidApp::$screen",
             0,
             "mobile_app_error",
             "[$username]$detail $msg" . ($stack ? "\nStack: " . substr($stack, 0, 3000) : "")
         );
     };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_log_error',
+            "mobile error log failed: $@");
+    }
 
     $c->res->status(200);
     $c->res->content_type('application/json');

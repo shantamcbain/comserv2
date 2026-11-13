@@ -106,4 +106,103 @@ for my $c (@cases) {
     is($got, $want, $label);
 }
 
+
+# --- additional normalisation (todo #2731) --------------------------------
+# These go through the same util the controller now delegates to.
+use_ok('Comserv::Util::Schema::Equivalence');
+my $E = 'Comserv::Util::Schema::Equivalence';
+
+my @more = (
+    ['NULL vs absent default is not drift',
+     { data_type=>'int', size=>'(11)', is_nullable=>'YES', default_value=>undef },
+     { data_type=>'integer', size=>'', is_nullable=>'YES', default_value=>undef }, 1],
+
+    ['NULL string vs no default is not drift',
+     { data_type=>'varchar', size=>'(50)', is_nullable=>'YES', default_value=>'NULL' },
+     { data_type=>'varchar', size=>'(50)', is_nullable=>'YES', default_value=>undef }, 1],
+
+    ['quoted default matches unquoted',
+     { data_type=>'varchar', size=>'(20)', is_nullable=>'NO', default_value=>"'sent'" },
+     { data_type=>'varchar', size=>'(20)', is_nullable=>'NO', default_value=>'sent' }, 1],
+
+    ['numeric 0 vs \'0\' is not drift',
+     { data_type=>'int', size=>'(11)', is_nullable=>'NO', default_value=>'0' },
+     { data_type=>'integer', size=>'', is_nullable=>'NO', default_value=>0 }, 1],
+
+    ['unsigned in the type string is noise',
+     { data_type=>'int unsigned', size=>'(11)', is_nullable=>'NO', default_value=>undef },
+     { data_type=>'integer', size=>'', is_nullable=>'NO', default_value=>undef }, 1],
+
+    ['charset/collate noise on the type is not drift',
+     { data_type=>'varchar character set utf8 collate utf8_general_ci', size=>'(255)', is_nullable=>'YES', default_value=>undef },
+     { data_type=>'varchar', size=>'(255)', is_nullable=>'YES', default_value=>undef }, 1],
+
+    ['name case lives in the key, values compared after lc of type',
+     { data_type=>'VARCHAR', size=>'(10)', is_nullable=>'YES', default_value=>undef },
+     { data_type=>'varchar', size=>'(10)', is_nullable=>'yes', default_value=>undef }, 1],
+
+    ['Result varchar with no size vs live varchar(255) is not drift (DBIx default)',
+     { data_type=>'varchar', size=>'(255)', is_nullable=>'YES', default_value=>undef },
+     { data_type=>'varchar', size=>'', is_nullable=>'YES', default_value=>undef }, 1],
+
+    ['is_nullable 0/1 matches YES/NO',
+     { data_type=>'int', size=>'(11)', is_nullable=>0, default_value=>undef },
+     { data_type=>'integer', size=>'', is_nullable=>'NO', default_value=>undef }, 1],
+
+    ['auto_increment in Extra matches is_auto_increment on the Result',
+     { data_type=>'int', size=>'(11)', is_nullable=>'NO', default_value=>undef, extra=>'auto_increment' },
+     { data_type=>'integer', size=>'', is_nullable=>'NO', default_value=>undef, is_auto_increment=>1 }, 1],
+
+    ['ON UPDATE in Extra vs Result default is not an Extra mismatch',
+     { data_type=>'timestamp', size=>'', is_nullable=>'NO', default_value=>'current_timestamp()', extra=>'on update current_timestamp()' },
+     { data_type=>'timestamp', size=>'', is_nullable=>'NO', default_value=>'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP', extra=>'' }, 1],
+
+    ['enum list in Result extra matches live enum type',
+     { data_type=>"enum('meal','drink')", size=>'', is_nullable=>'YES', default_value=>undef, extra=>'' },
+     { data_type=>'varchar', size=>10, is_nullable=>'YES', default_value=>undef, extra=>'enum(meal,drink)' }, 1],
+
+    # genuine cases that must still flag
+    ['GENUINE: Result varchar(100) vs live varchar(255)',
+     { data_type=>'varchar', size=>'(255)', is_nullable=>'YES', default_value=>undef },
+     { data_type=>'varchar', size=>'(100)', is_nullable=>'YES', default_value=>undef }, 0],
+
+
+    ['undeclared Result enum list is not drift (like omitted nullable)',
+     { data_type=>"enum('calm','moderate')", size=>'', is_nullable=>'YES', default_value=>undef, extra=>'' },
+     { data_type=>'enum', size=>'', is_nullable=>'YES', default_value=>undef, extra=>'' }, 1],
+
+    ['GENUINE: Result enum list differs from live',
+     { data_type=>"enum('calm','moderate')", size=>'', is_nullable=>'YES', default_value=>undef, extra=>'' },
+     { data_type=>'enum', size=>'', is_nullable=>'YES', default_value=>undef, extra=>'enum(calm,aggressive)' }, 0],
+
+    ['qw-style Result enum list matches live enum type',
+     { data_type=>"enum('calm','moderate','aggressive','very_aggressive')", size=>'', is_nullable=>'YES', default_value=>'calm', extra=>'' },
+     { data_type=>'enum', size=>'', is_nullable=>'YES', default_value=>'calm', extra=>'enum(calm,moderate,aggressive,very_aggressive)' }, 1],
+
+    ['GENUINE: auto_increment only on the live table',
+     { data_type=>'int', size=>'(11)', is_nullable=>'NO', default_value=>undef, extra=>'auto_increment' },
+     { data_type=>'integer', size=>'', is_nullable=>'NO', default_value=>undef, is_auto_increment=>0, extra=>'' }, 0],
+);
+
+for my $c (@more) {
+    my ($label, $d, $r, $want) = @$c;
+    my $got = $E->fields_equivalent($d, $r) ? 1 : 0;
+    is($got, $want, $label);
+    # Controller wrapper must agree with the util.
+    is($S->_fields_equivalent($d, $r) ? 1 : 0, $want, "wrapper: $label");
+}
+
+# Naive comparison STILL flags the classic int(11) vs integer case,
+# which proves the util is what removes that false positive.
+ok(!$E->fields_equivalent_naive(
+    { data_type=>'int', size=>'(11)', is_nullable=>'NO', default_value=>undef },
+    { data_type=>'integer', size=>'', is_nullable=>'NO', default_value=>undef },
+), 'naive compare still flags int(11) vs integer');
+ok($E->fields_equivalent(
+    { data_type=>'int', size=>'(11)', is_nullable=>'NO', default_value=>undef },
+    { data_type=>'integer', size=>'', is_nullable=>'NO', default_value=>undef },
+), 'normalised compare does not flag int(11) vs integer');
+
+
 done_testing();
+
