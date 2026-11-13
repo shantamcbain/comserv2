@@ -75,7 +75,7 @@ sub recipe_card {
         id          => $r->id + 0,
         name        => $r->name,
         ingredients => [ map { $class->line_text( { $_->get_columns } ) } @lines ],
-        url         => '/healthkitchen/recipes#recipe-' . $r->id,
+        url         => '/healthkitchen/recipe/' . $r->id,
     };
 }
 

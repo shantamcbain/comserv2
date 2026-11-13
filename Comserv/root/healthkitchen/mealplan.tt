@@ -7,7 +7,7 @@
    page_version = "0.01"
    last_updated = "2026-10-18"
 %]
-[% PageVersion = 'healthkitchen/mealplan.tt,v 0.01 2026/10/18 grok-bot Exp shanta ' %]
+[% PageVersion = 'healthkitchen/mealplan.tt,v 0.02 2026/11/13 hermes-agent Exp shanta - dish name opens the recipe detail' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="app-container">
@@ -37,7 +37,9 @@
         [% IF hk_plan.entries.size %]
             <table class="table"><thead><tr><th>Date</th><th>Meal</th><th>Dish</th><th>Servings</th><th></th></tr></thead><tbody>
             [% FOREACH e IN hk_plan.entries %]
-                <tr><td>[% e.plan_date %]</td><td>[% e.meal_slot %]</td><td>[% e.name | html %]</td><td>[% e.servings %]</td>
+                <tr><td>[% e.plan_date %]</td><td>[% e.meal_slot %]</td>
+                    <td>[% IF e.recipe.id %]<a href="[% c.uri_for('/healthkitchen/recipe', e.recipe.id) %]">[% e.name | html %]</a>[% ELSE %][% e.name | html %][% END %]</td>
+                    <td>[% e.servings %]</td>
                     <td><form method="post" action="[% c.uri_for('/healthkitchen/mealplan') %]/[% hk_plan.id %]"><input type="hidden" name="hk_action" value="delete" /><input type="hidden" name="entry_id" value="[% e.id %]" /><button type="submit" class="btn btn-secondary">Remove</button></form></td></tr>
             [% END %]</tbody></table>
         [% ELSE %]<p class="doc-muted">No meals yet.</p>[% END %]

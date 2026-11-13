@@ -26,7 +26,7 @@ $PLAN_MODELS = ['llama3.2'];
 is route($member)->[0], 'openrouter', 'member without paid access: no override (ModelPick)';
 is route($member, requested_model => 'openrouter/some-widget-default:free')->[1], 'some-widget-default:free',
    'member without paid access: widget default still wins';
-is_deeply route({ username => 'Shanta', user_id => 178, roles => ['admin'] }), ['supergrok', 'grok-4.6'], 'admin: override to SuperGrok';
+is_deeply route({ username => 'Shanta', user_id => 178, roles => ['admin'] }), ['supergrok', 'grok-4.7'], 'admin: override to SuperGrok grok-4.7';
 *Comserv::Model::AI2::Router::capable_chain_pick = sub { [ 'openrouter', 'cohere/north-mini-code:free' ] };
 is_deeply route($member, requested_model => 'openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'), [ 'openrouter', 'cohere/north-mini-code:free' ],
    'member substantive question: weak widget default replaced by cheapest capable';

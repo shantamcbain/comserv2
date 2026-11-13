@@ -7,6 +7,7 @@ use Crypt::CBC;
 use MIME::Base64;
 
 __PACKAGE__->table('user_api_keys');
+__PACKAGE__->resultset_class('Comserv::Model::Schema::Ency::ResultSet::UserApiKeys');
 __PACKAGE__->add_columns(
     id => {
         data_type => 'integer',

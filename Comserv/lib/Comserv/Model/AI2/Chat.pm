@@ -815,7 +815,8 @@ sub process {
     # data/ai_model_chains.json; failed attempts are written to the Ledger by
     # the Router (metadata.fallover); an enforce-mode grounding strip that
     # leaves nothing fails over to the next chain step.
-    my $purpose = ($gturn && $gturn->{enforce}) ? 'docs'
+    my $purpose = (($args{agent_id} // '') eq 'ency') ? 'ency'
+                : ($gturn && $gturn->{enforce}) ? 'docs'
                 : ($code_read || $args{skip_app_writes} || $args{phase}) ? 'coding'
                 : 'chat';
     my $postcheck = ($gturn && $gturn->{enforce}) ? sub {
