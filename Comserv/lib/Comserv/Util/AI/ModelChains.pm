@@ -447,9 +447,28 @@ sub clear_cache { %CACHE = (); %LOGGED = (); return 1 }
 sub chain {
     my ($class, $loaded, $purpose) = @_;
     my $d = ref $loaded eq 'HASH' && $loaded->{data} ? $loaded->{data} : $loaded;
-    $purpose = 'chat' unless $purpose && grep { $_ eq $purpose } @PURPOSES;
     my %rm = map { $_ => 1 } @{ $d->{removed} || [] };
+    # Encyclopedia reuses the Hermes order. Do not copy it into chain_chat:
+    # that would spend paid models on ordinary chat.
+    if (($purpose // '') eq 'ency') {
+        return grep { !$rm{$_} } @{ $d->{hermes_fallback_chain} || [] };
+    }
+    $purpose = 'chat' unless $purpose && grep { $_ eq $purpose } @PURPOSES;
     return grep { !$rm{$_} } @{ $d->{"chain_$purpose"} || [] };
+}
+
+# trials.*.cap_exempt model ids (particle-1). Hermes already ignores the
+# shared cash caps for these; the Router must do the same or the step is dead.
+sub cap_exempt_models {
+    my ($class, $loaded) = @_;
+    my $d = ref $loaded eq 'HASH' && $loaded->{data} ? $loaded->{data} : ($loaded || {});
+    my $trials = ref $d->{trials} eq 'HASH' ? $d->{trials} : {};
+    my %ex;
+    for my $t (values %$trials) {
+        next unless ref $t eq 'HASH' && $t->{cap_exempt} && length($t->{model} // '');
+        $ex{ $t->{model} } = 1;
+    }
+    return \%ex;
 }
 
 sub is_removed {

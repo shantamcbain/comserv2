@@ -377,7 +377,7 @@ sub chat {
         return Comserv::Util::AI::HarmRefusal::reply_hash($harm);
     }
 
-    my $model = $args{model} || ($self->is_prepaid_source ? 'grok-4.6' : 'grok-3');
+    my $model = $args{model} || ($self->is_prepaid_source ? 'grok-4.7' : 'grok-3');
     # Never send "supergrok/grok-4.6" / "supergrok|grok-4.6" to x.AI — bare id only
     # (CSC-20260914-4380). Router should already strip; belt-and-suspenders here.
     $model =~ s/^(?:supergrok|grok-oauth|grok|x-ai)[|\/]//i if defined $model;
