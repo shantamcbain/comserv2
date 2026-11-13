@@ -2928,42 +2928,72 @@ sub _app_sitename {
         require Comserv::Util::AdminAuth;
         $is_admin = Comserv::Util::AdminAuth->new->is_csc_admin($c) ? 1 : 0;
     };
+
     my $uid   = $c->session->{user_id};
-    my @mine  = $self->_user_site_names($c, $uid);
     my $uname = lc(eval { $c->session->{username} } // '');
+    my @mine  = $self->_user_site_names($c, $uid);
 
     # A login named after a site is that site's login ("Shanta" -> site Shanta).
-    # The same host serves every site, so the shared dev/CSC default must not
-    # decide where an app posts or whose suppliers it shows. Only an explicitly
-    # named site ranks above this.
     my ($own_site) = grep { length($uname) && lc($_) eq $uname } @mine;
 
-    my @candidates = (
-        $requested,
-        scalar(eval { $c->req->header('X-Sitename') }),
-        scalar(eval { $c->req->params->{sitename} }),
-        $c->stash->{SiteName},
-        $c->session->{SiteName},
-    );
+    my $hdr   = eval { $c->req->header('X-Sitename') };
+    my $param = eval { $c->req->params->{sitename} };
+    my $stash = $c->stash->{SiteName};
+    my $sess  = $c->session->{SiteName};
 
-    my $known_user = (defined $uid && $uid ne '') || $is_admin;
+    my ($resolved, $how);
 
-    for my $cand (@candidates) {
-        next unless defined $cand && $cand =~ /\S/;
-        $cand =~ s/[^a-zA-Z0-9._-]//g;
-        next unless length $cand;
-        next if $cand eq ( $c->session->{SiteName} // '' ) && defined $own_site && $own_site ne '';   # polluted session default
-        return $cand if $is_admin;
-        # Anonymous callers only reach here from the LAN/local bypass; a logged-in
-        # user may only name a site that is actually theirs.
-        return $cand unless $known_user;
-        return $cand if grep { $_ eq $cand } @mine;
+    # 1. A site the request names. Honoured for a CSC admin, for an anonymous
+    #    caller that arrived on the LAN/local bypass, and for a logged-in user
+    #    when the site is actually theirs.
+    for my $cand (grep { defined $_ && /\S/ } ($requested, $hdr, $param)) {
+        (my $clean = $cand) =~ s/[^a-zA-Z0-9._-]//g;
+        next unless length $clean;
+        if ($is_admin)                                   { $resolved = $clean; $how = 'explicit, CSC admin'; last }
+        if (!defined $uid || $uid eq '')                 { $resolved = $clean; $how = 'explicit, anonymous/LAN caller'; last }
+        if (grep { $_ eq $clean } @mine)                 { $resolved = $clean; $how = 'explicit, site of this login'; last }
+        $how = "explicit '$clean' rejected: not a site of uid $uid";
     }
 
-    # Nothing explicit: the login's own site wins over the domain default.
-    return $own_site if defined $own_site && $own_site ne '';
+    # 2. The login's own site, ahead of any hostname default.
+    if (!$resolved && defined $own_site && $own_site ne '') {
+        $resolved = $own_site;
+        $how = 'login name matches site (beats host default)';
+    }
 
-    return $known_user ? ($mine[0] // '') : '';
+    # 3. The host/session default (dev.computersystemconsulting.ca -> CSC).
+    if (!$resolved) {
+        for my $fallback ($stash, $sess) {
+            next unless defined $fallback && $fallback =~ /\S/;
+            (my $clean = $fallback) =~ s/[^a-zA-Z0-9._-]//g;
+            next unless length $clean;
+            next if defined $uid && $uid ne '' && !$is_admin && !grep { $_ eq $clean } @mine;
+            $resolved = $clean;
+            $how = 'host/session default';
+            last;
+        }
+    }
+
+    # 4. Last resort: the first site this login may use.
+    if (!$resolved) {
+        $resolved = $mine[0] // '';
+        $how = @mine ? 'first site of this login' : 'nothing resolved';
+    }
+
+    # One line that answers "why did it pick that site?" without guessing.
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_app_sitename',
+        "resolved='" . ($resolved // '') . "' via=$how"
+        . " | asked=" . ($requested // '-')
+        . " header=" . ($hdr // '-')
+        . " param=" . ($param // '-')
+        . " stash=" . ($stash // '-')
+        . " session_site=" . ($sess // '-')
+        . " user=" . ($uname || '-')
+        . " uid=" . ($uid // '-')
+        . " admin=$is_admin"
+        . " mine=[" . join(',', @mine) . "]");
+
+    return $resolved // '';
 }
 
 sub _app_site_names {
@@ -2996,6 +3026,15 @@ sub _app_site_names {
                     my $site = eval { $row->site } or next;
                     push @sites, $site->name if $site && $site->name;
                 }
+            } else {
+                # No session yet (the phone picker). Names from the sites table,
+                # not DISTINCT sitename on inventory_item.
+                my $rs = eval { $schema->resultset('Site')->search(undef, { order_by => 'name' }) };
+                if ($rs) {
+                    while (my $site = $rs->next) {
+                        push @sites, $site->name if $site && $site->name;
+                    }
+                }
             }
         }
         # Admin, or a user with no explicit user_sites rows: every site that holds
@@ -3008,6 +3047,11 @@ sub _app_site_names {
     }
     @sites = sort @sites;
     push @sites, $sitename if length $sitename && !grep { $_ eq $sitename } @sites;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_app_site_names',
+        "uid=" . ($c->session->{user_id} // '-')
+        . " admin=$is_admin current='" . ($sitename // '') . "'"
+        . " sites=[" . join(',', @sites) . "]");
 
     return (\@sites, $sitename);
 }
@@ -3074,6 +3118,14 @@ sub api_suppliers :Path('/Inventory/api/suppliers') :Args(0) {
 
     my $sitename = $self->_app_sitename($c);
     my $schema   = $self->_schema($c);
+    # Make the choice observable: "why is it showing CSC?" should be answerable
+    # from the log without guessing.
+    eval {
+        my $asked = $c->req->header('X-Sitename') // $c->req->params->{sitename} // '';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_suppliers',
+            "site=$sitename asked=" . ($asked eq '' ? '-' : $asked)
+            . " user=" . ($c->session->{username} // '-') . " uid=" . ($c->session->{user_id} // '-'));
+    };
     my $where    = { sitename => $sitename };
     $where->{status} = 'active' unless $c->req->params->{all};
 

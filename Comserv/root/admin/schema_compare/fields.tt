@@ -64,10 +64,10 @@
                             </td>
                             <td class="cell-name"><strong>[% field.name | html %]</strong></td>
                             <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]"><code>[% field.data_type | html %]</code></td>
-                            <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]"><code>[% field.size | html %]</code></td>
-                            <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]"><code>[% field.nullable | html %]</code></td>
+                            <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]"><code>[% (field.item('size') || '—') | html %]</code></td>
+                            <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]"><code>[% (field.nullable || '—') | html %]</code></td>
                             <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]"><code>[% field.default_val | html %]</code></td>
-                            <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]"><code>[% field.extra | html %]</code></td>
+                            <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]"><code>[% (field.extra || '—') | html %]</code></td>
                             <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]">[% field.comment | html %]</td>
                             <td class="cell-status">
                                 [% IF field.status == 'Match' %]

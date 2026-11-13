@@ -473,6 +473,39 @@ sub do_login :Local {
         # Store additional session data for backward compatibility
         $c->session->{username} = $user->username;
         $c->session->{user_id}  = $user->id;
+
+        # Lock the login's own site into the session ("Shanta" login -> site
+        # Shanta). The host may be a shared dev host that resolves to CSC, and
+        # without this the whole session runs as CSC and every page/API answers
+        # with CSC suppliers, items and theme.
+        eval {
+            my $dbh = $c->model('DBEncy')->storage->dbh;
+            my ($own) = $dbh->selectrow_array(
+                "SELECT s.name FROM sites s JOIN user_site_roles usr ON usr.site_id = s.id
+                  WHERE usr.user_id = ? AND LOWER(s.name) = LOWER(?)
+                    AND (usr.is_active IS NULL OR usr.is_active = 1)
+                  LIMIT 1",
+                undef, $user->id, $user->username
+            );
+            $c->session->{site_locked} = 1;    # decided at login; don't keep re-deciding
+            if ($own) {
+                my $prev = $c->session->{SiteName} // '';
+                if (lc $prev ne lc $own) {
+                    $c->session->{SiteName} = $own;
+                    $c->stash->{SiteName}   = $own;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                        "Login site locked to '$own' (host had '$prev')");
+                }
+            } else {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                    "No site named after user '$username'; keeping host site '"
+                    . ($c->session->{SiteName} // '') . "'");
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_login',
+                "Login site lock failed: $@");
+        }
         $c->session->{first_name} = $user->first_name if $user->can('first_name');
         $c->session->{last_name}  = $user->last_name if $user->can('last_name');
         $c->session->{email}    = $user->email if $user->can('email');

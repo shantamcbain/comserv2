@@ -1451,3 +1451,61 @@
     font-size: 0.85rem;
     color: #666;
 }
+
+
+/* ---- Tables-list drift flags (todo #2731) ---- */
+.sc-tables-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    margin: 0 0 1rem 0;
+    padding: 0.6rem 1rem;
+    background: var(--bg-secondary, #f8f9fa);
+    border: 1px solid var(--border-color, #e3e6ea);
+    border-radius: 6px;
+}
+.sc-problems-only-label {
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+}
+.sc-flagged-count { color: var(--text-muted, #555); }
+.sc-flagged-count-warn { color: var(--warning-color, #856404); }
+.sc-badge {
+    display: inline-block;
+    padding: 0.15em 0.55em;
+    border-radius: 999px;
+    font-size: 0.8em;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+.sc-badge-ok {
+    background: var(--success-bg, #d4edda);
+    color: var(--success-color, #155724);
+}
+.sc-badge-problem {
+    background: var(--warning-bg, #fff3cd);
+    color: var(--warning-color, #856404);
+    border: 1px solid var(--warning-color, #ffc107);
+}
+.sc-status-cell { min-width: 8rem; vertical-align: top; }
+.sc-orphan-status { margin-bottom: 0.4rem; }
+.sc-issue-details { margin-top: 0.3rem; font-size: 0.85em; }
+.sc-issue-details summary { cursor: pointer; color: var(--text-muted, #555); }
+.sc-issue-list { margin: 0.3rem 0 0 1.1rem; padding: 0; }
+.sc-issue-list li { margin: 0.15rem 0; }
+tr.sc-table-row[data-has-problem="1"] td:first-child {
+    border-left: 3px solid var(--warning-color, #ffc107);
+}
+body.sc-problems-only tr.sc-table-row[data-has-problem="0"],
+body.sc-problems-only .sc-table-row[data-has-problem="0"] {
+    display: none;
+}
+body.sc-problems-only .comparison-section.sc-filter-empty {
+    display: none;
+}
+.orphan-result-card[data-has-problem="1"] {
+    border-left: 3px solid var(--warning-color, #ffc107);
+}
