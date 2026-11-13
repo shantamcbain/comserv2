@@ -1,6 +1,6 @@
 {
-  "versionCode": 31,
-  "versionName": "3.3.2",
-  "apkUrl": "/static/app/ComservInventory.apk",
-  "releaseNotes": "3.3.2 - fix: the app no longer assumes CSC. On login and at every start it asks GET /api/app/context which site this domain and login belong to, stores that site, and every list (suppliers, items, counts) follows it - so SiteName Shanta shows Shanta's suppliers (Food Bank etc.), and any other site shows its own. Site picker on Add Item defaults to the resolved site."
+  "versionCode": 48,
+  "versionName": "3.4.15",
+  "apkUrl": "/api/app/download",
+  "releaseNotes": "v3.4.15 WebView X-Debug-Mode header injection for live web debug bar & automatic target re-authentication on Dev/Prod Connection Test."
 }

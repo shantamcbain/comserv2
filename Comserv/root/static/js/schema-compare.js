@@ -119,6 +119,24 @@
      Tables page
      --------------------------------------------------------------- */
 
+
+  function applyProblemsOnlyFilter(on) {
+    document.body.classList.toggle('sc-problems-only', !!on);
+    document.querySelectorAll('.comparison-section').forEach(function (section) {
+      var rows = section.querySelectorAll('.sc-table-row');
+      if (!rows.length) return;
+      var visible = 0;
+      for (var i = 0; i < rows.length; i++) {
+        if (!on || rows[i].getAttribute('data-has-problem') === '1') visible++;
+      }
+      if (on && visible === 0) {
+        section.classList.add('sc-filter-empty');
+      } else {
+        section.classList.remove('sc-filter-empty');
+      }
+    });
+  }
+
   function toggleSection(headerEl) {
     var content = headerEl.nextElementSibling;
     if (!content) return;
@@ -279,6 +297,19 @@
 
     // Auto-collapse empty sections (tables page)
     autoCollapseEmptySections();
+
+    var problemsOnly = document.getElementById('sc-problems-only');
+    if (problemsOnly) {
+      var stored = false;
+      try { stored = sessionStorage.getItem('sc-problems-only') === '1'; } catch (err) {}
+      problemsOnly.checked = stored;
+      applyProblemsOnlyFilter(stored);
+      problemsOnly.addEventListener('change', function () {
+        var on = !!problemsOnly.checked;
+        try { sessionStorage.setItem('sc-problems-only', on ? '1' : '0'); } catch (err) {}
+        applyProblemsOnlyFilter(on);
+      });
+    }
 
     // --- Delegated click handler ---
     document.addEventListener('click', function (e) {
