@@ -15,6 +15,8 @@
 use strict;
 use warnings;
 use FindBin;
+use lib "$FindBin::Bin/../lib";
+use Comserv::Util::AppTime ();
 use Getopt::Long;
 use HTTP::Tiny;
 use JSON::PP;
@@ -24,7 +26,7 @@ my ($inbox, $alert, $no_notify, $json_file, $data_dir, $base) = (0, 0, 0, undef,
 GetOptions('inbox' => \$inbox, 'alert' => \$alert, 'no-notify' => \$no_notify, 'json-file=s' => \$json_file,
            'data-dir=s' => \$data_dir, 'base=s' => \$base)
     or die "usage: $0 [--inbox] [--alert] [--no-notify] [--json-file F] [--data-dir D] [--base URL]\n";
-$ENV{TZ} = 'America/Vancouver';
+$ENV{TZ} = Comserv::Util::AppTime->app_tz;
 POSIX::tzset();
 
 my $content;

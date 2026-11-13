@@ -1,6 +1,7 @@
 package Comserv::Util::AI::RankQuality;
 
 use strict;
+use Comserv::Util::AppTime ();
 use warnings;
 
 use Exporter 'import';
@@ -84,7 +85,7 @@ sub rank_report {
 sub _date_from_ts {
     my ($ts) = @_;
     return '1970-01-01' unless defined $ts && $ts =~ /^\d+$/;
-    local $ENV{TZ} = 'America/Vancouver';
+    local $ENV{TZ} = Comserv::Util::AppTime->app_tz;
     POSIX::tzset();
     return strftime('%Y-%m-%d', localtime($ts));
 }

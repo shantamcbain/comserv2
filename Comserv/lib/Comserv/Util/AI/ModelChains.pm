@@ -52,7 +52,7 @@ our %KNOB_DEFAULTS = (
 # (within the OpenRouter caps) and only then to free north-mini, which is always the LAST step
 # (it is easily overwhelmed when it suddenly replaces a smarter model). The emergency list is used
 # only when every step of the chain is unusable. Both live in data/ai_model_chains.json.
-our @HERMES_CHAIN_DEFAULT     = ('supergrok|grok-4.7', 'openrouter|particle-ai/particle-1', 'xai|grok-4.7', 'openrouter|openai/gpt-5.6-luna', 'openrouter|cohere/north-mini-code:free');   # Oct 28 2026: luna (on probation) replaced qwen3-coder; Nov 2 2026: particle-1 (probation, price drop) first paid step
+our @HERMES_CHAIN_DEFAULT     = ('supergrok|grok-4.7', 'openrouter|particle-ai/particle-1', 'openrouter|openai/gpt-5.6-luna', 'openrouter|baidu/ernie-5.5-flash-preview:free', 'openrouter|cohere/north-mini-code:free');   # Nov 12 2026: ernie ahead of north-mini; do not re-add xai|grok-4.7 (xai_direct cap is 0)
 our @HERMES_EMERGENCY_DEFAULT = ('ollama|gemma4-64k:latest', 'openrouter|nvidia/nemotron-3.5-lightning:free');
 our $HERMES_NORTH_RE          = qr/north-mini-code/i;
 our $HERMES_BANNED_RE         = qr/grok|glm|v4-pro/i;     # never as an openrouter step (grok only via Super Grok)

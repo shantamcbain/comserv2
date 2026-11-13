@@ -84,6 +84,28 @@
         <button type="button" class="page-fmt-btn" data-cmd="redo" title="Redo">Redo</button>
     </div>
 
+    [% IF ai_assist %]
+    [%# Nov 5 2026: AI Assist (preview only; Insert/Discard). JS: static/js/page-ai-assist.js %]
+    <div id="page-ai-assist" class="page-ai-assist" data-page-code="[% ai_page_code | html %]">
+        <strong>AI Assist:</strong>
+        <button type="button" class="page-fmt-btn" data-ai-action="draft" title="Write a first draft from the title (and any notes)">Draft</button>
+        <button type="button" class="page-fmt-btn" data-ai-action="rewrite" title="Rewrite the selected text (or the whole page) more clearly">Rewrite</button>
+        <button type="button" class="page-fmt-btn" data-ai-action="format" title="Tidy headings, paragraphs and lists without changing the words">Tidy format</button>
+        <button type="button" class="page-fmt-btn" data-ai-action="outline" title="Suggest a section outline">Outline</button>
+        <button type="button" class="page-fmt-btn" data-ai-action="links" title="Suggest links to your other pages and a menu placement">Suggest links</button>
+        <input type="text" id="page-ai-notes" class="form-control page-ai-notes" placeholder="Optional notes for the AI">
+        <span id="page-ai-status" class="page-ai-status"></span>
+        <div id="page-ai-preview" class="page-ai-preview" hidden>
+            <div class="page-ai-preview-head">Preview <span id="page-ai-model"></span> &mdash; nothing is saved until you press Save.</div>
+            <div id="page-ai-preview-body" class="page-ai-preview-body"></div>
+            <div id="page-ai-links" class="page-ai-links"></div>
+            <button type="button" class="btn btn-primary btn-sm" id="page-ai-insert">Insert</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="page-ai-replace" title="Replace the selection (or the whole body)">Replace</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="page-ai-discard">Discard</button>
+        </div>
+    </div>
+    [% END %]
+
     <div class="page-editor-layout page-editor-layout-visual">
         <div class="page-editor-pane page-editor-visual-pane" id="page-editor-visual-pane">
             <div class="page-editor-preview-label">

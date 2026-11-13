@@ -9,6 +9,7 @@ package Comserv::Util::AI::HermesOverrunGuard;
 # evaluator loop in script/comserv_server.pl. flock + min interval = idempotent.
 
 use strict;
+use Comserv::Util::AppTime ();
 use warnings;
 use JSON::PP ();
 use HTTP::Tiny;
@@ -60,6 +61,10 @@ our %THRASH_LIMITS = (
 # model.default 'openrouter/cohere/...' with provider openrouter -> HTTP 400 'not a valid
 # model ID' -> every new session fell through fallback_providers to paid v4-pro).
 our @CANDIDATES = (
+    # Nov 12 2026 (Shanta): ernie-5.5-flash-preview:free ahead of north-mini (Crouton Alpha gone).
+    { name => 'openrouter/baidu/ernie-5.5-flash-preview:free', provider => 'openrouter',
+      default => 'baidu/ernie-5.5-flash-preview:free', base_url => 'https://openrouter.ai/api/v1',
+      api_mode => 'chat_completions', health => 'openrouter|baidu/ernie-5.5-flash-preview:free', free => 1 },
     { name => 'openrouter/cohere/north-mini-code:free', provider => 'openrouter',
       default => 'cohere/north-mini-code:free', base_url => 'https://openrouter.ai/api/v1',
       api_mode => 'chat_completions', health => 'openrouter|cohere/north-mini-code:free', free => 1 },
@@ -91,7 +96,10 @@ our @PAID_WATCH     = ('deepseek-v4-pro', 'tencent/hy4-preview', 'x-ai/grok', 'q
 # BLOCKED, not just watched: set_model/set_aliases/write_fallback_providers rewrite it, and
 # every run sweeps config default, aliases, fallback, auxiliary and delegation (or_grok_block_plan).
 our $OR_GROK_RE     = qr{(?:^openrouter/.*grok|^x-ai/|/x-ai/|^~?x-ai/)}i;
-our $FREE_SAFE      = { provider => 'openrouter', default => 'cohere/north-mini-code:free' };
+# Nov 12 2026 (Shanta): when Super Grok is unavailable the switch target is particle-1 (cap_exempt);
+# $FREE_SAFE is the first free step, ahead of north-mini.
+our $SWITCH_SAFE    = { provider => 'openrouter', default => 'particle-ai/particle-1' };
+our $FREE_SAFE      = { provider => 'openrouter', default => 'baidu/ernie-5.5-flash-preview:free' };
 our $PAID_WATCH_RE  = do { my $a = join '|', map { quotemeta } @PAID_WATCH; qr/$a/i };
 our $OR_MODELS_URL  = 'https://openrouter.ai/api/v1/models';
 our $OR_CACHE_TTL   = 6 * 3600;
@@ -145,7 +153,7 @@ sub new {
 
 sub _now { my $s = shift; defined $s->{now} ? $s->{now} : time }
 
-sub pt { my $e = shift // time; local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset(); strftime('%a %b %d %H:%M PT', localtime $e) }
+sub pt { my $e = shift // time; local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); strftime('%a %b %d %H:%M PT', localtime $e) }
 
 # ---- pure decision ---------------------------------------------------------
 # in: thrash (int|undef), openrouter {ok,day_usd,...}, state {tripped}, caps, thrash_n,
@@ -166,6 +174,8 @@ sub decide {
     if ($use_tbc) {
         my $counts = $tbc->{counts} || {};
         for my $cl (sort keys %$counts) {
+            # Nov 11 2026 (Shanta t393u): a cap-exempt model (trials.*.cap_exempt, e.g. particle-1) is never a thrash hand-off
+            next if $cl =~ /^model:(.+)\z/ && ref $in{cap_exempt} eq 'HASH' && $in{cap_exempt}{$1};
             my $n = $counts->{$cl} // 0;
             my $lim = exists($lims->{$cl}) ? $lims->{$cl} : ($lims->{other} // 20);
             if ($n >= $lim) {
@@ -475,7 +485,9 @@ sub candidate_ok {
     my $d = $c->{default} // '';
     return 0 if !length $d || $d =~ $BANNED_RE;
     return 0 if normalize_model_id($c->{provider}, $d) ne $d;
-    return 0 if $c->{paid} && (!$in{paid_ok} || $d =~ /glm/i || is_or_grok($c->{provider}, $d));   # paid chain step only inside the caps
+    # Nov 11 2026 (Shanta t393u): a cap-exempt chain step (trials.*.cap_exempt, particle-1) stays usable when the cash caps have no room
+    my $exempt = ref $in{cap_exempt} eq 'HASH' && $in{cap_exempt}{$d} ? 1 : 0;
+    return 0 if $c->{paid} && ((!$in{paid_ok} && !$exempt) || $d =~ /glm/i || is_or_grok($c->{provider}, $d));   # paid chain step only inside the caps
     return supergrok_budget_left($in{supergrok}) if $c->{sg_budget};
     return supergrok_available($in{supergrok}) if $c->{supergrok};
     if ($c->{ollama}) {
@@ -534,8 +546,17 @@ sub chain_candidates {
 
 sub candidate_order {
     my ($kind, $cands, $sg, %opt) = @_;
-    if (ref $opt{chain} eq 'ARRAY' && @{ $opt{chain} } && ($kind // 'thrash') eq 'caps') {
-        return chain_candidates(candidates => $cands, chain => $opt{chain}, emergency => $opt{emergency});
+    # Nov 12 2026 (Shanta): when a Hermes chain is configured, cash trips follow it
+    # (Super Grok -> particle-1 -> ... -> ernie -> north-mini last). Thrash follows the same
+    # list but skips paid cash models that are not cap_exempt (particle-1 stays; luna/x.ai do not).
+    if (ref $opt{chain} eq 'ARRAY' && @{ $opt{chain} }) {
+        my @all = chain_candidates(candidates => $cands, chain => $opt{chain}, emergency => $opt{emergency});
+        return @all if ($kind // 'thrash') eq 'caps';
+        my $ex = ref $opt{cap_exempt} eq 'HASH' ? $opt{cap_exempt} : {};
+        return grep {
+            $_->{supergrok} || $_->{sg_budget} || $_->{free} || $_->{ollama}
+            || $ex->{ $_->{default} // '' }
+        } @all;
     }
     my @c  = @{ $cands || \@CANDIDATES };
     my @or = grep { !$_->{ollama} } @c;
@@ -552,7 +573,7 @@ sub candidate_order {
 # pure: first usable candidate for this trip kind, or undef (pause).
 sub pick_target {
     my (%in) = @_;
-    for my $c (candidate_order($in{kind}, $in{candidates}, $in{supergrok}, chain => $in{chain}, emergency => $in{emergency})) {
+    for my $c (candidate_order($in{kind}, $in{candidates}, $in{supergrok}, chain => $in{chain}, emergency => $in{emergency}, cap_exempt => $in{cap_exempt})) {
         return { %$c } if candidate_ok($c, %in);
     }
     return undef;
@@ -622,12 +643,18 @@ sub build_trip_plan {
     my (%in) = @_;
     my $kind   = trip_kind($in{reasons});
     my $target = pick_target(%in, kind => $kind);
+    # Nov 11 2026 (Shanta t393u): Hermes already on a cap-exempt model (particle-1) stays on it through any trip
+    my $cm = $in{current_model} || {};
+    my $ex = ref $in{cap_exempt} eq 'HASH' ? $in{cap_exempt} : {};
+    if (length($cm->{default} // '') && $ex->{ $cm->{default} } && $cm->{default} !~ $BANNED_RE) {
+        $target = { %$cm, name => alias_value($cm), cap_exempt => 1 };
+    }
     my $paused = $target ? 0 : 1;
     $target ||= { %{ (grep { $_->{ollama} } @CANDIDATES)[0] }, placeholder => 1 };
     return {
         kind => $kind, target => $target, paused => $paused,
         model     => { map { ($_ => $target->{$_}) } @MODEL_KEYS },
-        aliases   => alias_rewrite_plan(aliases => $in{aliases}, safe => alias_value($target)),
+        aliases   => alias_rewrite_plan(aliases => $in{aliases}, safe => alias_value($target), cap_exempt => $ex),
         fallback  => fallback_chain(%in),
         auxiliary => aux_plan(%in),
     };
@@ -666,7 +693,7 @@ sub supergrok_daily_off {
     return 0 unless ref $sg eq 'HASH' && $sg->{off_today} && ($sg->{mode} // 'grok') ne 'grok';
     # Oct 11 2026: the lock lasts for the WORK day (starts day_start_hour PT, default 5).
     my $h = (defined $sg->{day_start_hour} && $sg->{day_start_hour} =~ /^\d+$/) ? $sg->{day_start_hour} : 5;
-    my $today = do { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset(); my $d = POSIX::strftime('%Y-%m-%d', localtime(($now // time) - $h * 3600)); $d };
+    my $today = do { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); my $d = POSIX::strftime('%Y-%m-%d', localtime(($now // time) - $h * 3600)); $d };
     POSIX::tzset();
     return (($sg->{lock_date} // '') eq $today) ? 1 : 0;
 }
@@ -674,9 +701,9 @@ sub supergrok_daily_off {
 # pure: the daily guard's cheap model (from its state file), never banned.
 sub supergrok_daily_target {
     my ($sg) = @_;
-    my $m = { provider => $sg->{switch_provider} || 'openrouter', default => $sg->{switch_model} || 'cohere/north-mini-code:free',
+    my $m = { provider => $sg->{switch_provider} || 'openrouter', default => $sg->{switch_model} || $SWITCH_SAFE->{default},
               base_url => $sg->{switch_base_url} || 'https://openrouter.ai/api/v1', api_mode => $sg->{switch_api_mode} || 'chat_completions' };
-    $m->{default} = 'cohere/north-mini-code:free' if $m->{default} =~ $BANNED_RE || $m->{default} =~ /glm/i;   # Oct 13: glm removed
+    $m->{default} = $FREE_SAFE->{default} if $m->{default} =~ $BANNED_RE || $m->{default} =~ /glm/i;   # Oct 13: glm removed; Nov 12: free step is ernie
     return $m;
 }
 
@@ -820,6 +847,8 @@ sub alias_rewrite_plan {
         next unless defined $v && length $v;
         next if $v eq $safe;
         next if ($v =~ /:free\z/ || $v =~ /^ollama/ || $v =~ m{^xai-oauth/}) && $v !~ $BANNED_RE;
+        # Nov 11 2026 (Shanta t393u): an alias on a cap-exempt model (openrouter/particle-ai/particle-1) is left alone
+        next if ref $in{cap_exempt} eq 'HASH' && do { (my $b = $v) =~ s{^openrouter/}{}; $in{cap_exempt}{$b} };
         $set{$a} = $safe;
         $saved{$a} = $v;
     }
@@ -858,7 +887,7 @@ sub parse_api_calls {
     if (defined $opt{anchor}) {
         # Local readings are in the workstation's zone, not the process zone:
         # Comserv.pm sets TZ=UTC inside the app, which made both readings equal.
-        local $ENV{TZ} = $opt{tz} // $ENV{HERMES_LOG_TZ} // 'America/Vancouver';
+        local $ENV{TZ} = $opt{tz} // $ENV{HERMES_LOG_TZ} // Comserv::Util::AppTime->app_tz;
         POSIX::tzset();
         my $ref = $opt{anchor};
         for my $i (reverse 0 .. $#lines) {
@@ -1450,6 +1479,10 @@ sub chain_context {
     my $path = $s->{chains_file} // "$s->{app_root}/data/ai_model_chains.json";
     my $ld = eval { Comserv::Util::AI::ModelChains->load(undef, path => $path, logger => sub { $s->log_line("ai_model_chains: $_[1]") }) };
     return () unless $ld;
+    # Nov 5 2026: an invalid or missing chains file silently fell back to perl_default; log it as an error.
+    if (($ld->{source} // "") ne "file") {
+        eval { require Comserv::Util::Logging; Comserv::Util::Logging->instance->log_with_details(undef, "error", __FILE__, __LINE__, "chain_context", "ai_model_chains: $path not used (source=" . ($ld->{source} // "?") . "); Hermes chain is on Perl defaults") };
+    }
     my @chain = Comserv::Util::AI::ModelChains->hermes_chain($ld);
     # Oct 28 2026: a PROBATION model (trials.*.probation) is a chain step only while its probation is begun and not stopped; once it
     # hits its limit (10 sessions / $5) it is out of the chain until Shanta approves the audit (script/ai_trial.pl approve).
@@ -1457,7 +1490,17 @@ sub chain_context {
     my @gone = grep { $blocked->{ $_->{model} } } @chain;
     @chain = grep { !$blocked->{ $_->{model} } } @chain;
     my %allowed = map { ($_->{model} => 1) } grep { $_->{tier} eq 'paid' } @chain;
-    return (chain => \@chain, emergency => [ Comserv::Util::AI::ModelChains->hermes_chain($ld, emergency => 1) ],
+    # Nov 11 2026 (Shanta t393u): chain models whose trial says cap_exempt (and is not stopped / blocked)
+    my %exempt;
+    { my $dd = $ld->{data} || {};
+      for my $tn (grep { !/^_/ } keys %{ ref $dd->{trials} eq 'HASH' ? $dd->{trials} : {} }) {
+          my $tr = $dd->{trials}{$tn};
+          next unless ref $tr eq 'HASH' && $tr->{model} && ($tr->{cap_exempt} // '') =~ /^(?:1|true)\z/;
+          next if $blocked->{ $tr->{model} } || ($s->{trial_stopped} && $s->{trial_stopped}{ $tr->{model} });
+          next unless $allowed{ $tr->{model} };
+          $exempt{ $tr->{model} } = 1;
+      } }
+    return (chain => \@chain, cap_exempt => \%exempt, emergency => [ Comserv::Util::AI::ModelChains->hermes_chain($ld, emergency => 1) ],
             allowed_paid => \%allowed, probation_out => { map { ($_->{model} => $blocked->{ $_->{model} }) } @gone },
             channel_caps => { map { ($_ => Comserv::Util::AI::ModelChains->channel_caps($ld, $_, logger => sub { $s->log_line($_[1]) })) } qw(openrouter xai_direct) },
             chain_source => $ld->{source});
@@ -2015,7 +2058,7 @@ sub run {
     my $or_caps = (($cc0{channel_caps} || {})->{openrouter})
         || Comserv::Util::AI::ModelChains->channel_caps(undef, 'openrouter', logger => sub { $s->log_line($_[1]) });
     my $d = decide(thrash_by_class => $tbc, limits => $lims, thrash => $thrash, openrouter => $or, state => $dst, v4pro_recent => $v4pro_recent,
-                   caps => $or_caps,
+                   caps => $or_caps, cap_exempt => $cc0{cap_exempt},
                    xai_direct => { usd => ($xai_live->{usd} // 0), cap_day => ((($cc0{channel_caps} || {})->{xai_direct} || {})->{day}) },
                    watch_model => (ref $live eq 'HASH' ? $live->{last_watch_model} : undef));
     $d->{thrash} = $thrash;
@@ -2071,15 +2114,8 @@ sub run {
         return $d;
     }
 
-    # Oct 28 2026 hysteresis (Shanta: flapping trip/restore): count consecutive runs that are authoritatively clear; a trip is restored
-    # only after $CLEAR_RUNS of them. Any over / unknown / live-estimate-only reading resets the count. State is shared, so a server
-    # running older code that restores on its own cannot be stopped here; the next run of this code re-trips (see report).
-    if ($st->{tripped} && !$shielded) {
-        if ($d->{action} eq 'restore') {
-            $st->{clear_streak} = ($st->{clear_streak} // 0) + 1;
-            if ($st->{clear_streak} < $CLEAR_RUNS) { $d->{action} = 'hold'; $d->{clear_streak} = $st->{clear_streak}; $d->{clear_runs_needed} = $CLEAR_RUNS }
-        } else { $st->{clear_streak} = 0 }
-    }
+    # Nov 4 2026: the Oct 28 streak block that stood here was removed; it duplicated the Oct 31 block below, which then
+    # zeroed the streak on every run (action already "hold"), so a trip could never restore. One streak block remains.
     # Oct 23: 30-minute cool-down between a trip and a restore.
     if ($d->{action} eq 'restore' && $st->{since} && $t - $st->{since} < $COOLDOWN_S) {
         $d->{action} = 'hold';
@@ -2097,6 +2133,33 @@ sub run {
             }
         } elsif ($d->{action} eq 'hold' && !$d->{cooldown_left_s}) {
             $st->{clear_streak} = 0;
+        }
+    }
+    # Nov 11 2026 (Shanta t393u): a trip made before particle-1 was cap-exempt (default/code/coder on north-mini) is moved
+    # onto the exempt model while it holds. saved_model / saved_aliases from the original trip are kept for the restore.
+    if ($d->{action} eq 'hold' && $st->{tripped} && !$shielded && !$st->{paid_block_only} && %{ $ctx{cap_exempt} || {} }) {
+        my $plan = build_trip_plan(%ctx, reasons => (@{ $d->{reasons} } ? $d->{reasons} : $st->{reasons} || []));
+        my $tg = $plan->{target} || {};
+        my $want_alias = alias_value($tg);
+        my %aset = map { ($_ => $want_alias) } grep { ($ctx{aliases}{$_} // '') =~ /:free\z/ } qw(code coder);   # handed-off coding aliases
+        my $cur_d = bare_model_id((($ctx{current_model} || {})->{default}) // '');
+        my $cur_free = $cur_d =~ /:free\z/ ? 1 : 0;   # only a free hand-off default is moved; a hand-set paid/local default is kept
+        if (!$plan->{paused} && $ctx{cap_exempt}{ $tg->{default} // '' } && (%aset || ($cur_free && $cur_d ne $tg->{default}))) {
+            my $bak = $s->backup_config;
+            my @errs;
+            my $done  = $cur_free ? (eval { $s->set_model($plan->{model}) } || []) : []; push @errs, $@ if $@;
+            my $adone = eval { $s->set_aliases(\%aset) } || []; push @errs, $@ if $@;
+            my $fdone = eval { $s->write_fallback_providers($plan->{fallback}) } || []; push @errs, $@ if $@;
+            my $err = join ' ', @errs;
+            my $msg = sprintf('Hermes overrun guard RETARGET %s: %s is cap-exempt (Shanta t393u); default %s -> %s, aliases %s, fallback %s. Backup: %s',
+                pt($t), $tg->{default}, ($cur_free ? $cur_d : "$cur_d (kept)"), ($cur_free ? $tg->{default} : $cur_d), (@$adone ? join(', ', @$adone) : 'none'), join(' > ', @$fdone) || 'unchanged', $bak // 'FAILED');
+            $s->log_line($msg . ($err ? " set_error=$err" : ''));
+            _write_notice($s, $msg);
+            _append($s->{events_file}, $J->encode({ at => $t, at_pt => pt($t), action => 'retarget', instance => $s->instance_name,
+                from => $cur_d, to => $tg->{name}, aliases => $adone, fallback => $fdone, backup => $bak, ($err ? (error => $err) : ()) }));
+            @$st{qw(target target_default)} = ($tg->{name}, $tg->{default});
+            $st->{aliases_set} = $adone; $st->{fallback_set} = $fdone;
+            $d->{retarget} = $tg->{name};
         }
     }
     if ($d->{action} eq 'trip') {

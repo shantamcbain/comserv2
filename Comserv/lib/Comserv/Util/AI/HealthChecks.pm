@@ -8,6 +8,7 @@ package Comserv::Util::AI::HealthChecks;
 # Read-only: no writes except throttled log lines through the caller's logger.
 
 use strict;
+use Comserv::Util::AppTime ();
 use utf8;
 use warnings;
 use JSON ();
@@ -51,7 +52,7 @@ sub iso_epoch {
 sub pt {
     my ($e) = @_;
     return '' unless defined $e && $e > 0;
-    local $ENV{TZ} = 'America/Vancouver';
+    local $ENV{TZ} = Comserv::Util::AppTime->app_tz;
     POSIX::tzset();
     my $s = strftime('%Y-%m-%d %H:%M PT', localtime($e));
     POSIX::tzset();

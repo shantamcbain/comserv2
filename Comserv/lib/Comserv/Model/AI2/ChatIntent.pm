@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use Exporter 'import';
 
-our @EXPORT_OK = qw(is_editor_agent looks_like_todo_create looks_like_helpdesk_ticket_create);
+our @EXPORT_OK = qw(is_editor_agent looks_like_todo_create looks_like_helpdesk_ticket_create looks_like_page_create);
 
 # AI Editor agents plan/analyze/implement code. Their buffers and phase
 # contracts mention "todo" constantly; intercepts must never fire (#2423).
@@ -44,6 +44,20 @@ sub looks_like_helpdesk_ticket_create {
     return 1 if $p =~ /\b(?:create|file|open|submit|raise|lodge|report)\b(?:\W+\w+){0,5}\W+\b(?:(?:a|an|new|the)\s+)?(?:help\s*desk\s+|helpdesk\s+|support\s+)?tickets?\b/i;
     return 1 if $p =~ /\b(?:help\s*desk|helpdesk)\b(?:\W+\w+){0,4}\W+\b(?:create|file|open|submit|raise)\b(?:\W+\w+){0,4}\W+\btickets?\b/i;
     return 0;
+}
+
+
+# Nov 5 2026: "create/make/write (me) a (new) page about X" -> topic X, else ''.
+sub looks_like_page_create {
+    my ($prompt) = @_;
+    return '' unless defined $prompt && $prompt =~ /\S/;
+    my $p = $prompt; $p =~ s/^\s+|\s+$//g;
+    return '' if $p =~ /^(how\s+(do\s+i|to)|what\s+is|explain|where\s+(is|do))\b/i;
+    return '' if $p =~ /\b(?:todo|task|ticket|invoice)s?\b/i;
+    if ($p =~ /\b(?:create|make|write|draft|add|build)\s+(?:me\s+)?(?:a|an|new|the)\s+(?:new\s+)?(?:web\s*)?page\s+(?:about|on|for|called|titled|describing)\s+(.{3,200})/i) {
+        my $t = $1; $t =~ s/[.?!]+\s*$//; return $t;
+    }
+    return '';
 }
 
 1;

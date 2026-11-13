@@ -13,7 +13,7 @@ require Comserv::Util::AI::ModelChains;
 $Comserv::Util::AI::HermesOverrunGuard::COOLDOWN_S = 0;   # Oct 23: legacy tests restore within minutes; cool-down tested below
 $Comserv::Util::AI::HermesOverrunGuard::CLEAR_RUNS = 1;   # Oct 28: legacy tests restore on the first clear run; hysteresis tested below
 # OpenRouter models list stand-in (validated ids only; no network in tests)
-my $IDS = { map { ($_ => 1) } 'cohere/north-mini-code:free', 'nvidia/nemotron-3.5-lightning:free',
+my $IDS = { map { ($_ => 1) } 'baidu/ernie-5.5-flash-preview:free', 'cohere/north-mini-code:free', 'nvidia/nemotron-3.5-lightning:free',
             'deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-flash' };
 my $SG_OK = { mode => 'grok', remaining => 60, locked => 0, off_today => 0 };
 
@@ -36,11 +36,11 @@ is $G->can('decide')->(thrash => 30, openrouter => { ok => 0 }, state => {})->{a
 
 # pick_target
 my $pick = $G->can('pick_target');
-is $pick->(health => {}, ollama_models => undef, or_ids => $IDS, kind => 'caps')->{name}, 'openrouter/cohere/north-mini-code:free', 'cheapest free first';
-is $pick->(health => {}, ollama_models => undef, or_ids => $IDS, kind => 'caps')->{default}, 'cohere/north-mini-code:free', 'written id has no openrouter/ prefix';
-is $pick->(or_ids => $IDS, kind => 'caps', health => { 'openrouter|cohere/north-mini-code:free' => { state => 'open' } })->{name},
-   'openrouter/nvidia/nemotron-3.5-lightning:free', 'skip open circuit';
-my $both_open = { 'openrouter|cohere/north-mini-code:free' => { state => 'open' }, 'openrouter|nvidia/nemotron-3.5-lightning:free' => { state => 'open' } };
+is $pick->(health => {}, ollama_models => undef, or_ids => $IDS, kind => 'caps')->{name}, 'openrouter/baidu/ernie-5.5-flash-preview:free', 'cheapest free first (Nov 12: ernie ahead of north-mini)';
+is $pick->(health => {}, ollama_models => undef, or_ids => $IDS, kind => 'caps')->{default}, 'baidu/ernie-5.5-flash-preview:free', 'written id has no openrouter/ prefix';
+is $pick->(or_ids => $IDS, kind => 'caps', health => { 'openrouter|baidu/ernie-5.5-flash-preview:free' => { state => 'open' } })->{name},
+   'openrouter/cohere/north-mini-code:free', 'skip open circuit (ernie down -> north-mini)';
+my $both_open = { 'openrouter|baidu/ernie-5.5-flash-preview:free' => { state => 'open' }, 'openrouter|cohere/north-mini-code:free' => { state => 'open' }, 'openrouter|nvidia/nemotron-3.5-lightning:free' => { state => 'open' } };
 is $pick->(or_ids => $IDS, health => $both_open, ollama_models => ['gemma4-64k:latest'])->{provider}, 'ollama-launch', 'ollama when OR free open';
 is $pick->(or_ids => $IDS, health => $both_open, ollama_models => undef), undef, 'none working -> undef (pause)';
 
@@ -65,13 +65,13 @@ my ($g, $set) = guard($h, now => 1000000);
 # Oct 31 2026: lite reuse needs a fresh snapshot (fetched_at, commit d17fb91f5); give the trip reading one.
 my $r = $g->run(thrash => 3, openrouter => { %$ok, week_usd => 15.89, fetched_at => 1000000 });
 is $r->{action}, 'trip', 'run trips on week';
-is $r->{target}, 'openrouter/cohere/north-mini-code:free', 'switched to cheapest';
+is $r->{target}, 'openrouter/baidu/ernie-5.5-flash-preview:free', 'switched to cheapest';
 ok $r->{backup} && -f $r->{backup}, 'config backed up';
 like do { local (@ARGV, $/) = $r->{backup}; <> }, qr/deepseek-v4-pro/, 'backup has old model';
-is $g->current_model->{default}, 'cohere/north-mini-code:free', 'config now cheap (valid id, no double prefix)';
+is $g->current_model->{default}, 'baidu/ernie-5.5-flash-preview:free', 'config now cheap (valid id, no double prefix)';
 unlike do { local (@ARGV, $/) = "$h/.hermes/config.yaml"; <> }, qr/v4-pro/, 'no v4-pro anywhere in config after trip';
 is_deeply [ map { "$_->{provider}/$_->{model}" } @{ $g->read_fallback_providers } ],
-    [ 'openrouter/cohere/north-mini-code:free', 'ollama-launch/gemma4-64k:latest', 'openrouter/nvidia/nemotron-3.5-lightning:free' ], # Oct 13: north-mini > 64K Ollama > rest; qwen2.5-coder dropped: context < 64K (Oct 10 2026)
+    [ 'openrouter/baidu/ernie-5.5-flash-preview:free', 'openrouter/cohere/north-mini-code:free', 'ollama-launch/gemma4-64k:latest', 'openrouter/nvidia/nemotron-3.5-lightning:free' ], # Nov 12: ernie > north-mini > 64K Ollama > rest; qwen2.5-coder dropped: context < 64K (Oct 10 2026)
     'trip wrote free/Ollama fallback chain (Super Grok unavailable)';
 my $st = $g->read_state;
 ok $st->{tripped}, 'state tripped'; is $st->{saved_model}{default}, 'openrouter/deepseek/deepseek-v4-pro', 'saved old model';
@@ -92,7 +92,7 @@ is $g->run(thrash => 30, openrouter => $ok)->{action}, 'hold', 'hold while over'
 ($g, $set) = guard($h, now => 1000600);
 $r = $g->run(thrash => 1, openrouter => $ok);
 is $r->{action}, 'restore', 'restore when clear';
-is $g->current_model->{default}, 'cohere/north-mini-code:free', 'restore never puts v4-pro back (saved v4-pro replaced)';
+is $g->current_model->{default}, 'baidu/ernie-5.5-flash-preview:free', 'restore never puts v4-pro back (saved v4-pro replaced)';
 unlike do { local (@ARGV, $/) = "$h/.hermes/config.yaml"; <> }, qr/v4-pro/, 'no v4-pro after restore';
 ok !$g->read_state->{tripped}, 'state cleared';
 ok !$G->status(home => $h, now => 1000600)->{tripped}, 'banner off after restore';
@@ -160,7 +160,7 @@ is $G->can('restore_model_decision')->(current_default => 'openrouter/cohere/nor
     my $r = $g->run(thrash => 25, openrouter => { ok => 1, day_usd => 0.1, week_usd => 1, month_usd => 2 });
     is $r->{action}, 'trip', 'alias trip';
     ok grep({ $_->[0] eq 'model.aliases.code' } @set), 'code alias set on trip';
-    is $g->read_aliases->{code}, 'openrouter/cohere/north-mini-code:free', 'code now free';
+    is $g->read_aliases->{code}, 'openrouter/baidu/ernie-5.5-flash-preview:free', 'code now free';
     # hand-set default during trip
     { open my $in,'<',"$h/.hermes/config.yaml"; my @l=<$in>; close $in; s/^  default: .*/  default: openrouter\/deepseek\/deepseek-v4-flash-0731/ for @l; open my $o,'>',"$h/.hermes/config.yaml"; print $o @l; close $o; }
     ($g) = do {
@@ -199,16 +199,16 @@ is $G->can('restore_model_decision')->(current_default => 'openrouter/cohere/nor
     my $t = $pick->(or_ids => $IDS, supergrok => $SG_OK, kind => 'thrash', ollama_models => []);
     is $t->{provider}, 'xai-oauth', 'thrash prefers Super Grok'; is $t->{default}, 'grok-4.7', 'Super Grok id (Oct 31: grok-4.7)';
     is $pick->(or_ids => $IDS, supergrok => $SG_OK, kind => 'caps')->{default}, 'grok-4.7', '$ caps + Super Grok budget -> grok-4.7 (proposal #34a, eval report 35)';
-    is $pick->(or_ids => $IDS, supergrok => { %$SG_OK, locked => 1 }, kind => 'caps')->{default}, 'cohere/north-mini-code:free', '$ caps, Super Grok locked -> free';
-    is $pick->(or_ids => $IDS, supergrok => { %$SG_OK, locked => 1 }, kind => 'thrash')->{default}, 'cohere/north-mini-code:free', 'locked Super Grok -> free';
-    is $pick->(or_ids => $IDS, supergrok => { %$SG_OK, mode => 'openrouter' }, kind => 'thrash')->{default}, 'cohere/north-mini-code:free', 'Super Grok exhausted -> free';
+    is $pick->(or_ids => $IDS, supergrok => { %$SG_OK, locked => 1 }, kind => 'caps')->{default}, 'baidu/ernie-5.5-flash-preview:free', '$ caps, Super Grok locked -> free';
+    is $pick->(or_ids => $IDS, supergrok => { %$SG_OK, locked => 1 }, kind => 'thrash')->{default}, 'baidu/ernie-5.5-flash-preview:free', 'locked Super Grok -> free';
+    is $pick->(or_ids => $IDS, supergrok => { %$SG_OK, mode => 'openrouter' }, kind => 'thrash')->{default}, 'baidu/ernie-5.5-flash-preview:free', 'Super Grok exhausted -> free';
     is $pick->(or_ids => { 'nvidia/nemotron-3.5-lightning:free' => 1 }, kind => 'caps')->{default}, 'nvidia/nemotron-3.5-lightning:free', 'id missing from OR list skipped';
     is $pick->(or_ids => undef, kind => 'caps', ollama_models => ['gemma4-64k:latest'])->{provider}, 'ollama-launch', 'OR list unknown -> no OpenRouter write';
 
     my $fc = $G->can('fallback_chain')->(or_ids => $IDS, supergrok => $SG_OK, ollama_models => undef);
     is_deeply [ map { "$_->{provider}/$_->{model}" } @$fc ],
-        [ 'openrouter/cohere/north-mini-code:free', 'ollama-launch/gemma4-64k:latest',
-          'openrouter/nvidia/nemotron-3.5-lightning:free' ], 'permanent chain (Oct 31: no grok-build first): north-mini > 64K Ollama > nemotron';
+        [ 'openrouter/baidu/ernie-5.5-flash-preview:free', 'openrouter/cohere/north-mini-code:free', 'ollama-launch/gemma4-64k:latest',
+          'openrouter/nvidia/nemotron-3.5-lightning:free' ], 'permanent chain (Nov 12: ernie > north-mini > 64K Ollama > nemotron)';
     ok !grep({ $_->{model} =~ /grok-build/ } @$fc), 'chain never grok-build';
     ok !grep({ $_->{model} =~ /v4-pro/ } @$fc), 'chain never v4-pro';
 
@@ -223,7 +223,7 @@ is $G->can('restore_model_decision')->(current_default => 'openrouter/cohere/nor
         title_generation => { provider => 'openrouter', model => 'deepseek/deepseek-v4-flash' },
         compression => { provider => 'auto', model => '' },
         vision => { provider => 'openrouter', model => 'nvidia/nemotron-3.5-lightning:free' } });
-    is_deeply $ax, { title_generation => { provider => 'openrouter', model => 'cohere/north-mini-code:free' } }, 'aux paid -> valid :free; free/auto kept';
+    is_deeply $ax, { title_generation => { provider => 'openrouter', model => 'baidu/ernie-5.5-flash-preview:free' } }, 'aux paid -> valid :free; free/auto kept';
     is_deeply $G->can('aux_plan')->(or_ids => undef, auxiliary => { t => { provider => 'openrouter', model => 'deepseek/deepseek-v4-pro' } }),
         { t => { provider => 'auto', model => '' } }, 'aux with no validated free -> auto';
 
@@ -297,9 +297,9 @@ sub cb_for {
     is $g->current_model->{provider}, 'xai-oauth', 'thrash trip keeps/sets Super Grok';
     my $cfg = do { local (@ARGV, $/) = "$h/.hermes/config.yaml"; <> };
     unlike $cfg, qr/v4-pro/, 'trip removed v4-pro fallback';
-    like $cfg, qr/fallback_providers:\n(?:  - provider: xai\n    model: grok-4\.7\n)?  - provider: openrouter\n    model: cohere\/north-mini-code:free/, q{fallback chain: optional paid x.ai, then free (Oct 31: no grok-build)};
+    like $cfg, qr/fallback_providers:\n(?:  - provider: xai\n    model: grok-4\.7\n)?  - provider: openrouter\n    model: baidu\/ernie-5\.5-flash-preview:free/, q{fallback chain: optional paid x.ai, then first free (Nov 12: ernie)};
     unlike $cfg, qr/grok-build-0\.1\n  - provider/, 'no grok-build fallback entry';
-    like $cfg, qr/title_generation:\n    provider: openrouter\n    model: cohere\/north-mini-code:free/, 'aux title_generation -> :free';
+    like $cfg, qr/title_generation:\n    provider: openrouter\n    model: baidu\/ernie-5\.5-flash-preview:free/, 'aux title_generation -> :free';
     like $cfg, qr/toolsets:\n  - hermes-cli/, 'rest of config intact';
     is $g->read_aliases->{code}, 'xai-oauth/grok-build-0.1', 'Super Grok coding alias untouched';
     is $g->read_aliases->{delegate}, 'xai-oauth/grok-4.7', 'paid delegate alias -> Super Grok grok-4.7 while tripped';
@@ -559,7 +559,7 @@ sub cb_for {
     my $p = $G->can('build_restore_plan')->(%ctx, state => $st, supergrok => $sg, now => $now);
     is $p->{model}{default}, 'cohere/north-mini-code:free', 'restore during daily lock -> cheap model, not grok-4.7';
     is $p->{aliases}{code}, 'openrouter/cohere/north-mini-code:free', '... code alias cheap';
-    is $G->can('supergrok_daily_target')->({ switch_model => 'z-ai/glm-5.3-flash' })->{default}, 'cohere/north-mini-code:free', 'stale glm switch_model -> north-mini (Oct 13)';
+    is $G->can('supergrok_daily_target')->({ switch_model => 'z-ai/glm-5.3-flash' })->{default}, 'baidu/ernie-5.5-flash-preview:free', 'stale glm switch_model -> first free (Nov 12: ernie)';
     ok $p->{daily_lock}, '... flagged';
     $p = $G->can('build_restore_plan')->(%ctx, state => $st, supergrok => { %$sg, lock_date => '2026-10-08' }, now => $now);
     is $p->{model}{default}, 'grok-4.7', 'new PT day -> restore grok-4.7';
@@ -586,7 +586,7 @@ sub cb_for {
     ok !$G->can('is_or_grok')->('xai-oauth', 'grok-4.7'), 'xai-oauth grok-4.7 allowed';
     ok !$G->can('is_or_grok')->('', 'xai-oauth/grok-4.7'), 'xai-oauth alias allowed';
     is $G->can('fix_alias_value')->('openrouter/x-ai/grok-4.7', $open), 'xai-oauth/grok-4.7', 'alias -> Super Grok when open';
-    is $G->can('fix_alias_value')->('openrouter/x-ai/grok-4.7', $shut), 'openrouter/cohere/north-mini-code:free', 'alias -> north-mini when Super Grok shut';
+    is $G->can('fix_alias_value')->('openrouter/x-ai/grok-4.7', $shut), 'openrouter/baidu/ernie-5.5-flash-preview:free', 'alias -> first free when Super Grok shut';
     is $G->can('fix_alias_value')->('openrouter/tencent/hy3', $open), 'openrouter/tencent/hy3', 'non-grok untouched';
     my $p = $G->can('or_grok_block_plan')->(
         current_model => { provider => 'openrouter', default => 'x-ai/grok-4.7', base_url => 'https://openrouter.ai/api/v1', api_mode => 'chat_completions' },
@@ -596,9 +596,9 @@ sub cb_for {
         delegation => { provider => 'openrouter', model => 'deepseek/deepseek-v4-flash' },
         supergrok => $shut);
     is $p->{model}{provider}, 'openrouter', 'model rewritten';
-    is $p->{model}{default}, 'cohere/north-mini-code:free', 'to north-mini when shut';
+    is $p->{model}{default}, 'baidu/ernie-5.5-flash-preview:free', 'to first free when shut';
     is_deeply [ keys %{ $p->{aliases} } ], ['paidgrok'], 'only the grok alias rewritten';
-    is scalar @{ $p->{fallback} }, 1, 'fallback grok replaced and deduped';
+    is scalar @{ $p->{fallback} }, 2, 'fallback grok replaced with first free (ernie) and north-mini kept';
     ok $p->{auxiliary}{vision}, 'aux grok rewritten';
     ok !$p->{delegation}, 'non-grok delegation untouched';
     my $q = $G->can('or_grok_block_plan')->(current_model => { provider => 'xai-oauth', default => 'grok-4.7' },
@@ -612,7 +612,7 @@ sub cb_for {
     is $pick->(or_ids => $IDS, supergrok => $SG, kind => 'caps')->{default}, 'grok-4.7', 'caps + SG 60% -> grok-4.7 (xai-oauth)';
     is $pick->(or_ids => $IDS, supergrok => $SG, kind => 'caps')->{provider}, 'xai-oauth', 'grok-4.7 via xai-oauth';
     my $hi = { %$SG, build => 98, daily_budget => { remaining_today_pct => '10', used_now_pct => '98' } };
-    is $pick->(or_ids => $IDS, supergrok => $hi, kind => 'caps')->{default}, 'cohere/north-mini-code:free', 'caps + SG 98% -> north-mini';
+    is $pick->(or_ids => $IDS, supergrok => $hi, kind => 'caps')->{default}, 'baidu/ernie-5.5-flash-preview:free', 'caps + SG 98% -> first free';
     is $pick->(or_ids => {}, supergrok => $hi, kind => 'caps', ollama_models => []), undef, 'caps, no SG budget, no free -> pause, not Super Grok build';
 }
 

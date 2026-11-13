@@ -245,3 +245,41 @@ body[class*="theme-"] .submenu a.submenu-add-link:hover {
   background-color: var(--nav-hover-bg) !important;
   color: var(--link-hover-color, var(--accent-color, var(--text-color))) !important;
 }
+
+/* Page create/edit AI assist. Small addition to the global theme sheet, not a page CSS file. */
+.page-ai-writer {
+  display: block;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+}
+.page-ai-writer .form-control { width: 100%; box-sizing: border-box; }
+.page-ai-assist {
+  margin: 6px 0;
+  padding: 6px;
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.page-ai-notes { min-width: 220px; flex: 1 1 220px; }
+.page-ai-preview {
+  flex-basis: 100%;
+  border: 1px solid var(--border-color);
+  background: var(--secondary-color);
+  padding: 8px;
+  margin-top: 4px;
+}
+.page-ai-preview-body {
+  max-height: 320px;
+  overflow: auto;
+  background: var(--background-color);
+  padding: 6px;
+  border: 1px solid var(--border-color);
+  margin: 4px 0;
+}
+.page-ai-links li { margin: 2px 0; }
+.page-ai-status { font-size: 0.9em; color: var(--text-muted, var(--text-color)); }
