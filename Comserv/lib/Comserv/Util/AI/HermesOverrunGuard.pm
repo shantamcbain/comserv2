@@ -1637,6 +1637,61 @@ sub sanitize_plan {
     return \%p;
 }
 
+
+# Nov 13 2026 (Shanta): open sessions adopt this model at their next prompt
+# unless they already ran /model after this generation. Same file the Hermes
+# session policy reads (~/.hermes/guard_model_switch.json).
+sub write_guard_model_switch {
+    my ($s, %in) = @_;
+    my $home = $s->{hermes_home} || (($ENV{HOME} || '/home/shanta') . '/.hermes');
+    my $path = "$home/guard_model_switch.json";
+    my $model = $in{model} || {};
+    return unless $model->{default};
+    my $prev = {};
+    if (open my $rh, '<', $path) {
+        local $/;
+        my $raw = <$rh>;
+        close $rh;
+        $prev = eval { $J->decode($raw) } || {};
+        $prev = {} unless ref $prev eq 'HASH';
+    }
+    my $gen = 1;
+    $gen = $prev->{generation} + 1 if defined $prev->{generation} && $prev->{generation} =~ /^\d+$/;
+    my $default = $model->{default};
+    (my $short = $default) =~ s{.*/}{};
+    my $reason = $in{reason} || 'overrun_trip';
+    my $notice;
+    if ($reason eq 'overrun_trip' || $reason eq 'trip') {
+        $notice = "Cash overrun guard switched this session to $short";
+    } elsif ($reason eq 'overrun_restore' || $reason eq 'restore' || $reason eq 'clear') {
+        $notice = "Cash overrun guard restored this session to $short";
+    } else {
+        $notice = $in{notice} || "Cash overrun guard switched this session to $short";
+    }
+    my $provider = $model->{provider} || '';
+    my $t = $in{at} || time;
+    local $ENV{TZ} = eval { Comserv::Util::AppTime->app_tz } || 'America/Dawson_Creek';
+    POSIX::tzset();
+    my $at_label = POSIX::strftime('%a %b %d %H:%M', localtime $t);
+    POSIX::tzset();
+    my $rec = {
+        generation => $gen,
+        at         => int($t),
+        at_label   => $at_label,
+        source     => 'overrun_guard',
+        reason     => $reason,
+        from       => $in{from} || '',
+        to         => ($provider ? "$provider/$default" : $default),
+        model      => { map { ($_ => $model->{$_}) } grep { defined $model->{$_} } qw(default provider base_url api_mode) },
+        notice     => $notice,
+    };
+    my $tmp = "$path.tmp";
+    open my $fh, '>', $tmp or return;
+    print $fh $J->encode($rec); close $fh;
+    rename $tmp, $path;
+    return $rec;
+}
+
 sub write_session_notice {
     my ($s, $hash) = @_;
     my $tmp = "$s->{session_notice}.tmp";
@@ -2195,7 +2250,7 @@ sub run {
                 instance => $s->instance_name, tripped_by => $s->instance_name,
                 ($err ? (set_error => $err) : ()));
         delete $st->{set_error} unless $err;
-        my $msg = sprintf("Hermes overrun guard TRIPPED %s (%s): %s. %s Backup: %s. Aliases blocked: %s. Fallback: %s. Open TUI/dashboard sessions adopt this at their next turn unless pinned with /model (then /model %s).",
+        my $msg = sprintf("Hermes overrun guard TRIPPED %s (%s): %s. %s Backup: %s. Aliases blocked: %s. Fallback: %s. Open sessions adopt this at their next prompt, unless you already ran /model after this switch (then /model %s).",
             pt($t), $plan->{kind}, join('; ', @{ $d->{reasons} }),
             $paused ? "No working cheap model - Hermes PAUSED (local placeholder $target->{name})."
                     : "Hermes default switched to $target->{name}.", $bak // 'FAILED',
@@ -2206,10 +2261,13 @@ sub run {
         _write_notice($s, $msg . "\nAuto-restores when per-provider thrash limits are clear and OpenRouter day/week/month are under \$$or_caps->{day}/\$$or_caps->{week}/\$$or_caps->{month}.");
         $s->write_session_notice({ at => $t, at_pt => pt($t), action => 'trip', reasons => $d->{reasons},
             target => $target->{name}, text => $msg });
+        $s->write_guard_model_switch(reason => 'overrun_trip', at => $t, from => ($cur->{provider} ? "$cur->{provider}/$cur->{default}" : ($cur->{default} || '')),
+            model => { map { ($_ => $target->{$_}) } grep { defined $target->{$_} } @MODEL_KEYS })
+            unless ($plan->{kind} || '') eq 'caps_paid_only';
         $s->notify_change($st, ($paused ? 'paused' : 'tripped'), $target->{name}, 'Hermes overrun guard TRIPPED',
             (@$billing ? "Billing: $billing->[0]{label}. " : '')
             . ($paused ? 'Hermes PAUSED. ' : "New sessions use $target->{name}. ")
-            . 'Open sessions pinned with /model keep their model: run /model code. Details: ~/.hermes/overrun_notice.txt',
+            . 'Open sessions adopt this at their next prompt, unless you already ran /model after this switch. /model code to switch by hand. Details: ~/.hermes/overrun_notice.txt',
             (@$billing ? "$billing->[0]{provider}/$billing->[0]{model}" : undef));
         $s->log_line($msg . ($err ? " set_error=$err" : ''));
         my $ev = { at => $t, at_pt => pt($t), action => 'trip', instance => $s->instance_name, kind => $plan->{kind}, reasons => $d->{reasons},
@@ -2255,6 +2313,9 @@ sub run {
         $s->log_line($msg . ($err ? " set_error=$err" : ''));
         _write_notice($s, $msg);
         $s->write_session_notice({ at => $t, at_pt => pt($t), action => 'clear', text => $msg });
+        $s->write_guard_model_switch(reason => 'overrun_restore', at => $t, from => ($st->{target} || ''),
+            model => { map { ($_ => $want->{$_}) } grep { defined $want->{$_} } @MODEL_KEYS })
+            if $dec->{restore_default} && $want->{default};
         $s->notify_change($st, 'normal', ($dec->{restore_default} ? $want->{default} : $cur->{default}),
             'Hermes overrun guard cleared', $msg);
         my $ev = { at => $t, at_pt => pt($t), action => 'restore', instance => $s->instance_name,
@@ -2571,7 +2632,7 @@ sub status {
     if ($sn && ($sn->{action} || '') eq 'supergrok_handoff' && $sn->{at}
         && ($s->_now - $sn->{at}) < 6 * 3600) {
         $handoff_banner = $sn->{text} || sprintf(
-            'Super Grok handoff (%s) — Hermes → %s. Open TUI may need /model or a new session.',
+            'Super Grok handoff (%s) — Hermes → %s. Open sessions switch at their next prompt, unless you already ran /model after this switch.',
             $sn->{reason} // 'handoff', $sn->{to} // 'grok-build-0.1');
     }
     return {
@@ -2590,7 +2651,7 @@ sub status {
 sub banner {
     my ($st) = @_;
     return '' unless $st && $st->{tripped};
-    return sprintf('Hermes overrun guard %s since %s: %s -> %s. Live Hermes sessions keep their model - end them or /model cheap, then start a new session. Auto-restores when clear.',
+    return sprintf('Hermes overrun guard %s since %s: %s -> %s. Open sessions adopt this at their next prompt, unless you already ran /model after this switch. /model code to switch by hand. Auto-restores when clear.',
         $st->{paused} ? 'PAUSED Hermes' : 'tripped', $st->{since_pt} // '?',
         join('; ', @{ $st->{reasons} || [] }), $st->{target} // '?');
 }

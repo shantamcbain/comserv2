@@ -183,9 +183,11 @@ sub burn_alerts {
     if (defined $budget && $budget > 0 && $hrs_in >= $c->{check_hour} - $dsh) {
         my $frac = $rise / $budget;
         if ($frac > $c->{budget_fraction}) {
+            my $as_of = do { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset();
+                my $x = strftime('%H:%M', localtime $in{now}); POSIX::tzset(); $x };
             push @a, { kind => 'work_window', level => 'warning', value => sprintf('%.2f', $frac),
-                       message => sprintf('By %02d:00 PT %.0f%% of today\'s Super Grok budget is gone (%.1f of %.1f points; limit %.0f%%). Pace the rest of the work window or switch big jobs to glm.',
-                                          $c->{check_hour}, 100 * $frac, $rise, $budget, 100 * $c->{budget_fraction}) };
+                       message => sprintf('As of %s, %.0f%% of today\'s Super Grok budget is gone (%.1f of %.1f points; limit %.0f%%). Pace the rest of the work window or switch big jobs to particle-1 (`/model code`).',
+                                          $as_of, 100 * $frac, $rise, $budget, 100 * $c->{budget_fraction}) };
         }
     }
     return \@a;
