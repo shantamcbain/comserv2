@@ -1721,6 +1721,67 @@ sub fetch_and_set {
         }
     }
 
+    # Sessions created before the login-site lock was added carry the host's
+    # SiteName (CSC on dev) and no site_locked flag. Correct them once, in place,
+    # so nobody has to log out to pick the fix up.
+    if (defined $c->session->{user_id} && $c->session->{user_id} ne '' && !$c->session->{site_locked}) {
+        eval {
+            my $dbh = $c->model('DBEncy')->storage->dbh;
+            my ($own) = $dbh->selectrow_array(
+                "SELECT s.name FROM sites s JOIN user_site_roles usr ON usr.site_id = s.id
+                  WHERE usr.user_id = ? AND LOWER(s.name) = LOWER(?)
+                    AND (usr.is_active IS NULL OR usr.is_active = 1) LIMIT 1",
+                undef, $c->session->{user_id}, $c->session->{username} // ''
+            );
+            $c->session->{site_locked} = 1;
+            if ($own) {
+                my $prev = $c->session->{SiteName} // '';
+                $c->session->{SiteName} = $own;
+                $c->stash->{SiteName}   = $own;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set',
+                    "Existing session healed: site '$prev' -> '$own' for user '"
+                    . ($c->session->{username} // '?') . "'");
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fetch_and_set',
+                "Session site heal failed: $@");
+        }
+    }
+
+    # A SiteName already locked into the session (set at login, or by
+    # /switch_site) survives every later request. Without this the hostname
+    # default re-resolves each time and overwrites the login's site — which is
+    # why a Shanta login on dev.computersystemconsulting.ca kept getting CSC.
+    if (!defined $c->stash->{SiteName} && defined $c->session->{SiteName} && length $c->session->{SiteName}) {
+        my $sess_site = $c->session->{SiteName};
+        my $uid       = $c->session->{user_id};
+        my $allowed   = 0;
+        if ($sess_site ne 'none' && $_validate_site->($sess_site)) {
+            if ($c->session->{is_csc_admin}) {
+                # switch_site is gated on this flag, not on a user_site_roles row.
+                # Requiring a role here writes the hostname site back on the next request.
+                $allowed = 1;
+            } elsif (!defined $uid || $uid eq '') {
+                $allowed = 1;    # anonymous: session site came from the host anyway
+            } else {
+                $allowed = eval {
+                    my $dbh = $c->model('DBEncy')->storage->dbh;
+                    $dbh->selectrow_array(
+                        "SELECT 1 FROM user_site_roles usr JOIN sites s ON s.id = usr.site_id
+                          WHERE usr.user_id = ? AND LOWER(s.name) = LOWER(?) LIMIT 1",
+                        undef, $uid, $sess_site
+                    ) || 0;
+                } || 0;
+            }
+        }
+        if ($allowed) {
+            $c->stash->{SiteName} = $sess_site;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set',
+                "Session SiteName '$sess_site' kept (locked at login) — host default skipped");
+        }
+    }
+
     if (!defined $c->stash->{SiteName}) {
         my $domain = $c->req->uri->host;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Extracted domain: $domain");
@@ -1831,6 +1892,7 @@ sub switch_site :Path('/switch_site') :Args(1) {
     # Persist the new active site for the session (mirrors fetch_and_set's write).
     $c->session->{SiteName} = $target;
     $c->stash->{SiteName}   = $target;
+    $c->session->{site_locked} = 1;    # an explicit switch is a decision, keep it
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'switch_site',
         "CSC admin switched active site to '$target'");

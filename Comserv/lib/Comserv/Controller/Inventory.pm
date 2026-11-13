@@ -510,14 +510,14 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
         my $sitename = $self->_sitename($c);
         my $schema   = $self->_schema($c);
 
-        # Check for existing by barcode (for scanned items) before create
+        # Check for existing by barcode (for scanned items) before create.
+        # Shared finder: spaced and normalised forms, search()->first (barcode is not unique).
         if ($params->{barcode}) {
-            my $existing = eval {
-                $schema->resultset('Accounting::InventoryItem')->search({
-                    sitename => $sitename,
-                    barcode  => $params->{barcode}
-                })->first;
-            };
+            my $existing = eval { $self->_find_item_by_barcode($c, $sitename, $params->{barcode}) };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'item_add',
+                    "Barcode lookup failed: $@");
+            }
             if ($existing) {
                 $c->flash->{success_msg} = 'Item with this barcode already exists — switching to edit form.';
                 $c->res->redirect($c->uri_for('/Inventory/item/edit', [$existing->id]));
@@ -566,6 +566,45 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
     );
 }
 
+# Find one inventory item by barcode. barcode has no unique constraint, so this
+# is search()->first, never find(). $type only narrows; omit it for the
+# duplicate guard. Numeric codes are also matched in normalised form.
+sub _find_item_by_barcode {
+    my ($self, $c, $sitename, $barcode, $type) = @_;
+    return undef unless defined $sitename && $sitename ne '';
+    return undef unless defined $barcode && $barcode =~ /\S/;
+    my $raw = $barcode;
+    $raw =~ s/^\s+|\s+$//g;
+    require Comserv::Util::HealthKitchen;
+    my $norm = Comserv::Util::HealthKitchen->new->normalize_upc($raw);
+    my %seen;
+    my @forms = grep { length && !$seen{$_}++ } ($raw, ($norm || ()));
+    my $digits = $raw;
+    $digits =~ s/[\s-]//g;
+    push @forms, $digits if $digits =~ /^\d+$/ && !$seen{$digits}++;
+
+    my @or = map { { barcode => $_ } } @forms;
+    if ($norm) {
+        push @or, \[ "REPLACE(REPLACE(barcode, ' ', ''), '-', '') = ?", $norm ];
+    }
+    my $where = { sitename => $sitename, -or => \@or };
+    $where->{barcode_type} = $type if defined $type && $type ne '';
+    return $self->_schema($c)->resultset('Accounting::InventoryItem')->search(
+        $where,
+        { order_by => { -asc => 'id' }, rows => 1 }
+    )->first;
+}
+
+sub _barcode_store {
+    my ($self, $barcode) = @_;
+    return undef unless defined $barcode && $barcode =~ /\S/;
+    my $raw = $barcode;
+    $raw =~ s/^\s+|\s+$//g;
+    require Comserv::Util::HealthKitchen;
+    my $norm = Comserv::Util::HealthKitchen->new->normalize_upc($raw);
+    return $norm || $raw;
+}
+
 # Reusable inventory-item creation. Single source of truth shared by the
 # web form (item_add) and external callers (e.g. 3d API). Returns the new row.
 sub _create_item {
@@ -573,7 +612,7 @@ sub _create_item {
     my $schema = $self->_schema($c);
     my $now    = $self->_now();
 
-    my $sitename = $p->{sitename} || $self->_sitename($c);
+    my $sitename = $self->_app_sitename($c, $p->{sitename});
     my $cat      = $p->{category};
     my $consumable = $p->{is_consumable} ? 1 : 0;
     $consumable = 1 if $cat && $cat =~ /^(food|herb|spice|produce)$/i;
@@ -591,9 +630,7 @@ sub _create_item {
     }
 
     if ($p->{barcode}) {
-        my $existing = $schema->resultset('Accounting::InventoryItem')->find(
-            { sitename => $sitename, barcode => $p->{barcode} }
-        );
+        my $existing = $self->_find_item_by_barcode($c, $sitename, $p->{barcode});
         if ($existing) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_item',
                 "Barcode already exists (id=" . $existing->id . ") — returning existing for edit/receive/adjust");
@@ -613,7 +650,7 @@ sub _create_item {
         unit_of_measure     => $p->{unit_of_measure} || 'each',
         unit_cost           => $p->{unit_cost}  || undef,
         unit_price          => $p->{unit_price} || undef,
-        barcode             => $p->{barcode}    || undef,
+        barcode             => $self->_barcode_store($p->{barcode}),
         barcode_type        => $p->{barcode_type} || undef,
         image_path          => $p->{image_path}   || undef,
         reorder_point       => $p->{reorder_point} || 0,
@@ -2854,21 +2891,561 @@ sub push_to_marketplace :Path('/Inventory/push_to_marketplace') :Args(0) {
 # API endpoint for future accounting integration
 # -------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# App endpoints: suppliers.
+#
+# These mirror /Inventory/suppliers and /Inventory/supplier/add — same table,
+# same columns, same sitename scoping and same 'active' default — so the phone
+# list cannot drift from what the web forms write.
+# ---------------------------------------------------------------------------
+
+# Sites the app may file an item under: the ones this user can post to.
+# CSC admin sees all sites that have inventory (plus its current one); everyone
+# else sees their user_sites rows. Same source the web builds its site picker
+# from, so the phone cannot offer a site the web would refuse.
+# Sites a user actually belongs to (user_site_roles), used to validate any site
+# the phone asks for: a request may name a site, but only one the login can use.
+sub _user_site_names {
+    my ($self, $c, $uid) = @_;
+    return () unless defined $uid && $uid ne '';
+    my $schema = $self->_schema($c);
+    my $dbh    = $schema->storage->dbh;
+    my $names  = $dbh->selectcol_arrayref(
+        "SELECT DISTINCT s.name FROM user_site_roles usr JOIN sites s ON s.id = usr.site_id WHERE usr.user_id = ?",
+        undef, $uid
+    ) || [];
+    return @$names;
+}
+
+# Resolve the site for an app request: the requested/header/session site if this
+# login may use it, otherwise the login's own first site. Never a hardcoded
+# default — the wrong site shows another site's suppliers and files items there.
+sub _app_sitename {
+    my ($self, $c, $requested) = @_;
+
+    my $is_admin = 0;
+    eval {
+        require Comserv::Util::AdminAuth;
+        $is_admin = Comserv::Util::AdminAuth->new->is_csc_admin($c) ? 1 : 0;
+    };
+
+    my $uid   = $c->session->{user_id};
+    my $uname = lc(eval { $c->session->{username} } // '');
+    my @mine  = $self->_user_site_names($c, $uid);
+
+    # A login named after a site is that site's login ("Shanta" -> site Shanta).
+    my ($own_site) = grep { length($uname) && lc($_) eq $uname } @mine;
+
+    my $hdr   = eval { $c->req->header('X-Sitename') };
+    my $param = eval { $c->req->params->{sitename} };
+    my $stash = $c->stash->{SiteName};
+    my $sess  = $c->session->{SiteName};
+
+    my ($resolved, $how);
+
+    # 1. A site the request names. Honoured for a CSC admin, for an anonymous
+    #    caller that arrived on the LAN/local bypass, and for a logged-in user
+    #    when the site is actually theirs.
+    for my $cand (grep { defined $_ && /\S/ } ($requested, $hdr, $param)) {
+        (my $clean = $cand) =~ s/[^a-zA-Z0-9._-]//g;
+        next unless length $clean;
+        if ($is_admin)                                   { $resolved = $clean; $how = 'explicit, CSC admin'; last }
+        if (!defined $uid || $uid eq '')                 { $resolved = $clean; $how = 'explicit, anonymous/LAN caller'; last }
+        if (grep { $_ eq $clean } @mine)                 { $resolved = $clean; $how = 'explicit, site of this login'; last }
+        $how = "explicit '$clean' rejected: not a site of uid $uid";
+    }
+
+    # 2. The login's own site, ahead of any hostname default.
+    if (!$resolved && defined $own_site && $own_site ne '') {
+        $resolved = $own_site;
+        $how = 'login name matches site (beats host default)';
+    }
+
+    # 3. The host/session default (dev.computersystemconsulting.ca -> CSC).
+    if (!$resolved) {
+        for my $fallback ($stash, $sess) {
+            next unless defined $fallback && $fallback =~ /\S/;
+            (my $clean = $fallback) =~ s/[^a-zA-Z0-9._-]//g;
+            next unless length $clean;
+            next if defined $uid && $uid ne '' && !$is_admin && !grep { $_ eq $clean } @mine;
+            $resolved = $clean;
+            $how = 'host/session default';
+            last;
+        }
+    }
+
+    # 4. Last resort: the first site this login may use.
+    if (!$resolved) {
+        $resolved = $mine[0] // '';
+        $how = @mine ? 'first site of this login' : 'nothing resolved';
+    }
+
+    # One line that answers "why did it pick that site?" without guessing.
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_app_sitename',
+        "resolved='" . ($resolved // '') . "' via=$how"
+        . " | asked=" . ($requested // '-')
+        . " header=" . ($hdr // '-')
+        . " param=" . ($param // '-')
+        . " stash=" . ($stash // '-')
+        . " session_site=" . ($sess // '-')
+        . " user=" . ($uname || '-')
+        . " uid=" . ($uid // '-')
+        . " admin=$is_admin"
+        . " mine=[" . join(',', @mine) . "]");
+
+    return $resolved // '';
+}
+
+sub _app_site_names {
+    my ($self, $c) = @_;
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_app_sitename($c);
+
+    my $is_admin = 0;
+    eval {
+        require Comserv::Util::AdminAuth;
+        $is_admin = Comserv::Util::AdminAuth->new->is_csc_admin($c) ? 1 : 0;
+    };
+
+    my $distinct_sites = sub {
+        my $table = $schema->resultset('Accounting::InventoryItem')->result_source->name;
+        my $dbh   = $schema->storage->dbh;
+        my $names = $dbh->selectcol_arrayref(
+            "SELECT DISTINCT sitename FROM $table WHERE sitename IS NOT NULL AND sitename <> '' ORDER BY sitename"
+        ) || [];
+        return @$names;
+    };
+
+    my @sites;
+    eval {
+        if (!$is_admin) {
+            my $uid = $c->session->{user_id};
+            if (defined $uid && $uid ne '') {
+                my $us = $schema->resultset('UserSite')->search({ user_id => $uid });
+                while (my $row = $us->next) {
+                    my $site = eval { $row->site } or next;
+                    push @sites, $site->name if $site && $site->name;
+                }
+            } else {
+                # No session yet (the phone picker). Names from the sites table,
+                # not DISTINCT sitename on inventory_item.
+                my $rs = eval { $schema->resultset('Site')->search(undef, { order_by => 'name' }) };
+                if ($rs) {
+                    while (my $site = $rs->next) {
+                        push @sites, $site->name if $site && $site->name;
+                    }
+                }
+            }
+        }
+        # Admin, or a user with no explicit user_sites rows: every site that holds
+        # inventory (reads are still scoped to the request's site).
+        @sites = $distinct_sites->() unless @sites;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_app_site_names',
+            "site list failed: $@");
+    }
+    @sites = sort @sites;
+    push @sites, $sitename if length $sitename && !grep { $_ eq $sitename } @sites;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_app_site_names',
+        "uid=" . ($c->session->{user_id} // '-')
+        . " admin=$is_admin current='" . ($sitename // '') . "'"
+        . " sites=[" . join(',', @sites) . "]");
+
+    return (\@sites, $sitename);
+}
+
+sub api_sites :Path('/Inventory/api/sites') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    my ($sites, $current) = $self->_app_site_names($c);
+
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json({
+        success => 1,
+        current => $current,
+        sites   => $sites,
+    }));
+    $c->detach;
+}
+
+# Link the supplier the phone picked. Same table, upsert and preferred rules as
+# /Inventory/item_supplier/add, so web and app agree on what "the supplier" is.
+sub _api_link_supplier {
+    my ($self, $c, $item, $p) = @_;
+    return undef unless $item && $p;
+
+    my $sid = $p->{supplier_id};
+    return undef unless defined $sid && $sid =~ /^\d+$/ && $sid > 0;
+
+    my $schema = $self->_schema($c);
+    my $supplier = eval {
+        $schema->resultset('Accounting::InventorySupplier')
+            ->find({ id => $sid, sitename => $item->sitename });
+    };
+    if (!$supplier) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_link_supplier',
+            "supplier $sid not found for sitename " . ($item->sitename // '') . " (item " . $item->id . ")");
+        return undef;
+    }
+
+    my $rs = $schema->resultset('Accounting::InventoryItemSupplier');
+    eval {
+        $rs->update_or_create({
+            item_id      => $item->id,
+            supplier_id  => $supplier->id,
+            supplier_sku => (defined $p->{supplier_sku} && $p->{supplier_sku} =~ /\S/) ? $p->{supplier_sku} : undef,
+            unit_cost    => (defined $p->{supplier_unit_cost} && $p->{supplier_unit_cost} =~ /^\d+(\.\d+)?$/)
+                ? $p->{supplier_unit_cost} : undef,
+            is_preferred => 1,
+        });
+        $rs->search({ item_id => $item->id, supplier_id => { '!=' => $supplier->id } })
+            ->update({ is_preferred => 0 });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_api_link_supplier',
+            "link failed item=" . $item->id . " supplier=" . $supplier->id . ": $@");
+        return undef;
+    }
+    return { id => $supplier->id, name => $supplier->name };
+}
+
+sub api_suppliers :Path('/Inventory/api/suppliers') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    my $sitename = $self->_app_sitename($c);
+    my $schema   = $self->_schema($c);
+    # Make the choice observable: "why is it showing CSC?" should be answerable
+    # from the log without guessing.
+    eval {
+        my $asked = $c->req->header('X-Sitename') // $c->req->params->{sitename} // '';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_suppliers',
+            "site=$sitename asked=" . ($asked eq '' ? '-' : $asked)
+            . " user=" . ($c->session->{username} // '-') . " uid=" . ($c->session->{user_id} // '-'));
+    };
+    my $where    = { sitename => $sitename };
+    $where->{status} = 'active' unless $c->req->params->{all};
+
+    my @suppliers;
+    eval {
+        @suppliers = $schema->resultset('Accounting::InventorySupplier')
+            ->search($where, { order_by => { -asc => 'name' } })->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_suppliers',
+            "supplier list failed sitename=$sitename: $@");
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "supplier list failed: $@", code => 'list_failed' }));
+        $c->detach;
+    }
+
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json({
+        success   => 1,
+        sitename  => $sitename,
+        suppliers => [ map {
+            {
+                id             => $_->id,
+                name           => $_->name,
+                contact_name   => $_->contact_name,
+                email          => $_->email,
+                phone          => $_->phone,
+                website        => $_->website,
+                lead_time_days => $_->lead_time_days,
+                status         => $_->status,
+            }
+        } @suppliers ],
+    }));
+    $c->detach;
+}
+
+sub api_supplier_create :Path('/Inventory/api/supplier/create') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => 'POST required', code => 'method_not_allowed' }));
+        $c->detach;
+    }
+
+    my $p = {};
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $p = JSON::decode_json($raw) if $raw;
+            } else {
+                $p = JSON::decode_json($body);
+            }
+        }
+    };
+    if ($@ || ref($p) ne 'HASH') {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "Invalid JSON: $@", code => 'json_parse_error' }));
+        $c->detach;
+    }
+    for my $k (keys %{ $c->req->body_parameters || {} }) {
+        $p->{$k} = $c->req->body_parameters->{$k} unless exists $p->{$k};
+    }
+
+    my $sitename = $self->_app_sitename($c, $p->{sitename});
+
+    my $name = defined $p->{name} ? $p->{name} : '';
+    $name =~ s/^\s+|\s+$//g;
+    unless (length $name) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => 'Supplier name is required', code => 'name_required' }));
+        $c->detach;
+    }
+
+    my $schema = $self->_schema($c);
+    my $now    = $self->_now();
+    my $supplier;
+    eval {
+        $supplier = $schema->resultset('Accounting::InventorySupplier')->create({
+            sitename       => $sitename,
+            name           => $name,
+            contact_name   => (defined $p->{contact_name} && $p->{contact_name} =~ /\S/) ? $p->{contact_name} : undef,
+            email          => (defined $p->{email}        && $p->{email}        =~ /\S/) ? $p->{email}        : undef,
+            phone          => (defined $p->{phone}        && $p->{phone}        =~ /\S/) ? $p->{phone}        : undef,
+            address        => (defined $p->{address}      && $p->{address}      =~ /\S/) ? $p->{address}      : undef,
+            website        => (defined $p->{website}      && $p->{website}      =~ /\S/) ? $p->{website}      : undef,
+            lead_time_days => (defined $p->{lead_time_days} && $p->{lead_time_days} =~ /^\d+$/) ? $p->{lead_time_days} : 0,
+            status         => (defined $p->{status} && $p->{status} =~ /\S/) ? $p->{status} : 'active',
+            notes          => (defined $p->{notes} && $p->{notes} =~ /\S/) ? $p->{notes} : undef,
+            created_by     => $c->session->{username} || 'mobile_app',
+            created_at     => $now,
+            updated_at     => $now,
+        });
+    };
+    if ($@ || !$supplier) {
+        my $err = $@ || 'create returned nothing';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_supplier_create',
+            "supplier create failed sitename=$sitename name=$name: $err");
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({
+            success => 0,
+            error   => "Could not create supplier: $err",
+            code    => 'create_failed',
+        }));
+        $c->detach;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_supplier_create',
+        "created supplier id=" . $supplier->id . " name=$name site=$sitename via app");
+
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json({
+        success  => 1,
+        sitename => $sitename,
+        supplier => {
+            id     => $supplier->id,
+            name   => $supplier->name,
+            status => $supplier->status,
+        },
+    }));
+    $c->detach;
+}
+
+# Does this barcode / name already exist? The phone asks after a scan so it can
+# open the existing item instead of creating a duplicate.
+#   match=barcode -> item (and `other_site` if the barcode lives elsewhere)
+#   match=name    -> candidates, for "is this the item?" 
+#   match=none    -> create new
+sub api_item_find :Path('/Inventory/api/item/find') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_app_sitename($c);
+    my $barcode  = $c->req->params->{barcode} // '';
+    my $name     = $c->req->params->{name}    // '';
+    my $sku      = $c->req->params->{sku}     // '';
+
+    my $supplier_for = sub {
+        my $item_id = shift;
+        my $link = eval {
+            $schema->resultset('Accounting::InventoryItemSupplier')
+                ->search({ item_id => $item_id }, { order_by => [ { -desc => 'is_preferred' } ], rows => 1 })->first;
+        };
+        return () unless $link;
+        my $sup = eval { $link->supplier };
+        return () unless $sup;
+        return ( $sup->id, $sup->name, $link->supplier_sku );
+    };
+
+    my $as_json = sub {
+        my $i = shift;
+        return undef unless $i;
+        my ($sid, $sname, $ssku) = $supplier_for->($i->id);
+        return {
+            id            => $i->id,
+            sku           => $i->sku,
+            name          => $i->name,
+            description   => $i->description,
+            category      => $i->category,
+            barcode       => $i->barcode,
+            barcode_type  => $i->barcode_type,
+            unit_cost     => $i->unit_cost,
+            unit_price    => $i->unit_price,
+            image_path    => $i->image_path,
+            sitename      => $i->sitename,
+            supplier_id   => $sid,
+            supplier_name => $sname,
+            supplier_sku  => $ssku,
+        };
+    };
+
+    my $reply = sub {
+        my %payload = @_;
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 1, sitename => $sitename, %payload }));
+        $c->detach;
+    };
+
+    # 1. Barcode that already belongs to an item: modify that one.
+    if ($barcode =~ /\S/) {
+        my $hit = eval { $self->_find_item_by_barcode($c, $sitename, $barcode) };
+        if ($hit) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_item_find',
+                "barcode $barcode matched item " . $hit->id . " site=$sitename");
+            return $reply->(match => 'barcode', item => $as_json->($hit));
+        }
+        # Same barcode under another site: say so, don't silently duplicate it.
+        my $elsewhere = eval {
+            $schema->resultset('Accounting::InventoryItem')
+                ->search({ barcode => $barcode, sitename => { '!=' => $sitename } }, { rows => 1 })->first;
+        };
+        if ($elsewhere) {
+            return $reply->(match => 'other_site', item => $as_json->($elsewhere),
+                message => 'This barcode belongs to item ' . $elsewhere->id . ' on site ' . ($elsewhere->sitename // '?'));
+        }
+    }
+
+    # 2. Same SKU: that is the same item by definition.
+    if ($sku =~ /\S/) {
+        my $by_sku = eval {
+            $schema->resultset('Accounting::InventoryItem')
+                ->search({ sku => $sku, sitename => $sitename }, { rows => 1 })->first;
+        };
+        return $reply->(match => 'sku', item => $as_json->($by_sku)) if $by_sku;
+    }
+
+    # 3. Similar name (after the public lookup filled in a description/name).
+    my @candidates;
+    if ($name =~ /\S/) {
+        my @words = grep { length($_) >= 4 } split /\s+/, lc $name;
+        @words = @words[0 .. 2] if @words > 3;
+        if (@words) {
+            my @and = map { \[ 'LOWER(name) LIKE ?', '%' . $_ . '%' ] } @words;
+            eval {
+                @candidates = $schema->resultset('Accounting::InventoryItem')->search(
+                    { sitename => $sitename, status => 'active', -and => \@and },
+                    { order_by => 'name', rows => 5 }
+                )->all;
+            };
+        }
+        # Nothing strictly matching: fall back to the first significant word.
+        if (!@candidates && @words) {
+            eval {
+                @candidates = $schema->resultset('Accounting::InventoryItem')->search(
+                    { sitename => $sitename, status => 'active',
+                      -or => [ { name => { like => '%' . $words[0] . '%' } },
+                               { sku  => { like => '%' . uc($words[0]) . '%' } } ] },
+                    { order_by => 'name', rows => 5 }
+                )->all;
+            };
+        }
+    }
+
+    if (@candidates) {
+        return $reply->(match => 'name', candidates => [ map { $as_json->($_) } @candidates ]);
+    }
+
+    return $reply->(match => 'none', candidates => []);
+}
+
 sub api_items :Path('/Inventory/api/items') :Args(0) {
     my ($self, $c) = @_;
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_items', 'API: list items');
 
-    my $sitename = $c->req->params->{sitename} || $self->_sitename($c);
+    # ?sitename= is honoured only for a CSC admin. Everyone else stays on the session site.
+    my $sitename = $self->_sitename($c);
+    if (defined $c->req->params->{sitename} && $c->req->params->{sitename} ne '') {
+        require Comserv::Util::AdminAuth;
+        $sitename = $c->req->params->{sitename}
+            if Comserv::Util::AdminAuth->new->is_csc_admin($c);
+    }
     my $schema   = $self->_schema($c);
+    my $where = { sitename => $sitename, status => 'active' };
+    my $barcode_q = $c->req->params->{barcode};
+    if (defined $barcode_q && $barcode_q =~ /\S/) {
+        my $raw = $barcode_q;
+        $raw =~ s/^\s+|\s+$//g;
+        require Comserv::Util::HealthKitchen;
+        my $norm = Comserv::Util::HealthKitchen->new->normalize_upc($raw);
+        my %seen;
+        my @forms = grep { length && !$seen{$_}++ } ($raw, ($norm || ()));
+        $where->{barcode} = { -in => \@forms };
+    }
+    my $cat = $c->req->params->{category};
 
     my @items;
     eval {
-        @items = $schema->resultset('Accounting::InventoryItem')->search(
-            { sitename => $sitename, status => 'active' },
-            { order_by => 'sku' }
+        my $rs = $schema->resultset('Accounting::InventoryItem')->search(
+            $where, { order_by => 'sku' }
         );
+        if (defined $cat && $cat =~ /\S/) {
+            $rs = $rs->search(\[ 'LOWER(me.category) = ?', lc $cat ]);
+        }
+        @items = $rs->all;
     };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_items',
+            "item list failed: $@");
+        @items = ();
+    }
+
+    # Supplier per item, preferred first: the phone preselects the dropdown from
+    # this when a barcode matches an item that already exists.
+    my %supplier_for;
+    if (@items) {
+        eval {
+            my @ids = map { $_->id } @items;
+            my $links = $schema->resultset('Accounting::InventoryItemSupplier')->search(
+                { item_id => { -in => \@ids }, supplier_id => { '!=', undef } },
+                { prefetch => 'supplier' },
+            );
+            while (my $l = $links->next) {
+                my $s = eval { $l->supplier } or next;
+                my $cur = $supplier_for{ $l->item_id };
+                next if $cur && ($cur->{is_preferred} || !$l->is_preferred);
+                $supplier_for{ $l->item_id } = {
+                    id           => $s->id,
+                    name         => $s->name,
+                    supplier_sku => $l->supplier_sku,
+                    unit_cost    => $l->unit_cost,
+                    is_preferred => $l->is_preferred ? 1 : 0,
+                };
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_items',
+                "supplier prefetch failed: $@");
+        }
+    }
 
     my @result = map {
         {
@@ -2882,9 +3459,19 @@ sub api_items :Path('/Inventory/api/items') :Args(0) {
             is_consumable    => $_->is_consumable ? 1 : 0,
             unit_of_measure  => $_->unit_of_measure,
             unit_cost        => $_->unit_cost,
+            unit_price       => $_->unit_price,
+            selling_price    => $_->selling_price,
+            barcode          => $_->barcode,
+            barcode_type     => $_->barcode_type,
+            notes            => $_->notes,
+            image_path       => $_->image_path,
             reorder_point    => $_->reorder_point,
             reorder_quantity => $_->reorder_quantity,
             status           => $_->status,
+            sitename         => $_->sitename,
+            supplier_id      => $supplier_for{ $_->id } ? $supplier_for{ $_->id }{id} : undef,
+            supplier_name    => $supplier_for{ $_->id } ? $supplier_for{ $_->id }{name} : undef,
+            supplier_sku     => $supplier_for{ $_->id } ? $supplier_for{ $_->id }{supplier_sku} : undef,
         }
     } @items;
 
@@ -2946,6 +3533,28 @@ require JSON;
     }
 
     my $schema = $self->_schema($c);
+    if (defined $p->{barcode} && $p->{barcode} =~ /\S/) {
+        my $by_bc = eval { $self->_find_item_by_barcode($c, $sitename, $p->{barcode}) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_create',
+                "Barcode lookup failed: $@");
+        }
+        if ($by_bc) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_item_create',
+                "Barcode already exists id=" . $by_bc->id);
+            $c->res->content_type('application/json');
+            $c->res->body(JSON::encode_json({
+                success    => 1,
+                existing   => 1,
+                existed    => 1,
+                matched_on => 'barcode',
+                item_id    => $by_bc->id,
+                sku        => $by_bc->sku,
+                sitename   => $by_bc->sitename,
+            }));
+            $c->detach;
+        }
+    }
     my $existing = eval {
         $schema->resultset('Accounting::InventoryItem')->find(
             { sitename => $sitename, sku => $p->{sku} }
@@ -2956,11 +3565,13 @@ require JSON;
             "SKU $p->{sku} already exists id=" . $existing->id);
         $c->res->content_type('application/json');
         $c->res->body(JSON::encode_json({
-            success  => 1,
-            existed  => 1,
-            item_id  => $existing->id,
-            sku      => $existing->sku,
-            sitename => $existing->sitename,
+            success    => 1,
+            existing   => 1,
+            existed    => 1,
+            matched_on => 'sku',
+            item_id    => $existing->id,
+            sku        => $existing->sku,
+            sitename   => $existing->sitename,
         }));
         $c->detach;
     }
@@ -2977,15 +3588,28 @@ require JSON;
         $c->detach;
     }
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_item_create',
-        "created item id=" . $item->id . " sku=" . $item->sku . " site=$sitename");
+    require Comserv::Util::InventoryBarcode;
+    my $prod = eval { Comserv::Util::InventoryBarcode->save_product_fields($c, $item, $p) };
+    if ($@ || (ref $prod eq 'HASH' && exists $prod->{ok} && !$prod->{ok})) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_create',
+            "product fields failed for item " . $item->id . ": " . ($@ || $prod->{error}));
+    }
+
+    my $linked_supplier = $self->_api_link_supplier($c, $item, $p);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_item',
+        "created item id=" . $item->id . " sku=" . $item->sku . " site=$sitename" .
+        ($linked_supplier ? " supplier=" . $linked_supplier->{id} : ""));
     $c->res->content_type('application/json');
     $c->res->body(JSON::encode_json({
-        success  => 1,
-        existed  => 0,
-        item_id  => $item->id,
-        sku      => $item->sku,
-        sitename => $item->sitename,
+        success       => 1,
+        created       => 1,
+        existed       => 0,
+        item_id       => $item->id,
+        sku           => $item->sku,
+        sitename      => $sitename,
+        supplier_id   => $linked_supplier ? $linked_supplier->{id}   : undef,
+        supplier_name => $linked_supplier ? $linked_supplier->{name} : undef,
     }));
     $c->detach;
 }
@@ -3035,7 +3659,12 @@ sub api_item_update :Path('/Inventory/api/item/update') :Args(0) {
         $item = eval { $schema->resultset('Accounting::InventoryItem')->find($p->{item_id}) };
     } elsif ($p->{sku}) {
         my $where = { sku => $p->{sku} };
-        $where->{sitename} = $p->{sitename} if $p->{sitename};
+        my $site = $p->{sitename};
+        if (!defined $site || $site eq '') {
+            my $sess = $c->stash->{SiteName} || $c->session->{SiteName} || $self->_sitename($c);
+            $site = $sess if defined $sess && $sess ne '' && $sess ne 'default';
+        }
+        $where->{sitename} = $site if defined $site && $site ne '';
         $item = eval { $schema->resultset('Accounting::InventoryItem')->search($where)->first };
     }
     unless ($item) {
@@ -3043,6 +3672,32 @@ sub api_item_update :Path('/Inventory/api/item/update') :Args(0) {
         $c->res->content_type('application/json');
         $c->res->body(JSON::encode_json({ success => 0, error => 'item not found' }));
         $c->detach;
+    }
+    my $sess_site = $self->_app_sitename($c, $p->{sitename});
+    if ($sess_site && $sess_site ne 'default' && ($item->sitename // '') ne $sess_site) {
+        $c->res->status(404);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => 'item not found' }));
+        $c->detach;
+    }
+
+    if (exists $p->{barcode} && defined $p->{barcode} && $p->{barcode} =~ /\S/) {
+        my $other = eval { $self->_find_item_by_barcode($c, $item->sitename, $p->{barcode}) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_update',
+                "Barcode lookup failed: $@");
+        }
+        if ($other && $other->id != $item->id) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_item_update',
+                "Barcode in use by id=" . $other->id);
+            $c->res->status(409);
+            $c->res->content_type('application/json');
+            $c->res->body(JSON::encode_json({
+                success => 0, code => 'barcode_in_use', item_id => 0 + $other->id,
+                error => 'Barcode is already used by another item on this site',
+            }));
+            $c->detach;
+        }
     }
 
     # HARD GUARD: reject any SKU change that would collide with another item in the same
@@ -3064,51 +3719,79 @@ sub api_item_update :Path('/Inventory/api/item/update') :Args(0) {
     }
 
     my %upd;
+    my @updated;
     for my $col (qw(
         item_origin name description category notes status unit_of_measure
-        reorder_point reorder_quantity unit_cost unit_price
+        reorder_point reorder_quantity unit_cost unit_price barcode barcode_type image_path
     )) {
-        $upd{$col} = $p->{$col} if exists $p->{$col};
+        next unless exists $p->{$col};
+        $upd{$col} = $col eq 'barcode' ? $self->_barcode_store($p->{$col}) : $p->{$col};
+        push @updated, $col;
     }
     if (exists $p->{is_assemblable}) {
         $upd{is_assemblable} = $p->{is_assemblable} ? 1 : 0;
+        push @updated, 'is_assemblable';
     }
     if (exists $p->{is_consumable}) {
         $upd{is_consumable} = $p->{is_consumable} ? 1 : 0;
+        push @updated, 'is_consumable';
     }
     my $cat_for_cons = exists $upd{category} ? $upd{category} : $item->category;
     if ($cat_for_cons && $cat_for_cons =~ /^(food|herb|spice|produce)$/i) {
         $upd{is_consumable} = 1;
     }
-    unless (keys %upd) {
+    my $has_product = exists $p->{brand} || exists $p->{size} || exists $p->{ingredients}
+        || exists $p->{ingredients_text} || exists $p->{ingredients_source};
+    unless (keys %upd || $has_product) {
         $c->res->status(400);
         $c->res->content_type('application/json');
         $c->res->body(JSON::encode_json({ success => 0, error => 'no updatable fields' }));
         $c->detach;
     }
-    $upd{updated_at} = $self->_now();
-    $upd{updated_by} = $c->session->{username} || 'api';
-
-    eval { $item->update(\%upd) };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_update',
-            "update failed id=" . $item->id . ": $@");
-        $c->res->status(500);
-        $c->res->content_type('application/json');
-        $c->res->body(JSON::encode_json({ success => 0, error => "update failed: $@" }));
-        $c->detach;
+    if (keys %upd) {
+        $upd{updated_at} = $self->_now();
+        $upd{updated_by} = $c->session->{username} || 'api';
+        eval { $item->update(\%upd) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_update',
+                "update failed id=" . $item->id . ": $@");
+            $c->res->status(500);
+            $c->res->content_type('application/json');
+            $c->res->body(JSON::encode_json({ success => 0, error => "update failed: $@" }));
+            $c->detach;
+        }
     }
+    if ($has_product) {
+        require Comserv::Util::InventoryBarcode;
+        my $prod = eval { Comserv::Util::InventoryBarcode->save_product_fields($c, $item, $p) };
+        if ($@ || !$prod || !$prod->{ok}) {
+            my $err = $@ || ($prod && $prod->{error}) || 'product save failed';
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_update',
+                "product save failed id=" . $item->id . ": $err");
+            $c->res->status(400);
+            $c->res->content_type('application/json');
+            $c->res->body(JSON::encode_json({ success => 0, error => "$err" }));
+            $c->detach;
+        }
+        push @updated, @{ $prod->{updated} || [] };
+    }
+
+    my $linked_supplier = $self->_api_link_supplier($c, $item, $p);
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_item_update',
         "updated item id=" . $item->id . " sku=" . ($item->sku // '') .
-        " fields=" . join(',', sort keys %upd));
+        " fields=" . join(',', @updated) .
+        ($linked_supplier ? " supplier=" . $linked_supplier->{id} : ""));
     $c->res->content_type('application/json');
     $c->res->body(JSON::encode_json({
-        success     => 1,
-        item_id     => $item->id,
-        sku         => $item->sku,
-        item_origin => $item->item_origin,
-        sitename    => $item->sitename,
+        success       => 1,
+        item_id       => $item->id,
+        sku           => $item->sku,
+        item_origin   => $item->item_origin,
+        sitename      => $item->sitename,
+        updated       => \@updated,
+        supplier_id   => $linked_supplier ? $linked_supplier->{id}   : undef,
+        supplier_name => $linked_supplier ? $linked_supplier->{name} : undef,
     }));
     $c->detach;
 }
@@ -3379,22 +4062,6 @@ sub api_bom :Path('/Inventory/api/bom') :Args(0) {
         "BOM list parent=$res->{parent_sku} lines=" . scalar(@{ $res->{lines} || [] }));
     $c->res->content_type('application/json');
     $c->res->body(JSON::encode_json({ success => 1, %$res }));
-    $c->detach;
-}
-
-sub api_suppliers :Path('/Inventory/api/suppliers') :Args(0) {
-    my ($self, $c) = @_;
-    my $sitename = $c->req->params->{sitename} || $self->_sitename($c);
-    my @suppliers;
-    eval {
-        @suppliers = $self->_schema($c)->resultset('Accounting::InventorySupplier')->search(
-            { sitename => $sitename, status => 'active' },
-            { order_by => 'name' }
-        )->all;
-    };
-    my @result = map { { id => $_->id, name => $_->name } } @suppliers;
-    $c->res->content_type('application/json');
-    $c->res->body(do { require JSON; JSON::encode_json(\@result) });
     $c->detach;
 }
 

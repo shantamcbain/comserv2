@@ -27,6 +27,19 @@ __PACKAGE__->add_columns(
     sugar_g          => { data_type => 'decimal', size => [10, 2], is_nullable => 1 },
     sodium_mg        => { data_type => 'decimal', size => [10, 2], is_nullable => 1 },
     notes            => { data_type => 'text', is_nullable => 1 },
+    # Meal-slot timing / quick-add (Health Kitchen MealSlots). Times are the
+    # user's wall clock (AppTime user zone). kind: meal|drink. source:
+    # slot (planned card), drink_out (count only), meal_out (described meal).
+    kind               => { data_type => 'varchar', size => 10,  is_nullable => 1 },
+    slot_key           => { data_type => 'varchar', size => 32,  is_nullable => 1 },
+    recipe_id          => { data_type => 'integer', is_nullable => 1 },
+    meal_plan_entry_id => { data_type => 'integer', is_nullable => 1 },
+    started_at         => { data_type => 'datetime', is_nullable => 1 },
+    ended_at           => { data_type => 'datetime', is_nullable => 1 },
+    duration_min       => { data_type => 'integer', is_nullable => 1 },
+    source             => { data_type => 'varchar', size => 16,  is_nullable => 1 },
+    location           => { data_type => 'varchar', size => 255, is_nullable => 1 },
+    description        => { data_type => 'text', is_nullable => 1 },
     created_at       => { data_type => 'datetime', is_nullable => 1, set_on_create => 1 },
     updated_at       => { data_type => 'datetime', is_nullable => 1, set_on_create => 1, set_on_update => 1 },
 );

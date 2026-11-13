@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.6",
+  "versionCode": 48,
+  "versionName": "3.4.15",
   "apkUrl": "/api/app/download",
-  "releaseNotes": "Fix custom domain URL in updater & Settings, dynamic version display."
+  "releaseNotes": "v3.4.15 WebView X-Debug-Mode header injection for live web debug bar & automatic target re-authentication on Dev/Prod Connection Test."
 }

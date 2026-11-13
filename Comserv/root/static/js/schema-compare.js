@@ -119,6 +119,24 @@
      Tables page
      --------------------------------------------------------------- */
 
+
+  function applyProblemsOnlyFilter(on) {
+    document.body.classList.toggle('sc-problems-only', !!on);
+    document.querySelectorAll('.comparison-section').forEach(function (section) {
+      var rows = section.querySelectorAll('.sc-table-row');
+      if (!rows.length) return;
+      var visible = 0;
+      for (var i = 0; i < rows.length; i++) {
+        if (!on || rows[i].getAttribute('data-has-problem') === '1') visible++;
+      }
+      if (on && visible === 0) {
+        section.classList.add('sc-filter-empty');
+      } else {
+        section.classList.remove('sc-filter-empty');
+      }
+    });
+  }
+
   function toggleSection(headerEl) {
     var content = headerEl.nextElementSibling;
     if (!content) return;
@@ -280,6 +298,19 @@
     // Auto-collapse empty sections (tables page)
     autoCollapseEmptySections();
 
+    var problemsOnly = document.getElementById('sc-problems-only');
+    if (problemsOnly) {
+      var stored = false;
+      try { stored = sessionStorage.getItem('sc-problems-only') === '1'; } catch (err) {}
+      problemsOnly.checked = stored;
+      applyProblemsOnlyFilter(stored);
+      problemsOnly.addEventListener('change', function () {
+        var on = !!problemsOnly.checked;
+        try { sessionStorage.setItem('sc-problems-only', on ? '1' : '0'); } catch (err) {}
+        applyProblemsOnlyFilter(on);
+      });
+    }
+
     // --- Delegated click handler ---
     document.addEventListener('click', function (e) {
       var target = e.target;
@@ -299,8 +330,9 @@
       // ------------------------------------------------------------
       var serverCard = target.closest('[data-action="navigate-server"]');
       if (serverCard) {
-        // Don't navigate if clicking a refresh button inside the card
         if (target.closest('[data-action="refresh-server"]')) return;
+        if (target.closest('.db-compare-pick')) return;
+        if (target.closest('input, label, button[type="submit"]')) return;
         var srv = getParam(serverCard, 'server');
         if (srv) loadServerDatabases(srv);
         return;
@@ -318,10 +350,20 @@
       // ------------------------------------------------------------
       // Databases page actions
       // ------------------------------------------------------------
+      var compareBtn = target.closest('[data-action="compare-selected"]');
+      if (compareBtn) {
+        var checked = document.querySelectorAll('#db-compare-form input[name="db"]:checked');
+        if (checked.length < 2) {
+          e.preventDefault();
+          alert('Select at least two databases to compare.');
+        }
+        return;
+      }
+
       var dbCard = target.closest('[data-action="navigate-db"]');
       if (dbCard) {
-        // Don't navigate if clicking a refresh button inside the card
         if (target.closest('[data-action="refresh-db"]')) return;
+        if (target.closest('.db-compare-pick')) return;
         var srvName = getParam(dbCard, 'server');
         var dbName = getParam(dbCard, 'db');
         if (srvName && dbName) loadDatabaseTables(srvName, dbName);

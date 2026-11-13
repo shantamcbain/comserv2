@@ -1,0 +1,59 @@
+BOT GIT IDENTITIES  (Code Guard for Shanta, 2026-10-24)
+
+PROBLEM
+Every commit showed "Zencoder <zencoder@workstation.local>" (global ~/.gitconfig), so it was
+impossible to tell which bot or person made a change.
+
+WHERE IT WAS SET
+Only the global ~/.gitconfig (user.name / user.email). No repo, worktree, GIT_AUTHOR_*/GIT_COMMITTER_*
+env var, Hermes config, Util/Git.pm or Admin/Git.pm override exists. Util/Git.pm runs plain
+"git commit -m" inside the branch worktree, so it automatically uses per-worktree identity.
+
+SOLUTION
+extensions.worktreeConfig=true (in the main repo's .git/config) plus "git config --worktree user.*"
+in each bot worktree. The identity is stored in <gitdir>/worktrees/<name>/config.worktree (main:
+.git/config.worktree). Author and committer are both the bot. The global identity stays as fallback.
+
+WORKTREE -> IDENTITY  (updated 2026-10-24; single source: Comserv/root/config/bot_identities.json)
+Every worktree from "git worktree list" now has its own identity (email = worktree name @workstation.local
+unless shown):  main = CSC developer <csc-developer@>; codeguard = Code Guard; aisystem / ai /
+aichatsystem-ef4e = Chat-with-AI fixer; helpdesk / helpdesk-spam = HelpDesk; healthkitchen = Health & Diet;
+Bmaster = Beemaster; mailnewletter = Beemaster Newsletter; DockerHA = Docker fixer <dockerfix@>;
+cgi-bin-legacy = cgi-bin converter; errlog-fix = Error Audit fixer; planning = Planning; schema = Schema;
+Documentation; InventoryAccounting = Inventory & Accounting; CSSNavigation = CSS Navigation; ency = Ency;
+git (git-dev) = Git tools; 3d = 3D; ~/.grok/worktrees/* (detached) = Grok Bot <grok-bot@>.
+Unclear owners got "<name> worktree" labels: deployflow, herbs-then-web, login-return, mail-connect,
+todo-search. Edit bot_identities.json and re-run the script to rename any of them.
+
+HERMES
+- ~/.hermes/hermes-agent (Hermes' own checkout): repo-local identity Hermes <hermes@workstation.local>.
+- Commits Hermes makes inside a Comserv worktree use that worktree's identity (so the per-branch Hermes
+  dashboards commit as their bot). NOT set via GIT_AUTHOR_*/GIT_COMMITTER_* in ~/.hermes/.env: .env is the
+  secrets file, and env vars would override every worktree identity (all bots would show as Hermes).
+  To make ALL Hermes commits show "Hermes" anyway, add these 4 lines to ~/.hermes/.env (back it up first)
+  and restart Hermes: GIT_AUTHOR_NAME=Hermes GIT_AUTHOR_EMAIL=hermes@workstation.local
+  GIT_COMMITTER_NAME=Hermes GIT_COMMITTER_EMAIL=hermes@workstation.local
+  Undo: delete those lines.
+- Hermes creates its own subagent worktrees (hermes-agent/tools/subagent_worktree.py, "git worktree add");
+  those are separate temporary worktrees of whichever repo it works in and fall back to the global identity
+  unless the repo/worktree has one. Adding a call there is a Hermes source change; not made.
+
+NEW WORKTREES
+Comserv/lib/Comserv/Util/BotIdentity.pm applies extensions.worktreeConfig + `git config --worktree
+user.name/user.email` from bot_identities.json (default "<branch> bot <branch@workstation.local>").
+Util::Git->create_worktree calls it right after `git worktree add` (non-fatal: a warning is logged on failure).
+Manual / other scripts:  perl script/set_worktree_identity.pl <worktree-dir> [name]   (safe to repeat)
+Test: perl -Ilib t/util_bot_identity.t (throwaway repo, 9 checks).
+NOTE: Util/Git.pm is owned by CSC developer (main); this change is on codeguard and must go through main's
+merge rules. Until merged, worktrees created by the running app won't get an identity; run the script.
+The Hermes-created worktrees and `git worktree add` run by hand are not covered; run the script for those.
+
+LIMITS
+Identity is only a label, not authentication: anyone can set any name. Old commits are unchanged.
+Merge commits made on main show the main identity. If a script or Hermes sets GIT_AUTHOR_* env vars,
+those win over this config.
+
+RISK / UNDO
+Low. To undo one worktree:  git -C <worktree> config --worktree --unset user.name; ... --unset user.email
+To undo everything:         git config --unset extensions.worktreeConfig   (per-worktree files are then ignored)
+Hermes checkout:            git -C ~/.hermes/hermes-agent config --local --unset user.name (and user.email)
