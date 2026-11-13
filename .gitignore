@@ -268,3 +268,4 @@ Comserv/data/ai_tasks_cache.json
 
 # runtime: consignment count photos (uploaded, never committed)
 Comserv/data/consignment_counts/
+Comserv/data/custom_creation_jobs/
