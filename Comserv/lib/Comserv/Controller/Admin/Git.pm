@@ -132,6 +132,17 @@ sub _bind_target {
     return $t;
 }
 
+# Bind the posted target and return resolve_target's error, or '' when the
+# key is allowed (local, a TARGET_HOSTS row, or a registered external repo).
+# Suggest and any other read that runs git must stop on a non-empty return
+# instead of falling through to the Comserv checkout.
+sub _suggest_target_error {
+    my ($self, $c) = @_;
+    my $t = $self->_bind_target($c);
+    my $info = $self->git_service->resolve_target($c, $t);
+    return $info->{error} || '';
+}
+
 =head2 _git_list
 
 Run a git command with EXPLICIT ARGUMENT LIST — no shell, no interpolation.
@@ -620,10 +631,17 @@ sub suggest_commit_message :Path('/admin/git/suggest_message') :Args(0) {
         $c->response->body(encode_json({ success => 0, error => 'POST required' }));
         return;
     }
-    # The file form posts the selected repo as target. Without this, path
-    # checks run against the Comserv checkout and every external-repo file
-    # is rejected, so Suggest cannot draft a message for that commit.
-    $self->_bind_target($c);
+    # The file form posts the selected repo as target. Bind it, then refuse a
+    # key that is not in TARGET_HOSTS or external_repos. _bind_target only
+    # stashes the param; without the resolve check an unknown target makes
+    # _git_list return empty and Suggest reports "nothing to draft" after
+    # quietly staying on the Comserv checkout.
+    if (my $terr = $self->_suggest_target_error($c)) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'suggest_commit_message',
+            "target error: $terr");
+        $c->response->body(encode_json({ success => 0, error => $terr }));
+        return;
+    }
 
     # Build the diff. Selected paths (validated) narrow it; else staged, else working tree.
     my @paths = $c->req->param('paths');

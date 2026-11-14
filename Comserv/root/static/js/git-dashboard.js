@@ -806,6 +806,10 @@
                 if (!url) { return; }
 
                 var body = new URLSearchParams();
+                // Look the selector up here. An outer targetSelect exists in this
+                // ready() closure, but this handler must not depend on that name:
+                // a missing binding throws and the click does nothing.
+                var targetSelect = document.getElementById('git-target-select');
                 if (targetSelect && targetSelect.value) {
                     body.append('target', targetSelect.value);
                 }
