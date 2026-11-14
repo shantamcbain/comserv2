@@ -806,6 +806,9 @@
                 if (!url) { return; }
 
                 var body = new URLSearchParams();
+                if (targetSelect && targetSelect.value) {
+                    body.append('target', targetSelect.value);
+                }
                 var boxes = selectedBoxes();
                 for (var k = 0; k < boxes.length; k++) {
                     body.append('paths', boxes[k].value);

@@ -620,6 +620,10 @@ sub suggest_commit_message :Path('/admin/git/suggest_message') :Args(0) {
         $c->response->body(encode_json({ success => 0, error => 'POST required' }));
         return;
     }
+    # The file form posts the selected repo as target. Without this, path
+    # checks run against the Comserv checkout and every external-repo file
+    # is rejected, so Suggest cannot draft a message for that commit.
+    $self->_bind_target($c);
 
     # Build the diff. Selected paths (validated) narrow it; else staged, else working tree.
     my @paths = $c->req->param('paths');
