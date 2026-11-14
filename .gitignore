@@ -269,3 +269,4 @@ Comserv/data/ai_trials/gpt_56_luna.state.json
 Comserv/data/ai_tasks_cache.json
 Comserv/data/ai_model_chains.json.bak-t393u-20261111-104106
 Comserv/lib/Comserv/Util/AI/HermesOverrunGuard.pm.bak-t393u-20261111-104106
+Comserv/var/twiggy.enabled
