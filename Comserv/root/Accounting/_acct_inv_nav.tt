@@ -1,4 +1,4 @@
-<%# Shared navigation bar — included at top of Accounting and Inventory dashboards %>
+[%# Shared navigation bar — included at top of Accounting and Inventory dashboards %]
 <nav style="background:var(--nav-bg,#1e293b);color:#fff;padding:0.4rem 0.8rem;border-radius:6px;margin-bottom:1.2rem;display:flex;flex-wrap:wrap;gap:0.3rem;align-items:center;font-size:0.85rem;">
   <span style="color:#94a3b8;margin-right:0.4rem;">&#128200; Accounting &amp; Inventory:</span>
   <a href="/Accounting"        style="color:#93c5fd;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;" [% IF current_page == 'accounting' %]style="background:rgba(255,255,255,0.15);"[% END %]>Dashboard</a>
@@ -33,7 +33,7 @@
   <span style="color:#475569;">|</span>
   <a href="/Accounting/setup" style="color:#fcd34d;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;" title="Site configuration">&#9881; Setup</a>
   <span style="color:#475569;">|</span>
-  <a href="/static/app/ComservInventory.apk" style="color:#86efac;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;" title="Download the inventory phone app">Phone app</a>
+  <a href="[% phone_app_href || '/static/app/ComservInventory.apk' %]" style="color:#86efac;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;" title="Download the inventory phone app">Phone app</a>
 </nav>
 
 <!-- NEW: AI Vision Testing Navigation -->

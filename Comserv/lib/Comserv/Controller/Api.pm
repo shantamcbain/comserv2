@@ -15,6 +15,7 @@ use Comserv::Util::DocumentationConfig;
 use Comserv::Util::ModelCatalog;
 use Comserv::Util::TodoLog;
 use Comserv::Util::AccessCheck;
+use Comserv::Util::ApkDownload;
 
 # Resolve the default model for the AI Focus-Tune picker from the SAME shared
 # catalog every other AI surface uses (ModelCatalog::default_for) — NEVER a
@@ -695,32 +696,57 @@ sub _git_line {
     return $line;
 }
 
+# Same identity the web debug bar prints (pagetop.tt / Root::auto): the checkout
+# this process is running, not the primary tree and not a baked "main" stamp.
+# The phone's ping badge and /api/app/version serverInfo must show that too.
+sub _app_live_identity {
+    my ($c) = @_;
+    my $home = eval { $c->config->{home} } // '';
+    my $git_root = '';
+    if ($home && -e "$home/../.git") {
+        $git_root = "$home/..";
+    } elsif ($home && -e "$home/.git") {
+        $git_root = $home;
+    }
+    my $branch = $git_root ? _git_line($git_root, 'rev-parse', '--abbrev-ref', 'HEAD') : '';
+    my $commit = $git_root ? _git_line($git_root, 'rev-parse', '--short', 'HEAD') : '';
+    my $workflow = eval {
+        require Comserv::Util::SystemInfo;
+        Comserv::Util::SystemInfo->get_app_workflow($home);
+    } || $branch || 'main';
+    $branch = $workflow if $branch eq '';
+    my $label = ($commit ne '') ? "$branch\@$commit" : $branch;
+    return {
+        branch   => $branch,
+        commit   => $commit,
+        workflow => $workflow,
+        label    => $label,
+    };
+}
+
 # Which server is answering? Deliberately unauthenticated and data-free: the
 # phone must be able to show "dev :3001 main c17663f" (or "production, old
 # build") before anything else works — that is what makes a change testable.
+# Git comes from the running checkout, the same source as the web debug bar.
 sub api_app_ping :Path('app/ping') :Args(0) {
     my ($self, $c) = @_;
-
-    my $root = $ENV{COMSERV_ROOT} || '/home/shanta/PycharmProjects/comserv2/Comserv';
-    $root =~ s{/Comserv/?$}{};
-    my ($branch, $commit) = ('', '');
-    # List-form open: no shell, so a quote in COMSERV_ROOT cannot run a command.
-    if ($root =~ m{^/[\w./-]+$} && -d $root) {
-        $branch = _git_line($root, 'rev-parse', '--abbrev-ref', 'HEAD');
-        $commit = _git_line($root, 'rev-parse', '--short', 'HEAD');
-    }
-
+    my $id   = _app_live_identity($c);
     my $port = $c->req->uri->port || '';
+    my $env  = $port eq '5000' ? 'production'
+             : $port eq '3001' ? 'dev'
+             : ($id->{workflow} || "port_$port");
+
     $c->res->content_type('application/json');
     $c->res->body(encode_json({
-        success => 1,
-        service => 'comserv2',
-        port    => "$port",
-        host    => scalar($c->req->uri->host // ''),
-        env     => ($port eq '5000' ? 'production' : ($port eq '3001' ? 'dev' : "port_$port")),
-        git     => { branch => $branch, commit => $commit },
-        pid     => $$,
-        time    => scalar(localtime),
+        success  => 1,
+        service  => 'comserv2',
+        port     => "$port",
+        host     => scalar($c->req->uri->host // ''),
+        env      => $env,
+        workflow => $id->{workflow},
+        git      => { branch => $id->{branch}, commit => $id->{commit} },
+        pid      => $$,
+        time     => scalar(localtime),
     }));
     $c->detach;
 }
@@ -4094,23 +4120,12 @@ No auth required (clients hit this before login to decide whether to update).
 
 sub api_app_version :Path('app/version') :Args(0) {
     my ($self, $c) = @_;
-
-    my $hostname = eval {
-        require Comserv::Util::SystemInfo;
-        Comserv::Util::SystemInfo::get_server_hostname();
-    } || 'workstation';
-
-    my $workflow = eval {
-        require Comserv::Util::SystemInfo;
-        Comserv::Util::SystemInfo->get_app_workflow($c->config->{home});
-    } || 'main';
-
-    my $git_head = eval {
-        require Comserv::Util::Git;
-        Comserv::Util::Git->current_head_str($c);
-    } || 'main';
-
+    my $id = _app_live_identity($c);
     my $client_ip = eval { $c->req->address } || '';
+    my $server = eval {
+        require Comserv::Util::Logging;
+        Comserv::Util::Logging->get_system_identifier();
+    } || $id->{workflow};
 
     # The APK on the NFS share is the only build artifact that exists; its
     # version.json is written by the Android gradle publish, not by an agent.
@@ -4151,9 +4166,9 @@ sub api_app_version :Path('app/version') :Args(0) {
     $json_data->{serverInfo} = {
         domain   => eval { $c->req->uri->host } || 'dev.computersystemconsulting.ca',
         clientIp => $client_ip,
-        server   => "$hostname (Docker):" . (eval { $c->req->uri->port } || 3001),
-        workflow => $workflow,
-        git      => $git_head,
+        server   => $server,
+        workflow => $id->{workflow},
+        git      => $id->{label},
         dbEnv    => ($ENV{DATABASE_ENVIRONMENT} || 'PRODUCTION'),
     };
 
@@ -4361,7 +4376,7 @@ the app simply hides the badge.
 =head3 JSON
 
   { success, domain, clientIp, server, serverHost, serverIp, workflow, port,
-    git: {branch, commit}, build: {branch, commit, date, host},
+    git, gitInfo: {branch, commit}, build: {branch, commit, date, host},
     dbEnv, dbUser,
     targets: [ {name, label, port, host, url, running} ] }
 
@@ -4435,26 +4450,11 @@ sub api_app_server_info :Path('app/server-info') :Args(0) {
 
     my $home = $c->config->{home} // '';
     my $sys  = eval { Comserv::Util::SystemInfo::get_system_info() } || {};
-
-    my $workflow   = eval { Comserv::Util::SystemInfo->get_app_workflow($home) } || 'main';
+    my $id   = _app_live_identity($c);
+    my $workflow   = $id->{workflow};
     my $identifier = eval { Comserv::Util::Logging->get_system_identifier() } || '';
-
-    # Live checkout, not the baked image stamp: a worktree server must report the
-    # branch it actually runs (Root::auto does the same overlay for the debug bar).
-    my ($git_branch, $git_commit) = ('', '');
-    my $git_root = -e "$home/../.git" ? "$home/.."
-                 : (-e "$home/.git"   ? $home : '');
-    if ($git_root) {
-        for my $args (['--abbrev-ref', 'HEAD'], ['--short', 'HEAD']) {
-            my $out = '';
-            if (open my $fh, '-|', 'git', '-C', $git_root, 'rev-parse', @$args) {
-                $out = <$fh> // '';
-                close $fh;
-            }
-            chomp $out;
-            if ($args->[0] eq '--abbrev-ref') { $git_branch = $out } else { $git_commit = $out }
-        }
-    }
+    my $git_branch = $id->{branch};
+    my $git_commit = $id->{commit};
 
     my $build = {};
     my $version_file = $home ? "$home/version.json" : '';
@@ -4493,7 +4493,8 @@ sub api_app_server_info :Path('app/server-info') :Args(0) {
         workflow   => $workflow,
         sitename   => $c->stash->{SiteName} // $c->session->{SiteName} // '',
         port       => 0 + $port,
-        git        => { branch => $git_branch, commit => $git_commit },
+        git        => $id->{label},
+        gitInfo    => { branch => $git_branch, commit => $git_commit },
         build      => {
             branch => $build->{branch}     // '',
             commit => $build->{commit}     // '',
@@ -4506,7 +4507,6 @@ sub api_app_server_info :Path('app/server-info') :Args(0) {
     }));
     $c->detach();
 }
-
 =head2 api_app_download
 
 GET /api/app/download - Direct download for the Android APK with correct APK MIME type.

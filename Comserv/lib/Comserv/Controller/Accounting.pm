@@ -762,6 +762,88 @@ sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
     $c->res->redirect($c->uri_for('/Accounting/coa'));
 }
 
+# One new account. The list button used to jump straight to seed_merge,
+# which inserts the standard chart and redirects. There was no form.
+sub coa_add :Path('/Accounting/coa/add') :Args(0) {
+    my ($self, $c) = @_;
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $form = {
+        accno       => '6240',
+        description => 'Food & Groceries',
+        category    => 'E',
+    };
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->body_parameters;
+        $form->{accno}       = $p->{accno} // '';
+        $form->{description} = $p->{description} // '';
+        $form->{category}    = uc($p->{category} // '');
+        $form->{accno}       =~ s/^\s+|\s+$//g;
+        $form->{description} =~ s/^\s+|\s+$//g;
+
+        my $error;
+        if ($form->{accno} !~ /^\d{3,6}$/) {
+            $error = 'Account number must be 3 to 6 digits, for example 6240.';
+        }
+        elsif (!length $form->{description}) {
+            $error = 'Description is required.';
+        }
+        elsif ($form->{category} !~ /^[ALQIE]$/) {
+            $error = 'Choose an account type.';
+        }
+        else {
+            my $existing = eval {
+                $schema->resultset('Accounting::CoaAccount')->search({
+                    accno    => $form->{accno},
+                    sitename => $sitename,
+                    obsolete => 0,
+                })->first;
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'coa_add', "lookup failed for $form->{accno} on $sitename: $@");
+                $error = 'Could not check existing accounts.';
+            }
+            elsif ($existing) {
+                $error = "Account $form->{accno} already exists on $sitename.";
+            }
+            else {
+                my $row = eval {
+                    $schema->resultset('Accounting::CoaAccount')->create({
+                        accno       => $form->{accno},
+                        description => $form->{description},
+                        category    => $form->{category},
+                        is_contra   => 0,
+                        is_tax      => 0,
+                        obsolete    => 0,
+                        sitename    => $sitename,
+                    });
+                };
+                if ($@ || !$row) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                        'coa_add', "create failed for $form->{accno} on $sitename: $@");
+                    $error = 'Could not save the account.';
+                }
+                else {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'coa_add', "Added $form->{accno} $form->{description} on $sitename id=" . $row->id);
+                    $c->flash->{success_msg} = "Added account $form->{accno} $form->{description}.";
+                    $c->res->redirect($c->uri_for('/Accounting/coa'));
+                    return;
+                }
+            }
+        }
+        $c->stash->{error_msg} = $error if $error;
+    }
+
+    $c->stash(
+        sitename => $sitename,
+        form     => $form,
+        template => 'Accounting/coa/add.tt',
+    );
+}
+
 # =========================================================================
 # Account Transfer / Direct Payment
 # =========================================================================
