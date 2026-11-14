@@ -71,6 +71,12 @@
                 <button type="submit" class="btn btn-primary">Save</button>
                 [% IF e %]<a href="[% c.uri_for('/healthkitchen/history') %]">Cancel</a>[% END %]
             </form>
+            [% PROCESS 'ai/partials/ai_form_assistant.tt'
+               ai_form_entity_label = 'health history entry'
+               ai_form_context = 'personal health kitchen record: allergies, conditions, medications, foods, symptoms. Use accurate names. Do not invent a condition, drug, or plant.'
+               ai_form_agent = 'ency'
+               ai_form_allow_user = 1
+            %]
         </div>
 
         <div class="content-section">

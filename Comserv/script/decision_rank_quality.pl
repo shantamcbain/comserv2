@@ -12,6 +12,7 @@ use strict;
 use warnings;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
+use Comserv::Util::AppTime ();
 use Getopt::Long;
 use JSON qw(encode_json decode_json);
 use LWP::UserAgent;
@@ -237,9 +238,9 @@ if ($write) {
     my $inbox = "$inbox_dir/$date_str-decision-rank-quality.json";
 
     my $now_str = do {
-        local $ENV{TZ} = 'America/Vancouver';
+        local $ENV{TZ} = Comserv::Util::AppTime->app_tz;
         POSIX::tzset();
-        strftime('%Y-%m-%dT%H:%M:%S-07:00', localtime);
+        strftime('%Y-%m-%dT%H:%M:%S%z', localtime);
     };
 
     my %by_model;
@@ -325,7 +326,7 @@ if ($write) {
 }
 
 sub _today_vancouver {
-    local $ENV{TZ} = 'America/Vancouver';
+    local $ENV{TZ} = Comserv::Util::AppTime->app_tz;
     POSIX::tzset();
     return strftime('%Y-%m-%d', localtime);
 }

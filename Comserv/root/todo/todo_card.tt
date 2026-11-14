@@ -37,6 +37,8 @@
   Outer-scope variables used automatically: is_admin, is_csc
   ============================================================ %]
 [% tc_done_fn  = tc_done_fn || 'quickClose' -%]
+[%# tc_subject_override: display title (e.g. HK slot -> today's recipe name) %]
+[% SET tci_subject = tc_subject_override || tc.subject -%]
 [% SET tci_p   = tc.priority || 9 -%]
 [% SET tci_status = tc.status -%]
 [% SET tci_is_done = (tci_status == 3 OR tci_status == 4
@@ -70,7 +72,7 @@
     <summary class="d-flex align-items-center p-1 todo-card-summary-cal">
       <a href="/todo/details?record_id=[% tc.record_id %]" class="todo-card-id text-muted mr-1" title="Todo #[% tc.record_id %]" style="font-family:monospace;white-space:nowrap;">#[% tc.record_id %]</a>
       <a href="/todo/details?record_id=[% tc.record_id %]"
-         class="todo-card-subject flex-grow-1 min-width-0">[% tc.subject || '(No subject)' | html %]</a>
+         class="todo-card-subject flex-grow-1 min-width-0">[% tci_subject || '(No subject)' | html %]</a>
       <span class="badge pri-[% tci_p %]">P[% tci_p %]</span>
       [% IF is_csc && tc.sitename && tc.sitename != 'CSC' %]<span class="badge badge-primary">[% tc.sitename | html %]</span>[% END %]
       [% IF tc_is_overdue %]<span class="badge badge-danger">OVR</span>[% END %]
@@ -117,7 +119,7 @@
         [% ELSIF tc_due_today %]<span class="badge badge-warning">⚡</span>[% END %]
         [% IF is_csc && tc.sitename && tc.sitename != 'CSC' %]<span class="badge badge-primary">[% tc.sitename | html %]</span>[% END %]
         <a href="/todo/details?record_id=[% tc.record_id %]" class="todo-card-id text-muted ml-1" title="Todo #[% tc.record_id %]" style="font-family:monospace;white-space:nowrap;">#[% tc.record_id %]</a>
-        <a href="/todo/details?record_id=[% tc.record_id %]" class="todo-card-subject ml-1">[% tc.subject || '(No subject)' | html %]</a>
+        <a href="/todo/details?record_id=[% tc.record_id %]" class="todo-card-subject ml-1">[% tci_subject || '(No subject)' | html %]</a>
       </div>
       <div class="d-flex align-items-center flex-shrink-0 todo-card-actions">
         <a href="/todo/details?record_id=[% tc.record_id %]" class="btn btn-sm btn-outline-primary">View</a>

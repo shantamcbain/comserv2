@@ -52,7 +52,7 @@ our %KNOB_DEFAULTS = (
 # (within the OpenRouter caps) and only then to free north-mini, which is always the LAST step
 # (it is easily overwhelmed when it suddenly replaces a smarter model). The emergency list is used
 # only when every step of the chain is unusable. Both live in data/ai_model_chains.json.
-our @HERMES_CHAIN_DEFAULT     = ('supergrok|grok-4.7', 'openrouter|particle-ai/particle-1', 'xai|grok-4.7', 'openrouter|openai/gpt-5.6-luna', 'openrouter|cohere/north-mini-code:free');   # Oct 28 2026: luna (on probation) replaced qwen3-coder; Nov 2 2026: particle-1 (probation, price drop) first paid step
+our @HERMES_CHAIN_DEFAULT     = ('supergrok|grok-4.7', 'openrouter|particle-ai/particle-1', 'openrouter|openai/gpt-5.6-luna', 'openrouter|baidu/ernie-5.5-flash-preview:free', 'openrouter|cohere/north-mini-code:free');   # Nov 12 2026: ernie ahead of north-mini; do not re-add xai|grok-4.7 (xai_direct cap is 0)
 our @HERMES_EMERGENCY_DEFAULT = ('ollama|gemma4-64k:latest', 'openrouter|nvidia/nemotron-3.5-lightning:free');
 our $HERMES_NORTH_RE          = qr/north-mini-code/i;
 our $HERMES_BANNED_RE         = qr/grok|glm|v4-pro/i;     # never as an openrouter step (grok only via Super Grok)
@@ -110,6 +110,9 @@ sub validate_structure {
     for my $p (@PURPOSES) {
         my $k = "chain_$p";
         my $v = $d->{$k};
+        # Nov 8 2026: an ABSENT chain key is filled from perl_default by load()
+        # (%full merge), so it is not an error. Only a present-but-empty/bad one is.
+        next unless exists $d->{$k};
         unless (ref $v eq 'ARRAY' && @$v) { push @e, "$k must be a non-empty list"; next }
         my %seen;
         for my $s (@$v) {
@@ -245,6 +248,11 @@ sub _chain_models_in_use {
     return \%used;
 }
 
+# Free-model rule and the verified 0/0 list live in Util::AI::FreeModel (single source).
+require Comserv::Util::AI::FreeModel;
+our %ZERO_PRICED_FREE;
+*ZERO_PRICED_FREE = \%Comserv::Util::AI::FreeModel::ZERO_PRICED_FREE;   # alias, not a copy
+
 sub _validate_trials {
     my ($class, $d, %vo) = @_;   # vo{all_trials}: the full trials set when only one trial is checked (Nov 2 2026)
     return () unless exists $d->{trials};
@@ -267,7 +275,7 @@ sub _validate_trials {
             # Nov 2 2026 (Shanta): several probation models may share the paid steps (particle-1 + luna); any OTHER paid OpenRouter step is still refused.
             my %probm = map { ($_->{model} => 1) } grep { ref $_ eq 'HASH' && defined $_->{model} && defined $_->{probation} && !ref $_->{probation} && $_->{probation} =~ /^(?:1|true)\z/ } values %{ $vo{all_trials} || $d->{trials} };
             push @e, "trials.$name: a probation model may share the paid steps of hermes_fallback_chain only with other probation models"
-                if grep { !ref && m{^openrouter\|(.+)\z} && $1 !~ /:free\z/ && !$probm{$1} } @$ch;
+                if grep { !ref && m{^openrouter\|(.+)\z} && $1 !~ /:free\z/ && !$ZERO_PRICED_FREE{$1}  && !$probm{$1} } @$ch;
         }
         push @e, "trials.$name.provider must be openrouter" unless ($t->{provider} // '') eq 'openrouter';
         my $sel = $t->{selectable_by} // '';
@@ -439,9 +447,28 @@ sub clear_cache { %CACHE = (); %LOGGED = (); return 1 }
 sub chain {
     my ($class, $loaded, $purpose) = @_;
     my $d = ref $loaded eq 'HASH' && $loaded->{data} ? $loaded->{data} : $loaded;
-    $purpose = 'chat' unless $purpose && grep { $_ eq $purpose } @PURPOSES;
     my %rm = map { $_ => 1 } @{ $d->{removed} || [] };
+    # Encyclopedia reuses the Hermes order. Do not copy it into chain_chat:
+    # that would spend paid models on ordinary chat.
+    if (($purpose // '') eq 'ency') {
+        return grep { !$rm{$_} } @{ $d->{hermes_fallback_chain} || [] };
+    }
+    $purpose = 'chat' unless $purpose && grep { $_ eq $purpose } @PURPOSES;
     return grep { !$rm{$_} } @{ $d->{"chain_$purpose"} || [] };
+}
+
+# trials.*.cap_exempt model ids (particle-1). Hermes already ignores the
+# shared cash caps for these; the Router must do the same or the step is dead.
+sub cap_exempt_models {
+    my ($class, $loaded) = @_;
+    my $d = ref $loaded eq 'HASH' && $loaded->{data} ? $loaded->{data} : ($loaded || {});
+    my $trials = ref $d->{trials} eq 'HASH' ? $d->{trials} : {};
+    my %ex;
+    for my $t (values %$trials) {
+        next unless ref $t eq 'HASH' && $t->{cap_exempt} && length($t->{model} // '');
+        $ex{ $t->{model} } = 1;
+    }
+    return \%ex;
 }
 
 sub is_removed {

@@ -1,15 +1,14 @@
 {
-  "branch": "main",
-  "head_sha": "0cc4b539b",
-  "date": "2026-11-09",
+  "branch": "aisystem",
+  "head_sha": "963b595d6",
+  "date": "2026-11-13",
   "uncommitted": true,
-  "last_doc_commit": "0cc4b539b (Merge branch 'planning'); this session's docs and code are uncommitted",
-  "changelog_entry": "Comserv/root/Documentation/changelog/entries/2026-11-09-apk-download-endpoint.inc",
+  "last_doc_commit": "963b595d6 feat(ai): update model chains and overrun guard for new AI system",
+  "changelog_entry": "Comserv/root/Documentation/changelog/entries/2026-11-13-editor-prompt-file-load.inc",
   "docs_updated": [
-    "Comserv/root/Documentation/HermesBranchContextPlan.tt (v0.5)",
-    "Comserv/root/Documentation/changelog/entries/2026-11-07-branch-hermes-launch.inc",
-    "Comserv/root/Documentation/changelog/entries/2026-11-08-worktrees-json-symlink.inc"
+    "Comserv/root/Documentation/AISYSTEMPlan.tt (Now block, todo 2735)",
+    "Comserv/root/Documentation/changelog/entries/2026-11-13-editor-prompt-file-load.inc"
   ],
-  "todos_touched": [],
-  "note": "Four threads verified but NOT committed (user commits and has another model review). (1) Branch Hermes launcher: open_or_start_hermes returns after spawn, non-blocking lock, log header before spawn. Verified live from running :3001: 3d -> :9103 returned 0.00s, log line then HERMES_DASHBOARD_READY, HTTP 302 on :9103, :9119 untouched; test dashboard stopped. t/branch_server_control.t 30 tests; the rewrite had dropped unit_name/stop/start guards, restored as stable refusal checks. (2) Git dashboard one-click: single confirm, always navigate when the port comes up, data-inflight guard; JS only checked with node --check, the click itself is unverified. (3) worktrees.json symlink on create_worktree plus 'nothing to merge' summary in update_all_from_main; t/util_git_create_worktree.t now asserts the link path (<gitroot>/Comserv/root/config/worktrees.json) - previously untested. (4) APK: GET /api/app/download streams /data/nfs/inventory-apks/ComservInventory.apk with the APK MIME (curl: 200, content-length 35099202); static .apk mime_types works (/static/app/ComservInventory.apk also returns the APK type); version.json apkUrl -> /api/app/download (7 / 1.6). Removed the api_app_download eval/require of Comserv::Util::ApkDownload - that module does not exist here. INCIDENT (self, repaired): a throwaway perl probe of _ensure_worktree_config_link wrote '{}' THROUGH the symlink it created and truncated Comserv/root/config/worktrees.json. Restored from /home/shanta/.comserv/worktrees/git/Comserv/Comserv/root/config/worktrees.json (Nov 1 copy); verified 16 branches, identical ports, labels/urls/host/project_id, port_start 4000, external_repos openbafang:9120; build_worktree_list -> 18 rows. Lesson: a probe must copy the target first; never write into a linked registry. OPEN: t/git_update_all_from_main.t is RED at HEAD too (same 11 failures) - it expects skipped_local_changes / skipped_proxmox / skipped_4003 / uptodate while Git.pm now does would_merge_autostash / merged_manual / in_sync and has no proxmox/4003 skip strings left; stale-test-vs-regression is the user's call. STILL OWED: browser click on /admin/git with :9119 stopped (needs an admin session; non-session POST -> 302). Test gate green; TT parse OK."
+  "todos_touched": [2735],
+  "note": "Editor review briefs load named lib/root/script/t paths. How-to /ai2/ URL no longer forces DEFAULT_APP_PATHS. chat.js uncommitted. No editor window used. healthkitchen unchanged until merge. Open clocks 2311, 2595, 2682 are other projects; not closed."
 }

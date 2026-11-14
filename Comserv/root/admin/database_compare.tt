@@ -1,0 +1,87 @@
+[%# Read-only database-to-database difference report.
+    Cell values are not shown. No sync or edit actions.
+%]
+<div class="schema-compare-container">
+    <header class="schema-compare-header">
+        <h1>Database differences</h1>
+        <p class="server-card-text">Row counts are approximate (InnoDB <code>table_rows</code>). This page does not show or edit cell values.</p>
+    </header>
+
+    <p><a href="[% c.uri_for('/admin/schema_compare') %]">← Back to schema compare</a></p>
+
+    [% IF errors.size %]
+    <div class="card border server-card mb-3">
+        <div class="card-body">
+            [% FOREACH err IN errors %]
+            <p class="text-danger">[% err | html %]</p>
+            [% END %]
+        </div>
+    </div>
+    [% END %]
+
+    [% FOREACH pair IN pairs %]
+    <section class="mb-3">
+        <h2 class="server-section-title">
+            [% pair.left.host | html %]:[% pair.left.port %] [% pair.left.database | html %]
+            vs
+            [% pair.right.host | html %]:[% pair.right.port %] [% pair.right.database | html %]
+        </h2>
+
+        <h3>Rows on the left that the right does not have</h3>
+        <p class="server-card-text">Tables that exist with rows only on the left, plus shared tables that are empty on the right. This is the missed-copy list when the left side is the older database.</p>
+        <ul>
+            [% FOREACH t IN pair.diff.tables_only_left %]
+            [% IF t.row_count.defined && t.row_count > 0 %]
+            <li><code>[% t.name | html %]</code> — [% t.row_count %] rows, table missing on the right</li>
+            [% END %]
+            [% END %]
+            [% FOREACH t IN pair.diff.data %]
+            [% IF t.status == 'missing_on_right' %]
+            <li><code>[% t.name | html %]</code> — [% t.left_rows %] rows on the left, 0 on the right</li>
+            [% END %]
+            [% END %]
+        </ul>
+
+        <h3>Rows on the right that the left does not have</h3>
+        <ul>
+            [% FOREACH t IN pair.diff.tables_only_right %]
+            [% IF t.row_count.defined && t.row_count > 0 %]
+            <li><code>[% t.name | html %]</code> — [% t.row_count %] rows, table missing on the left</li>
+            [% END %]
+            [% END %]
+            [% FOREACH t IN pair.diff.data %]
+            [% IF t.status == 'missing_on_left' %]
+            <li><code>[% t.name | html %]</code> — [% t.right_rows %] rows on the right, 0 on the left</li>
+            [% END %]
+            [% END %]
+        </ul>
+
+        <h3>Counts differ</h3>
+        <ul>
+            [% FOREACH t IN pair.diff.data %]
+            [% IF t.status == 'count_differs' || t.status == 'count_unknown' %]
+            <li><code>[% t.name | html %]</code> — left [% t.left_rows.defined ? t.left_rows : '—' %], right [% t.right_rows.defined ? t.right_rows : '—' %]</li>
+            [% END %]
+            [% END %]
+        </ul>
+
+        <details>
+            <summary>Schema differences (not missed data — the schema has evolved)</summary>
+            [% IF pair.diff.schema.size %]
+            <ul>
+                [% FOREACH t IN pair.diff.schema %]
+                <li>
+                    <code>[% t.name | html %]</code>
+                    [% IF t.columns_only_left.size %] only on left: [% t.columns_only_left.join(', ') | html %][% END %]
+                    [% IF t.columns_only_right.size %] only on right: [% t.columns_only_right.join(', ') | html %][% END %]
+                    [% IF t.type_mismatches.size %] type differs: [% t.type_mismatches.join(', ') | html %][% END %]
+                </li>
+                [% END %]
+            </ul>
+            [% ELSE %]
+            <p>No column differences on shared tables.</p>
+            [% END %]
+        </details>
+    </section>
+    [% END %]
+</div>

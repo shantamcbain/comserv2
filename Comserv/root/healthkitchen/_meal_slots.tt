@@ -1,0 +1,67 @@
+[%# Meal / drink slot cards (HealthKitchen::MealSlots, read-only render).
+    Each button is a same-origin POST (OriginCheck in HealthKitchen auto). %]
+<div class="hk-meal-slots">
+  <p class="doc-muted">
+    Coffees today: <strong>[% hk_day.coffees || 0 %]</strong>
+    · <a href="[% c.uri_for('/healthkitchen/slots') %]">Meal times</a>
+  </p>
+  [% IF !hk_day.timing_ready %]
+  <div class="alert alert-warning">Start/Stop logging needs the new <code>HealthKitchen::IntakeLog</code> columns. Admin: Schema Compare → apply IntakeLog.</div>
+  [% END %]
+  [% FOREACH sg IN hk_slot_suggestions %]
+  <div class="alert alert-info">[% sg.label | html %]: you usually start at <strong>[% sg.to | html %]</strong> (last [% sg.n %] logs), set to [% sg.from | html %]. <a href="[% c.uri_for('/healthkitchen/slots') %]">Adjust</a></div>
+  [% END %]
+  [% FOREACH s IN hk_day.slots %]
+  <div class="card mb-2 hk-slot hk-slot-[% s.kind %][% IF s.done %] opacity-60[% END %]" data-slot="[% s.key | html %]">
+    <div class="card-body p-2">
+      <strong>[% s.start %]–[% s.end %]</strong> [% s.label | html %]
+      [% IF s.done %]<span class="badge badge-success">done[% IF s.duration.defined %] · [% s.duration %] min[% END %]</span>[% END %]
+      [% IF s.started %]<span class="badge badge-warning">started [% s.started %]</span>[% END %]
+      [% FOREACH r IN s.recipes %]
+      <div class="hk-slot-recipe mt-1">
+        <a href="[% r.url %]">[% r.name | html %]</a>
+        [% IF r.ingredients.size %]<small class="doc-muted">— [% r.ingredients.join(', ') | html %]</small>[% END %]
+        <form method="post" action="[% c.uri_for('/healthkitchen/recipe_make') %]/[% r.id %]" style="display:inline">
+          <input type="hidden" name="return" value="home"><input type="hidden" name="batches" value="1">
+          <button class="btn btn-sm btn-outline-success" type="submit">Mark made</button>
+        </form>
+      </div>
+      [% END %]
+      [% IF !s.recipes.size && s.kind == 'meal' %]<div class="doc-muted">Nothing planned for this slot today.</div>[% END %]
+      [% IF hk_day.timing_ready %]
+      <form method="post" action="[% c.uri_for('/healthkitchen/slot_log') %]" class="mt-1">
+        <input type="hidden" name="slot" value="[% s.key | html %]">
+        [% IF s.recipes.size %]<input type="hidden" name="recipe_id" value="[% s.recipes.0.id %]">[% END %]
+        [% IF s.started %]
+        <button class="btn btn-sm btn-outline-warning" name="action" value="stop">Stop</button>
+        [% ELSIF !s.done %]
+        <button class="btn btn-sm btn-outline-primary" name="action" value="start">Start</button>
+        <button class="btn btn-sm btn-outline-success" name="action" value="done">Done</button>
+        [% END %]
+      </form>
+      [% END %]
+    </div>
+  </div>
+  [% END %]
+  [% IF hk_day.timing_ready %]
+  <details class="mt-2"><summary>+ Drink out</summary>
+    <form method="post" action="[% c.uri_for('/healthkitchen/drink_out') %]">
+      <input name="what" value="Coffee" maxlength="60"> <input name="location" placeholder="where (optional)" maxlength="255">
+      <button class="btn btn-sm btn-primary" type="submit">Log drink</button> <small class="doc-muted">counts only, no inventory change</small>
+    </form>
+  </details>
+  <details class="mt-2"><summary>+ Meal out</summary>
+    <form method="post" action="[% c.uri_for('/healthkitchen/meal_out') %]">
+      <textarea name="description" rows="3" maxlength="4000" style="width:100%" placeholder="What did you eat? (type, dictate, or paste from Chat with AI)"></textarea>
+      <input name="location" placeholder="restaurant (optional)" maxlength="255">
+      <button class="btn btn-sm btn-primary" type="submit">Log meal</button> <small class="doc-muted">no inventory change</small>
+    </form>
+  </details>
+  [% IF hk_day.drinks_out.size || hk_day.meals_out.size %]
+  <ul class="mt-2">
+    [% FOREACH d IN hk_day.drinks_out %]<li>[% d.name | html %][% IF d.location %] @ [% d.location | html %][% END %]</li>[% END %]
+    [% FOREACH m IN hk_day.meals_out %]<li>Meal out: [% m.description | html %][% IF m.location %] @ [% m.location | html %][% END %]</li>[% END %]
+  </ul>
+  [% END %]
+  [% END %]
+</div>

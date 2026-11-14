@@ -220,6 +220,8 @@ Comserv/data/ai_eval_inbox/**
 Comserv/data/ai_hermes_overrun*.json
 Comserv/data/ai_commit_gate.json
 Comserv/data/ai_review_scores.json
+Comserv/data/ai_rank_jobs/
+Comserv/data/ai_rank_jobs/**
 Comserv/data/ai_reviewer_spend.json
 Comserv/data/ai_trials/
 Comserv/root/static/ai/*usage*.json*
@@ -265,3 +267,5 @@ Comserv/data/ai_rank_jobs/git.json
 Comserv/data/supergrok_pacing.json
 Comserv/data/ai_trials/gpt_56_luna.state.json
 Comserv/data/ai_tasks_cache.json
+Comserv/data/ai_model_chains.json.bak-t393u-20261111-104106
+Comserv/lib/Comserv/Util/AI/HermesOverrunGuard.pm.bak-t393u-20261111-104106

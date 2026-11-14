@@ -1,65 +1,67 @@
-[%# Schema Compare - Server List (top level)
-    Shows server groups with their database counts and status.
-    Clicking a server tunnels to its DB list.
-    JS via schema-compare.js (event delegation on data-action attributes)
+[%# Schema Compare - database cards
+    One card per real database, with approximate counts.
+    A checkbox under each card selects it for the difference report.
+    Clicking the card body still opens that database's tables.
 %]
 <div class="schema-servers" data-base-url="[% c.uri_for('/admin/schema_compare/server') %]" data-refresh-url="[% c.uri_for('/admin/schema_compare/refresh_server') %]">
-    <!-- Fixed summary card -->
     <div class="card mb-3 border servers-summary-card">
         <div class="card-body py-2">
-            <strong>Configured Database Servers:</strong> [% server_count %] 
+            <strong>Configured Database Servers:</strong> [% server_count %]
             ([% servers.map('name').join(', ') %])
+            <p class="server-card-text mb-0">Tick two or more databases, then compare. The report lists data that is on one side and not the other. It does not show cell values.</p>
         </div>
     </div>
 
-    <!-- Horizontal server cards -->
-    <div class="server-grid">
+    <form id="db-compare-form" method="get" action="[% c.uri_for('/admin/database_compare') %]">
         [% FOREACH server IN servers %]
-        <div class="card border server-card"
-             data-action="navigate-server"
-             data-server="[% server.server_group | html %]">
-            <div class="card-body">
-                <h5 class="card-title server-card-title">
-                    <i class="fas fa-server me-2"></i>[% server.name | html %]
-                </h5>
-                <p class="card-text mb-1 server-card-text">
-                    <strong>Databases:</strong> [% server.db_count %]
-                </p>
-                <p class="card-text mb-1 server-card-text">
-                    <strong>Types:</strong> [% server.type_display || '—' %]
-                </p>
-                <p class="card-text mb-1 server-card-text">
-                    <strong>Host:</strong>
-                    [% IF server.routes.size > 1 %]
-                    <span class="server-routes">
-                        [% FOREACH r IN server.routes %]
-                        <span class="server-route [% IF r.reachable %]text-success[% ELSE %]text-danger[% END %]"
-                              title="[% r.host %]:[% r.port %] — [% IF r.reachable %]reachable[% ELSE %]unreachable[% END %][% IF r.error %] ([% r.error | html %])[% END %]">
-                            <i class="fas [% IF r.reachable %]fa-check-circle[% ELSE %]fa-times-circle[% END %]"></i>
-                            [% r.host %]:[% r.port %][% IF r.slot_count && r.slot_count > 1 %] <span class="doc-muted">([% r.slot_count %] logins)</span>[% END %]
-                        </span>[% UNLESS loop.last %]<br>[% END %]
-                        [% END %]
-                    </span>
+        <h3 class="server-section-title">
+            [% server.name | html %]
+            <span class="server-status">[% server.status | ucfirst %]</span>
+            [% IF server.db_error %]
+            <span class="text-danger" title="[% server.db_error | html %]">login error</span>
+            [% END %]
+            <button type="button" class="btn btn-sm btn-outline-primary" data-action="navigate-server" data-server="[% server.server_group | html %]">Open server</button>
+        </h3>
+        <div class="server-grid">
+            [% FOREACH db IN server.live_databases %]
+            <div class="card border server-card">
+                <div class="card-body"
+                     data-action="navigate-db"
+                     data-server="[% db.server_group | html %]"
+                     data-db="[% db.name | html %]">
+                    <h5 class="card-title server-card-title">
+                        <i class="fas fa-database me-2"></i>[% db.host | html %]:[% db.port %] [% db.name | html %]
+                    </h5>
+                    <p class="card-text mb-1 server-card-text">
+                        <strong>Tables:</strong> [% IF db.has_counts %][% db.table_count %][% ELSE %]—[% END %]
+                    </p>
+                    <p class="card-text mb-1 server-card-text">
+                        <strong>Rows:</strong> [% IF db.has_counts %][% db.row_count %] <span class="doc-muted">(approx)</span>[% ELSE %]—[% END %]
+                    </p>
+                    <p class="card-text mb-1 server-card-text">
+                        <strong>Host:</strong> [% db.host | html %][% IF db.port %]:[% db.port %][% END %]
+                    </p>
+                    <p class="card-text mb-0 server-card-text">
+                        <strong>Engine:</strong> [% db.engine || server.type_display || '—' | html %]
+                    </p>
+                </div>
+                <div class="card-body db-compare-pick">
+                    [% IF db.comparable %]
+                    <label>
+                        <input type="checkbox" name="db" value="[% db.key | html %]">
+                        Compare this database
+                    </label>
                     [% ELSE %]
-                    [% server.ips.join(', ') | html %][% IF server.routes.size == 1 && server.routes.0.slot_count > 1 %] <span class="doc-muted">([% server.routes.0.slot_count %] logins, one listener)</span>[% END %]
+                    <span class="text-danger">[% db.error || 'Not reachable — cannot compare' | html %]</span>
                     [% END %]
-                </p>
-                <p class="card-text mb-1 server-card-text">
-                    <strong>Status:</strong> <span class="server-status">[% server.status | ucfirst %]</span>
-                </p>
-                <p class="card-text mb-1 server-card-text">
-                    <strong>DB:</strong>
-                    [% IF server.db_error %]
-                    <span class="server-db-error text-danger" title="[% server.db_error | html %]">error</span>
-                    [% ELSE %]
-                    <span class="server-db-ok text-success">ok</span>
-                    [% END %]
-                </p>
-                <button class="btn btn-sm btn-outline-primary refresh-btn" data-action="refresh-server" data-server="[% server.server_group | html %]">
-                    <i class="fa fa-sync"></i> Refresh
-                </button>
+                </div>
             </div>
+            [% END %]
         </div>
         [% END %]
-    </div>
+
+        <div class="db-compare-bar">
+            <button type="submit" class="btn btn-primary" data-action="compare-selected">Compare selected differences</button>
+        </div>
+    </form>
 </div>

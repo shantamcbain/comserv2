@@ -249,6 +249,11 @@
 <script src="/static/js/ai-chat/index.js?v=[% cv %]" defer></script>
 [% END %]
 
+<!-- Page create/edit AI assist. Script waits for DOMContentLoaded. -->
+[% IF c.request.uri.match('/pages/create') || c.request.uri.match('/pages/edit') %]
+<script src="/static/js/page-ai-assist.js?v=[% cv %]" defer></script>
+[% END %]
+
 <!-- Health Kitchen dashboard: activity check-off -->
 [% IF c.request.uri.match('/healthkitchen') %]
 <script src="/static/js/healthkitchen/dashboard.js?v=[% cv %]" defer></script>

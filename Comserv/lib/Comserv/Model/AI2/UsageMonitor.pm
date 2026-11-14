@@ -1,4 +1,5 @@
 package Comserv::Model::AI2::UsageMonitor;
+use Comserv::Util::AppTime ();
 
 use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];
@@ -347,7 +348,10 @@ sub _eff_quality {
         else {
             # Pre-migration: tally metadata.grounding, bounded scan newest first.
             my $q = $rs->search({ 'me.metadata' => { -like => '%"grounding"%' } }, {
-                columns  => [ $agent_col, 'me.provider', 'me.model', 'me.metadata' ],
+                # Nov 8 2026: select+as so get_column('agent') works (was
+                # "No such column 'agent'" on every pre-migration tally).
+                select   => [ $agent_col, 'me.provider', 'me.model', 'me.metadata' ],
+                as       => [qw(agent provider model metadata)],
                 order_by => { -desc => 'me.id' },
                 rows     => METADATA_SCAN_ROWS,
             });
@@ -1829,7 +1833,7 @@ sub ai_health {
             $e->{csrf} = $c->session->{ai_eval_csrf};
         }
         require POSIX;
-        { local $ENV{TZ} = 'America/Los_Angeles'; POSIX::tzset(); $e->{now_pt_input} = POSIX::strftime('%Y-%m-%d %H:%M', localtime); }
+        { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); $e->{now_pt_input} = POSIX::strftime('%Y-%m-%d %H:%M', localtime); }
         POSIX::tzset();
         $e;
     } || { errors => [ "usage_estimator: $@" ], consumers => [] };

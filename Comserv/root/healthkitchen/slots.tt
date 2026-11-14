@@ -1,0 +1,42 @@
+[% META title = "Health Kitchen — meal times" roles = "user,admin" TemplateType = "Application" category = "HealthKitchen" %]
+<div class="app-container">
+  <h1>Meal &amp; drink times</h1>
+  [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+  [% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+  [% FOREACH sg IN hk_slot_suggestions %]
+  <div class="alert alert-info">[% sg.label | html %]: logged starts suggest <strong>[% sg.to | html %]</strong> instead of [% sg.from | html %] ([% sg.n %] logs, last 14 days).</div>
+  [% END %]
+  <form method="post" action="[% c.uri_for('/healthkitchen/slots') %]">
+    <table class="table table-sm">
+      <tr><th>Key</th><th>Kind</th><th>Label</th><th>Start</th><th>End</th><th>Drink recipe</th><th>Meal plan slots</th><th>Remove</th></tr>
+      [% SET n = 0 %]
+      [% FOREACH s IN hk_slots %]
+      <tr>
+        <td><input name="key_[% n %]" value="[% s.key | html %]" size="14" pattern="[a-z][a-z0-9_]{0,31}"></td>
+        <td><select name="kind_[% n %]"><option value="meal" [% IF s.kind == 'meal' %]selected[% END %]>meal</option><option value="drink" [% IF s.kind == 'drink' %]selected[% END %]>drink</option></select></td>
+        <td><input name="label_[% n %]" value="[% s.label | html %]" maxlength="60"></td>
+        <td><input type="time" name="start_[% n %]" value="[% s.start %]"></td>
+        <td><input type="time" name="end_[% n %]" value="[% s.end %]"></td>
+        <td><input name="recipe_[% n %]" value="[% s.recipe_name | html %]" maxlength="120"></td>
+        <td><input name="plan_[% n %]" value="[% s.plan_slots.join(',') | html %]" placeholder="breakfast,lunch"></td>
+        <td><input type="checkbox" name="remove_[% n %]" value="1"></td>
+      </tr>
+      [% n = n + 1 %]
+      [% END %]
+      <tr>
+        <td><input name="key_[% n %]" size="14" placeholder="new_slot"></td>
+        <td><select name="kind_[% n %]"><option>meal</option><option>drink</option></select></td>
+        <td><input name="label_[% n %]" maxlength="60"></td>
+        <td><input type="time" name="start_[% n %]"></td><td><input type="time" name="end_[% n %]"></td>
+        <td><input name="recipe_[% n %]" maxlength="120"></td><td><input name="plan_[% n %]"></td><td></td>
+      </tr>
+    </table>
+    <button class="btn btn-primary" type="submit">Save meal times</button>
+    <a href="[% c.uri_for('/healthkitchen') %]" class="btn btn-secondary">Back</a>
+  </form>
+  <hr>
+  <form method="post" action="[% c.uri_for('/healthkitchen/setup_apply') %]">
+    <p>Recipe setup: Morning beverage weighed amounts (cinnamon 16 g, turmeric 16 g, chia 58 g, collagen 78 g added, black pepper a pinch, never deducted), a home Coffee recipe (112 g beans per 4-demitasse pot), and 56 g container weights for cinnamon and turmeric once Schema Compare has added <code>net_weight_g</code>. Backs up first; safe to press again.</p>
+    <button class="btn btn-warning" type="submit">Apply recipe setup</button>
+  </form>
+</div>

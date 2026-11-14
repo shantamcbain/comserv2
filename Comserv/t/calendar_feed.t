@@ -207,14 +207,16 @@ SKIP: {
 
 # ---------------------------------------------------------------- POST origin check (CSRF)
 {
-    require Comserv::Controller::Calendar;
-    my $ok = \&Comserv::Controller::Calendar::origin_ok;
+    require Comserv::Util::OriginCheck;
+    my $W  = { scheme => 'http', host => 'workstation.local', port => 3001 };
+    my $ok = sub { shift; Comserv::Util::OriginCheck->matches($W, @_) };
     ok(!$ok->('workstation.local'), 'no Origin and no Referer: refused');
     ok(!$ok->('workstation.local', '', undef), 'empty headers: refused');
     ok(!$ok->('workstation.local', 'https://evil.example'), 'mismatched Origin: refused');
     ok(!$ok->('workstation.local', undef, 'https://workstation.local.evil.example/x'), 'look-alike Referer: refused');
     ok(!$ok->('workstation.local', 'http://workstation.local:3001', 'https://evil.example/'), 'one mismatch: refused');
     ok(!$ok->('workstation.local', 'null'), 'Origin null: refused');
+    ok(!$ok->('workstation.local', 'http://workstation.local:3002'), 'same host, other port: refused');
     ok($ok->('workstation.local', 'http://workstation.local:3001'), 'matching Origin: allowed');
     ok($ok->('workstation.local', undef, 'http://workstation.local:3001/calendar/subscribe'), 'matching Referer: allowed');
 }

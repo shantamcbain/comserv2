@@ -5,6 +5,74 @@
     JS via schema-compare.js (event delegation on data-action attributes)
 %]
 
+[% BLOCK result_fields_preview %]
+    [% IF fields && fields.size %]
+    <div class="table-container orphan-fields-wrap">
+        <table class="data-table orphan-fields-table" style="margin: 0; font-size: 0.9em;">
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th>Type</th>
+                    <th>Size</th>
+                    <th>Nullable</th>
+                    <th>Default</th>
+                    <th>Extra</th>
+                    <th>Flags / Docs</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOREACH field IN fields %]
+                <tr>
+                    <td><code>[% field.name | html %]</code></td>
+                    <td>[% field.data_type | html %]</td>
+                    <td><code>[% (field.item('size') || '—') | html %]</code></td>
+                    <td>
+                        [% IF field.nullable == 'YES' %]<span class="prop nullable">YES</span>
+                        [% ELSIF field.nullable == 'NO' %]<span class="prop not-null">NO</span>
+                        [% ELSE %]—[% END %]
+                    </td>
+                    <td><code>[% (field.default_val || field.default_value || '—') | html %]</code></td>
+                    <td><code>[% (field.extra || '—') | html %]</code></td>
+                    <td>
+                        [% IF field.is_primary_key %]<span class="prop primary">PK</span> [% END %]
+                        [% IF field.comment %]<span class="text-muted">[% field.comment | html %]</span>
+                        [% ELSIF field.docs %]<span class="text-muted">[% field.docs | html %]</span>[% END %]
+                    </td>
+                </tr>
+                [% END %]
+            </tbody>
+        </table>
+    </div>
+    [% ELSE %]
+    <p class="text-muted" style="margin: 0;">No column definitions parsed from this Result file.</p>
+    [% END %]
+[% END %]
+
+
+[% BLOCK table_issue_status %]
+    [% IF table.has_problem %]
+        <span class="sc-badge sc-badge-problem">[% table.issue_count || 0 %] issue[% IF table.issue_count != 1 %]s[% END %]</span>
+        [% IF table.issues && table.issues.size %]
+        <details class="sc-issue-details">
+            <summary>Details</summary>
+            <ul class="sc-issue-list">
+                [% FOREACH iss IN table.issues %]
+                <li>
+                    [% IF iss.column %]<code>[% iss.column | html %]</code>: [% END %]
+                    [% iss.message | html %]
+                    [% IF iss.kind != 'missing_result' && iss.kind != 'missing_table' && iss.kind != 'missing_in_result' && iss.kind != 'missing_in_table' %]
+                        <span class="text-muted">(live: <code>[% (iss.table_value || '—') | html %]</code>; Result: <code>[% (iss.result_value || '—') | html %]</code>)</span>
+                    [% END %]
+                </li>
+                [% END %]
+            </ul>
+        </details>
+        [% END %]
+    [% ELSE %]
+        <span class="sc-badge sc-badge-ok">OK</span>
+    [% END %]
+[% END %]
+
 [% SET fetch_url = c.uri_for('/schema-comparison/create_table_from_result') %]
 
 <div class="app-container">
@@ -100,13 +168,26 @@
         </details>
     </div>
 
+
+    <div class="sc-tables-filter-bar">
+        <label class="sc-problems-only-label">
+            <input type="checkbox" id="sc-problems-only" data-action="filter-problems-only">
+            Problems only
+        </label>
+        <span class="sc-flagged-count[% IF problem_table_count %] sc-flagged-count-warn[% END %]">
+            Flagged tables: <strong>[% problem_table_count || 0 %]</strong>
+            of [% listed_table_count || 0 %]
+        </span>
+    </div>
+
     <div class="content-container">
         <div class="content-primary">
             
             <!-- Section 1: Tables with Result files -->
             <div class="comparison-section">
                 <h3 class="section-toggle-h3" data-action="toggle-section">
-                    <i class="fas fa-check-circle icon-green"></i> Tables (all have result files) ([% both.size %])
+                    [% IF both_problem_count %]<i class="fas fa-exclamation-circle icon-warning"></i>[% ELSE %]<i class="fas fa-check-circle icon-green"></i>[% END %]
+                    Tables with Result files ([% both.size %][% IF both_problem_count %], [% both_problem_count %] with problems[% END %])
                     <span class="toggle-hint">[click to toggle]</span>
                 </h3>
                 <div class="section-content">
@@ -116,6 +197,7 @@
                             <thead>
                                 <tr>
                                     <th>Table Name</th>
+                                    <th>Status</th>
                                     <th>Rows</th>
                                     <th>Size</th>
                                     <th>Result File</th>
@@ -124,13 +206,23 @@
                             </thead>
                             <tbody>
                                 [% FOREACH table IN both %]
-                                <tr>
+                                <tr class="sc-table-row" data-has-problem="[% IF table.has_problem %]1[% ELSE %]0[% END %]">
                                     <td><a href="[% c.uri_for('/admin/schema_compare/server') %]/[% server.name | uri %]/db/[% db.name | uri %]/table/[% table.name | uri %]">[% table.name | html %]</a></td>
+                                    <td class="sc-status-cell">[% PROCESS table_issue_status table=table %]</td>
                                     <td>[% table.row_count || 0 %]</td>
                                     <td>[% table.size %]</td>
                                     <td>[% table.result_name | html %]
+                                        [% IF table.field_count %]
+                                            <span class="text-muted">([% table.field_count %] fields)</span>
+                                        [% END %]
                                         [% IF table.result_rel_path %]
                                             <a href="#" onclick="openAI2EditorWindow('[% table.result_rel_path | html %]');return false" class="btn btn-sm btn-secondary" title="Edit result file in AI editor"><i class="fas fa-edit"></i> Edit</a>
+                                        [% END %]
+                                        [% IF table.fields && table.fields.size %]
+                                        <details class="result-settings-toggle">
+                                            <summary>Result file settings</summary>
+                                            [% PROCESS result_fields_preview fields=table.fields %]
+                                        </details>
                                         [% END %]
                                     </td>
                                     <td class="action-cell">
@@ -163,6 +255,7 @@
                             <thead>
                                 <tr>
                                     <th>Table Name</th>
+                                    <th>Status</th>
                                     <th>Rows</th>
                                     <th>Size</th>
                                     <th>Actions</th>
@@ -170,8 +263,9 @@
                             </thead>
                             <tbody>
                                 [% FOREACH table IN table_only %]
-                                <tr>
+                                <tr class="sc-table-row" data-has-problem="[% IF table.has_problem %]1[% ELSE %]0[% END %]">
                                     <td>[% table.name | html %]</td>
+                                    <td class="sc-status-cell">[% PROCESS table_issue_status table=table %]</td>
                                     <td>[% table.row_count || 0 %]</td>
                                     <td>[% table.size %]</td>
                                     <td class="action-cell">
@@ -205,7 +299,8 @@
                     [% IF result_only.size %]
                     <div class="orphan-result-list">
                         [% FOREACH res IN result_only %]
-                        <div class="orphan-result-card" style="margin-bottom: 1rem; padding: 0.75rem 1rem; border: 1px solid var(--border-color, #ddd); border-radius: 6px; background: var(--bg-secondary, #fafafa);">
+                        <div class="orphan-result-card sc-table-row" data-has-problem="[% IF res.has_problem %]1[% ELSE %]0[% END %]" style="margin-bottom: 1rem; padding: 0.75rem 1rem; border: 1px solid var(--border-color, #ddd); border-radius: 6px; background: var(--bg-secondary, #fafafa);">
+                            <div class="sc-status-cell sc-orphan-status">[% PROCESS table_issue_status table=res %]</div>
                             <div class="orphan-result-header" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem;">
                                 <div>
                                     <strong><i class="fas fa-file-code"></i> [% res.result_name | html %]</strong>
@@ -225,36 +320,7 @@
                                 </div>
                             </div>
                             [% IF res.fields && res.fields.size %]
-                            <div class="table-container orphan-fields-wrap">
-                                <table class="data-table orphan-fields-table" style="margin: 0; font-size: 0.9em;">
-                                    <thead>
-                                        <tr>
-                                            <th>Field</th>
-                                            <th>Type</th>
-                                            <th>Size</th>
-                                            <th>Nullable</th>
-                                            <th>Default</th>
-                                            <th>Flags / Docs</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        [% FOREACH field IN res.fields %]
-                                        <tr>
-                                            <td><code>[% field.name | html %]</code></td>
-                                            <td>[% field.data_type | html %]</td>
-                                            <td>[% IF field.size.defined %][% field.size %][% ELSE %]—[% END %]</td>
-                                            <td>[% IF field.is_nullable %]<span class="prop nullable">NULL</span>[% ELSE %]<span class="prop not-null">NOT NULL</span>[% END %]</td>
-                                            <td><code>[% IF field.default_value.defined %][% field.default_value | html %][% ELSE %]—[% END %]</code></td>
-                                            <td>
-                                                [% IF field.is_primary_key %]<span class="prop primary">PK</span> [% END %]
-                                                [% IF field.is_auto_increment %]<span class="prop">AI</span> [% END %]
-                                                [% IF field.docs %]<span class="text-muted">[% field.docs | html %]</span>[% END %]
-                                            </td>
-                                        </tr>
-                                        [% END %]
-                                    </tbody>
-                                </table>
-                            </div>
+                            [% PROCESS result_fields_preview fields=res.fields %]
                             [% ELSIF res.columns %]
                             <div class="table-container orphan-fields-wrap">
                                 <table class="data-table orphan-fields-table" style="margin: 0; font-size: 0.9em;">

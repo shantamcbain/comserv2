@@ -179,8 +179,8 @@ sub get_result_file_schema {
 
         while ($content =~ /__PACKAGE__->add_unique_constraint\s*\(\s*(?:['"]([^'"]+)['"]\s*=>\s*)?\[(.*?)\]\s*\)/gs) {
             my $name = $1 || 'unnamed';
-            my $cols = $2; $cols =~ s/['"\s]//g;
-            push @{$schema_info->{unique_constraints}}, { name => $name, columns => [split /,/, $cols] };
+            my $cols = $self->_parse_perl_list($2);
+            push @{$schema_info->{unique_constraints}}, { name => $name, columns => $cols };
         }
 
         while ($content =~ /__PACKAGE__->(belongs_to|has_many|has_one|might_have)\s*\(\s*['"]?(\w+)['"]?\s*=>\s*['"]?([^'",\s\)]+)['"]?\s*(?:,\s*(?:['"]?(\w+)['"]?|\{(.*?)\}))?/gs) {
@@ -199,6 +199,30 @@ sub get_result_file_schema {
 # Walks the block character-by-character, balancing [] and {} so array and
 # nested-hash values (e.g. enum `extra => { list => [ 'tt', 'md' ] }`) are
 # captured verbatim instead of being mis-parsed as an opaque string.
+
+# Parse the interior of a Perl list: [ 'a', 'b' ], [10, 2],
+# [qw/calm moderate/], [qw(role module)]. Used for enum lists, decimal
+# size arrays, and unique-constraint column lists.
+sub _parse_perl_list {
+    my ($self, $inner) = @_;
+    $inner = '' unless defined $inner;
+    $inner =~ s/^\s+|\s+$//g;
+    my @items;
+    if ($inner =~ /^\s*qw\s*(\S)(.*)\S\s*$/s) {
+        my $body = $2 // '';
+        $body =~ s/^\s+|\s+$//g;
+        for my $tok (split /\s+/, $body) {
+            $tok =~ s/^['"]|['"]$//g;
+            push @items, $tok if length $tok;
+        }
+        return \@items;
+    }
+    while ($inner =~ /(['"])\s*((?:(?!\1).)*)\s*\1|([+-]?\d+(?:\.\d+)?)/g) {
+        push @items, defined $3 ? $3 + 0 : $2;
+    }
+    return \@items;
+}
+
 sub _parse_result_inner_hash {
     my ($self, $block) = @_;
     $block = '' unless defined $block;
@@ -238,9 +262,7 @@ sub _parse_result_inner_hash {
                 $j++;
             }
             my $inner = substr($block, $i + 1, $j - $i - 2);
-            my @items;
-            while ($inner =~ /['"]\s*([^'"]*)\s*['"]/g) { push @items, $1; }
-            $info->{$name} = \@items;
+            $info->{$name} = $self->_parse_perl_list($inner);
             $i = $j;
         }
         elsif ($ch eq '{') {
@@ -313,6 +335,23 @@ sub parse_result_file_columns {
             elsif ($def =~ /\G\s*(['"])((?:(?!\1).)*)\1/gc) { $val = $2; }
             elsif ($def =~ /\G\s*(\d+)/gc) { $val = $1 + 0; }
             elsif ($def =~ /\G\s*undef\b/gc) { $val = undef; }
+            # Array ref, e.g. size => [10, 2] or [ 'tt', 'md' ]. Without this
+            # branch the value fell through to the bareword branch, which cannot
+            # match '[', so every decimal's size parsed as undef: the schema
+            # compare panel showed no size on the Result side and "Add column"
+            # built DECIMAL with no scale (decimal(10,0)).
+            elsif ($def =~ /\G\s*\[/gc) {
+                my $astart = pos($def) - 1; my $adepth = 1; my $j = pos($def);
+                while ($j < length($def) && $adepth > 0) {
+                    my $ch = substr($def, $j, 1);
+                    $adepth++ if $ch eq '[';
+                    $adepth-- if $ch eq ']';
+                    $j++;
+                }
+                my $inner = substr($def, $astart + 1, $j - $astart - 2);
+                $val = $self->_parse_perl_list($inner);
+                pos($def) = $j;
+            }
             elsif ($def =~ /\G\s*\{/gc) {
                 my $hstart = pos($def)-1; my $hdepth=1; my $j=pos($def);
                 while ($j < length($def) && $hdepth>0) { my $ch=substr($def,$j,1); $hdepth++ if $ch eq '{'; $hdepth-- if $ch eq '}'; $j++; }
@@ -364,6 +403,123 @@ sub _extract_balanced_parens {
         }
     }
     return '';
+}
+
+
+# Flatten one parsed Result-file column into UI-safe scalar attributes.
+# Template Toolkit cannot print ARRAY/HASH refs (those cells render empty),
+# and schema_compare_table previously hard-coded Result extra/comment to ''.
+#
+# Returns:
+#   name, data_type,
+#   size            -- '(10,2)' / '(50)' / ''  (empty when undeclared; for comparison)
+#   is_nullable     -- 'YES' / 'NO' / undef     (undef = not declared; do not compare)
+#   nullable        -- 'YES' / 'NO' / '--'      (display; em-dash when undeclared)
+#   default_value   -- scalar or undef
+#   default_val     -- display ('NULL' when undef)
+#   extra           -- 'auto_increment', 'enum(a,b)', 'unsigned', ... never a ref
+#   comment         -- comment // docs // documentation, or ''
+sub format_column_for_display {
+    my ($self, $col, $name) = @_;
+    $col = {} unless ref($col) eq 'HASH';
+
+    my $dt = $col->{data_type} // $col->{type} // 'varchar';
+
+    my $sz_raw;
+    my $size_in = $col->{size};
+    $size_in = $col->{data_length} if !defined $size_in || $size_in eq '';
+    if (ref($size_in) eq 'ARRAY' && @{$size_in}) {
+        $sz_raw = join(',', @{$size_in});
+    }
+    elsif (defined $size_in && !ref($size_in) && $size_in ne '') {
+        $sz_raw = $size_in;
+    }
+    my $size = defined $sz_raw ? '(' . $sz_raw . ')' : '';
+
+    my $nullable;
+    if (defined $col->{is_nullable} && $col->{is_nullable} ne '') {
+        $nullable = ($col->{is_nullable} =~ /^(0|no|false)$/i) ? 'NO' : 'YES';
+    }
+    elsif ($col->{is_auto_increment}) {
+        $nullable = 'NO';
+    }
+    else {
+        $nullable = undef;
+    }
+
+    my $default = $col->{default_value};
+    $default = $$default if ref($default) eq 'SCALAR';
+    $default = undef if ref($default);
+
+    my @extra;
+    push @extra, 'auto_increment' if $col->{is_auto_increment};
+    my $ex = $col->{extra};
+    if (ref($ex) eq 'HASH') {
+        if (ref($ex->{list}) eq 'ARRAY' && @{$ex->{list}}) {
+            push @extra, 'enum(' . join(',', @{ $ex->{list} }) . ')';
+        }
+        for my $k (sort keys %$ex) {
+            next if $k eq 'list';
+            my $v = $ex->{$k};
+            next if ref $v;
+            next unless defined $v && $v ne '';
+            if ($v eq '1' || lc($v) eq 'true') {
+                push @extra, $k;
+            }
+            else {
+                push @extra, "$k=$v";
+            }
+        }
+    }
+    elsif (defined $ex && !ref($ex) && $ex ne '') {
+        push @extra, $ex;
+    }
+
+    my $comment = $col->{comment} // $col->{docs} // $col->{documentation} // '';
+    $comment = '' if ref $comment;
+
+    return {
+        name          => $name // '',
+        data_type     => $dt,
+        size          => $size,
+        is_nullable   => $nullable,
+        nullable      => defined $nullable ? $nullable : "\x{2014}",
+        default_value => $default,
+        default_val   => defined $default ? $default : 'NULL',
+        extra         => join(' ', @extra),
+        comment       => $comment,
+        is_auto_increment => $col->{is_auto_increment} ? 1 : 0,
+        is_primary_key    => $col->{is_primary_key} ? 1 : 0,
+        docs              => $comment,
+    };
+}
+
+# Parse a Result file and return an ordered, TT-safe field list for table previews.
+sub preview_fields {
+    my ($self, $path) = @_;
+    my $empty = { columns => {}, fields => [], primary_keys => [], field_count => 0, table_name => undef };
+    return $empty unless $path && -f $path;
+    my $schema = eval { $self->get_result_file_schema($path) };
+    return $empty unless $schema && ref($schema->{columns}) eq 'HASH';
+
+    my @pks = @{ $schema->{primary_keys} || [] };
+    my %pk  = map { $_ => 1 } @pks;
+    my @fields;
+    for my $cname (sort keys %{ $schema->{columns} }) {
+        my $cinfo = $schema->{columns}{$cname} || {};
+        $cinfo->{is_primary_key} = 1 if $pk{$cname};
+        my $disp = $self->format_column_for_display($cinfo, $cname);
+        $disp->{is_primary_key} = $pk{$cname} ? 1 : 0;
+        push @fields, $disp;
+    }
+    return {
+        columns            => $schema->{columns},
+        fields             => \@fields,
+        primary_keys       => \@pks,
+        unique_constraints => $schema->{unique_constraints} || [],
+        field_count        => scalar(@fields),
+        table_name         => $schema->{table_name},
+    };
 }
 
 1;

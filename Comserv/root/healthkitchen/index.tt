@@ -7,7 +7,7 @@
    page_version = "0.03"
    last_updated = "2026-10-29"
 %]
-[% PageVersion = 'healthkitchen/index.tt,v 0.03 2026/10/29 hermes-agent Exp shanta - embed the day view filtered to the kitchen schedule' %]
+[% PageVersion = 'healthkitchen/index.tt,v 0.04 2026/11/13 hermes-agent Exp shanta - recipe name opens the detail page' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="app-container">
@@ -32,7 +32,11 @@
 
     <div class="content-section">
         <h2>Today [% IF hk_today.plan_date %]<span class="doc-muted">[% hk_today.plan_date | html %]</span>[% END %]</h2>
+        [% IF hk_slots_source == 'todos' %]
         <iframe title="Today" src="[% c.uri_for('/todo/day') %][% IF hk_today.plan_date %]/[% hk_today.plan_date %][% END %]?embed=1&amp;filter=schedule" style="width:100%;height:72vh;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-color);"></iframe>
+        [% ELSE %]
+        [% INCLUDE 'healthkitchen/_meal_slots.tt' %]
+        [% END %]
         [% IF !hk_today.ready %]
             <div class="alert alert-warning">Health plan tables are not on this database yet. Admin: Schema Compare for <code>HealthKitchen::UserHealthPlan</code>.</div>
         [% ELSIF hk_today.plan %]
@@ -98,7 +102,7 @@
         [% IF hk_recipes && hk_recipes.size %]
             <ul>
                 [% FOREACH r IN hk_recipes %]
-                    <li>[% r.name | html %]</li>
+                    <li><a href="[% c.uri_for('/healthkitchen/recipe', r.id) %]">[% r.name | html %]</a></li>
                 [% END %]
             </ul>
             [% IF hk_recipe_n > 5 %]

@@ -17,6 +17,7 @@ use DBI;
 use JSON::PP ();
 use POSIX qw(strftime);
 use Time::Local qw(timelocal);
+use Comserv::Util::AppTime ();
 use Comserv::Util::AI::ModelScorecard;
 use Comserv::Util::AI::HermesOverrunGuard;
 
@@ -73,7 +74,7 @@ sub build {
     return $out;
 }
 
-sub _pt { local $ENV{TZ} = 'America/Vancouver'; POSIX::tzset(); my $r = strftime('%a %b %d %H:%M PT', localtime $_[0]); POSIX::tzset(); $r }
+sub _pt { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); my $r = strftime('%a %b %d %H:%M PT', localtime $_[0]); POSIX::tzset(); $r }
 
 # Per model: median seconds per finished turn (user message -> "Turn ended"), all tasks.
 sub _speed {
