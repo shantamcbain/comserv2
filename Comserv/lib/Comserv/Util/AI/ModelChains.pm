@@ -453,6 +453,11 @@ sub chain {
     if (($purpose // '') eq 'ency') {
         return grep { !$rm{$_} } @{ $d->{hermes_fallback_chain} || [] };
     }
+    # Form fill already has the sources. Skip SuperGrok: that hop took ~200s
+    # and the page aborts at 120s, so the compiled fields never arrive.
+    if (($purpose // '') eq 'ency_fill') {
+        return grep { !$rm{$_} && $_ !~ /^supergrok\|/ } @{ $d->{hermes_fallback_chain} || [] };
+    }
     $purpose = 'chat' unless $purpose && grep { $_ eq $purpose } @PURPOSES;
     return grep { !$rm{$_} } @{ $d->{"chain_$purpose"} || [] };
 }

@@ -1259,6 +1259,7 @@ sub chat :Local :Args(0) {
             page_content    => $page_content,
             page_links      => $page_links,
             use_search      => $use_search,
+            lookup_name     => $json_data->{lookup_name},
             conversation_id => $conversation_id,
             project_id      => $project_id,
             task_id         => $task_id,
