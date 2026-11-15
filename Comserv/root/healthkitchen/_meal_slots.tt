@@ -14,7 +14,8 @@
   [% FOREACH s IN hk_day.slots %]
   <div class="card mb-2 hk-slot hk-slot-[% s.kind %][% IF s.done %] opacity-60[% END %]" data-slot="[% s.key | html %]">
     <div class="card-body p-2">
-      <strong>[% s.start %]–[% s.end %]</strong> [% s.label | html %]
+      <strong>[% s.start %]–[% s.end %]</strong>
+      [% IF s.plan_url %]<a href="[% s.plan_url %]">[% (s.title || s.label) | html %]</a>[% ELSE %][% (s.title || s.label) | html %][% END %]
       [% IF s.done %]<span class="badge badge-success">done[% IF s.duration.defined %] · [% s.duration %] min[% END %]</span>[% END %]
       [% IF s.started %]<span class="badge badge-warning">started [% s.started %]</span>[% END %]
       [% FOREACH r IN s.recipes %]
