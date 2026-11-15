@@ -107,16 +107,19 @@
                     <td class="doc-td">LanMap plus multi-material filament accounting. A sliced file can name more than one tool.</td>
                 </tr>
                 <tr>
-                    <td class="doc-td">2026-10-17</td>
-                    <td class="doc-td">Send-time rows in printing_3d_job_filaments. Complete shows those colours and grams and lets staff change copies, time each, and grams before stock is issued. Verified popup values win over the printer's own elapsed time. Job list is at the top of /3d/queue. Printers are a closed row of cards.</td>
+                    <td class="doc-td">2026-11-06</td>
+                    <td class="doc-td">Staff started a print from the queue. Kobra 3 is at 192.168.2.61 (serial BECB-D68E-F519-16AB). Start Print lists printer files, searches, and pre-selects by shared words with the item name. Complete/Cancel still fail until labour_cost is applied. Serial follow is on disk, not in the running :4003 process.</td>
                 </tr>
             </table>
             <div class="doc-info">
                 <p class="doc-body"><strong>Next.</strong>
                 Newsletter branch writes the member-facing highlight. Todo
                 <a href="[% c.uri_for('/todo/details') %]?record_id=2589" class="doc-link">#2589</a>
-                on MailSystem (#44), not on #206. LAN control (#2334) is still open: gcode send is not done.
-                A verified complete time is what staff confirm; it is not a replacement for live printer control.</p>
+                on MailSystem (#44), not on #206. LAN start-print works on the live address
+                192.168.2.61. Todo #2334 stays open: the running :4003 process has not
+                loaded the serial follow, and Complete/Cancel still need schema-compare
+                for labour_cost. See
+                <a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a>.</p>
             </div>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
@@ -176,7 +179,7 @@
                 <tr class="doc-tr-alt">
                     <td class="doc-td"><a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a></td>
                     <td class="doc-td">#206 · <a href="[% c.uri_for('/todo/details') %]?record_id=2334" class="doc-link">#2334</a></td>
-                    <td class="doc-td">Stock LAN Mode: discover :18910, attach [LAN_HOST] on existing farm row, GET /info + MQTTS telemetry, control page Pause/Resume/Stop. Linked 192.168.2.53. No gcode send yet.</td>
+                    <td class="doc-td">Stock LAN Mode. Farm row id=1 is at 192.168.2.61 as of 2026-11-06. Start Print from /3d/queue works. Serial follow and auto-enroll are written but not loaded in the running worker. Complete/Cancel blocked on missing labour_cost column.</td>
                 </tr>
                 <tr class="doc-tr-alt">
                     <td class="doc-td"><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing</a> (operator KB, not a plan)</td>

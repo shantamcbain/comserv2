@@ -134,6 +134,9 @@
                 <td>
                     [% IF job.model_name %][% job.model_name | html %][% ELSIF job.item_name %][% job.item_name | html %][% ELSE %]#[% job.id %][% END %]
                     [% IF job.quantity > 1 %]<span style="margin-left:0.4em;background:var(--accent-color,#007bff);color:white;padding:0.1em 0.5em;border-radius:10px;font-size:0.8em;font-weight:bold;" title="Quantity to print">×[% job.quantity %]</span>[% END %]
+                    [% IF job.consignment_id %]
+                    <br><a href="/Inventory/consignment/view/[% job.consignment_id %]" style="font-size:0.8em;color:#1d4ed8;" title="The replacement batch this job refills — opens the count and the invoice it replaces">↩ Co-op batch #[% job.consignment_id %]</a>
+                    [% END %]
                     [% IF job.model_id && job.source_type == 'sign' %]
                     <br><a href="/signgenerator/download/[% job.model_id %]/3mf?job_id=[% job.id %]" style="font-size:0.8em;color:var(--accent-color,#007bff);" title="Two-colour 3MF from the order filament picks">⬇ Download 3MF</a>
                     [% ELSIF job.model_id %]
@@ -170,9 +173,9 @@
                         <br>
                         <a href="/3d/printer_lan/control?printer_id=[% job.printer_id %]" target="_blank" style="font-size:0.75em;color:var(--accent-color,#007bff);">Control Printer</a>
                         [% IF ps && ps.ok && ps.print_state == 'free' %]
-                        <button type="button" onclick="showPrinterFiles([% job.printer_id %], '[% job.printer_name | html %]', '[% job.model_name | html %]', '[% job.item_sku | html %]', [% job.model_id || 0 %])" style="font-size:0.75em;margin-left:0.3em;background:#28a745;color:white;border:none;border-radius:4px;padding:0.25em 0.6em;font-weight:bold;cursor:pointer;" title="Printer is really idle — start the assigned job on it (pick the file in the popup)">▶ Start Print</button>
+                        <button type="button" onclick="showPrinterFiles([% job.printer_id %], '[% job.printer_name | html %]', '[% job.model_name | html %]', '[% job.item_sku | html %]', [% job.model_id || 0 %], '[% job.item_name | html %]')" style="font-size:0.75em;margin-left:0.3em;background:#28a745;color:white;border:none;border-radius:4px;padding:0.25em 0.6em;font-weight:bold;cursor:pointer;" title="Printer is really idle — start the assigned job on it (pick the file in the popup)">▶ Start Print</button>
                         [% END %]
-                        <button type="button" onclick="showPrinterFiles([% job.printer_id %], '[% job.printer_name | html %]', '[% job.model_name | html %]', '[% job.item_sku | html %]', [% job.model_id || 0 %])" style="font-size:0.7em;margin-left:0.3em;">Files on Printer (popup)</button>
+                        <button type="button" onclick="showPrinterFiles([% job.printer_id %], '[% job.printer_name | html %]', '[% job.model_name | html %]', '[% job.item_sku | html %]', [% job.model_id || 0 %], '[% job.item_name | html %]')" style="font-size:0.7em;margin-left:0.3em;">Files on Printer (popup)</button>
                         [% END %]
                     [% ELSE %]&mdash;[% END %]
                 </td>
@@ -487,12 +490,20 @@ document.querySelectorAll('.complete-form').forEach(function(form) {
   </div>
 </div>
 
+<script type="application/json" id="sp-last-printed">[
+[% SET sp_comma = 0 %]
+[% FOREACH job IN recent_completed %]
+[% IF job.item_name.match('\.gcode') %][% IF sp_comma %],[% END %]
+{"name":"[% job.item_name | html %]","at":"[% job.completed_at | html %]"}[% SET sp_comma = 1 %]
+[% END %]
+[% END %]
+]</script>
 <script>
 /* 2026-10-13: compact Start Print dialog modelled on Anycubic Slicer Next.
    One form: file choice (relevant printer files, library files, source),
    preview/time/filament, one colour row per filament used -> ACE slot,
    printer with live state, options, "This will print" box, tick + confirm. */
-function showPrinterFiles(printerId, printerName, jobModel, itemSku, modelId, libraryFile) {
+function showPrinterFiles(printerId, printerName, jobModel, itemSku, modelId, itemName, libraryFile) {
   var modal = document.getElementById('printer-files-modal');
   var backdrop = document.getElementById('modal-backdrop');
   var content = document.getElementById('modal-content');
@@ -509,7 +520,7 @@ function showPrinterFiles(printerId, printerName, jobModel, itemSku, modelId, li
   if (libraryFile) ju += '&library_file=' + encodeURIComponent(libraryFile);
   Promise.all([fetch(fu).then(function(r){return r.json();}), fetch(ju).then(function(r){return r.json();})])
     .then(function(res){
-      content.innerHTML = spDialogHtml(res[0], res[1], printerId, printerName, jobModel, itemSku, modelId);
+      content.innerHTML = spDialogHtml(res[0], res[1], printerId, printerName, jobModel, itemSku, modelId, itemName);
       spWire(content, printerName, jobModel, itemSku, modelId);
     })
     .catch(function(e){ content.innerHTML = '<p class="app-flash-error">Could not load: ' + escapeHtml(String(e)) + '</p>'; });
@@ -517,16 +528,83 @@ function showPrinterFiles(printerId, printerName, jobModel, itemSku, modelId, li
 
 function spHexRgb(h) { var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(h || ''); return m ? [parseInt(m[1],16), parseInt(m[2],16), parseInt(m[3],16)] : null; }
 function spDist(a, b) { var x = spHexRgb(a), y = spHexRgb(b); if (!x || !y) return 999; return Math.sqrt(Math.pow(x[0]-y[0],2)+Math.pow(x[1]-y[1],2)+Math.pow(x[2]-y[2],2)); }
+function spWords(s) {
+  return String(s || '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
+    .split(/[^a-z0-9]+/).filter(function(t) {
+      return t.length >= 3 && !/^(pla|petg|abs|tpu|gcode|3mf|plate|the|and|for|with)$/.test(t);
+    }).map(function(t) { return t.replace(/(ing|ers|er|ed|es|s)$/, ''); });
+}
+function spHit(fileWord, itemWord) {
+  if (!fileWord || !itemWord || itemWord.length < 3) return false;
+  return fileWord === itemWord || fileWord.indexOf(itemWord) === 0 || itemWord.indexOf(fileWord) === 0;
+}
+function spNameScore(fileName, itemName, jobModel, sku) {
+  var fw = spWords(fileName);
+  var iw = spWords([itemName, jobModel, sku].join(' '));
+  var hits = [], seen = {};
+  for (var i = 0; i < iw.length; i++) {
+    if (seen[iw[i]]) continue;
+    for (var j = 0; j < fw.length; j++) {
+      if (spHit(fw[j], iw[i])) { hits.push(iw[i]); seen[iw[i]] = 1; break; }
+    }
+  }
+  var unmatched = 0;
+  for (var k = 0; k < fw.length; k++) {
+    var ok = false;
+    for (var n = 0; n < iw.length; n++) if (spHit(fw[k], iw[n])) ok = true;
+    if (!ok && !/^(wide|mouth|jar|hole|dryer|hour|min)$/.test(fw[k]) && !/^\d/.test(fw[k])) unmatched++;
+  }
+  if (sku && String(fileName).toLowerCase().indexOf(String(sku).toLowerCase()) >= 0) hits.push('sku');
+  return { hits: hits, unmatched: unmatched };
+}
+function spSliceKey(name) {
+  var m = /^(\d{2})(\d{2})-(\d{2})(\d{2})-/.exec(name || '');
+  return m ? (m[1] + m[2] + m[3] + m[4]) : '';
+}
+function spLastPrinted() {
+  var el = document.getElementById('sp-last-printed');
+  if (!el) return {};
+  var rows = [];
+  try { rows = JSON.parse(el.textContent || '[]'); } catch (e) { rows = []; }
+  var map = {};
+  for (var i = 0; i < rows.length; i++) {
+    var n = rows[i].name || '';
+    if (!n || map[n]) continue;
+    map[n] = rows[i].at || '';
+  }
+  return map;
+}
 function spChip(hex) { return '<span style="display:inline-block;width:1.1em;height:1.1em;border:1px solid #888;border-radius:3px;vertical-align:middle;background:' + escapeHtml(hex || '#fff') + '"></span>'; }
 
-function spDialogHtml(files, info, printerId, printerName, jobModel, itemSku, modelId) {
+function spDialogHtml(files, info, printerId, printerName, jobModel, itemSku, modelId, itemName) {
   var job = (info && info.job) || {};
   var printers = (info && info.printers) || [];
   var me = null;
   for (var i = 0; i < printers.length; i++) if (String(printers[i].id) === String(printerId)) me = printers[i];
   var slots = (me && me.ace_slots) || [];
   var all = ((files && files.local) || []).concat((files && files.udisk) || []).filter(function(f){ return f && !f.is_dir; });
-  var rel = all.filter(function(f){ return f.matches_job; }).sort(function(a,b){ return (b.match_score||0)-(a.match_score||0); });
+  var printed = spLastPrinted();
+  var label = itemName || jobModel || '';
+  for (var fi = 0; fi < all.length; fi++) {
+    var sc = spNameScore(all[fi].name, itemName, jobModel, itemSku);
+    all[fi].name_hits = sc.hits;
+    all[fi].name_unmatched = sc.unmatched;
+    all[fi].printed_at = printed[all[fi].name] || all[fi].printed_at || '';
+    all[fi].slice_key = spSliceKey(all[fi].name);
+  }
+  all.sort(function(a, b) {
+    var ah = (a.name_hits || []).length, bh = (b.name_hits || []).length;
+    if (ah !== bh) return bh - ah;
+    if ((a.printed_at || '') !== (b.printed_at || '')) return (a.printed_at || '') < (b.printed_at || '') ? 1 : -1;
+    if ((a.name_unmatched || 0) !== (b.name_unmatched || 0)) return (a.name_unmatched || 0) - (b.name_unmatched || 0);
+    if ((a.slice_key || '') !== (b.slice_key || '')) return (a.slice_key || '') < (b.slice_key || '') ? 1 : -1;
+    return 0;
+  });
+  var picked = null;
+  for (var pi = 0; pi < all.length; pi++) {
+    if ((all[pi].name_hits || []).length >= 2 || (all[pi].printed_at && (all[pi].name_hits || []).length >= 1)) { picked = all[pi]; break; }
+  }
+  var rel = all.filter(function(f){ return (f.name_hits || []).length >= 2; });
   var lib = (info && info.library) || [];
   var h = '<form method="post" action="/3d/printer_lan/command" class="app-form" id="sp-form" style="font-size:0.9em;max-width:46em;">';
   h += '<input type="hidden" name="printer_id" value="' + escapeHtml(String(printerId)) + '">';
@@ -573,21 +651,34 @@ function spDialogHtml(files, info, printerId, printerName, jobModel, itemSku, mo
     first = false; return r;
   }
   if (rel.length) {
-    for (var r = 0; r < rel.length && r < 6; r++) h += radio('p:' + (rel[r].storage || 'local') + ':' + rel[r].name, '📟 On printer: <code>' + escapeHtml(rel[r].name) + '</code>' + (r === 0 ? ' <em>(best match)</em>' : ''));
-  } else {
-    h += '<div style="font-size:0.85em;color:#666;">No file for this job on the printer.</div>';
+    for (var r = 0; r < rel.length && r < 3; r++) h += radio('p:' + (rel[r].storage || 'local') + ':' + rel[r].name, '📟 Best match: <code>' + escapeHtml(rel[r].name) + '</code>');
   }
-  for (var l = 0; l < lib.length && l < 6; l++) h += radio('l:' + lib[l].path, '💾 Send from library: <code>' + escapeHtml(lib[l].name) + '</code>' + (lib[l].own ? ' <em>(linked to this job)</em>' : ''), 'data-lib="1"');
+  for (var l = 0; l < lib.length && l < 3; l++) h += radio('l:' + lib[l].path, '💾 Send from library: <code>' + escapeHtml(lib[l].name) + '</code>' + (lib[l].own ? ' <em>(linked to this job)</em>' : ''), 'data-lib="1"');
   if (info && info.model) {
     h += '<div style="font-size:0.85em;margin-top:0.2em;">⬇ <a href="' + escapeHtml(info.model.download_url) + '">Download this job\'s file</a>';
     if (info.model.source_url) h += ' · <a href="' + escapeHtml(info.model.source_url) + '" target="_blank" rel="noopener">source</a>';
     h += ' (slice it, then Upload New)</div>';
   }
-  var others = all.filter(function(f){ return !f.matches_job; });
-  if (others.length) {
-    h += '<details style="font-size:0.85em;"><summary>Show all files on the printer (' + all.length + ')</summary><select id="sp-allfiles" style="max-width:100%;"><option value="">— pick any printer file —</option>';
-    for (var o = 0; o < others.length; o++) h += '<option value="p:' + escapeHtml(others[o].storage || 'local') + ':' + escapeHtml(others[o].name) + '">' + escapeHtml(others[o].name) + '</option>';
-    h += '</select></details>';
+  h += '<div style="margin-top:0.4em;">';
+  h += '<label for="sp-filefilter" style="font-size:0.85em;">Search printer files (' + all.length + '). Best name match first, then last printed.</label>';
+  if (!all.length) {
+    h += '<div class="app-flash-error" style="padding:0.3em;">The printer returned no files.</div>';
+  } else {
+    h += '<input id="sp-filefilter" type="search" placeholder="Search by file or item words" style="width:100%;margin:0.2em 0;padding:0.25em;">';
+    h += '<select id="sp-allfiles" size="8" style="width:100%;">';
+    for (var o = 0; o < all.length; o++) {
+      var val = 'p:' + (all[o].storage || 'local') + ':' + all[o].name;
+      var mark = (all[o].printed_at ? 'printed ' + all[o].printed_at + ' — ' : '');
+      h += '<option value="' + escapeHtml(val) + '"' + (picked && all[o] === picked ? ' selected' : '') + '>' + escapeHtml(mark + all[o].name) + '</option>';
+    }
+    h += '</select>';
+    if (picked && label) {
+      h += '<div style="font-size:0.8em;margin-top:0.2em;">Pre-selected <code>' + escapeHtml(picked.name) + '</code> for item <strong>' + escapeHtml(label) + '</strong>';
+      h += ' (shared words: ' + escapeHtml((picked.name_hits || []).join(', ')) + '). The printer file is not named like the item.</div>';
+    } else if (label) {
+      h += '<div style="font-size:0.8em;margin-top:0.2em;">No file shared two words with <strong>' + escapeHtml(label) + '</strong>. Search, or pick from the last-printed files at the top.</div>';
+    }
+    h += '</div>';
   }
   h += '</fieldset>';
 
@@ -676,10 +767,31 @@ function spWire(root, printerName, jobModel, itemSku, modelId) {
   var radios = form.querySelectorAll('input[name="sp_pick"]');
   for (var i = 0; i < radios.length; i++) radios[i].addEventListener('change', function(){ var a = root.querySelector('#sp-allfiles'); if (a) a.value = ''; pick(); });
   var a = root.querySelector('#sp-allfiles'); if (a) a.addEventListener('change', pick);
+  var filt = root.querySelector('#sp-filefilter');
+  if (filt && a) {
+    var saved = [];
+    for (var n = 0; n < a.options.length; n++) saved.push({ value: a.options[n].value, text: a.options[n].text });
+    filt.addEventListener('input', function() {
+      var q = filt.value.toLowerCase();
+      var keep = a.value;
+      a.innerHTML = '';
+      for (var i = 0; i < saved.length; i++) {
+        var blob = (saved[i].text + ' ' + saved[i].value).toLowerCase();
+        if (q && blob.indexOf(q) < 0) continue;
+        var opt = document.createElement('option');
+        opt.value = saved[i].value;
+        opt.text = saved[i].text;
+        if (saved[i].value === keep) opt.selected = true;
+        a.appendChild(opt);
+      }
+      if (a.selectedIndex < 0 && a.options.length) a.selectedIndex = 0;
+      pick();
+    });
+  }
   var sels = form.querySelectorAll('.sp-slot');
   for (var j = 0; j < sels.length; j++) sels[j].addEventListener('change', slotCheck);
   var ps = root.querySelector('#sp-printer'), rf = root.querySelector('#sp-refresh');
-  function reload() { var o = ps.options[ps.selectedIndex]; showPrinterFiles(ps.value, o ? o.text.split(' — ')[0] : printerName, jobModel, itemSku, modelId); }
+  function reload() { var o = ps.options[ps.selectedIndex]; showPrinterFiles(ps.value, o ? o.text.split(' — ')[0] : printerName, jobModel, itemSku, modelId, itemName); }
   if (ps) ps.addEventListener('change', reload);
   if (rf) rf.addEventListener('click', reload);
   pick(); slotCheck();

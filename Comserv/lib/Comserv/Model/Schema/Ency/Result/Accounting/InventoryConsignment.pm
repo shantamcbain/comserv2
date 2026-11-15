@@ -47,6 +47,12 @@ __PACKAGE__->add_columns(
         size        => 255,
         is_nullable => 1,
     },
+    # The invoice is the anchor for both tracks: a replacement batch cites the sale that
+    # emptied it, and a direct sale can hang the same restock work off the same document.
+    invoice_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
     created_at => {
         data_type     => 'datetime',
         is_nullable   => 1,
@@ -66,6 +72,12 @@ __PACKAGE__->belongs_to(
     'partner',
     'Comserv::Model::Schema::Ency::Result::Accounting::InventoryConsignmentPartner',
     { 'foreign.id' => 'self.partner_id' }
+);
+
+__PACKAGE__->belongs_to(
+    'invoice',
+    'Comserv::Model::Schema::Ency::Result::Accounting::InventoryCustomerInvoice',
+    { 'foreign.id' => 'self.invoice_id' }
 );
 
 __PACKAGE__->has_many(

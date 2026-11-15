@@ -140,6 +140,11 @@
 <script src="/static/js/remotedb-pw.js?v=[% cv %]" defer></script>
 [% END %]
 
+<!-- Consignment photo count: poll the review page while the worker reads the photo -->
+[% IF c.request.uri.match('/Inventory/consignment/count') %]
+<script src="/static/js/consignment-count.js?v=[% cv %]" defer></script>
+[% END %]
+
 <!-- Schema Compare JS -->
 [% IF c.request.uri.match('/admin/schema_compare') %]
 <script src="/static/js/schema-compare.js?v=[% cv %]" defer></script>
@@ -166,6 +171,11 @@
 <!-- Herb Sign Generator live preview -->
 [% IF c.request.uri.match('/signgenerator') %]
 <script src="/static/js/sign-preview.js?v=[% cv %]" defer></script>
+[% END %]
+
+<!-- Custom creation progress polling (staff desk) -->
+[% IF c.request.uri.match('/customcreation') %]
+<script src="/static/js/customcreation-progress.js?v=[% cv %]" defer></script>
 [% END %]
 
 <!-- Legacy menu (conditional) -->

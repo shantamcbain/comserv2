@@ -207,13 +207,20 @@ sub index :Path('/Inventory') :Args(0) {
         $item_count = $supplier_count = $location_count = $low_stock = 0;
     }
 
+    my $open_consignments = 0;
+    eval {
+        $open_consignments = $schema->resultset('Accounting::InventoryConsignment')
+            ->search({ sitename => $sitename, status => 'open' })->count;
+    };
+
     $c->stash(
-        item_count     => $item_count,
-        supplier_count => $supplier_count,
-        location_count => $location_count,
-        low_stock      => $low_stock,
-        sitename       => $sitename,
-        template       => 'Inventory/index.tt',
+        item_count        => $item_count,
+        supplier_count    => $supplier_count,
+        location_count    => $location_count,
+        low_stock         => $low_stock,
+        open_consignments => $open_consignments,
+        sitename          => $sitename,
+        template          => 'Inventory/index.tt',
     );
 }
 
@@ -6797,7 +6804,7 @@ sub consignment_list :Path('/Inventory/consignment') :Args(0) {
     my ($self, $c) = @_;
     my $sitename        = $self->_sitename($c);
     my $schema          = $self->_schema($c);
-    my $status          = $c->req->params->{status} || 'all';
+    my $status          = $c->req->params->{status} || 'open';
     my $source_sitename = $c->req->params->{source_sitename} || $sitename;
 
     my %where = ('me.sitename' => $source_sitename);
@@ -6812,8 +6819,21 @@ sub consignment_list :Path('/Inventory/consignment') :Args(0) {
     };
     push @{$c->stash->{debug_errors}}, "Consignment list error: $@" if $@;
 
+    # Photo counts hang off a placement (location + partner + item), not a
+    # consignment batch. The list page is the only place a person already goes,
+    # so the count entry has to be here or the screen is unreachable.
+    my @placements;
+    eval {
+        @placements = $schema->resultset('Accounting::InventoryConsignmentPlacement')->search(
+            { 'me.sitename' => $source_sitename, 'me.status' => 'active' },
+            { prefetch => [qw(location partner item)], order_by => 'me.id' }
+        )->all;
+    };
+    push @{$c->stash->{debug_errors}}, "Placement list error: $@" if $@;
+
     $c->stash(
         consignments    => \@consignments,
+        placements      => \@placements,
         filter_status   => $status,
         sitename        => $sitename,
         source_sitename => $source_sitename,
@@ -6978,6 +6998,17 @@ sub consignment_view :Path('/Inventory/consignment/view') :Args(1) {
             { prefetch => ['partner', { 'lines' => 'item' }] }
         );
     };
+    # prefetch can die on this schema (relname_to_table_alias) and take the whole page with
+    # it, turning a real batch into "Consignment not found". Fall back to a plain find and
+    # let the template's lazy relation access do the rest.
+    unless ($consignment) {
+        eval {
+            $consignment = $schema->resultset('Accounting::InventoryConsignment')
+                ->find({ 'me.id' => $id, 'me.sitename' => $sitename });
+            $consignment->lines->all if $consignment;
+        };
+        push @{ $c->stash->{debug_errors} ||= [] }, "Consignment load (fallback): $@" if $@;
+    }
     unless ($consignment) {
         $c->flash->{error_msg} = 'Consignment not found.';
         $c->res->redirect($c->uri_for('/Inventory/consignment'));
@@ -6995,11 +7026,31 @@ sub consignment_view :Path('/Inventory/consignment/view') :Args(1) {
         }
     };
 
+    # The invoice is the anchor for both tracks — consignment refill and direct sale. This
+    # batch exists because a count sold these units and billed for them, so carry that count
+    # and its invoice onto the page rather than leaving the batch without a reason.
+    my ($source_count, $invoice, @jobs);
+    eval {
+        $source_count = $schema->resultset('Accounting::InventoryLocationCount')->search(
+            { 'me.consignment_id' => $consignment->id },
+            { order_by => { -desc => 'me.id' } })->first;
+        if ($source_count && $source_count->invoice_id) {
+            $invoice = $schema->resultset('Accounting::InventoryCustomerInvoice')
+                ->find($source_count->invoice_id);
+        }
+        @jobs = $schema->resultset('Printing3dJob')->search(
+            { 'me.consignment_id' => $consignment->id }, { order_by => 'me.id' })->all;
+    };
+    push @{ $c->stash->{debug_errors} ||= [] }, "Consignment origin error: $@" if $@;
+
     $c->stash(
-        consignment => $consignment,
-        sitename    => $sitename,
-        site_info   => \%site_info,
-        template    => 'Inventory/consignment/view.tt',
+        consignment  => $consignment,
+        source_count => $source_count,
+        invoice      => $invoice,
+        jobs         => \@jobs,
+        sitename     => $sitename,
+        site_info    => \%site_info,
+        template     => 'Inventory/consignment/view.tt',
     );
 }
 
@@ -7102,6 +7153,261 @@ sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
         site_info   => \%site_info,
         no_wrapper  => 1,
         template    => 'Inventory/consignment/print.tt',
+    );
+}
+
+# ============================================================
+# Consignment location count (photo -> text -> inventory -> invoice -> top-up)
+# See .hermes/plans/2026-11-05-consignment-location-count-photo.md
+# ============================================================
+
+sub _count_root {
+    my ($self, $c) = @_;
+    my $home = eval { $c->config->{home} } || eval { $c->path_to()->stringify } || '.';
+    return $home;
+}
+
+# Start the photo-reading worker detached from the request. The child exec()s a
+# fresh perl, so it must not inherit the listening socket or the DB handle: every
+# descriptor above stderr is closed before the exec.
+sub _spawn_count_worker {
+    my ($self, $c, $count_id) = @_;
+
+    my $script = eval { $c->path_to('script', 'consignment_count_worker.pl')->stringify }
+              || 'script/consignment_count_worker.pl';
+    my $logdir = eval { $c->path_to('logs')->stringify } || 'logs';
+    mkdir $logdir unless -d $logdir;
+    my $log = "$logdir/consignment_count_worker.log";
+
+    my $pid = fork;
+    unless (defined $pid) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_spawn_count_worker', "fork failed for count #$count_id: $!");
+        return;
+    }
+
+    if (!$pid) {
+        eval {
+            require POSIX;
+            POSIX::setsid();
+            open STDIN,  '<',  '/dev/null';
+            open STDOUT, '>>', $log;
+            open STDERR, '>>', $log;
+            POSIX::close($_) for 3 .. 1023;
+        };
+        exec($^X, $script, $count_id);
+        require POSIX;
+        POSIX::_exit(1);
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        '_spawn_count_worker', "spawned worker pid $pid for count #$count_id");
+    return $pid;
+}
+
+sub _count_placement {
+    my ($self, $c, $placement_id) = @_;
+    my $schema = $self->_schema($c);
+    return eval {
+        $schema->resultset('Accounting::InventoryConsignmentPlacement')->find(
+            { 'me.id' => $placement_id, 'me.status' => 'active' },
+            { prefetch => [qw(location partner item)] });
+    };
+}
+
+sub consignment_count :Path('/Inventory/consignment/count') :Args(1) {
+    my ($self, $c, $placement_id) = @_;
+    my $schema = $self->_schema($c);
+    require Comserv::Util::ConsignmentCountRun;
+    my $run = Comserv::Util::ConsignmentCountRun->new(root => $self->_count_root($c));
+
+    my $placement = $self->_count_placement($c, $placement_id);
+    unless ($placement) {
+        $c->flash->{error_msg} = 'Consignment placement not found.';
+        $c->res->redirect($c->uri_for('/Inventory/consignment'));
+        return $c->detach;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my %args = (placement_id => $placement_id);
+        my $upload = $c->req->upload('photo');
+        my $text   = $c->req->param('text') // '';
+
+        if ($upload) {
+            # Reading the photo is a CPU vision pass (minutes cold, ~20s warm). The
+            # request must not wait for it: this server runs one worker, so a
+            # synchronous read froze the whole app for 3.5 minutes (2026-11-06).
+            # queue_from_photo stores the photo + a status='reading' row, and the
+            # detached worker fills in the text; the review page polls for it.
+            my $q = $run->queue_from_photo($c,
+                placement_id => $placement_id,
+                image_path   => $upload->tempname,
+                mime         => $upload->type || 'image/jpeg',
+            );
+            if ($q->{ok}) {
+                $self->_spawn_count_worker($c, $q->{count_id});
+                $c->res->redirect($c->uri_for('/Inventory/consignment/count/review', [$q->{count_id}]));
+                return $c->detach;
+            }
+            $c->flash->{error_msg} = $q->{error} || 'Could not store the photo.';
+            $c->res->redirect($c->uri_for('/Inventory/consignment/count', [$placement_id]));
+            return $c->detach;
+        }
+
+        if (length $text) {
+            $args{text}   = $text;
+            $args{source} = 'manual';
+        }
+        else {
+            $c->flash->{error_msg} = 'Upload a photo of the container, or type the count.';
+            $c->res->redirect($c->uri_for('/Inventory/consignment/count', [$placement_id]));
+            return $c->detach;
+        }
+
+        my $res = $run->create_draft($c, %args);
+        if ($res->{ok}) {
+            $c->flash->{success_msg} = 'Draft count created from '
+                . ($res->{engine} // 'entry') . ': ' . ($res->{raw_text} // '')
+                . '. Check the text, then tick "text is correct" to apply it.';
+            $c->res->redirect($c->uri_for('/Inventory/consignment/count/review', [$res->{count_id}]));
+            return $c->detach;
+        }
+        $c->flash->{error_msg} = $res->{error} || 'Could not read the count.';
+        $c->res->redirect($c->uri_for('/Inventory/consignment/count', [$placement_id]));
+        return $c->detach;
+    }
+
+    my @counts = eval {
+        $schema->resultset('Accounting::InventoryLocationCount')->search(
+            { placement_id => $placement_id },
+            { order_by => { -desc => 'id' }, rows => 20 })->all;
+    };
+
+    my $target = $placement->target_map;
+    my $total_target = 0;
+    $total_target += $_ for values %$target;
+
+    $c->stash(
+        placement    => $placement,
+        item         => $placement->item,
+        counts       => \@counts,
+        target       => $target,
+        total_target => $total_target,
+        colours      => [ $placement->colour_list ],
+        sitename     => $placement->sitename,
+        template     => 'Inventory/consignment/count.tt',
+    );
+}
+
+sub consignment_count_review :Path('/Inventory/consignment/count/review') :Args(1) {
+    my ($self, $c, $count_id) = @_;
+    my $schema = $self->_schema($c);
+    require Comserv::Util::ConsignmentCountRun;
+    my $run = Comserv::Util::ConsignmentCountRun->new(root => $self->_count_root($c));
+
+    my $count = eval {
+        $schema->resultset('Accounting::InventoryLocationCount')->find(
+            { 'me.id' => $count_id }, { prefetch => [qw(placement partner item)] });
+    };
+    unless ($count) {
+        $c->flash->{error_msg} = 'Count not found.';
+        $c->res->redirect($c->uri_for('/Inventory/consignment'));
+        return $c->detach;
+    }
+    my $placement = $count->placement;
+
+    # A killed worker (reboot, OOM) would leave the row 'reading' forever.
+    if (($count->status // '') eq 'reading') {
+        my $stale = eval {
+            $schema->resultset('Accounting::InventoryLocationCount')->search({
+                'me.id'         => $count->id,
+                'me.status'     => 'reading',
+                'me.counted_at' => { '<', \'UTC_TIMESTAMP() - INTERVAL 15 MINUTE' },
+            })->count;
+        };
+        if ($stale) {
+            $count->update({ status => 'failed', notes => 'The photo read stopped before it finished.' });
+            $c->log->warn("count #$count_id read timed out");
+        }
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->param('do') || 'save';
+        my $back   = $c->uri_for('/Inventory/consignment/count/review', [$count_id]);
+
+        if ($action eq 'retry') {
+            unless (($count->status // '') eq 'failed') {
+                $c->flash->{error_msg} = 'Only a count whose read failed can be read again.';
+                $c->res->redirect($back);
+                return $c->detach;
+            }
+            $count->update({ status => 'reading', notes => undef });
+            $self->_spawn_count_worker($c, $count->id);
+            $c->flash->{success_msg} = 'Reading the photo again — the text will appear here.';
+            $c->res->redirect($back);
+            return $c->detach;
+        }
+
+        if (($count->status // '') eq 'reading') {
+            $c->flash->{error_msg} = 'The photo is still being read. Wait for the text to appear.';
+            $c->res->redirect($back);
+            return $c->detach;
+        }
+
+        if ($action eq 'discard') {
+            my $r = $run->discard($c, $count_id);
+            $c->flash->{ $r->{ok} ? 'success_msg' : 'error_msg' } =
+                $r->{ok} ? 'Draft count discarded and its photo deleted.' : ($r->{error} || 'Could not discard.');
+            $c->res->redirect($placement
+                ? $c->uri_for('/Inventory/consignment/count', [ $placement->id ])
+                : $c->uri_for('/Inventory/consignment'));
+            return $c->detach;
+        }
+
+        my $text = $c->req->param('raw_text');
+        if (defined $text && length $text) {
+            my $u = $run->update_text($c, $count_id, $text);
+            unless ($u->{ok}) {
+                $c->flash->{error_msg} = $u->{error} || 'Could not read that text.';
+                $c->res->redirect($back);
+                return $c->detach;
+            }
+        }
+
+        if ($action eq 'apply') {
+            unless ($c->req->param('confirm')) {
+                $c->flash->{error_msg} = 'Tick "the text is correct" before applying the count.';
+                $c->res->redirect($back);
+                return $c->detach;
+            }
+            my $res = $run->apply($c, $count_id);
+            $c->flash->{ $res->{ok} ? 'success_msg' : 'error_msg' } =
+                $res->{ok} ? $res->{message} : ($res->{error} || 'Could not apply the count.');
+            # The batch this apply just created is the next thing to work on. Landing back
+            # on the count screen left it hidden in a list that only grows.
+            $c->res->redirect(
+                ($res->{ok} && $res->{consignment_id})
+                    ? $c->uri_for('/Inventory/consignment/view', [ $res->{consignment_id} ])
+                    : ($placement
+                        ? $c->uri_for('/Inventory/consignment/count', [ $placement->id ])
+                        : $c->uri_for('/Inventory/consignment')));
+            return $c->detach;
+        }
+
+        $c->flash->{success_msg} = 'Counted text saved. Photo still held until you apply.';
+        $c->res->redirect($back);
+        return $c->detach;
+    }
+
+    my @lines = $count->lines->search(undef, { order_by => 'sort_order' })->all;
+    $c->stash(
+        count     => $count,
+        placement => $placement,
+        item      => $count->item,
+        lines     => \@lines,
+        raw_text  => $count->raw_text,
+        sitename  => $count->sitename,
+        template  => 'Inventory/consignment/count_review.tt',
     );
 }
 

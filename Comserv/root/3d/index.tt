@@ -136,6 +136,7 @@
     <a href="/3d/admin" class="action-btn secondary"><i class="icon-admin"></i> Admin Dashboard</a>
     <a href="/3d/queue" class="action-btn secondary"><i class="icon-list"></i> Print Queue</a>
     <a href="/3d/printers" class="action-btn secondary"><i class="icon-server"></i> Printer Farm</a>
+    <a href="/customcreation" class="action-btn secondary"><i class="icon-edit"></i> Create STL from Description</a>
     [% END %]
 </div>
 

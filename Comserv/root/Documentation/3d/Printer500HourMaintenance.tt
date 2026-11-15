@@ -54,7 +54,7 @@
         <div class="col-100">
             <h2 id="now" class="doc-h2">Now</h2>
             <p class="doc-body">Farm printer id=1 is the stock Anycubic Kobra 3 on LAN
-            (<code>[LAN_HOST:192.168.2.53]</code>). Cloud hour-counters do not run while LAN Mode is on.
+            (<code>[LAN_HOST:192.168.2.61]</code>). Cloud hour-counters do not run while LAN Mode is on.
             There is <strong>no</strong> in-app alarm that blocks a printer at 500 hours. The worker
             reads the snapshot JSON (and completed job times), then does the service by hand
             <em>before the next job</em>.</p>

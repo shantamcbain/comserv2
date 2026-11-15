@@ -2052,6 +2052,7 @@ sub queue :Path('/3d/queue') :Args(0) {
     eval {
         require Comserv::Util::Printing3d::LanMap;
         my $lanmap = Comserv::Util::Printing3d::LanMap->new;
+        $lanmap->spawn_sync($c);
         my %seen;
         # Active first (with job context). Stored IP is a cache — if DHCP
         # moved the printer, LanMap rewrites [LAN_HOST:] before we read state.

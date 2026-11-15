@@ -40,6 +40,24 @@
 </div>
 [% END %]
 
+[% IF placements.size %]
+<div style="border:1px solid var(--border-color);border-radius:4px;padding:10px 14px;margin-bottom:1em;background:var(--secondary-color)">
+  <div style="font-family:var(--header-font);color:var(--text-color);margin-bottom:0.4em">Count a container</div>
+  <p style="margin:0 0 0.6em;font-family:var(--body-font);font-size:0.85rem;color:var(--text-color)">
+    Photograph what is standing there. You check the text, then stock, the draft invoice and the print top-up follow from it.
+  </p>
+  [% FOREACH pl IN placements %]
+  <a href="[% c.uri_for('/Inventory/consignment/count', [pl.id]) %]"
+     style="display:inline-block;margin:0 0.5em 0.4em 0;padding:6px 14px;background:var(--primary-color);color:#fff;border-radius:4px;text-decoration:none;font-family:var(--body-font);font-size:0.9rem">
+    Count [% pl.location.name | html %]
+  </a>
+  <span style="font-family:var(--body-font);font-size:0.85rem;color:var(--text-muted-color)">
+    [% pl.item.name | html %] · [% pl.partner.name | html %]
+  </span><br>
+  [% END %]
+</div>
+[% END %]
+
 [% IF consignments.size == 0 %]
 <p style="color:var(--text-muted-color);font-family:var(--body-font)">No consignments found. <a href="/Inventory/consignment/new">Create the first one</a>.</p>
 [% ELSE %]
