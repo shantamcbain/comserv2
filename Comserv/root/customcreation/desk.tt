@@ -1,0 +1,69 @@
+[% PageVersion = 'customcreation/desk.tt,v 0.01 2026/11/11 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Create a part from a description</h1>
+
+<p>
+  <a href="/CustomerOrder">Orders</a>
+  <a href="/3d" style="margin-left:1em;">3D printing</a>
+</p>
+
+[% IF error_msg %]<p class="alert alert-danger">[% error_msg | html %]</p>[% END %]
+[% IF error_tried.size %]
+<div class="alert alert-warning">
+  <p><strong>What was tried, in order:</strong></p>
+  <ul>
+    [% FOREACH t IN error_tried %]<li>[% t | html %]</li>[% END %]
+  </ul>
+  [% IF error_detail %]<p>[% error_detail | html %]</p>[% END %]
+</div>
+[% END %]
+[% IF flash.error_msg %]<p class="alert alert-danger">[% flash.error_msg | html %]</p>[% END %]
+[% IF flash.success_msg %]<p class="alert alert-success">[% flash.success_msg | html %]</p>[% END %]
+
+<div class="card">
+  <div class="card-body">
+    <p>Type the part in words, with its measurements. A collar, a box, a bracket, a clip. A figurine or a part that only exists in a photo will not come back as a usable STL.</p>
+    <p>Circumferences stay circumferences: 29 cm around is about 92 mm across, not 29 mm. Centimetres are converted to millimetres. The result is one solid, 400 mm at most, with walls between 1.2 mm and 8 mm.</p>
+
+    <form method="POST" action="/customcreation/preview">
+      [% IF line_id %]
+      <p>From order line #[% line_id %].</p>
+      <input type="hidden" name="line_id" value="[% line_id %]">
+      [% END %]
+      <p>
+        <label for="description">Describe the part</label><br>
+        <textarea id="description" name="description" rows="8" cols="72" required>[% description | html %]</textarea>
+      </p>
+      <p><button type="submit" class="btn btn-primary">Preview STL</button>
+         <span class="doc-muted">The AI catalog writes the source, then OpenSCAD renders it. This can take up to two minutes; the page waits.</span></p>
+    </form>
+
+    [% IF pictures.size %]
+    <h2>Reference pictures</h2>
+    <ul>
+      [% FOREACH pic IN pictures %]
+      <li>[% pic.name | html %]</li>
+      [% END %]
+    </ul>
+    [% END %]
+  </div>
+</div>
+
+[% IF preview_token %]
+<div class="card">
+  <div class="card-body">
+    <h2>Preview</h2>
+    <p>Rendered [% preview_bytes %] bytes. Nothing is saved until you accept.</p>
+    <p><a class="btn btn-secondary" download="preview.stl"
+          href="data:model/stl;base64,[% preview_b64 %]">Download preview STL</a></p>
+    <form method="POST" action="/customcreation/accept" style="display:inline;">
+      <input type="hidden" name="token" value="[% preview_token %]">
+      <button type="submit" class="btn btn-success">Accept and save</button>
+    </form>
+    <form method="POST" action="/customcreation/reject" style="display:inline;">
+      <button type="submit" class="btn btn-danger">Reject</button>
+    </form>
+  </div>
+</div>
+[% END %]

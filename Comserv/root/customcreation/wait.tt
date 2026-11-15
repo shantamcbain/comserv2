@@ -1,0 +1,35 @@
+[% PageVersion = 'customcreation/wait.tt,v 0.01 2026/11/11 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Building your part</h1>
+
+<p>
+  <a href="/customcreation">Back to the desk</a>
+  <a href="/3d" style="margin-left:1em;">3D printing</a>
+</p>
+
+<div class="card" id="cc-progress" data-token="[% job_id %]">
+  <div class="card-body">
+    <p><strong class="cc-stage">[% job.label | html %]</strong>
+       <span class="doc-muted">(<span class="cc-elapsed">0</span> s)</span></p>
+
+    <ol class="cc-log">
+      [% FOREACH entry IN job.log %]
+      <li>[% entry.label | html %]</li>
+      [% END %]
+    </ol>
+
+    <p class="cc-note doc-muted">The AI catalog writes the OpenSCAD source, then the render service
+       turns it into an STL. This usually takes 10–60 seconds and can take up to two minutes on the
+       local model. You can leave this page open; nothing is saved until you accept.</p>
+
+    <div class="cc-error" style="display:none;">
+      <p class="alert alert-danger cc-error-msg"></p>
+      <div class="alert alert-warning cc-tried-wrap" style="display:none;">
+        <p><strong>What was tried, in order:</strong></p>
+        <ul class="cc-tried"></ul>
+      </div>
+      <p><a class="btn btn-secondary" href="/customcreation">Change the description and try again</a></p>
+    </div>
+  </div>
+</div>

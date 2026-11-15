@@ -26,6 +26,7 @@
                 <a href="#viewing"    style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Viewing a Consignment</a>
                 <a href="#settling"   style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Settlement</a>
                 <a href="#gl"         style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">GL Entry</a>
+                <a href="#replace"    style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Replacement After a Sale</a>
                 <a href="#troubleshoot" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Troubleshooting</a>
             </div>
         </div>
@@ -177,9 +178,50 @@
         </div>
     </div>
 
+    <div id="replace" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">8. Replacement After a Sale</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Stock sits with the partner free of charge until it sells. When it sells you bill it
+                and then put it back, so the partner's container stays full and they never lose a
+                sale. That second half is what the count creates.
+            </p>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Applying a location count does five things in one transaction:
+            </p>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>sets the stock on hand at that location to what was counted;</li>
+                <li>writes a <em>count_adjust</em> transaction for the difference;</li>
+                <li>raises a draft sales invoice for the units that left, at retail, less the partner's commission;</li>
+                <li>opens a <strong>replacement consignment</strong> (<code>REPL-&lt;site&gt;-&lt;count&gt;</code>)
+                    with one line per item, <em>qty sent</em> = units sold, and stamps it on the count as its <code>consignment</code>;</li>
+                <li>queues the shortfall as printing jobs that point at that same consignment.</li>
+            </ol>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The replacement also lands as a <strong>todo</strong> in the Monachee Coop project
+                ("Replace sold stock - consignment #N"), so the work appears in the list instead of
+                waiting to be discovered on a traveler.
+            </p>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                To refill, open the replacement consignment and pull what is already printed from
+                another location, or print what is missing. Only the missing part reaches a printer;
+                anything in stock is simply moved to the partner's location.
+            </p>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Applying lands you on that batch. Its first panel, <em>Why this batch exists</em>,
+                shows the count it came from and the invoice it billed — the invoice is the anchor for
+                both tracks, so a consignment refill and a direct sale hang off the same document. The
+                list shows open batches by default; settled ones are behind the status filter, and the
+                dashboards carry a <em>Needs Refill</em> count. Every print-queue row that belongs to a
+                batch links back to it.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
     <div id="troubleshoot" class="row">
         <div class="col-100">
-            <h2 style="color:var(--text-color);font-family:var(--header-font)">8. Troubleshooting</h2>
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">9. Troubleshooting</h2>
             <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
                 <thead>
                     <tr style="background-color:var(--table-header-bg)">

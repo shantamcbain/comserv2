@@ -1,0 +1,92 @@
+[% PageVersion = 'root/Inventory/consignment/count.tt,v 1.02 2026/11/06 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+<div class="app-container">
+<div class="content-container">
+
+[% SET loc = placement.location %]
+[% SET partner = placement.partner %]
+
+<h2 style="color:var(--text-color);margin-top:0">Container count — [% loc.name | html %]</h2>
+
+<div style="background:var(--secondary-color);border:1px solid var(--border-color);border-radius:4px;padding:10px 14px;margin-bottom:1em;color:var(--text-color)">
+  <div><strong>Consignor:</strong> [% partner.name | html %]
+    [% IF placement.invoice_customer_name %] &nbsp;·&nbsp; <strong>Invoice customer:</strong> [% placement.invoice_customer_name | html %][% END %]
+    &nbsp;·&nbsp; <strong>Commission:</strong> [% placement.effective_commission_percent %]%
+  </div>
+  <div><strong>Item:</strong> [% item.name | html %]
+    [% IF item.sku %]([% item.sku | html %])[% END %]
+    &nbsp;·&nbsp; <strong>Retail:</strong> $[% item.unit_price %]
+    &nbsp;·&nbsp; <strong>Location:</strong> # [% loc.id %]
+  </div>
+  <div><strong>Maintained here:</strong>
+    [% FOREACH c IN colours %][% c | html %] [% target.$c || 0 %][% UNLESS loop.last %] &nbsp;·&nbsp; [% END %][% END %]
+    &nbsp;(total [% total_target %])
+  </div>
+</div>
+
+<div class="row" style="display:flex;gap:1em;flex-wrap:wrap;align-items:flex-start">
+
+  <div class="card" style="flex:1 1 340px;border:1px solid var(--border-color);border-radius:4px;padding:12px;background:var(--bg-color,#fff)">
+    <h3 style="margin-top:0;color:var(--text-color)">1. Photo of the container</h3>
+    <p style="color:var(--text-color);font-size:var(--font-size-small)">
+      Take a photo of the container as it stands. We read the number and colour of the items
+      from it and turn that into text. <strong>The photo is deleted once you confirm the text.</strong>
+    </p>
+    <form method="POST" action="[% c.uri_for('/Inventory/consignment/count', [placement.id]) %]" enctype="multipart/form-data">
+      <input type="file" name="photo" accept="image/*" capture="environment"
+             style="display:block;margin-bottom:0.6em;color:var(--text-color)">
+      <button type="submit" class="btn btn-primary">Read the photo</button>
+    </form>
+  </div>
+
+  <div class="card" style="flex:1 1 340px;border:1px solid var(--border-color);border-radius:4px;padding:12px;background:var(--bg-color,#fff)">
+    <h3 style="margin-top:0;color:var(--text-color)">…or type the count</h3>
+    <p style="color:var(--text-color);font-size:var(--font-size-small)">
+      Same result without a photo — write it as you would say it, e.g.
+      <em>[% FOREACH c IN colours %][% target.$c || 0 %] [% c | html %][% UNLESS loop.last %], [% END %][% END %]</em>
+    </p>
+    <form method="POST" action="[% c.uri_for('/Inventory/consignment/count', [placement.id]) %]">
+      <input type="text" name="text" class="form-control" style="width:100%;margin-bottom:0.6em"
+             placeholder="[% FOREACH c IN colours %][% target.$c || 0 %] [% c | html %][% UNLESS loop.last %], [% END %][% END %]">
+      <button type="submit" class="btn">Use typed count</button>
+    </form>
+  </div>
+
+</div>
+
+[% IF counts.size %]
+<div class="card" style="margin-top:1.2em;border:1px solid var(--border-color);border-radius:4px;padding:12px;background:var(--bg-color,#fff)">
+  <h3 style="margin-top:0;color:var(--text-color)">Count history</h3>
+  <table class="table" style="width:100%;border-collapse:collapse;color:var(--text-color);font-size:var(--font-size-small)">
+    <tr style="background-color:var(--table-header-bg)">
+      <th style="text-align:left;padding:4px 8px">#</th>
+      <th style="text-align:left;padding:4px 8px">Status</th>
+      <th style="text-align:left;padding:4px 8px">Verified text</th>
+      <th style="text-align:left;padding:4px 8px">Read by</th>
+      <th style="text-align:left;padding:4px 8px">Invoice</th>
+      <th style="text-align:left;padding:4px 8px">When</th>
+      <th style="text-align:left;padding:4px 8px"></th>
+    </tr>
+    [% FOREACH n IN counts %]
+    <tr>
+      <td style="padding:4px 8px">[% n.id %]</td>
+      <td style="padding:4px 8px">[% n.status | html %]</td>
+      <td style="padding:4px 8px">[% n.raw_text | html %]</td>
+      <td style="padding:4px 8px">[% n.engine | html %]</td>
+      <td style="padding:4px 8px">[% IF n.invoice_id %]#[% n.invoice_id %][% ELSE %]—[% END %]</td>
+      <td style="padding:4px 8px">[% n.counted_at | html %]</td>
+      <td style="padding:4px 8px">
+        [% IF n.status == 'draft' %]<a href="[% c.uri_for('/Inventory/consignment/count/review', [n.id]) %]">Review</a>[% ELSIF n.status == 'reading' %]<a href="[% c.uri_for('/Inventory/consignment/count/review', [n.id]) %]">Reading&hellip;</a>[% ELSIF n.status == 'failed' %]<a href="[% c.uri_for('/Inventory/consignment/count/review', [n.id]) %]">Retry</a>[% END %]
+      </td>
+    </tr>
+    [% END %]
+  </table>
+</div>
+[% END %]
+
+<p style="margin-top:1.2em">
+  <a href="[% c.uri_for('/Inventory/consignment') %]">&larr; All consignments</a>
+</p>
+
+</div>
+</div>
