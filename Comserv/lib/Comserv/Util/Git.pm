@@ -197,8 +197,8 @@ Returns a hashref:
     port => $port, label => $human }
 
 Local mode returns mode 'local' and the normal repo_path(). SSH mode returns the
-remote repo path and connection details. An unknown target falls back to local
-and logs a warning (fail-safe, never runs a command on an undeclared host).
+remote repo path and connection details. An unknown target returns C<{error}> and
+no repo. Callers must refuse it. It never falls back to the Comserv checkout.
 
 =cut
 

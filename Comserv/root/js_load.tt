@@ -140,6 +140,11 @@
 <script src="/static/js/remotedb-pw.js?v=[% cv %]" defer></script>
 [% END %]
 
+<!-- Consignment photo count: poll the review page while the worker reads the photo -->
+[% IF c.request.uri.match('/Inventory/consignment/count') %]
+<script src="/static/js/consignment-count.js?v=[% cv %]" defer></script>
+[% END %]
+
 <!-- Schema Compare JS -->
 [% IF c.request.uri.match('/admin/schema_compare') %]
 <script src="/static/js/schema-compare.js?v=[% cv %]" defer></script>
@@ -168,6 +173,11 @@
 <script src="/static/js/sign-preview.js?v=[% cv %]" defer></script>
 [% END %]
 
+<!-- Custom creation progress polling (staff desk) -->
+[% IF c.request.uri.match('/customcreation') %]
+<script src="/static/js/customcreation-progress.js?v=[% cv %]" defer></script>
+[% END %]
+
 <!-- Legacy menu (conditional) -->
 [% UNLESS c.session.use_db_menu || c.stash.use_db_menu %]
 <script src="/static/js/sub-menu.js" defer></script>
@@ -190,6 +200,7 @@
 <script src="/static/js/ai-chat/model-select.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai-chat/tooltips.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai-chat/feature-todo.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai-chat/feature-invoice.js?v=[% cv %]" defer></script>
 
 [% IF c.request.uri.match('/ai/usage') %]
 <script src="/static/js/ai/usage-monitor.js?v=[% cv %]" defer></script>

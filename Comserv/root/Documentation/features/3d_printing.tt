@@ -109,9 +109,31 @@ Items are shown in the shop when their linked inventory item has <code>show_in_s
 <h2 id="queue">4. Print Queue</h2>
 <p class="doc-body">
 The print queue at <a href="/3d/queue">/3d/queue</a> puts the active job list first.
-Staff complete or cancel a printing job there. The printer strip under that list
-stays closed until opened. Each printer is a card across the row, so another printer
-is another card, not another table row.
+Staff start a print from the printer card or an assigned job. Start Print
+opens a dialog that lists the files already stored on the printer (248 on
+the Kobra at 192.168.2.61 on 2026-11-06), with a search box. It pre-selects
+a file when the item name and the file name share words, even if the names
+are not the same (Sprouting Lid Mason Small Mesh matches
+MasonJar_Wide_SmallHole). Staff still confirm the file before start.
+</p>
+<p class="doc-body">
+Complete opens the cost dialog and issues the filament. Both columns it
+needs, <code>labour_cost</code> and <code>cost_breakdown</code>, are on
+<code>printing_3d_jobs</code> as of 2026-11-06. <code>labour_cost</code> declares
+<code>decimal(10,4)</code> because costing accrues labour per step, but the column
+is still <code>decimal(10,0)</code>, so labour currently stores in whole units
+until the in-app schema-compare sync widens it.
+</p>
+<p class="doc-body">
+Stopping a print from Control does not cancel it. The job goes back to the
+Queued list with a "stopped on printer" note, and starting the same file
+again resumes that job instead of adding a second active row. A different
+file still starts a new job. This behaviour needs the <code>:4003</code>
+worker to be restarted before it is live.
+</p>
+<p class="doc-body">
+The printer strip under the job list stays closed until opened. Each printer
+is a card across the row, so another printer is another card, not another table row.
 </p>
 <p class="doc-body">
 <strong>Complete</strong> opens a dialog. It shows copies, time per copy, and one gram

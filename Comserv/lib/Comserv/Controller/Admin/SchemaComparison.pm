@@ -1838,8 +1838,9 @@ sub update_table_field_from_result {
     if ($data_type =~ /^enum$/i && $result_field_info->{enum_list}) {
         my $list_str = join("','", @{$result_field_info->{enum_list}});
         $data_type = "ENUM('$list_str')";
-    } elsif ($result_field_info->{size} && $data_type !~ /\(/) {
-        $data_type .= "($result_field_info->{size})";
+    } elsif (my $sz = $result_field_info->{size}) {
+        $sz = join(',', @$sz) if ref $sz eq 'ARRAY';
+        $data_type .= "($sz)" if $data_type !~ /\(/;
     }
     
     my $nullable = $result_field_info->{is_nullable} ? "NULL" : "NOT NULL";
@@ -2381,7 +2382,12 @@ sub get_table_result_comparison_v2 {
             $result_field->{is_auto_increment} //= 0;
             $result_field->{default_value} //= undef;
             $result_field->{extra} = defined $result_field->{extra} ? "$result_field->{extra}" : '';
-            if (defined $result_field->{size} && ref $result_field->{size} ne 'ARRAY') {
+            if (ref $result_field->{size} eq 'ARRAY') {
+                # decimal/varchar precision arrives as [10, 4]; render it the way
+                # the DB side reports it ("p,s") so the two columns compare and
+                # display alike.
+                $result_field->{size} = join(',', @{ $result_field->{size} });
+            } elsif (defined $result_field->{size}) {
                 $result_field->{size} = 0 + $result_field->{size};
             }
         }

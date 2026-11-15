@@ -100,17 +100,17 @@ __PACKAGE__->add_columns(
     },
     filament_cost => {
         data_type   => 'decimal',
-        size        => [10, 2],
+        size        => [10, 4],    # unrounded; only total_cost is rounded (once)
         is_nullable => 1,
     },
     printer_cost => {
         data_type   => 'decimal',
-        size        => [10, 2],
+        size        => [10, 4],    # unrounded; only total_cost is rounded (once)
         is_nullable => 1,
     },
     electricity_cost => {
         data_type   => 'decimal',
-        size        => [10, 2],
+        size        => [10, 4],    # unrounded; only total_cost is rounded (once)
         is_nullable => 1,
     },
     total_cost => {
@@ -133,7 +133,7 @@ __PACKAGE__->add_columns(
     },
     labour_cost => {
         data_type   => "decimal",
-        size        => [10, 4],
+        size        => [10, 4],    # Costing/Traveler write sprintf('%.4f') and accrue per step
         is_nullable => 1,
     },
     cost_breakdown => {

@@ -4,6 +4,8 @@ use namespace::autoclean;
 use JSON;
 use Comserv::Util::Logging;
 use Comserv::Util::AppTime;
+use File::Path qw(make_path);
+use POSIX qw(strftime);
 
 has 'logging' => (
     is      => 'ro',
@@ -49,6 +51,34 @@ sub _now {
     return Comserv::Util::AppTime->now_utc;
 }
 
+# A typed part description is enough. The full paragraph is kept in notes
+# because inventory_customer_order_lines.description is varchar(500).
+sub _normalize_line {
+    my ($self, $l) = @_;
+    return undef unless ref $l eq 'HASH';
+    my $notes = defined $l->{notes_line} ? $l->{notes_line} : ($l->{notes} || '');
+    my $desc  = $l->{description} || '';
+    $notes =~ s/^\s+|\s+$//g;
+    $desc  =~ s/^\s+|\s+$//g;
+    my $item_id = $l->{item_id} || '';
+    return undef unless ($item_id || length $desc || length $notes);
+    if (length($desc) > 500) {
+        $notes = length($notes) ? $desc . "\n" . $notes : $desc;
+        $desc  = substr($desc, 0, 120);
+    }
+    if (!length($desc) && length($notes)) {
+        my ($first) = split /\n/, $notes, 2;
+        $first =~ s/^\s+|\s+$//g;
+        $desc = substr($first, 0, 120);
+    }
+    return {
+        item_id     => $item_id,
+        description => $desc,
+        quantity    => $l->{quantity} || 1,
+        notes       => $notes,
+    };
+}
+
 # -------------------------------------------------------------------------
 # Public: Customer Order Form
 # -------------------------------------------------------------------------
@@ -72,13 +102,9 @@ sub order_new :Path('/CustomerOrder/new') :Args(0) {
         my @initial_lines;
         for my $idx (sort { $a <=> $b } keys %lines_by_idx) {
             my $l = $lines_by_idx{$idx};
-            next unless ($l->{item_id} || $l->{description});
-            push @initial_lines, {
-                item_id     => $l->{item_id} || '',
-                description => $l->{description} || '',
-                quantity    => $l->{quantity} || 1,
-                notes       => $l->{notes_line} || '',
-            };
+            my $norm = $self->_normalize_line($l);
+            next unless $norm;
+            push @initial_lines, $norm;
         }
 
         unless ($params->{customer_name}) {
@@ -87,7 +113,7 @@ sub order_new :Path('/CustomerOrder/new') :Args(0) {
             $c->stash->{initial_lines} = \@initial_lines;
         }
         elsif (!@initial_lines) {
-            $c->stash->{error_msg} = 'Add at least one item (use + Add Line, then pick an item).';
+            $c->stash->{error_msg} = 'Add at least one line: pick an item, or describe the part.';
             $c->stash->{submitted} = $params;
             $c->stash->{initial_lines} = \@initial_lines;
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'order_new',
@@ -131,6 +157,7 @@ sub order_new :Path('/CustomerOrder/new') :Args(0) {
                         });
                     }
                     $order->update({ total_amount => $total });
+                    $self->_save_line_drawings($c, $order);
                 });
             };
             if ($@) {
@@ -230,7 +257,7 @@ sub order_view :Path('/CustomerOrder/view') :Args(1) {
         $c->res->redirect($c->uri_for('/CustomerOrder'));
         return;
     }
-    $c->stash(order => $order, template => 'CustomerOrder/view.tt');
+    $c->stash(order => $order, is_admin => 1, template => 'CustomerOrder/view.tt');
 }
 
 # -------------------------------------------------------------------------
@@ -366,6 +393,69 @@ sub customer_view :Path('/CustomerOrder/customer') :Args(0) {
         sitename  => $sitename,
         template  => 'CustomerOrder/customer.tt',
     );
+}
+
+# Reference pictures for a described part. Optional: an order with no files
+# saves exactly as before. Files land under /data/nfs/3d/custom and are tagged
+# by line id so the creation desk can show them beside the description.
+# reference_id stays 0 — the traveler already stores item ids there.
+sub _save_line_drawings {
+    my ($self, $c, $order) = @_;
+    my @uploads = $c->req->upload;
+    return unless @uploads;
+
+    my $dir = '/data/nfs/3d/custom';
+    unless (-d $dir) {
+        eval { make_path($dir) };
+        if ($@ || !-d $dir) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'order_new',
+                "Cannot create $dir for order drawings: " . ($@ // $!));
+            die "reference pictures could not be stored: $dir is not writable";
+        }
+    }
+
+    my $saved = 0;
+    for my $upload (@uploads) {
+        my ($idx) = ($upload->name // '') =~ /^drawings_(\d+)$/;
+        next unless defined $idx;
+        my $line = $order->lines->search({}, { order_by => 'id', rows => 1, offset => $idx })->first;
+        next unless $line;
+
+        my $name = $upload->filename // 'drawing';
+        $name =~ s{[/\\]}{}g;
+        $name =~ s/[^A-Za-z0-9._-]/_/g;
+        next unless $name =~ /\.(jpe?g|png|pdf|svg)$/i;
+
+        my $stamp = strftime('%Y%m%d_%H%M%S', localtime);
+        my $dest  = "$dir/line_" . $line->id . "_${stamp}_$name";
+        unless ($upload->copy_to($dest)) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'order_new',
+                "Drawing copy failed for line " . $line->id . ": $!");
+            die "a reference picture could not be stored";
+        }
+        $c->model('DBEncy')->resultset('File')->create({
+            file_name    => $name,
+            file_type    => ($name =~ /(\.[^.]+)$/ ? $1 : ''),
+            file_data    => '',
+            site_id      => $c->session->{site_id} // 0,
+            reference_id => 0,
+            category_id  => 0,
+            share_id     => 0,
+            description  => 'custom_order_line:' . $line->id,
+            upload_date  => strftime('%Y-%m-%d %H:%M:%S', localtime),
+            file_size    => $upload->size // 0,
+            file_path    => $dest,
+            nfs_path     => $dest,
+            file_url     => '',
+            file_status  => 'active',
+            file_format  => 'application/octet-stream',
+            user_id      => $c->session->{user_id} // 0,
+            sitename     => $self->_sitename($c),
+        });
+        $saved++;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'order_new',
+        "Order " . $order->id . " stored $saved reference picture(s)") if $saved;
 }
 
 __PACKAGE__->meta->make_immutable;
