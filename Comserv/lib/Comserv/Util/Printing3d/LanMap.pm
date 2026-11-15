@@ -138,6 +138,109 @@ sub follow {
     return $found;
 }
 
+# Create a farm row for a Kobra the scan found and nobody has attached.
+# Identity is the serial. A second call with the same serial does nothing.
+# ACE / filament hubs are not printers and are not enrolled.
+sub enroll {
+    my ($self, $c, $schema, $sitename, $info) = @_;
+    return { ok => 0, error => 'No printer info' } unless $info && $info->{ok};
+    my $serial = $info->{serial} || '';
+    my $host   = $info->{host} || '';
+    return { ok => 0, error => 'Printer did not give a serial' } unless $serial && $host;
+    my $model_id = $info->{model_id} || '';
+    my $model    = $info->{model_name} || '';
+    unless ($model_id eq '20024' || $model =~ /kobra\s*3/i) {
+        return { ok => 0, skipped => 1, error => 'Not a Kobra 3' };
+    }
+
+    my @rows = $schema->resultset('Printing3dPrinter')->search({ sitename => $sitename })->all;
+    for my $row (@rows) {
+        my $have = serial_from_notes(eval { $row->notes } || '');
+        if ($have && $have eq $serial) {
+            return { ok => 1, existed => 1, printer_id => $row->id };
+        }
+    }
+
+    my $name = $info->{device_name} || $model || 'Kobra 3';
+    my $row = eval {
+        $schema->resultset('Printing3dPrinter')->create({
+            sitename => $sitename || '3d',
+            name     => $name,
+            model    => $model || 'Kobra 3',
+            status   => 'idle',
+            notes    => notes_with_host('', $host, $serial),
+        });
+    };
+    if ($@ || !$row) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'enroll',
+            "could not add serial=$serial host=$host: " . ($@ || 'no row'));
+        return { ok => 0, error => $@ || 'create failed' };
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'enroll',
+        'printer_id=' . $row->id . " enrolled serial=$serial host=$host");
+    return { ok => 1, created => 1, printer_id => $row->id, host => $host, serial => $serial };
+}
+
+# Follow every known printer, then enroll any Kobra on the printer subnet
+# that has no farm row. Called from a detached script, never from the
+# queue request: a /24 sweep takes most of a minute and this server has
+# one worker.
+sub sync_farm {
+    my ($self, $c, $schema, $sitename) = @_;
+    $sitename ||= '3d';
+    my @rows = $schema->resultset('Printing3dPrinter')->search({ sitename => $sitename })->all;
+    my @followed;
+    for my $row (@rows) {
+        my $r = eval { $self->resolve($c, $row) };
+        $r = { ok => 0, error => "$@" } if $@;
+        push @followed, {
+            id    => $row->id,
+            ok    => $r->{ok} ? 1 : 0,
+            host  => $r->{host} || '',
+            error => $r->{error} || '',
+        };
+    }
+
+    my $adapter = $self->adapter_for('');
+    my $found = eval { $adapter->discover($c, '192.168.2.0/24') } || [];
+    my @enrolled;
+    for my $p (@$found) {
+        my $info = eval { $adapter->fetch_info($c, $p->{ip}, 18910, 4) };
+        next unless $info && $info->{ok};
+        my $e = $self->enroll($c, $schema, $sitename, $info);
+        push @enrolled, $e if $e->{created};
+    }
+    return { followed => \@followed, enrolled => \@enrolled };
+}
+
+# Start sync_farm outside the request. The queue must not wait on a subnet sweep.
+sub spawn_sync {
+    my ($self, $c) = @_;
+    my $root = eval { $c->path_to()->stringify } || '.';
+    my $script = "$root/script/printer_lan_sync.pl";
+    return unless -f $script;
+    my $lock = "$root/logs/printer_lan_sync.lock";
+    return if -f $lock && (stat($lock))[9] && (time - (stat($lock))[9]) < 120;
+    open my $lf, '>', $lock;
+    print $lf $$;
+    close $lf;
+    my $log = "$root/logs/printer_lan_sync.log";
+    my $pid = fork;
+    return unless defined $pid;
+    return $pid if $pid;
+    eval {
+        require POSIX;
+        POSIX::setsid();
+        open STDIN,  '<',  '/dev/null';
+        open STDOUT, '>>', $log;
+        open STDERR, '>>', $log;
+        POSIX::close($_) for 3 .. 1023;
+    };
+    exec($^X, $script);
+    require POSIX;
+    POSIX::_exit(1);
+}
+
 # Probe the cached IP first. A timeout means the printer is slow, not that
 # DHCP moved it — do not sweep the LAN and do not mark the row offline.
 # A hard miss (refused / wrong serial) still searches and rewrites [LAN_HOST:].

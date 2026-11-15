@@ -38,6 +38,7 @@
                 <a href="/3d/admin" class="submenu-link"><i class="icon-dashboard"></i>3D Admin Dashboard</a>
                 <a href="/3d/queue" class="submenu-link"><i class="icon-list"></i>Print Queue</a>
                 <a href="/3d/printers" class="submenu-link"><i class="icon-server"></i>Printer Farm</a>
+                <a href="/customcreation" class="submenu-link"><i class="icon-edit"></i>Create STL from Description</a>
                 <a href="/Inventory/items?category=3d_filament" class="submenu-link"><i class="icon-resources"></i>Filament Stock</a>
                 <a href="/Inventory/items?category=3d_supply" class="submenu-link"><i class="icon-tools"></i>Supplies</a>
                 <a href="/Inventory/items?category=3d_printed_item" class="submenu-link"><i class="icon-shop"></i>Items for Sale</a>

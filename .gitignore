@@ -267,5 +267,10 @@ Comserv/data/ai_rank_jobs/git.json
 Comserv/data/supergrok_pacing.json
 Comserv/data/ai_trials/gpt_56_luna.state.json
 Comserv/data/ai_tasks_cache.json
+
+# runtime: consignment count photos (uploaded, never committed)
+Comserv/data/consignment_counts/
+Comserv/data/custom_creation_jobs/
 Comserv/data/ai_model_chains.json.bak-t393u-20261111-104106
 Comserv/lib/Comserv/Util/AI/HermesOverrunGuard.pm.bak-t393u-20261111-104106
+Comserv/var/twiggy.enabled

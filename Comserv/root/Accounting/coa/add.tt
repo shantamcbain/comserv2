@@ -1,0 +1,40 @@
+[% PageVersion = 'Accounting/coa/add.tt,v 0.01 2026/10/31 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Add Account</h1>
+<p><a href="/Accounting/coa">← Chart of Accounts</a></p>
+
+[% IF error_msg %]<p style="color:var(--danger-color, #b00020);font-weight:bold">[% error_msg | html %]</p>[% END %]
+
+<p>This adds one account on <strong>[% sitename | html %]</strong>. It does not post anything.
+Suggested for pantry food: <strong>6240 Food &amp; Groceries</strong>, type Expense.
+The fields below are filled with that suggestion. Change them if this is a different account.</p>
+
+<form method="POST" action="/Accounting/coa/add">
+  <table cellpadding="6">
+    <tr>
+      <th><label for="accno">Account number *</label></th>
+      <td><input type="text" id="accno" name="accno" required maxlength="6" value="[% form.accno | html %]"></td>
+    </tr>
+    <tr>
+      <th><label for="description">Description *</label></th>
+      <td><input type="text" id="description" name="description" required maxlength="255" size="40" value="[% form.description | html %]"></td>
+    </tr>
+    <tr>
+      <th><label for="category">Type *</label></th>
+      <td>
+        <select id="category" name="category">
+          <option value="A"[% IF form.category == 'A' %] selected[% END %]>Asset</option>
+          <option value="L"[% IF form.category == 'L' %] selected[% END %]>Liability</option>
+          <option value="Q"[% IF form.category == 'Q' %] selected[% END %]>Equity</option>
+          <option value="I"[% IF form.category == 'I' %] selected[% END %]>Income</option>
+          <option value="E"[% IF form.category == 'E' %] selected[% END %]>Expense</option>
+        </select>
+      </td>
+    </tr>
+  </table>
+  <p>
+    <button type="submit">Save account</button>
+    <a href="/Accounting/coa" style="margin-left:8px;">Cancel</a>
+  </p>
+</form>

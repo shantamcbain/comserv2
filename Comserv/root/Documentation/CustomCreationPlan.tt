@@ -1,0 +1,302 @@
+[% META
+   title = "Custom Creation Plan"
+   description = "Staff turn a typed customer description and drawings into a printable STL. First part is a tapered strengthening collar."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "plans"
+   page_version = "0.01"
+   last_updated = "Sat Nov 07 2026"
+   site_specific = "false"
+   project_id = "310"
+   project_code = "CUST-STL"
+%]
+[% PageVersion = 'Documentation/CustomCreationPlan.tt,v 0.01 2026/11/07 hermes-agent Exp shanta - Custom Creation plan hub' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+[%#
+  Working checklist (not a route): .hermes/plans/2026-11-07_162551-custom-creation-stl.md
+  Do not put Template Toolkit directives in this comment.
+%]
+
+<div class="container">
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'Custom Creation Plan'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <p class="doc-muted">Jump to section:</p>
+            <div class="doc-navrow">
+                <a href="#now" class="doc-navlink">Now</a>
+                <a href="#decisions" class="doc-navlink">Decisions</a>
+                <a href="#workflow" class="doc-navlink">Staff workflow</a>
+                <a href="#fixture" class="doc-navlink">Collar fixture</a>
+                <a href="#files" class="doc-navlink">Files</a>
+                <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
+                <a href="#see-also" class="doc-navlink">See Also</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="now" class="doc-h2">Now</h2>
+            <p class="doc-body">Current: a part description can be typed and saved on an order line. No STL is created yet. No template is added per part.</p>
+            <p class="doc-body">Blocked by: port 4003 was not running. This file is not served until that server is up and Documentation is rescanned. Do not start the server from this plan.</p>
+            <p class="doc-body">Done: <a href="[% c.uri_for('/todo/details') %]?record_id=2681" class="doc-link">todo #2681</a> stores any part description on the order line. Next is <a href="[% c.uri_for('/todo/details') %]?record_id=2682" class="doc-link">todo #2682</a>, optional pictures. No STL is created yet.</p>
+            <div class="doc-navrow">
+                <a href="[% c.uri_for('/project/details') %]?project_id=310" class="doc-navlink">Project #310</a>
+                <a href="[% c.uri_for('/todo') %]?project_id=310" class="doc-navlink">Todos</a>
+                <a href="[% c.uri_for('/CustomerOrder/new') %]" class="doc-navlink">Customer order form</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="decisions" class="doc-h2">Decisions</h2>
+            <p class="doc-body">Corrected 2026-11-07. Type any description. An STL comes back. No new program is checked in for that part.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Decision</th>
+                    <th class="doc-th">Resolution</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Units</td>
+                    <td class="doc-td">29 cm and 33 cm are circumferences. Tube length is 42 cm. Convert with diameter_mm = circumference_cm * 10 / pi. Do not treat 29 as a diameter.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Collar length</td>
+                    <td class="doc-td">4 cm (40 mm) for this fixture. Staff can change it. The fit check still refuses a length that cannot slide on from the small end.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Who generates</td>
+                    <td class="doc-td">Staff and admin only, until this is proven. The customer submits words and pictures.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Voice</td>
+                    <td class="doc-td">Text only. A microphone is a future option, not this project.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Any description</td>
+                    <td class="doc-td">Staff type the part in words. The tool writes a one-off solid for that request, renders it with the existing OpenSCAD service, and staff accept or reject the STL. Do not add a template file per shape.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Tracking</td>
+                    <td class="doc-td">Child project #310 under #206. Not under #272. #272 is the dryer import project.</td>
+                </tr>
+            </table>
+            <div class="doc-warning">
+                <p class="doc-body">Treating a 29 cm circumference as a 29 mm diameter prints a ring about one-third the real size. The desk must show the converted diameters, about 92.3 mm and 105.0 mm, before it renders.</p>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="workflow" class="doc-h2">Staff workflow</h2>
+            <p class="doc-body">Staff type any description. The tool returns an STL for that request only. A collar is one example, not the product.</p>
+            <ol class="doc-body">
+                <li>Staff type the description. Pictures can be attached as reference. They are not required.</li>
+                <li>The app asks the existing AI catalog for OpenSCAD source for that description. That source is not saved as a new template.</li>
+                <li>The existing OpenSCAD service renders it. The service already accepts scad_source on POST /render and returns STL bytes.</li>
+                <li>Staff look at the result and accept or reject it. Accept saves a printing_3d_models row. Reject saves nothing.</li>
+                <li>A shape the solid generator cannot build shows the error. It does not invent a mesh from a photo.</li>
+            </ol>
+            <div class="doc-warning">
+                <p class="doc-body">This makes measured solids from words: a collar, a box, a bracket, a clip. It will not reliably make a figurine, a face, or a part that only exists in a photo. That would be a different tool, and this shop does not have one.</p>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="fixture" class="doc-h2">Example description</h2>
+            <p class="doc-body">The vacuum collar is one description to try, not a special template. A second, different description must also return an STL before this is called working. The numbers below are the customer's words. The generator has to read them. Do not hard-code a collar.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Input</th>
+                    <th class="doc-th">Customer figure</th>
+                    <th class="doc-th">Used by the fit check</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Tube length</td>
+                    <td class="doc-td">42 cm</td>
+                    <td class="doc-td">420 mm</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Small end</td>
+                    <td class="doc-td">29 cm circumference</td>
+                    <td class="doc-td">about 92.31 mm diameter</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Large end</td>
+                    <td class="doc-td">33 cm circumference</td>
+                    <td class="doc-td">about 105.04 mm diameter</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Collar length</td>
+                    <td class="doc-td">4 cm</td>
+                    <td class="doc-td">40 mm</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Wall</td>
+                    <td class="doc-td">not given</td>
+                    <td class="doc-td">staff entry, printable range 1.2 to 8 mm</td>
+                </tr>
+            </table>
+            <p class="doc-body">A 40 mm collar on that taper must pass. A collar as long as the tube must fail, because a tight full-length sleeve cannot slide on from the small end. The STL is the collar only.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="files" class="doc-h2">Files</h2>
+            <p class="doc-muted">These paths are the build map. They are not all written yet.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Role</th>
+                    <th class="doc-th">Path</th>
+                    <th class="doc-th">State</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">This plan</td>
+                    <td class="doc-td">Comserv/root/Documentation/CustomCreationPlan.tt</td>
+                    <td class="doc-td">written</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Working checklist</td>
+                    <td class="doc-td">.hermes/plans/2026-11-07_162551-custom-creation-stl.md</td>
+                    <td class="doc-td">written, not a Documentation route</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Order form</td>
+                    <td class="doc-td">Comserv/root/CustomerOrder/new.tt and root/static/js/CustomerOrder/order-form.js</td>
+                    <td class="doc-td">not started</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Fit check</td>
+                    <td class="doc-td">Comserv/lib/Comserv/Util/CustomCreation.pm</td>
+                    <td class="doc-td">not started</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Staff desk</td>
+                    <td class="doc-td">Comserv/lib/Comserv/Controller/CustomCreation.pm and root/customcreation/desk.tt</td>
+                    <td class="doc-td">not started</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">One-off solid</td>
+                    <td class="doc-td">Generated OpenSCAD sent as scad_source. No new file under services/openscad/templates.</td>
+                    <td class="doc-td">not started</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" class="doc-h2">Project Tracking</h2>
+            <p class="doc-body">
+                Owning project:
+                <a href="[% c.uri_for('/project/details') %]?project_id=310" class="doc-link">#310 (CUST-STL)</a>
+                &mdash; parent:
+                <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-link">#206 (3DPRINT)</a>.
+                These rows are steps, not sub-projects. Start a todo before editing it. Stop or mark it done before opening the next one.
+            </p>
+            <div class="doc-navrow">
+                <a href="[% c.uri_for('/project/details') %]?project_id=310" class="doc-navlink">Open project</a>
+                <a href="[% c.uri_for('/todo') %]?project_id=310" class="doc-navlink">View todos</a>
+                <a href="[% c.uri_for('/project') %]" class="doc-navlink">All projects</a>
+            </div>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Step</th>
+                    <th class="doc-th">Todo</th>
+                    <th class="doc-th">Done when</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">In-app plan page</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2680" class="doc-link">#2680</a></td>
+                    <td class="doc-td">This page renders and links #310 and the todos below.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Verbal description on the order form</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2681" class="doc-link">#2681</a></td>
+                    <td class="doc-td">A long paragraph round-trips into the line notes and shows on the order.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Drawings and request file</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2682" class="doc-link">#2682</a></td>
+                    <td class="doc-td">A picture and a PDF land on disk, and an order with no files still saves.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Any description in, STL out</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2683" class="doc-link">#2683</a></td>
+                    <td class="doc-td">The vacuum paragraph and a different part each return STL bytes. No new template file is added.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Staff-only desk</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2684" class="doc-link">#2684</a></td>
+                    <td class="doc-td">A customer cannot open the desk. A bad length is refused before any STL is written.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">No template per shape</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2685" class="doc-link">#2685</a></td>
+                    <td class="doc-td">templates/ still has only herb_sign_v1 after a successful custom render.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Render into the model library</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2686" class="doc-link">#2686</a></td>
+                    <td class="doc-td">One STL and one printing_3d_models row linked to the order line.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Verify and changelog</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2687" class="doc-link">#2687</a></td>
+                    <td class="doc-td">Two different descriptions each produce an STL. Sign generator unchanged.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">ROUTINE re-audit</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2688" class="doc-link">#2688</a> (recurring)</td>
+                    <td class="doc-td">Quarterly check that this page still matches the code.</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="doc-success">
+                <h2 class="doc-h3">See Also</h2>
+                <ul class="doc-body">
+                    <li><a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-link">3D printing plan</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/SignGenerator') %]" class="doc-link">Herb sign generator</a> — the existing OpenSCAD path this feature reuses</li>
+                    <li><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">How to use the 3D printing system</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/DocumentationTtTemplate') %]" class="doc-link">Documentation template</a></li>
+                </ul>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Project <a href="[% c.uri_for('/project/details') %]?project_id=310" class="doc-link">#310 (CUST-STL)</a>. Parent <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-link">#206</a>.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

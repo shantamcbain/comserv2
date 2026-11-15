@@ -3,9 +3,11 @@
   roles = 'admin,developer'
   TemplateType = 'Application'
   category = 'admin,infrastructure'
-  page_version = '1.1'
-  last_updated = '2026-02-10'
+  page_version = '1.2'
+  last_updated = '2026-11-14'
 %]
+[% PageVersion = 'admin/infrastructure/index.tt,v 0.02 2026/11/14 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <style>
 .infrastructure-dashboard {
@@ -337,6 +339,18 @@
             <div class="cluster-actions">
                 <a href="[% c.uri_for('/admin/infrastructure/opnsense') %]" class="btn btn-primary">Open Gateway</a>
                 <a href="[% c.uri_for('/Documentation/GatewayPlan') %]" class="btn btn-secondary">Gateway Plan Doc</a>
+            </div>
+        </div>
+
+        <div class="cluster-card">
+            <div class="cluster-header">
+                <div class="cluster-name"><i class="fas fa-network-wired"></i> ZeroTier</div>
+            </div>
+            <div class="cluster-info">
+                <div>Routes, DNS and devices. A route is flagged when its via address is on no device.</div>
+            </div>
+            <div class="cluster-actions">
+                <a href="[% c.uri_for('/admin/infrastructure/zerotier') %]" class="btn btn-primary">Open ZeroTier</a>
             </div>
         </div>
 

@@ -3463,6 +3463,8 @@ sub _nav_source_priority {
 our @CORE_ROLE_NAV_ROUTES = (
     [ 'opnsense gateway', '/admin/infrastructure/opnsense', 'admin',
       qw(opnsense opn sense opn-sense opnsense gateway opnsense dashboard gateway management opsence opnsence) ],
+    [ 'zerotier', '/admin/infrastructure/zerotier', 'admin',
+      qw(zerotier zero tier zt network routes) ],
     [ 'infrastructure', '/admin/infrastructure', 'admin', qw(infrastructure infra) ],
     [ 'application dns', '/admin/dns', 'admin', qw(dns dns zones application dns) ],
     [ 'gateway plan', '/Documentation/system/GatewayPlan', 'admin', qw(gateway plan routing plan) ],

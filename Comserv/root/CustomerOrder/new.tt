@@ -10,7 +10,7 @@
 <p class="doc-body" style="color:var(--error-color,red);font-weight:bold;">[% error_msg | html %]</p>
 [% END %]
 
-<form method="POST" action="/CustomerOrder/new" id="order-form"
+<form method="POST" action="/CustomerOrder/new" id="order-form" enctype="multipart/form-data"
       data-items="[% items_json | html %]"
       data-initial-lines="[% initial_lines_json | html %]">
 
@@ -38,7 +38,7 @@
 </table>
 
 <h2>Items to Order</h2>
-<p><small>Filter the list, pick an item, then Submit. Use + Add Line for more rows.</small></p>
+<p><small>Pick a catalog item, or leave the item blank and describe the part. A description alone is enough. Use + Add Line for more rows.</small></p>
 <p>
   <label for="item-filter">Find item</label>
   <input type="search" id="item-filter" placeholder="Type SKU or name (e.g. HDRY)" style="width:280px;">
@@ -49,11 +49,11 @@
     <tr>
       <th>#</th>
       <th>Item</th>
-      <th>Description / Custom Request</th>
+      <th>Short title</th>
       <th>Qty</th>
       <th>Unit Price</th>
       <th>Total</th>
-      <th>Notes (colour, size…)</th>
+      <th>Describe the part</th>
       <th></th>
     </tr>
   </thead>

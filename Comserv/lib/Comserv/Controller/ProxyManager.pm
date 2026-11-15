@@ -1196,7 +1196,7 @@ sub create_proxy :Local :Args(0) {
         forward_scheme  => $c->req->params->{scheme} || 'http',
         forward_host    => $c->req->params->{backend_ip},
         forward_port    => $c->req->params->{backend_port},
-        ssl_forced      => $c->req->params->{ssl} ? JSON::true : JSON::false,
+        ssl_forced      => $c->req->params->{ssl} ? \1 : \0,
         advanced_config => join("\n",
             "proxy_set_header Host \$host;",
             "proxy_set_header X-Real-IP \$remote_addr;")
