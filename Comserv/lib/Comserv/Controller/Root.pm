@@ -11,6 +11,7 @@ use Time::HiRes qw(gettimeofday);
 
 use Comserv::Util::Logging;
 use Comserv::Util::RequestTrace;
+use Comserv::Util::ApkDownload;
 
 # Cache-buster epoch for asset URLs (?v=...): set once per server start so
 # browsers refetch CSS/JS after every restart/deploy (see Root::auto).
@@ -2757,6 +2758,18 @@ sub begin :Private {
     if (($c->req->path // '') =~ m{^(?:cgi-bin(?:/|$)|static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
         return;
     }
+
+    # Publish a newer Studio build before the link is rendered, then name
+    # that release in the href. The browser keeps the domain that served the page.
+    my $ver_file = $c->path_to('root/static/app/version.json')->stringify;
+    my $pub = eval { Comserv::Util::ApkDownload::publish_latest_build(tree_meta => $ver_file) };
+    if ($@ || (ref $pub eq 'HASH' && $pub->{error})) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin',
+            $@ || $pub->{error});
+    }
+    $c->stash->{phone_app_href} = Comserv::Util::ApkDownload::versioned_href(
+        Comserv::Util::ApkDownload::meta_path($ver_file)
+    );
 
     # Store request start time for timing analysis
     $c->stash->{_request_start_time} = time();

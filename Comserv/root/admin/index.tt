@@ -1,5 +1,5 @@
 [% META title = 'Admin Dashboard' %]
-[% PageVersion = 'admin/index.tt,v 0.06 2026/09/25 shanta Exp shanta ' %]
+[% PageVersion = 'admin/index.tt,v 0.07 2026/11/14 shanta Exp shanta ' %]
 
 <div class="admin-dashboard">
     <div class="dashboard-header">
@@ -675,6 +675,10 @@
                         <i class="fas fa-shield-alt"></i>
                         <span>OPN
                             sense Gateway</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/infrastructure/zerotier') %]" class="admin-link">
+                        <i class="fas fa-network-wired"></i>
+                        <span>ZeroTier</span>
                     </a>
                     <a href="[% c.uri_for('/cloudflareapi') %]" class="admin-link">
                         <i class="fas fa-cloud"></i>

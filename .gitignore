@@ -273,3 +273,4 @@ Comserv/data/consignment_counts/
 Comserv/data/custom_creation_jobs/
 Comserv/data/ai_model_chains.json.bak-t393u-20261111-104106
 Comserv/lib/Comserv/Util/AI/HermesOverrunGuard.pm.bak-t393u-20261111-104106
+Comserv/var/twiggy.enabled

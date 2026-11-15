@@ -7,7 +7,7 @@
    category = 'developer'
    tags = 'server, development, cpanfile, dependencies, perlbrew'
 %]
-[% PageVersion = 'admintopmenu.tt,v 0.10 2026/09/25 shanta Exp shanta ' %]
+[% PageVersion = 'admintopmenu.tt,v 0.11 2026/11/14 shanta Exp shanta ' %]
 [% IF debug == 1 %]
     [%# PageVersion %]
     [% #INCLUDE 'debug.tt' %]
@@ -367,6 +367,7 @@
                     <a href="/admin/hardware_monitor"><i class="icon-server"></i>Hardware Monitor</a>
                     <a href="/admin/logging_audit"><i class="icon-log"></i>Logging Audit</a>
                     <a href="/admin/infrastructure"><i class="icon-cluster"></i>K8s Clusters</a>
+                    <a href="/admin/infrastructure/zerotier"><i class="icon-network"></i>ZeroTier</a>
                     <a href="/admin/docker-containers"><i class="icon-docker"></i>Docker Containers</a>
                 </div>
 
