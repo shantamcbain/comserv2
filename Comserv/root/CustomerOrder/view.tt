@@ -46,7 +46,8 @@
     <td style="text-align:right">[% ln.quantity %]</td>
     <td style="text-align:right">$[% ln.unit_price || '0.00' %]</td>
     <td style="text-align:right">$[% ln.line_total || '0.00' %]</td>
-    <td>[% IF ln.notes %]<pre>[% ln.notes | html %]</pre>[% ELSE %]—[% END %]</td>
+    <td>[% IF ln.notes %]<pre>[% ln.notes | html %]</pre>[% ELSE %]—[% END %]
+      [% IF is_admin %]<br><a href="/customcreation/line/[% ln.id %]">Create STL</a>[% END %]</td>
   </tr>
   [% END %]
   </tbody>

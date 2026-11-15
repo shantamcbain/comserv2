@@ -10,7 +10,7 @@
 <p class="doc-body" style="color:var(--error-color,red);font-weight:bold;">[% error_msg | html %]</p>
 [% END %]
 
-<form method="POST" action="/CustomerOrder/new" id="order-form"
+<form method="POST" action="/CustomerOrder/new" id="order-form" enctype="multipart/form-data"
       data-items="[% items_json | html %]"
       data-initial-lines="[% initial_lines_json | html %]">
 

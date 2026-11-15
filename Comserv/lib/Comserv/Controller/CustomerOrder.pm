@@ -4,6 +4,8 @@ use namespace::autoclean;
 use JSON;
 use Comserv::Util::Logging;
 use Comserv::Util::AppTime;
+use File::Path qw(make_path);
+use POSIX qw(strftime);
 
 has 'logging' => (
     is      => 'ro',
@@ -155,6 +157,7 @@ sub order_new :Path('/CustomerOrder/new') :Args(0) {
                         });
                     }
                     $order->update({ total_amount => $total });
+                    $self->_save_line_drawings($c, $order);
                 });
             };
             if ($@) {
@@ -254,7 +257,7 @@ sub order_view :Path('/CustomerOrder/view') :Args(1) {
         $c->res->redirect($c->uri_for('/CustomerOrder'));
         return;
     }
-    $c->stash(order => $order, template => 'CustomerOrder/view.tt');
+    $c->stash(order => $order, is_admin => 1, template => 'CustomerOrder/view.tt');
 }
 
 # -------------------------------------------------------------------------
@@ -390,6 +393,69 @@ sub customer_view :Path('/CustomerOrder/customer') :Args(0) {
         sitename  => $sitename,
         template  => 'CustomerOrder/customer.tt',
     );
+}
+
+# Reference pictures for a described part. Optional: an order with no files
+# saves exactly as before. Files land under /data/nfs/3d/custom and are tagged
+# by line id so the creation desk can show them beside the description.
+# reference_id stays 0 — the traveler already stores item ids there.
+sub _save_line_drawings {
+    my ($self, $c, $order) = @_;
+    my @uploads = $c->req->upload;
+    return unless @uploads;
+
+    my $dir = '/data/nfs/3d/custom';
+    unless (-d $dir) {
+        eval { make_path($dir) };
+        if ($@ || !-d $dir) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'order_new',
+                "Cannot create $dir for order drawings: " . ($@ // $!));
+            die "reference pictures could not be stored: $dir is not writable";
+        }
+    }
+
+    my $saved = 0;
+    for my $upload (@uploads) {
+        my ($idx) = ($upload->name // '') =~ /^drawings_(\d+)$/;
+        next unless defined $idx;
+        my $line = $order->lines->search({}, { order_by => 'id', rows => 1, offset => $idx })->first;
+        next unless $line;
+
+        my $name = $upload->filename // 'drawing';
+        $name =~ s{[/\\]}{}g;
+        $name =~ s/[^A-Za-z0-9._-]/_/g;
+        next unless $name =~ /\.(jpe?g|png|pdf|svg)$/i;
+
+        my $stamp = strftime('%Y%m%d_%H%M%S', localtime);
+        my $dest  = "$dir/line_" . $line->id . "_${stamp}_$name";
+        unless ($upload->copy_to($dest)) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'order_new',
+                "Drawing copy failed for line " . $line->id . ": $!");
+            die "a reference picture could not be stored";
+        }
+        $c->model('DBEncy')->resultset('File')->create({
+            file_name    => $name,
+            file_type    => ($name =~ /(\.[^.]+)$/ ? $1 : ''),
+            file_data    => '',
+            site_id      => $c->session->{site_id} // 0,
+            reference_id => 0,
+            category_id  => 0,
+            share_id     => 0,
+            description  => 'custom_order_line:' . $line->id,
+            upload_date  => strftime('%Y-%m-%d %H:%M:%S', localtime),
+            file_size    => $upload->size // 0,
+            file_path    => $dest,
+            nfs_path     => $dest,
+            file_url     => '',
+            file_status  => 'active',
+            file_format  => 'application/octet-stream',
+            user_id      => $c->session->{user_id} // 0,
+            sitename     => $self->_sitename($c),
+        });
+        $saved++;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'order_new',
+        "Order " . $order->id . " stored $saved reference picture(s)") if $saved;
 }
 
 __PACKAGE__->meta->make_immutable;

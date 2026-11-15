@@ -112,6 +112,16 @@
         desc.value = prefill.description || '';
         tdDesc.appendChild(desc);
 
+        var file = document.createElement('input');
+        file.type = 'file';
+        file.name = 'drawings_' + idx;
+        file.id = 'drawings_' + idx;
+        file.multiple = true;
+        file.accept = '.jpg,.jpeg,.png,.pdf,.svg';
+        file.setAttribute('aria-label', 'Reference pictures for this part');
+        tdDesc.appendChild(document.createElement('br'));
+        tdDesc.appendChild(file);
+
         var tdQty = document.createElement('td');
         var qty = document.createElement('input');
         qty.type = 'number';
