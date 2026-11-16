@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.6",
+  "versionCode": 60,
+  "versionName": "3.5.2",
   "apkUrl": "/api/app/download",
-  "releaseNotes": "Fix custom domain URL in updater & Settings, dynamic version display."
+  "releaseNotes": "v3.5.2 Native HealthKitchen Dashboard: Daily Meals, Coffees, Recipes BOM, Patient Intake & 1-Tap HTML Web View Toggle."
 }

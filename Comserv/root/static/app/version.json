@@ -1,6 +1,6 @@
 {
-  "versionCode": 48,
-  "versionName": "3.4.15",
+  "versionCode": 60,
+  "versionName": "3.5.2",
   "apkUrl": "/api/app/download",
-  "releaseNotes": "v3.4.15 WebView X-Debug-Mode header injection for live web debug bar & automatic target re-authentication on Dev/Prod Connection Test."
+  "releaseNotes": "v3.5.2 Native HealthKitchen Dashboard: Daily Meals, Coffees, Recipes BOM, Patient Intake & 1-Tap HTML Web View Toggle."
 }
