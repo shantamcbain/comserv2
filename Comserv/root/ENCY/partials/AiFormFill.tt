@@ -41,8 +41,8 @@
     </label>
     &nbsp;&nbsp;
     <label style="cursor:pointer;" title="Sends use_search to /ai2/chat, the same flag Chat with AI uses">
-      <input type="checkbox" id="ency-ai-web-search" style="vertical-align:middle;">
-      Use live web search (same flag as Chat with AI)
+      <input type="checkbox" id="ency-ai-web-search" checked style="vertical-align:middle;">
+      Search sites, then fill the form from those sources
     </label>
     <span style="margin-left:1em;color:#888;">
       Note: The <em>Reference</em> field is always appended, never replaced.
@@ -125,7 +125,7 @@
 
     // One access path: POST /ai2/chat. Model is the Chat with AI selector
     // (empty = the server Router). Agent is ency. No private provider list.
-    function encyAiRequest(promptText, signal) {
+    function encyAiRequest(promptText, signal, extra) {
         var model = sharedChatModel();
         var web = document.getElementById('ency-ai-web-search');
         var body = {
@@ -135,6 +135,7 @@
             page_title: document.title,
             use_search: (web && web.checked) ? 1 : 0
         };
+        if (extra && extra.lookup_name) body.lookup_name = extra.lookup_name;
         if (model) body.model = model;
         return fetch('/ai2/chat', {
             method: 'POST',
@@ -172,9 +173,9 @@
         document.getElementById('ency-ai-raw').style.display = 'none';
         document.getElementById('ency-resolve-panel').style.display = 'none';
 
-        statusEl.textContent = 'Asking Encyclopedia agent\u2026';
+        statusEl.textContent = 'Searching sources, then filling the form\u2026';
 
-        var timeoutMs  = 120000;
+        var timeoutMs  = 180000;
         var controller = new AbortController();
         var timeoutId  = setTimeout(function() { controller.abort(); }, timeoutMs);
 
@@ -187,7 +188,7 @@
         var basePrompt = fieldInstruction + ' The subject is: ' + name;
         var fullPrompt = extraInstructions ? basePrompt + '\n\nAdditional instructions: ' + extraInstructions : basePrompt;
 
-        encyAiRequest(fullPrompt, controller.signal)
+        encyAiRequest(fullPrompt, controller.signal, { lookup_name: name })
         .then(function(data) {
             clearTimeout(timeoutId);
             btn.disabled = false;
