@@ -883,6 +883,24 @@ sub api_inventory_stock_unreserve :Path('inventory/stock/unreserve') :Args(0) {
 
 # Session gate for the phone barcode routes. Existing inventory aliases keep
 # the LAN bypass. App-context work can later point this at ModuleAccess.
+# Inventory permission used by the phone gate below and by Chat-with-AI's
+# photo/barcode intent (Model::AI2::PhotoIntent), so both decide the same way.
+sub inventory_allowed {
+    my ($self, $c) = @_;
+    my $allowed = $self->_session_is_admin($c);
+    if (eval { require Comserv::Util::ModuleAccess; 1 }) {
+        my $mod = 'Comserv::Util::ModuleAccess';
+        if ($mod->can('inventory_access')) {
+            $allowed = $mod->inventory_access($c) ? 1 : 0;
+        } elsif ($mod->can('allows')) {
+            $allowed = $mod->allows($c, 'inventory') ? 1 : 0;
+        } elsif ($mod->can('can_access')) {
+            $allowed = $mod->can_access($c, 'inventory') ? 1 : 0;
+        }
+    }
+    return $allowed ? 1 : 0;
+}
+
 sub _api_inventory_session_gate {
     my ($self, $c) = @_;
     my $uid = eval { $c->session->{user_id} };
@@ -931,18 +949,7 @@ sub _api_inventory_session_gate {
     $c->stash->{SiteName} = $resolved;
     $c->session->{SiteName} = $resolved;
 
-    my $allowed = $self->_session_is_admin($c);
-    if (eval { require Comserv::Util::ModuleAccess; 1 }) {
-        my $mod = 'Comserv::Util::ModuleAccess';
-        if ($mod->can('inventory_access')) {
-            $allowed = $mod->inventory_access($c) ? 1 : 0;
-        } elsif ($mod->can('allows')) {
-            $allowed = $mod->allows($c, 'inventory') ? 1 : 0;
-        } elsif ($mod->can('can_access')) {
-            $allowed = $mod->can_access($c, 'inventory') ? 1 : 0;
-        }
-    }
-    unless ($allowed) {
+    unless ($self->inventory_allowed($c)) {
         $self->_json_error($c, 403, 'Forbidden.', 'forbidden');
         return;
     }
@@ -1051,6 +1058,192 @@ sub api_inventory_photo_upload :Path('inventory/photo/upload') :Args(0) {
         bytes        => $r->{bytes},
         content_type => $r->{content_type},
     });
+}
+
+# ---------------------------------------------------------------------------
+# Shared photo / barcode reader. ONE code path for the Android app, the web
+# inventory pages and Chat-with-AI (Model::AI2::PhotoIntent calls the same
+# Comserv::Util::Inventory::PhotoRead subs). Only the view differs.
+#   POST /api/app/photo/read           multipart photo, mode=items|invoice [, location_id] -> 202
+#   GET  /api/app/photo/read/<id>      the read, matched lines, totals, supplier
+#   POST /api/app/photo/reparse        {read_id, raw_text}
+#   POST /api/app/photo/confirm        {read_id, lines, create_invoice, supplier_id|supplier_create, ...}
+#   POST /api/app/photo/rerun          {read_id [, sitename (admin)]}  -> 202
+#   POST /api/app/photo/delete         {read_id [, sitename (admin)]}
+#   GET  /api/app/photo/reads          admin only
+#   POST /api/app/photo/scan           {barcode?, description?}
+#   POST /api/app/photo/scan/apply     {item_id | create, action, qty, location_id, to_location_id, ...}
+# Session only (_api_inventory_session_gate); the site comes from that gate.
+# ---------------------------------------------------------------------------
+
+sub _photo_reader {
+    my ($self, $c) = @_;
+    require Comserv::Util::Inventory::PhotoRead;
+    my $root = eval { $c->config->{home} } || eval { $c->path_to()->stringify } || '.';
+    return Comserv::Util::Inventory::PhotoRead->new(root => $root);
+}
+
+sub _photo_fail {
+    my ($self, $c, $r) = @_;
+    $self->_json_error($c, ($r->{status} || 400), ($r->{error} || 'Request failed'), ($r->{code} || 'bad_request'));
+}
+
+sub _photo_post_json {
+    my ($self, $c) = @_;
+    unless (uc($c->req->method || '') eq 'POST') {
+        $self->_json_error($c, 405, 'POST required', 'method_not_allowed');
+        return;
+    }
+    my $p = $self->_api_read_json($c);
+    return ref $p eq 'HASH' ? $p : {};
+}
+
+sub _json_202 {
+    my ($self, $c, $payload) = @_;
+    $c->res->status(202);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => 1, %{ $payload || {} } }));
+    $c->detach();
+}
+
+# Admins may act on another site's read from the photo_reads list.
+sub _photo_target_site {
+    my ($self, $c, $site, $p) = @_;
+    my $admin = $self->_session_is_admin($c);
+    my $want = ref $p eq 'HASH' ? $p->{sitename} : undef;
+    return ($admin && defined $want && $want =~ /\S/) ? ($want, 1) : ($site, $admin);
+}
+
+sub api_app_photo_read :Path('app/photo/read') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    unless (uc($c->req->method || '') eq 'POST') {
+        $self->_json_error($c, 405, 'POST required', 'method_not_allowed');
+        return;
+    }
+    my $upload = eval { $c->req->upload('photo') };
+    unless ($upload && $upload->tempname) {
+        $self->_json_error($c, 400, 'No photo supplied.', 'no_photo');
+        return;
+    }
+    my $pr = $self->_photo_reader($c);
+    my $r  = $pr->queue($c,
+        sitename    => $site,
+        user_id     => $c->session->{user_id},
+        username    => $c->session->{username},
+        mode        => scalar($c->req->param('mode')),
+        location_id => scalar($c->req->param('location_id')),
+        image_path  => $upload->tempname,
+        mime        => ($upload->type || 'image/jpeg'),
+    );
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    $pr->spawn_worker($c, $site, $r->{read_id});
+    $self->_json_202($c, { read_id => $r->{read_id}, status => $r->{status} });
+}
+
+sub api_app_photo_read_get :Path('app/photo/read') :Args(1) {
+    my ($self, $c, $read_id) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my ($tsite, $admin) = $self->_photo_target_site($c, $site, { sitename => scalar $c->req->param('sitename') });
+    my $schema = eval { $c->model('DBEncy') };
+    my $r = $self->_photo_reader($c)->view($c, $schema,
+        sitename => $tsite, user_id => $c->session->{user_id}, read_id => $read_id, is_admin => $admin);
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    $self->_json_ok($c, $r->{read});
+}
+
+sub api_app_photo_reparse :Path('app/photo/reparse') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $p = $self->_photo_post_json($c) or return;
+    my $r = $self->_photo_reader($c)->reparse($c,
+        sitename => $site, user_id => $c->session->{user_id}, read_id => $p->{read_id}, raw_text => $p->{raw_text});
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
+}
+
+sub api_app_photo_confirm :Path('app/photo/confirm') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $p = $self->_photo_post_json($c) or return;
+    my $schema = eval { $c->model('DBEncy') };
+    unless ($schema) {
+        $self->_json_error($c, 503, 'Database not available', 'db_unavailable');
+        return;
+    }
+    my $r = $self->_photo_reader($c)->confirm($c, $schema,
+        sitename => $site,
+        user_id  => $c->session->{user_id},
+        username => $c->session->{username},
+        create_invoice => ($p->{create_invoice} ? 1 : 0),
+        keep_photo     => ($p->{keep_photo} ? 1 : 0),
+        map { ($_ => $p->{$_}) } qw(read_id lines supplier_id supplier_create invoice_number
+                                     invoice_date tax shipping total attach_photo_index),
+    );
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
+}
+
+sub api_app_photo_rerun :Path('app/photo/rerun') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $p = $self->_photo_post_json($c) or return;
+    my ($tsite, $admin) = $self->_photo_target_site($c, $site, $p);
+    my $pr = $self->_photo_reader($c);
+    my $r = $pr->rerun($c, sitename => $tsite, user_id => $c->session->{user_id},
+        read_id => $p->{read_id}, is_admin => $admin);
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    $pr->spawn_worker($c, $tsite, $r->{read_id});
+    $self->_json_202($c, { read_id => $r->{read_id}, status => $r->{status} });
+}
+
+sub api_app_photo_delete :Path('app/photo/delete') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $p = $self->_photo_post_json($c) or return;
+    my ($tsite, $admin) = $self->_photo_target_site($c, $site, $p);
+    my $r = $self->_photo_reader($c)->delete_photo($c, sitename => $tsite,
+        user_id => $c->session->{user_id}, read_id => $p->{read_id}, is_admin => $admin);
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
+}
+
+sub api_app_photo_reads :Path('app/photo/reads') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_inventory_session_gate($c) or return;
+    my $r = $self->_photo_reader($c)->list_reads($c, is_admin => $self->_session_is_admin($c),
+        kept_only => ($c->req->param('kept') ? 1 : 0));
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
+}
+
+sub api_app_photo_scan :Path('app/photo/scan') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $p = $self->_photo_post_json($c) or return;
+    my $schema = eval { $c->model('DBEncy') };
+    my $r = $self->_photo_reader($c)->scan($c, $schema, sitename => $site,
+        barcode => $p->{barcode}, description => $p->{description}, inv => eval { $c->controller('Inventory') });
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
+}
+
+sub api_app_photo_scan_apply :Path('app/photo/scan/apply') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $p = $self->_photo_post_json($c) or return;
+    my $schema = eval { $c->model('DBEncy') };
+    my $r = $self->_photo_reader($c)->scan_apply($c, $schema,
+        sitename => $site, user_id => $c->session->{user_id}, username => $c->session->{username},
+        map { ($_ => $p->{$_}) } qw(item_id create action qty location_id to_location_id unit_cost supplier_id));
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
 }
 
 =head2 api_list_documentation
@@ -4782,6 +4975,33 @@ sub api_admin_bot_tokens :Path('admin/bot_tokens') :Args(0) {
         "Bot token list read by admin=$admin->{username}, rows=" . scalar(@out));
     $c->res->status(200);
     $c->res->body(encode_json({ success => 1, count => scalar(@out), tokens => \@out }));
+    $c->detach();
+}
+
+sub api_healthkitchen_dashboard :Path('healthkitchen/dashboard') :Args(0) {
+    my ($self, $c) = @_;
+
+    require Comserv::Util::HealthKitchen;
+    require Comserv::Util::HealthKitchen::MealSlots;
+    require Comserv::Util::AppTime;
+
+    my $hk = Comserv::Util::HealthKitchen->new;
+    my $MS = 'Comserv::Util::HealthKitchen::MealSlots';
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
+
+    my $today_dash = eval { $hk->today_dashboard($c) } || {};
+    my $day_slots  = eval { $MS->day($c, $today) } || { slots => [] };
+    my $recipes    = eval { $hk->list_recipes($c) } || [];
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success       => \1,
+        coffees_today => $today_dash->{coffees_today} || 0,
+        morning_bev   => $today_dash->{morning_bev} || "Ceylon Cinnamon, Turmeric, Black Pepper, Chia Seed",
+        meal_slots    => $day_slots->{slots} || [],
+        recipes       => $recipes
+    }));
     $c->detach();
 }
 
