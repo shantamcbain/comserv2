@@ -475,36 +475,69 @@ sub do_login :Local {
         $c->session->{user_id}  = $user->id;
 
         # Lock the login's own site into the session ("Shanta" login -> site
-        # Shanta). The host may be a shared dev host that resolves to CSC, and
-        # without this the whole session runs as CSC and every page/API answers
-        # with CSC suppliers, items and theme.
+        # Shanta) only on a shared or unmapped host. A specific public domain
+        # keeps the host's site; the lock would otherwise replace 3d.usbm.ca
+        # with site Shanta for the rest of the session.
+        my $req_host = eval { $c->req->uri->host };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_login',
+                "Login host read failed: $@");
+            $req_host = '';
+        }
+        $req_host = '' unless defined $req_host;
+        my $host_site = '';
+        my $specific = 0;
         eval {
-            my $dbh = $c->model('DBEncy')->storage->dbh;
-            my ($own) = $dbh->selectrow_array(
-                "SELECT s.name FROM sites s JOIN user_site_roles usr ON usr.site_id = s.id
-                  WHERE usr.user_id = ? AND LOWER(s.name) = LOWER(?)
-                    AND (usr.is_active IS NULL OR usr.is_active = 1)
-                  LIMIT 1",
-                undef, $user->id, $user->username
-            );
-            $c->session->{site_locked} = 1;    # decided at login; don't keep re-deciding
-            if ($own) {
-                my $prev = $c->session->{SiteName} // '';
-                if (lc $prev ne lc $own) {
-                    $c->session->{SiteName} = $own;
-                    $c->stash->{SiteName}   = $own;
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
-                        "Login site locked to '$own' (host had '$prev')");
+            require Comserv::Controller::Root;
+            if (!Comserv::Controller::Root::_is_shared_host($req_host)) {
+                my $sd = $c->model('Site')->get_site_domain($c, $req_host);
+                if ($sd) {
+                    my $site = $c->model('Site')->get_site_details($c, $sd->site_id);
+                    if ($site && defined $site->name && $site->name ne '') {
+                        $specific = 1;
+                        $host_site = $site->name;
+                    }
                 }
-            } else {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
-                    "No site named after user '$username'; keeping host site '"
-                    . ($c->session->{SiteName} // '') . "'");
             }
         };
         if ($@) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_login',
-                "Login site lock failed: $@");
+                "Login host-site check failed: $@");
+        }
+        if ($specific) {
+            $c->session->{SiteName} = $host_site;
+            $c->stash->{SiteName}   = $host_site;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                "Login on $req_host keeps host site $host_site");
+        } else {
+            eval {
+                my $dbh = $c->model('DBEncy')->storage->dbh;
+                my ($own) = $dbh->selectrow_array(
+                    "SELECT s.name FROM sites s JOIN user_site_roles usr ON usr.site_id = s.id
+                      WHERE usr.user_id = ? AND LOWER(s.name) = LOWER(?)
+                        AND (usr.is_active IS NULL OR usr.is_active = 1)
+                      LIMIT 1",
+                    undef, $user->id, $user->username
+                );
+                $c->session->{site_locked} = 1;    # decided at login; don't keep re-deciding
+                if ($own) {
+                    my $prev = $c->session->{SiteName} // '';
+                    if (lc $prev ne lc $own) {
+                        $c->session->{SiteName} = $own;
+                        $c->stash->{SiteName}   = $own;
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                            "Login site locked to '$own' (host had '$prev')");
+                    }
+                } else {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                        "No site named after user '$username'; keeping host site '"
+                        . ($c->session->{SiteName} // '') . "'");
+                }
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_login',
+                    "Login site lock failed: $@");
+            }
         }
         $c->session->{first_name} = $user->first_name if $user->can('first_name');
         $c->session->{last_name}  = $user->last_name if $user->can('last_name');

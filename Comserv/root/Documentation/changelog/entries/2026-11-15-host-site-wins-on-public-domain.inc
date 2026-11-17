@@ -1,0 +1,6 @@
+<div id="2026-11-15-host-site-wins-on-public-domain" class="cl-entry">
+<h3>2026-11-15 — Public domain Host site wins over the username-site lock</h3>
+<p class="doc-body"><strong>What.</strong> On a public domain that maps to a site, that site is used and written into the session, even when the session is site-locked or the user is a CSC admin. An explicit <code>?SiteName=</code> or <code>X-Sitename</code> that already validates still wins. Shared hosts (localhost, a bare IP, <code>*.local</code>, <code>*.zero</code>, <code>workstation*</code>, <code>dev.computersystemconsulting.ca</code>) keep the username-site lock, the session heal, and <code>/switch_site</code>. Login on a specific host logs <code>Login on &lt;host&gt; keeps host site &lt;X&gt;</code> and does not apply the username lock.</p>
+<p class="doc-body"><strong>Why.</strong> Signing in at <code>3d.usbm.ca</code> as Shanta locked the session to site Shanta, the same site as <code>shanta.weaverbeck.com</code>. The Android app no longer sends <code>X-Sitename</code> on public domains, so the Host has to decide. The lock was only meant to stop shared dev hosts from forcing CSC.</p>
+<p class="doc-body"><strong>Files.</strong> <code>lib/Comserv/Controller/Root.pm</code>, <code>lib/Comserv/Controller/User.pm</code>, <code>t/root_site_host_precedence.t</code>.</p>
+</div>
