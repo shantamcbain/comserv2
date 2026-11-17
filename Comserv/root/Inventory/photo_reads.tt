@@ -1,0 +1,11 @@
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+<h1>Photo reads (admin)</h1>
+<p>Invoice photos are kept only as a debug backup tied to their read. Re-run reads the stored photo again; Delete removes the photo and keeps the record.
+<a href="/Inventory/invoice" style="margin-left:1em;">&larr; Supplier invoices</a></p>
+<div id="photo-reads-list"></div>
+<script src="/static/js/ai-chat/feature-photo.js?v=20261116-steps"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.ComservChat && ComservChat.featurePhoto) ComservChat.featurePhoto.mountReadsList(document.getElementById('photo-reads-list'));
+});
+</script>

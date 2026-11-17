@@ -50,11 +50,17 @@ sub lookup {
     my $raw = defined $args{barcode} ? $args{barcode} : '';
     $raw =~ s/^\s+|\s+$//g;
     my $barcode = $class->_barcode_key($raw);
+    # The catalog language is part of the key: switching <Inventory>/catalog_language
+    # must not keep serving results translated into the previous language.
+    require Comserv::Util::TextTranslate;
+    my $cache_key = length $barcode
+        ? $barcode . '|' . Comserv::Util::TextTranslate->catalog_language($c)
+        : '';
     my $save = $args{save} ? 1 : 0;
     my $now = time;
 
-    if (length $barcode && $CACHE{$barcode}) {
-        my $hit = $CACHE{$barcode};
+    if (length $cache_key && $CACHE{$cache_key}) {
+        my $hit = $CACHE{$cache_key};
         if ($now - $hit->{at} < $hit->{ttl}) {
             my %copy = %{ $hit->{data} };
             $copy{cached} = 1;
@@ -68,7 +74,7 @@ sub lookup {
     my $found;
 
     push @tried, 'open_food_facts';
-    my $off = eval { $class->_from_open_food_facts($barcode, $fetcher) };
+    my $off = eval { $class->_from_open_food_facts($barcode, $fetcher, $c) };
     if ($@) {
         $errors{open_food_facts} = 'request_failed';
         $class->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'lookup',
@@ -116,7 +122,7 @@ sub lookup {
         $out->{errors} = \%errors if %errors;
     }
 
-    $CACHE{$barcode} = {
+    $CACHE{$cache_key} = {
         at   => $now,
         ttl  => $out->{found} ? 24 * 3600 : 3600,
         data => { %$out, cached => 0 },
@@ -134,15 +140,23 @@ sub _barcode_key {
 }
 
 sub _off_url {
-    my ($class, $barcode) = @_;
-    my $fields = 'product_name,brands,quantity,ingredients_text,nutriments,image_front_url';
-    return 'https://world.openfoodfacts.org/api/v2/product/' . $barcode . '.json?fields=' . $fields;
+    my ($class, $barcode, $c) = @_;
+    require Comserv::Util::TextTranslate;
+    my $want = Comserv::Util::TextTranslate->catalog_language($c);
+    my @fields = qw(product_name brands quantity ingredients_text generic_name lang nutriments image_front_url);
+    # Ask for the catalog language's own copy when Open Food Facts has one, so a
+    # non-English catalog does not have to translate text it already has.
+    for my $base (qw(product_name ingredients_text generic_name)) {
+        push @fields, "${base}_$want" if $want ne 'en';
+    }
+    return 'https://world.openfoodfacts.org/api/v2/product/' . $barcode
+        . '.json?fields=' . join(',', @fields);
 }
 
 sub _from_open_food_facts {
-    my ($class, $barcode, $fetcher) = @_;
+    my ($class, $barcode, $fetcher, $c) = @_;
     return { found => 0 } unless length $barcode;
-    my $res = $fetcher->($class->_off_url($barcode));
+    my $res = $fetcher->($class->_off_url($barcode, $c));
     return { error => 'timeout' } unless $res && ref $res eq 'HASH';
     return { error => $res->{error} } if $res->{error};
     my $status = $res->{status} // 0;
@@ -152,11 +166,41 @@ sub _from_open_food_facts {
     my $data = eval { decode_json($res->{body} // '') };
     return { error => 'bad_json' } unless $data && ref $data eq 'HASH';
     return { found => 0 } unless ($data->{status} // 0) && ref $data->{product} eq 'HASH';
-    return { found => 1, data => $class->_map_off($barcode, $data->{product}) };
+    return { found => 1, data => $class->_map_off($barcode, $data->{product}, $c) };
+}
+
+# Catalog text for a field, in the shop's catalog language (comserv.conf
+# <Inventory>/catalog_language, default English).
+#
+# Order: the source's own copy of that language, then the product's language when
+# it already matches the catalog, then a translation. Falls back to the original
+# when translation is unavailable, so a field is never emptied.
+sub _catalog_text {
+    my ($class, $c, $p, $base) = @_;
+    return '' unless ref $p eq 'HASH';
+    require Comserv::Util::TextTranslate;
+    my $want = Comserv::Util::TextTranslate->catalog_language($c);
+    for my $key ("${base}_$want", "${base}_en") {
+        my $v = $p->{$key};
+        return $v if defined $v && $v =~ /\S/;
+    }
+    my $src = $p->{$base};
+    return '' unless defined $src && $src =~ /\S/;
+    my $lang = Comserv::Util::TextTranslate->normalize_lang($p->{lang});
+    return $src if defined $p->{lang} && $lang eq $want;
+    return $src if Comserv::Util::TextTranslate->in_language($src, $want);
+    return $src unless $c;
+    my $t = eval { Comserv::Util::TextTranslate->new(lang => $want)->to_language($c, $src) };
+    if ($@ || !defined $t || $t !~ /\S/) {
+        $class->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'translate',
+            "Could not translate $base to $want (source lang=" . ($p->{lang} || '?') . '): ' . ($@ || 'empty'));
+        return $src;
+    }
+    return $t;
 }
 
 sub _map_off {
-    my ($class, $barcode, $p) = @_;
+    my ($class, $barcode, $p, $c) = @_;
     require Comserv::Util::HealthKitchen;
     my $hk = Comserv::Util::HealthKitchen->new;
     my $brand = $p->{brands};
@@ -164,10 +208,10 @@ sub _map_off {
     $brand = undef if defined $brand && $brand !~ /\S/;
     my $qty = $p->{quantity};
     my ($sv, $su) = $hk->parse_size($qty // '');
-    my $ings = $class->split_ingredients($p->{ingredients_text});
+    my $ings = $class->split_ingredients($class->_catalog_text($c, $p, 'ingredients_text'));
     my $nut = $class->_map_nutriments($p->{nutriments});
     return {
-        name        => $p->{product_name} || undef,
+        name        => $class->_catalog_text($c, $p, 'product_name') || undef,
         brand       => $brand,
         size        => (defined $qty && $qty =~ /\S/) ? $qty : undef,
         size_value  => $sv,
@@ -177,6 +221,7 @@ sub _map_off {
         image_url   => $p->{image_front_url} || undef,
         source      => 'open_food_facts',
         source_url  => "https://world.openfoodfacts.org/product/$barcode",
+        description => $class->_catalog_text($c, $p, 'generic_name') || undef,
         saved_nutrient_id => undef,
         _nutriments => (ref $p->{nutriments} eq 'HASH' ? $p->{nutriments} : {}),
     };

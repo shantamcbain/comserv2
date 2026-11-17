@@ -14,6 +14,8 @@
 [% IF error_msg %]<p style="color:red;font-weight:bold">List error: [% error_msg %]</p>[% END %]
 [% IF flash.error_msg %]<p style="color:red">[% flash.error_msg %]</p>[% END %]
 
+[% INCLUDE 'Inventory/invoice/photo_read.tt' %]
+
 [% IF invoices.size %]
 <table border="1" cellpadding="6" style="width:100%;border-collapse:collapse;">
   <thead>
