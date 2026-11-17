@@ -1,6 +1,6 @@
 {
-  "versionCode": 48,
-  "versionName": "3.4.15",
-  "apkUrl": "/api/app/download",
-  "releaseNotes": "v3.4.15 WebView X-Debug-Mode header injection for live web debug bar & automatic target re-authentication on Dev/Prod Connection Test."
+    "versionCode": 61,
+    "versionName": "3.4.17",
+    "apkUrl": "/static/app/ComservInventory.apk",
+    "releaseNotes": "Dev server + sitename fix; in-app ZeroTier (*.zero) lookup with Comserv Dev CA"
 }
