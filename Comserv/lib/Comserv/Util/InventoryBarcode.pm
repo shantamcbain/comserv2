@@ -36,8 +36,19 @@ sub item_payload {
     my $ready = eval { $hk->ingredients_columns_ready($c) } ? 1 : 0;
     my $product = $class->_product_for($c, $item, $ready);
     my $links = $class->_links_for($c, $item);
+    # Rows captured before the catalog language was enforced, or filled from a
+    # one-language source, can hold another language. Show the catalog language in
+    # the form so the app and the stored catalog agree.
+    my $ing_raw = $ready ? $product->{ingredients_text} : undef;
+    if (defined $ing_raw && $ing_raw =~ /\S/) {
+        require Comserv::Util::TextTranslate;
+        my $want = Comserv::Util::TextTranslate->catalog_language($c);
+        unless (Comserv::Util::TextTranslate->in_language($ing_raw, $want)) {
+            $ing_raw = Comserv::Util::TextTranslate->new(lang => $want)->to_language($c, $ing_raw);
+        }
+    }
     my $ingredients = $ready
-        ? Comserv::Util::ProductLookup->split_ingredients($product->{ingredients_text})
+        ? Comserv::Util::ProductLookup->split_ingredients($ing_raw)
         : [];
     my $row = {
         id              => 0 + $item->id,

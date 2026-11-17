@@ -4185,6 +4185,19 @@ sub invoice_list :Path('/Inventory/invoice') :Args(0) {
     );
 }
 
+# Admin list of kept photo reads (debug backups). The page is a thin view: it
+# calls /api/app/photo/reads, /rerun and /delete (Util::Inventory::PhotoRead).
+sub photo_reads :Path('/Inventory/photo_reads') :Args(0) {
+    my ($self, $c) = @_;
+    my $api = $c->controller('Api');
+    unless ($api && $api->_session_is_admin($c)) {
+        $c->res->status(403);
+        $c->res->body('Admins only.');
+        return;
+    }
+    $c->stash(template => 'Inventory/photo_reads.tt');
+}
+
 sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
     my ($self, $c) = @_;
     my $sitename = $self->_sitename($c);
@@ -6633,83 +6646,22 @@ sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
 
     eval {
         $schema->txn_do(sub {
-            my $stock = $schema->resultset('Accounting::InventoryStockLevel')->find_or_create(
-                { item_id => $item_id, location_id => ($loc_id || \'NULL') },
-                { default => { quantity_on_hand => 0, quantity_reserved => 0, quantity_on_order => 0 } }
-            ) if $loc_id;
-
-            if ($loc_id) {
-                my $new_qty = $stock->quantity_on_hand;
-                if ($type =~ /^(receive|adjust_up|produce|harvest|return)$/) {
-                    $new_qty += $qty;
-                } else {
-                    $new_qty -= $qty;
-                }
-                $stock->update({ quantity_on_hand => $new_qty, updated_at => $now });
-            }
-
-            my $item_rec = $schema->resultset('Accounting::InventoryItem')->find($item_id);
-            if ($item_rec && ($item_rec->inventory_accno_id || $item_rec->expense_accno_id)) {
-                my $unit_cost = $params->{unit_cost} || $item_rec->unit_cost || 0;
-                my $value     = $qty * $unit_cost;
-                my $ref       = 'API-TXN-' . $item_id . '-' . time();
-                my $gl = $schema->resultset('Accounting::GlEntry')->create({
-                    reference   => $ref,
-                    description => ucfirst($type) . ' (API): ' . ($item_rec->name || "Item $item_id") . " x$qty",
-                    entry_type  => 'inventory',
-                    post_date   => $today,
-                    approved    => 1,
-                    currency    => 'CAD',
-                    sitename    => $sitename,
-                    entered_by  => $c->session->{user_id} || undef,
-                });
-                $gl_entry_id = $gl->id;
-
-                if ($value != 0) {
-                    my ($dr_acct, $cr_acct);
-                    if ($type =~ /^(receive|adjust_up|produce|harvest)$/) {
-                        $dr_acct = $item_rec->inventory_accno_id;
-                        $cr_acct = $item_rec->expense_accno_id || $item_rec->inventory_accno_id;
-                    } else {
-                        $dr_acct = $item_rec->expense_accno_id || $item_rec->inventory_accno_id;
-                        $cr_acct = $item_rec->inventory_accno_id;
-                    }
-                    if ($dr_acct) {
-                        $schema->resultset('Accounting::GlEntryLine')->create({
-                            gl_entry_id => $gl_entry_id,
-                            account_id  => $dr_acct,
-                            amount      => $value,
-                            memo        => ucfirst($type) . " $qty units (API)",
-                            sort_order  => 1,
-                        });
-                    }
-                    if ($cr_acct && $cr_acct != ($dr_acct || 0)) {
-                        $schema->resultset('Accounting::GlEntryLine')->create({
-                            gl_entry_id => $gl_entry_id,
-                            account_id  => $cr_acct,
-                            amount      => -$value,
-                            memo        => ucfirst($type) . " $qty units (API)",
-                            sort_order  => 2,
-                        });
-                    }
-                }
-            }
-
-            my $txn = $schema->resultset('Accounting::InventoryTransaction')->create({
+            # Shared with the scan flow (Util::Inventory::StockTxn, 2026-11-16).
+            require Comserv::Util::Inventory::StockTxn;
+            ($txn_id, $gl_entry_id) = Comserv::Util::Inventory::StockTxn->post($schema,
                 item_id          => $item_id,
-                location_id      => $loc_id || undef,
-                transaction_type => $type,
-                quantity         => $qty,
-                unit_cost        => $params->{unit_cost} || undef,
-                reference_number => $params->{reference_number} || undef,
-                gl_entry_id      => $gl_entry_id || undef,
+                type             => $type,
+                qty              => $qty,
+                location_id      => $loc_id,
                 sitename         => $sitename,
-                notes            => $params->{notes} || undef,
-                performed_by     => $c->session->{username} || 'api',
-                transaction_date => $now,
-                created_at       => $now,
-            });
-            $txn_id = $txn->id;
+                unit_cost        => $params->{unit_cost},
+                reference_number => $params->{reference_number},
+                notes            => $params->{notes},
+                user_id          => $c->session->{user_id},
+                username         => $c->session->{username},
+                now              => $now,
+                today            => $today,
+            );
         });
     };
     if ($@) {
