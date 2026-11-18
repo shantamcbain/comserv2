@@ -58,6 +58,18 @@ sub auto :Private {
 
 sub _sitename {
     my ($self, $c) = @_;
+    # The Android app and the JSON API carry the site in the request (a
+    # sitename parameter or the X-Sitename header) and have no session to read
+    # it from. Without this they fell through to 'default' and every list came
+    # back empty, which reads as "the data is gone".
+    my $sent = eval { $c->req->params->{sitename} }
+        || eval { $c->req->header('X-Sitename') }
+        || eval { $c->req->params->{'X-Sitename'} };
+    if (defined $sent && $sent =~ /\S/) {
+        $sent =~ s/^\s+|\s+$//g;
+        $sent =~ s/[^A-Za-z0-9._ -]//g;
+        return $sent if length $sent;
+    }
     return $c->session->{'SiteName'} || 'default';
 }
 
@@ -4080,14 +4092,45 @@ sub api_bom :Path('/Inventory/api/bom') :Args(0) {
 sub api_locations :Path('/Inventory/api/locations') :Args(0) {
     my ($self, $c) = @_;
     my $sitename = $c->req->params->{sitename} || $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $rs       = $schema->resultset('Accounting::InventoryLocation');
+
+    # An older DB has no `code` column, and DBIC names every column it knows,
+    # so the whole select fails with "Unknown column 'me.code'". Read only the
+    # columns that are actually there. Answering "no locations" instead would
+    # read as lost data to the person holding the container.
+    my $src  = $rs->result_source;
+    my $have = do { my %h = map { $_ => 1 } $src->columns; \%h };
+    my @cols = grep { $have->{$_} } qw(id name code location_type);
+    push @cols, 'description' if $have->{description};
+
     my @locations;
+    my $err;
     eval {
-        @locations = $self->_schema($c)->resultset('Accounting::InventoryLocation')->search(
-            { sitename => $sitename },
-            { order_by => 'name' }
+        @locations = $rs->search(
+            { sitename => $sitename, status => [ 'active', undef ] },
+            { columns => \@cols, order_by => 'name' }
         )->all;
-    };
-    my @result = map { { id => $_->id, name => $_->name } } @locations;
+        1;
+    } or $err = $@ || 'query failed';
+
+    # An empty result is a legitimate answer (a site with no locations yet), not
+    # a failure. Treating it as one reported "Could not read locations" with a
+    # blank error, which reads as lost data to the person holding a container.
+    # Only a real DBIC error is a failure here.
+    if ($err) {
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(do { require JSON; JSON::encode_json({
+            success => 0, error => "Could not read locations: $err", sitename => $sitename }) });
+        $c->detach;
+    }
+
+    my @result = map {
+        { id => $_->id, name => $_->name,
+          code => ($have->{code} ? (eval { $_->code } // '') : ''),
+          location_type => ($have->{location_type} ? (eval { $_->location_type } // '') : '') }
+    } @locations;
     $c->res->content_type('application/json');
     $c->res->body(do { require JSON; JSON::encode_json(\@result) });
     $c->detach;
