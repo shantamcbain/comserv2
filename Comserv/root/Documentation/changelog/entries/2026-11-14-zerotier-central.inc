@@ -1,0 +1,6 @@
+<div id="2026-11-14-zerotier-central" class="cl-entry">
+<h3>2026-11-14 — ZeroTier Central page</h3>
+<p class="doc-body"><strong>What.</strong> Admins and developers can open <code>/admin/infrastructure/zerotier</code>, see routes, DNS and devices for network <code>af78bf943680bfeb</code>, and change routes or DNS after a side-by-side confirm. A route whose via address is on no device is flagged. The API token is stored encrypted in <code>app_secrets</code> and is never shown or logged. The previous routes and DNS are written to the log before a change, and the last change can be undone from the same confirm step.</p>
+<p class="doc-body"><strong>Why.</strong> The <code>192.168.1.0/24</code> route pointed at <code>172.30.39.42</code>, which no device has, and the DNS handed to devices was the workstation resolver, which refuses website names. Those settings could only be fixed by hand on the ZeroTier Central website.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/lib/Comserv/Util/ZeroTier.pm</code>, <code>Comserv/lib/Comserv/Util/ZeroTierCredentials.pm</code>, <code>Comserv/lib/Comserv/Controller/Admin/ZeroTier.pm</code>, <code>Comserv/root/admin/infrastructure/zerotier.tt</code>, <code>Comserv/t/zerotier_central.t</code></p>
+</div>

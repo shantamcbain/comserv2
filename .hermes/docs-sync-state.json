@@ -1,22 +1,18 @@
 {
-  "branch": "healthkitchen",
-  "head_sha": "6cda5cc6a",
-  "date": "2026-11-12",
+  "branch": "3d",
+  "head_sha": "bcdddf576",
+  "date": "2026-11-11",
   "uncommitted": true,
-  "last_doc_commit": "0b5be2495 (docs: update Hermes.md with AI guidance and Gitleaks config); this session's docs are uncommitted",
-  "changelog_entry": "Comserv/root/Documentation/changelog/entries/2026-11-12-schema-compare-decimal-size.inc",
+  "last_doc_commit": "bcdddf576 feat: add APK download endpoint and improve branch server startup (from main); the 3d doc and code edits from 2026-11-05..11-07 are still uncommitted",
+  "changelog_entry": "Comserv/root/Documentation/changelog/entries/2026-11-05-consignment-location-count.inc, 2026-11-06-consignment-replacement.inc, 2026-11-06-consignment-loop.inc, 2026-11-06-restock-levels.inc, 2026-11-06-kobra-start-print.inc, 2026-11-07-custom-creation-plan.inc, 2026-11-07-custom-creation-any-description.inc, 2026-11-07-custom-order-description.inc, 2026-11-11-hermes-md-repair.inc",
   "docs_updated": [
-    "Comserv/root/Documentation/SchemaMasterPlan.tt (section 11 defect 5 - Result-side decimal size)",
-    "Comserv/root/Documentation/HealthKitchenPlan.tt (HK-PANTRY stock-out paragraph)",
-    "Comserv/root/Documentation/changelog/entries/2026-11-12-schema-compare-decimal-size.inc",
-    "Comserv/root/Documentation/changelog/entries/2026-11-12-healthkitchen-recipe-make-hardening.inc"
+    "Comserv/root/Documentation/CustomCreationPlan.tt (new)",
+    "Comserv/root/Documentation/3dPrintingPlan.tt",
+    "Comserv/root/Documentation/3d/Kobra3LanMode.tt",
+    "Comserv/root/Documentation/3d/Printer500HourMaintenance.tt",
+    "Comserv/root/Documentation/Inventory/consignment.tt",
+    "Comserv/root/Documentation/features/3d_printing.tt"
   ],
-  "todos_touched": [
-    "2469",
-    "2638",
-    "2691",
-    "2692",
-    "2706"
-  ],
-  "note": "Schema comparison showed every decimal column with a blank Result size, so Update Table emitted MODIFY ... decimal NULL and MariaDB resolved it to decimal(10,0); net_weight_g could not be corrected. Cause was the read direction: Result files declare size => [10, 2] and ResultParser had no array branch (the bareword branch cannot match a leading '['), so size parsed as undef; the nested-hash branch collected only quoted items and turned [10, 2] into an empty list. Fixed in ResultParser (array + nested-array parsing) and SchemaComparison (flatten to the DB parser's \"p,s\" form for the grid and the ALTER; no 0+$size on a reference). Verified through the real action, not the page: calling Admin::SchemaComparison::schema_compare_table in-process now yields Result sizes discount_percent (10,0), markup_percent (6,2), net_weight_g (10,2), print_time_hours (6,2), selling_price/unit_cost/unit_price (10,2), reorder_point blank (integer, correct); table side net_weight_g/markup_percent still (10,0) = real pre-existing drift to apply. Sweep of 294 Result files: 218/219 decimal columns carry a size (Todo.point_rate declares none). Test t/schema_result_parser_array_size.t. ALSO this session: a dashboard merge of main into healthkitchen left four conflicted files with markers in Git.pm and Api.pm, which made the app uncompilable, froze :4015 on 14:53 code and made the parser fixes look ineffective - root cause of the whole report. Resolved Git.pm (main's BotIdentity block + this branch's registry symlink), Api.pm (kept api_log_error), version.json (kept versionCode 25 / 1.3.1 over main's 23 / 3.2), the worktrees-json-symlink changelog (main's wording); t/util_git_create_worktree.t 15/15. HealthKitchen consume_recipe now rounds container fractions to 3 decimals to match the decimal(12,3) stock columns. Todo 2469 was still status 5 with a dead clock (accumulative_time 00:00:00) and no matching page (/healthkitchen/plan/id never existed; the UI is mealplans.tt/mealplan.tt) - stopped to status 2. 2638 is open again at status 1 (reopened after an earlier close) and genuinely needs a Director work order for the first-drink recipe; 2691/2692 status 2, 2706 status 3. Other branches still hold status-5 rows: 2311 (project 121 AI chat), 2595 (project 232 mail invoice sort), 2682 (project 310 3D STL pictures)."
+  "todos_touched": [2334, 2666, 2668, 2680, 2681],
+  "note": "Conflict here was a stash pop (3d side) over main's 2026-11-09 docs note; resolved 2026-11-11 keeping the 3d truth. Main's note described the git-dev/Documentation branches and remains in git history. Staged for one commit: consignment placement/count/restock flow (Util/ConsignmentCount*.pm, RestockWork.pm, four new Result classes, count + review templates, consignment-count.js, worker script), printer LAN and queue work (PrinterLan.pm, LanMap.pm, Anycubic.pm, 3d/queue.tt, printer_lan_sync.pl), custom-creation intake (order-form paragraph + drawings, CustomCreationPlan.tt) and the .hermes.md repair. Runtime noise (var/twiggy.enabled deletion, ai_rank_jobs/3d.json pid blob, static/app/version.json) was restored to HEAD so it does not ride along. STILL OWED: inventory_location_levels and inventory_consignments.invoice_id must be applied through the in-app schema-compare Update Table (no hand DDL; db/migrations/20261105_consignment_location_counts.sql stays untracked as history only). printing_3d_jobs.labour_cost stays decimal(10,0) until that same sync runs, so todo #2334 remains open."
 }

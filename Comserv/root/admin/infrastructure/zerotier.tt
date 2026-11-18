@@ -1,0 +1,216 @@
+[% PageVersion = 'admin/infrastructure/zerotier.tt,v 0.01 2026/11/14 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% META
+  title = 'ZeroTier Network'
+  roles = 'admin,developer'
+  TemplateType = 'Application'
+  category = 'admin,infrastructure'
+%]
+
+<div class="container">
+    <h1>ZeroTier</h1>
+    <p>
+        <a href="[% c.uri_for('/admin/infrastructure') %]">Infrastructure</a>
+        · network <code>[% zt_network_id | html %]</code>
+    </p>
+
+    [% IF c.flash.success_msg %]
+    <div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+    [% END %]
+    [% IF c.flash.error_msg %]
+    <div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+    [% END %]
+    [% IF zt_error %]
+    <div class="alert alert-danger">[% zt_error | html %]</div>
+    [% END %]
+    [% IF zt_member_error %]
+    <div class="alert alert-warning">[% zt_member_error | html %]</div>
+    [% END %]
+
+    <div class="card">
+        <div class="card-header">Connection</div>
+        <div class="card-body">
+            <p>
+                [% IF zt_token_set %]
+                Token is set. It is not shown.
+                [% ELSE %]
+                Token is not set.
+                [% END %]
+            </p>
+            <p class="text-muted">The token is stored encrypted in app_secrets. This page does not approve or remove devices, and it does not create networks.</p>
+            <form method="POST" action="[% c.uri_for('/admin/infrastructure/zerotier/token') %]">
+                <div class="form-group">
+                    <label for="zt-network-id">Network id</label>
+                    <input id="zt-network-id" class="form-control" type="text" name="network_id" value="[% zt_network_id | html %]" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="zt-token">API token</label>
+                    <input id="zt-token" class="form-control" type="password" name="api_token" value="" autocomplete="new-password" placeholder="Leave blank to keep the saved token">
+                </div>
+                <button type="submit" class="btn btn-primary">Save connection</button>
+            </form>
+        </div>
+    </div>
+
+    [% IF zt_view %]
+    <div class="card">
+        <div class="card-header">Network</div>
+        <div class="card-body">
+            <p><strong>[% zt_view.name | html %]</strong>
+                [% IF zt_view.private %]<span class="badge badge-secondary">private</span>[% ELSE %]<span class="badge badge-warning">public</span>[% END %]
+            </p>
+            [% IF zt_view.pools.size %]
+            <p>Address pools:
+                [% FOREACH pool IN zt_view.pools %]
+                <code>[% pool.start | html %]–[% pool.end | html %]</code>
+                [% END %]
+            </p>
+            [% END %]
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Routes
+            [% IF zt_view.orphan_count %]
+            <span class="badge badge-warning">[% zt_view.orphan_count %] via an address no device has</span>
+            [% END %]
+        </div>
+        <div class="card-body">
+            <table class="table table-sm">
+                <thead><tr><th>Target</th><th>Via</th><th></th></tr></thead>
+                <tbody>
+                [% FOREACH route IN zt_view.routes %]
+                <tr>
+                    <td><code>[% route.target | html %]</code></td>
+                    <td><code>[% route.via | html %]</code></td>
+                    <td>[% IF route.orphan %]<span class="badge badge-warning">no device has this address</span>[% END %]</td>
+                </tr>
+                [% END %]
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">DNS</div>
+        <div class="card-body">
+            <p>Domain: <code>[% zt_view.dns.domain | html %]</code></p>
+            <ul>
+                [% IF zt_view.dns.servers.size %]
+                [% FOREACH server IN zt_view.dns.servers %]
+                <li><code>[% server | html %]</code></li>
+                [% END %]
+                [% ELSE %]
+                <li>No DNS servers are pushed to devices.</li>
+                [% END %]
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Devices</div>
+        <div class="card-body">
+            <table class="table table-sm">
+                <thead><tr><th>Name</th><th>Node</th><th>Authorized</th><th>Addresses</th><th>Last seen</th></tr></thead>
+                <tbody>
+                [% FOREACH device IN zt_view.devices %]
+                <tr>
+                    <td>[% device.name | html %]</td>
+                    <td><code>[% device.node_id | html %]</code></td>
+                    <td>[% IF device.authorized %]yes[% ELSE %]no[% END %]</td>
+                    <td><code>[% device.ips | html %]</code></td>
+                    <td>[% device.last_seen | html %]</td>
+                </tr>
+                [% END %]
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    [% IF zt_pending %]
+    <div class="card">
+        <div class="card-header">Confirm [% zt_pending.op | html %]</div>
+        <div class="card-body">
+            <p>Nothing has been sent yet. Compare the live settings with the change, then confirm.</p>
+            <div class="row">
+                <div class="col-md-6">
+                    <h2>Current</h2>
+                    <table class="table table-sm">
+                        <thead><tr><th>Target</th><th>Via</th></tr></thead>
+                        <tbody>
+                        [% FOREACH route IN zt_current_routes %]
+                        <tr>
+                            <td><code>[% route.target | html %]</code></td>
+                            <td><code>[% route.via | html %]</code>[% IF route.orphan %] <span class="badge badge-warning">orphan</span>[% END %]</td>
+                        </tr>
+                        [% END %]
+                        </tbody>
+                    </table>
+                    <p>DNS <code>[% zt_pending.baseline.dns.domain | html %]</code></p>
+                    <ul>
+                        [% FOREACH server IN zt_pending.baseline.dns.servers %]
+                        <li><code>[% server | html %]</code></li>
+                        [% END %]
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h2>New</h2>
+                    <table class="table table-sm">
+                        <thead><tr><th>Target</th><th>Via</th></tr></thead>
+                        <tbody>
+                        [% FOREACH route IN zt_proposed_routes %]
+                        <tr>
+                            <td><code>[% route.target | html %]</code></td>
+                            <td><code>[% route.via | html %]</code>[% IF route.orphan %] <span class="badge badge-warning">orphan</span>[% END %]</td>
+                        </tr>
+                        [% END %]
+                        </tbody>
+                    </table>
+                    <p>DNS <code>[% zt_pending.proposed.dns.domain | html %]</code></p>
+                    <ul>
+                        [% FOREACH server IN zt_pending.proposed.dns.servers %]
+                        <li><code>[% server | html %]</code></li>
+                        [% END %]
+                    </ul>
+                </div>
+            </div>
+            <form method="POST" action="[% c.uri_for('/admin/infrastructure/zerotier/confirm') %]">
+                <input type="hidden" name="pending_sha" value="[% zt_pending.sha | html %]">
+                <button type="submit" class="btn btn-primary">Confirm</button>
+            </form>
+        </div>
+    </div>
+    [% END %]
+
+    <div class="card">
+        <div class="card-header">Change routes and DNS</div>
+        <div class="card-body">
+            <p>One route per line: <code>192.168.1.0/24 via 172.30.39.1</code> or <code>10.147.17.0/24</code>. One DNS server IP per line. This step only shows the difference.</p>
+            <form method="POST" action="[% c.uri_for('/admin/infrastructure/zerotier/preview') %]">
+                <div class="form-group">
+                    <label for="zt-routes">Routes</label>
+                    <textarea id="zt-routes" class="form-control" name="routes_text" rows="6">[% IF zt_pending %][% FOREACH route IN zt_pending.proposed.routes %][% route.target | html %][% IF route.via %] via [% route.via | html %][% END %]
+[% END %][% ELSE %][% FOREACH route IN zt_view.routes %][% route.target | html %][% IF route.via %] via [% route.via | html %][% END %]
+[% END %][% END %]</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="zt-dns-domain">DNS domain</label>
+                    <input id="zt-dns-domain" class="form-control" type="text" name="dns_domain" value="[% IF zt_pending %][% zt_pending.proposed.dns.domain | html %][% ELSE %][% zt_view.dns.domain | html %][% END %]">
+                </div>
+                <div class="form-group">
+                    <label for="zt-dns-servers">DNS servers</label>
+                    <textarea id="zt-dns-servers" class="form-control" name="dns_servers" rows="4">[% IF zt_pending %][% FOREACH server IN zt_pending.proposed.dns.servers %][% server | html %]
+[% END %][% ELSE %][% FOREACH server IN zt_view.dns.servers %][% server | html %]
+[% END %][% END %]</textarea>
+                </div>
+                <button type="submit" class="btn btn-secondary">Preview change</button>
+            </form>
+            [% IF zt_undo %]
+            <form method="POST" action="[% c.uri_for('/admin/infrastructure/zerotier/undo') %]">
+                <button type="submit" class="btn btn-warning">Preview undo of last change</button>
+            </form>
+            [% END %]
+        </div>
+    </div>
+    [% END %]
+</div>

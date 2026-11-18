@@ -12,6 +12,17 @@
     </div>
     [% END %]
     
+    [%# Nov 5 2026: document-writer AI. Fills the form below; you still review and press Create. %]
+    <details class="page-ai-writer" id="page-ai-writer">
+        <summary><strong>Write with AI</strong> &mdash; describe the page and the AI fills in the form for you to review</summary>
+        <label for="page-ai-topic">What is the page about?</label>
+        <input type="text" id="page-ai-topic" class="form-control" placeholder="e.g. Printer maintenance checklist for the 3D farm">
+        <label for="page-ai-writer-notes">Facts, points or text to include</label>
+        <textarea id="page-ai-writer-notes" class="form-control" rows="5"></textarea>
+        <button type="button" class="btn btn-primary btn-sm" id="page-ai-write-btn">Write page</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="page-ai-draft-btn" title="Save what is in the form as a hidden draft page">Save as draft</button>
+        <span id="page-ai-writer-status" class="page-ai-status"></span>
+    </details>
     <form method="POST" action="/pages/create">
         <div class="form-group">
             <label for="sitename">Site Name:</label>
@@ -56,6 +67,7 @@
         [% PROCESS 'pages/partials/html_editor.tt'
            body_content  = form_data.body
            body_label    = 'Page Content'
+           ai_assist     = 1
            body_required = 1
         %]
         

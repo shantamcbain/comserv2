@@ -44,7 +44,7 @@ local *Comserv::Util::UserPreferences::get = sub { undef };
     HKFake::Row->new(id => 4, name => 'Stew', sitename => 'CSC', username_of_poster => 'Shanta', _lines => []),
   ],
   'HealthKitchen::MealPlanEntry' => [
-    HKFake::Row->new(id => 11, plan_date => '2026-11-09', meal_slot => 'breakfast', recipe_id => 2, user_id => 178, sitename => 'Shanta', status => 'draft'),
+    HKFake::Row->new(id => 11, plan_date => '2026-11-09', meal_slot => 'breakfast', recipe_id => 2, meal_plan_id => 7, user_id => 178, sitename => 'Shanta', status => 'draft'),
     HKFake::Row->new(id => 12, plan_date => '2026-11-09', meal_slot => 'dinner', recipe_id => 4, user_id => 178, sitename => 'Shanta', status => 'draft'),
     HKFake::Row->new(id => 13, plan_date => '2026-11-09', meal_slot => 'dinner', recipe_id => 2, user_id => 999, sitename => 'Shanta', status => 'draft'),
   ],
@@ -62,6 +62,9 @@ is $s{morning_beverage}{recipes}[0]{name}, 'Morning beverage', 'drink default re
 is_deeply $s{morning_beverage}{recipes}[0]{ingredients}, ['16 g Turmeric'], 'ingredients';
 is scalar @{ $s{coffee_1}{recipes} }, 0, "other owner's Coffee recipe not used";
 is $s{breakfast}{recipes}[0]{name}, 'Oats', 'breakfast from own plan';
+is $s{breakfast}{title}, 'Oats', 'card title is the dish, not the slot label';
+is $s{breakfast}{plan_url}, '/healthkitchen/mealplan/7', 'title links to that meal plan';
+is $s{supper}{title}, 'Supper', 'no owned recipe keeps the slot label';
 is scalar @{ $s{supper}{recipes} }, 0, 'cross-site recipe and other user plan ignored';
 ok $s{coffee_1}{done} && $s{coffee_1}{duration} == 8, 'done + duration from log';
 is $s{breakfast}{started}, '10:20', 'open start shown';

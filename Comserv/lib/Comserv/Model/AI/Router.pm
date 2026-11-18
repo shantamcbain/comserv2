@@ -2,6 +2,7 @@ package Comserv::Model::AI::Router;
 
 use Moose;
 use namespace::autoclean;
+use JSON::MaybeXS qw(decode_json);
 
 # Add your code here later
 
@@ -50,7 +51,7 @@ sub sync_models {
     my $roles   = $c->session->{roles} || [];
     $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
     my $is_admin = grep { $_ =~ /^(admin|developer)$/i } @$roles;
-    return { success => JSON::false, error => 'Admin access required' } unless $is_admin;
+    return { success => \0, error => 'Admin access required' } unless $is_admin;
 
     my $schema = $c->model('DBEncy')->schema;
     my $key_obj = $schema->resultset('UserApiKeys')->search(
@@ -60,11 +61,11 @@ sub sync_models {
             { service => $service, is_active => '1' }
          )->first;
 
-    return { success => JSON::false, error => "No active $service API key found" }
+    return { success => \0, error => "No active $service API key found" }
         unless $key_obj && $key_obj->api_key_encrypted;
 
     my $api_key = $key_obj->get_api_key() || '';
-    return { success => JSON::false, error => "Failed to decrypt $service API key" }
+    return { success => \0, error => "Failed to decrypt $service API key" }
         unless $api_key;
 
     my %endpoint = (
@@ -72,18 +73,18 @@ sub sync_models {
         openai => 'https://api.openai.com/v1/models',
     );
     my $url = $endpoint{lc $service};
-    return { success => JSON::false, error => "Model sync not supported for $service" }
+    return { success => \0, error => "Model sync not supported for $service" }
         unless $url;
 
     require LWP::UserAgent;
     my $ua = LWP::UserAgent->new(timeout => 10);
     my $res = $ua->get($url, Authorization => "Bearer $api_key");
-    return { success => JSON::false, error => 'Provider API error: ' . $res->status_line }
+    return { success => \0, error => 'Provider API error: ' . $res->status_line }
         unless $res->is_success;
 
     my $models = decode_json($res->decoded_content)->{data} || [];
     # store in metadata if desired...
-    return { success => JSON::true, models => $models, count => scalar(@$models) };
+    return { success => \1, models => $models, count => scalar(@$models) };
 }
 
 # ----------------------------------------------------------------------

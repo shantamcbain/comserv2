@@ -632,12 +632,72 @@ function ensureThinkingStyles(doc) {
             .catch(function () { return ''; });
     }
 
+    /* AI2_ATTACH_DECISION_START */
     const DEFAULT_APP_PATHS = [
         'lib/Comserv/Controller/AI2.pm',
         'lib/Comserv/Model/AI2/Chat.pm',
         'lib/Comserv/Model/AI2/CodeRead.pm',
         'lib/Comserv/Model/AI2/Router.pm'
     ];
+
+    // A how-to URL is not an ask about the editor. Todo 2735: the HealthKitchen
+    // brief contained http://host/ai2/editing_widget_popup and that alone made
+    // isAboutAiEditor true, so the named Result files were never loaded.
+    function textWithoutInstructionUrls(text) {
+        return String(text || '')
+            .replace(/https?:\/\/[^\s<>"')\]]+/gi, ' ')
+            .replace(/(?:^|[\s`'"(:=])\/ai2\/editing_widget_popup\b/gi, ' ');
+    }
+
+    function promptNamedSourcePaths(text) {
+        const raw = String(text || '');
+        const re = /(?:^|[\s`'"(=:,])((?:Comserv\/)?(?:lib|root|script|t)\/[A-Za-z0-9_./-]+\.(?:pm|tt|js|pl|t))/gi;
+        const out = [];
+        let m;
+        while ((m = re.exec(raw)) !== null) {
+            const p = m[1].replace(/^Comserv\//i, '');
+            if (out.indexOf(p) === -1) out.push(p);
+        }
+        return out;
+    }
+
+    // eval #31: attach the four AI2 sources only when the ask is about the
+    // editor itself. Do not count /ai2/ that appears only in a how-to URL.
+    function isAboutAiEditor(text, openPath) {
+        const p = textWithoutInstructionUrls(text).toLowerCase()
+            + ' ' + String(openPath || '').toLowerCase();
+        return /\bai2\b|ai editor|ai-editor|chat with ai|\bchat\.pm\b|\brouter\.pm\b|coderead|\/ai2\//.test(p);
+    }
+
+    // Named lib/root/script/t paths always load, including on a review brief
+    // (wantEval). The launch file is added by the caller when it is a source
+    // path; a .tt buffer is sent as content, not fetched again.
+    function evalFetchPaths(openPath, promptText) {
+        const paths = promptNamedSourcePaths(promptText);
+        if (isAboutAiEditor(promptText, openPath)) {
+            DEFAULT_APP_PATHS.forEach(function (p) {
+                if (paths.indexOf(p) === -1) paths.push(p);
+            });
+        }
+        if (openPath && /^(lib|root\/static|sql|script|t)\//.test(openPath)
+            && paths.indexOf(openPath) === -1) {
+            paths.unshift(openPath);
+        }
+        return paths;
+    }
+
+    function evalAttachPlan(openPath, openContent, promptText) {
+        const fetchPaths = evalFetchPaths(openPath, promptText).slice();
+        const buffer = !!(openPath && openContent && String(openContent).length
+            && !/^(lib|root\/static|sql|script|t)\//.test(openPath));
+        return {
+            bufferPath: buffer ? openPath : '',
+            fetchPaths: buffer
+                ? fetchPaths.filter(function (p) { return p !== openPath; })
+                : fetchPaths
+        };
+    }
+    /* AI2_ATTACH_DECISION_END */
 
     // Infer related controller / pipeline files from an opened template or page path.
     // Beefed up: uses getEditorContext() to handle cases where the *open file* (the one being edited)
@@ -743,29 +803,13 @@ function ensureThinkingStyles(doc) {
             .catch(function () { return null; });
     }
 
-    // eval #31: only attach the AI2 chat/router sources when the ask is about
-    // the AI editor/chat itself. Before, every "review/evaluate" ask about any
-    // page got ~190K chars of AI2 code, so free models answered about AI2.
-    function isAboutAiEditor(text, openPath) {
-        const p = String(text || '').toLowerCase() + ' ' + String(openPath || '').toLowerCase();
-        return /\bai2\b|ai editor|ai-editor|chat with ai|\bchat\.pm\b|\brouter\.pm\b|coderead|\/ai2\//.test(p);
-    }
-
     function loadFilesForEval(openPath, openContent, promptText) {
-        const paths = isAboutAiEditor(promptText, openPath) ? DEFAULT_APP_PATHS.slice() : [];
-        if (openPath && openContent && String(openContent).length
-            && paths.indexOf(openPath) === -1 && !/^(lib|root\/static|sql|script|t)\//.test(openPath)) {
-            // Open .tt or other buffer: send what is in the editor, then the rest.
-            return Promise.all(paths.map(fetchLoadFile)).then(function (rows) {
-                return [{ path: openPath, content: openContent }].concat(rows.filter(Boolean));
-            });
-        }
-        if (openPath && /^(lib|root\/static|sql|script|t)\//.test(openPath)
-            && paths.indexOf(openPath) === -1) {
-            paths.unshift(openPath);
-        }
-        return Promise.all(paths.map(fetchLoadFile)).then(function (rows) {
+        const plan = evalAttachPlan(openPath, openContent, promptText);
+        return Promise.all(plan.fetchPaths.map(fetchLoadFile)).then(function (rows) {
             const got = rows.filter(Boolean);
+            if (plan.bufferPath) {
+                return [{ path: plan.bufferPath, content: openContent }].concat(got);
+            }
             if (!got.length && openPath && openContent && String(openContent).length) {
                 return [{ path: openPath, content: openContent }];
             }
@@ -1416,6 +1460,12 @@ function ensureThinkingStyles(doc) {
                       host: document.getElementById('chat-messages'),
                       status: target.status,
                       pagePath: currentFilePath() || window.location.pathname
+                  });
+              }
+              if (data.invoice_action && window.ComservChat && ComservChat.featureInvoice
+                  && typeof ComservChat.featureInvoice.handleServerResult === 'function') {
+                  ComservChat.featureInvoice.handleServerResult(data.invoice_action, {
+                      host: document.getElementById('chat-messages')
                   });
               }
               if (!skipTodoCreate && extracted.actions && extracted.actions.length && window.ComservChat.featureTodo.handleAction) {

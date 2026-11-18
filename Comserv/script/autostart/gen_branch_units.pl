@@ -10,9 +10,17 @@
 # dashboard's Restart/Open buttons and the bulk update's "restart once at the end"
 # both need.
 #
-# Usage:  perl script/autostart/gen_branch_units.pl [--install]
+# Usage:  perl script/autostart/gen_branch_units.pl [--install] [--only=BRANCH]
 #         (default: write the files and PRINT the commands; --install runs
-#          `systemctl --user daemon-reload` and prints enable instructions only)
+#          `systemctl --user daemon-reload` and prints enable instructions only;
+#          --only=BRANCH rewrites just that worktree's unit)
+#
+# A branch entry may set "twiggy": true in root/config/worktrees.json. Its unit
+# then starts with -w: comserv_server.pl execs `plackup -s Twiggy -a
+# script/comserv_server.psgi` instead of Catalyst::ScriptRunner. That is what
+# enables the browser WebSocket terminal (_interactive_ws_available) and loads
+# the PSGI middleware chain (trusted-proxy X-Forwarded-For, PortlessHost,
+# static MIME/APK headers). Branch entries without it keep the plain dev server.
 use strict; use warnings;
 use JSON::MaybeXS qw(decode_json);
 use File::Path qw(make_path);
@@ -31,12 +39,26 @@ my $lib   = '/home/shanta/perl5/lib/perl5';
 make_path($dir);
 make_path("$home/.comserv/logs");
 
-my $install = (@ARGV && $ARGV[0] eq '--install') ? 1 : 0;
+my $install = 0;
+my $only;
+for my $arg (@ARGV) {
+    if    ($arg eq '--install')          { $install = 1 }
+    elsif ($arg =~ /^--only=(.+)$/)      { $only = $1 }
+    else  { die "unknown option $arg (expected --install or --only=BRANCH)\n" }
+}
 my $wrote = 0;
 for my $key (sort keys %{ $cfg->{branches} // {} }) {
+    next if defined $only && $key ne $only;
     my $ent  = $cfg->{branches}{$key};
     my $port = ref $ent eq 'HASH' ? $ent->{port} : $ent;
     next unless defined $port && $port =~ /^\d+$/;
+    # "twiggy": true -> start under plackup/Twiggy (-w) instead of the Catalyst dev
+    # server, so script/comserv_server.psgi (WebSockets + PSGI middleware) is loaded.
+    my $twiggy = (ref $ent eq 'HASH' && $ent->{twiggy}) ? 1 : 0;
+    my $start_args = $twiggy ? ' -w' : '';
+    my $twiggy_note = $twiggy
+        ? "# Twiggy (-w): app is served from script/comserv_server.psgi (WebSocket terminal +\n# PSGI middleware: trusted-proxy X-Forwarded-For, PortlessHost, static/APK headers).\n"
+        : '';
     my $wd = "$base/$key/Comserv/Comserv";
     unless (-d $wd) { warn "skip $key : $wd is not a checkout\n"; next; }
 
@@ -46,7 +68,7 @@ for my $key (sort keys %{ $cfg->{branches} // {} }) {
 # :$port = $key worktree. No -r: the process is supervised here (Restart=on-failure),
 # so a bulk main merge cannot trigger a restart storm mid-merge; the Git dashboard
 # restarts the unit once when the merge is done.
-[Unit]
+${twiggy_note}[Unit]
 Description=Comserv $key dev server on :$port (branch $key)
 After=network-online.target
 Wants=network-online.target
@@ -61,7 +83,7 @@ Environment=PATH=/home/shanta/perl5/perlbrew/perls/perl-5.40.0/bin:/usr/local/bi
 # Wait out a hand-started server still holding the port (stop can lag a few seconds);
 # without this every restart silently skipped.
 ExecCondition=/bin/sh -c 'i=0; while ss -ltn | grep -q ":$port "; do i=\$\$((i+1)); [ \$\$i -ge 20 ] && exit 1; sleep 1; done; exit 0'
-ExecStart=$perl script/comserv_server.pl -p $port
+ExecStart=$perl script/comserv_server.pl -p $port$start_args
 Restart=on-failure
 RestartSec=5
 StandardOutput=append:$home/.comserv/logs/$key\_$port.log

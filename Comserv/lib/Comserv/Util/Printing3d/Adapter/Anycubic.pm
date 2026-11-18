@@ -79,12 +79,15 @@ sub fetch_info {
         my $reason = ($res && $res->{reason}) ? $res->{reason} : '';
         $reason =~ s/\s+/ /g;
         $reason = substr($reason, 0, 80);
-        # HTTP::Tiny uses 599 for timeout, refused, and reset. A Kobra that
-        # just booted answers with one of those. That is not proof DHCP moved
-        # it: the 0.15s discover sweep misses a slow accept, and follow then
-        # marks the farm row offline. The printers page hides Control for
-        # offline, so the printer looks gone while it is still at this IP.
-        my $transient = ($status == 599 || $body =~ /timed?\s*out|refused|reset/i) ? 1 : 0;
+        # HTTP::Tiny uses 599 for timeout, refused, reset, AND "no route to host".
+        # A booting Kobra refuses or times out while it is still at this IP, so
+        # those stay transient and follow does not scan. "No route" means the
+        # address itself is dead (DHCP moved it). That must scan, or the farm
+        # keeps a stale IP and the queue shows no printer.
+        my $gone = ($reason =~ /no route|unreachable|host is down/i
+                 || $body   =~ /no route|unreachable/i) ? 1 : 0;
+        my $transient = (!$gone && ($status == 599
+                 || $body =~ /timed?\s*out|refused|reset/i)) ? 1 : 0;
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fetch_info',
             "host=$safe http=$status" . ($transient ? ' transient' : '')
             . ($reason ? " reason=$reason" : ''));

@@ -7,7 +7,7 @@
    page_version = "0.01"
    last_updated = "2026-09-23"
 %]
-[% PageVersion = 'healthkitchen/recipes.tt,v 0.01 2026/09/23 hermes-agent Exp shanta ' %]
+[% PageVersion = 'healthkitchen/recipes.tt,v 0.02 2026/11/13 hermes-agent Exp shanta - name opens the recipe detail' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="app-container">
@@ -46,7 +46,7 @@
 
         [% FOREACH r IN hk_recipes %]
             <div class="content-section" id="recipe-[% r.id %]">
-                <h2>[% r.name | html %][% IF r.source == 'ai_generated' %] <small class="badge">AI draft</small>[% END %]</h2>
+                <h2><a href="[% c.uri_for('/healthkitchen/recipe', r.id) %]">[% r.name | html %]</a>[% IF r.source == 'ai_generated' %] <small class="badge">AI draft</small>[% END %]</h2>
                 [% IF r.source == 'ai_generated' && r.notes %]<p class="alert alert-warning">[% r.notes | html %]</p>[% END %]
                 [% IF r.instructions %]<p style="white-space:pre-line">[% r.instructions | html %]</p>[% END %]
                 [% IF r.preparation %]<p>[% r.preparation | html %]</p>[% END %]

@@ -1,4 +1,4 @@
-[% PageVersion = 'Accounting/index.tt,v 0.03 2026/09/24 shanta Exp' %]
+[% PageVersion = 'Accounting/index.tt,v 0.04 2026/11/06 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
@@ -54,6 +54,11 @@
     <a href="/Inventory/stock/levels?low_only=1" style="flex:1;min-width:120px;background:[% low_stock > 0 ? '#fef2f2' : '#fff' %];border:1px solid [% low_stock > 0 ? '#ef4444' : '#ddd' %];border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
       <div style="font-size:1.8rem;font-weight:bold;color:[% low_stock > 0 ? '#b91c1c' : '#059669' %];">[% low_stock %]</div>
       <div style="font-size:0.8rem;color: var(--text-muted-color, #555);">Low Stock</div>
+    </a>
+
+    <a href="/Inventory/consignment?status=open" style="flex:1;min-width:120px;background:[% open_consignments > 0 ? '#eff6ff' : '#fff' %];border:1px solid [% open_consignments > 0 ? '#2563eb' : '#ddd' %];border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;" title="Consignment batches still owed a refill or a settlement">
+      <div style="font-size:1.8rem;font-weight:bold;color:[% open_consignments > 0 ? '#1d4ed8' : '#059669' %];">[% open_consignments %]</div>
+      <div style="font-size:0.8rem;color: var(--text-muted-color, #555);">Needs Refill</div>
     </a>
 
   </div>
@@ -153,6 +158,14 @@
         &#128230; Inventory
       </h2>
       <ul style="list-style:none;padding:0;margin:0;">
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory" style="font-weight:bold;">&#128230; Inventory Dashboard</a>
+          <div style="font-size:0.78rem;color:var(--text-muted-color,#666);">Counts, consignments, shop and stock in one place</div>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/consignment" style="font-weight:bold;">Co-op Consignments</a>
+          <div style="font-size:0.78rem;color:var(--text-muted-color,#666);">Photo count &rarr; invoice &rarr; replacement batch</div>
+        </li>
         <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
           <a href="/Inventory/items" style="font-weight:bold;">Items / SKUs ([% item_count %] active)</a>
         </li>

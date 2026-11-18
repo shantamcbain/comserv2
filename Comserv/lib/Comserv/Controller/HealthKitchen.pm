@@ -380,6 +380,25 @@ sub recipe_save :Local :Args(0) {
     $c->detach;
 }
 
+sub recipe :Local :Args(1) {
+    my ( $self, $c, $recipe_id ) = @_;
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'recipe',
+        "HealthKitchen recipe $recipe_id" );
+    require Comserv::Util::HealthKitchen::RecipeDetail;
+    my $detail = Comserv::Util::HealthKitchen::RecipeDetail->detail( $c, $recipe_id );
+    unless ($detail) {
+        $c->flash->{error_msg} = 'Recipe not found.';
+        $c->response->redirect( $c->uri_for( $self->action_for('recipes') ) );
+        $c->detach;
+        return;
+    }
+    $c->stash(
+        hk_recipe      => $detail,
+        hk_max_batches => $self->hk->max_batches($c),
+        template       => 'healthkitchen/recipe.tt',
+    );
+}
+
 sub seed_morning :Local :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'seed_morning',

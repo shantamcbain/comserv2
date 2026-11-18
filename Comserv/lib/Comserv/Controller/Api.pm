@@ -4411,12 +4411,12 @@ sub api_inventory_item_by_barcode_alt :Path('inventory/item_by_barcode') :Args(0
         my $map = eval { decode_json($res->{content}) };
         if ($map && $map->{status} && $map->{status} == 1) {
             my $p = $map->{product} || {};
-            my $pname = $p->{product_name} || $p->{product_name_en} || '';
+            my $pname = $p->{product_name_en} || $p->{product_name} || '';
             my $pcat  = $p->{categories} || $p->{category} || 'Pantry';
             $pcat =~ s/,.*//;
             my $pimg  = $p->{image_url} || $p->{image_front_url} || '';
             my $pbrand = $p->{brands} || '';
-            my $pingredients = $p->{ingredients_text} || $p->{ingredients_text_en} || '';
+            my $pingredients = $p->{ingredients_text_en} || $p->{ingredients_text} || '';
             my $nutr = $p->{nutriments} || {};
             my $kcal = $nutr->{'energy-kcal_100g'} || $nutr->{'energy-kcal'} || 0;
             my $prot = $nutr->{'proteins_100g'} || $nutr->{'proteins'} || 0;
@@ -4981,28 +4981,59 @@ sub api_admin_bot_tokens :Path('admin/bot_tokens') :Args(0) {
 sub api_healthkitchen_dashboard :Path('healthkitchen/dashboard') :Args(0) {
     my ($self, $c) = @_;
 
-    require Comserv::Util::HealthKitchen;
-    require Comserv::Util::HealthKitchen::MealSlots;
-    require Comserv::Util::AppTime;
+    unless ($c->session->{username} && $c->session->{user_id}) {
+        $c->res->status(401);
+        $c->res->content_type('application/json; charset=utf-8');
+        $c->res->body(encode_json({ success => 0, error => 'Not authenticated. Please log in first.', code => 'not_authenticated' }));
+        $c->detach;
+        return;
+    }
 
-    my $hk = Comserv::Util::HealthKitchen->new;
-    my $MS = 'Comserv::Util::HealthKitchen::MealSlots';
-    my $today = Comserv::Util::AppTime->today_ymd_for($c);
+    require Comserv::Util::HealthKitchen::AppDashboard;
+    my $dash = 'Comserv::Util::HealthKitchen::AppDashboard';
+    unless ( $dash->allowed($c) ) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'api_healthkitchen_dashboard',
+            'healthkitchen dashboard refused: no access');
+        $c->res->status(403);
+        $c->res->content_type('application/json; charset=utf-8');
+        $c->res->body(encode_json({ success => 0, error => 'Add Health Kitchen to your account to use this feature.' }));
+        $c->detach;
+        return;
+    }
 
-    my $today_dash = eval { $hk->today_dashboard($c) } || {};
-    my $day_slots  = eval { $MS->day($c, $today) } || { slots => [] };
-    my $recipes    = eval { $hk->list_recipes($c) } || [];
+    if ( ( $c->req->method // '' ) eq 'POST' ) {
+        my $res = eval { $dash->apply( $c, $c->req->params ) };
+        if ( my $err = $@ ) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_healthkitchen_dashboard',
+                "dashboard action failed: $err");
+            $res = { ok => 0, error => 'Could not update Health Kitchen.' };
+        }
+        $res = { ok => 0, error => 'Could not update Health Kitchen.' } unless ref $res eq 'HASH';
+        $c->res->status( $res->{ok} ? 200 : 400 );
+        $c->res->content_type('application/json; charset=utf-8');
+        $c->res->body(encode_json({
+            success => $res->{ok} ? 1 : 0,
+            ( $res->{error} ? ( error => "$res->{error}" ) : () ),
+            ( $res->{id} ? ( id => $res->{id} + 0 ) : () ),
+        }));
+        $c->detach;
+        return;
+    }
 
+    my $body = eval { $dash->payload($c) };
+    if ( my $err = $@ ) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_healthkitchen_dashboard',
+            "dashboard read failed: $err");
+        $c->res->status(500);
+        $c->res->content_type('application/json; charset=utf-8');
+        $c->res->body(encode_json({ success => 0, error => 'Could not load Health Kitchen.' }));
+        $c->detach;
+        return;
+    }
     $c->res->status(200);
-    $c->res->content_type('application/json');
-    $c->res->body(encode_json({
-        success       => \1,
-        coffees_today => $today_dash->{coffees_today} || 0,
-        morning_bev   => $today_dash->{morning_bev} || "Ceylon Cinnamon, Turmeric, Black Pepper, Chia Seed",
-        meal_slots    => $day_slots->{slots} || [],
-        recipes       => $recipes
-    }));
-    $c->detach();
+    $c->res->content_type('application/json; charset=utf-8');
+    $c->res->body(encode_json($body));
+    $c->detach;
 }
 
 1;

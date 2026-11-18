@@ -11,6 +11,7 @@ use Time::HiRes qw(gettimeofday);
 
 use Comserv::Util::Logging;
 use Comserv::Util::RequestTrace;
+use Comserv::Util::ApkDownload;
 
 # Cache-buster epoch for asset URLs (?v=...): set once per server start so
 # browsers refetch CSS/JS after every restart/deploy (see Root::auto).
@@ -1674,6 +1675,25 @@ sub set_theme {
         "Set theme for site $site_name to $theme_name");
 }
 
+# A shared dev host maps to CSC and must not override a login's own site.
+# A public domain that maps to a site is specific: that site wins.
+# One list. CodingAccess / DevPreview / ClientIP classify a different question
+# (who may code, whether this process is the workstation, client IP).
+sub _is_shared_host {
+    my ($host) = @_;
+    return 1 unless defined $host && length $host;
+    $host = lc $host;
+    $host =~ s/:\d+\z//;
+    $host =~ s/^\[|\]$//g;
+    return 1 if $host eq 'localhost' || $host eq '127.0.0.1' || $host eq '::1';
+    return 1 if $host =~ /^\d{1,3}(?:\.\d{1,3}){3}$/;
+    return 1 if $host =~ /:/ && $host =~ /^[0-9a-f:]+$/;
+    return 1 if $host =~ /\.(?:local|zero)$/;
+    return 1 if $host =~ /^workstation/;
+    return 1 if $host eq 'dev.computersystemconsulting.ca';
+    return 0;
+}
+
 sub fetch_and_set {
     my ($self, $c, $param) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Starting fetch_and_set action");
@@ -1721,10 +1741,35 @@ sub fetch_and_set {
         }
     }
 
+    # Host site is decided before the session lock. A specific public domain
+    # (mapped, and not a shared dev host) wins over site_locked and over an
+    # admin session. An explicit ?SiteName= / X-Sitename already in the stash
+    # still wins. Shared or unmapped hosts keep the lock, the heal, and
+    # /switch_site.
+    my $req_host = eval { $c->req->uri->host };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fetch_and_set',
+            "Host read failed: $@");
+        $req_host = '';
+    }
+    $req_host = '' unless defined $req_host;
+    my $host_specific = 0;
+    if (!_is_shared_host($req_host)) {
+        my $mapped = eval { $c->model('Site')->get_site_domain($c, $req_host) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fetch_and_set',
+                "Host site lookup failed for '$req_host': $@");
+        } elsif ($mapped) {
+            $host_specific = 1;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set',
+                "Host '$req_host' is specific; session lock will not override it");
+        }
+    }
+
     # Sessions created before the login-site lock was added carry the host's
     # SiteName (CSC on dev) and no site_locked flag. Correct them once, in place,
-    # so nobody has to log out to pick the fix up.
-    if (defined $c->session->{user_id} && $c->session->{user_id} ne '' && !$c->session->{site_locked}) {
+    # so nobody has to log out to pick the fix up. Not on a specific public host.
+    if (!$host_specific && defined $c->session->{user_id} && $c->session->{user_id} ne '' && !$c->session->{site_locked}) {
         eval {
             my $dbh = $c->model('DBEncy')->storage->dbh;
             my ($own) = $dbh->selectrow_array(
@@ -1753,7 +1798,7 @@ sub fetch_and_set {
     # /switch_site) survives every later request. Without this the hostname
     # default re-resolves each time and overwrites the login's site — which is
     # why a Shanta login on dev.computersystemconsulting.ca kept getting CSC.
-    if (!defined $c->stash->{SiteName} && defined $c->session->{SiteName} && length $c->session->{SiteName}) {
+    if (!$host_specific && !defined $c->stash->{SiteName} && defined $c->session->{SiteName} && length $c->session->{SiteName}) {
         my $sess_site = $c->session->{SiteName};
         my $uid       = $c->session->{user_id};
         my $allowed   = 0;
@@ -2757,6 +2802,18 @@ sub begin :Private {
     if (($c->req->path // '') =~ m{^(?:cgi-bin(?:/|$)|static/|favicon(?:/|$)|robots\.txt$|sitemap\.xml$|ads\.txt$|llms\.txt$|\.well-known/)}) {
         return;
     }
+
+    # Publish a newer Studio build before the link is rendered, then name
+    # that release in the href. The browser keeps the domain that served the page.
+    my $ver_file = $c->path_to('root/static/app/version.json')->stringify;
+    my $pub = eval { Comserv::Util::ApkDownload::publish_latest_build(tree_meta => $ver_file) };
+    if ($@ || (ref $pub eq 'HASH' && $pub->{error})) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin',
+            $@ || $pub->{error});
+    }
+    $c->stash->{phone_app_href} = Comserv::Util::ApkDownload::versioned_href(
+        Comserv::Util::ApkDownload::meta_path($ver_file)
+    );
 
     # Store request start time for timing analysis
     $c->stash->{_request_start_time} = time();

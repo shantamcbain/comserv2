@@ -1,0 +1,91 @@
+[% META
+   title = "Recipe"
+   description = "Preparation steps and ENCY links for one food recipe"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "HealthKitchen"
+   page_version = "0.01"
+   last_updated = "2026-11-13"
+%]
+[% PageVersion = 'healthkitchen/recipe.tt,v 0.01 2026/11/13 hermes-agent Exp shanta - steps and ENCY ingredient links' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+    [% INCLUDE 'healthkitchen/_disclaimer.tt' %]
+    <div class="page-header">
+        <h1>[% hk_recipe.name | html %]</h1>
+        <p>
+            <a href="[% c.uri_for('/healthkitchen/recipes') %]">Recipes</a>
+            ·
+            <a href="[% c.uri_for('/healthkitchen/recipe_form', { id => hk_recipe.id }) %]">Edit</a>
+            ·
+            <a href="[% c.uri_for('/healthkitchen') %]">Health Kitchen</a>
+        </p>
+    </div>
+
+    [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+
+    <p class="doc-muted">
+        [% IF hk_recipe.cuisine %][% hk_recipe.cuisine | html %][% END %]
+        [% IF hk_recipe.cook_time_min %] · [% hk_recipe.cook_time_min | html %] min[% END %]
+        [% IF hk_recipe.servings %] · [% hk_recipe.servings | html %] servings[% END %]
+        [% IF hk_recipe.yield_amount %] · [% hk_recipe.yield_amount | html %] [% hk_recipe.yield_unit | html %][% END %]
+    </p>
+
+    <div class="content-section">
+        <h2>Ingredients</h2>
+        [% IF hk_recipe.lines.size %]
+            <ul>
+                [% FOREACH ln IN hk_recipe.lines %]
+                    <li>
+                        [% IF ln.ency_id %]
+                            <a href="[% c.uri_for(ln.ency_path, ln.ency_id) %]">[% ln.name | html %]</a>
+                            [% IF ln.process %]<span class="doc-muted"> — [% ln.process | html %] form of [% ln.plant | html %]</span>[% END %]
+                        [% ELSIF ln.plant %]
+                            <a href="[% c.uri_for('/ENCY/add_herb', { common_names => ln.plant }) %]">[% ln.name | html %]</a>
+                            <span class="doc-muted"> — [% ln.process | html %] is a preparation of [% ln.plant | html %], not a new plant. Add [% ln.plant | html %].</span>
+                        [% ELSE %]
+                            <a href="[% c.uri_for('/ENCY/add_herb', { common_names => ln.name }) %]">[% ln.name | html %]</a>
+                            <span class="doc-muted">not in ENCY — add it</span>
+                        [% END %]
+                        [% IF ln.quantity %] — [% ln.quantity | html %] [% ln.unit | html %][% END %]
+                        [% IF ln.optional %] <span class="doc-muted">(optional)</span>[% END %]
+                        [% IF ln.notes %] <span class="doc-muted">[% ln.notes | html %]</span>[% END %]
+                    </li>
+                [% END %]
+            </ul>
+        [% ELSE %]
+            <p class="doc-muted">No ingredients stored.</p>
+        [% END %]
+    </div>
+
+    <div class="content-section">
+        <h2>Steps</h2>
+        [% IF hk_recipe.steps.size %]
+            <ol>
+                [% FOREACH step IN hk_recipe.steps %]
+                    <li>[% step | html %]</li>
+                [% END %]
+            </ol>
+        [% ELSE %]
+            <p class="doc-muted">No preparation steps are stored for this recipe yet.</p>
+        [% END %]
+    </div>
+
+    [% IF hk_recipe.notes && hk_recipe.source != 'ai_generated' %]
+        <div class="content-section">
+            <h2>Notes</h2>
+            <p>[% hk_recipe.notes | html %]</p>
+        </div>
+    [% END %]
+    [% IF hk_recipe.source == 'ai_generated' && hk_recipe.notes %]
+        <p class="alert alert-warning">[% hk_recipe.notes | html %]</p>
+    [% END %]
+
+    <form method="post" action="[% c.uri_for('/healthkitchen/recipe_make') %]/[% hk_recipe.id %]">
+        <input type="hidden" name="return" value="home" />
+        <label>Batches <input type="number" name="batches" value="1" min="1" max="[% hk_max_batches || 10 %]" step="1" /></label>
+        <button type="submit" class="btn btn-primary">Mark as made</button>
+    </form>
+</div>

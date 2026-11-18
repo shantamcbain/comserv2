@@ -217,7 +217,7 @@ sub classify_prompt_for_routing {
     # For editor agents (programming/analyze/documentation), mark supergrok available
     # and prefer it when the guard says daily allotment remains and key resolves.
     my $guard = $self->supergrok_guard($c);
-    my $sg_available = !$guard->{locked} && $self->_external_default_available($c, 'supergrok|grok-4.6');
+    my $sg_available = !$guard->{locked} && $self->_external_default_available($c, 'supergrok|grok-4.7');
     if ($sg_available) {
         # Nov 8 2026: SuperGrok is its own prepaid allowance; OpenRouter spend no
         # longer decides it (its guard + pacing do). Real questions (TaskTier) and
@@ -241,7 +241,10 @@ sub classify_prompt_for_routing {
     # This makes the aisystem switch and can surface a system warning to the user.
     my $or_spend = eval { $self->openrouter_spend($c) } || {};
     my $or_over = 0;
-    my $day_cap = 1.65;
+    # Shared cap file (~/.comserv/ai_caps.json) via ModelChains. The old
+    # hardcoded $1.65 marked OpenRouter exhausted while the live day cap is $3.
+    my $chains_ld = eval { Comserv::Util::AI::ModelChains->load($c) };
+    my $day_cap = ($chains_ld && Comserv::Util::AI::ModelChains->knob($chains_ld, 'openrouter_soft_cap_day_usd')) || 3;
     if ($or_spend->{ok}) {
         if (($or_spend->{day} || 0) >= $day_cap) {
             $or_over = 1;
@@ -480,7 +483,7 @@ sub select_model {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'select_model',
         sprintf("classify tier=%s use_sg=%s agent=%s phase=%s complexity=%s sg_available=%s or_over=%s sg_locked=%s quota_note=%s notes=%s",
             $cl->{tier} // '', $cl->{use_supergrok} // 0, $agent_id, $phase, $cl->{complexity} // '', 
-            ($self->_external_default_available($c, 'supergrok|grok-4.6') ? 1 : 0),
+            ($self->_external_default_available($c, 'supergrok|grok-4.7') ? 1 : 0),
             $cl->{openrouter_over_daily} // 0, $cl->{supergrok_locked} // 0,
             ($cl->{quota_warning} || ''), substr($cl->{notes} // '', 0, 100)));
 
@@ -507,7 +510,7 @@ sub select_model {
     # SuperGrok and the guard + credential allow it, a widget default (not a
     # real user pick) no longer overrides it, and ModelPick does not run.
     my $sg_guard = $self->supergrok_guard($c) || {};
-    my $sg_avail = $self->_external_default_available($c, 'supergrok|grok-4.6') ? 1 : 0;
+    my $sg_avail = $self->_external_default_available($c, 'supergrok|grok-4.7') ? 1 : 0;
     my $sg_want  = ($cl->{use_supergrok} || ($cl->{tier} // '') eq 'supergrok') ? 1 : 0;
     # Nov 8 2026 (Shanta): override only for admin/developer/editor
     # (paid-member entitlement deferred, see route_override_allowed). Everyone else keeps the
@@ -543,9 +546,22 @@ sub select_model {
     }
 
     if ($sg_ok && !$is_editor_agent) {
-        my $sg_model = (($cl->{domain} // '') =~ /code|programming/) ? 'grok-build-0.1' : 'grok-4.6';
+        my $sg_model = (($cl->{domain} // '') =~ /code|programming/) ? 'grok-build-0.1' : 'grok-4.7';
         $cl->{selected} = "supergrok/$sg_model";
         return ('supergrok', $sg_model);
+    }
+    # Encyclopedia is not a coding job. When SuperGrok allowance is gone, start
+    # at the Hermes chain (particle-1, then luna inside the OpenRouter caps,
+    # then free) instead of chain_coding. x.ai cash stays off (channel cap 0).
+    if (($agent_id // '') eq 'ency') {
+        my $ld = Comserv::Util::AI::ModelChains->load($c);
+        for my $s (Comserv::Util::AI::ModelChains->chain($ld, 'ency')) {
+            my ($p, $m) = split /\|/, $s, 2;
+            next unless $p && $m;
+            next if $p eq 'supergrok';
+            $cl->{selected} = "$p/$m";
+            return ($p, $m);
+        }
     }
     # Nov 8 2026 (Shanta: "good answers done by the most cost effective model
     # for the job"): substantive / page / code questions take the cheapest
@@ -576,11 +592,11 @@ sub select_model {
     # 1.5) SuperGrok weekly/daily credits (per guard from 15min eval) BEFORE paid.
     # Respect classification + agent (programming/analyze) + allotment.
     my $guard = $self->supergrok_guard($c);
-    my $sg_key_available = $self->_external_default_available($c, 'supergrok|grok-4.6');
+    my $sg_key_available = $self->_external_default_available($c, 'supergrok|grok-4.7');
     if (!$guard->{locked} && $sg_key_available) {
         if ($cl->{use_supergrok} || $is_editor_agent || $cl->{complexity} eq 'high' || $agent_id =~ /programming|code/) {
             # Prefer grok-build-0.1 for editor/build work when SuperGrok allotment available.
-            my $sg_model = ($cl->{domain} =~ /code|programming/ || $agent_id =~ /programming|code|analyze/) ? 'grok-build-0.1' : 'grok-4.6';
+            my $sg_model = ($cl->{domain} =~ /code|programming/ || $agent_id =~ /programming|code|analyze/) ? 'grok-build-0.1' : 'grok-4.7';
             return ('supergrok', $sg_model);
         }
     }
@@ -1248,8 +1264,13 @@ sub _skip_reason {
         return 'supergrok_locked' if $g->{locked};
     }
     if ($self->_is_paid_candidate($cand)) {
+        my $ex = $ld ? Comserv::Util::AI::ModelChains->cap_exempt_models($ld) : {};
+        my $exempt = $ex->{ $cand->{model} } ? 1 : 0;
         my $is_failover = ${ $a{attempt_no_ref} } > 0 || $cand->{source} ne 'requested';
-        if ($is_failover) {
+        # Same rule as Hermes: a trials.*.cap_exempt step (particle-1) stays
+        # usable when the shared OpenRouter caps have no room. A zero balance
+        # still skips it. Luna and other paid steps stay inside the caps.
+        if ($is_failover && !$exempt) {
             my $sp = $a{spend} || ($c && ref $c && $c->can('model') ? $self->openrouter_spend($c) : { ok => 0 });
             return 'budget_unknown' unless $sp->{ok};
             return 'budget_cap_day'   if $sp->{day}   >= ($k->{openrouter_soft_cap_day_usd}   // 0);   # 0 = fail-safe; caps from ~/.comserv/ai_caps.json via ModelChains->knob

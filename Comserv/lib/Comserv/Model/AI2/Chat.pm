@@ -768,6 +768,48 @@ sub process {
         delete $args{use_search};   # no unlabelled provider-side search in a grounded turn
     }
 
+    # Add/edit form fill: search sites for the name, then compile into the
+    # form's JSON fields. This used to happen on the old /ai/generate path.
+    # SuperGrok's own search is not used here — that call ran 160–260s and
+    # the page aborts at 120s, so the fields never arrived.
+    my $lookup = $args{lookup_name};
+    $lookup = '' unless defined $lookup && !ref $lookup;
+    $lookup =~ s/[\r\n\t]+/ /g;
+    $lookup =~ s/^\s+|\s+$//g;
+    $lookup = substr($lookup, 0, 120) if length($lookup) > 120;
+    if (($args{agent_id} // '') eq 'ency' && length $lookup) {
+        $args{_ency_fill} = 1;
+        my $ai_ctrl = eval { $c->controller('AI') };
+        my ($search_ctx, $sp) = ('', '');
+        my $q = "$lookup herbal identification constituents traditional use";
+        if ($ai_ctrl && $ai_ctrl->can('_do_web_search')) {
+            eval { ($search_ctx, $sp) = $ai_ctrl->_do_web_search($c, $q, 'ency', \@thinking); };
+            push @thinking, "ency fill search error: $@" if $@;
+        }
+        my $note = "This is an encyclopedia form fill for \"$lookup\". "
+            . "Return ONLY a raw JSON object for the requested fields. "
+            . "Use only the sources below and any Ency database context already in this prompt. "
+            . "Put source URLs in the Reference field. "
+            . "If a fact is not in those sources, use an empty string. "
+            . "Do not invent a species, dose, constituent, or citation.\n";
+        $note .= ($search_ctx && length $search_ctx)
+            ? "\n$search_ctx\n"
+            : "\nNo web sources were returned. Leave unknown fields empty.\n";
+        if (@$messages && $messages->[0]{role} eq 'system') {
+            $messages->[0]{content} .= "\n\n" . $note;
+        } else {
+            unshift @$messages, { role => 'system', content => $note };
+        }
+        push @thinking, ($search_ctx && length $search_ctx)
+            ? "ency fill: web search via $sp before the model call"
+            : 'ency fill: no web sources; model must not invent fields';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+            "ency fill lookup=$lookup search=" . (($sp && length $sp) ? $sp : 'none')
+            . ' chars=' . length($search_ctx // ''));
+        $args{_auto_enrich_done} = 1;
+        delete $args{use_search};
+    }
+
     # Select provider+model (v2 Router). The editor cheap-pin is not a user
     # choice — leave it unset so ModelPick sees SuperGrok, OpenRouter, Ollama.
     # Pass prompt + phase + agent so classification can choose Supergrok
@@ -800,6 +842,17 @@ sub process {
             'Daily quota hit in classify: ' . $cl->{quota_warning} . ' suggested=' . $next . ' (or_over=' . ($cl->{openrouter_over_daily}||0) . ', sg_locked=' . ($cl->{supergrok_locked}||0) . ')'
             . '. Admin: check Hermes default/editor/director/git aliases are not pinned to grok-build-0.1 / xai-oauth.');
     }
+    if ($args{_ency_fill} && ($provider_name // '') eq 'supergrok') {
+        my $ld = Comserv::Util::AI::ModelChains->load($c);
+        for my $s (Comserv::Util::AI::ModelChains->chain($ld, 'ency_fill')) {
+            my ($fp, $fm) = split /\|/, $s, 2;
+            next unless $fp && $fm;
+            push @thinking, "ency fill: compile with $fp/$fm (sources already attached)";
+            $provider_name = $fp;
+            $use_model = $fm;
+            last;
+        }
+    }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
         "AI2 chat dispatch: user=$username provider=$provider_name model="
         . ($use_model // '(router-default)') . " can_select=$can_select");
@@ -815,7 +868,9 @@ sub process {
     # data/ai_model_chains.json; failed attempts are written to the Ledger by
     # the Router (metadata.fallover); an enforce-mode grounding strip that
     # leaves nothing fails over to the next chain step.
-    my $purpose = ($gturn && $gturn->{enforce}) ? 'docs'
+    my $purpose = $args{_ency_fill} ? 'ency_fill'
+                : (($args{agent_id} // '') eq 'ency') ? 'ency'
+                : ($gturn && $gturn->{enforce}) ? 'docs'
                 : ($code_read || $args{skip_app_writes} || $args{phase}) ? 'coding'
                 : 'chat';
     my $postcheck = ($gturn && $gturn->{enforce}) ? sub {

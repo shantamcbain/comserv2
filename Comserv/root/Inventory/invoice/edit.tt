@@ -54,10 +54,13 @@
 </table>
 
 <h2>Line Items</h2>
-<p><small>Select an existing item or type a description. Add a location to update stock on hand when posted.</small></p>
+<p><small>Select an existing item, or use <strong>New item from this line</strong> to create one from this line’s description, quantity, and unit cost for the supplier above. Stock does not change until you Post.</small></p>
 <p>
   <button type="button" onclick="openItemPopup('/Inventory/item/add?popup=1', 'item')" style="font-size:0.85em;">
     + Add New Item (opens popup)
+  </button>
+  <button type="button" onclick="openItemPopup('/Inventory/location/add?popup=1', 'location')" style="font-size:0.85em;margin-left:6px;">
+    + Add New Location (opens popup)
   </button>
 </p>
 
@@ -219,7 +222,10 @@ function addLine(prefill) {
     + '<td id="total-' + idx + '" style="text-align:right">$' + (prefill.line_total || '0.00') + '</td>'
     + (hasCoa ? '<td id="acct-cell-' + idx + '">' + buildAccountSelect('account_id_' + idx, prefill.account_id) + '</td>' : '')
     + '<td>' + buildLocationSelect('location_id_' + idx, prefill.location_id) + '</td>'
-    + '<td><button type="button" onclick="removeLine(' + idx + ')">&#x2715;</button></td>';
+    + '<td><button type="button" onclick="newItemFromLine(' + idx + ')">New item from this line</button>'
+    + '<button type="button" onclick="removeLine(' + idx + ')">&#x2715;</button>'
+    + '<input type="hidden" name="new_for_supplier_' + idx + '" value="">'
+    + '<input type="hidden" name="new_item_name_' + idx + '" value=""></td>';
   document.getElementById('lines-body').appendChild(row);
 }
 
@@ -268,6 +274,30 @@ function recalcGrandTotal() {
   document.getElementById('invoice-total').textContent = (subtotal + tax + shipping - discount).toFixed(2);
 }
 
+function newItemFromLine(idx) {
+  var descEl = document.querySelector('[name="description_' + idx + '"]');
+  var name = descEl ? descEl.value.replace(/^\s+|\s+$/g, '') : '';
+  if (!name) {
+    alert('Type the new item name in Description first. That text becomes the inventory item.');
+    if (descEl) descEl.focus();
+    return;
+  }
+  var supplier = document.getElementById('supplier_id');
+  var supplierName = supplier && supplier.selectedIndex >= 0
+    ? supplier.options[supplier.selectedIndex].text : 'this supplier';
+  if (!confirm('Create inventory item "' + name + '" for ' + supplierName
+      + ' and replace the item on this line? The old item is not changed. Stock changes only when you Post.')) {
+    return;
+  }
+  var itemSel = document.querySelector('[name="item_id_' + idx + '"]');
+  if (itemSel) itemSel.value = '';
+  var flag = document.querySelector('[name="new_for_supplier_' + idx + '"]');
+  var nameField = document.querySelector('[name="new_item_name_' + idx + '"]');
+  if (flag) flag.value = '1';
+  if (nameField) nameField.value = name;
+  document.getElementById('invoice-form').submit();
+}
+
 function removeLine(idx) {
   var row = document.getElementById('line-' + idx);
   if (row) row.remove();
@@ -281,6 +311,7 @@ function openItemPopup(url, type) {
       clearInterval(timer);
       if (type === 'item')     refreshItemsAjax();
       if (type === 'supplier') refreshSuppliersAjax();
+      if (type === 'location') refreshLocationsAjax();
     }
   }, 600);
 }
@@ -307,6 +338,30 @@ function refreshItemsAjax() {
       });
     })
     .catch(function(e) { console.warn('refreshItemsAjax failed', e); });
+}
+
+function refreshLocationsAjax() {
+  var before = {};
+  locations.forEach(function(l) { before[String(l.id)] = 1; });
+  fetch('/Inventory/api/locations')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var added = data.filter(function(l) { return !before[String(l.id)]; });
+      locations = data;
+      document.querySelectorAll('[name^="location_id_"]').forEach(function(sel) {
+        var cur = sel.value;
+        sel.innerHTML = '<option value="">— none —</option>';
+        data.forEach(function(l) {
+          var opt = document.createElement('option');
+          opt.value = l.id;
+          opt.textContent = l.name;
+          if (String(l.id) === String(cur)) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        if (!cur && added.length === 1) sel.value = added[0].id;
+      });
+    })
+    .catch(function(e) { console.warn('refreshLocationsAjax failed', e); });
 }
 
 function refreshSuppliersAjax() {

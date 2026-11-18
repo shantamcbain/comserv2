@@ -4,13 +4,13 @@
     roles = "admin,developer"
     TemplateType = "Documentation"
     category = "3d-printing,lan-mode,printer-farm"
-    last_updated = "2026-09-05"
-    page_version = "0.2"
+    last_updated = "2026-11-06"
+    page_version = "0.3"
     site_specific = "false"
     project_id = "206"
     project_code = "3DPRINT"
 %]
-[% PageVersion = 'Documentation/3d/Kobra3LanMode.tt,v 0.2 2026/09/05 hermes-agent Exp - live .53 state + control page' %]
+[% PageVersion = 'Documentation/3d/Kobra3LanMode.tt,v 0.3 2026/11/06 hermes-agent Exp - print started at .61' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container">
@@ -40,21 +40,30 @@
 
     <div class="row">
         <div class="col-100">
-            <h2 id="now" class="doc-h2">Now (2026-09-05)</h2>
+            <h2 id="now" class="doc-h2">Now (2026-11-06)</h2>
             <div class="doc-success">
-                <p class="doc-body"><strong>Current.</strong> Farm printer id=1 is linked
-                <code>[LAN_HOST:192.168.2.53]</code>. Live probe: modelId 20024 Anycubic Kobra 3,
-                ctrlType=lan, MQTT handshake OK. Job telemetry (file, %, nozzle/bed) comes from
-                MQTTS :9883 after signed POST /ctrl — not from GET /info alone.</p>
+                <p class="doc-body"><strong>Current.</strong> Farm printer id=1, serial
+                <code>BECB-D68E-F519-16AB</code>, is linked
+                <code>[LAN_HOST:192.168.2.61]</code>. The old address 192.168.2.59
+                (and the September address 192.168.2.53) is dead. Staff started a
+                print from the queue on 2026-11-06. State at the new address was
+                free before that start.</p>
                 <p class="doc-body"><strong>Operator.</strong>
-                Discover on <a href="[% c.uri_for('/3d/printers') %]" class="doc-link">/3d/printers</a>
-                → Control
-                <a href="[% c.uri_for('/3d/printer_lan/control') %]?printer_id=1" class="doc-link">/3d/printer_lan/control?printer_id=1</a>
-                (Pause / Resume / Stop with cancel checkbox). Page auto-refreshes 15s.</p>
-                <p class="doc-body"><strong>Blocked / next.</strong> Do not upload gcode or start a
-                print from Comserv yet. Do not add host/port columns until schema-compare.
-                Next: feed live progress/temps into queue Complete; optional user subnet field
-                (scan already accepts <code>?subnet=</code>).</p>
+                Queue <a href="[% c.uri_for('/3d/queue') %]" class="doc-link">/3d/queue</a>
+                → Start Print. The dialog lists files already on the printer, has a
+                search box, and pre-selects a file when the item name and the file
+                name share words (Mason Small matches MasonJar_Wide_SmallHole).
+                Control remains
+                <a href="[% c.uri_for('/3d/printer_lan/control') %]?printer_id=1" class="doc-link">/3d/printer_lan/control?printer_id=1</a>.</p>
+                <p class="doc-body"><strong>Not live until a human restarts :4003.</strong>
+                The worker has been up since 2026-11-05 12:16 and does not reload
+                <code>.pm</code> files. On disk, a dead address (no route) now
+                searches by serial and rewrites <code>[LAN_HOST]</code>. A timeout
+                or a refused connection during boot still does not search. Opening
+                the queue is meant to start <code>script/printer_lan_sync.pl</code>,
+                which enrolls a new Kobra instead of asking staff to attach it.
+                None of that runs in the current process. The stored address was
+                rewritten by a one-off follow, which is why this print could start.</p>
             </div>
             <p class="doc-body">Tracking:
                 <a href="[% c.uri_for('/todo/details') %]?record_id=2334" class="doc-link">todo #2334</a>
@@ -73,7 +82,7 @@
             <ul class="doc-body">
                 <li><strong>Workstation</strong> — dual-home 192.168.1.0 (Ethernet) and 192.168.2.0 (WiFi).</li>
                 <li><strong>Production1</strong> — 192.168.1.0 only; OPNsense routes to 192.168.2.0.</li>
-                <li><strong>Kobra 3</strong> — WiFi only, 192.168.2.0/24. Proven at <strong>192.168.2.53</strong> (port 18910 HTTP, 9883 MQTTS, 18088 camera FLV).</li>
+                <li><strong>Kobra 3</strong> — WiFi only, 192.168.2.0/24. Proven 2026-11-06 at <strong>192.168.2.61</strong> (port 18910 HTTP, 9883 MQTTS). 192.168.2.59 and 192.168.2.53 no longer answer.</li>
             </ul>
             <p class="doc-body">Cloud/app login is not used. LAN Mode on the printer:
             Settings → Network → LAN Mode. Cloud drops while LAN is on.</p>
@@ -136,10 +145,11 @@
         <div class="col-100">
             <h2 id="next" class="doc-h2">Next session</h2>
             <ol class="doc-body">
-                <li>Show live % / remaining minutes on <code>/3d/queue</code> Complete (true print time vs elapsed-since-assign). Todo #2334 remaining.</li>
-                <li>Subnet box on Discover is already a form field — keep default 192.168.2.0/24; do not hard-tie the server NIC.</li>
-                <li>Camera FLV at :18088 — link only until a theme-safe player exists (no new per-page JS).</li>
-                <li>If Control 404s, the :4003 worker has not loaded new <code>:Path</code> actions — human restarts <code>perl script/comserv_server.pl -p 4003 -r</code>. AI does not restart servers.</li>
+                <li>Human restart of <code>perl script/comserv_server.pl -p 4003 -r</code> so the serial follow, <code>printer_lan_sync.pl</code> enroll, and the stop-requeue / restart-resume behaviour in <code>PrinterLan.pm</code> are actually running. AI does not restart servers.</li>
+                <li>Jobs #192 (green top-up, assigned) and #193 (the MasonJar print) are the duplicate pair from before the fix. #193 is the real print. #192 can now be cancelled or completed.</li>
+                <li><code>printing_3d_jobs.labour_cost</code> is <code>decimal(10,0)</code> but the result class declares <code>[10, 4]</code>, which is what <code>Manufacturing/Costing.pm</code> and <code>Traveler.pm</code> write (<code>sprintf('%.4f')</code>). Until 2026-11-06 the schema-compare page showed a blank size for every decimal column because <code>ResultParser</code> had no branch for arrayref attributes (<code>size => [10, 4]</code> parsed as undef), so a table sync issued <code>MODIFY col decimal</code> — i.e. back to <code>decimal(10,0)</code>. That is fixed; the page now reads <code>(10,4)</code> and Update Table widens the column correctly. <code>printer_cost</code> and <code>electricity_cost</code> have the same drift (column <code>(10,0)</code>, class <code>(10,2)</code>).</li>
+                <li>Start Print pre-selects by shared words, not by an exact file name. Two SmallHole files still tie (1h24m and 1h22m). The printer file record has only a creation timestamp, not last-printed. Last-printed order uses the last 10 completed jobs whose item name contains <code>.gcode</code>.</li>
+                <li>Consignment count todo #2666 is paused, not done. Remaining: photo-count section in Documentation/Inventory/consignment, and the decision on pulling stock from another location before printing the shortfall.</li>
             </ol>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
@@ -149,7 +159,6 @@
         <div class="col-100">
             <h2 id="out" class="doc-h2">Out of scope</h2>
             <ul class="doc-body">
-                <li>Start print / gcode_upload from Comserv until ping + telemetry stay stable on the live IP.</li>
                 <li>Anycubic cloud MQTT / account login.</li>
                 <li>Rinkhals / Moonraker :7125 unless the printer is rooted.</li>
                 <li>Result columns host/port/adapter_type before schema-compare (unknown column 500s /3d/printers).</li>

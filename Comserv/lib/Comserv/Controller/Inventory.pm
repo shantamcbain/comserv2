@@ -207,13 +207,20 @@ sub index :Path('/Inventory') :Args(0) {
         $item_count = $supplier_count = $location_count = $low_stock = 0;
     }
 
+    my $open_consignments = 0;
+    eval {
+        $open_consignments = $schema->resultset('Accounting::InventoryConsignment')
+            ->search({ sitename => $sitename, status => 'open' })->count;
+    };
+
     $c->stash(
-        item_count     => $item_count,
-        supplier_count => $supplier_count,
-        location_count => $location_count,
-        low_stock      => $low_stock,
-        sitename       => $sitename,
-        template       => 'Inventory/index.tt',
+        item_count        => $item_count,
+        supplier_count    => $supplier_count,
+        location_count    => $location_count,
+        low_stock         => $low_stock,
+        open_consignments => $open_consignments,
+        sitename          => $sitename,
+        template          => 'Inventory/index.tt',
     );
 }
 
@@ -1792,13 +1799,18 @@ sub location_add :Path('/Inventory/location/add') :Args(0) {
             $c->stash->{error_msg} = "Failed to create location: $@";
         } else {
             $c->flash->{success_msg} = 'Location created successfully';
-            $c->res->redirect($c->uri_for('/Inventory/locations'));
+            if ($c->req->params->{popup}) {
+                $c->res->redirect($c->uri_for('/Inventory/location/add', { popup => 1, done => 1 }));
+            } else {
+                $c->res->redirect($c->uri_for('/Inventory/locations'));
+            }
             return;
         }
     }
 
     $c->stash(
         sitename => $sitename,
+        is_popup => $c->req->params->{popup} ? 1 : 0,
         template => 'Inventory/locations/add.tt',
     );
 }
@@ -4065,6 +4077,22 @@ sub api_bom :Path('/Inventory/api/bom') :Args(0) {
     $c->detach;
 }
 
+sub api_locations :Path('/Inventory/api/locations') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $c->req->params->{sitename} || $self->_sitename($c);
+    my @locations;
+    eval {
+        @locations = $self->_schema($c)->resultset('Accounting::InventoryLocation')->search(
+            { sitename => $sitename },
+            { order_by => 'name' }
+        )->all;
+    };
+    my @result = map { { id => $_->id, name => $_->name } } @locations;
+    $c->res->content_type('application/json');
+    $c->res->body(do { require JSON; JSON::encode_json(\@result) });
+    $c->detach;
+}
+
 sub api_items_with_accounts :Path('/Inventory/api/items_with_accounts') :Args(0) {
     my ($self, $c) = @_;
     my $sitename = $c->req->params->{sitename} || $self->_sitename($c);
@@ -4155,6 +4183,19 @@ sub invoice_list :Path('/Inventory/invoice') :Args(0) {
         today      => $today,
         template   => 'Inventory/invoice/list.tt',
     );
+}
+
+# Admin list of kept photo reads (debug backups). The page is a thin view: it
+# calls /api/app/photo/reads, /rerun and /delete (Util::Inventory::PhotoRead).
+sub photo_reads :Path('/Inventory/photo_reads') :Args(0) {
+    my ($self, $c) = @_;
+    my $api = $c->controller('Api');
+    unless ($api && $api->_session_is_admin($c)) {
+        $c->res->status(403);
+        $c->res->body('Admins only.');
+        return;
+    }
+    $c->stash(template => 'Inventory/photo_reads.tt');
 }
 
 sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
@@ -4364,7 +4405,7 @@ sub invoice_edit :Path('/Inventory/invoice/edit') :Args(1) {
 
         my %lines_by_idx;
         for my $key (keys %$params) {
-            if ($key =~ /^(item_id|description|quantity|unit_cost|account_id|location_id)_(\d+)$/) {
+            if ($key =~ /^(item_id|description|quantity|unit_cost|account_id|location_id|new_for_supplier|new_item_name)_(\d+)$/) {
                 $lines_by_idx{$2}{$1} = $params->{$key};
             }
         }
@@ -4396,7 +4437,26 @@ sub invoice_edit :Path('/Inventory/invoice/edit') :Args(1) {
                 my $line_total_sum = 0;
                 for my $idx (sort { $a <=> $b } keys %lines_by_idx) {
                     my $l = $lines_by_idx{$idx};
-                    next unless ($l->{item_id} || $l->{description});
+                    next unless ($l->{item_id} || $l->{description} || $l->{new_for_supplier});
+                    if ($l->{new_for_supplier}) {
+                        my $new_name = $l->{new_item_name} || $l->{description} || '';
+                        $new_name =~ s/^\s+|\s+$//g;
+                        die "Line needs a description to create a new item\n" unless length $new_name >= 2;
+                        require Comserv::Model::AI2::InvoiceCreate;
+                        my $brain = Comserv::Model::AI2::InvoiceCreate->new;
+                        my $created = $brain->_create_chat_item($c, $schema, {
+                            sitename    => $sitename,
+                            user        => $c->session->{username} || 'ai',
+                            name        => $new_name,
+                            description => $l->{description} || $new_name,
+                            unit_cost   => $l->{unit_cost},
+                            supplier_id => $params->{supplier_id},
+                        });
+                        die "Could not create the inventory item\n" unless $created && $created->{id};
+                        $l->{item_id} = $created->{id};
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                            'invoice_edit', "new item #$created->{id} '$new_name' for supplier $params->{supplier_id} on invoice $id");
+                    }
                     my $qty  = $l->{quantity}  || 1;
                     my $cost = $l->{unit_cost} || 0;
                     my $lt   = $qty * $cost;
@@ -4533,6 +4593,20 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
                 if ($sl) {
                     my $old_qty = $sl->quantity_on_hand || 0;
                     $sl->update({ quantity_on_hand => $old_qty + $line->quantity });
+                    if (defined $line->unit_cost && $line->unit_cost > 0) {
+                        my $priced = eval {
+                            my $item_row = $schema->resultset('Accounting::InventoryItem')->find($line->item_id);
+                            $item_row->update({
+                                unit_cost  => $line->unit_cost,
+                                updated_at => $self->_now(),
+                            }) if $item_row;
+                            1;
+                        };
+                        if (!$priced) {
+                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                                'invoice_post', "unit_cost update failed for item " . $line->item_id . ": $@");
+                        }
+                    }
                     push @stock_log, "$item_nm: $old_qty → " . ($old_qty + $line->quantity);
                     $stock_updated++;
                 } else {
@@ -6572,83 +6646,22 @@ sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
 
     eval {
         $schema->txn_do(sub {
-            my $stock = $schema->resultset('Accounting::InventoryStockLevel')->find_or_create(
-                { item_id => $item_id, location_id => ($loc_id || \'NULL') },
-                { default => { quantity_on_hand => 0, quantity_reserved => 0, quantity_on_order => 0 } }
-            ) if $loc_id;
-
-            if ($loc_id) {
-                my $new_qty = $stock->quantity_on_hand;
-                if ($type =~ /^(receive|adjust_up|produce|harvest|return)$/) {
-                    $new_qty += $qty;
-                } else {
-                    $new_qty -= $qty;
-                }
-                $stock->update({ quantity_on_hand => $new_qty, updated_at => $now });
-            }
-
-            my $item_rec = $schema->resultset('Accounting::InventoryItem')->find($item_id);
-            if ($item_rec && ($item_rec->inventory_accno_id || $item_rec->expense_accno_id)) {
-                my $unit_cost = $params->{unit_cost} || $item_rec->unit_cost || 0;
-                my $value     = $qty * $unit_cost;
-                my $ref       = 'API-TXN-' . $item_id . '-' . time();
-                my $gl = $schema->resultset('Accounting::GlEntry')->create({
-                    reference   => $ref,
-                    description => ucfirst($type) . ' (API): ' . ($item_rec->name || "Item $item_id") . " x$qty",
-                    entry_type  => 'inventory',
-                    post_date   => $today,
-                    approved    => 1,
-                    currency    => 'CAD',
-                    sitename    => $sitename,
-                    entered_by  => $c->session->{user_id} || undef,
-                });
-                $gl_entry_id = $gl->id;
-
-                if ($value != 0) {
-                    my ($dr_acct, $cr_acct);
-                    if ($type =~ /^(receive|adjust_up|produce|harvest)$/) {
-                        $dr_acct = $item_rec->inventory_accno_id;
-                        $cr_acct = $item_rec->expense_accno_id || $item_rec->inventory_accno_id;
-                    } else {
-                        $dr_acct = $item_rec->expense_accno_id || $item_rec->inventory_accno_id;
-                        $cr_acct = $item_rec->inventory_accno_id;
-                    }
-                    if ($dr_acct) {
-                        $schema->resultset('Accounting::GlEntryLine')->create({
-                            gl_entry_id => $gl_entry_id,
-                            account_id  => $dr_acct,
-                            amount      => $value,
-                            memo        => ucfirst($type) . " $qty units (API)",
-                            sort_order  => 1,
-                        });
-                    }
-                    if ($cr_acct && $cr_acct != ($dr_acct || 0)) {
-                        $schema->resultset('Accounting::GlEntryLine')->create({
-                            gl_entry_id => $gl_entry_id,
-                            account_id  => $cr_acct,
-                            amount      => -$value,
-                            memo        => ucfirst($type) . " $qty units (API)",
-                            sort_order  => 2,
-                        });
-                    }
-                }
-            }
-
-            my $txn = $schema->resultset('Accounting::InventoryTransaction')->create({
+            # Shared with the scan flow (Util::Inventory::StockTxn, 2026-11-16).
+            require Comserv::Util::Inventory::StockTxn;
+            ($txn_id, $gl_entry_id) = Comserv::Util::Inventory::StockTxn->post($schema,
                 item_id          => $item_id,
-                location_id      => $loc_id || undef,
-                transaction_type => $type,
-                quantity         => $qty,
-                unit_cost        => $params->{unit_cost} || undef,
-                reference_number => $params->{reference_number} || undef,
-                gl_entry_id      => $gl_entry_id || undef,
+                type             => $type,
+                qty              => $qty,
+                location_id      => $loc_id,
                 sitename         => $sitename,
-                notes            => $params->{notes} || undef,
-                performed_by     => $c->session->{username} || 'api',
-                transaction_date => $now,
-                created_at       => $now,
-            });
-            $txn_id = $txn->id;
+                unit_cost        => $params->{unit_cost},
+                reference_number => $params->{reference_number},
+                notes            => $params->{notes},
+                user_id          => $c->session->{user_id},
+                username         => $c->session->{username},
+                now              => $now,
+                today            => $today,
+            );
         });
     };
     if ($@) {
@@ -6743,7 +6756,7 @@ sub consignment_list :Path('/Inventory/consignment') :Args(0) {
     my ($self, $c) = @_;
     my $sitename        = $self->_sitename($c);
     my $schema          = $self->_schema($c);
-    my $status          = $c->req->params->{status} || 'all';
+    my $status          = $c->req->params->{status} || 'open';
     my $source_sitename = $c->req->params->{source_sitename} || $sitename;
 
     my %where = ('me.sitename' => $source_sitename);
@@ -6758,8 +6771,21 @@ sub consignment_list :Path('/Inventory/consignment') :Args(0) {
     };
     push @{$c->stash->{debug_errors}}, "Consignment list error: $@" if $@;
 
+    # Photo counts hang off a placement (location + partner + item), not a
+    # consignment batch. The list page is the only place a person already goes,
+    # so the count entry has to be here or the screen is unreachable.
+    my @placements;
+    eval {
+        @placements = $schema->resultset('Accounting::InventoryConsignmentPlacement')->search(
+            { 'me.sitename' => $source_sitename, 'me.status' => 'active' },
+            { prefetch => [qw(location partner item)], order_by => 'me.id' }
+        )->all;
+    };
+    push @{$c->stash->{debug_errors}}, "Placement list error: $@" if $@;
+
     $c->stash(
         consignments    => \@consignments,
+        placements      => \@placements,
         filter_status   => $status,
         sitename        => $sitename,
         source_sitename => $source_sitename,
@@ -6924,6 +6950,17 @@ sub consignment_view :Path('/Inventory/consignment/view') :Args(1) {
             { prefetch => ['partner', { 'lines' => 'item' }] }
         );
     };
+    # prefetch can die on this schema (relname_to_table_alias) and take the whole page with
+    # it, turning a real batch into "Consignment not found". Fall back to a plain find and
+    # let the template's lazy relation access do the rest.
+    unless ($consignment) {
+        eval {
+            $consignment = $schema->resultset('Accounting::InventoryConsignment')
+                ->find({ 'me.id' => $id, 'me.sitename' => $sitename });
+            $consignment->lines->all if $consignment;
+        };
+        push @{ $c->stash->{debug_errors} ||= [] }, "Consignment load (fallback): $@" if $@;
+    }
     unless ($consignment) {
         $c->flash->{error_msg} = 'Consignment not found.';
         $c->res->redirect($c->uri_for('/Inventory/consignment'));
@@ -6941,11 +6978,31 @@ sub consignment_view :Path('/Inventory/consignment/view') :Args(1) {
         }
     };
 
+    # The invoice is the anchor for both tracks — consignment refill and direct sale. This
+    # batch exists because a count sold these units and billed for them, so carry that count
+    # and its invoice onto the page rather than leaving the batch without a reason.
+    my ($source_count, $invoice, @jobs);
+    eval {
+        $source_count = $schema->resultset('Accounting::InventoryLocationCount')->search(
+            { 'me.consignment_id' => $consignment->id },
+            { order_by => { -desc => 'me.id' } })->first;
+        if ($source_count && $source_count->invoice_id) {
+            $invoice = $schema->resultset('Accounting::InventoryCustomerInvoice')
+                ->find($source_count->invoice_id);
+        }
+        @jobs = $schema->resultset('Printing3dJob')->search(
+            { 'me.consignment_id' => $consignment->id }, { order_by => 'me.id' })->all;
+    };
+    push @{ $c->stash->{debug_errors} ||= [] }, "Consignment origin error: $@" if $@;
+
     $c->stash(
-        consignment => $consignment,
-        sitename    => $sitename,
-        site_info   => \%site_info,
-        template    => 'Inventory/consignment/view.tt',
+        consignment  => $consignment,
+        source_count => $source_count,
+        invoice      => $invoice,
+        jobs         => \@jobs,
+        sitename     => $sitename,
+        site_info    => \%site_info,
+        template     => 'Inventory/consignment/view.tt',
     );
 }
 
@@ -7048,6 +7105,261 @@ sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
         site_info   => \%site_info,
         no_wrapper  => 1,
         template    => 'Inventory/consignment/print.tt',
+    );
+}
+
+# ============================================================
+# Consignment location count (photo -> text -> inventory -> invoice -> top-up)
+# See .hermes/plans/2026-11-05-consignment-location-count-photo.md
+# ============================================================
+
+sub _count_root {
+    my ($self, $c) = @_;
+    my $home = eval { $c->config->{home} } || eval { $c->path_to()->stringify } || '.';
+    return $home;
+}
+
+# Start the photo-reading worker detached from the request. The child exec()s a
+# fresh perl, so it must not inherit the listening socket or the DB handle: every
+# descriptor above stderr is closed before the exec.
+sub _spawn_count_worker {
+    my ($self, $c, $count_id) = @_;
+
+    my $script = eval { $c->path_to('script', 'consignment_count_worker.pl')->stringify }
+              || 'script/consignment_count_worker.pl';
+    my $logdir = eval { $c->path_to('logs')->stringify } || 'logs';
+    mkdir $logdir unless -d $logdir;
+    my $log = "$logdir/consignment_count_worker.log";
+
+    my $pid = fork;
+    unless (defined $pid) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_spawn_count_worker', "fork failed for count #$count_id: $!");
+        return;
+    }
+
+    if (!$pid) {
+        eval {
+            require POSIX;
+            POSIX::setsid();
+            open STDIN,  '<',  '/dev/null';
+            open STDOUT, '>>', $log;
+            open STDERR, '>>', $log;
+            POSIX::close($_) for 3 .. 1023;
+        };
+        exec($^X, $script, $count_id);
+        require POSIX;
+        POSIX::_exit(1);
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        '_spawn_count_worker', "spawned worker pid $pid for count #$count_id");
+    return $pid;
+}
+
+sub _count_placement {
+    my ($self, $c, $placement_id) = @_;
+    my $schema = $self->_schema($c);
+    return eval {
+        $schema->resultset('Accounting::InventoryConsignmentPlacement')->find(
+            { 'me.id' => $placement_id, 'me.status' => 'active' },
+            { prefetch => [qw(location partner item)] });
+    };
+}
+
+sub consignment_count :Path('/Inventory/consignment/count') :Args(1) {
+    my ($self, $c, $placement_id) = @_;
+    my $schema = $self->_schema($c);
+    require Comserv::Util::ConsignmentCountRun;
+    my $run = Comserv::Util::ConsignmentCountRun->new(root => $self->_count_root($c));
+
+    my $placement = $self->_count_placement($c, $placement_id);
+    unless ($placement) {
+        $c->flash->{error_msg} = 'Consignment placement not found.';
+        $c->res->redirect($c->uri_for('/Inventory/consignment'));
+        return $c->detach;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my %args = (placement_id => $placement_id);
+        my $upload = $c->req->upload('photo');
+        my $text   = $c->req->param('text') // '';
+
+        if ($upload) {
+            # Reading the photo is a CPU vision pass (minutes cold, ~20s warm). The
+            # request must not wait for it: this server runs one worker, so a
+            # synchronous read froze the whole app for 3.5 minutes (2026-11-06).
+            # queue_from_photo stores the photo + a status='reading' row, and the
+            # detached worker fills in the text; the review page polls for it.
+            my $q = $run->queue_from_photo($c,
+                placement_id => $placement_id,
+                image_path   => $upload->tempname,
+                mime         => $upload->type || 'image/jpeg',
+            );
+            if ($q->{ok}) {
+                $self->_spawn_count_worker($c, $q->{count_id});
+                $c->res->redirect($c->uri_for('/Inventory/consignment/count/review', [$q->{count_id}]));
+                return $c->detach;
+            }
+            $c->flash->{error_msg} = $q->{error} || 'Could not store the photo.';
+            $c->res->redirect($c->uri_for('/Inventory/consignment/count', [$placement_id]));
+            return $c->detach;
+        }
+
+        if (length $text) {
+            $args{text}   = $text;
+            $args{source} = 'manual';
+        }
+        else {
+            $c->flash->{error_msg} = 'Upload a photo of the container, or type the count.';
+            $c->res->redirect($c->uri_for('/Inventory/consignment/count', [$placement_id]));
+            return $c->detach;
+        }
+
+        my $res = $run->create_draft($c, %args);
+        if ($res->{ok}) {
+            $c->flash->{success_msg} = 'Draft count created from '
+                . ($res->{engine} // 'entry') . ': ' . ($res->{raw_text} // '')
+                . '. Check the text, then tick "text is correct" to apply it.';
+            $c->res->redirect($c->uri_for('/Inventory/consignment/count/review', [$res->{count_id}]));
+            return $c->detach;
+        }
+        $c->flash->{error_msg} = $res->{error} || 'Could not read the count.';
+        $c->res->redirect($c->uri_for('/Inventory/consignment/count', [$placement_id]));
+        return $c->detach;
+    }
+
+    my @counts = eval {
+        $schema->resultset('Accounting::InventoryLocationCount')->search(
+            { placement_id => $placement_id },
+            { order_by => { -desc => 'id' }, rows => 20 })->all;
+    };
+
+    my $target = $placement->target_map;
+    my $total_target = 0;
+    $total_target += $_ for values %$target;
+
+    $c->stash(
+        placement    => $placement,
+        item         => $placement->item,
+        counts       => \@counts,
+        target       => $target,
+        total_target => $total_target,
+        colours      => [ $placement->colour_list ],
+        sitename     => $placement->sitename,
+        template     => 'Inventory/consignment/count.tt',
+    );
+}
+
+sub consignment_count_review :Path('/Inventory/consignment/count/review') :Args(1) {
+    my ($self, $c, $count_id) = @_;
+    my $schema = $self->_schema($c);
+    require Comserv::Util::ConsignmentCountRun;
+    my $run = Comserv::Util::ConsignmentCountRun->new(root => $self->_count_root($c));
+
+    my $count = eval {
+        $schema->resultset('Accounting::InventoryLocationCount')->find(
+            { 'me.id' => $count_id }, { prefetch => [qw(placement partner item)] });
+    };
+    unless ($count) {
+        $c->flash->{error_msg} = 'Count not found.';
+        $c->res->redirect($c->uri_for('/Inventory/consignment'));
+        return $c->detach;
+    }
+    my $placement = $count->placement;
+
+    # A killed worker (reboot, OOM) would leave the row 'reading' forever.
+    if (($count->status // '') eq 'reading') {
+        my $stale = eval {
+            $schema->resultset('Accounting::InventoryLocationCount')->search({
+                'me.id'         => $count->id,
+                'me.status'     => 'reading',
+                'me.counted_at' => { '<', \'UTC_TIMESTAMP() - INTERVAL 15 MINUTE' },
+            })->count;
+        };
+        if ($stale) {
+            $count->update({ status => 'failed', notes => 'The photo read stopped before it finished.' });
+            $c->log->warn("count #$count_id read timed out");
+        }
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->param('do') || 'save';
+        my $back   = $c->uri_for('/Inventory/consignment/count/review', [$count_id]);
+
+        if ($action eq 'retry') {
+            unless (($count->status // '') eq 'failed') {
+                $c->flash->{error_msg} = 'Only a count whose read failed can be read again.';
+                $c->res->redirect($back);
+                return $c->detach;
+            }
+            $count->update({ status => 'reading', notes => undef });
+            $self->_spawn_count_worker($c, $count->id);
+            $c->flash->{success_msg} = 'Reading the photo again — the text will appear here.';
+            $c->res->redirect($back);
+            return $c->detach;
+        }
+
+        if (($count->status // '') eq 'reading') {
+            $c->flash->{error_msg} = 'The photo is still being read. Wait for the text to appear.';
+            $c->res->redirect($back);
+            return $c->detach;
+        }
+
+        if ($action eq 'discard') {
+            my $r = $run->discard($c, $count_id);
+            $c->flash->{ $r->{ok} ? 'success_msg' : 'error_msg' } =
+                $r->{ok} ? 'Draft count discarded and its photo deleted.' : ($r->{error} || 'Could not discard.');
+            $c->res->redirect($placement
+                ? $c->uri_for('/Inventory/consignment/count', [ $placement->id ])
+                : $c->uri_for('/Inventory/consignment'));
+            return $c->detach;
+        }
+
+        my $text = $c->req->param('raw_text');
+        if (defined $text && length $text) {
+            my $u = $run->update_text($c, $count_id, $text);
+            unless ($u->{ok}) {
+                $c->flash->{error_msg} = $u->{error} || 'Could not read that text.';
+                $c->res->redirect($back);
+                return $c->detach;
+            }
+        }
+
+        if ($action eq 'apply') {
+            unless ($c->req->param('confirm')) {
+                $c->flash->{error_msg} = 'Tick "the text is correct" before applying the count.';
+                $c->res->redirect($back);
+                return $c->detach;
+            }
+            my $res = $run->apply($c, $count_id);
+            $c->flash->{ $res->{ok} ? 'success_msg' : 'error_msg' } =
+                $res->{ok} ? $res->{message} : ($res->{error} || 'Could not apply the count.');
+            # The batch this apply just created is the next thing to work on. Landing back
+            # on the count screen left it hidden in a list that only grows.
+            $c->res->redirect(
+                ($res->{ok} && $res->{consignment_id})
+                    ? $c->uri_for('/Inventory/consignment/view', [ $res->{consignment_id} ])
+                    : ($placement
+                        ? $c->uri_for('/Inventory/consignment/count', [ $placement->id ])
+                        : $c->uri_for('/Inventory/consignment')));
+            return $c->detach;
+        }
+
+        $c->flash->{success_msg} = 'Counted text saved. Photo still held until you apply.';
+        $c->res->redirect($back);
+        return $c->detach;
+    }
+
+    my @lines = $count->lines->search(undef, { order_by => 'sort_order' })->all;
+    $c->stash(
+        count     => $count,
+        placement => $placement,
+        item      => $count->item,
+        lines     => \@lines,
+        raw_text  => $count->raw_text,
+        sitename  => $count->sitename,
+        template  => 'Inventory/consignment/count_review.tt',
     );
 }
 

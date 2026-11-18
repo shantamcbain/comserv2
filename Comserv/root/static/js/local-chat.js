@@ -3196,6 +3196,19 @@
                         host: document.getElementById('chat-messages')
                     });
                 }
+                if (data.invoice_action && window.ComservChat && ComservChat.featureInvoice
+                    && typeof ComservChat.featureInvoice.handleServerResult === 'function') {
+                    ComservChat.featureInvoice.handleServerResult(data.invoice_action, {
+                        host: document.getElementById('chat-messages')
+                    });
+                }
+                // Photo read / barcode scan: same /api/app/photo/* path as the Android app.
+                if (data.photo_action && window.ComservChat && ComservChat.featurePhoto
+                    && typeof ComservChat.featurePhoto.handleServerResult === 'function') {
+                    ComservChat.featurePhoto.handleServerResult(data.photo_action, {
+                        host: document.getElementById('chat-messages')
+                    });
+                }
 
                 // Coding READ_FILE auto-fetch is AI Editor only — hard-disable on site Chat-with-AI
                 if (isAi2EditorContext()

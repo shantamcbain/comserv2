@@ -93,6 +93,54 @@
   </div>
 </div>
 
+<!-- Why this batch exists. The invoice is the anchor for both tracks (this refill and a
+     direct sale), so the count that sold the stock and the invoice it billed live here. -->
+[% IF source_count || invoice || jobs.size %]
+<div style="background:#f8fafc;border:1px solid #cbd5e1;border-left:4px solid #2563eb;border-radius:6px;padding:0.9rem 1rem;margin-bottom:1.5em;font-family:var(--body-font)" class="no-print">
+  <h3 style="margin:0 0 0.5rem;color:#1e40af;font-size:1rem">Why this batch exists</h3>
+  <table style="border-collapse:collapse;font-size:0.9rem">
+    [% IF source_count %]
+    <tr>
+      <td style="padding:2px 14px 2px 0;color:#475569;vertical-align:top">Count</td>
+      <td>
+        <a href="[% c.uri_for('/Inventory/consignment/count/review', [ source_count.id ]) %]"># [% source_count.id %]</a>
+        [% IF source_count.counted_at %]<span style="color:#64748b">· read [% source_count.counted_at %]</span>[% END %]
+        [% IF source_count.applied_at %]<span style="color:#64748b">· applied [% source_count.applied_at %]</span>[% END %]
+      </td>
+    </tr>
+    [% IF source_count.raw_text %]
+    <tr>
+      <td style="padding:2px 14px 2px 0;color:#475569;vertical-align:top">Counted</td>
+      <td><code style="font-size:0.85rem">[% source_count.raw_text | html %]</code></td>
+    </tr>
+    [% END %]
+    [% END %]
+    [% IF invoice %]
+    <tr>
+      <td style="padding:2px 14px 2px 0;color:#475569;vertical-align:top">Invoice</td>
+      <td>
+        <a href="[% c.uri_for('/Inventory/sales/view', [ invoice.id ]) %]">[% invoice.invoice_number | html %]</a>
+        <span style="color:#64748b">· [% invoice.total_amount %] · [% invoice.status | html %]</span>
+        <span style="color:#64748b">— the sale this batch replaces</span>
+      </td>
+    </tr>
+    [% END %]
+    [% IF jobs.size %]
+    <tr>
+      <td style="padding:2px 14px 2px 0;color:#475569;vertical-align:top">Print jobs</td>
+      <td>
+        [% FOREACH j IN jobs %]
+          <a href="/3d/queue">#[% j.id %]</a>
+          <span style="color:#64748b">[% j.status | html %][% IF j.filament_color %] · [% j.filament_color | html %][% END %][% IF j.quantity > 1 %] ×[% j.quantity %][% END %]</span>
+          &nbsp;
+        [% END %]
+      </td>
+    </tr>
+    [% END %]
+  </table>
+</div>
+[% END %]
+
 <h2 style="font-family:var(--header-font);color:var(--text-color)">Items</h2>
 [% SET grand_gross = 0; SET grand_net = 0; SET grand_comm = 0 %]
 <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:0.9rem;margin-bottom:1.5em">

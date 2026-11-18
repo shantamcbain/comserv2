@@ -132,10 +132,34 @@ sub day {
         }
         for my $e ( $class->_plan_entries( $schema, $owner, $date, $s->{plan_slots} || [] ) ) {
             next if $seen_entry{ $e->id }++;
-            my $r = $SR->recipe_card( $schema, $e->recipe_id, $owner ) or next;
-            $r->{entry_id} = $e->id;
-            push @{ $card{recipes} }, $r;
+            my $plan_id = eval { $e->meal_plan_id };
+            $plan_id = undef unless defined $plan_id && $plan_id =~ /^\d+$/;
+            $card{plan_id} ||= $plan_id if $plan_id;
+            my $plan_url = $plan_id ? "/healthkitchen/mealplan/$plan_id" : '';
+            my $r = $SR->recipe_card( $schema, $e->recipe_id, $owner );
+            if ($r) {
+                $r->{entry_id} = $e->id;
+                $r->{plan_url} = $plan_url if $plan_url;
+                push @{ $card{recipes} }, $r;
+            }
+            else {
+                # Typed meal name, no recipe row. Still the dish the card must show.
+                my $custom = eval { $e->custom_name } // '';
+                $custom =~ s/^\s+|\s+$//g;
+                next unless length $custom && $custom !~ /[<>\x00-\x1f]/;
+                push @{ $card{recipes} }, {
+                    name        => $custom,
+                    ingredients => [],
+                    url         => $plan_url,
+                    entry_id    => $e->id,
+                    custom      => 1,
+                };
+            }
         }
+        my $main = $card{recipes}[0];
+        $card{title}    = ( $main && $main->{name} ) ? $main->{name} : $s->{label};
+        $card{plan_url} = ( $main && $main->{plan_url} ) ? $main->{plan_url}
+            : ( $card{plan_id} ? "/healthkitchen/mealplan/$card{plan_id}" : '' );
         my @mine = grep { ( $_->slot_key // '' ) eq $s->{key} } @$logs;
         my ($open) = grep { $_->started_at && !$_->ended_at } reverse @mine;
         my ($done) = grep { $_->ended_at } reverse @mine;

@@ -632,9 +632,25 @@ sub command :Path('/3d/printer_lan/command') :Args(0) {
                     }
                 }
 
-                my $job = $schema->resultset('Printing3dJob')->create(\%job_data);
+                my $existing = $self->_resumable_job($c, $schema, $row, $fn);
+                my $job;
+                if ($existing) {
+                    my $was = $existing->status || 'unknown';
+                    $existing->update({
+                        status     => 'printing',
+                        started_at => $stamp,
+                        notes      => (($existing->notes || '') . " | restarted $stamp (was $was)"),
+                    });
+                    $job = $existing;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'command',
+                        "start_print resumed job #" . $job->id . " instead of creating a new row (file=$fn was=$was)");
+                } else {
+                    $job = $schema->resultset('Printing3dJob')->create(\%job_data);
+                }
                 if ($job) {
-                    $c->flash->{success_msg} .= ' Tracked as job #' . $job->id . ' in queue.';
+                    eval { $row->update({ current_job_id => $job->id, status => 'printing' }) };
+                    $c->flash->{success_msg} .= ($existing ? ' Resumed job #' : ' Tracked as job #')
+                        . $job->id . ' in queue.';
                     if ($job_data{filament_quantity}) {
                         $c->flash->{success_msg} .= " (filament ~" . $job_data{filament_quantity} . "g";
                         $c->flash->{success_msg} .= ', cost $' . ($job_data{filament_cost} || '?') if $job_data{filament_cost};
@@ -646,6 +662,18 @@ sub command :Path('/3d/printer_lan/command') :Args(0) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'command',
                     "start_print job create failed: $@");
                 $c->flash->{success_msg} .= ' (Note: could not auto-create queue job; add manually for full tracking.)';
+            }
+        } elsif ($cmd eq 'stop') {
+            eval {
+                my $job = $self->_requeue_stopped_job($c, $c->model('DBEncy'), $row);
+                $c->flash->{success_msg} .= ' Job #' . $job->id
+                    . ' is back in the queue — Start Print resumes it, it does not make a second job.'
+                    if $job;
+                $row->update({ status => 'idle', current_job_id => undef });
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'command',
+                    'stop requeue failed printer_id=' . $row->id . ": $@");
             }
         }
     } else {
@@ -695,6 +723,56 @@ sub _resolve_printer {
     }
     $c->stash->{lan_error} = 'Printer not reachable and no stored LAN host.' unless $host;
     return ($row, $host, $paused);
+}
+
+# A stop is not a cancel. The job row must go back to the queue so the same
+# print can be started again. Without this the row stayed 'printing' forever
+# and the next Start Print inserted a second active job for one file.
+sub _requeue_stopped_job {
+    my ($self, $c, $schema, $row) = @_;
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || '3d';
+    my $job = $schema->resultset('Printing3dJob')->search(
+        { sitename => $sitename, printer_id => $row->id, status => { -in => [qw(printing assigned)] } },
+        { order_by => { -desc => 'id' }, rows => 1 },
+    )->first;
+    return unless $job;
+    my $stamp = eval { Comserv::Util::AppTime->now_utc } || '';
+    $job->update({
+        status => 'queued',
+        notes  => (($job->notes || '') . " | stopped on printer $stamp — restart from the queue, do not add a new job"),
+    });
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'command',
+        'stop requeued job #' . $job->id . ' printer_id=' . $row->id);
+    return $job;
+}
+
+# The same file started again on the same printer is the same print, whether it
+# was stopped by a fault or by hand. Find that row instead of inserting a twin.
+sub _resumable_job {
+    my ($self, $c, $schema, $row, $fn) = @_;
+    return unless $fn;
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || '3d';
+    my @jobs = $schema->resultset('Printing3dJob')->search(
+        { sitename => $sitename, printer_id => $row->id,
+          status => { -in => [qw(printing assigned queued)] } },
+        { order_by => { -desc => 'id' } },
+    )->all;
+
+    my $want = lc $fn;
+    (my $want_base = $want) =~ s/(?:\.gcode)?\.3mf\z|\.gcode\z//;
+
+    for my $job (@jobs) {
+        my $name  = lc($job->item_name || '');
+        my $notes = $job->notes || '';
+        return $job if $name && $name eq $want;
+        return $job if $notes =~ /\bFile:\s*\Q$fn\E/;
+        next unless $job->model_id;
+        my $model = eval { $schema->resultset('Printing3dModel')->find($job->model_id) };
+        next unless $model && $model->nfs_path;
+        (my $base = lc(($model->nfs_path =~ m{([^/\\]+)$})[0])) =~ s/(?:\.gcode)?\.3mf\z|\.gcode\z|\.stl\z//;
+        return $job if $base && $base eq $want_base;
+    }
+    return;
 }
 
 # File delete/rename/move/upload/start can pull the file out from under a running job.
