@@ -1,6 +1,6 @@
 {
-  "versionCode": 60,
-  "versionName": "3.5.2",
-  "apkUrl": "/api/app/download",
-  "releaseNotes": "v3.5.2 Native HealthKitchen Dashboard: Daily Meals, Coffees, Recipes BOM, Patient Intake & 1-Tap HTML Web View Toggle."
+    "versionCode": 61,
+    "versionName": "3.4.17",
+    "apkUrl": "/static/app/ComservInventory.apk",
+    "releaseNotes": "Dev server + sitename fix; in-app ZeroTier (*.zero) lookup with Comserv Dev CA"
 }
