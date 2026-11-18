@@ -1080,6 +1080,12 @@ sub chat :Local :Args(0) {
     my $audio_file_id      = $json_data->{audio_file_id};
     my $transcript_file_id = $json_data->{transcript_file_id};
     my $skip_role_prompt   = $json_data->{skip_role_prompt} ? 1 : 0;
+    my $editor_skip_writes_early = sub {
+        require Comserv::Model::AI2::ChatIntent;
+        return (Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id)
+            || Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id_requested)
+            || ($editor_phase =~ /^(?:clarify|analyze|plan|verify|implement)$/)) ? 1 : 0;
+    };
 
     # The dropdown sends "provider|model" (e.g. openrouter|anthropic/...,
     # grok|grok-4..., ollama|llama3...). Extract the real model name.
@@ -1087,8 +1093,39 @@ sub chat :Local :Args(0) {
         $model = $2;
     }
 
+    # Image in chat (signed-in only; GuestGuard already dropped image_data for guests).
+    my $image_data = (!$is_guest_chat && defined $json_data->{image_data} && !ref $json_data->{image_data}
+                      && length $json_data->{image_data}) ? $json_data->{image_data} : undef;
+    my $image_mime = $json_data->{image_mime};
+    $prompt = 'What is in this image?' if $image_data && !(defined $prompt && $prompt =~ /\S/);
+
     unless ($prompt && length($prompt) > 0) {
         $c->res->body(encode_json({ success => 0, error => 'Prompt is required' }));
+        return;
+    }
+
+    # ── Inventory photo / barcode intent: the SAME PhotoRead subs as
+    # /api/app/photo/* (Android app + web). Chat only draws the card.
+    my $photo_hit = (!$is_guest_chat && !$skip_role_prompt && !$editor_skip_writes_early->()) && eval {
+        require Comserv::Model::AI2::PhotoIntent;
+        Comserv::Model::AI2::PhotoIntent->new->try_chat($c,
+            prompt => $prompt, image_data => $image_data, image_mime => $image_mime);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'ai2_chat', "PhotoIntent try_chat threw: $@");
+    }
+    if ($photo_hit && $photo_hit->{handled}) {
+        $c->res->body(encode_json({
+            success         => $photo_hit->{success} ? 1 : 0,
+            response        => $photo_hit->{response} // '',
+            model           => '(photo-read)',
+            provider        => 'ai2-photo',
+            needs_web_search=> 0,
+            photo_action    => $photo_hit->{photo_action},
+            conversation_id => $conversation_id,
+            thinking        => [],
+        }));
         return;
     }
 
@@ -1336,6 +1373,18 @@ sub chat :Local :Args(0) {
         return;
     }
 
+    # Any other chat image: VisionRead text goes into the normal chat prompt.
+    my $image_read;
+    if ($image_data) {
+        require Comserv::Model::AI2::PhotoIntent;
+        my $vi = eval { Comserv::Model::AI2::PhotoIntent->new->describe_image($c,
+            image_data => $image_data, image_mime => $image_mime, prompt => $prompt) } || {};
+        if ($vi->{ok}) {
+            $prompt = Comserv::Model::AI2::PhotoIntent->new->prompt_with($prompt, $vi);
+        }
+        $image_read = { engine => $vi->{engine}, error => ($vi->{ok} ? undef : ($vi->{error} || $@ || 'vision failed')) };
+    }
+
     my $result = try {
         $c->model('AI2::Chat')->process($c,
             prompt          => $prompt,
@@ -1394,6 +1443,7 @@ sub chat :Local :Args(0) {
         original_model   => $result->{original_model},
         original_error   => $result->{original_error},
         all_exhausted    => $result->{all_exhausted},
+        ($image_read ? (image_read => $image_read) : ()),
     }));
 }
 

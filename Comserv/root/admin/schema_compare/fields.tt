@@ -26,13 +26,18 @@
             <div class="table-container">
                 <p class="field-count-info">
                     [% SET match_count = 0; diff_count = 0; table_only = 0; result_only = 0; %]
-                    [% FOREACH f IN fields; NEXT UNLESS f.source == 'Table'; %]
-                      [% IF f.status == 'Match'; match_count = match_count + 1; %]
-                      [% ELSIF f.status == 'Table' && f.has_result; diff_count = diff_count + 1; %]
-                      [% ELSIF f.status == 'Table' && !f.has_result; table_only = table_only + 1; %]
-                      [% END; END %]
+                    [%# Counts use the same tests as the Status badges below, so the header matches the rows. %]
                     [% count_result_only = 0; %]
-                    [% FOREACH f IN fields; NEXT UNLESS f.source == 'Result'; NEXT IF f.status == 'Match'; count_result_only = count_result_only + 1; END %]
+                    [% FOREACH f IN fields; %]
+                      [% IF f.source == 'Table'; %]
+                        [% IF f.status == 'Match'; match_count = match_count + 1; %]
+                        [% ELSIF f.has_diff; diff_count = diff_count + 1; %]
+                        [% ELSIF !f.has_result; table_only = table_only + 1; %]
+                        [% END; %]
+                      [% ELSIF f.source == 'Result' && f.status != 'Match' && !f.has_diff && !f.has_result; %]
+                        [% count_result_only = count_result_only + 1; %]
+                      [% END; %]
+                    [% END %]
                     <strong>[% fields.size %] rows</strong> —
                     [% match_count %] match ·
                     [% diff_count %] differ ·

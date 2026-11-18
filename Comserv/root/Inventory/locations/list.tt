@@ -19,6 +19,7 @@
   <thead>
     <tr>
       <th>Name</th>
+      <th>Code</th>
       <th>Type</th>
       <th>Description</th>
       <th>Status</th>
@@ -29,6 +30,7 @@
   [% FOREACH loc IN locations %]
     <tr>
       <td>[% loc.name %]</td>
+      <td>[% loc.code || '-' %]</td>
       <td>[% loc.location_type || '-' %]</td>
       <td>[% loc.description || '-' %]</td>
       <td>[% loc.status %]</td>
