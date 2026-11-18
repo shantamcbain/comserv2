@@ -1,0 +1,6 @@
+{
+    "versionCode": 61,
+    "versionName": "3.4.17",
+    "apkUrl": "/static/app/ComservInventory.apk",
+    "releaseNotes": "Dev server + sitename fix; in-app ZeroTier (*.zero) lookup with Comserv Dev CA"
+}
