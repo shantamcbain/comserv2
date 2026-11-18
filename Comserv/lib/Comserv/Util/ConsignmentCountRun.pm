@@ -146,7 +146,7 @@ sub create_draft {
     try {
         $schema->txn_do(sub {
             $count = $schema->resultset('Accounting::InventoryLocationCount')->create({
-                sitename     => $pl->sitename || '3d',
+                sitename     => $pl->sitename || $self->_request_site($c),
                 placement_id => $pl->id,
                 location_id  => $pl->location_id,
                 partner_id   => $pl->partner_id,
@@ -208,6 +208,19 @@ sub create_draft {
 # froze every other request for 3.5 minutes on the first real photo (2026-11-06).
 # ---------------------------------------------------------------------------
 
+
+# The placement's own sitename wins. Without one, the site the request resolved
+# (stash, then session). Never a hardcoded site: a guessed site files the count
+# under someone else's books.
+sub _request_site {
+    my ($self, $c) = @_;
+    return undef unless $c && ref $c && $c->can('stash');
+    for my $cand (eval { $c->stash->{SiteName} }, eval { $c->session->{SiteName} }) {
+        return $cand if defined $cand && $cand =~ /\S/;
+    }
+    return undef;
+}
+
 sub queue_from_photo {
     my ($self, $c, %args) = @_;
     my $schema = $self->_schema($c) or return { ok => 0, error => 'Database not available' };
@@ -233,7 +246,7 @@ sub queue_from_photo {
     my ($count, $err);
     try {
         $count = $schema->resultset('Accounting::InventoryLocationCount')->create({
-            sitename     => $pl->sitename || '3d',
+            sitename     => $pl->sitename || $self->_request_site($c),
             placement_id => $pl->id,
             location_id  => $pl->location_id,
             partner_id   => $pl->partner_id,

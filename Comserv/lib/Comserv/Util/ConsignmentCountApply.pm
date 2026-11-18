@@ -106,7 +106,10 @@ sub apply {
     my $item      = $count->item or return { ok => 0, error => 'Item missing on this count' };
     my $item_id   = $count->item_id;
     my $loc_id    = $count->location_id;
-    my $sitename  = $count->sitename || '3d';
+    my $sitename  = $count->sitename
+                 || ($placement ? $placement->sitename : undef)
+                 || eval { $c->stash->{SiteName} } || eval { $c->session->{SiteName} };
+    return { ok => 0, error => 'Count has no sitename' } unless $sitename;
 
     my @sold  = grep { ($_->qty_delta // 0) < 0 } @lines;
     my @short = grep { ($_->qty_expected // 0) > ($_->qty_counted // 0) } @lines;

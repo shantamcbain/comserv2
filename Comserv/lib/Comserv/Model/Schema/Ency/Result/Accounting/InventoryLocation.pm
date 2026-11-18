@@ -26,6 +26,12 @@ __PACKAGE__->add_columns(
         data_type   => 'text',
         is_nullable => 1,
     },
+    # NOTE: no `code` column here. `code` is the number a person writes on a
+    # container so a count can be tied to a tub without a barcode printer. It is
+    # deliberately NOT in this class: DBIC names every column it knows, so
+    # declaring one the live DB does not have breaks the whole locations query.
+    # Read it with `SELECT code ...` only after the column has been added
+    # (see Inventory::api_locations, which degrades to '' when it is absent).
     location_type => {
         data_type     => 'varchar',
         size          => 100,

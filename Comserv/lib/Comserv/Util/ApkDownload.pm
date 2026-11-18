@@ -206,6 +206,10 @@ sub publish_latest_build {
         };
     }
     if (!$cand_ver->{versionCode}) {
+        # Gradle may still be writing the APK; an unreadable file this fresh is not an error yet.
+        my $age = time - ((stat $candidate)[9] || 0);
+        return { changed => 0, reason => 'build output still being written', source => $candidate }
+            if $age < ($opt{settle_seconds} // 900);
         return { changed => 0, error => "could not read version from $candidate", source => $candidate };
     }
 

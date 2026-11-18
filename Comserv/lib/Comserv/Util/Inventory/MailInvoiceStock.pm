@@ -628,24 +628,19 @@ sub _apply_one {
             'to=' . ($msg->{to} || ''),
             'subject=' . ($msg->{subject} || ''),
         );
-        eval {
-            $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->create({
-                sitename       => $sitename,
-                supplier_id    => $supplier->id,
-                invoice_number => $inv_no,
-                invoice_date   => $today,
-                total_amount   => $amount,
-                status         => 'draft',
-                notes          => $notes,
-                created_by     => ($c->session->{username} || 'mail-invoice'),
-                created_at     => $now,
-                updated_at     => $now,
-            });
-        };
-        if ($@ || !$invoice) {
-            $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'apply',
-                "create invoice $inv_no: $@");
-            return { id => $mail_id, reason => "create: $@" };
+        my $err;
+        ($invoice, $err) = $self->_create_draft_invoice($c, $schema,
+            sitename       => $sitename,
+            supplier_id    => $supplier->id,
+            invoice_number => $inv_no,
+            invoice_date   => $today,
+            total_amount   => $amount,
+            notes          => $notes,
+            created_by     => ($c->session->{username} || 'mail-invoice'),
+            now            => $now,
+        );
+        unless ($invoice) {
+            return { id => $mail_id, reason => "create: $err" };
         }
         $created_now = 1;
     }
@@ -704,25 +699,9 @@ sub _finish_invoice {
         $schema->txn_do(sub {
             my @existing = $invoice->lines->all;
             unless (@existing) {
-                my $body = $classifier->message_body($msg);
-                my @parsed = $classifier->_parse_invoice_line_items(
-                    $body, $msg->{subject}, $msg->{from},
-                );
-                for my $line (@parsed) {
-                    my $qty = 0 + ($line->{quantity} || 0);
-                    next unless $qty > 0;
-                    my $item = $self->_match_item($schema, $sitename, $supplier->id, $line);
-                    my $cost = 0 + ($line->{price} || 0);
-                    my $desc = $line->{name} || $line->{sku} || 'Mail invoice line';
-                    $desc = substr($desc, 0, 250);
-                    $invoice->create_related('lines', {
-                        item_id     => $item ? $item->id : undef,
-                        description => $desc,
-                        quantity    => $qty,
-                        unit_cost   => $cost,
-                        line_total  => sprintf('%.2f', $qty * $cost),
-                    });
-                }
+                my $parsed = $self->_parse_mail_lines($classifier, $msg);
+                $self->_draft_lines($schema, $invoice, $sitename, $supplier->id, $parsed,
+                    'Mail invoice line');
                 @existing = $invoice->lines->all;
             }
             unless (@existing) {
@@ -793,6 +772,106 @@ sub _finish_invoice {
         return { reason => "finish: $fail" };
     }
     return $result;
+}
+
+# ---------------------------------------------------------------------------
+# Shared draft half. The mail path (_apply_one/_finish_invoice) and the photo
+# reader (Comserv::Util::Inventory::PhotoRead) both build a DRAFT invoice from
+# parsed lines here, so there is one matcher and one line writer.
+#
+# Parsed line shape: { name, sku, quantity, price, item_id? }. item_id, when a
+# person already chose it, wins over matching.
+# ---------------------------------------------------------------------------
+
+# Parse step of the mail path: message body -> parsed lines (no DB).
+sub _parse_mail_lines {
+    my ($self, $classifier, $msg) = @_;
+    my $body = $classifier->message_body($msg);
+    my @parsed = $classifier->_parse_invoice_line_items(
+        $body, $msg->{subject}, $msg->{from},
+    );
+    return \@parsed;
+}
+
+# Header of a draft supplier invoice. Returns ($invoice, $error).
+sub _create_draft_invoice {
+    my ($self, $c, $schema, %a) = @_;
+    my $now = $a{now} || Comserv::Util::AppTime->now_utc;
+    my $invoice = eval {
+        $schema->resultset('Accounting::InventorySupplierInvoice')->create({
+            sitename       => $a{sitename},
+            supplier_id    => $a{supplier_id},
+            invoice_number => $a{invoice_number},
+            invoice_date   => $a{invoice_date} || Comserv::Util::AppTime->today_utc_ymd,
+            total_amount   => (defined $a{total_amount} ? $a{total_amount} : 0),
+            (defined $a{tax_amount}      ? (tax_amount      => $a{tax_amount})      : ()),
+            (defined $a{shipping_amount} ? (shipping_amount => $a{shipping_amount}) : ()),
+            status         => 'draft',
+            notes          => $a{notes},
+            created_by     => $a{created_by} || 'mail-invoice',
+            created_at     => $now,
+            updated_at     => $now,
+        });
+    };
+    my $err = $@;
+    if ($err || !$invoice) {
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'apply',
+            "create invoice " . ($a{invoice_number} // '') . ": $err");
+        return (undef, $err || 'create failed');
+    }
+    return ($invoice, undef);
+}
+
+# Match/draft step: one invoice line per parsed line with qty > 0.
+sub _draft_lines {
+    my ($self, $schema, $invoice, $sitename, $supplier_id, $parsed, $fallback_desc) = @_;
+    my $n = 0;
+    for my $line (@{ $parsed || [] }) {
+        my $qty = 0 + ($line->{quantity} || 0);
+        next unless $qty > 0;
+        my $item;
+        if ($line->{item_id}) {
+            $item = eval { $schema->resultset('Accounting::InventoryItem')->find($line->{item_id}) };
+            $item = undef if $item && lc($item->sitename || '') ne lc($sitename || '');
+        }
+        $item ||= $self->_match_item($schema, $sitename, $supplier_id, $line);
+        my $cost = 0 + ($line->{price} || 0);
+        my $desc = $line->{name} || $line->{sku} || $fallback_desc || 'Invoice line';
+        $desc = substr($desc, 0, 250);
+        $invoice->create_related('lines', {
+            item_id     => $item ? $item->id : undef,
+            description => $desc,
+            quantity    => $qty,
+            unit_cost   => $cost,
+            line_total  => sprintf('%.2f', $qty * $cost),
+        });
+        $n++;
+    }
+    return $n;
+}
+
+# Public: a DRAFT invoice from already-parsed lines (photo reader, other views).
+# Never receives stock and never posts: a person accepts it later.
+# -> { ok, invoice_id, lines } or { ok => 0, error }
+sub draft_invoice {
+    my ($self, $c, $schema, %a) = @_;
+    return { ok => 0, error => 'sitename required' }    unless $a{sitename};
+    return { ok => 0, error => 'supplier_id required' } unless $a{supplier_id};
+    return { ok => 0, error => 'invoice_number required' } unless $a{invoice_number};
+    my ($invoice, $n, $err);
+    eval {
+        $schema->txn_do(sub {
+            ($invoice, $err) = $self->_create_draft_invoice($c, $schema, %a);
+            die "$err\n" unless $invoice;
+            $n = $self->_draft_lines($schema, $invoice, $a{sitename}, $a{supplier_id},
+                $a{lines}, 'Photo invoice line');
+        });
+    };
+    if ($@) {
+        $self->{logging}->log_with_details($c, 'error', __FILE__, __LINE__, 'draft_invoice', "$@");
+        return { ok => 0, error => 'Could not create the draft invoice.' };
+    }
+    return { ok => 1, invoice_id => $invoice->id, lines => $n };
 }
 
 sub _match_item {
