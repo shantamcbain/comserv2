@@ -1,0 +1,53 @@
+[% META
+   title = "Recipe"
+   description = "Add or edit a Health Kitchen food recipe"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "HealthKitchen"
+   page_version = "0.01"
+   last_updated = "2026-11-13"
+%]
+[% PageVersion = 'healthkitchen/recipe_form.tt,v 0.01 2026/11/13 hermes-agent Exp shanta - add and edit with the shared AI assistant' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% f = hk_recipe_form || {} %]
+
+<div class="app-container">
+    [% INCLUDE 'healthkitchen/_disclaimer.tt' %]
+    <div class="page-header">
+        <h1>[% IF f.id %]Edit recipe[% ELSE %]Add recipe[% END %]</h1>
+        <p>
+            <a href="[% c.uri_for('/healthkitchen/recipes') %]">Recipes</a>
+            ·
+            <a href="[% c.uri_for('/healthkitchen') %]">Health Kitchen</a>
+        </p>
+    </div>
+
+    [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+
+    <form method="post" action="[% c.uri_for('/healthkitchen/recipe_save') %]" class="content-section">
+        [% IF f.id %]<input type="hidden" name="id" value="[% f.id %]" />[% END %]
+        <label>Name <input type="text" name="name" maxlength="500" required value="[% f.name | html %]" /></label>
+        <label>Cuisine <input type="text" name="cuisine" maxlength="100" value="[% f.cuisine | html %]" /></label>
+        <label>Cook time (minutes) <input type="number" name="cook_time_min" min="0" value="[% f.cook_time_min %]" /></label>
+        <label>Servings <input type="number" name="servings" min="0" value="[% f.servings %]" /></label>
+        <label>Yield amount <input type="text" name="yield_amount" value="[% f.yield_amount %]" /></label>
+        <label>Yield unit <input type="text" name="yield_unit" maxlength="30" value="[% f.yield_unit | html %]" /></label>
+        <label>Description <textarea name="description" rows="3">[% f.description | html %]</textarea></label>
+        <label>Preparation <textarea name="preparation" rows="3">[% f.preparation | html %]</textarea></label>
+        <label>Instructions <textarea name="instructions" rows="6">[% f.instructions | html %]</textarea></label>
+        <label>Notes <textarea name="notes" rows="3">[% f.notes | html %]</textarea></label>
+        <label>Ingredients <textarea name="ingredients" rows="8" placeholder="One per line: 1 tsp turmeric">[% f.ingredients_text | html %]</textarea></label>
+        <p class="doc-muted">One ingredient per line. A leading number and unit are saved as the amount. Leave this box unchanged to keep existing ingredient links.</p>
+        <button type="submit" class="btn btn-primary">Save recipe</button>
+        <a href="[% c.uri_for('/healthkitchen/recipes') %]">Cancel</a>
+    </form>
+
+    [% PROCESS 'ai/partials/ai_form_assistant.tt'
+       ai_form_entity_label = 'food recipe'
+       ai_form_context = 'Health Kitchen food recipe. Use accurate plant, herb, and food names. Do not invent a species or a dose. Ingredients: one per line, quantity unit name.'
+       ai_form_fields = 'name, cuisine, cook_time_min, servings, yield_amount, yield_unit, description, preparation, instructions, notes, ingredients'
+       ai_form_agent = 'ency'
+       ai_form_allow_user = 1
+    %]
+</div>

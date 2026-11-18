@@ -8,18 +8,11 @@
   <div style="margin-top:0.6em;display:flex;flex-wrap:wrap;gap:0.5em;align-items:center;">
     <input type="text" id="ency-ai-entity-name" placeholder="Enter name to look up…" size="38"
            value="[% ency_ai_entity_name | html %]" />
-    <select id="ency-ai-model-sel" title="AI model to use" style="font-size:0.9em;">
-      <option value="grok-beta|grok" selected>Grok Beta (loading…)</option>
-    </select>
+    <span style="font-size:0.85em;">Model: Chat with AI selector. Agent: Encyclopedia.</span>
     <button type="button" id="ency-ai-ask-btn" onclick="encyAiFill()">Ask AI</button>
     <button type="button" id="ency-ai-review-btn" onclick="encyAiReview()"
             title="Send current field values to AI and ask it to identify errors or inconsistencies"
             style="background: var(--caution-bg, #fff3cd);border:1px solid var(--caution-color, #ffc107);padding:0.3em 0.7em;cursor:pointer;">Review &amp; Correct</button>
-    [% IF is_admin %]
-    <button type="button" id="ency-ai-sync-btn" onclick="encyAiSyncModels()"
-            title="Sync available xAI model list from the API — run this if AI returns 410/deprecated errors"
-            style="background:#e8f4e8;border:1px solid #5a9;padding:0.3em 0.7em;cursor:pointer;font-size:0.85em;">&#8635; Sync Models</button>
-    [% END %]
     <span id="ency-ai-status" style="color: var(--text-muted-color, #555);font-style:italic;font-size:0.9em;"></span>
   </div>
   <div style="margin-top:0.5em;font-size:0.85em;color:#444;">
@@ -47,9 +40,9 @@
       Override existing values (default: only fills empty fields)
     </label>
     &nbsp;&nbsp;
-    <label style="cursor:pointer;" title="Enables Grok live web search for current data (may be unavailable on some plans)">
+    <label style="cursor:pointer;" title="Sends use_search to /ai2/chat, the same flag Chat with AI uses">
       <input type="checkbox" id="ency-ai-web-search" style="vertical-align:middle;">
-      Use live web search (Grok only — required for accurate author/person data)
+      Use live web search (same flag as Chat with AI)
     </label>
     <span style="margin-left:1em;color:#888;">
       Note: The <em>Reference</em> field is always appended, never replaced.
@@ -95,46 +88,6 @@
 <script>
 (function() {
     // ── Dynamic model loader ── same endpoint as local-chat.js ──────────────
-    function loadEncyModelOptions() {
-        var sel = document.getElementById('ency-ai-model-sel');
-        if (!sel) return;
-        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (!data.success || !data.providers) return;
-                var grokProvider = null;
-                data.providers.forEach(function(p) { if (p.service === 'grok') grokProvider = p; });
-                if (!grokProvider) return;
-                var DEAD_MODELS = { 'grok-code-fast-1': true, 'grok-3-mini': true, 'grok-4.20-non-reasoning': true, 'grok-4.20-multi-agent-0309': true, 'grok-4.20-multi-agent': true };
-                var FALLBACK = [
-                    { val: 'grok-beta|grok', label: 'Grok Beta' }
-                ];
-                var DEAD_MODELS = {
-                    'grok-code-fast-1': 1, 'grok-4-fast-non-reasoning': 1,
-                    'grok-4-1-fast-non-reasoning': 1, 'grok-4-0709': 1,
-                    'grok-3': 1, 'grok-4-fast-reasoning': 1, 'grok-4-1-fast-reasoning': 1,
-                    'grok-4.3': 1
-                };
-                var models = (grokProvider.models && grokProvider.models.length > 0)
-                    ? grokProvider.models
-                        .filter(function(m) { return m.id && !DEAD_MODELS[m.id] && !m.id.match(/imagine|video/i); })
-                        .map(function(m) {
-                            var lbl = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
-                            return { val: m.id + '|grok', label: lbl + ' (xAI)' };
-                        })
-                    : FALLBACK;
-                sel.innerHTML = '';
-                models.forEach(function(m, i) {
-                    var opt = document.createElement('option');
-                    opt.value = m.val;
-                    opt.textContent = m.label;
-                    if (i === 0) opt.selected = true;
-                    sel.appendChild(opt);
-                });
-            })
-            .catch(function() { /* keep default option on failure */ });
-    }
-    loadEncyModelOptions();
     // Auto-check web-search for entity types that need it (e.g. authors/people)
     (function() {
         var pd = document.getElementById('ency-ai-prompt-data');
@@ -149,11 +102,11 @@
                 if (wsCheckbox.checked) {
                     wsLabel.style.color = '#1a7a1a';
                     wsLabel.style.fontWeight = 'bold';
-                    wsLabel.title = 'Web search ACTIVE — Grok will search the web for current data';
+                    wsLabel.title = 'Web search ACTIVE — sent to /ai2/chat';
                 } else {
                     wsLabel.style.color = '';
                     wsLabel.style.fontWeight = '';
-                    wsLabel.title = 'Enables Grok live web search for current data (may be unavailable on some plans)';
+                    wsLabel.title = 'Sends use_search to /ai2/chat, the same flag Chat with AI uses';
                 }
             }
             wsCheckbox.addEventListener('change', updateWsStyle);
@@ -162,37 +115,41 @@
     })();
     // ────────────────────────────────────────────────────────────────────────
 
-    var INTEGRATIVE_SYSTEM = [
-        'You are an integrative health encyclopedia assistant serving a multi-disciplinary practitioner team:',
-        'MDs, naturopathic doctors (NDs), herbalists, TCM practitioners, Ayurvedic practitioners,',
-        'and other complementary healthcare providers.',
-        '',
-        'Your role is to provide balanced, evidence-informed information from MULTIPLE healing traditions.',
-        'Do NOT default to allopathic/pharmaceutical framing as the primary or only valid approach.',
-        'Present information from ALL relevant traditions where known:',
-        '  - Conventional medicine (allopathic/pharmaceutical)',
-        '  - Naturopathic medicine',
-        '  - Herbal/botanical medicine (western, TCM, Ayurvedic, indigenous)',
-        '  - Traditional Chinese Medicine (TCM) where relevant',
-        '  - Ayurvedic medicine where relevant',
-        '',
-        'The encyclopedia supports INFORMED PATIENT DECISION-MAKING.',
-        'Users are practitioners helping patients choose their own healthcare approach.',
-        'Do NOT add disclaimers telling people to consult a doctor — this IS a practitioner tool.',
-        'Do NOT present pharmaceutical or surgical intervention as default or superior.',
-        'Do NOT omit herbal, naturopathic, or traditional treatments.',
-        '',
-        'Return ONLY a raw JSON object. No markdown, no code fences, no disclaimers, no prose — pure JSON only.'
-    ].join(' ');
+    // Persona is the ency agent in Chat.pm. JSON shape is in the user prompt.
+    // Do not keep a second system prompt here.
 
-    function getModelAndProvider() {
-        var sel = document.getElementById('ency-ai-model-sel');
-        if (sel && sel.value) {
-            var parts = sel.value.split('|');
-            return { model: parts[0], provider: parts[1] || 'grok' };
-        }
-        return { model: 'grok-beta', provider: 'grok' };
+    function sharedChatModel() {
+        var sel = document.getElementById('ai-provider');
+        return (sel && sel.value) ? String(sel.value).trim() : '';
     }
+
+    // One access path: POST /ai2/chat. Model is the Chat with AI selector
+    // (empty = the server Router). Agent is ency. No private provider list.
+    function encyAiRequest(promptText, signal) {
+        var model = sharedChatModel();
+        var web = document.getElementById('ency-ai-web-search');
+        var body = {
+            prompt: promptText,
+            agent_id: 'ency',
+            page_path: window.location.pathname,
+            page_title: document.title,
+            use_search: (web && web.checked) ? 1 : 0
+        };
+        if (model) body.model = model;
+        return fetch('/ai2/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            signal: signal,
+            body: JSON.stringify(body)
+        }).then(function(r) {
+            return r.text().then(function(text) {
+                try { return JSON.parse(text); }
+                catch (e) { throw new Error('Server returned non-JSON (HTTP ' + r.status + ')'); }
+            });
+        });
+    }
+
 
     function encyAiFill() {
         var name = document.getElementById('ency-ai-entity-name').value.trim();
@@ -215,11 +172,9 @@
         document.getElementById('ency-ai-raw').style.display = 'none';
         document.getElementById('ency-resolve-panel').style.display = 'none';
 
-        var mp        = getModelAndProvider();
-        var isGrok    = (mp.provider === 'grok');
-        var timeoutMs = isGrok ? 45000 : 120000;
-        statusEl.textContent = 'Asking ' + mp.model + '\u2026';
+        statusEl.textContent = 'Asking Encyclopedia agent\u2026';
 
+        var timeoutMs  = 120000;
         var controller = new AbortController();
         var timeoutId  = setTimeout(function() { controller.abort(); }, timeoutMs);
 
@@ -232,33 +187,11 @@
         var basePrompt = fieldInstruction + ' The subject is: ' + name;
         var fullPrompt = extraInstructions ? basePrompt + '\n\nAdditional instructions: ' + extraInstructions : basePrompt;
 
-        var payload = {
-            prompt:     fullPrompt,
-            system:     INTEGRATIVE_SYSTEM,
-            provider:   mp.provider,
-            model:      mp.model,
-            page_path:  window.location.pathname,
-            page_title: document.title,
-            use_search: (mp.provider === 'grok') && document.getElementById('ency-ai-web-search') && document.getElementById('ency-ai-web-search').checked
-        };
-
-        fetch('/ai/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            signal: controller.signal,
-            body: JSON.stringify(payload)
-        })
-        .then(function(r) {
-            return r.text().then(function(text) {
-                try { return JSON.parse(text); }
-                catch(e) { throw new Error('Server returned non-JSON (HTTP ' + r.status + ')'); }
-            });
-        })
+        encyAiRequest(fullPrompt, controller.signal)
         .then(function(data) {
             clearTimeout(timeoutId);
             btn.disabled = false;
-            var modelUsed = data.model || mp.model;
+            var modelUsed = data.model || 'router';
             if (!data.success) {
                 statusEl.textContent = 'AI error (' + modelUsed + '): ' + (data.error || 'unknown error');
                 document.getElementById('ency-ai-raw-text').textContent = JSON.stringify(data, null, 2);
@@ -590,8 +523,7 @@
     function encyAiMarkReference() {
         var refEl = document.querySelector('[name="reference"]');
         if (!refEl) return;
-        var mp   = getModelAndProvider();
-        var note = 'AI-generated (' + mp.model + '), reviewed by [% c.session.username | html %]';
+        var note = 'AI-generated (ENCY agent via Chat with AI), reviewed by [% c.session.username | html %]';
         var existing = (refEl.value || '').trim();
         if (existing && existing.indexOf('AI-generated') === -1) {
             refEl.value = existing + '\n' + note;
@@ -622,7 +554,6 @@
             if (v) currentValues[n] = v;
         });
 
-        var mp        = getModelAndProvider();
         var timeoutMs = 60000;
         var controller = new AbortController();
         setTimeout(function() { controller.abort(); }, timeoutMs);
@@ -638,22 +569,7 @@
             + 'If nothing to correct or fill, return {"corrections": []}. '
             + 'Current field values: ' + JSON.stringify(currentValues);
 
-        fetch('/ai/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            signal: controller.signal,
-            body: JSON.stringify({
-                prompt:     prompt,
-                system:     INTEGRATIVE_SYSTEM,
-                provider:   mp.provider,
-                model:      mp.model,
-                page_path:  window.location.pathname,
-                page_title: document.title,
-                use_search: (mp.provider === 'grok') && document.getElementById('ency-ai-web-search') && document.getElementById('ency-ai-web-search').checked
-            })
-        })
-        .then(function(r) { return r.json(); })
+        encyAiRequest(prompt, controller.signal)
         .then(function(data) {
             btn.disabled = false;
             if (!data.success) {
@@ -947,49 +863,6 @@
         .catch(function(){});
     }
 
-    function encyAiSyncModels() {
-        var btn = document.getElementById('ency-ai-sync-btn');
-        var statusEl = document.getElementById('ency-ai-status');
-        if (btn) btn.disabled = true;
-        statusEl.textContent = 'Syncing xAI model list\u2026';
-        fetch('/ai/sync_models?service=grok', { method: 'POST', credentials: 'include' })
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-                if (btn) btn.disabled = false;
-                if (d.success) {
-                    var syncedModels = d.models || [];
-                    var sel = document.getElementById('ency-ai-model-sel');
-                    var DEAD_MODELS = { 'grok-code-fast-1': true, 'grok-3-mini': true, 'grok-4.20-non-reasoning': true, 'grok-4.20-multi-agent-0309': true, 'grok-4.20-multi-agent': true };
-                    var added = 0;
-                    if (sel && syncedModels.length > 0) {
-                        var current = sel.value;
-                        sel.innerHTML = '';
-                        syncedModels.forEach(function(m) {
-                            if (!m.id || DEAD_MODELS[m.id] || m.id.match(/imagine|video/i)) return;
-                            var lbl = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
-                            var opt = document.createElement('option');
-                            opt.value = m.id + '|grok';
-                            opt.textContent = lbl + ' (xAI)';
-                            if (m.id + '|grok' === current || added === 0) opt.selected = true;
-                            sel.appendChild(opt);
-                            added++;
-                        });
-                    }
-                    if (added > 0) {
-                        statusEl.textContent = '\u2713 Synced \u2014 ' + added + ' model' + (added === 1 ? '' : 's') + ' in dropdown.';
-                    } else {
-                        statusEl.textContent = '\u2713 Synced (no new models found \u2014 using grok-beta)';
-                        loadEncyModelOptions();
-                    }
-                } else {
-                    statusEl.textContent = 'Sync failed: ' + (d.error || 'unknown error');
-                }
-            })
-            .catch(function(e) {
-                if (btn) btn.disabled = false;
-                statusEl.textContent = 'Sync request failed: ' + e.message;
-            });
-    }
 
     window.encyAiFill           = encyAiFill;
     window.encyAiReview         = encyAiReview;
@@ -1000,7 +873,6 @@
     window.encySkipAll          = encySkipAll;
     window.encyRefSearch        = encyRefSearch;
     window.encyLinkReference    = encyLinkReference;
-    window.encyAiSyncModels     = encyAiSyncModels;
 })();
 </script>
 [% END %]

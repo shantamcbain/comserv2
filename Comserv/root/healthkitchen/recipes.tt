@@ -18,6 +18,8 @@
             <a href="[% c.uri_for('/healthkitchen') %]">Health Kitchen</a>
             ·
             <a href="[% c.uri_for('/healthkitchen/pantry') %]">Pantry</a>
+            ·
+            <a href="[% c.uri_for('/healthkitchen/recipe_form') %]">Add recipe</a>
         </p>
     </div>
 

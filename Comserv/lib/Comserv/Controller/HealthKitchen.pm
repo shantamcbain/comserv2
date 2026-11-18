@@ -331,6 +331,55 @@ sub recipes :Local :Args(0) {
     );
 }
 
+sub recipe_form :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    my $id = $c->req->params->{id};
+    my $form = {};
+    if ( defined $id && $id =~ /^\d+$/ ) {
+        $form = $self->hk->recipe_for_edit( $c, $id );
+        unless ($form) {
+            $c->flash->{error_msg} = 'Recipe not found, or you cannot edit it.';
+            $c->response->redirect( $c->uri_for( $self->action_for('recipes') ) );
+            $c->detach;
+            return;
+        }
+    }
+    $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'recipe_form',
+        'HealthKitchen recipe form id=' . ( $form->{id} || 'new' ) );
+    $c->stash(
+        hk_recipe_form => $form,
+        template       => 'healthkitchen/recipe_form.tt',
+    );
+}
+
+sub recipe_save :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    unless ( $c->req->method eq 'POST' ) {
+        $c->response->redirect( $c->uri_for( $self->action_for('recipe_form') ) );
+        $c->detach;
+        return;
+    }
+    my $res = $self->hk->save_recipe( $c, { %{ $c->req->params } } );
+    if ( $res->{ok} ) {
+        $c->flash->{success_msg} = $res->{created} ? 'Recipe added.' : 'Recipe saved.';
+        my $detail = $self->action_for('recipe');
+        $c->response->redirect(
+            $detail
+            ? $c->uri_for( $detail, [ $res->{id} ] )
+            : $c->uri_for( $self->action_for('recipes') )
+        );
+    }
+    else {
+        $c->flash->{error_msg} = $res->{error} || 'Could not save the recipe.';
+        my $id = $c->req->params->{id};
+        $c->response->redirect( $c->uri_for(
+            $self->action_for('recipe_form'),
+            ( defined $id && $id =~ /^\d+$/ ) ? { id => $id } : ()
+        ) );
+    }
+    $c->detach;
+}
+
 sub seed_morning :Local :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details( $c, 'info', __FILE__, __LINE__, 'seed_morning',

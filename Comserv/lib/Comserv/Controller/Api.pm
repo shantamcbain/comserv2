@@ -15,6 +15,7 @@ use Comserv::Util::DocumentationConfig;
 use Comserv::Util::ModelCatalog;
 use Comserv::Util::TodoLog;
 use Comserv::Util::AccessCheck;
+use Comserv::Util::ApkDownload;
 
 # Resolve the default model for the AI Focus-Tune picker from the SAME shared
 # catalog every other AI surface uses (ModelCatalog::default_for) — NEVER a
@@ -695,32 +696,57 @@ sub _git_line {
     return $line;
 }
 
+# Same identity the web debug bar prints (pagetop.tt / Root::auto): the checkout
+# this process is running, not the primary tree and not a baked "main" stamp.
+# The phone's ping badge and /api/app/version serverInfo must show that too.
+sub _app_live_identity {
+    my ($c) = @_;
+    my $home = eval { $c->config->{home} } // '';
+    my $git_root = '';
+    if ($home && -e "$home/../.git") {
+        $git_root = "$home/..";
+    } elsif ($home && -e "$home/.git") {
+        $git_root = $home;
+    }
+    my $branch = $git_root ? _git_line($git_root, 'rev-parse', '--abbrev-ref', 'HEAD') : '';
+    my $commit = $git_root ? _git_line($git_root, 'rev-parse', '--short', 'HEAD') : '';
+    my $workflow = eval {
+        require Comserv::Util::SystemInfo;
+        Comserv::Util::SystemInfo->get_app_workflow($home);
+    } || $branch || 'main';
+    $branch = $workflow if $branch eq '';
+    my $label = ($commit ne '') ? "$branch\@$commit" : $branch;
+    return {
+        branch   => $branch,
+        commit   => $commit,
+        workflow => $workflow,
+        label    => $label,
+    };
+}
+
 # Which server is answering? Deliberately unauthenticated and data-free: the
 # phone must be able to show "dev :3001 main c17663f" (or "production, old
 # build") before anything else works — that is what makes a change testable.
+# Git comes from the running checkout, the same source as the web debug bar.
 sub api_app_ping :Path('app/ping') :Args(0) {
     my ($self, $c) = @_;
-
-    my $root = $ENV{COMSERV_ROOT} || '/home/shanta/PycharmProjects/comserv2/Comserv';
-    $root =~ s{/Comserv/?$}{};
-    my ($branch, $commit) = ('', '');
-    # List-form open: no shell, so a quote in COMSERV_ROOT cannot run a command.
-    if ($root =~ m{^/[\w./-]+$} && -d $root) {
-        $branch = _git_line($root, 'rev-parse', '--abbrev-ref', 'HEAD');
-        $commit = _git_line($root, 'rev-parse', '--short', 'HEAD');
-    }
-
+    my $id   = _app_live_identity($c);
     my $port = $c->req->uri->port || '';
+    my $env  = $port eq '5000' ? 'production'
+             : $port eq '3001' ? 'dev'
+             : ($id->{workflow} || "port_$port");
+
     $c->res->content_type('application/json');
     $c->res->body(encode_json({
-        success => 1,
-        service => 'comserv2',
-        port    => "$port",
-        host    => scalar($c->req->uri->host // ''),
-        env     => ($port eq '5000' ? 'production' : ($port eq '3001' ? 'dev' : "port_$port")),
-        git     => { branch => $branch, commit => $commit },
-        pid     => $$,
-        time    => scalar(localtime),
+        success  => 1,
+        service  => 'comserv2',
+        port     => "$port",
+        host     => scalar($c->req->uri->host // ''),
+        env      => $env,
+        workflow => $id->{workflow},
+        git      => { branch => $id->{branch}, commit => $id->{commit} },
+        pid      => $$,
+        time     => scalar(localtime),
     }));
     $c->detach;
 }
@@ -857,6 +883,24 @@ sub api_inventory_stock_unreserve :Path('inventory/stock/unreserve') :Args(0) {
 
 # Session gate for the phone barcode routes. Existing inventory aliases keep
 # the LAN bypass. App-context work can later point this at ModuleAccess.
+# Inventory permission used by the phone gate below and by Chat-with-AI's
+# photo/barcode intent (Model::AI2::PhotoIntent), so both decide the same way.
+sub inventory_allowed {
+    my ($self, $c) = @_;
+    my $allowed = $self->_session_is_admin($c);
+    if (eval { require Comserv::Util::ModuleAccess; 1 }) {
+        my $mod = 'Comserv::Util::ModuleAccess';
+        if ($mod->can('inventory_access')) {
+            $allowed = $mod->inventory_access($c) ? 1 : 0;
+        } elsif ($mod->can('allows')) {
+            $allowed = $mod->allows($c, 'inventory') ? 1 : 0;
+        } elsif ($mod->can('can_access')) {
+            $allowed = $mod->can_access($c, 'inventory') ? 1 : 0;
+        }
+    }
+    return $allowed ? 1 : 0;
+}
+
 sub _api_inventory_session_gate {
     my ($self, $c) = @_;
     my $uid = eval { $c->session->{user_id} };
@@ -905,18 +949,7 @@ sub _api_inventory_session_gate {
     $c->stash->{SiteName} = $resolved;
     $c->session->{SiteName} = $resolved;
 
-    my $allowed = $self->_session_is_admin($c);
-    if (eval { require Comserv::Util::ModuleAccess; 1 }) {
-        my $mod = 'Comserv::Util::ModuleAccess';
-        if ($mod->can('inventory_access')) {
-            $allowed = $mod->inventory_access($c) ? 1 : 0;
-        } elsif ($mod->can('allows')) {
-            $allowed = $mod->allows($c, 'inventory') ? 1 : 0;
-        } elsif ($mod->can('can_access')) {
-            $allowed = $mod->can_access($c, 'inventory') ? 1 : 0;
-        }
-    }
-    unless ($allowed) {
+    unless ($self->inventory_allowed($c)) {
         $self->_json_error($c, 403, 'Forbidden.', 'forbidden');
         return;
     }
@@ -1025,6 +1058,192 @@ sub api_inventory_photo_upload :Path('inventory/photo/upload') :Args(0) {
         bytes        => $r->{bytes},
         content_type => $r->{content_type},
     });
+}
+
+# ---------------------------------------------------------------------------
+# Shared photo / barcode reader. ONE code path for the Android app, the web
+# inventory pages and Chat-with-AI (Model::AI2::PhotoIntent calls the same
+# Comserv::Util::Inventory::PhotoRead subs). Only the view differs.
+#   POST /api/app/photo/read           multipart photo, mode=items|invoice [, location_id] -> 202
+#   GET  /api/app/photo/read/<id>      the read, matched lines, totals, supplier
+#   POST /api/app/photo/reparse        {read_id, raw_text}
+#   POST /api/app/photo/confirm        {read_id, lines, create_invoice, supplier_id|supplier_create, ...}
+#   POST /api/app/photo/rerun          {read_id [, sitename (admin)]}  -> 202
+#   POST /api/app/photo/delete         {read_id [, sitename (admin)]}
+#   GET  /api/app/photo/reads          admin only
+#   POST /api/app/photo/scan           {barcode?, description?}
+#   POST /api/app/photo/scan/apply     {item_id | create, action, qty, location_id, to_location_id, ...}
+# Session only (_api_inventory_session_gate); the site comes from that gate.
+# ---------------------------------------------------------------------------
+
+sub _photo_reader {
+    my ($self, $c) = @_;
+    require Comserv::Util::Inventory::PhotoRead;
+    my $root = eval { $c->config->{home} } || eval { $c->path_to()->stringify } || '.';
+    return Comserv::Util::Inventory::PhotoRead->new(root => $root);
+}
+
+sub _photo_fail {
+    my ($self, $c, $r) = @_;
+    $self->_json_error($c, ($r->{status} || 400), ($r->{error} || 'Request failed'), ($r->{code} || 'bad_request'));
+}
+
+sub _photo_post_json {
+    my ($self, $c) = @_;
+    unless (uc($c->req->method || '') eq 'POST') {
+        $self->_json_error($c, 405, 'POST required', 'method_not_allowed');
+        return;
+    }
+    my $p = $self->_api_read_json($c);
+    return ref $p eq 'HASH' ? $p : {};
+}
+
+sub _json_202 {
+    my ($self, $c, $payload) = @_;
+    $c->res->status(202);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => 1, %{ $payload || {} } }));
+    $c->detach();
+}
+
+# Admins may act on another site's read from the photo_reads list.
+sub _photo_target_site {
+    my ($self, $c, $site, $p) = @_;
+    my $admin = $self->_session_is_admin($c);
+    my $want = ref $p eq 'HASH' ? $p->{sitename} : undef;
+    return ($admin && defined $want && $want =~ /\S/) ? ($want, 1) : ($site, $admin);
+}
+
+sub api_app_photo_read :Path('app/photo/read') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    unless (uc($c->req->method || '') eq 'POST') {
+        $self->_json_error($c, 405, 'POST required', 'method_not_allowed');
+        return;
+    }
+    my $upload = eval { $c->req->upload('photo') };
+    unless ($upload && $upload->tempname) {
+        $self->_json_error($c, 400, 'No photo supplied.', 'no_photo');
+        return;
+    }
+    my $pr = $self->_photo_reader($c);
+    my $r  = $pr->queue($c,
+        sitename    => $site,
+        user_id     => $c->session->{user_id},
+        username    => $c->session->{username},
+        mode        => scalar($c->req->param('mode')),
+        location_id => scalar($c->req->param('location_id')),
+        image_path  => $upload->tempname,
+        mime        => ($upload->type || 'image/jpeg'),
+    );
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    $pr->spawn_worker($c, $site, $r->{read_id});
+    $self->_json_202($c, { read_id => $r->{read_id}, status => $r->{status} });
+}
+
+sub api_app_photo_read_get :Path('app/photo/read') :Args(1) {
+    my ($self, $c, $read_id) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my ($tsite, $admin) = $self->_photo_target_site($c, $site, { sitename => scalar $c->req->param('sitename') });
+    my $schema = eval { $c->model('DBEncy') };
+    my $r = $self->_photo_reader($c)->view($c, $schema,
+        sitename => $tsite, user_id => $c->session->{user_id}, read_id => $read_id, is_admin => $admin);
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    $self->_json_ok($c, $r->{read});
+}
+
+sub api_app_photo_reparse :Path('app/photo/reparse') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $p = $self->_photo_post_json($c) or return;
+    my $r = $self->_photo_reader($c)->reparse($c,
+        sitename => $site, user_id => $c->session->{user_id}, read_id => $p->{read_id}, raw_text => $p->{raw_text});
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
+}
+
+sub api_app_photo_confirm :Path('app/photo/confirm') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $p = $self->_photo_post_json($c) or return;
+    my $schema = eval { $c->model('DBEncy') };
+    unless ($schema) {
+        $self->_json_error($c, 503, 'Database not available', 'db_unavailable');
+        return;
+    }
+    my $r = $self->_photo_reader($c)->confirm($c, $schema,
+        sitename => $site,
+        user_id  => $c->session->{user_id},
+        username => $c->session->{username},
+        create_invoice => ($p->{create_invoice} ? 1 : 0),
+        keep_photo     => ($p->{keep_photo} ? 1 : 0),
+        map { ($_ => $p->{$_}) } qw(read_id lines supplier_id supplier_create invoice_number
+                                     invoice_date tax shipping total attach_photo_index),
+    );
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
+}
+
+sub api_app_photo_rerun :Path('app/photo/rerun') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $p = $self->_photo_post_json($c) or return;
+    my ($tsite, $admin) = $self->_photo_target_site($c, $site, $p);
+    my $pr = $self->_photo_reader($c);
+    my $r = $pr->rerun($c, sitename => $tsite, user_id => $c->session->{user_id},
+        read_id => $p->{read_id}, is_admin => $admin);
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    $pr->spawn_worker($c, $tsite, $r->{read_id});
+    $self->_json_202($c, { read_id => $r->{read_id}, status => $r->{status} });
+}
+
+sub api_app_photo_delete :Path('app/photo/delete') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $p = $self->_photo_post_json($c) or return;
+    my ($tsite, $admin) = $self->_photo_target_site($c, $site, $p);
+    my $r = $self->_photo_reader($c)->delete_photo($c, sitename => $tsite,
+        user_id => $c->session->{user_id}, read_id => $p->{read_id}, is_admin => $admin);
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
+}
+
+sub api_app_photo_reads :Path('app/photo/reads') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_inventory_session_gate($c) or return;
+    my $r = $self->_photo_reader($c)->list_reads($c, is_admin => $self->_session_is_admin($c),
+        kept_only => ($c->req->param('kept') ? 1 : 0));
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
+}
+
+sub api_app_photo_scan :Path('app/photo/scan') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $p = $self->_photo_post_json($c) or return;
+    my $schema = eval { $c->model('DBEncy') };
+    my $r = $self->_photo_reader($c)->scan($c, $schema, sitename => $site,
+        barcode => $p->{barcode}, description => $p->{description}, inv => eval { $c->controller('Inventory') });
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
+}
+
+sub api_app_photo_scan_apply :Path('app/photo/scan/apply') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $p = $self->_photo_post_json($c) or return;
+    my $schema = eval { $c->model('DBEncy') };
+    my $r = $self->_photo_reader($c)->scan_apply($c, $schema,
+        sitename => $site, user_id => $c->session->{user_id}, username => $c->session->{username},
+        map { ($_ => $p->{$_}) } qw(item_id create action qty location_id to_location_id unit_cost supplier_id));
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
 }
 
 =head2 api_list_documentation
@@ -4094,23 +4313,12 @@ No auth required (clients hit this before login to decide whether to update).
 
 sub api_app_version :Path('app/version') :Args(0) {
     my ($self, $c) = @_;
-
-    my $hostname = eval {
-        require Comserv::Util::SystemInfo;
-        Comserv::Util::SystemInfo::get_server_hostname();
-    } || 'workstation';
-
-    my $workflow = eval {
-        require Comserv::Util::SystemInfo;
-        Comserv::Util::SystemInfo->get_app_workflow($c->config->{home});
-    } || 'main';
-
-    my $git_head = eval {
-        require Comserv::Util::Git;
-        Comserv::Util::Git->current_head_str($c);
-    } || 'main';
-
+    my $id = _app_live_identity($c);
     my $client_ip = eval { $c->req->address } || '';
+    my $server = eval {
+        require Comserv::Util::Logging;
+        Comserv::Util::Logging->get_system_identifier();
+    } || $id->{workflow};
 
     # The APK on the NFS share is the only build artifact that exists; its
     # version.json is written by the Android gradle publish, not by an agent.
@@ -4151,9 +4359,9 @@ sub api_app_version :Path('app/version') :Args(0) {
     $json_data->{serverInfo} = {
         domain   => eval { $c->req->uri->host } || 'dev.computersystemconsulting.ca',
         clientIp => $client_ip,
-        server   => "$hostname (Docker):" . (eval { $c->req->uri->port } || 3001),
-        workflow => $workflow,
-        git      => $git_head,
+        server   => $server,
+        workflow => $id->{workflow},
+        git      => $id->{label},
         dbEnv    => ($ENV{DATABASE_ENVIRONMENT} || 'PRODUCTION'),
     };
 
@@ -4361,7 +4569,7 @@ the app simply hides the badge.
 =head3 JSON
 
   { success, domain, clientIp, server, serverHost, serverIp, workflow, port,
-    git: {branch, commit}, build: {branch, commit, date, host},
+    git, gitInfo: {branch, commit}, build: {branch, commit, date, host},
     dbEnv, dbUser,
     targets: [ {name, label, port, host, url, running} ] }
 
@@ -4435,26 +4643,11 @@ sub api_app_server_info :Path('app/server-info') :Args(0) {
 
     my $home = $c->config->{home} // '';
     my $sys  = eval { Comserv::Util::SystemInfo::get_system_info() } || {};
-
-    my $workflow   = eval { Comserv::Util::SystemInfo->get_app_workflow($home) } || 'main';
+    my $id   = _app_live_identity($c);
+    my $workflow   = $id->{workflow};
     my $identifier = eval { Comserv::Util::Logging->get_system_identifier() } || '';
-
-    # Live checkout, not the baked image stamp: a worktree server must report the
-    # branch it actually runs (Root::auto does the same overlay for the debug bar).
-    my ($git_branch, $git_commit) = ('', '');
-    my $git_root = -e "$home/../.git" ? "$home/.."
-                 : (-e "$home/.git"   ? $home : '');
-    if ($git_root) {
-        for my $args (['--abbrev-ref', 'HEAD'], ['--short', 'HEAD']) {
-            my $out = '';
-            if (open my $fh, '-|', 'git', '-C', $git_root, 'rev-parse', @$args) {
-                $out = <$fh> // '';
-                close $fh;
-            }
-            chomp $out;
-            if ($args->[0] eq '--abbrev-ref') { $git_branch = $out } else { $git_commit = $out }
-        }
-    }
+    my $git_branch = $id->{branch};
+    my $git_commit = $id->{commit};
 
     my $build = {};
     my $version_file = $home ? "$home/version.json" : '';
@@ -4493,7 +4686,8 @@ sub api_app_server_info :Path('app/server-info') :Args(0) {
         workflow   => $workflow,
         sitename   => $c->stash->{SiteName} // $c->session->{SiteName} // '',
         port       => 0 + $port,
-        git        => { branch => $git_branch, commit => $git_commit },
+        git        => $id->{label},
+        gitInfo    => { branch => $git_branch, commit => $git_commit },
         build      => {
             branch => $build->{branch}     // '',
             commit => $build->{commit}     // '',
@@ -4506,7 +4700,6 @@ sub api_app_server_info :Path('app/server-info') :Args(0) {
     }));
     $c->detach();
 }
-
 =head2 api_app_download
 
 GET /api/app/download - Direct download for the Android APK with correct APK MIME type.
@@ -4782,6 +4975,33 @@ sub api_admin_bot_tokens :Path('admin/bot_tokens') :Args(0) {
         "Bot token list read by admin=$admin->{username}, rows=" . scalar(@out));
     $c->res->status(200);
     $c->res->body(encode_json({ success => 1, count => scalar(@out), tokens => \@out }));
+    $c->detach();
+}
+
+sub api_healthkitchen_dashboard :Path('healthkitchen/dashboard') :Args(0) {
+    my ($self, $c) = @_;
+
+    require Comserv::Util::HealthKitchen;
+    require Comserv::Util::HealthKitchen::MealSlots;
+    require Comserv::Util::AppTime;
+
+    my $hk = Comserv::Util::HealthKitchen->new;
+    my $MS = 'Comserv::Util::HealthKitchen::MealSlots';
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
+
+    my $today_dash = eval { $hk->today_dashboard($c) } || {};
+    my $day_slots  = eval { $MS->day($c, $today) } || { slots => [] };
+    my $recipes    = eval { $hk->list_recipes($c) } || [];
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success       => \1,
+        coffees_today => $today_dash->{coffees_today} || 0,
+        morning_bev   => $today_dash->{morning_bev} || "Ceylon Cinnamon, Turmeric, Black Pepper, Chia Seed",
+        meal_slots    => $day_slots->{slots} || [],
+        recipes       => $recipes
+    }));
     $c->detach();
 }
 

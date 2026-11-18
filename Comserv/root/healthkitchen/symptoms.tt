@@ -52,6 +52,13 @@
             <label>Severity <input type="text" name="severity" /></label>
             <button type="submit" class="btn btn-secondary">Submit for review</button>
         </form>
+        [% PROCESS 'ai/partials/ai_form_assistant.tt'
+           ai_form_entity_label = 'symptom'
+           ai_form_context = 'encyclopedia symptom record. Use the established name. Do not invent a symptom.'
+           ai_form_fields = 'new_name, new_description, severity'
+           ai_form_agent = 'ency'
+           ai_form_allow_user = 1
+        %]
 
         [% IF hk_pending_symptoms && hk_pending_symptoms.size %]
             <h3>Pending review</h3>
