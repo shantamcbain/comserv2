@@ -31,10 +31,12 @@ my $high = { ok => 1, model => 'anthropic/claude-sonnet-5.5', review => { verdic
   my $low = { %$high, review => { %{ $high->{review} }, findings => [ { severity => 'low', issue => 'naming' } ] } };
   ok(!$rv->gate_view($low)->{blocking}, 'low finding does not block');
 }
-my $cap = $rv->gate_view({ ok => 0, skipped => 1, reason => 'daily cap reached' });
-ok($cap->{allow} && !$cap->{blocking} && $cap->{warning} =~ /daily cap/, 'cap hit -> warn and allow');
-my $err = $rv->gate_view({ ok => 0, reason => 'review call failed: 500' });
-ok($err->{allow} && $err->{warning} =~ /Not reviewed/, 'reviewer error -> warn and allow');
+my $cap = $rv->gate_view({ ok => 0, skipped => 1, reason => 'daily cap reached and no free reviewer model' });
+ok(!$cap->{allow} && $cap->{blocking} && $cap->{retry} && $cap->{warning} =~ /^Not reviewed, commit blocked: daily cap/, 'cap hit, no free reviewer -> blocked with Retry review');
+my $err = $rv->gate_view({ ok => 0, reason => 'review call failed: 500', blocking => 0 });
+ok(!$err->{allow} && $err->{blocking} && $err->{not_reviewed} && $err->{warning} =~ /commit blocked/, 'reviewer error -> blocked even if caller says blocking 0');
+my $empty = $rv->gate_view({ ok => 0, skipped => 1, empty_diff => 1, reason => 'empty diff' });
+ok($empty->{allow} && !$empty->{blocking} && !$empty->{retry}, 'empty diff -> allowed, nothing to review');
 # 3) add-on stabilizer (native_host.py)
 my $out = `python3 $FindBin::Bin/grokcom_stabilize_check.py $FindBin::Bin/../script/firefox-grokcom-usage/native_host.py 2>&1`;
 is($? >> 8, 0, 'native_host stabilize: flapping/jump cases') or diag $out;
