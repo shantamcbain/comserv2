@@ -12,5 +12,6 @@
   "cohere/north-mini-code:free": { "in": 0, "out": 0 }
  },
  "max_diff_chars": 60000,
- "max_tokens": 1500
+ "max_tokens": 8000,
+ "free_models": ["cohere/north-mini-code:free"]
 }
