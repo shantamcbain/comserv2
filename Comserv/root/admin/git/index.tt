@@ -357,12 +357,13 @@
                        is silently dropped by the HTML parser — the start tag vanishes and
                        the buttons join the outer form, which is why Preview/Update did
                        nothing when clicked. Links cannot be swallowed that way. %]
-                    <p>Merges main into <strong>every</strong> registered worktree — Proxmox (:4016) and 3d (:4003) included;
-                       nothing is skipped to keep a branch out of sync. A branch with uncommitted files is still merged when main
-                       does not touch those files. If main does touch them, the merge is retried with git's own
-                       <code>--autostash</code>: everything is merged, then your edits are re-applied on top &mdash; an edit that
-                       collides stays in the worktree as a conflict and in <code>git stash list</code>, and that row is flagged
-                       <strong>&#9873; needs manual</strong>. Nothing is force-pushed and no branch is reset.
+                    <p>Merges main into every worktree <code>git worktree list</code> knows about (plus the ones in worktrees.json).
+                       Each branch is checked <strong>before</strong> git touches it, and is only merged when the merge is clean:
+                       <strong>skipped_conflict</strong> = main and the branch change the same lines (resolve it in that worktree;
+                       git rerere remembers the fix for other branches); <strong>skipped_dirty</strong> = uncommitted edits to files main
+                       changes, or files still marked conflicted; <strong>skipped_untracked</strong> = untracked files main would overwrite.
+                       Each listed file says whether it is the same as main (safe to discard/delete) or differs. Edits to files main does
+                       not change are left as they are. Nothing is stashed, nothing is left half merged, no branch is reset or force-pushed.
                        Dev servers started with <code>-r</code> restart on their own when their files change.</p>
                     <div class="git-actions">
                         <a class="admin-btn admin-btn-sm" rel="nofollow" data-update-all-mode="preview"
@@ -379,18 +380,20 @@
                     [% IF update_all_result && update_all_result.rows && update_all_result.rows.size %]
                     <table class="data-table" data-update-all-table="1">
                         <thead><tr><th>Worktree</th><th>Branch</th><th>Port</th><th>Result</th><th>Manual</th><th>Behind / ahead</th>
-                            <th>Before (undo point)</th><th>Files / reason</th><th>Auto-restart</th></tr></thead>
+                            <th>Before (undo point) &rarr; after</th><th>Reason / files</th><th>Auto-restart</th></tr></thead>
                         <tbody>
                         [% FOREACH r IN update_all_result.rows %]
                             <tr>
-                                <td>[% r.key %]</td>
-                                <td>[% r.branch %]</td>
+                                <td title="[% r.path | html %]">[% r.key | html %]</td>
+                                <td>[% r.branch | html %]</td>
                                 <td>[% IF r.port %]:[% r.port %][% END %]</td>
-                                <td>[% r.action | html %][% IF r.autostash %] (autostash)[% END %][% IF r.tree %]<br><small style="opacity:.7;">[% r.tree | html %]</small>[% END %]</td>
+                                <td>[% res_status = r.status || r.action %][% res_status | html %][% IF r.tree %]<br><small style="opacity:.7;">[% r.tree | html %]</small>[% END %]</td>
                                 <td style="white-space:nowrap;">[% IF r.needs_manual %]<span style="color:#dc3545;font-weight:bold;">&#9873; needs manual</span>[% END %]</td>
                                 <td>[% r.behind %][% IF r.ahead %] / [% r.ahead %][% END %]</td>
-                                <td>[% IF r.pre_merge_commit %][% r.pre_merge_commit.substr(0, 10) %][% END %]</td>
-                                <td>[% IF r.reason %][% r.reason | html %][% ELSIF r.dirty_files && r.dirty_files.size %]uncommitted kept: [% r.dirty_files.join(', ') | html %][% END %][% IF r.manual_files && r.manual_files.size %] <strong>conflict in: [% r.manual_files.join(', ') | html %]</strong>[% END %][% IF r.stash %] <em>stash: [% r.stash.substr(0, 60) | html %]</em>[% END %]</td>
+                                <td>[% before = r.before_sha || r.pre_merge_commit %][% IF before %][% before.substr(0, 10) %][% END %][% IF r.after_sha %] &rarr; [% r.after_sha.substr(0, 10) %][% END %]</td>
+                                <td>[% r.reason | html %]
+                                    [% IF r.files && r.files.size %]<ul style="margin:2px 0 0 16px;padding:0;">[% FOREACH f IN r.files %]<li><code>[% f | html %]</code>[% IF r.file_notes && r.file_notes.$f %] &mdash; [% r.file_notes.$f | html %][% END %]</li>[% END %]</ul>[% END %]
+                                    [% IF r.kept_uncommitted && r.kept_uncommitted.size %]<small>uncommitted kept as is: [% r.kept_uncommitted.join(', ') | html %]</small>[% END %]</td>
                                 <td>[% IF r.will_restart %]yes[% END %]</td>
                             </tr>
                         [% END %]
@@ -399,7 +402,7 @@
                     [% END %]
                     <table class="data-table" data-update-all-table="1" hidden>
                         <thead><tr><th>Worktree</th><th>Branch</th><th>Port</th><th>Result</th><th>Manual</th><th>Behind / ahead</th>
-                            <th>Before (undo point)</th><th>Files / reason</th><th>Auto-restart</th></tr></thead>
+                            <th>Before (undo point) &rarr; after</th><th>Reason / files</th><th>Auto-restart</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
