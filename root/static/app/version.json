@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.6",
-  "apkUrl": "/api/app/download",
-  "releaseNotes": "Fix custom domain URL in updater & Settings, dynamic version display."
+    "versionCode": 61,
+    "versionName": "3.4.17",
+    "apkUrl": "/static/app/ComservInventory.apk",
+    "releaseNotes": "Dev server + sitename fix; in-app ZeroTier (*.zero) lookup with Comserv Dev CA"
 }

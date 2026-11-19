@@ -79,11 +79,17 @@
             showInvoiceSteps();
         }
         var current = null;
+        var locs = [];
         function poll() {
             api('/api/app/photo/read/' + readId).then(function (d) {
                 if (!d.success) { k.say(d.error || 'Read failed', 1); return; }
                 current = d;
                 if (d.status === 'reading') { k.say('Reading the photo... (a cold model can take a few minutes)'); setTimeout(poll, 4000); return; }
+                if (d.mode !== 'invoice' && (!d.locations || !d.locations.length)) {
+                    api('/api/inventory/locations').then(function (g) { if (g && g.locations) { d.locations = g.locations; locs = g.locations; } render(d); },
+                                                          function () { render(d); });
+                    return;
+                }
                 render(d);
             }).catch(function (e) { k.say('Network error: ' + e, 1); });
         }
@@ -118,6 +124,16 @@
             var inv = d.mode === 'invoice';
             k.say(d.status === 'failed' ? ('Could not read lines: ' + (d.error || '') + ' Edit the text and Re-parse.') :
                   d.status === 'confirmed' ? 'Already confirmed.' : 'Read by ' + (d.engine || '?') + '. Check the text and every line, then Confirm.', d.status === 'failed');
+            if (!inv && d.locations && !q('.pc-container')) {
+                var picks = '<p><b>Container / location:</b> <select class="pc-container">' +
+                    (d.location_id ? '' : '<option value="">-- pick the container --</option>') +
+                    (d.locations || []).map(function (l) {
+                        return '<option value="' + l.id + '"' + (d.location_id === l.id ? ' selected' : '') + '>' +
+                               esc(l.name) + (l.code ? ' (' + esc(l.code) + ')' : '') + '</option>';
+                    }).join('') + '</select></p>';
+                var pre = document.createElement('div'); pre.innerHTML = picks;
+                k.body.insertBefore(pre.firstChild, k.body.firstChild);
+            }
             var h = '<details' + (d.status === 'failed' ? ' open' : '') + '><summary>Text read from the photo (edit, then Re-parse)</summary>' +
                     '<textarea class="pc-raw" rows="8" style="width:100%">' + esc(d.raw_text) + '</textarea>' +
                     '<button type="button" class="pc-reparse">Re-parse</button> ' +
@@ -135,12 +151,20 @@
                              : '<td><input type="radio" name="pc-att-' + readId + '" class="pc-att" value="' + l.index + '" title="Use this photo as the item picture"></td>') +
                         '<td>' + (m ? '#' + m.item_id + ' ' + esc(m.name) + ' <small>' + esc(m.sku) + '</small>' : '<i>not in inventory</i>') +
                         '<input type="hidden" class="pc-item" value="' + (m ? m.item_id : '') + '"></td>' +
-                        '<td><select class="pc-act">' + (m ? '<option value="match" selected>attach to this item</option>' : '') +
-                        '<option value="create"' + (m ? '' : ' selected') + '>create new item</option><option value="skip">skip</option></select></td>' +
+                        '<td><select class="pc-act">' +
+                        (inv ? '<option value="match"' + (m ? ' selected' : ' disabled') + '>attach to this item</option>' :
+                               '<option value="count" selected>counted</option><option value="receive">new stock (receive)</option>' +
+                               '<option value="use">consumed</option><option value="move">moved somewhere else</option><option value="skip">skip</option>') +
+                        '<option value="create"' + (m ? '' : ' selected') + '>create new item</option><option value="skip">skip</option></select>' +
+                        (!inv ? ' <select class="pc-to"><option value="">- moved to -</option>' : '') +
+                        ((!inv && (d.locations || [])) ? (d.locations || []).map(function (l) {
+                            return '<option value="' + l.id + '">' + esc(l.name) + '</option>';
+                        }).join('') : '') + (!inv ? '</select>' : '') + '</td>' +
                         '<td><input class="pc-name" size="18" value="' + esc(p.name || l.name) + '"> <input class="pc-sku" size="9" placeholder="SKU" value="' + esc(p.sku) + '"></td></tr>';
                 });
                 h += '</table><p>' + (inv ? '<label><input type="checkbox" class="pc-inv" checked> create draft invoice</label> ' +
-                     '<label><input type="checkbox" class="pc-keep"> keep the photo (debug backup)</label> ' : '') +
+                     '<label><input type="checkbox" class="pc-keep"> keep the photo (debug backup)</label> ' :
+                     '<b>What happened to each line?</b> (a count sets the on-hand to the number you checked) ') +
                      '<button type="button" class="pc-confirm">Confirm</button></p>';
             }
             k.body.innerHTML = h;
@@ -167,10 +191,20 @@
         }
         function confirmRead() {
             var d = current, lines = [], body = { read_id: readId, lines: lines, create_invoice: 0 };
+            var cont = k.body.querySelector('.pc-container');
+            var containerId = cont ? cont.value : (d.location_id || '');
+            var isCount = d.mode !== 'invoice';
             k.body.querySelectorAll('tr[data-ix]').forEach(function (tr) {
                 var act = tr.querySelector('.pc-act').value, ln = { index: +tr.dataset.ix, action: act, qty: num(tr.querySelector('.pc-qty').value) };
                 var pr = tr.querySelector('.pc-price'); if (pr) ln.unit_price = num(pr.value);
                 if (act === 'match') ln.item_id = +tr.querySelector('.pc-item').value;
+                if (isCount) {
+                    ln.location_id = containerId ? +containerId : undefined;
+                    if (act === 'move') {
+                        var to = tr.querySelector('.pc-to');
+                        ln.to_location_id = (to && to.value) ? +to.value : undefined;
+                    }
+                }
                 if (act === 'create') { ln.name = tr.querySelector('.pc-name').value; ln.sku = tr.querySelector('.pc-sku').value; }
                 var at = tr.querySelector('.pc-att'); if (at && at.checked) ln.attach_photo = 1;
                 lines.push(ln);
@@ -189,10 +223,26 @@
                 }
             }
             var n = lines.filter(function (l) { return l.action === 'create'; }).length;
-            if (!window.confirm('Create ' + n + ' new item(s)' + (body.supplier_create ? ', a new supplier' : '') +
-                                (body.create_invoice ? ' and a DRAFT invoice' : '') + '?')) return;
-            api('/api/app/photo/confirm', body).then(function (r) {
-                if (!r.success) { k.say(r.error || 'Confirm failed', 1); return; }
+            var msg;
+            if (isCount) {
+                if (!containerId) { k.say('Pick the container this photo is of first.', 1); return; }
+                msg = 'Count ' + lines.length + ' line(s) into ' +
+                      (cont ? cont.options[cont.selectedIndex].text : 'that location') +
+                      (n ? ', create ' + n + ' new item(s)' : '') + '?';
+            } else {
+                msg = 'Create ' + n + ' new item(s)' + (body.supplier_create ? ', a new supplier' : '') +
+                      (body.create_invoice ? ' and a DRAFT invoice' : '') + '?';
+            }
+            if (!window.confirm(msg)) return;
+            var path = isCount ? '/api/app/photo/count/confirm'
+                               : '/api/app/photo/confirm';
+            if (isCount) body = { read_id: readId, decisions: lines };
+            api(path, body).then(function (r) {
+                if (!r.success) { k.say(r.error || (isCount ? 'Count failed' : 'Confirm failed'), 1); return; }
+                if (isCount) {
+                    k.say('Counted ' + (r.confirmed || 0) + ' line(s). Stock updated.');
+                    return;
+                }
                 k.say('Done: ' + r.created_items.length + ' item(s) created, ' + r.matched.length + ' attached' +
                       (r.supplier_created ? ', supplier #' + r.supplier_created + ' added' : '') +
                       (r.invoice_id ? ', draft invoice #' + r.invoice_id : '') + '.');

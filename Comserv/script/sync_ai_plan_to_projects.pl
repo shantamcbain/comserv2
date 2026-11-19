@@ -33,6 +33,12 @@ use POSIX qw(strftime);
 use Scalar::Util qw(blessed);
 use LWP::UserAgent;
 
+# The plan text is UTF-8; without these layers a subject containing an em dash
+# reported "Wide character in print" and the old byte-read turned it into
+# mojibake in the todo subject/description.
+binmode(STDOUT, ':encoding(UTF-8)');
+binmode(STDERR, ':encoding(UTF-8)');
+
 my ($doc, $parent, $base, $code, $developer, $dry_run, $help);
 GetOptions(
     'doc=s'       => \$doc,
@@ -60,7 +66,7 @@ my $ua = LWP::UserAgent->new( timeout => 60 );
 $ua->agent('ai-plan-sync/1.0');
 
 # ---------- read doc ----------
-my $raw = do { local $/; open my $fh, '<', $doc or die "open $doc: $!"; <$fh> };
+my $raw = do { local $/; open my $fh, '<:encoding(UTF-8)', $doc or die "open $doc: $!"; <$fh> };
 my $meta = parse_meta($raw);
 my $title = $meta->{title} // ($doc =~ /([^\/]+)\.(tt|md)$/ ? $1 : $doc);
 my $desc  = $meta->{description} // '';
@@ -214,10 +220,17 @@ sub post_json {
     # may send text/html (or no content-type), which previously made this
     # routine report success=>0 even on a 200 with a valid JSON payload --
     # that broke idempotency stamping and caused duplicate todo creation.
-    if ($ct =~ /json/ || ($content =~ /^\s*\{/ && $content =~ /"success"/)) {
-        eval { my $d = decode_json($content); return _coerce($d); } || return { success => 0, error => "bad json: ".$content };
+    my $is_json = ($ct =~ /json/ || $content =~ /^\s*\{/);
+    if ($is_json) {
+        my $d = eval { decode_json($content) };
+        return _coerce($d) if $d;
+        # Say WHY it did not decode; "HTTP 200: <body>" hid the real cause
+        # (a chunked/utf8 body) and looked like a bare HTTP failure.
+        return { success => 0, error => "bad json (" . ($@ || 'empty decode') . "): " . substr($content, 0, 300) };
     }
-    return { success => 0, error => "HTTP ".$resp->code.": ".$content };
+    warn "post_json $path: non-JSON reply ct=[$ct] code=" . $resp->code
+        . " body=" . substr($content, 0, 200) . "\n" if $ENV{AI_PLAN_SYNC_DEBUG};
+    return { success => 0, error => "HTTP " . $resp->code . ": " . substr($content, 0, 500) };
 }
 
 # JSON::MaybeXS may return boolean objects that Perl treats as false. Coerce
@@ -295,7 +308,15 @@ sub extract_steps {
             next;
         }
         # Accumulate description lines into current step.
-        if (defined $cur && $line =~ /\S/ && $line !~ /^\s*(?:[#\d>*-]|\|)/) {
+        # NOTE: gated on $in_phase as well as $cur. The last phase heading leaves
+        # $cur set, so without this every non-heading line AFTER the final phase
+        # (tables, code boxes, footers of the rest of the document) was appended
+        # to the last todo's description. Still ends the block with `next`.
+        # Also skips pure-markup lines and the doc's own nav furniture
+        # ("Up Back to Top"), which are page chrome, not work-order text.
+        if ($in_phase && defined $cur && $line =~ /\S/ && $line !~ /^\s*(?:[#\d>*-]|\|)/
+            && $line !~ /^\s*(?:<\/?[a-zA-Z][^>]*>\s*)+$/
+            && doc_text_of($line) !~ /^(?:Back to Top)?$/i) {
             ${$cur}->{description} .= trim($line) . ' ';
         }
     }
@@ -353,6 +374,17 @@ sub replace_sync_comment {
 }
 
 sub trim { my ($s) = @_; $s =~ s/^\s+|\s+$//g; $s }
+
+# Visible text of one HTML line, for deciding whether the line is page chrome
+# (markup only, or a nav label such as the "Up Back to Top" link).
+sub doc_text_of {
+    my ($line) = @_;
+    my $t = $line;
+    $t =~ s/<[^>]*>//g;            # tags
+    $t =~ s/&#\d+;//g;             # numeric entities
+    $t =~ s/&[a-zA-Z]+;//g;        # named entities
+    return trim($t);
+}
 
 sub today { strftime('%Y-%m-%d', localtime) }
 sub plus_days {

@@ -26,6 +26,11 @@
       </td>
     </tr>
     <tr>
+      <th><label for="code">Container code</label></th>
+      <td><input type="text" id="code" name="code" maxlength="100"
+                 placeholder="e.g. FZ-1 (written on the container)" /></td>
+    </tr>
+    <tr>
       <th><label for="description">Description</label></th>
       <td><textarea id="description" name="description" rows="3" cols="40"></textarea></td>
     </tr>
