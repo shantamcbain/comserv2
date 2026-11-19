@@ -385,14 +385,14 @@ sub classify_prompt_for_routing {
     if ($@) {
         $notes .= 'llm-classify skipped (' . substr($@,0,60) . '); ';
     }
-<<<<<<< HEAD
+    }   # end else: LLM-classifier branch (skipped for coding agents / no_llm_classify)
+
     # Keep the rule-based SuperGrok decision for editor/code work: the local
     # classifier is a routing hint for paid-vs-free, not permission to drop Grok.
     if ($sg_ruled && ($agent =~ /programming|coding|code|analyze|documentation/)) {
         $use_sg  = 1;
         $tier    = 'supergrok';
         $notes  .= 'llm classifier cannot downgrade grok for editor agents; ';
-=======
     }
 
     # One timing line per classification: names the stage that actually cost time
@@ -406,7 +406,6 @@ sub classify_prompt_for_routing {
             sprintf('total=%.0fms agent=%s phase=%s llm_classify=%s stages=[%s]',
                 $cls_total_ms, $agent, $phase, $used_llm_classify ? 1 : 0,
                 join(' ', @cls_stages)));
->>>>>>> main
     }
 
     return {
@@ -604,14 +603,9 @@ sub select_model {
         require Comserv::Model::AI2::ModelPick;
         $auto_pin = Comserv::Model::AI2::ModelPick->is_auto_pin($requested);
     }
-<<<<<<< HEAD
     # ONE definition of "editor agent" (ChatIntent::is_editor_agent). Router had
     # its own copy of this regex and the two drifted (skill: keep one definition).
     my $is_editor_agent = Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id) ? 1 : 0;
-=======
-    require Comserv::Model::AI2::ModelPick;
-    my $is_editor_agent = Comserv::Model::AI2::ModelPick->is_editor_agent($agent_id);
->>>>>>> main
     my $is_cheap_default = ($requested // '') =~ /cohere\/north-mini|gemma-4-31b-it:free|nemotron-3\.5-lightning:free|north-mini-code:free/i;
     my $editor_read_phase = ($is_editor_agent && lc($phase // '') =~ /^(analyze|plan|clarify)$/) ? 1 : 0;
     my $ignore_cheap = ($auto_pin && !$ctx{user_picked})

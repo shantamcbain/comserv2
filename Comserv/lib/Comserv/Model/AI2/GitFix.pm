@@ -114,49 +114,8 @@ sub try_chat_fix {
         if $named;
     $response .= "Source:\n\n$excerpt";
 
-<<<<<<< HEAD
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'try_chat_fix',
         'answered path rejection from Admin/Git.pm; no model call');
-=======
-    my $analysis = try {
-        $router->dispatch_chat($c, $analysis_model, [
-            { role => 'system', content => 'You are a precise senior engineer on Comserv2 git + AI2. Cite file:line. Be actionable.' },
-            { role => 'user', content => $analysis_prompt }
-        ], log_usage => 'git_fix', agent_id => 'gitfix-analysis', phase => 'analyze');
-    } catch { { error => "$_" } };
-
-    # Router + decision model for structured output.
-    # tev1:0.8b is a last resort only: on 2026-11-15 it echoed the caller's own
-    # prompt back as JSON ("list of .gitignore lines for the data files in the
-    # error"), i.e. unusable. Ask the same Hermes chain the rest of the editor
-    # uses, and keep the local model for the case where nothing is live.
-    my $decision_ref = 'ollama|tev1:0.8b';
-    my $decision_label = 'local decision tev1:0.8b';
-    my ($dprov, $dmodel) = eval {
-        $router->select_model($c,
-            agent_id        => 'gitfix-decision',
-            phase           => 'verify',
-            prompt          => 'structured JSON recommendation for a git commit rejection',
-            no_llm_classify => 1,
-        );
-    };
-    if (!$@ && defined $dprov && defined $dmodel && length $dmodel) {
-        $decision_ref   = "$dprov|$dmodel";
-        $decision_label = "$dmodel";
-    }
-    my $dec_prompt = "Return ONLY JSON: { \"ignores\": [\"list of .gitignore lines for the data files in the error\"], \"error_hint\": \"text to append to the rejection message\", \"revert_js_if_needed\": bool, \"notes\": \"short\" } . Error: " . substr($prompt, 0, 1200);
-
-    my $decision = try {
-        $router->dispatch_chat($c, $decision_ref, [
-            { role => 'system', content => 'Return only the JSON object.' },
-            { role => 'user', content => $dec_prompt }
-        ], log_usage => 'git_fix_decision', agent_id => 'gitfix-decision', phase => 'analyze');
-    } catch { { error => "$_" } };
-
-    my $response = "=== Router Analysis (" . ($analysis_model // 'model') . ") ===\n" . ($analysis->{response} // $analysis->{error} // 'analysis unavailable') . "\n\n";
-    $response .= "=== Structured Recommendation (" . $decision_label . " via Router) ===\n" . ($decision->{response} // $decision->{error} // 'decision unavailable') . "\n\n";
-    $response .= "Verification: Run git status --porcelain on the exact target used for the commit. Only submit paths that appear there. Add the runtime data to .gitignore. Improve the flash error with target hint.";
->>>>>>> main
 
     return {
         handled  => 1,
