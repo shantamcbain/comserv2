@@ -15,6 +15,8 @@ use Comserv::Util::ModelCatalog;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::Git;
 use Comserv::Util::SystemInfo;
+use Comserv::Util::AI::ModelChains;
+use Time::HiRes ();
 
 BEGIN { extends 'Catalyst::Controller' }
 
@@ -213,16 +215,89 @@ sub editing_widget_popup :Local :Args(0) {
     my $router = eval { $c->model('AI2::Router') } || undef;
 
     # select_best_model returns [$model,$prov]; coerce to a plain string for TT/JS.
-    my $selected_model = $router ? $router->select_best_model($c) : 'grok-beta';
-    if (ref $selected_model eq 'ARRAY') {
-        my ($model, $prov) = @$selected_model;
-        $selected_model = (defined $prov && length $prov && defined $model && length $model)
-            ? "$prov|$model"
-            : (defined $model && length $model ? $model : 'grok-beta');
-    } elsif (ref $selected_model) {
-        $selected_model = 'grok-beta';
+    #
+    # PERF (todo #2739): this used to run the FULL Router inline, including the
+    # optional local Ollama LLM classifier inside classify_prompt_for_routing —
+    # a blocking /api/chat generate with a 120s (warm) / 480s (cold) timeout. On
+    # 2026-11-15 that held the popup for 152s (log: ollama_resolve_host, then
+    # silence, then Router.pm:483). Nothing in the template consumes
+    # selected_model: #model-select is populated client-side by
+    # ComservChat.modelSelect.init from /ai2/providers. So:
+    #   * serve the per-session cached choice when we have one (instant),
+    #   * otherwise resolve once with a hard 3s budget and no LLM classifier,
+    #   * fall back to the head of the coding chain (a real coding model, never
+    #     a small vision model) and let JS refresh the list after load.
+    my $t_sel_start = Time::HiRes::time();
+    my $selected_model = $c->session->{ai2_editor_model} || '';
+    my $sel_source = 'session-cache';
+    # A cached weak model (vision-only / sub-7B) is stale garbage for a code
+    # editor — the cache was filled before the Hermes chain existed (todo #2564:
+    # sessions were stuck on ollama|qwen2.5vl:3b). Drop it and resolve again.
+    if (length $selected_model && !ref $selected_model) {
+        require Comserv::Model::AI2::ModelPick;
+        if (Comserv::Model::AI2::ModelPick->is_weak_for_coding($selected_model)) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'ai2_editor_model', "dropping cached weak model '$selected_model' (not fit for code); re-resolving");
+            delete $c->session->{ai2_editor_model};
+            $selected_model = '';
+        }
     }
-    $selected_model = 'grok-beta' unless defined $selected_model && !ref($selected_model) && length $selected_model;
+    unless (length $selected_model && !ref $selected_model) {
+        $selected_model = '';
+        $sel_source = 'router';
+        my $timed_out = 0;
+        my $picked;
+        if ($router) {
+            # Alarm guards the whole call: a hung provider/DB/Ollama generate must
+            # never hold a page render. Alarm is cleared in every path.
+            eval {
+                local $SIG{ALRM} = sub { die "ai2_editor_model_timeout\n" };
+                alarm 3;
+                $picked = $router->select_best_model(
+                    $c,
+                    agent_id        => 'code',
+                    no_llm_classify => 1,     # no blocking local generate on a page load
+                );
+                alarm 0;
+                1;
+            };
+            alarm 0;   # belt and braces: never leave a pending alarm behind
+            if ($@) {
+                $timed_out = ($@ =~ /ai2_editor_model_timeout/) ? 1 : 0;
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'ai2_editor_model',
+                    'select_best_model failed' . ($timed_out ? ' (3s budget exceeded)' : '')
+                    . ': ' . substr($@ =~ s/\s+$//r, 0, 200));
+                $picked = undef;
+            }
+        }
+        if (ref $picked eq 'ARRAY') {
+            my ($model, $prov) = @$picked;
+            $selected_model = (defined $prov && length $prov && defined $model && length $model)
+                ? "$prov|$model"
+                : (defined $model && length $model ? $model : '');
+        } elsif (defined $picked && !ref $picked) {
+            $selected_model = $picked;
+        }
+        # Last-good fallback: head of the coding chain. Reuses the same chain
+        # loader the Router uses, so it follows data/ai_model_chains.json (no
+        # hardcoded slug, no small vision model).
+        unless (length $selected_model) {
+            $sel_source = 'coding-chain-fallback';
+            my $ld = eval { Comserv::Util::AI::ModelChains->load($c) };
+            my @chain = eval { Comserv::Util::AI::ModelChains->chain($ld, 'coding') };
+            ($selected_model) = grep { defined && length && !/^ollama\|auto$/ } @chain;
+        }
+        $selected_model = 'grok-beta' unless defined $selected_model && length $selected_model;
+        # Cache only a real Router/chain answer, never a placeholder.
+        $c->session->{ai2_editor_model} = $selected_model if $sel_source ne 'router'
+            || $selected_model ne 'grok-beta';
+    }
+    $selected_model = 'grok-beta' if ref($selected_model);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'ai2_editor_model',
+        sprintf('model=%s source=%s elapsed=%.0fms', $selected_model, $sel_source,
+            (Time::HiRes::time() - $t_sel_start) * 1000));
     # Model <select> is filled by ComservChat.modelSelect.init from catalog — do not
     # stash hashrefs (TT [% m | html %] → HASH(0x…)). Empty list keeps TT safe.
     my $recommended_models = [];
@@ -963,7 +1038,10 @@ sub chat :Local :Args(0) {
     # For editor agents, treat old cheap free defaults as "auto" so Router
     # classification + Supergrok (when available per guard) can run instead of
     # forcing the weak model for initial analyze/evaluation.
-    if ($agent_id =~ /^(programming|coding|code|documentation|analyze)$/i) {
+    # One definition of "editor agent" (ModelPick::is_editor_agent) so gitfix-*
+    # and the rest cannot drift apart (todo #2564).
+    require Comserv::Model::AI2::ModelPick;
+    if (Comserv::Model::AI2::ModelPick->is_editor_agent($agent_id)) {
         if ($model =~ /cohere\/north-mini|gemma-4-31b-it:free|nemotron-3\.5-lightning:free|north-mini-code:free/i || $model eq '') {
             $model = '';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ai2_chat',
@@ -976,6 +1054,17 @@ sub chat :Local :Args(0) {
         $agent_id = 'general';
         $json_data->{agent_id} = 'general';
     }
+
+    # Remember the request's agent+phase for the whole turn (todo #2564). Every
+    # later select_model hop — dispatch_chat, GitFix, focus-tune — inherits it,
+    # so the coding chain sees agent=programming instead of agent=(none).
+    eval {
+        $c->stash->{ai2_agent_ctx} = {
+            agent_id => $agent_id_requested || $agent_id,
+            phase    => $editor_phase,
+            surface  => ($editor_phase || Comserv::Model::AI2::ModelPick->is_editor_agent($agent_id)) ? 'editor' : 'chat',
+        };
+    };
     my $system  = $json_data->{system} // '';
     my $page_path   = $json_data->{page_path} // '';
     my $page_title  = $json_data->{page_title} // '';
@@ -991,6 +1080,12 @@ sub chat :Local :Args(0) {
     my $audio_file_id      = $json_data->{audio_file_id};
     my $transcript_file_id = $json_data->{transcript_file_id};
     my $skip_role_prompt   = $json_data->{skip_role_prompt} ? 1 : 0;
+    my $editor_skip_writes_early = sub {
+        require Comserv::Model::AI2::ChatIntent;
+        return (Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id)
+            || Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id_requested)
+            || ($editor_phase =~ /^(?:clarify|analyze|plan|verify|implement)$/)) ? 1 : 0;
+    };
 
     # The dropdown sends "provider|model" (e.g. openrouter|anthropic/...,
     # grok|grok-4..., ollama|llama3...). Extract the real model name.
@@ -998,8 +1093,39 @@ sub chat :Local :Args(0) {
         $model = $2;
     }
 
+    # Image in chat (signed-in only; GuestGuard already dropped image_data for guests).
+    my $image_data = (!$is_guest_chat && defined $json_data->{image_data} && !ref $json_data->{image_data}
+                      && length $json_data->{image_data}) ? $json_data->{image_data} : undef;
+    my $image_mime = $json_data->{image_mime};
+    $prompt = 'What is in this image?' if $image_data && !(defined $prompt && $prompt =~ /\S/);
+
     unless ($prompt && length($prompt) > 0) {
         $c->res->body(encode_json({ success => 0, error => 'Prompt is required' }));
+        return;
+    }
+
+    # ── Inventory photo / barcode intent: the SAME PhotoRead subs as
+    # /api/app/photo/* (Android app + web). Chat only draws the card.
+    my $photo_hit = (!$is_guest_chat && !$skip_role_prompt && !$editor_skip_writes_early->()) && eval {
+        require Comserv::Model::AI2::PhotoIntent;
+        Comserv::Model::AI2::PhotoIntent->new->try_chat($c,
+            prompt => $prompt, image_data => $image_data, image_mime => $image_mime);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'ai2_chat', "PhotoIntent try_chat threw: $@");
+    }
+    if ($photo_hit && $photo_hit->{handled}) {
+        $c->res->body(encode_json({
+            success         => $photo_hit->{success} ? 1 : 0,
+            response        => $photo_hit->{response} // '',
+            model           => '(photo-read)',
+            provider        => 'ai2-photo',
+            needs_web_search=> 0,
+            photo_action    => $photo_hit->{photo_action},
+            conversation_id => $conversation_id,
+            thinking        => [],
+        }));
         return;
     }
 
@@ -1211,7 +1337,7 @@ sub chat :Local :Args(0) {
     # UI button uses) so the question is answerable from Chat-with-AI too.
     # Triggered by the 'focustune' agent_id OR a natural-language intent.
     # Programming/coding agents in AI Editor must not divert to FocusTune on plan/build words.
-    my $editor_prog = (lc($agent_id // '') =~ /^(?:programming|coding|code|documentation|analyze)$/);
+    my $editor_prog = Comserv::Model::AI2::ModelPick->is_editor_agent($agent_id) ? 1 : 0;
     # Admin tool: FocusTune reads the todo queue; Guests never get it.
     my $is_focus = (!$is_guest_chat) && (!$editor_prog) && ((lc($agent_id) eq 'focustune')
         || ($prompt =~ /\b(top\s*5|top five|most important|should i (do|work on|tackle)|what (todo|todos) (should|to) i|priorit)/i
@@ -1245,6 +1371,18 @@ sub chat :Local :Args(0) {
         };
         $c->res->body(encode_json($payload));
         return;
+    }
+
+    # Any other chat image: VisionRead text goes into the normal chat prompt.
+    my $image_read;
+    if ($image_data) {
+        require Comserv::Model::AI2::PhotoIntent;
+        my $vi = eval { Comserv::Model::AI2::PhotoIntent->new->describe_image($c,
+            image_data => $image_data, image_mime => $image_mime, prompt => $prompt) } || {};
+        if ($vi->{ok}) {
+            $prompt = Comserv::Model::AI2::PhotoIntent->new->prompt_with($prompt, $vi);
+        }
+        $image_read = { engine => $vi->{engine}, error => ($vi->{ok} ? undef : ($vi->{error} || $@ || 'vision failed')) };
     }
 
     my $result = try {
@@ -1305,6 +1443,7 @@ sub chat :Local :Args(0) {
         original_model   => $result->{original_model},
         original_error   => $result->{original_error},
         all_exhausted    => $result->{all_exhausted},
+        ($image_read ? (image_read => $image_read) : ()),
     }));
 }
 

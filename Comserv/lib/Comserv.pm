@@ -65,7 +65,26 @@ __PACKAGE__->config(
         # /static/js, so include_path must be 'root' (file = root/static/...).
         # include_path => ['root/static'] looked for root/static/static/js and
         # 404'd every asset. Restrict with dirs, not a nested include_path.
-        include_path => [ (do { require Comserv::Util::ThemePaths; my $s = Comserv::Util::ThemePaths::static_include_shim(); $s ? ($s) : () }), 'root' ],
+        #
+        # CWD-PROOF ABSOLUTE ENTRY (todo #2739, 2026-11-15): Static::Simple
+        # resolves a relative entry against the PROCESS CWD (it tests
+        # -d $dir && -f $dir/$path). The :4006 server was launched from
+        # /home/shanta, so 'root' resolved to /home/shanta/root (missing) and
+        # EVERY /static asset 404'd — the AI editor popup came up with no JS at
+        # all (dead Send button, blank code panel, no model list).
+        # Pick the first candidate that really contains static/js, computed from
+        # this file (absolute at startup whatever the CWD later becomes) and
+        # from FindBin $Bin (<app>/script). Falls back to 'root'.
+        include_path => [ (do { require Comserv::Util::ThemePaths; my $s = Comserv::Util::ThemePaths::static_include_shim(); $s ? ($s) : () }), (do {
+            require Cwd; require File::Basename;
+            my @cand = (
+                Cwd::abs_path("$Bin/../root"),
+                Cwd::abs_path(File::Basename::dirname(File::Basename::dirname(Cwd::abs_path(__FILE__) || __FILE__)) . '/root'),
+                Cwd::abs_path('root'),
+            );
+            my ($real) = grep { defined $_ && -d "$_/static/js" } @cand;
+            $real || 'root';
+        }), 'root' ],
         dirs => [ 'static', 'LegacyStaticPages' ],
         ignore_dirs => [ 'config' ],
         ignore => [ qr{^config/} ],

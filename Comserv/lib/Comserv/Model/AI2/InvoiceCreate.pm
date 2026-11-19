@@ -1342,11 +1342,19 @@ sub _create_chat_item {
     my $name = $args->{name} || '';
     $name =~ s/^\s+|\s+$//g;
     return undef unless length $name >= 2;
-    my $sku = lc $name;
-    $sku =~ s/[^a-z0-9]+/-/g;
-    $sku =~ s/^-+|-+$//g;
     my $sid = $args->{supplier_id} || 0;
-    $sku = 'chat-s' . $sid . '-' . ($sku || 'item');
+    my $sku;
+    # A SKU read off the label (photo reader) is kept as-is; chat entry keeps
+    # its generated chat-s<supplier>-<name> SKU.
+    if (defined $args->{sku} && $args->{sku} =~ /\S/) {
+        $sku = $args->{sku};
+        $sku =~ s/^\s+|\s+$//g;
+    } else {
+        $sku = lc $name;
+        $sku =~ s/[^a-z0-9]+/-/g;
+        $sku =~ s/^-+|-+$//g;
+        $sku = 'chat-s' . $sid . '-' . ($sku || 'item');
+    }
     $sku = substr($sku, 0, 100);
     my $existing = eval {
         $schema->resultset('Accounting::InventoryItem')->find({
@@ -1372,7 +1380,7 @@ sub _create_chat_item {
             unit_of_measure     => 'each',
             unit_cost           => $cost,
             status              => 'active',
-            notes               => 'Added from Chat-with-AI invoice entry.',
+            notes               => ($args->{notes} || 'Added from Chat-with-AI invoice entry.'),
             show_in_shop        => 0,
             hide_stock_count    => 0,
             accepts_points      => 0,
@@ -1395,6 +1403,8 @@ sub _create_chat_item {
                 item_id     => $row->id,
                 supplier_id => $args->{supplier_id},
                 unit_cost   => $cost,
+                (defined $args->{supplier_sku} && $args->{supplier_sku} =~ /\S/
+                    ? (supplier_sku => substr($args->{supplier_sku}, 0, 100)) : ()),
             });
             1;
         };

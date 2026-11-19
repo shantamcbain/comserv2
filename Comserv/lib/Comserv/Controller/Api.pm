@@ -851,6 +851,18 @@ sub api_inventory_need :Path('inventory/need') :Args(0) {
     $c->controller('Inventory::PurchaseOrder')->api_need($c);
 }
 
+# GET /api/inventory/locations — thin wrapper so the app has one documented
+# route next to the other /api/inventory/* calls it already uses.
+sub api_inventory_locations :Path('inventory/locations') :Args(0) {
+    my ($self, $c) = @_;
+    # _api_authenticate* answers the 401 itself and returns undef when it denies,
+    # so the result has to gate the call: running api_locations anyway would
+    # answer a denied request with data.
+    my $user = $self->_api_authenticate_inventory($c);
+    return if !defined $user && ($c->res->status || 200) != 200;
+    return $c->controller('Inventory')->api_locations($c);
+}
+
 sub api_inventory_po_create :Path('inventory/po/create') :Args(0) {
     my ($self, $c) = @_;
     $self->_api_authenticate_inventory($c);
@@ -1241,6 +1253,26 @@ sub api_app_photo_scan_apply :Path('app/photo/scan/apply') :Args(0) {
     my $r = $self->_photo_reader($c)->scan_apply($c, $schema,
         sitename => $site, user_id => $c->session->{user_id}, username => $c->session->{username},
         map { ($_ => $p->{$_}) } qw(item_id create action qty location_id to_location_id unit_cost supplier_id));
+    return $self->_photo_fail($c, $r) unless $r->{ok};
+    delete $r->{ok};
+    $self->_json_ok($c, $r);
+}
+
+# One confirm for a whole container count. Same decisions as scan/apply, but
+# the batch is one transaction and a line with no location uses the container
+# the photo was taken of.
+sub api_app_photo_count_confirm :Path('app/photo/count/confirm') :Args(0) {
+    my ($self, $c) = @_;
+    my $site = $self->_api_inventory_session_gate($c) or return;
+    my $p = $self->_photo_post_json($c) or return;
+    my $schema = eval { $c->model('DBEncy') };
+    unless ($schema) {
+        $self->_json_error($c, 503, 'Database not available', 'db_unavailable');
+        return;
+    }
+    my $r = $self->_photo_reader($c)->count_confirm($c, $schema,
+        sitename => $site, user_id => $c->session->{user_id}, username => $c->session->{username},
+        read_id => $p->{read_id}, decisions => $p->{decisions});
     return $self->_photo_fail($c, $r) unless $r->{ok};
     delete $r->{ok};
     $self->_json_ok($c, $r);
@@ -4339,6 +4371,25 @@ sub api_app_version :Path('app/version') :Args(0) {
         $json_data = eval { decode_json($raw) } || {};
     }
 
+    # A published stamp that post-dates the APK it advertises was not written by
+    # the gradle publish (that copies the APK first, then writes the stamp a
+    # second later). A hand-edited stamp has already put the update badge on a
+    # build that was not newer, so withhold it: no update beats a false one.
+    if (($path // '') eq $nfs_path) {
+        my $apk = '/data/nfs/inventory-apks/ComservInventory.apk';
+        if (-r $apk) {
+            my $skew = (stat($nfs_path))[9] - (stat($apk))[9];
+            if ($skew > 600) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_app_version',
+                    "published version.json is ${skew}s newer than the APK it advertises; withholding versionCode "
+                    . ($json_data->{versionCode} // '?') . ' (hand edit of the stamp?)');
+                $json_data->{versionCode}  = 0;
+                $json_data->{versionName}  = '0.0.0';
+                $json_data->{releaseNotes} = 'Update withheld: the published stamp does not match the published APK.';
+            }
+        }
+    }
+
     # A hand-edited checkout copy must not outrun the published stamp.
     if (-r $nfs_path && -r $checkout) {
         my $git_code = eval {
@@ -4411,12 +4462,12 @@ sub api_inventory_item_by_barcode_alt :Path('inventory/item_by_barcode') :Args(0
         my $map = eval { decode_json($res->{content}) };
         if ($map && $map->{status} && $map->{status} == 1) {
             my $p = $map->{product} || {};
-            my $pname = $p->{product_name} || $p->{product_name_en} || '';
+            my $pname = $p->{product_name_en} || $p->{product_name} || '';
             my $pcat  = $p->{categories} || $p->{category} || 'Pantry';
             $pcat =~ s/,.*//;
             my $pimg  = $p->{image_url} || $p->{image_front_url} || '';
             my $pbrand = $p->{brands} || '';
-            my $pingredients = $p->{ingredients_text} || $p->{ingredients_text_en} || '';
+            my $pingredients = $p->{ingredients_text_en} || $p->{ingredients_text} || '';
             my $nutr = $p->{nutriments} || {};
             my $kcal = $nutr->{'energy-kcal_100g'} || $nutr->{'energy-kcal'} || 0;
             my $prot = $nutr->{'proteins_100g'} || $nutr->{'proteins'} || 0;

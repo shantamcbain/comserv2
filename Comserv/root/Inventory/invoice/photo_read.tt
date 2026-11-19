@@ -1,0 +1,33 @@
+[%# Thin view of the shared photo / barcode reader (same /api/app/photo/* as the
+    Android app and Chat-with-AI; drawing is in /static/js/ai-chat/feature-photo.js). %]
+<details id="photo-read" style="margin:1em 0;padding:0.6em 0.9em;border:1px solid #ccc;border-radius:4px;">
+  <summary style="cursor:pointer;font-weight:bold;">&#x1F4F7; Read a photo or scan a barcode</summary>
+  <form id="pr-form" style="margin-top:0.6em;">
+    <input type="file" name="photo" accept="image/*" capture="environment" required>
+    <label style="margin-left:0.75em;"><input type="radio" name="mode" value="invoice" checked> Invoice</label>
+    <label style="margin-left:0.5em;"><input type="radio" name="mode" value="items"> Items</label>
+    <button type="submit" style="margin-left:0.75em;">Read photo</button>
+  </form>
+  <form id="pr-scan" style="margin-top:0.5em;">
+    <input name="barcode" placeholder="barcode" size="16"> or <input name="description" placeholder="description" size="24">
+    <button type="submit">Find item</button>
+  </form>
+  <p><small>The same reader runs in Chat with AI: attach a photo and say "invoice" or "items", or type "scan 0123456789012".</small></p>
+  <div id="pr-result"></div>
+</details>
+<script src="/static/js/ai-chat/feature-photo.js?v=20261116-steps"></script>
+<script>
+(function () {
+  var out = document.getElementById('pr-result');
+  var fp = function () { return window.ComservChat && ComservChat.featurePhoto; };
+  document.getElementById('pr-form').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var f = this.photo.files[0]; if (!f || !fp()) return;
+    fp().upload(out, f, this.querySelector('input[name=mode]:checked').value);
+  });
+  document.getElementById('pr-scan').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (fp()) fp().scan(out, this.barcode.value, this.description.value);
+  });
+})();
+</script>

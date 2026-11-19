@@ -9,6 +9,7 @@ use LWP::UserAgent;
 use JSON qw(decode_json encode_json);
 
 use Comserv::Util::Logging;
+use Comserv::Util::AI::ReplyBudget;
 
 has 'logging' => (
     is      => 'ro',
@@ -254,7 +255,8 @@ sub _chat_http {
         model       => $model,
         messages    => $messages,
         temperature => 0.7,
-        max_tokens  => $args{max_tokens} // 4096,
+        # 4096 default; implement/coding calls get 16384 (ReplyBudget, todo #2758).
+        max_tokens  => Comserv::Util::AI::ReplyBudget->reply_max_tokens($c, %args),
         # Ask OpenRouter for the billed cost of this call (usage.cost) so the
         # Ledger audit row carries real dollars, not a token-rate guess.
         usage       => { include => JSON::true },
@@ -300,23 +302,16 @@ sub _chat_http {
         return { http_sent => 1, success => 0, error => 'Bad JSON from OpenRouter' };
     }
 
-    my $text = '';
-    if ($data->{choices} && ref($data->{choices}) eq 'ARRAY' && @{$data->{choices}}) {
-        my $msg = $data->{choices}[0]{message} // {};
-        $text = $msg->{content} // '';
-        # Some free models (e.g. nemotron) return null content and put text in
-        # reasoning / reasoning_content, or content as a list of parts.
-        if ((!defined $text || $text eq '') && ref($msg) eq 'HASH') {
-            $text = $msg->{reasoning_content} // $msg->{reasoning} // '';
-        }
-        if (ref($text) eq 'ARRAY') {
-            $text = join('', map {
-                ref($_) eq 'HASH' ? ($_->{text} // $_->{content} // '') : (defined $_ ? "$_" : '')
-            } @$text);
-        }
-        $text = '' unless defined $text;
+    # Thinking-only replies are a failure, not an answer (ReplyBudget, todo #2758).
+    my ($text, $cut_err) = Comserv::Util::AI::ReplyBudget->extract_reply_text($data,
+        coding => Comserv::Util::AI::ReplyBudget->is_coding_call($c, %args));
+    if ($cut_err) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'openrouter_chat',
+            "$cut_err (model=$model, user=" . ($c->session->{username} // 'Guest') . ")");
+        return { http_sent => 1, id => $data->{id}, upstream => $data->{provider},
+                 success => 0, truncated => 1, error => "OpenRouter $cut_err",
+                 model => $data->{model} || $model, usage => $data->{usage} || {} };
     }
-    $text =~ s/^\s+|\s+$//g if defined $text;
     unless (defined $text && length $text) {
         my $body = substr($res->decoded_content // '', 0, 600);
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,

@@ -291,7 +291,7 @@ sub parse_text {
         my $p = length $raw_text ? $self->parse_plain($mode, $raw_text) : undef;
         return $p ? { %$p, raw_text => $raw_text } : undef;
     }
-    my $out = { raw_text => $raw_text, lines => \@lines,
+    my $out = { raw_text => $raw_text, lines => _aggregate_lines(\@lines),
                 supplier => '', supplier_contact => undef, invoice_number => '', date => '',
                 subtotal => undef, tax => undef, shipping => undef, total => undef };
     if ($mode eq 'invoice') {
@@ -339,7 +339,7 @@ sub parse_plain {
                        unit_price => ($mode eq 'invoice' && defined $price) ? $price + 0 : undef };
     }
     return undef unless @lines;
-    my $out = { raw_text => $text, lines => \@lines, supplier => '', supplier_contact => undef,
+    my $out = { raw_text => $text, lines => _aggregate_lines(\@lines), supplier => '', supplier_contact => undef,
                 invoice_number => '', date => '', subtotal => undef, tax => undef, shipping => undef, total => undef };
     if ($mode eq 'invoice') {
         my $t = $self->_totals_from_text($text);
@@ -348,6 +348,32 @@ sub parse_plain {
         if ($text =~ /\b(\d{4}-\d{2}-\d{2})\b/) { $out->{date} = $1 }
     }
     return $out;
+}
+
+# Collapse identical lines. A receipt prints one line per unit, and a container
+# photo can show the same item in more than one place in the frame; both come
+# back as repeated lines of qty 1. Left alone, confirm creates a separate item
+# for each (a Freshmart receipt of 2 lasagna + 2 bacon became 4 items).
+# Same normalised name + sku merge; qty sums; a price is kept only when every
+# copy agrees, so a price that changed mid-receipt stays visible instead of
+# being averaged away.
+sub _aggregate_lines {
+    my ($lines) = @_;
+    my (@out, %seen);
+    for my $l (@$lines) {
+        my $key = lc($l->{name}) . "\x1f" . lc($l->{sku});
+        if (defined $seen{$key}) {
+            my $keep = $out[$seen{$key}];
+            $keep->{qty} += $l->{qty};
+            my $a = $keep->{unit_price};
+            my $b = $l->{unit_price};
+            $keep->{unit_price} = undef if defined $a && defined $b && abs($a - $b) > 0.001;
+        } else {
+            $seen{$key} = scalar @out;
+            push @out, { %$l };
+        }
+    }
+    return \@out;
 }
 
 sub _totals_from_text {
@@ -577,10 +603,11 @@ sub _present {
         $invoice = { number => $p->{invoice_number} // '', date => $p->{date} // '', %{ $self->invoice_totals($p) } };
     }
     return {
-        read_id   => $rec->{read_id},
-        mode      => $rec->{mode},
-        sitename  => $site,
-        status    => $rec->{status},
+        read_id     => $rec->{read_id},
+        mode        => $rec->{mode},
+        sitename    => $site,
+        location_id => $rec->{location_id},
+        status      => $rec->{status},
         engine    => $rec->{engine},
         raw_text  => $rec->{raw_text} // '',
         has_photo => ($rec->{photo} && -f $rec->{photo}) ? 1 : 0,
@@ -1000,7 +1027,9 @@ sub site_locations {
         $schema->resultset('Accounting::InventoryLocation')->search(
             { sitename => $site, status => [ 'active', undef ] }, { order_by => 'name' })->all;
     };
-    return [ map { { id => 0 + $_->id, name => $_->name } } @rows ];
+    return [ map { { id => 0 + $_->id, name => $_->name,
+                      code => (eval { $_->code } // ''),
+                      location_type => (eval { $_->location_type } // '') } } @rows ];
 }
 
 sub _site_location {
@@ -1015,6 +1044,22 @@ sub _site_location {
 # Writes through Comserv::Util::Inventory::StockTxn (same code as
 # /Inventory/api/transaction). No GL post. No picture stored.
 sub scan_apply {
+    my ($self, $c, $schema, %a) = @_;
+    # count_confirm already holds one transaction for the whole batch. Opening a
+    # nested txn_do here would let each line commit on its own and a failed line
+    # would leave the lines before it written.
+    return $self->_scan_apply_inner($c, $schema, %a) if $a{_in_txn};
+    my $out;
+    eval { $schema->txn_do(sub { $out = $self->_scan_apply_inner($c, $schema, %a) }) };
+    if (my $e = $@) {
+        if (ref $e eq 'HASH' && $e->{status}) { return { ok => 0, %$e } }
+        $self->_log($c, 'error', 'scan_apply failed: ' . (ref $e ? ($e->{error} // '') : $e));
+        return _fail(500, 'apply_failed', 'Nothing was saved.');
+    }
+    return $out;
+}
+
+sub _scan_apply_inner {
     my ($self, $c, $schema, %a) = @_;
     my $site = $self->clean_site($a{sitename});
     my $act  = lc($a{action} // '');
@@ -1097,6 +1142,61 @@ sub scan_apply {
     my $item = $schema->resultset('Accounting::InventoryItem')->find($item_id);
     return { ok => 1, action => $act, item_id => $item_id, created => $created ? 1 : 0,
              transactions => \@txns, item => $self->_item_out($schema, $item) };
+}
+
+# One confirm for a whole container photo: each decision is a scan_apply, and
+# the batch is one transaction so a bad line rolls the container back instead
+# of leaving it half counted.
+#   decisions => [ { action, qty, item_id | create, location_id, to_location_id,
+#                    unit_cost, supplier_id, index } ]
+# A decision without its own location uses the read's container.
+sub count_confirm {
+    my ($self, $c, $schema, %a) = @_;
+    my $site = $self->clean_site($a{sitename});
+    my $lock = $self->_lock($site, $a{read_id}) or return _fail(500, 'lock_failed', 'Could not lock the read.');
+    my $rec = $self->_load($site, $a{read_id});
+    return _fail(404, 'not_found', 'Photo read not found.') unless $self->_owned($rec, %a);
+    return _fail(409, 'already_confirmed', 'This photo read was already confirmed.')
+        if ($rec->{status} // '') eq 'confirmed';
+    return _fail(409, 'not_ready', 'The photo is still being read.') if ($rec->{status} // '') eq 'reading';
+    my $decisions = $a{decisions};
+    return _fail(400, 'no_decisions', 'Send the decisions for this count.')
+        unless ref $decisions eq 'ARRAY' && @$decisions;
+
+    my $container = $rec->{location_id};
+    my (@results, $failed);
+    eval {
+        $schema->txn_do(sub {
+            for my $d (@$decisions) {
+                next unless ref $d eq 'HASH';
+                my $r = $self->scan_apply($c, $schema, _in_txn => 1,
+                    sitename => $site, user_id => $a{user_id}, username => $a{username},
+                    action => $d->{action}, qty => $d->{qty},
+                    item_id => $d->{item_id}, create => $d->{create},
+                    location_id => ($d->{location_id} // $container),
+                    to_location_id => $d->{to_location_id},
+                    unit_cost => $d->{unit_cost}, supplier_id => $d->{supplier_id});
+                push @results, { index => $d->{index}, action => ($d->{action} // ''),
+                                 ok => $r->{ok} ? 1 : 0, item_id => $r->{item_id},
+                                 error => ($r->{error} // '') };
+                if (!$r->{ok}) { $failed = $r; die 'rollback' }
+            }
+            $rec->{status}       = 'confirmed';
+            $rec->{confirmed_at} = Comserv::Util::AppTime->now_utc . '';
+            $rec->{confirmed_by} = $a{username} // '';
+            $rec->{result}       = { decisions => \@results };
+            $self->_save($site, $rec->{read_id}, $rec);
+        });
+    };
+    if ($failed) {
+        $self->_log($c, 'warn', "count_confirm rolled back at line $results[-1]{index}: $failed->{error}");
+        return { ok => 0, %$failed, results => \@results };
+    }
+    if (my $e = $@) {
+        $self->_log($c, 'error', "count_confirm failed: $e");
+        return _fail(500, 'apply_failed', 'Nothing was saved.');
+    }
+    return { ok => 1, read_id => $rec->{read_id}, confirmed => scalar @results, results => \@results };
 }
 
 1;
