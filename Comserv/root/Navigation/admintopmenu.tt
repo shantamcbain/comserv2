@@ -267,6 +267,7 @@
                     <a href="/Inventory/email-config"><i class="icon-mail"></i>Set Invoice Email Addresses</a>
                     <a href="/Accounting/coa"><i class="icon-coa"></i>Chart of Accounts</a>
                     <a href="/Accounting/gl"><i class="icon-gl"></i>General Ledger</a>
+                    <a href="/Accounting/recurring"><i class="icon-invoice"></i>Recurring Subscriptions</a>
                 </div>
             </div>
         </div>

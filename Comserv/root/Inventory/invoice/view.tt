@@ -56,6 +56,23 @@
   [% END %]
 </table>
 
+<div style="margin:1.2rem 0;padding:0.9rem 1.2rem;background: var(--caution-bg, #eef4ff);border:1px solid var(--primary-color, #007bff);border-radius:6px;max-width:560px;">
+  <h3 style="margin:0 0 0.4rem;font-size:1rem;">&#x1F501; Recurring subscription</h3>
+  <p style="margin:0 0 0.6rem;font-size:0.9em;">
+    Turn this bill into a monthly schedule. Each period generates a <strong>draft</strong> copy
+    (supplier, lines, accounts and auto-pay carried over) that you review and post as usual.
+    Set the payment source (the real bank / credit-card account it is paid from) on the
+    <a href="/Accounting/recurring">Recurring Subscriptions</a> page.
+  </p>
+  <form method="post" action="/Accounting/recurring/from_invoice/[% invoice.id %]" style="display:inline;"
+        onsubmit="return confirm('Create a monthly recurring schedule from invoice [% invoice.invoice_number | html %]?');">
+    <button type="submit"
+            style="background: var(--primary-color, #007bff);color:white;border:none;padding:5px 14px;border-radius:4px;cursor:pointer;">
+      Make this a monthly subscription
+    </button>
+  </form>
+</div>
+
 [% IF (is_admin || c.stash.is_admin) && invoice.status != 'paid' && invoice.status != 'voided' %]
 <div style="margin:1.5rem 0;padding:1rem 1.5rem;background:#e8f5e9;border:2px solid #4caf50;border-radius:8px;max-width:520px;">
   <h3 style="margin:0 0 0.5rem;color:#1b5e20;">✅ Mark Paid by Shanta (Admin)</h3>
