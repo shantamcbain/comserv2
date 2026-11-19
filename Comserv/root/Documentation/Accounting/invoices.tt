@@ -207,9 +207,10 @@
                     <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Cadence</td><td style="border:1px solid var(--border-color);padding:5px 8px">✅ Yes</td><td style="border:1px solid var(--border-color);padding:5px 8px">How often to bill — e.g. monthly or yearly. Short months are clamped correctly (a 31st schedule bills the last day of February).</td></tr>
                     <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Next Generate Date</td><td style="border:1px solid var(--border-color);padding:5px 8px">✅ Yes</td><td style="border:1px solid var(--border-color);padding:5px 8px">The date the next draft invoice is created. Advances automatically after each run.</td></tr>
                     <tr><td style="border:1px solid var(--border-color);padding:5px 8px">End Date</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">Blank = runs until you deactivate it. Set it for fixed-term memberships.</td></tr>
-                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Payment Source Account</td><td style="border:1px solid var(--border-color);padding:5px 8px">✅ Yes</td><td style="border:1px solid var(--border-color);padding:5px 8px">A real bank or credit-card <strong>asset</strong> account from the Chart of Accounts that the charge is paid <em>from</em> — not free text. This is what lets AP reports show where money actually leaves.</td></tr>
-                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">AP Account</td><td style="border:1px solid var(--border-color);padding:5px 8px">✅ Yes</td><td style="border:1px solid var(--border-color);padding:5px 8px">Liability account credited on the generated invoice. Usually 2000 Accounts Payable.</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Payment Source Account</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">A real bank or credit-card <strong>asset</strong> account from the Chart of Accounts that the charge is paid <em>from</em> — not free text, and it must be an account this site can see. This is what lets AP reports show where money actually leaves.</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">AP Account</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">Liability account credited on the generated invoice. Usually 2000 Accounts Payable.</td></tr>
                     <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Default Expense Account</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">Used for line templates that have no item/account of their own — e.g. 5900 Subscriptions &amp; Dues.</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Tax / shipping amount</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">Fixed amounts added to every generated bill (GST/PST and freight). Stored on the schedule and kept when you edit it.</td></tr>
                     <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Auto-pay</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">Marks the schedule as charged automatically to the payment source (credit card / pre-authorized debit).</td></tr>
                 </tbody>
             </table>
@@ -222,7 +223,16 @@
                 arrived. Generated invoices land as <strong>drafts</strong> on
                 <a href="/Inventory/invoice" style="color:var(--link-color)">/Inventory/invoice</a> — open each one,
                 review it, then Post. Posting and the resulting GL entry stay a human step: nothing is posted
-                automatically. Re-running Run Due on the same day will not create a duplicate for the same period.
+                automatically. Re-running Run Due on the same day will not create a duplicate for the same period,
+                and two runs happening at once (the button and the cron job) cannot bill the same period twice.
+            </p>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                <strong>Who and where.</strong> This page is for administrators, and every schedule belongs to the
+                site you are signed in to: the supplier list, the accounts and the schedules you see (and the ones
+                Run Due touches) are that site's only. Changing the <code>sitename</code> in a request does not
+                switch sites. From a terminal, the same run is available unattended as
+                <code>script/generate_recurring_invoices.pl --site CSC</code> (add <code>--dry-run</code> to list
+                what would be billed, <code>--date YYYY-MM-DD</code> to back-date a catch-up run).
             </p>
             <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
         </div>
