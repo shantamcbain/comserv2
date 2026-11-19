@@ -167,17 +167,21 @@ sub get_site_details_by_name {
 sub get_site_domain {
     my ($self, $c, $domain) = @_;
 
-    return unless defined $domain;
+    return unless defined $domain && length $domain;
 
-    # Dev workstation: LAN + ZeroTier IPs map to workstation.local (same sitedomain row).
-    if ($domain =~ /^(?:192\.168\.1\.199|172\.30\.131\.126)$/) {
-        my $alias = $self->schema->resultset('SiteDomain')->find({ domain => 'workstation.local' });
-        return $alias if $alias;
-    }
-
-    # Short-circuit for loopback/internal addresses — these are never in the SiteDomain
-    # table and hitting the DB for every Docker health check causes 15s timeout errors.
-    if ($domain =~ /^(localhost|127\.\d+\.\d+\.\d+|::1)(?::\d+)?$/) {
+    # An IP literal is NOT a domain. Never look one up in SiteDomain, never
+    # alias it to a hostname row, and never let the www/subdomain/dev
+    # fallbacks further down fabricate a site from it. A request that carried
+    # an address instead of a hostname has no site domain; callers
+    # (Root::fetch_and_set / site_setup) then fall back to the session site or
+    # the default site, which is the only correct answer.
+    my $bare = lc $domain;
+    $bare =~ s/:\d+\z//;
+    $bare =~ s/^\[//;
+    $bare =~ s/\]\z//;
+    return if $bare eq 'localhost';
+    if ( $bare =~ /^\d{1,3}(?:\.\d{1,3}){3}\z/
+      || ( $bare =~ /:/ && $bare =~ /^[0-9a-f:.]+\z/ ) ) {
         return;
     }
 
@@ -318,8 +322,8 @@ sub _site_domain_for_dev_workstation {
     my ($self, $c, $domain) = @_;
     return unless defined $domain && $domain ne '';
 
-    # Match dev workstation patterns
-    if ($domain =~ /^(?:workstation\.local|localhost|127\.0\.0\.1|192\.168\.1\.199|172\.30\.131\.126)(?::\d+)?$/) {
+    # Hostnames only — an IP literal is never a site domain (see get_site_domain).
+    if ($domain =~ /^(?:workstation\.local)(?::\d+)?$/i) {
         my $default_site_name = $self->_get_default_site_name($c) || "CSC";
         my $site = $self->get_site_details_by_name($c, $default_site_name);
         if ($site) {

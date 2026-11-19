@@ -309,6 +309,54 @@ my $mk = $pr->scan_apply($c, $schema, sitename => $SITE, user_id => 7, username 
 ok($mk->{ok} && $mk->{created}, 'scan_apply creates the item then receives');
 is($RS->('Accounting::InventoryItem')->find($mk->{item_id})->barcode, '5550001112223', 'barcode saved on the new item');
 
+# ---- duplicate lines merge (a receipt prints one line per unit) -----------------
+{
+    my $pr_agg = reader('{"raw_text":"receipt","lines":[{"name":"*PC LASAG SEAFD FRZ","sku":"","qty":1,"unit_price":10.99},'
+        . '{"name":"*PC LASAG SEAFD FRZ","sku":"","qty":1,"unit_price":10.99},'
+        . '{"name":"*PC OLD FASHION BACON","sku":"","qty":1,"unit_price":17.99},'
+        . '{"name":"*PC OLD FASHION BACON","sku":"","qty":1,"unit_price":17.99}]}');
+    my $qid = $pr_agg->queue($c, sitename => $SITE, user_id => 7, username => 'tester',
+        mode => 'invoice', image_path => $photo, mime => 'image/jpeg')->{read_id};
+    $pr_agg->finish(undef, $SITE, $qid);
+    my $v = view($pr_agg, $qid);
+    is(scalar @{ $v->{lines} }, 2, 'four receipt lines collapse to two items');
+    is($v->{lines}[0]{qty}, 2, 'collapsed qty is the sum');
+    is($v->{lines}[0]{unit_price}, 10.99, 'unit price kept when both copies agree');
+    is($v->{lines}[1]{name}, '*PC OLD FASHION BACON', 'second item kept separately');
+}
+
+# ---- count_confirm: one batch, container default, rollback on a bad line ------
+{
+    my $qid = $pr->queue($c, sitename => $SITE, user_id => 7, username => 'tester',
+        mode => 'items', location_id => $locB->id, image_path => $photo, mime => 'image/jpeg')->{read_id};
+    $pr->finish(undef, $SITE, $qid);
+    is(view($pr, $qid)->{location_id}, $locB->id, 'read reports the container it belongs to');
+
+    # no location_id on a decision: the container is used
+    my $ok = $pr->count_confirm($c, $schema, sitename => $SITE, user_id => 7, username => 'tester',
+        read_id => $qid, decisions => [
+            { index => 0, action => 'receive', qty => 6, item_id => $nuts->id },
+            { index => 1, action => 'count', qty => 4, item_id => $nuts->id },
+        ]);
+    ok($ok->{ok}, 'count_confirm accepts the batch');
+    is($ok->{confirmed}, 2, 'both decisions applied');
+    is($qoh->($locB), 4, 'receive 6 into the freezer then count 4 lands on the container');
+    is($pr->count_confirm($c, $schema, sitename => $SITE, user_id => 7, username => 'tester',
+        read_id => $qid, decisions => [{ action => 'count', qty => 1 }] )->{status},
+       409, 'a second confirm of the same read is refused');
+
+    my $qid2 = $pr->queue($c, sitename => $SITE, user_id => 7, username => 'tester',
+        mode => 'items', location_id => $locA->id, image_path => $photo, mime => 'image/jpeg')->{read_id};
+    $pr->finish(undef, $SITE, $qid2);
+    my $bad = $pr->count_confirm($c, $schema, sitename => $SITE, user_id => 7, username => 'tester',
+        read_id => $qid2, decisions => [
+            { index => 0, action => 'receive', qty => 5, item_id => $nuts->id, location_id => $locA->id },
+            { index => 1, action => 'count', qty => 1, location_id => 999999 },
+        ]);
+    ok(!$bad->{ok}, 'bad location in the batch fails');
+    is($qoh->($locA), 3, 'the good line is rolled back with the bad one');
+}
+
 # ---- Chat-with-AI reaches the same subs -----------------------------------------
 {
     my $hits = {};

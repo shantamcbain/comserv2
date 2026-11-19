@@ -988,7 +988,12 @@ function ensureThinkingStyles(doc) {
             && !/\b(expected|should|want|instead)\b/i.test(lower)) {
             gaps.push('What should happen instead? (expected behavior)');
         }
-        if (!/\b(repro|steps|when i|after i|click|login|guest)\b/i.test(lower) && p.length < 200) {
+        // Only ask for repro steps when the ask is BOTH short AND bug-shaped.
+        // Todo #2739: this used to fire for ANY prompt under 200 chars without
+        // repro keywords, on the popup's default analyze phase — so a normal
+        // brief was swallowed into Clarify and Send produced no request at all.
+        const bugShaped = /\b(bug|broken|fix|error|fail|not work|wrong|crash)\b/i.test(lower);
+        if (bugShaped && !/\b(repro|steps|when i|after i|click|login|guest)\b/i.test(lower) && p.length < 120) {
             gaps.push('How do you reproduce it? (short steps)');
         }
         if (/\b(addon|feature)\b/i.test(lower) && !/\b(site_modules|enabled_modules|hosting|nav)\b/i.test(lower)) {
@@ -1105,7 +1110,9 @@ function ensureThinkingStyles(doc) {
             + '<br><br><span style="opacity:0.85;">Reply with answers in one message, or say '
             + '<code>skip clarify</code> / <code>analyze now</code> to proceed anyway.</span>');
         if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
-        if (target && target.status) target.status('Clarify — waiting for your answers');
+        if (target && target.status) {
+            target.status('Clarify — nothing sent to the model yet; answer the questions (or say "analyze now")');
+        }
     }
 
     function phaseContract(phase, agentId, promptText) {
@@ -1671,10 +1678,34 @@ function ensureThinkingStyles(doc) {
         }, 100);
     }
 
-    function wire() {
-        // Models first so a later throw cannot leave "Loading models…" forever.
-        initModelSelect();
+    // A failure in ANY init step must be visible to the user and must never stop
+    // the chat from working (todo #2739: a slow/failed model list left Send dead
+    // with nothing on screen and no POST /ai2/chat).
+    function reportWiringError(where, err) {
+        var msg = (err && err.message) ? err.message : String(err);
+        console.error('[AI2EditorChat] ' + where + ' failed', err);
+        try {
+            recordMessage('AI', '<span style="color:#f66">⚠ ' + escapeHtml(where) +
+                ' failed: ' + escapeHtml(msg) + ' — chat still works, try Send.</span>');
+        } catch (e) { /* log below is the fallback */ }
+        try {
+            if (typeof setStatus === 'function') setStatus(where + ' failed: ' + msg, true);
+        } catch (e) { /* ignore */ }
+    }
 
+    // Run one wiring step in isolation: its failure is reported, never thrown.
+    function guardStep(where, fn) {
+        try {
+            fn();
+        } catch (err) {
+            reportWiringError(where, err);
+        }
+    }
+
+    function wire() {
+        // CHAT FIRST. Send + input are bound before anything else is wired so a
+        // throw in the model list, resize, detach or the file load can never
+        // leave the Send button dead (that was the 2026-11-15 report).
         const sendBtn = document.getElementById('ai-chat-send');
         const input = document.getElementById('ai-chat-input');
         const approve = document.getElementById('ai-approve-btn');
@@ -1684,7 +1715,10 @@ function ensureThinkingStyles(doc) {
         if (sendBtn && input) {
             function fireAttached() {
                 const v = (input.value || '').trim();
-                if (!v) return;
+                if (!v) {
+                    if (typeof setStatus === 'function') setStatus('Type a prompt first', true);
+                    return;
+                }
                 input.value = '';
                 autosizePrompt(input);
                 try {
@@ -1696,46 +1730,61 @@ function ensureThinkingStyles(doc) {
                 }
             }
             sendBtn.addEventListener('click', fireAttached);
-            wirePromptBox(input, fireAttached);
+            try { wirePromptBox(input, fireAttached); } catch (err) { reportWiringError('prompt box', err); }
+        } else {
+            reportWiringError('chat wiring',
+                new Error('missing #ai-chat-send / #ai-chat-input in the popup markup'));
         }
-        if (approve) approve.addEventListener('click', approveSuggestion);
-        if (reject) reject.addEventListener('click', rejectSuggestion);
-        if (clear && input) clear.addEventListener('click', function () {
-            _clarifySession = null;
-            chatLog = [];   // reset the shared log (both views re-render empty)
-            renderChatLog(document.getElementById('chat-messages'));
-            const w = window._aiChatWin;
-            if (w && !w.closed) renderChatLog(w.document.getElementById('chat-messages'));
-            input.value = '';
-        });
 
-        initResize();
-        initDetach();
-        initClose();
-        applyViewState();   // ensure correct initial view (attached by default)
+        if (approve) guardStep('approve button', function () { approve.addEventListener('click', approveSuggestion); });
+        if (reject) guardStep('reject button', function () { reject.addEventListener('click', rejectSuggestion); });
+        if (clear && input) {
+            guardStep('clear button', function () {
+                clear.addEventListener('click', function () {
+                    _clarifySession = null;
+                    chatLog = [];   // reset the shared log (both views re-render empty)
+                    renderChatLog(document.getElementById('chat-messages'));
+                    const w = window._aiChatWin;
+                    if (w && !w.closed) renderChatLog(w.document.getElementById('chat-messages'));
+                    input.value = '';
+                });
+            });
+        }
 
-        // model-select: see initModelSelect() at top of wire()
+        // Models next (may be slow / may fail — never fatal).
+        guardStep('model select', initModelSelect);
+
+        guardStep('chat resize', initResize);
+        guardStep('chat detach', initDetach);
+        guardStep('chat close', initClose);
+        guardStep('chat view state', applyViewState);   // ensure correct initial view (attached by default)
 
         // "Add Todo" chat feature (shared module) — attaches to the current page's project.
         const todoBtn = document.getElementById('ai-chat-todo');
         if (todoBtn && window.ComservChat && ComservChat.featureTodo) {
-            todoBtn.addEventListener('click', function () {
-                ComservChat.featureTodo.open({
-                    pagePath: currentFilePath() || window.location.pathname,
-                    pageTitle: (currentFilePath() ? currentFilePath().split('/').pop() : document.title) || '',
-                    prefill: lastAiText()
+            guardStep('add-todo button', function () {
+                todoBtn.addEventListener('click', function () {
+                    ComservChat.featureTodo.open({
+                        pagePath: currentFilePath() || window.location.pathname,
+                        pageTitle: (currentFilePath() ? currentFilePath().split('/').pop() : document.title) || '',
+                        prefill: lastAiText()
+                    });
                 });
             });
         }
 
         // Keep the dirty flag in sync after an Approve applies a suggestion.
-        const editor = getEditor();
-        if (editor) {
-            editor.session.on('change', function () { _dirty = true; });
-        }
+        guardStep('editor dirty tracking', function () {
+            const editor = getEditor();
+            if (editor) {
+                editor.session.on('change', function () { _dirty = true; });
+            }
+        });
 
         // Apply shared tooltip map to this widget's buttons.
-        if (window.ComservChat && ComservChat.tooltips) ComservChat.tooltips.apply(document);
+        guardStep('tooltips', function () {
+            if (window.ComservChat && ComservChat.tooltips) ComservChat.tooltips.apply(document);
+        });
 
 
         // Agent + phase controls (minimal analyze → plan → verify → implement UI)
@@ -1769,7 +1818,7 @@ function ensureThinkingStyles(doc) {
         }
 
         console.log('[AI2EditorChat] chat + suggestion wiring ready');
-        seedGuardPrompt();
+        guardStep('prompt seed', seedGuardPrompt);
     }
 
     function seedGuardPrompt() {
