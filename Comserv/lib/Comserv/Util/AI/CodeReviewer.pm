@@ -6,16 +6,22 @@ package Comserv::Util::AI::CodeReviewer;
 #     never on every change.
 #   - Primary anthropic/claude-sonnet-5.5, alternate openai/gpt-6-sol
 #     (data/ai_reviewer.json). Never reviews output written by a model of its
-#     own vendor: switches to the alternate, or skips if both match.
-#   - Hard daily cap (cap_usd_per_day, PT calendar day). A call is refused if
-#     spent + worst-case estimate would pass the cap.
+#     own vendor: that step is skipped.
+#   - Hard daily cap (cap_usd_per_day, PT calendar day). A paid call is refused
+#     if spent + worst-case estimate would pass the cap (free models still run).
 #   - Every call goes through Provider::OpenRouter->chat (Ledger audit row,
 #     purpose code_review) and also writes its own Ledger row via
 #     AI::Usage->log (request_type code_review) so it shows as its own usage.
-#   - mode 'warn' records advice and does not stop a commit.
-#     mode 'block' (data/ai_reviewer.json) refuses the commit on a high
-#     finding, security below 4, or correctness below 3. A skipped or
-#     failed review never blocks. The fixer is a third vendor and returns
+#   - 2026-11-18 todo #2761: fail closed. Every commit is reviewed or blocked
+#     (only an empty diff passes unreviewed; reviewer disabled also blocks).
+#     review/should_block/gate_view live in Comserv::Util::AI::ReviewRun:
+#     primary at max_tokens (8000), primary again at 12000 after a cut-off or
+#     failure, alternate, then free coding models from data/ai_model_chains.json
+#     (Comserv::Util::AI::ReviewGate). Vendor independence at every step. When
+#     the daily cap is hit, paid steps are skipped and the free reviewer runs.
+#     The result records which model gave the review (model, pick, attempts).
+#   - mode 'block' also refuses a parsed review with a high finding, security
+#     below 4, or correctness below 3. The fixer is a third vendor and returns
 #     a diff only; it does not write files.
 # Spend counter: data/ai_reviewer_spend.json { "YYYY-MM-DD": {usd, calls} }.
 
@@ -25,6 +31,7 @@ use warnings;
 use JSON::PP ();
 use POSIX qw(strftime);
 use Fcntl qw(:flock);
+use Comserv::Util::AI::ReviewRun ();
 
 my $J = JSON::PP->new->canonical->allow_nonref;
 
@@ -40,7 +47,7 @@ sub config {
     my $c = _read_json($s->config_file) || {};
     return { enabled => 0, mode => 'warn', cap_usd_per_day => 0.50, primary => 'anthropic/claude-sonnet-5.5',
              alternate => 'openai/gpt-6-sol', fixer => 'cohere/north-mini-code:free',
-             prices => {}, max_diff_chars => 60000, max_tokens => 1500, %$c };
+             prices => {}, max_diff_chars => 60000, max_tokens => 8000, free_models => [], %$c };
 }
 
 sub today_pt { local $ENV{TZ} = Comserv::Util::AppTime->app_tz; POSIX::tzset(); my $d = strftime('%Y-%m-%d', localtime($_[1] // time)); POSIX::tzset(); $d }
@@ -112,12 +119,16 @@ sub build_messages {
         'Flag: raw SQL in app code, secrets/credentials in code, missing input checks, XSS in templates (missing | html),',
         'broken Try::Tiny returns, logic errors, and code that cannot run.',
         'Reply with JSON only: {"correctness":n,"security":n,"quality":n,"verdict":"pass|warn","summary":"...",',
-        '"findings":[{"file":"","line":0,"severity":"","reason":""}]}');
+        '"findings":[{"file":"","line":0,"severity":"","reason":""}]}',
+        'A file or module that is absent from the diff may already exist in the repository. Do not report it as missing or uncommitted unless the repository facts say it does not exist.');
     my $diff = $a{diff} // '';
     my $max = $s->config->{max_diff_chars} || 60000;
     my $cut = length($diff) > $max;
     $diff = substr($diff, 0, $max) . "\n... [diff cut at $max chars]" if $cut;
-    my $user = ($a{task} ? "Task the change was for:\n$a{task}\n\n" : '') . "Diff:\n$diff";
+    my $facts = $a{repo_note} // '';
+    my $user = ($a{task} ? "Task the change was for:\n$a{task}\n\n" : '')
+             . ($facts =~ /\S/ ? "Repository facts:\n$facts\n\n" : '')
+             . "Diff:\n$diff";
     return ([ { role => 'system', content => $sys }, { role => 'user', content => $user } ], $cut);
 }
 
@@ -135,65 +146,7 @@ sub parse_reply {
 
 # review($c, diff => ..., author_models => [..], task => '', source => 'commit_gate')
 # -> { ok, skipped?, reason?, model, review => {...}, usd, spent_today, cap }
-sub review {
-    my ($s, $c, %a) = @_;
-    my $cfg = $s->config;
-    my ($spent) = $s->spent_today;
-    my $base = { cap => $cfg->{cap_usd_per_day}, spent_today => $spent, mode => 'warn' };
-    return { %$base, ok => 0, skipped => 1, reason => 'reviewer disabled (data/ai_reviewer.json enabled=0)' } unless $cfg->{enabled};
-    return { %$base, ok => 0, skipped => 1, reason => 'empty diff' } unless defined $a{diff} && $a{diff} =~ /\S/;
-    my ($model, $why) = $s->pick_model(author_models => $a{author_models});
-    return { %$base, ok => 0, skipped => 1, reason => $why } unless $model;
-    my ($msgs, $cut) = $s->build_messages(diff => $a{diff}, task => $a{task});
-    my $chars = 0; $chars += length($_->{content}) for @$msgs;
-    my $est = $s->estimate_usd($model, $chars, $cfg->{max_tokens});
-    if ($spent + $est > $cfg->{cap_usd_per_day}) {
-        return { %$base, ok => 0, skipped => 1, model => $model, estimate_usd => sprintf('%.4f', $est) + 0,
-                 reason => sprintf('daily cap: spent $%.4f + up to $%.4f would pass the $%.2f cap; resets 00:00 PT', $spent, $est, $cfg->{cap_usd_per_day}) };
-    }
-    my $prov = $a{provider} || eval { $c->model('AI2::Provider::OpenRouter') };
-    return { %$base, ok => 0, skipped => 1, reason => 'OpenRouter provider unavailable' } unless $prov;
-    my $t0 = time;
-    my $r = $prov->chat($c, model => $model, messages => $msgs, max_tokens => $cfg->{max_tokens}, purpose => 'code_review');
-    my $u = ref $r->{usage} eq 'HASH' ? $r->{usage} : {};
-    my $pt = 0 + ($u->{prompt_tokens} // 0); my $ct = 0 + ($u->{completion_tokens} // 0);
-    my $p = $cfg->{prices}{$model} || { in => 15, out => 75 };
-    my $usd = defined $u->{cost} ? 0 + $u->{cost} : ($pt * $p->{in} + $ct * $p->{out}) / 1e6;
-    $s->_add_spend($usd) if $pt || $ct || $usd;
-    eval {
-        my $usage = $a{usage_model} || $c->model('AI::Usage');
-        $usage->log($c, provider => 'openrouter', model => $model, prompt_tokens => $pt, completion_tokens => $ct,
-            estimated_cost_usd => $usd, duration_ms => (time - $t0) * 1000, request_type => 'code_review',
-            status => ($r->{success} ? 'success' : 'error'), error_message => ($r->{success} ? undef : $r->{error}),
-            metadata => { feature => 'code_reviewer', source => ($a{source} // 'manual'), author_models => $a{author_models} || [],
-                          reviewer_pick => $why, diff_chars => length($a{diff}), diff_cut => ($cut ? 1 : 0),
-                          cap_usd_per_day => $cfg->{cap_usd_per_day} });
-        1;
-    };
-    my ($now) = $s->spent_today;
-    return { %$base, ok => 0, model => $model, usd => $usd, spent_today => $now, reason => 'review call failed: ' . ($r->{error} // '?') }
-        unless $r->{success};
-    my $rev = parse_reply($r->{response});
-    if ($rev) {
-        my $high = grep { ($_->{severity} // '') =~ /high/i } @{ $rev->{findings} || [] };
-        $s->append_score({
-            at => time,
-            author_models => [ grep { defined && length } @{ $a{author_models} || [] } ],
-            reviewer_model => $model,
-            source => ($a{source} // 'manual'),
-            files => $a{files} || [],
-            correctness => $rev->{correctness},
-            security => $rev->{security},
-            quality => $rev->{quality},
-            verdict => $rev->{verdict},
-            high_findings => $high,
-            diff_sha => $a{diff_sha},
-            override => 0,
-        });
-    }
-    return { %$base, ok => 1, model => $model, pick => $why, usd => sprintf('%.5f', $usd) + 0, spent_today => $now,
-             diff_cut => ($cut ? 1 : 0), review => $rev, raw => ($rev ? undef : substr($r->{response} // '', 0, 3000)) };
-}
+sub review { my ($s, $c, %a) = @_; return Comserv::Util::AI::ReviewRun->review($s, $c, %a) }
 
 sub scores_file { $_[0]->root . '/data/ai_review_scores.json' }
 
@@ -242,47 +195,11 @@ sub scores_by_author {
     return [ sort { $b->{n} <=> $a->{n} || $a->{model} cmp $b->{model} } values %g ];
 }
 
-# Block only a parsed review in mode 'block'. A skip or a failed call never blocks.
-sub should_block {
-    my ($s, $res) = @_;
-    return 0 unless ($s->config->{mode} // '') eq 'block';
-    return 0 unless ref $res eq 'HASH' && $res->{ok} && !$res->{skipped};
-    my $rev = $res->{review};
-    return 0 unless ref $rev eq 'HASH';
-    return 1 if ($rev->{security} // 5) < 4;
-    return 1 if ($rev->{correctness} // 5) < 3;
-    for my $f (@{ $rev->{findings} || [] }) {
-        return 1 if ref $f eq 'HASH' && ($f->{severity} // '') =~ /high/i;
-    }
-    return 0;
-}
+# Fail closed (todo #2761): see Comserv::Util::AI::ReviewRun::should_block.
+sub should_block { my ($s, $res) = @_; return Comserv::Util::AI::ReviewRun->should_block($s, $res) }
 
-# 2026-10-15: what the AI Editor commit form shows. Pure, testable.
-# Cap hit / error / disabled / empty -> warn and allow. High finding in
-# block mode -> blocked, commit only with "commit anyway" + reason.
-sub gate_view {
-    my ($s, $res) = @_;
-    $res = {} unless ref $res eq 'HASH';
-    my $rev = ref $res->{review} eq 'HASH' ? $res->{review} : {};
-    my @f = map { { severity => $_->{severity} // '', file => $_->{file} // '', line => $_->{line} // '',
-                    issue => $_->{issue} // $_->{message} // $_->{text} // $_->{reason} // '' } }
-            grep { ref $_ eq 'HASH' } @{ $rev->{findings} || [] };
-    my $skipped = ($res->{skipped} || !$res->{ok}) ? 1 : 0;
-    my $blocking = $skipped ? 0 : ($res->{blocking} // $s->should_block($res)) ? 1 : 0;
-    return {
-        reviewed  => $skipped ? 0 : 1,
-        blocking  => $blocking,
-        allow     => $blocking ? 0 : 1,
-        warning   => $skipped ? ('Not reviewed: ' . ($res->{reason} // 'skipped') . '. Commit is allowed.') : '',
-        verdict   => $rev->{verdict} // '',
-        scores    => { correctness => $rev->{correctness}, security => $rev->{security}, quality => $rev->{quality} },
-        findings  => \@f,
-        model     => $res->{model} // '',
-        usd       => $res->{usd} // 0,
-        spent_today => $res->{spent_today},
-        cap       => $res->{cap},
-    };
-}
+# What the AI Editor commit form shows; unreviewed = blocked + Retry review (todo #2761).
+sub gate_view { my ($s, $res) = @_; return Comserv::Util::AI::ReviewRun->gate_view($s, $res) }
 
 # Third-vendor repair. Returns a unified diff. Does not write the worktree.
 sub propose_fix {
@@ -323,7 +240,7 @@ sub propose_fix {
     return { ok => 0, model => $fixer, reason => 'fixer call failed: ' . ($r->{error} // '?') } unless $r->{success};
     my $text = $r->{response} // '';
     my $patch = $text;
-    if ($text =~ /```(?:diff)?\s*\n(.+?)```/s) { $patch = $1 }
+    if ($text =~ /\x60\x60\x60(?:diff)?\s*\n(.+?)\x60\x60\x60/s) { $patch = $1 }
     $patch =~ s/^\s+|\s+$//g;
     return { ok => 0, model => $fixer, usd => $usd, reason => 'fixer did not return a diff' }
         unless $patch =~ /^(?:diff --git|--- )/m;

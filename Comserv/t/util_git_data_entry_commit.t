@@ -28,7 +28,8 @@ my $diff = join("\n",
 my $kept = $git->strip_data_entry_diff($diff);
 like($kept, qr/Util\/Git\.pm/, 'code hunk kept');
 unlike($kept, qr/gpt_56_luna/, 'data-entry hunk dropped');
-ok($git->strip_data_entry_diff($diff =~ s/Util\/Git\.pm.*//sr) !~ /\S/, 'data-only diff leaves nothing to review');
+ok($git->strip_data_entry_diff("diff --git a/Comserv/data/ai_trials/gpt_56_luna.state.json b/Comserv/data/ai_trials/gpt_56_luna.state.json\n--- a/Comserv/data/ai_trials/gpt_56_luna.state.json\n+++ b/Comserv/data/ai_trials/gpt_56_luna.state.json\n-{\"t\":1}\n+{\"t\":2}\n") !~ /\S/,
+   'data-only diff leaves nothing to review');
 
 my $holds = $git->commit_findings_that_hold([
     { severity => 'low', file => 'Comserv/data/ai_trials/gpt_56_luna.state.json', issue => 'timestamp churn' },
