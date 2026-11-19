@@ -1267,91 +1267,27 @@ sub process {
     }
 
 
-    # ── Persist conversation + messages (v2 parity with v1 /ai/chat) ──
-    # Without this, no conversation_id is ever created, so the widget can
-    # never "start a new conversation" and nothing is saved to history.
-    my $conversation_id = $args{conversation_id};
-    my $saved_title;
-    my $created_at = '';
-    try {
-        my $schema = $c->model('DBEncy')->schema;
-        my $is_guest = is_guest_session($c);
-        my $uid = $c->session->{user_id};
-        if ($is_guest) {
-            $uid = 199 unless defined $uid;
-        }
-        die "No user_id for conversation persist\n" unless defined $uid;
-        my $agent  = $args{agent_id} // 'general';
-        my $gid = $is_guest ? ensure_guest_session_id($c) : '';
-
-        # Create a new conversation only when none was supplied (first turn)
-        unless ($conversation_id && $conversation_id =~ /^\d+$/) {
-            $saved_title = $prompt ? substr($prompt, 0, 80) : 'Chat Conversation';
-            $saved_title =~ s/\n/ /g;
-            my %meta = (agent_id => $agent);
-            $meta{guest_session_id} = $gid if $is_guest && length $gid;
-            my $conv = $schema->resultset('AiConversation')->create({
-                user_id    => $uid,
-                title      => $saved_title,
-                project_id => $args{project_id},
-                task_id    => $args{task_id},
-                model      => $resp->{model} // $use_model // '',
-                status     => 'active',
-                metadata   => encode_json(\%meta),
-            });
-            $conversation_id = $conv ? $conv->id : undef;
-        } else {
-            my $existing = $schema->resultset('AiConversation')->find($conversation_id);
-            if ($existing) {
-                unless (conversation_owned_by_session($c, $existing)) {
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
-                        "Blocked persist into foreign conversation_id=$conversation_id");
-                    $conversation_id = undef;
-                }
-            }
-        }
-
-        if ($conversation_id) {
-            # Share the id across widget + /ai page (mirrors v1)
-            $c->session->{current_conversation_id} = $conversation_id;
-
-            my $model_used = $resp->{model} // $use_model // '';
-            # Attach voice recording file refs to the user message when this
-            # turn came from a voice transcript. Stored in metadata JSON so the
-            # conversation history / voice page can locate and replay the audio.
-            my $user_meta;
-            if ($args{audio_file_id} || $args{transcript_file_id}) {
-                $user_meta = encode_json({
-                    ($args{audio_file_id}      ? (audio_file_id      => int($args{audio_file_id}))      : ()),
-                    ($args{transcript_file_id} ? (transcript_file_id => int($args{transcript_file_id})) : ()),
-                    source => 'voice',
-                });
-            }
-            $schema->resultset('AiMessage')->create({
-                conversation_id => $conversation_id,
-                user_id         => $uid,
-                role            => 'user',
-                content         => $prompt,
-                agent_type      => $agent,
-                model_used      => $model_used,
-                ($user_meta ? (metadata => $user_meta) : ()),
-            });
-            $schema->resultset('AiMessage')->create({
-                conversation_id => $conversation_id,
-                user_id         => $uid,
-                role            => 'assistant',
-                content         => $resp->{response} // '',
-                agent_type      => $agent,
-                model_used      => $model_used,
-                metadata        => encode_json({ thinking_trace => \@thinking }),
-            });
-            $created_at = eval { require Comserv::Util::AppTime; Comserv::Util::AppTime->now_utc } || scalar(localtime);
-        }
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
-            "Failed to persist v2 conversation: $_");
-        # Non-fatal: still return the AI response to the user.
-    };
+    # Every exchange is one user row + one assistant row. Early controller
+    # returns (GitFix, CodeRead, ticket/todo intercepts) call the same method
+    # so a turn cannot vanish before this block.
+    my $saved_ex = $self->persist_exchange($c,
+        prompt             => $prompt,
+        response           => $resp->{response} // '',
+        model              => $resp->{model} // $use_model // '',
+        agent_id           => $args{agent_id},
+        conversation_id    => $args{conversation_id},
+        project_id         => $args{project_id},
+        task_id            => $args{task_id},
+        audio_file_id      => $args{audio_file_id},
+        transcript_file_id => $args{transcript_file_id},
+        phase              => $args{phase},
+        page_path          => $args{page_path},
+        provider           => $resp->{provider} // '',
+        thinking           => \@thinking,
+    );
+    my $conversation_id = $saved_ex->{conversation_id};
+    my $saved_title     = $saved_ex->{title};
+    my $created_at      = $saved_ex->{created_at} // '';
 
     eval {
         my $usage_info = $resp->{usage} || {};
@@ -1651,6 +1587,143 @@ sub _herb_db_context {
     }
     my $min = $c->config->{HerbsThenWeb}{rich_min_chars} // 150;
     return { herb_question => 1, context => $ctx, citations => \@cit, rich => (($facts_len // 0) >= $min ? 1 : 0) };
+}
+
+# Split an editor POST into the typed ask (content + title) and the full
+# prompt the server received (stored on the user-message metadata). The
+# contract has no blank line; chat.js inserts \n\n before the user text and
+# \n\n---\nThese files were loaded live before the [FILE:] blob.
+sub user_prompt_record {
+    my ($prompt) = @_;
+    my $full = defined $prompt ? "$prompt" : '';
+    my $ask = $full;
+    my @files;
+    while ($full =~ /\[FILE:([^\]]+)\]/g) {
+        push @files, $1;
+    }
+    if ($full =~ /\A\[AI Editor agent=/) {
+        my $body = $full;
+        $body =~ s/\n\n---\nThese files were loaded live.*\z//s;
+        if ($body =~ /\n\n([\s\S]+)\z/) {
+            my $tail = $1;
+            $tail =~ s/\A\s+//;
+            $tail =~ s/\s+\z//;
+            $ask = $tail if $tail ne '';
+        }
+    }
+    $ask =~ s/\A\s+//;
+    $ask =~ s/\s+\z//;
+    my $title_src = $ask ne '' ? $ask : $full;
+    $title_src =~ s/\s+/ /g;
+    $title_src = substr($title_src, 0, 80) if length($title_src) > 80;
+    $title_src = 'Chat Conversation' if $title_src eq '';
+    return {
+        ask   => ($ask ne '' ? $ask : $full),
+        title => $title_src,
+        files => \@files,
+        full  => $full,
+    };
+}
+
+# Write one exchange: the user prompt and the reply that was returned.
+# Safe to call from Controller::AI2 before an early return. Never throws
+# to the caller — a save failure is logged and the reply still goes out.
+sub persist_exchange {
+    my ($self, $c, %args) = @_;
+    my $prompt = $args{prompt} // '';
+    my $response = defined $args{response} ? "$args{response}" : '';
+    my $conversation_id = $args{conversation_id};
+    my $saved_title;
+    my $created_at = '';
+    my $rec = user_prompt_record($prompt);
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $is_guest = is_guest_session($c);
+        my $uid = $c->session->{user_id};
+        if ($is_guest) {
+            $uid = 199 unless defined $uid;
+        }
+        die "No user_id for conversation persist\n" unless defined $uid;
+        my $agent = $args{agent_id} // 'general';
+        my $gid = $is_guest ? ensure_guest_session_id($c) : '';
+        my $is_new = !($conversation_id && $conversation_id =~ /^\d+$/);
+
+        if ($is_new) {
+            $saved_title = $rec->{title};
+            my %meta = (agent_id => $agent);
+            $meta{guest_session_id} = $gid if $is_guest && length $gid;
+            $meta{phase} = $args{phase} if defined $args{phase} && $args{phase} ne '';
+            my $conv = $schema->resultset('AiConversation')->create({
+                user_id    => $uid,
+                title      => $saved_title,
+                project_id => $args{project_id},
+                task_id    => $args{task_id},
+                model      => substr(($args{model} // ''), 0, 100),
+                status     => 'active',
+                metadata   => encode_json(\%meta),
+            });
+            $conversation_id = $conv ? $conv->id : undef;
+        } else {
+            my $existing = $schema->resultset('AiConversation')->find($conversation_id);
+            if ($existing) {
+                unless (conversation_owned_by_session($c, $existing)) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'persist_exchange',
+                        "Blocked persist into foreign conversation_id=$conversation_id");
+                    $conversation_id = undef;
+                }
+            }
+        }
+
+        if ($conversation_id) {
+            $c->session->{current_conversation_id} = $conversation_id;
+            my $model_used = substr(($args{model} // ''), 0, 100);
+            my %user_meta = (
+                prompt_sent => $rec->{full},
+                user_ask    => $rec->{ask},
+            );
+            $user_meta{attached_files} = $rec->{files} if @{ $rec->{files} };
+            $user_meta{phase} = $args{phase} if defined $args{phase} && $args{phase} ne '';
+            $user_meta{page_path} = $args{page_path} if defined $args{page_path} && $args{page_path} ne '';
+            $user_meta{provider} = $args{provider} if defined $args{provider} && $args{provider} ne '';
+            if ($args{audio_file_id} || $args{transcript_file_id}) {
+                $user_meta{audio_file_id} = int($args{audio_file_id}) if $args{audio_file_id};
+                $user_meta{transcript_file_id} = int($args{transcript_file_id}) if $args{transcript_file_id};
+                $user_meta{source} = 'voice';
+            }
+            $schema->resultset('AiMessage')->create({
+                conversation_id => $conversation_id,
+                user_id         => $uid,
+                role            => 'user',
+                content         => $rec->{ask},
+                agent_type      => substr($agent, 0, 100),
+                model_used      => $model_used,
+                metadata        => encode_json(\%user_meta),
+            });
+            my $thinking = ref $args{thinking} eq 'ARRAY' ? $args{thinking} : [];
+            $schema->resultset('AiMessage')->create({
+                conversation_id => $conversation_id,
+                user_id         => $uid,
+                role            => 'assistant',
+                content         => $response,
+                agent_type      => substr($agent, 0, 100),
+                model_used      => $model_used,
+                metadata        => encode_json({ thinking_trace => $thinking }),
+            });
+            $created_at = eval { require Comserv::Util::AppTime; Comserv::Util::AppTime->now_utc } || scalar(localtime);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'persist_exchange',
+                "chat exchange saved conversation_id=$conversation_id user_chars=" . length($rec->{ask})
+                . " reply_chars=" . length($response)
+                . " prompt_chars=" . length($rec->{full}));
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'persist_exchange',
+            "Failed to persist v2 conversation: $_");
+    };
+    return {
+        conversation_id => $conversation_id,
+        title           => $saved_title,
+        created_at      => $created_at,
+    };
 }
 
 1;

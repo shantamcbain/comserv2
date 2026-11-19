@@ -11,6 +11,7 @@ our %ALLOWED_KEYS = (
     'calendar.fixed_lane_pct' => 'number',
     'ui.theme_override'       => 'string',
     'ui.timezone'             => 'string',   # IANA TZ; display via AppTime
+    'ui.language'             => 'string',   # display language (Comserv::Util::UserLanguage)
     'dev_server.saved_commands' => 'object',
     'calendar.visible_sites'  => 'array',    # subset of the user's SiteNames shown on the calendar
     'healthkitchen.meal_slots' => 'object',  # { sitename => [ slot ] } (HealthKitchen::MealSlots)
@@ -73,6 +74,21 @@ sub validate_value {
         return 1 if !defined $value || $value eq '';
         require Comserv::Util::AppTime;
         return Comserv::Util::AppTime->is_valid_tz($value) ? 1 : 0;
+    }
+
+    # Display language: any code TextTranslate knows, in any regional form.
+    # 'fr-CA' / 'fr_CA' normalise to 'fr'; an unknown code ('xx') is rejected
+    # rather than silently stored, because it would render nothing.
+    # The shape check comes FIRST: normalize_lang() maps anything unusable to
+    # 'en', so without it 'french' or 'fr2' would be accepted as English.
+    if ($key eq 'ui.language') {
+        return 1 if !defined $value || $value eq '';
+        return 0 if ref $value;
+        (my $code = $value) =~ s/^\s+|\s+$//g;   # "fr\n" is still the code fr
+        return 0 unless $code =~ /^[a-zA-Z]{2}(?:[-_][a-zA-Z]{2,4})?$/;
+        require Comserv::Util::TextTranslate;
+        return Comserv::Util::TextTranslate->is_supported(
+            Comserv::Util::TextTranslate->normalize_lang($code)) ? 1 : 0;
     }
 
     return 0;
@@ -144,6 +160,17 @@ sub set_many {
             if ($key eq 'ui.timezone' && (!defined $val || $val eq '')) {
                 $rs->search({ user_id => $user_id, pref_key => $key })->delete;
                 next;
+            }
+
+            # Empty ui.language = "use the catalog language" -> drop the row so a
+            # later catalog_language change is picked up with no stale preference.
+            if ($key eq 'ui.language') {
+                if (!defined $val || $val eq '') {
+                    $rs->search({ user_id => $user_id, pref_key => $key })->delete;
+                    next;
+                }
+                # Store the canonical code, never 'fr-CA'.
+                $val = Comserv::Util::TextTranslate->normalize_lang($val);
             }
 
             if ($key eq 'calendar.site_colors' && ref $val eq 'HASH' && !keys %$val) {
