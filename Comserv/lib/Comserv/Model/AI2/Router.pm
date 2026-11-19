@@ -291,6 +291,15 @@ sub classify_prompt_for_routing {
         }
     }
 
+    # 2026-11-16 (Shanta: "the first obvious problem route is using north instead
+    # of grok"): the rules above decide SuperGrok for every editor agent
+    # (programming/analyze/documentation). A small local classifier
+    # (qwen2.5vl:3b) must NOT be able to undo that — it was returning
+    # use_supergrok=false and pushing the editor to cohere/north-mini-code:free.
+    # It may still set complexity/domain and choose between paid and free inside
+    # OpenRouter, but only the guard/credential check below may refuse SuperGrok.
+    my $sg_ruled = $use_sg;
+
     # Optional: use a new local Ollama eval/classifier model if reachable (cheap, no $).
     # Looks for a small/fast one (e.g. user-installed eval-tuned qwen/phi/gemma variant).
     # Falls back to rules if not.
@@ -376,6 +385,14 @@ sub classify_prompt_for_routing {
     if ($@) {
         $notes .= 'llm-classify skipped (' . substr($@,0,60) . '); ';
     }
+<<<<<<< HEAD
+    # Keep the rule-based SuperGrok decision for editor/code work: the local
+    # classifier is a routing hint for paid-vs-free, not permission to drop Grok.
+    if ($sg_ruled && ($agent =~ /programming|coding|code|analyze|documentation/)) {
+        $use_sg  = 1;
+        $tier    = 'supergrok';
+        $notes  .= 'llm classifier cannot downgrade grok for editor agents; ';
+=======
     }
 
     # One timing line per classification: names the stage that actually cost time
@@ -389,6 +406,7 @@ sub classify_prompt_for_routing {
             sprintf('total=%.0fms agent=%s phase=%s llm_classify=%s stages=[%s]',
                 $cls_total_ms, $agent, $phase, $used_llm_classify ? 1 : 0,
                 join(' ', @cls_stages)));
+>>>>>>> main
     }
 
     return {
@@ -586,8 +604,14 @@ sub select_model {
         require Comserv::Model::AI2::ModelPick;
         $auto_pin = Comserv::Model::AI2::ModelPick->is_auto_pin($requested);
     }
+<<<<<<< HEAD
+    # ONE definition of "editor agent" (ChatIntent::is_editor_agent). Router had
+    # its own copy of this regex and the two drifted (skill: keep one definition).
+    my $is_editor_agent = Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id) ? 1 : 0;
+=======
     require Comserv::Model::AI2::ModelPick;
     my $is_editor_agent = Comserv::Model::AI2::ModelPick->is_editor_agent($agent_id);
+>>>>>>> main
     my $is_cheap_default = ($requested // '') =~ /cohere\/north-mini|gemma-4-31b-it:free|nemotron-3\.5-lightning:free|north-mini-code:free/i;
     my $editor_read_phase = ($is_editor_agent && lc($phase // '') =~ /^(analyze|plan|clarify)$/) ? 1 : 0;
     my $ignore_cheap = ($auto_pin && !$ctx{user_picked})
@@ -638,9 +662,19 @@ sub select_model {
     }
 
     # 2026-10-15 editor chain before ModelPick, so a phase pin is not
-    # replaced by a live-list pick. analyze/plan/clarify -> north-mini-code:free.
-    # implement -> SuperGrok grok-4.7 when it has budget, else north-mini.
+    # replaced by a live-list pick.
+    # 2026-11-16 (Shanta: "the first obvious problem route is using north instead
+    # of grok"): analyze/plan/clarify used to be HARD-PINNED to
+    # cohere/north-mini-code:free for every editor agent, so the editor never
+    # reached Grok even with SuperGrok allowance left. A read phase is
+    # substantive work: Grok first, north-mini only when there is no allowance
+    # (guard locked) or the caller may not use the override.
     if ($editor_read_phase) {
+        if ($sg_ok) {
+            my $sg_model = ($cl->{domain} // '') =~ /code|programming/ ? 'grok-build-0.1' : 'grok-4.7';
+            $cl->{selected} = "supergrok/$sg_model";
+            return ('supergrok', $sg_model);
+        }
         return ('openrouter', 'cohere/north-mini-code:free');
     }
     if ($is_editor_agent && lc($phase // '') eq 'implement') {

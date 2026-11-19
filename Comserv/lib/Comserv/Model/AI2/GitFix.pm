@@ -3,7 +3,6 @@ package Comserv::Model::AI2::GitFix;
 use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];
 use Try::Tiny;
-use JSON qw(encode_json decode_json);
 
 use Comserv::Util::Logging;
 
@@ -15,39 +14,110 @@ has 'logging' => (
 
 =head1 NAME
 
-Comserv::Model::AI2::GitFix - Uses Router to orchestrate diagnosis and proposal for "Rejected unsafe or unknown path(s)" errors.
+Comserv::Model::AI2::GitFix - Quote the real path-rejection rule. Do not invent one.
 
-When triggered from AI2 chat (or dedicated call from editor), it:
-- Uses Router to pick model for analysis step.
-- Uses Router + local decision model for structured fix recommendation.
-- Gathers context (validator code, .gitignore patterns, current status patterns).
-- Returns proposal with concrete changes (gitignore, better error, path normalization).
-- The proposal is intended to be shown in the AI editor's review UI (with verify per stage/view) and applied on approval.
+The AI editor sends the open file and auto-attached sources inside the chat
+prompt. A broad "git ... commit ... path" match used to fire on that source
+(Chat.pm's investigator line) and return a model-written diagnosis of a commit
+rejection the user did not paste. That reply was fiction.
 
-This makes the AI editor capable of fixing the assigned task using the full AI2 resources (Router for model choice, multiple sub-calls, decision models).
+Trigger only when the user's own ask contains the flash string
+"Rejected unsafe or unknown path". The answer is the validator source, not a
+model call.
 
 =cut
+
+# Editor chat.js appends loaded files after this marker, and also as
+# [FILE: path] ``` ... ``` blocks. Neither is the user's question.
+sub user_ask {
+    my ($self, $prompt) = @_;
+    my $ask = defined $prompt ? $prompt : '';
+    $ask =~ s/\n---\nThese files were loaded live.*\z//s;
+    $ask =~ s/\[FILE:[^\]]*\][\s\S]*?```[\s\S]*?```//g;
+    return $ask;
+}
+
+sub is_path_rejection_ask {
+    my ($self, $prompt) = @_;
+    return $self->user_ask($prompt) =~ /Rejected unsafe or unknown path/i ? 1 : 0;
+}
+
+sub _read_lines {
+    my ($self, $abs, $start, $end) = @_;
+    return '' unless $abs && -f $abs && open my $fh, '<', $abs;
+    my @out;
+    my $n = 0;
+    while (my $line = <$fh>) {
+        $n++;
+        next if $n < $start;
+        last if $n > $end;
+        chomp $line;
+        push @out, sprintf('%d|%s', $n, $line);
+    }
+    close $fh;
+    return join("\n", @out);
+}
+
+sub validator_excerpt {
+    my ($self, $c) = @_;
+    my $abs = eval {
+        $c && $c->can('path_to')
+            ? $c->path_to('lib', 'Comserv', 'Controller', 'Admin', 'Git.pm')->stringify
+            : '';
+    };
+    return '' unless $abs && -f $abs;
+    my $rules = $self->_read_lines($abs, 213, 262);
+    my $flash = $self->_read_lines($abs, 319, 326);
+    return '' unless $rules && $flash;
+    return "lib/Comserv/Controller/Admin/Git.pm _validate_paths:\n$rules\n\n"
+         . "lib/Comserv/Controller/Admin/Git.pm flash (the exact string):\n$flash\n";
+}
 
 sub try_chat_fix {
     my ($self, $c, %args) = @_;
 
     my $prompt = $args{prompt} // '';
-    return { handled => 0 } unless $prompt =~ /Rejected unsafe or unknown path|unsafe or unknown path\(s\)|git.*(commit|stage).*(reject|error|fail|path)/i;
+    my $ask = $self->user_ask($prompt);
+    # Literal flash text in the USER ask only. Attached source must not trigger
+    # this, and a loose git/commit/path regex must not either — that match is
+    # what turned an editor question into a made-up rejection essay.
+    return { handled => 0 } unless $ask =~ /Rejected unsafe or unknown path/i;
 
-    my $router = $c->model('AI2::Router');
+    my $excerpt = eval { $self->validator_excerpt($c) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'try_chat_fix',
+            "validator excerpt failed: $@");
+        return { handled => 0 };
+    }
+    unless ($excerpt) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'try_chat_fix',
+            'Admin/Git.pm validator excerpt missing; not inventing a diagnosis');
+        return { handled => 0 };
+    }
 
-    # Router picks from the live SuperGrok / OpenRouter / Ollama lists,
-    # with coding context so classification can still prefer a code model.
-    my ($analysis_prov, $analysis_model) = $router->select_model($c,
-        agent_id => 'gitfix-analysis',
-        prompt   => $prompt,
-        route    => 'auto',
-        phase    => 'analyze',
-        context  => 'coding',
-    );
+    my $named = '';
+    if ($ask =~ /Rejected unsafe or unknown path\(s\):\s*([^(]+)/i) {
+        my $list = $1;
+        $list =~ s/\s+\z//;
+        $named = $list if length $list;
+    }
 
-    my $analysis_prompt = "Diagnose this Comserv2 git commit rejection. The validator in Admin/Git.pm only accepts paths that exactly match the strings from `git status --porcelain` on the bound target. Error: " . substr($prompt, 0, 2000) . "\n\nRoot causes and minimal fix (ignores for runtime data, better error message, path collection fix).";
+    my $response = "This is the server rule, not a model guess.\n\n"
+        . "The flash text is written by lib/Comserv/Controller/Admin/Git.pm "
+        . "when _validate_paths rejects a path. A path is rejected only when "
+        . "one of these is true in that sub:\n"
+        . "- it contains '..' or starts with '/'\n"
+        . "- it is not an exact key in `git status --porcelain` for the bound target\n"
+        . "- the target is local and the path is a symlink whose real path is outside the repo\n\n";
+    $response .= "The flash named these rejected paths: $named\n"
+        . "Those names came from the error text, not from inference.\n\n"
+        if $named;
+    $response .= "Source:\n\n$excerpt";
 
+<<<<<<< HEAD
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'try_chat_fix',
+        'answered path rejection from Admin/Git.pm; no model call');
+=======
     my $analysis = try {
         $router->dispatch_chat($c, $analysis_model, [
             { role => 'system', content => 'You are a precise senior engineer on Comserv2 git + AI2. Cite file:line. Be actionable.' },
@@ -86,27 +156,15 @@ sub try_chat_fix {
     my $response = "=== Router Analysis (" . ($analysis_model // 'model') . ") ===\n" . ($analysis->{response} // $analysis->{error} // 'analysis unavailable') . "\n\n";
     $response .= "=== Structured Recommendation (" . $decision_label . " via Router) ===\n" . ($decision->{response} // $decision->{error} // 'decision unavailable') . "\n\n";
     $response .= "Verification: Run git status --porcelain on the exact target used for the commit. Only submit paths that appear there. Add the runtime data to .gitignore. Improve the flash error with target hint.";
+>>>>>>> main
 
     return {
-        handled => 1,
-        success => 1,
+        handled  => 1,
+        success  => 1,
         response => $response,
-        model => 'router-gitfix (' . ($analysis_model // '') . ' + decision)',
+        model    => '(git-validator)',
         provider => 'ai2-gitfix',
         git_fix_proposal => 1,
-        verification_steps => [
-            'git -C <correct-toplevel> status --porcelain (note the exact path strings)',
-            'git check-ignore -v on each data path',
-            'Update .gitignore for ai_* runtime (model_chains, prices, usage_readings, eval_inbox, hermes guards)',
-            'Update _validate_paths error to include target and hint',
-            'In dashboard and AI editor path collection, only offer paths from current status for the target',
-            'Only commit from the worktree that has the changes'
-        ],
-        stages => [  # for feeding into review UI with verify per stage
-            { name => 'gitignore', changes => 'Add runtime AI data patterns', verify => 'git status no longer shows the data files' },
-            { name => 'validator', changes => 'Better error message with target and hint', verify => 'error message is helpful' },
-            { name => 'collection', changes => 'Dashboard/AI editor only submit current porcelain paths', verify => 'no more rejection for legitimate paths' }
-        ],
     };
 }
 
