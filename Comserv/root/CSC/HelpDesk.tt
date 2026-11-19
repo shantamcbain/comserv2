@@ -18,7 +18,7 @@
 <div class="helpdesk-container">
     <!-- HelpDesk View -->
     [% IF c.session.username %]
-        <h2>Hello [% c.session.firstname || c.session.username %] [% c.session.lastname %]! Welcome to [% site_display_name %] HelpDesk</h2>
+        <h2>Hello [% c.session.first_name || c.session.firstname || c.session.username %] [% c.session.last_name || c.session.lastname %]! Welcome to [% site_display_name %] HelpDesk</h2>
     [% ELSE %]
         <h2>Welcome to [% site_display_name %] HelpDesk</h2>
     [% END %]

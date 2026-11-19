@@ -923,7 +923,7 @@ sub view_ticket :Chained('ticket_base') :PathPart('view') :Args(1) {
         }
 
         my $staff_username = $c->session->{username} || '';
-        my $staff_display  = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+        my $staff_display  = ($c->session->{first_name} || $c->session->{firstname} || '') . ' ' . ($c->session->{last_name} || $c->session->{lastname} || '');
         $staff_display     = $staff_username unless $staff_display =~ /\S/;
 
         $c->stash(
@@ -977,7 +977,7 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
     }
 
     my $is_staff     = $self->_is_staff($c);
-    my $sender_name  = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    my $sender_name  = ($c->session->{first_name} || $c->session->{firstname} || '') . ' ' . ($c->session->{last_name} || $c->session->{lastname} || '');
     $sender_name     = $c->session->{username} || 'Anonymous' unless $sender_name =~ /\S/;
     my $sender_email = $c->session->{email} || '';
     my $sender_type  = $is_staff ? 'staff' : 'user';
@@ -1148,7 +1148,7 @@ sub ticket_update_status :Chained('ticket_base') :PathPart('update_status') :Arg
         return;
     }
 
-    my $staff_name  = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    my $staff_name  = ($c->session->{first_name} || $c->session->{firstname} || '') . ' ' . ($c->session->{last_name} || $c->session->{lastname} || '');
     $staff_name     = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
     my $now = Comserv::Util::AppTime->now_utc;
     my $site_name   = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
@@ -1296,7 +1296,7 @@ sub assign_ticket :Chained('ticket_base') :PathPart('assign') :Args(1) {
     my $assignee = $c->req->params->{assignee} || '';
     $assignee =~ s/^\s+|\s+$//g;  # trim
 
-    my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    my $staff_name = ($c->session->{first_name} || $c->session->{firstname} || '') . ' ' . ($c->session->{last_name} || $c->session->{lastname} || '');
     $staff_name    = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
     my $now = Comserv::Util::AppTime->now_utc;
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
@@ -1457,7 +1457,7 @@ sub send_reminder :Chained('ticket_base') :PathPart('remind') :Args(1) {
 
     my $now = Comserv::Util::AppTime->now_utc;
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
-    my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    my $staff_name = ($c->session->{first_name} || $c->session->{firstname} || '') . ' ' . ($c->session->{last_name} || $c->session->{lastname} || '');
     $staff_name    = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
 
     try {
@@ -1577,7 +1577,7 @@ sub create_todo :Chained('ticket_base') :PathPart('create_todo') :Args(1) {
     }
 
     my $now = Comserv::Util::AppTime->now_utc;
-    my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    my $staff_name = ($c->session->{first_name} || $c->session->{firstname} || '') . ' ' . ($c->session->{last_name} || $c->session->{lastname} || '');
     $staff_name  = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
     my $current_date = Comserv::Util::AppTime->today_ymd_for($c);
@@ -1717,7 +1717,7 @@ sub escalate_ticket :Chained('ticket_base') :PathPart('escalate_ticket') :Args(1
 
     my $note = $c->req->params->{note} || '';
     my $now = Comserv::Util::AppTime->now_utc;
-    my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    my $staff_name = ($c->session->{first_name} || $c->session->{firstname} || '') . ' ' . ($c->session->{last_name} || $c->session->{lastname} || '');
     $staff_name  = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
     my $current_date = Comserv::Util::AppTime->today_ymd_for($c);
