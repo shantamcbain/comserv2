@@ -657,7 +657,10 @@ JSON: { success, message, model } or { success => 0, error }.
 # 2026-10-15: AI Editor commit form (root/ai2/editor/right_dock_commit.tt).
 # step=review: review the staged diff with the in-app reviewer, return findings.
 # step=confirm: commit the reviewed diff; a blocked diff needs override_reason
-# ("commit anyway"). Cap hit / reviewer error -> warning, commit allowed.
+# ("commit anyway"). Fail closed (2026-11-18, todo #2761): not reviewed (cut-off,
+# error, all reviewer models failed, cap hit with no free model, disabled) ->
+# blocked with Retry review, no confirm and no override. Only an empty diff
+# (or a data-entry-only diff) passes unreviewed.
 sub editor_commit :Path('/admin/git/editor_commit') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
@@ -1931,7 +1934,9 @@ sub _dashboard_commit_gate {
     my $reason = $c->req->param('override_reason') // '';
     $reason =~ s/^\s+|\s+$//g;
     my $prev = eval { $self->_user_gate($c) };
-    if ($prev && ref $prev eq 'HASH' && ($prev->{diff_sha} // '') eq $sha && $prev->{dashboard}) {
+    # Never reuse an unreviewed result: clicking Commit again retries the review (todo #2761).
+    if ($prev && ref $prev eq 'HASH' && ($prev->{diff_sha} // '') eq $sha && $prev->{dashboard}
+        && !$rv->gate_view($prev->{review})->{not_reviewed}) {
         my $view = $rv->gate_view($prev->{review});
         if ($view->{blocking}) {
             return { proceed => 0, msg => 'Still blocked by the reviewer: ' . $self->_format_findings($view)
@@ -1946,13 +1951,17 @@ sub _dashboard_commit_gate {
         return { proceed => 1, note => 'Reviewed findings were confirmed.' };
     }
     my $res = eval { $rv->review($c, diff => $review_diff, files => [ $review_diff =~ m{^diff --git a/(.+?) b/}mg ],
-                                 diff_sha => $sha, task => $message, source => 'commit_gate') };
-    $res = { ok => 0, skipped => 1, reason => 'review call failed' . ($@ ? ": $@" : '') } if $@ || !$res;
+                                 diff_sha => $sha, task => $message, source => 'commit_gate',
+                                 repo_note => $self->_repo_module_note($c, $review_diff)) };
+    $res = { ok => 0, failed => 1, reason => 'review call failed' . ($@ ? ": $@" : '') } if $@ || !$res;
     my $view = $rv->gate_view($res);
     $view->{findings} = $git->commit_findings_that_hold($view->{findings});
     $res->{blocking} = $view->{blocking};
     $self->_save_user_gate($c, { at => time, diff_sha => $sha, message => $message, review => $res, dashboard => 1 });
-    return { proceed => 1, note => $view->{warning} } unless $view->{reviewed};
+    # Fail closed (todo #2761): only an empty diff passes unreviewed.
+    return { proceed => 1, note => $view->{warning} } if $view->{empty_diff};
+    return { proceed => 0, msg => $view->{warning} . ' Click Commit again to retry the review. Nothing has been committed.' }
+        if $view->{not_reviewed};
     if ($view->{blocking}) {
         return { proceed => 0, msg => 'Commit blocked by the reviewer (' . ($view->{model} || 'reviewer') . '): '
                  . $self->_format_findings($view)
@@ -1963,6 +1972,36 @@ sub _dashboard_commit_gate {
                  . ' Click Commit again to confirm. Nothing has been committed yet.' };
     }
     return { proceed => 1, note => 'Reviewer found no problems (' . ($view->{model} || 'reviewer') . ').' };
+}
+
+sub _repo_module_note {
+    my ($self, $c, $diff) = @_;
+    return '' unless defined $diff && length $diff;
+    my %mod;
+    for my $line (split /\n/, $diff) {
+        next unless $line =~ /^\+/ && $line !~ /^\+\+\+/;
+        while ($line =~ /^\+\s*(?:use|require)\s+([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z0-9_]+)*)/g) {
+            $mod{$1} = 1;
+        }
+    }
+    return '' unless %mod;
+    my $app = $self->_app_root($c);
+    my (@have, @miss);
+    for my $m (sort keys %mod) {
+        # Core modules and pragmas (strict, warnings, lib, File::Temp, ...) are
+        # not app files; listing them as "does not exist" only invents findings.
+        next if eval { require Module::CoreList; Module::CoreList::is_core($m) ? 1 : 0 };
+        (my $rel = $m) =~ s{::}{/}g;
+        my $file = "$app/lib/$rel.pm";
+        if (-f $file) { push @have, "$m ($file exists in the repository)" }
+        else          { push @miss, "$m ($file does NOT exist in the repository)" }
+    }
+    return '' unless @have || @miss;
+    my @parts;
+    push @parts, 'Modules referenced by this diff that already exist: ' . join('; ', @have) . '.' if @have;
+    push @parts, 'Modules referenced by this diff that do not exist yet: ' . join('; ', @miss) . '.' if @miss;
+    push @parts, 'A module or file absent from the diff may already exist in the repository; do not report it as missing or uncommitted unless this list says it does not exist.';
+    return join(' ', @parts);
 }
 
 sub _reviewer_for {
@@ -1994,6 +2033,21 @@ sub _review_for_commit {
         return $result;
     }
     $diff //= '';
+    # Structural checks on data-entry files (conflict markers, invalid JSON).
+    # Same gate the dashboard runs, so both commit surfaces refuse the same junk.
+    my $blob_err = $self->_data_entry_staged_error($c, $diff);
+    if ($blob_err) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, '_review_for_commit', $blob_err);
+        $result->{error_msg} = $blob_err;
+        return $result;
+    }
+    # Review and confirm against the code diff only. App-rewritten data-entry
+    # files (data/ai_trials/*.state.json) are re-staged while the review is on
+    # screen; hashing them made _confirm_reviewed_commit refuse its own review
+    # with "The diff changed after review." The dashboard path already strips
+    # them (_dashboard_commit_gate) — this path must use the same hash.
+    my $raw_diff = $diff;
+    $diff = $self->git_service->strip_data_entry_diff($diff);
     require Digest::SHA;
     my $sha = Digest::SHA::sha256_hex($diff);
     my @paths = @$files ? @$files : ($diff =~ /^diff --git a\/(.+?) b\//mg);
@@ -2012,14 +2066,17 @@ sub _review_for_commit {
     my $res = eval {
         $rv->review($c,
             diff => $diff, author_models => \@am, files => \@paths, diff_sha => $sha,
-            task => $message, source => 'commit_gate');
+            task => $message, source => 'commit_gate',
+            repo_note => $self->_repo_module_note($c, $diff));
     };
     if ($@ || !$res) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_review_for_commit',
             'review failed: ' . ($@ || 'no result'));
-        $res = { ok => 0, skipped => 1, reason => 'review call failed; confirm is allowed', blocking => 0 };
+        $res = { ok => 0, failed => 1, reason => 'review call failed: ' . ($@ || 'no result') };
     }
-    $res->{blocking} = ($res->{skipped} || !$res->{ok}) ? 0 : ($rv->should_block($res) ? 1 : 0);
+    # Fail closed (todo #2761): no parsed review blocks; only an empty diff passes.
+    $res->{blocking} = $rv->should_block($res) ? 1 : 0;
+    $res->{not_reviewed} = $rv->gate_view($res)->{not_reviewed} ? 1 : 0;
     my $gate = {
         at => time, diff => substr($diff, 0, 60000), diff_sha => $sha,
         files => $files, paths => \@paths, message => $message,
@@ -2028,9 +2085,11 @@ sub _review_for_commit {
     $self->_save_user_gate($c, $gate);
     $c->stash(commit_review => $gate);
     if ($diff !~ /\S/) {
-        $result->{success_msg} = 'No diff to review. Confirm only if that is what you meant.';
-    } elsif ($res->{skipped} || !$res->{ok}) {
-        $result->{success_msg} = 'Not reviewed: ' . ($res->{reason} // 'skipped') . '. You may confirm the commit.';
+        $result->{success_msg} = $raw_diff =~ /\S/
+            ? 'Data-entry files only. Structural checks passed; not sent to the reviewer. Confirm to commit.'
+            : 'No diff to review. Confirm only if that is what you meant.';
+    } elsif ($res->{not_reviewed}) {
+        $result->{error_msg} = $rv->gate_view($res)->{warning};
     } elsif ($res->{blocking}) {
         $result->{error_msg} = 'Review blocked this commit. Read the findings, ask the fixer, or override with a reason.';
     } else {
@@ -2057,10 +2116,26 @@ sub _confirm_reviewed_commit {
         $c->stash(commit_review => $gate);
         return $result;
     }
+    my $blob_err = $self->_data_entry_staged_error($c, $diff);
+    if ($blob_err) {
+        $result->{error_msg} = $blob_err;
+        $c->stash(commit_review => $gate);
+        return $result;
+    }
+    # Hash the code diff only, exactly as _review_for_commit hashed it. A
+    # data-entry rewrite between Review and Confirm is not a new review.
+    $diff = $self->git_service->strip_data_entry_diff($diff);
     require Digest::SHA;
     my $sha = Digest::SHA::sha256_hex($diff);
     if ($sha ne $gate->{diff_sha}) {
         $result->{error_msg} = 'The diff changed after review. Review it again before committing.';
+        $c->stash(commit_review => $gate);
+        return $result;
+    }
+    # Fail closed (todo #2761): an unreviewed diff cannot be confirmed or overridden.
+    my $gv = $self->_reviewer_for($c)->gate_view($gate->{review} || {});
+    if ($gv->{not_reviewed}) {
+        $result->{error_msg} = $gv->{warning};
         $c->stash(commit_review => $gate);
         return $result;
     }

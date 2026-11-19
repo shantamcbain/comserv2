@@ -68,7 +68,7 @@
 
         </div>
 
-        <h2 class="ticket-subject">[% ticket.subject %]</h2>
+        <h2 class="ticket-subject">[% ticket.subject | html %]</h2>
 
         <div class="ticket-meta-detail">
 
@@ -103,8 +103,8 @@
         <div class="ticket-customer-email" style="margin-top: 0.5rem; font-size: 0.9em; background: #f8f9fa; padding: 4px 8px; border-radius: 4px;">
             <strong>Customer email:</strong> 
             [% IF guest_email %]
-                <strong>[% guest_email %]</strong>
-                <a href="mailto:[% guest_email %]?subject=[% ticket.ticket_number %] [% ticket.subject | uri %]" 
+                <strong>[% guest_email | html %]</strong>
+                <a href="mailto:[% guest_email | html %]?subject=[% ticket.ticket_number %] [% ticket.subject | uri %]" 
                    class="btn btn-sm btn-outline-secondary" style="margin-left: 6px; padding: 1px 6px; font-size: 0.8em;">
                     ✉ Reply via email
                 </a>
@@ -204,7 +204,7 @@
 
                 <button type="submit" class="btn btn-sm btn-secondary"
 
-                        title="Send reminder email to [% ticket.email %]">
+                        title="Send reminder email to [% ticket.email | html %]">
 
                     &#128276; Send Reminder
 
