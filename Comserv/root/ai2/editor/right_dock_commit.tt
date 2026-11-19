@@ -1,7 +1,7 @@
 [%# ai2/right_dock_commit.tt — AI Editor commit form with the reviewer gate (2026-10-15).
-    Commit = review the STAGED diff first (in-app reviewer, Sonnet 5.5, $0.50/day cap),
+    Commit = review the STAGED diff first (in-app reviewer: Sonnet 5.5, retry, alternate, then a free coder; $0.50/day cap),
     show findings, then confirm. A high-severity finding blocks unless you use
-    "Commit anyway" with a reason. Cap hit / reviewer error = warning, commit allowed. %]
+    "Commit anyway" with a reason. Not reviewed (cut-off, error, all reviewer models failed, cap hit with no free reviewer, disabled) = blocked with Retry review; no confirm, no commit anyway. Only an empty diff passes unreviewed (2026-11-18, todo #2761). %]
 <div id="aec-root" style="padding:12px;font-size:13px;color:#ddd;">
     <div style="font-weight:500;margin-bottom:6px;">Commit staged changes</div>
     <div style="font-size:11px;opacity:0.8;margin-bottom:8px;">Stage files in the Git panel first. Only the staged diff is reviewed and committed.</div>
@@ -21,6 +21,7 @@
                style="width:100%;background:#1e1f22;color:#ddd;border:1px solid #a33;border-radius:4px;padding:6px;margin-bottom:6px;">
         <button id="aec-override" style="width:100%;background:#b71c1c;color:white;border:none;padding:8px;border-radius:4px;cursor:pointer;">Commit anyway</button>
     </div>
+    <div id="aec-retry-box" style="display:none;margin-top:10px;"><button id="aec-retry" style="width:100%;background:#0e639c;color:white;border:none;padding:8px;border-radius:4px;cursor:pointer;">Retry review</button></div>
 </div>
 <script>
 (function () {
@@ -34,18 +35,19 @@
     }
     function status(msg, color) { $('aec-status').innerHTML = '<span style="color:' + (color || '#ddd') + '">' + esc(msg) + '</span>'; }
     $('aec-cancel').onclick = close;
+    $('aec-retry').onclick = function () { $('aec-review').onclick(); };
     $('aec-review').onclick = function () {
         var msg = $('aec-msg').value.trim();
         if (!msg) { status('Commit message required.', '#f88'); return; }
         $('aec-review').disabled = true; status('Reviewing the staged diff…');
-        $('aec-confirm-box').style.display = 'none'; $('aec-override-box').style.display = 'none'; $('aec-findings').innerHTML = '';
+        $('aec-confirm-box').style.display = 'none'; $('aec-override-box').style.display = 'none'; $('aec-retry-box').style.display = 'none'; $('aec-findings').innerHTML = '';
         post({ step: 'review', commit_message: msg }).then(function (d) {
             $('aec-review').disabled = false;
             if (!d.success && !d.blocking) { status(d.error || d.message || 'Review failed', '#f88'); return; }
             var html = '';
             if (d.paths && d.paths.length) html += '<div style="opacity:0.8;">Files: ' + d.paths.map(esc).join(', ') + '</div>';
             if (d.reviewed) {
-                html += '<div>Reviewer ' + esc(d.model) + ' — verdict <b>' + esc(d.verdict || '?') + '</b>'
+                html += '<div>Reviewer ' + esc(d.model) + (d.pick ? ' (' + esc(d.pick) + ')' : '') + ' — verdict <b>' + esc(d.verdict || '?') + '</b>'
                     + ' (correctness ' + esc(d.scores.correctness) + ', security ' + esc(d.scores.security) + ', quality ' + esc(d.scores.quality) + ')</div>';
                 (d.findings || []).forEach(function (f) {
                     var col = /high/i.test(f.severity) ? '#f66' : (/med/i.test(f.severity) ? '#fc6' : '#9cf');
@@ -55,6 +57,11 @@
                 if (!(d.findings || []).length) html += '<div style="opacity:0.8;">No findings.</div>';
             }
             $('aec-findings').innerHTML = html;
+            if (d.not_reviewed) {
+                status(d.warning || 'Not reviewed, commit blocked. Click Retry review.', '#f66');
+                $('aec-retry-box').style.display = 'block';
+                return;
+            }
             if (d.blocking) {
                 status('Blocked: the reviewer found a high-severity problem. Fix it, or use Commit anyway with a reason.', '#f66');
                 $('aec-override-box').style.display = 'block';
