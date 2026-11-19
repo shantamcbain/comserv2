@@ -894,16 +894,35 @@ Arrayref of { ref, index, message }.
 =cut
 
 sub get_git_stash_list {
-    my ($self, $c) = @_;
+    my ($self, $c, $opts) = @_;
     my $r = $self->_run($c, 'stash', 'list');
     my $stashes = [];
     return $stashes unless $r->{success};
     for my $line (split /\n/, $r->{output}) {
         if ($line =~ /^(stash\@\{(\d+)\}):\s*(.+)$/) {
-            push @$stashes, { ref => $1, index => $2, message => $3 };
+            my ($ref, $idx, $msg) = ($1, $2, $3);
+            my ($sb) = $msg =~ /^(?:WIP on|On) ([^:]+):/;
+            push @$stashes, { ref => $ref, index => $idx, message => $msg, branch => $sb // '' };
         }
     }
-    return $stashes;
+    # 2026-11-19: the stash list is shared by every worktree. Show only the
+    # stashes made on the branch this page is bound to, so Stash Pop can never
+    # apply another branch's changes here. index stays the real stash@{N}.
+    return $stashes if $opts && $opts->{all};
+    my $cur = $self->get_current_branch($c);
+    return [ grep { $_->{branch} eq $cur } @$stashes ];
+}
+
+# Refuse to pop/drop a stash that was not made on the bound branch.
+sub _stash_belongs_here {
+    my ($self, $c, $index) = @_;
+    my ($s) = grep { $_->{index} == $index } @{ $self->get_git_stash_list($c, { all => 1 }) };
+    return { success => 0, error => "stash\@{$index} does not exist." } unless $s;
+    my $cur = $self->get_current_branch($c);
+    return { success => 0, error => "stash\@{$index} was made on '" . ($s->{branch} || 'unknown')
+        . "', not on '$cur'. Switch the Git page to that branch to pop or drop it." }
+        unless $s->{branch} eq $cur;
+    return;
 }
 
 =head2 get_git_status($c)
@@ -1396,12 +1415,14 @@ Pop or drop a stash by index (default 0).
 sub stash_pop {
     my ($self, $c, $index) = @_;
     $index = 0 unless defined $index && $index =~ /^\d+$/;
+    if (my $refuse = $self->_stash_belongs_here($c, $index)) { return $refuse; }
     return $self->_run($c, 'stash', 'pop', "stash\@{$index}");
 }
 
 sub stash_drop {
     my ($self, $c, $index) = @_;
     $index = 0 unless defined $index && $index =~ /^\d+$/;
+    if (my $refuse = $self->_stash_belongs_here($c, $index)) { return $refuse; }
     return $self->_run($c, 'stash', 'drop', "stash\@{$index}");
 }
 
@@ -2337,6 +2358,27 @@ sub merge_branch {
         return $result;
     }
 
+    # 2026-11-19 (Shanta approved): main->branch no longer auto-stashes. A stash
+    # left behind on conflict is shared by every worktree and was later popped
+    # into the wrong branch (42 stranded autostash entries). Refuse a dirty
+    # target instead, the same way "Update all from main" skips one.
+    # Untracked files do not count: git itself refuses if one would be overwritten.
+    my @tracked_dirty = map { my $l = $_; $l =~ s/^\s*[0-9A-Za-z.!? ]{1,2}\s+//; $l =~ s/^.* -> //; $l }
+                        grep { /\S/ && !/^\?\?/ } split /\n/, ($st->{output} // '');
+    if ($opts->{refuse_dirty} && @tracked_dirty) {
+        my @dirty = @tracked_dirty;
+        $result->{uncommitted} = 1;
+        $result->{reason}      = 'uncommitted';
+        $result->{error_msg}   = "Merge not started: $checkout_label has uncommitted changes ("
+            . join(', ', @dirty[0 .. ($#dirty > 11 ? 11 : $#dirty)]) . ($#dirty > 11 ? ' ...' : '')
+            . "). Commit or stash first, then retry Merge main.";
+        $result->{fix_hint}    = "Commit (or Stash) the changes in $checkout_label on the Git page, then retry.";
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_merge',
+            "merge_branch: refused dirty target branch='$branch' repo=" . ($repo // 'default')
+            . " dirty=" . scalar(@dirty));
+        return $result;
+    }
+
     # Secret guard on the incoming merge diff (merge-base..branch). Refuse on a hit.
     unless ($opts->{skip_secret_guard}) {
         my $guard = $self->secret_guard($c, $repo, '--merge', $branch);
@@ -2440,7 +2482,7 @@ sub merge_branch {
         else {
             $result->{error_msg} =
                 "Merge blocked by uncommitted changes in $checkout_label.$file_bit "
-              . "Commit or stash first (dashboard Stash / main→branch uses --autostash).";
+              . "Commit or stash first, then retry.";
             $result->{fix_hint} =
                 "Commit or stash WIP in $checkout_label, then retry.";
         }

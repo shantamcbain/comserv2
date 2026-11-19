@@ -431,6 +431,39 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
                 goto COMMIT_DONE;
             }
 
+            # 2026-11-19 one-branch rule (Shanta): a branch must not commit its own
+            # copy of a file that already sits on main with the same content. Those
+            # copies came from files written into several worktrees (PhotoRead.pm,
+            # Api.pm) and turn every later "Merge main" into an add/add conflict.
+            # Skipped while concluding a merge, where main's content is expected.
+            {
+                my ($cur_b) = $self->_git_list($c, 'rev-parse', '--abbrev-ref', 'HEAD');
+                $cur_b //= ''; $cur_b =~ s/\s+\z//;
+                my (undef, $merging) = $self->_git_list($c, 'rev-parse', '--verify', '--quiet', 'MERGE_HEAD');
+                if (length $cur_b && $cur_b ne 'main' && $cur_b ne 'HEAD' && $merging != 0) {
+                    my ($names) = $self->_git_list($c, 'diff', '--cached', '--name-only');
+                    my @copies;
+                    for my $p (grep { length } split /\n/, ($names // '')) {
+                        my ($idx, $ic) = $self->_git_list($c, 'rev-parse', '--verify', '--quiet', ":$p");
+                        next if $ic;                     # staged deletion
+                        my ($mn, $mc) = $self->_git_list($c, 'rev-parse', '--verify', '--quiet', "main:$p");
+                        next if $mc;                     # not on main: genuinely this branch's work
+                        my ($hd, $hc) = $self->_git_list($c, 'rev-parse', '--verify', '--quiet', "HEAD:$p");
+                        s/\s+\z// for grep { defined } ($idx, $mn, $hd);
+                        push @copies, $p if $idx eq $mn && ($hc || $hd ne $mn);
+                    }
+                    if (@copies) {
+                        $msg = "Commit refused (one branch per change): "
+                             . join(', ', @copies)
+                             . " would be committed here as a copy of main's version. "
+                             . "Unstage or discard these file(s), then use 'Merge main \x{2192} this branch' to get them.";
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'dashboard_action',
+                            "commit refused on $cur_b: copies of main: " . join(',', @copies));
+                        goto COMMIT_DONE;
+                    }
+                }
+            }
+
             # Secret guard (same script as the global pre-commit hook). Never --no-verify.
             my $guard = $self->git_service->secret_guard($c);
             unless ($guard->{ok}) {
@@ -1846,8 +1879,16 @@ sub _data_entry_staged_error {
     my ($self, $c, $diff) = @_;
     my $git = $self->git_service;
     my %seen;
+    # 2026-11-19: a staged DELETION (git rm --cached of a runtime file that is
+    # now gitignored) has no staged blob to read or validate. Let it commit.
+    my %deleted;
+    for my $part (split /(?=^diff --git )/m, ($diff // '')) {
+        my ($p) = $part =~ m{^diff --git a/(.+?) b/} or next;
+        $deleted{$p} = 1 if $part =~ /^deleted file mode /m;
+    }
     for my $path (($diff // '') =~ m{^diff --git a/(.+?) b/}mg) {
         next if $seen{$path}++;
+        next if $deleted{$path};
         next unless $git->data_entry_runtime_path($path);
         my ($blob, $code) = $self->_git_list($c, 'show', ":$path");
         if ($code) {
@@ -2713,7 +2754,7 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         }
         # Fetch first, then use the service's guarded merge implementation. It
         # preflights MERGE_HEAD/unmerged index state before invoking git and
-        # preserves the intentional --autostash behavior for WIP. The incoming
+        # refuses a dirty tree (commit or stash first) instead of auto-stashing. The incoming
         # main range is not scanned here because that scan is both expensive
         # and wrong for files already present on main; the pre-merge hook still
         # blocks a newly introduced secret.
@@ -2733,7 +2774,8 @@ sub merge :Path('/admin/git/merge') :Args(0) {
             # classification, and abort-safe recovery for this path too.
             $mr = $self->git_service->merge_branch($c, 'main', {
                 repo              => $dest,
-                autostash         => 1,
+                autostash         => 0,   # 2026-11-19: never stash; refuse a dirty tree
+                refuse_dirty      => 1,
                 skip_secret_guard => 1,
             });
         }
