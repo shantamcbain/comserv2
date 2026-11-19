@@ -275,3 +275,22 @@ Comserv/data/custom_creation_jobs/
 Comserv/data/ai_model_chains.json.bak-t393u-20261111-104106
 Comserv/lib/Comserv/Util/AI/HermesOverrunGuard.pm.bak-t393u-20261111-104106
 Comserv/var/twiggy.enabled
+
+# 2026-11-19 merge-conflict root fix: files the running app, Hermes and the AI
+# trial/eval jobs write in EVERY checkout. They were in .gitignore but still
+# tracked, so ignore rules did nothing and each merge of main conflicted on them.
+# Untracked with `git rm --cached` (copies kept on disk). Never re-add them.
+Comserv/data/ai_trials/
+Comserv/data/ai_rank_jobs/
+Comserv/data/ai_eval_inbox/
+Comserv/data/ai_eval_outbox/
+Comserv/data/*.lock
+Comserv/data/ai_reset_drift.jsonl
+Comserv/data/ai_decision_rank_quality.jsonl
+Comserv/data/supergrok_alert_notice.txt
+Comserv/var/translate_cache/
+Comserv/var/*.pid
+Comserv/var/*.log
+.hermes/docs-sync-state.json
+# stray duplicate of Comserv/root/static/app/version.json at the repo top (the app never reads it)
+/root/static/app/version.json
