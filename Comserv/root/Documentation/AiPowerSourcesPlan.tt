@@ -1,0 +1,194 @@
+[% META
+   title = "AI Power Sources Plan — provider, facility, and energy-mix data"
+   description = "Schema plan for storing how AI providers and their data centers get power (nuclear, gas, coal, solar, wind, hydro, grid mix), so AI spend can be steered to cleaner options. Four new Ency Result files, created via schema compare only. Includes AI editor prompts, router handoff, and the Hermes fix-prompt template."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "database,schema-management,ai"
+   page_version = "0.1"
+   last_updated = "Thu Nov 12 2026 (v0.1 — plan only, no Result files yet, todo #2742)"
+   site_specific = "false"
+   project_id = "5"
+   project_code = "Schema"
+%]
+
+<div class="container masterplan">
+<h1 id="top">AI Power Sources Plan</h1>
+<div class="last-updated doc-muted">Created: 2026-11-12 | Version: 0.1 | Status: PLAN (todo #2742, project 5, schema branch)</div>
+<p class="mp-back-link"><a href="/Documentation/SchemaMasterPlan">← Schema Master Plan</a></p>
+
+<h2>1. Summary</h2>
+<ul>
+<li><strong>Problem.</strong> Comserv has no record of how AI providers power their compute. Spend cannot be steered to cleaner providers.</li>
+<li><strong>Evidence.</strong> No <code>power</code>/<code>energy</code>/<code>provider</code> table in Ency (grep of <code>table()</code> names, 2026-11-12). Providers exist only as slugs: <code>ai_model_policy.provider</code> (e.g. supergrok, openrouter, ollama). <code>ai_model_config</code> is per site/role/model config, not a provider registry.</li>
+<li><strong>Impact.</strong> The router picks models on cost/policy only. Facts on power (IEA mix, nuclear deals, onsite gas) live in chat, not data.</li>
+<li><strong>Solution.</strong> Four new Result files: <code>ai_providers</code>, <code>ai_sites</code>, <code>ai_power_sources</code>, <code>ai_energy_metrics</code>. Tables made only by schema compare "Create Table". Seed only cited rows through the app.</li>
+<li><strong>Risk / undo.</strong> New tables only; no existing table changes. Undo = drop the four empty tables via schema compare and revert the commit. Live DB 192.168.1.20:3307 is the only DB; Shanta clicks each create.</li>
+</ul>
+
+<h2>2. Conventions used</h2>
+<ul>
+<li>Style from <code>Result/HealthKitchen/IntakeLog.pm</code>: <code>load_components('InflateColumn::DateTime','TimeStamp')</code>, <code>sitename varchar(255) NOT NULL</code>, <code>created_at/updated_at datetime</code> with <code>set_on_create/set_on_update</code>.</li>
+<li>Enum-like values are <code>varchar</code> + <code>documentation</code> (as <code>AiModelPolicy.status</code>). New values need no ALTER.</li>
+<li>No <code>add_index</code> in this DBIC; only <code>add_unique_constraint</code>. Create Table uses SQL::Translator per table, so <code>belongs_to</code> adds FK + index on <code>provider_id</code>/<code>site_id</code>.</li>
+<li>Size: Util/Model/Result ≤800 lines soft, Controllers ≤2,000 soft (SchemaSystemPlan / MASTER_PLAN).</li>
+<li>Logging via <code>log_with_details</code>; no inline JS; changelog fragments only (AGENTS.md, .hermes.md §4).</li>
+</ul>
+
+<h2>3. Reuse decision</h2>
+<p>No provider table exists, so <code>ai_providers</code> is new and is the FK target. Its <code>slug</code> equals the Router billing slug in <code>ai_model_policy.provider</code> — a soft join, no FK, no change to existing tables. <code>ai_model_config</code> is left alone (many rows per provider; changing it needs Shanta's OK).</p>
+
+<h2>4. Tables (field lists)</h2>
+<p>All: <code>id</code> int AI PK, <code>sitename</code> varchar(255) NOT NULL, <code>created_at</code>/<code>updated_at</code> datetime NULL (auto).</p>
+<h3>ai_providers (AiProvider.pm)</h3>
+<ul>
+<li>slug varchar(50) NOT NULL — router billing slug</li>
+<li>name varchar(100) NOT NULL; company varchar(100) NULL; model_family varchar(100) NULL</li>
+<li>api_endpoint varchar(500) NULL — reference only, never a key</li>
+<li>preferred_rank int NULL — 1 = most preferred for clean power; NULL = unranked</li>
+<li>notes text NULL; last_updated date NULL</li>
+<li>Unique <code>ai_providers_site_slug (sitename, slug)</code>. has_many sites, power_sources, energy_metrics (cascade_delete 0).</li>
+</ul>
+<h3>ai_sites (AiSite.pm) — data centers</h3>
+<ul>
+<li>provider_id int NOT NULL → ai_providers.id</li>
+<li>name varchar(150) NOT NULL; location varchar(255) NULL; country_code varchar(2) NULL; grid_region varchar(100) NULL</li>
+<li>status varchar(20) NOT NULL default 'unknown' — planned|construction|operating|retired|unknown</li>
+<li>estimated_mw decimal(10,2) NULL; source_url varchar(500) NULL; notes text NULL</li>
+<li>Unique <code>ai_sites_provider_name (provider_id, name)</code>. belongs_to provider; has_many power_sources, energy_metrics.</li>
+</ul>
+<h3>ai_power_sources (AiPowerSource.pm)</h3>
+<ul>
+<li>provider_id int NULL, site_id int NULL — at least one set (checked in Util)</li>
+<li>source_type varchar(20) NOT NULL — nuclear|gas|coal|solar|wind|hydro|grid_mix|fuel_cell|other|unknown</li>
+<li>capacity_mw decimal(10,2) NULL</li>
+<li>basis varchar(12) NOT NULL — physical|contractual (PPA/REC ≠ physical)</li>
+<li>status varchar(20) NOT NULL default 'operating' — planned|contracted|operating|retired</li>
+<li>start_year int NULL; end_year int NULL</li>
+<li>source_url varchar(500) NOT NULL; source_title varchar(255) NULL</li>
+<li>confidence varchar(10) NOT NULL default 'medium' — high|medium|low; last_verified date NULL; notes text NULL</li>
+<li>belongs_to provider, site (LEFT).</li>
+</ul>
+<h3>ai_energy_metrics (AiEnergyMetric.pm) — mix shares over time</h3>
+<ul>
+<li>provider_id int NULL, site_id int NULL</li>
+<li>scope varchar(20) NOT NULL default 'provider' — global|country|provider|site (IEA global/US mix = global/country rows)</li>
+<li>country_code varchar(2) NULL; metric_date date NOT NULL (period start); period varchar(10) NOT NULL default 'year' — year|month|day|hour</li>
+<li>basis varchar(12) NOT NULL — physical|contractual</li>
+<li>renewable_pct_annual, renewable_pct_hourly, nuclear_pct, gas_pct, coal_pct decimal(5,2) NULL</li>
+<li>nuclear_mw, gas_mw decimal(10,2) NULL</li>
+<li>source_url varchar(500) NOT NULL; source_title varchar(255) NULL; notes text NULL</li>
+<li>belongs_to provider, site (LEFT).</li>
+</ul>
+
+<h2>5. Seed-data rule</h2>
+<p>Every power-source and metric row needs <code>source_url</code>, <code>basis</code> and <code>confidence</code>. No invented numbers. Enter through the app (prompt 3), never SQL. Candidate sources (from Shanta's research, to be verified at entry): IEA <em>Energy and AI</em> mix (global, US); Microsoft–Constellation Crane restart; Amazon–Talen Susquehanna; Meta–Vistra; Google–Kairos; xAI Colossus permits.</p>
+
+<h2>6. Multi-site</h2>
+<p>Every table has <code>sitename</code> like other Ency tables. Seed under <code>CSC</code>. A site's <code>preferred_rank</code> is its own; facts may be copied per site later if needed (open question).</p>
+
+<h2>7. Router handoff (aisystem branch — describe only)</h2>
+<p>Router reads <code>ai_providers.preferred_rank</code> by <code>(sitename, slug = billing provider)</code>, falling back to <code>CSC</code>. Use it only as a tie-breaker after kill-switch and <code>ai_model_policy</code> status. NULL rank = no effect. Cache per request. Owner: Chat-with-AI fixer on <code>aisystem</code>.</p>
+
+<h2>8. AI editor prompts</h2>
+<h3>Prompt 1 — Result files only</h3>
+<pre class="doc-pre">TASK (Comserv2, schema branch, worktree ~/.comserv/worktrees/schema/Comserv): create FOUR new DBIx::Class Result files for AI power-source data. New files only. Do not edit any existing file. No SQL, no migrations, no scripts, no deploy. Plan: /Documentation/AiPowerSourcesPlan (todo #2742).
+
+Before you start: git status (stop and report if there is uncommitted work you did not make), then git merge main.
+
+Conventions (copy from lib/Comserv/Model/Schema/Ency/Result/HealthKitchen/IntakeLog.pm):
+- use strict; use warnings; use base &#x27;DBIx::Class::Core&#x27;;
+- __PACKAGE__-&gt;load_components(&#x27;InflateColumn::DateTime&#x27;, &#x27;TimeStamp&#x27;);
+- id integer is_auto_increment PK; sitename varchar 255 NOT NULL
+- created_at datetime nullable set_on_create =&gt; 1; updated_at datetime nullable set_on_create =&gt; 1, set_on_update =&gt; 1
+- Enum-like columns are varchar + a &#x27;documentation&#x27; attribute listing the allowed values (same as AiModelPolicy.status). Do NOT use data_type &#x27;enum&#x27;.
+- No add_index in this DBIC version. Only add_unique_constraint(name =&gt; [cols]). FK indexes come from belongs_to.
+- Decimal sizes are arrays: size =&gt; [10, 2].
+- Each file ends with 1; and stays well under 800 lines.
+
+Files (all under Comserv/lib/Comserv/Model/Schema/Ency/Result/):
+
+1) AiProvider.pm  package Comserv::Model::Schema::Ency::Result::AiProvider  table ai_providers
+   id; sitename;
+   slug varchar 50 NOT NULL (documentation: same slug the AI Router uses as billing provider, e.g. supergrok, openrouter, ollama; matches ai_model_policy.provider);
+   name varchar 100 NOT NULL; company varchar 100 NULL; model_family varchar 100 NULL;
+   api_endpoint varchar 500 NULL (documentation: reference URL only, never a key);
+   preferred_rank integer NULL (documentation: 1 = most preferred for clean power; NULL = unranked);
+   notes text NULL; last_updated date NULL; created_at; updated_at.
+   PK id. add_unique_constraint(ai_providers_site_slug =&gt; [qw(sitename slug)]).
+   has_many sites =&gt; AiSite provider_id; has_many power_sources =&gt; AiPowerSource provider_id; has_many energy_metrics =&gt; AiEnergyMetric provider_id. Use cascade_delete =&gt; 0 on each has_many.
+
+2) AiSite.pm  package ...::AiSite  table ai_sites
+   id; sitename; provider_id integer NOT NULL; name varchar 150 NOT NULL;
+   location varchar 255 NULL; country_code varchar 2 NULL; grid_region varchar 100 NULL;
+   status varchar 20 NOT NULL default &#x27;unknown&#x27; (documentation: planned|construction|operating|retired|unknown);
+   estimated_mw decimal [10,2] NULL; source_url varchar 500 NULL; notes text NULL; created_at; updated_at.
+   PK id. add_unique_constraint(ai_sites_provider_name =&gt; [qw(provider_id name)]).
+   belongs_to provider =&gt; AiProvider { &#x27;foreign.id&#x27; =&gt; &#x27;self.provider_id&#x27; }.
+   has_many power_sources =&gt; AiPowerSource site_id; has_many energy_metrics =&gt; AiEnergyMetric site_id (cascade_delete =&gt; 0).
+
+3) AiPowerSource.pm  package ...::AiPowerSource  table ai_power_sources
+   id; sitename; provider_id integer NULL; site_id integer NULL (documentation: at least one of provider_id/site_id is set; checked in code later);
+   source_type varchar 20 NOT NULL (documentation: nuclear|gas|coal|solar|wind|hydro|grid_mix|fuel_cell|other|unknown);
+   capacity_mw decimal [10,2] NULL;
+   basis varchar 12 NOT NULL (documentation: physical|contractual — physical = electrons actually used; contractual = PPA/REC);
+   status varchar 20 NOT NULL default &#x27;operating&#x27; (documentation: planned|contracted|operating|retired);
+   start_year integer NULL; end_year integer NULL;
+   source_url varchar 500 NOT NULL; source_title varchar 255 NULL;
+   confidence varchar 10 NOT NULL default &#x27;medium&#x27; (documentation: high|medium|low);
+   last_verified date NULL; notes text NULL; created_at; updated_at.
+   PK id. belongs_to provider =&gt; AiProvider (provider_id) and site =&gt; AiSite (site_id), both with { join_type =&gt; &#x27;LEFT&#x27; }.
+
+4) AiEnergyMetric.pm  package ...::AiEnergyMetric  table ai_energy_metrics
+   id; sitename; provider_id integer NULL; site_id integer NULL;
+   scope varchar 20 NOT NULL default &#x27;provider&#x27; (documentation: global|country|provider|site; global/country rows have no provider/site);
+   country_code varchar 2 NULL; metric_date date NOT NULL (documentation: start of the period);
+   period varchar 10 NOT NULL default &#x27;year&#x27; (documentation: year|month|day|hour);
+   basis varchar 12 NOT NULL (physical|contractual);
+   renewable_pct_annual decimal [5,2] NULL; renewable_pct_hourly decimal [5,2] NULL;
+   nuclear_pct decimal [5,2] NULL; gas_pct decimal [5,2] NULL; coal_pct decimal [5,2] NULL;
+   nuclear_mw decimal [10,2] NULL; gas_mw decimal [10,2] NULL;
+   source_url varchar 500 NOT NULL; source_title varchar 255 NULL; notes text NULL; created_at; updated_at.
+   PK id. belongs_to provider and site as in AiPowerSource (LEFT).
+
+Relationship class names are the full package, e.g. &#x27;Comserv::Model::Schema::Ency::Result::AiSite&#x27;.
+
+Checks before you report:
+- From Comserv/: perl -Ilib -Ilocal/lib/perl5 -c on each new file -&gt; syntax OK.
+- perl -Ilib -Ilocal/lib/perl5 -MComserv::Model::Schema::Ency -e &#x27;my $s=&quot;Comserv::Model::Schema::Ency&quot;; print join(&quot;,&quot;, grep { /^Ai(Provider|Site|PowerSource|EnergyMetric)$/ } $s-&gt;sources), &quot;\n&quot;&#x27; lists all four (if the schema loads namespaces that way; if not, report what you ran).
+- git add only the four files, commit small on schema: &quot;feat(schema): Result files for AI power-source data (#2742)&quot;. Add a changelog fragment Comserv/root/Documentation/changelog/entries/YYYY-MM-DD-ai-power-sources-results.inc. Do not push.
+- Report: commit hash, perl -c output, file paths.
+
+Then Shanta (not the editor) does: restart :4007 herself if the new classes do not show, open http://workstation.local:4007/admin/schema_compare -&gt; db-server-1:3307 -&gt; ency -&gt; &quot;Result files without tables&quot;. Create in this order: ai_providers, ai_sites, ai_power_sources, ai_energy_metrics. Read each proposed CREATE before confirming (expect varchar not enum, decimal(10,2)/(5,2), the two unique keys, FK keys on provider_id/site_id). After create, the tables list should show all four with the OK badge (0 issues). Any issue count above 0: copy the issue text to chat.
+
+Policy: Result file is the schema truth; never hand DDL; log_with_details in every catch (later code); no inline JS; new files only; no server restarts by the editor; live DB writes only through Shanta&#x27;s schema-compare click.
+</pre>
+<h3>Prompt 2 — outline</h3>
+<ul>
+<li><code>Comserv/Util/AI/PowerSources.pm</code> (≤800 lines): list/get/save per table, value checks (allowed values, one of provider_id/site_id, pct 0–100, source_url required), <code>log_with_details</code> in every catch.</li>
+<li><code>Controller/Admin/AiPower.pm</code>: list/view/edit for providers, sites, power sources, metrics; admin role check; CSRF as other admin forms.</li>
+<li>Templates <code>root/admin/ai_power/*.tt</code>; JS <code>root/static/js/admin/ai-power.js</code> via <code>js_load.tt</code>; CSS with <code>var(--*)</code>; no inline JS.</li>
+<li>Tests <code>t/ai_power_sources.t</code> for the checks. Changelog fragment. Commit small.</li>
+</ul>
+<h3>Prompt 3 — outline</h3>
+<ul>
+<li>Seed through the prompt-2 UI only, one row per cited fact; open each source first; fill source_url, source_title, basis, confidence, last_verified.</li>
+<li>Skip any number the source does not state. Report a table of rows added with URLs.</li>
+</ul>
+
+<h2>9. Hermes fix-prompt template</h2>
+<pre class="doc-pre">FIX: [error text / page / log line]
+Rules: work only in ~/.comserv/worktrees/schema/Comserv (branch schema, port 4007).
+1. git status; stop if foreign uncommitted work. git merge main.
+2. Diagnose from logs (Comserv/logs/, dev_server_4007.log) and the code path. State the root cause.
+3. Fix the root cause in the smallest change. No SQL, migrations or scripts. Live DB 192.168.1.20:3307 read-only. No deploy. No server restarts unless Shanta asks.
+4. perl -c changed files; run related tests (prove -Ilib -Ilocal/lib/perl5 t/...).
+5. Commit small with a changelog fragment. Log against todo #[id].
+6. Report: cause, files changed, commit hash, test output, what Shanta should click to verify.</pre>
+
+<h2>10. Open questions</h2>
+<ul>
+<li>Is one provider row per router billing slug right? OpenRouter resells other labs, so its power is the upstream lab's.</li>
+<li>Per-site rows, or one global CSC set for all sites?</li>
+<li>Rank by hand, or compute from metrics later?</li>
+</ul>
+</div>
