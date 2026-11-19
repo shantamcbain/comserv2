@@ -128,7 +128,7 @@
 
                         <td><code>[% t.ticket_number %]</code></td>
 
-                        <td>[% t.subject %]</td>
+                        <td>[% t.subject | html %]</td>
 
                         <td>[% t.category || 'other' %]</td>
 
@@ -211,11 +211,11 @@
 
                 <h3>Ticket Details: [% ticket.ticket_number %]</h3>
 
-                <div class="detail-row"><strong>Subject:</strong> [% ticket.subject %]</div>
+                <div class="detail-row"><strong>Subject:</strong> [% ticket.subject | html %]</div>
 
                 <div class="detail-row"><strong>Description:</strong>
 
-                    <pre class="description-box">[% ticket.description %]</pre>
+                    <pre class="description-box">[% ticket.description | html %]</pre>
 
                 </div>
 
@@ -223,7 +223,7 @@
 
                 <div class="detail-row"><strong>Resolution:</strong>
 
-                    <pre class="description-box">[% ticket.resolution %]</pre>
+                    <pre class="description-box">[% ticket.resolution | html %]</pre>
 
                 </div>
 

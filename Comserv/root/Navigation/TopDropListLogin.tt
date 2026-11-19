@@ -70,7 +70,7 @@
                 <i class="icon-user"></i> My Profile
             </a>
             <a href="/user/settings" class="menu-item">
-                <i class="icon-cog"></i> Account Settings
+                <i class="icon-cog"></i> Account Settings / Change Email
             </a>
 
             <!-- Private links: quick access here; same links also appear in their chosen menu -->
