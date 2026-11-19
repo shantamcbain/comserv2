@@ -46,7 +46,7 @@
                             </tr>
                             <tr>
                                 <td><strong>Email:</strong></td>
-                                <td>[% user.email | html %]</td>
+                                <td><!--email_off-->[% user.email | html %]<!--/email_off--> <a href="/user/settings#email" class="btn btn-sm btn-secondary" style="margin-left:6px;">Change email</a></td>
                             </tr>
                             <tr>
                                 <td><strong>Status:</strong></td>
