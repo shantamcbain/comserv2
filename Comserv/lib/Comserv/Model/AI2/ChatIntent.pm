@@ -13,7 +13,9 @@ our @EXPORT_OK = qw(is_editor_agent looks_like_todo_create looks_like_helpdesk_t
 # Chat-with-AI (non-editor) is the only surface that creates todos from chat.
 sub is_editor_agent {
     my ($agent_id) = @_;
-    return (lc($agent_id // '') =~ /^(?:programming|coding|code|documentation|analyze)$/) ? 1 : 0;
+    # Single source of truth (todo #2564): ModelPick knows about gitfix-* too.
+    require Comserv::Model::AI2::ModelPick;
+    return Comserv::Model::AI2::ModelPick->is_editor_agent($agent_id) ? 1 : 0;
 }
 
 # Primary object of create/add is a todo/task (not a helpdesk ticket).

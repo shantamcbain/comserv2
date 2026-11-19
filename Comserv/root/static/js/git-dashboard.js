@@ -947,17 +947,32 @@
         data.rows.forEach(function (r) {
             var tr = document.createElement('tr');
             cell(tr, r.key); cell(tr, r.branch); cell(tr, r.port ? ':' + r.port : '');
-            cell(tr, r.action + (r.autostash ? ' (autostash)' : '') + (r.tree ? ' \u2014 ' + r.tree : ''));
+            if (r.path) { tr.firstChild.title = r.path; }
+            cell(tr, (r.status || r.action) + (r.tree ? ' \u2014 ' + r.tree : ''));
             cell(tr, r.needs_manual ? '\u2691 needs manual' : '');
             cell(tr, (r.behind != null ? r.behind : '') + (r.ahead != null ? ' / ' + r.ahead : ''));
-            cell(tr, r.pre_merge_commit ? r.pre_merge_commit.substring(0, 10) : '');
-            var bits = [];
-            if (r.files && r.files.length) { bits.push(r.files.join(', ')); }
-            if (r.reason) { bits.push(r.reason); }
-            if (r.dirty_files && r.dirty_files.length && !(r.files && r.files.length)) { bits.push('uncommitted kept: ' + r.dirty_files.join(', ')); }
-            if (r.manual_files && r.manual_files.length) { bits.push('conflict in: ' + r.manual_files.join(', ')); }
-            if (r.stash) { bits.push('stash: ' + String(r.stash).substring(0, 60)); }
-            cell(tr, bits.join(' - '));
+            var before = r.before_sha || r.pre_merge_commit;
+            cell(tr, (before ? String(before).substring(0, 10) : '') + (r.after_sha ? ' \u2192 ' + String(r.after_sha).substring(0, 10) : ''));
+            // 2026-11-18: skip reason first, then one line per file with its "same as main / differs" note.
+            var td = document.createElement('td');
+            if (r.reason) { td.appendChild(document.createTextNode(r.reason)); }
+            if (r.files && r.files.length) {
+                var ul = document.createElement('ul');
+                ul.style.margin = '2px 0 0 16px'; ul.style.padding = '0';
+                r.files.forEach(function (f) {
+                    var li = document.createElement('li');
+                    var note = r.file_notes && r.file_notes[f];
+                    li.textContent = f + (note ? ' \u2014 ' + note : '');
+                    ul.appendChild(li);
+                });
+                td.appendChild(ul);
+            }
+            if (r.kept_uncommitted && r.kept_uncommitted.length) {
+                var sm = document.createElement('small');
+                sm.textContent = 'uncommitted kept as is: ' + r.kept_uncommitted.join(', ');
+                td.appendChild(sm);
+            }
+            tr.appendChild(td);
             cell(tr, r.will_restart ? 'yes' : '');
             tbody.appendChild(tr);
         });
@@ -1011,7 +1026,7 @@
         btn.addEventListener('click', function (ev) {
             if (!url || !window.fetch) { return; }
             var mode = btn.getAttribute('data-update-all-mode') || 'preview';
-            if (mode === 'update' && !window.confirm('Merge main into every registered branch now? Running -r dev servers will restart. Run Preview first if unsure.')) {
+            if (mode === 'update' && !window.confirm('Merge main into every branch whose preview is clean? Branches with conflicts, uncommitted or untracked blockers are skipped and listed. Running -r dev servers will restart.')) {
                 ev.preventDefault();
                 return;
             }
