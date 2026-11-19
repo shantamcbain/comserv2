@@ -1,0 +1,6 @@
+<div id="2026-11-07-schema-compare-restore-main" class="cl-entry">
+<h3>2026-11-07 — Schema compare restored to main's server cards</h3>
+<p class="doc-body"><strong>What.</strong> The schema compare landing page is main's version again: one card per configured server, and clicking a card tunnels into that server's database list. The per-database card grid, the "Compare selected differences" form and the <code>/admin/database_compare</code> report are gone.</p>
+<p class="doc-body"><strong>Why.</strong> The previous edit on this branch replaced the server-card page with database cards. The card body no longer opened a database server, so the page lost the drill-down that main still has. The branch is not the owner of a database-difference report; the working drill-down matters more than the added report.</p>
+<p class="doc-body"><strong>Files.</strong> <code>lib/Comserv/Controller/Admin/SchemaComparison.pm</code>, <code>root/admin/schema_compare/servers.tt</code>, <code>root/static/js/schema-compare.js</code>, <code>root/static/css/themes/schema_compare.css</code> — all byte-identical to <code>main</code>. Removed: <code>lib/Comserv/Util/DatabaseCompare.pm</code>, <code>root/admin/database_compare.tt</code>, <code>t/util_database_compare.t</code>.</p>
+</div>
