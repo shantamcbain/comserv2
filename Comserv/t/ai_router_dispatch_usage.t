@@ -57,15 +57,22 @@ $r->dispatch_chat($c, 'auto', $msgs, log_usage => 'coa_generate');
 is $ai->{rows}[0]{prompt_tokens}, 100, 'OpenAI-style usage mapped';
 is $r->log_dispatch_usage(undef, $next, 'x', 1), 0, 'no $c -> no row, no crash';
 
-# The four callers pass log_usage.
+# Callers that still dispatch a model pass log_usage. GitFix used to, and
+# that ungrounded call was the editor's fiction reply. It now quotes
+# Admin/Git.pm and must not call dispatch_chat.
 for ([ 'lib/Comserv/Controller/Admin/Git.pm', 'git_commit_message' ],
-     [ 'lib/Comserv/Model/AI2/GitFix.pm', 'git_fix' ],
      [ 'lib/Comserv/Model/AI2/TodoRank.pm', 'todo_rank' ],
      [ 'lib/Comserv/Util/Accounting/CoaAiGenerate.pm', 'coa_generate' ]) {
     my ($f, $p) = @$_;
     open my $fh, '<', "$FindBin::Bin/../$f" or die "$f: $!";
     local $/; my $src = <$fh>;
     like $src, qr/log_usage\s*=>\s*'$p'/, "$f passes log_usage => '$p'";
+}
+{
+    open my $fh, '<', "$FindBin::Bin/../lib/Comserv/Model/AI2/GitFix.pm" or die $!;
+    local $/; my $src = <$fh>;
+    unlike $src, qr/dispatch_chat/, 'GitFix does not ask a model to invent a diagnosis';
+    unlike $src, qr/log_usage\s*=>\s*'git_fix'/, 'GitFix no longer has an ungrounded model call to log';
 }
 # Controller::AI::_log_ai_usage now delegates to the tagged ledger writer.
 {
