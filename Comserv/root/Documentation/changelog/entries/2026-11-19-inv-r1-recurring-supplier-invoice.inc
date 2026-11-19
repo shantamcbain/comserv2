@@ -20,10 +20,22 @@ step, matching the existing chat/draft invoice path. Payment source is
 charge is paid <em>from</em>, not free text — so AP reporting can show where money actually leaves.
 Unblocks <strong>DRYER-INT #2250</strong> (CC3D/HDRY membership + invoice) and closes todo
 <strong>#2190</strong>.</p>
+<p class="doc-body"><strong>Hardening (review rounds).</strong> The page and every action on it are
+administrator-only — the earlier local-IP bypass and hardcoded admin username are gone, and a POST is
+refused unless it is same-origin (<code>Comserv::Util::OriginCheck</code>). The site is taken from the
+session, never from a <code>sitename</code> parameter or <code>X-Sitename</code> header, so a schedule
+cannot read or bill another site. Every id from the form is re-checked against the site (supplier and
+all accounts, including the payment source, which must be an asset account), money fields must be
+numeric, and dates are validated as real calendar dates so an impossible date is rejected at save time
+instead of failing at generation. Editing a schedule keeps its item/location line links and its
+tax/shipping amounts, and <code>run_due</code> re-reads each schedule under a row lock so the button and
+the cron script cannot both bill the same period.</p>
 <p class="doc-body"><strong>Files.</strong>
 <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/Accounting/InventoryRecurringInvoice.pm</code>,
 <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/Accounting/InventoryRecurringInvoiceLine.pm</code>,
 <code>Comserv/lib/Comserv/Util/Accounting/RecurringInvoice.pm</code>,
 <code>Comserv/lib/Comserv/Controller/Accounting/Recurring.pm</code>,
-<code>Comserv/root/Accounting/recurring/index.tt</code></p>
+<code>Comserv/root/Accounting/recurring/index.tt</code>,
+<code>Comserv/script/generate_recurring_invoices.pl</code>,
+<code>Comserv/root/Documentation/Accounting/invoices.tt</code></p>
 </div>
