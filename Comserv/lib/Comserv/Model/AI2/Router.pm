@@ -172,6 +172,21 @@ sub classify_prompt_for_routing {
     my $phase = lc($ctx{phase} // '');
     my $notes = '';
 
+    # Per-stage timing (todo #2739). The popup took 154s on 2026-11-15 and the
+    # log showed ollama_resolve_host then 152s of silence before select_model
+    # logged anything — this classifier was the black hole. Record every stage
+    # so the slow one is named instead of guessed.
+    my $t_cls_start = Time::HiRes::time();
+    my $t_mark      = $t_cls_start;
+    my @cls_stages;
+    my $mark = sub {
+        my ($name) = @_;
+        my $now = Time::HiRes::time();
+        push @cls_stages, sprintf('%s=%.0fms', $name, ($now - $t_mark) * 1000);
+        $t_mark = $now;
+        return $now - $t_cls_start;
+    };
+
     # Rule-based from agent + phase + keywords (fast, no tokens).
     my $tier = 'free';
     my $complexity = 'med';
@@ -217,7 +232,9 @@ sub classify_prompt_for_routing {
     # For editor agents (programming/analyze/documentation), mark supergrok available
     # and prefer it when the guard says daily allotment remains and key resolves.
     my $guard = $self->supergrok_guard($c);
+    $mark->('sg_guard');
     my $sg_available = !$guard->{locked} && $self->_external_default_available($c, 'supergrok|grok-4.7');
+    $mark->('ext_avail');
     if ($sg_available) {
         # Nov 8 2026: SuperGrok is its own prepaid allowance; OpenRouter spend no
         # longer decides it (its guard + pacing do). Real questions (TaskTier) and
@@ -240,10 +257,12 @@ sub classify_prompt_for_routing {
     # If over soft daily cap (or credits low), force free tier and record warning.
     # This makes the aisystem switch and can surface a system warning to the user.
     my $or_spend = eval { $self->openrouter_spend($c) } || {};
+    $mark->('or_spend');
     my $or_over = 0;
     # Shared cap file (~/.comserv/ai_caps.json) via ModelChains. The old
     # hardcoded $1.65 marked OpenRouter exhausted while the live day cap is $3.
     my $chains_ld = eval { Comserv::Util::AI::ModelChains->load($c) };
+    $mark->('chains');
     my $day_cap = ($chains_ld && Comserv::Util::AI::ModelChains->knob($chains_ld, 'openrouter_soft_cap_day_usd')) || 3;
     if ($or_spend->{ok}) {
         if (($or_spend->{day} || 0) >= $day_cap) {
@@ -284,13 +303,34 @@ sub classify_prompt_for_routing {
     # Optional: use a new local Ollama eval/classifier model if reachable (cheap, no $).
     # Looks for a small/fast one (e.g. user-installed eval-tuned qwen/phi/gemma variant).
     # Falls back to rules if not.
+    #
+    # WARNING (todo #2739): this is a blocking /api/chat generate. Ollama::chat uses
+    # a 120s (warm) / 480s (cold) UA timeout and there is no per-call budget, so on a
+    # busy workstation one classification can hold the caller for minutes. Callers
+    # that must not block (e.g. rendering a page) pass no_llm_classify => 1.
     my $used_llm_classify = 0;
+    # A coding/editor request never needs the LLM classifier: the agent already
+    # names the domain and ModelPick walks the Hermes chain anyway (todo #2564).
+    # 125s of Ollama generate used to be spent here on an editor Send.
+    require Comserv::Model::AI2::ModelPick;
+    my $coding_ctx = Comserv::Model::AI2::ModelPick->is_coding_agent($agent) ? 1 : 0;
+    if ($ctx{no_llm_classify} || $coding_ctx) {
+        $notes .= $coding_ctx
+            ? 'llm-classify skipped (coding agent ' . $agent . '); '
+            : 'llm-classify skipped (no_llm_classify); ';
+    } else {
     eval {
+        # Hard 5s ceiling: the classifier is advisory, the caller is not willing
+        # to wait minutes for it (todo #2564).
+        local $SIG{ALRM} = sub { die "classify timeout after 5s\n" };
+        alarm 5;
         my $ollama = $c->model('AI2::Provider::Ollama');
         my ($host, $port) = $ollama->resolve_host($c) if $ollama && $ollama->can('resolve_host');
+        $mark->('ollama_resolve');
         if ($ollama && $ollama->check_connection($c, $host, $port)) {
             # Pick a small local model for classification (prefer any :small or known fast).
             my $models = $ollama->list_models($c, $host, $port) || [];
+            $mark->('ollama_list');
             my $clf_model;
             for my $m (@$models) {
                 my $name = ref($m) ? ($m->{name}||'') : $m;
@@ -311,13 +351,27 @@ sub classify_prompt_for_routing {
                     {role=>'system', content=>'You are a fast request classifier. Output only JSON.'},
                     {role=>'user', content=>$classify_prompt}
                 ], model => $clf_model, host=>$host, port=>$port);
+                alarm 0;   # classifier answered (or died) — never let the alarm fire later
+                $mark->('ollama_classify_chat');
                 if ($resp && $resp->{success} && $resp->{response}) {
                     my $json = $resp->{response};
                     $json =~ s/.*?(\{.*\}).*/$1/s;  # crude extract
                     my $data = eval { JSON->new->decode($json) } || {};
                     if ($data->{tier}) {
                         $tier = $data->{tier} if $data->{tier} =~ /^(supergrok|paid|free)$/;
-                        $complexity = $data->{complexity} if $data->{complexity};
+                        # Complexity is a property of the TASK, not of the budget.
+                        # The eval model is small and tends to answer "low"; it may
+                        # raise the rule-based value but must never lower it
+                        # (todo #2564: a guard-locked day reported complexity=low
+                        # for a coding task with high-complexity keywords).
+                        my %rank = (low => 1, med => 2, high => 3);
+                        my $want = lc($data->{complexity} // '');
+                        if ($rank{$want} && $rank{$want} > $rank{$complexity}) {
+                            $complexity = $want;
+                        }
+                        elsif ($rank{$want} && $rank{$want} < $rank{$complexity}) {
+                            $notes .= "llm said complexity=$want, kept $complexity (task, not budget); ";
+                        }
                         $domain = $data->{domain} if $data->{domain};
                         $use_sg = $data->{use_supergrok} ? 1 : 0;
                         $notes .= 'llm-classified(' . ($clf_model||'local') . '); ';
@@ -327,15 +381,32 @@ sub classify_prompt_for_routing {
             }
         }
     };
+    alarm 0;   # belt-and-braces: a died classify must not leave SIGALRM pending
     if ($@) {
         $notes .= 'llm-classify skipped (' . substr($@,0,60) . '); ';
     }
+<<<<<<< HEAD
     # Keep the rule-based SuperGrok decision for editor/code work: the local
     # classifier is a routing hint for paid-vs-free, not permission to drop Grok.
     if ($sg_ruled && ($agent =~ /programming|coding|code|analyze|documentation/)) {
         $use_sg  = 1;
         $tier    = 'supergrok';
         $notes  .= 'llm classifier cannot downgrade grok for editor agents; ';
+=======
+    }
+
+    # One timing line per classification: names the stage that actually cost time
+    # (todo #2739 — the popup stall was invisible because nothing logged between
+    # ollama_resolve_host and select_model).
+    my $cls_total_ms = (Time::HiRes::time() - $t_cls_start) * 1000;
+    if ($c && ref $c) {
+        $self->logging->log_with_details($c,
+            ($cls_total_ms >= 3000 ? 'warn' : 'info'), __FILE__, __LINE__,
+            'ai2_classify_timing',
+            sprintf('total=%.0fms agent=%s phase=%s llm_classify=%s stages=[%s]',
+                $cls_total_ms, $agent, $phase, $used_llm_classify ? 1 : 0,
+                join(' ', @cls_stages)));
+>>>>>>> main
     }
 
     return {
@@ -483,6 +554,22 @@ sub capable_chain_pick {
 sub select_model {
     my ($self, $c, %ctx) = @_;
 
+    # Every hop must carry the request's agent+phase (todo #2564). Helpers that
+    # re-select — Router::dispatch_chat, GitFix, focus-tune — used to arrive with
+    # neither, so the pick logged agent=(none) and the coding guard was lost.
+    # The controller stashes the request context once; inherit it here.
+    if ($c && ref $c && $c->can('stash')) {
+        my $req_ctx = eval { $c->stash->{ai2_agent_ctx} } || {};
+        if (ref $req_ctx eq 'HASH') {
+            if ((!defined $ctx{agent_id} || $ctx{agent_id} eq '') && $req_ctx->{agent_id}) {
+                $ctx{agent_id} = $req_ctx->{agent_id};
+            }
+            if ((!defined $ctx{phase} || $ctx{phase} eq '') && $req_ctx->{phase}) {
+                $ctx{phase} = $req_ctx->{phase};
+            }
+        }
+    }
+
     my $requested   = $ctx{requested_model};
     my $installed   = $ctx{installed_models} // [];
     my $default     = $ctx{default_model};
@@ -517,9 +604,14 @@ sub select_model {
         require Comserv::Model::AI2::ModelPick;
         $auto_pin = Comserv::Model::AI2::ModelPick->is_auto_pin($requested);
     }
+<<<<<<< HEAD
     # ONE definition of "editor agent" (ChatIntent::is_editor_agent). Router had
     # its own copy of this regex and the two drifted (skill: keep one definition).
     my $is_editor_agent = Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id) ? 1 : 0;
+=======
+    require Comserv::Model::AI2::ModelPick;
+    my $is_editor_agent = Comserv::Model::AI2::ModelPick->is_editor_agent($agent_id);
+>>>>>>> main
     my $is_cheap_default = ($requested // '') =~ /cohere\/north-mini|gemma-4-31b-it:free|nemotron-3\.5-lightning:free|north-mini-code:free/i;
     my $editor_read_phase = ($is_editor_agent && lc($phase // '') =~ /^(analyze|plan|clarify)$/) ? 1 : 0;
     my $ignore_cheap = ($auto_pin && !$ctx{user_picked})
@@ -549,6 +641,26 @@ sub select_model {
         return ($prov, $model);
     }
 
+    # Hermes coding chain FIRST (todo #2564). A code-editing request takes the
+    # first chain hop that is live and guard-allowed — particle-1 when SuperGrok
+    # is locked — instead of a fixed free phase pin or a small local model.
+    # Falls through to the phase pins below only if no chain hop is live.
+    if ($is_editor_agent && !$ctx{user_picked}) {
+        my $cp = eval {
+            Comserv::Model::AI2::ModelPick->new
+                ->coding_pick($c, %ctx, agent_id => $agent_id, phase => $phase);
+        };
+        if (!$@ && $cp && $cp->{ok} && $cp->{provider} && $cp->{model}) {
+            $cl->{selected} = "$cp->{provider}/$cp->{model}";
+            $cl->{fallback_reason} = $cp->{notice} if $cp->{notice};
+            eval { $c->stash->{ai2_model_notice} = $cp->{notice} } if $cp->{notice};
+            return ($cp->{provider}, $cp->{model});
+        }
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'select_model',
+            'coding chain yielded nothing: agent=' . $agent_id . ' phase=' . $phase
+            . ($@ ? " died=$@" : ''));
+    }
+
     # 2026-10-15 editor chain before ModelPick, so a phase pin is not
     # replaced by a live-list pick.
     # 2026-11-16 (Shanta: "the first obvious problem route is using north instead
@@ -574,9 +686,8 @@ sub select_model {
     }
 
     if ($sg_ok && !$is_editor_agent) {
-        my $sg_model = (($cl->{domain} // '') =~ /code|programming/) ? 'grok-build-0.1' : 'grok-4.7';
-        $cl->{selected} = "supergrok/$sg_model";
-        return ('supergrok', $sg_model);
+        $cl->{selected} = 'supergrok/grok-4.7';
+        return ('supergrok', 'grok-4.7');
     }
     # Encyclopedia is not a coding job. When SuperGrok allowance is gone, start
     # at the Hermes chain (particle-1, then luna inside the OpenRouter caps,
@@ -614,6 +725,13 @@ sub select_model {
             "ModelPick failed: $@");
     }
     elsif ($pick && $pick->{ok} && $pick->{provider} && $pick->{model}) {
+        # A weak last-resort pick (all chain entries unavailable) must be told,
+        # not silent — Chat.pm renders fallback_reason as a user-visible note.
+        if ($pick->{notice}) {
+            $cl->{fallback_reason} = $pick->{notice};
+            eval { $c->stash->{ai2_model_notice} = $pick->{notice} };
+        }
+        $cl->{selected} = "$pick->{provider}/$pick->{model}";
         return ($pick->{provider}, $pick->{model});
     }
 
@@ -623,9 +741,10 @@ sub select_model {
     my $sg_key_available = $self->_external_default_available($c, 'supergrok|grok-4.7');
     if (!$guard->{locked} && $sg_key_available) {
         if ($cl->{use_supergrok} || $is_editor_agent || $cl->{complexity} eq 'high' || $agent_id =~ /programming|code/) {
-            # Prefer grok-build-0.1 for editor/build work when SuperGrok allotment available.
-            my $sg_model = ($cl->{domain} =~ /code|programming/ || $agent_id =~ /programming|code|analyze/) ? 'grok-build-0.1' : 'grok-4.7';
-            return ('supergrok', $sg_model);
+            # SuperGrok head is the allotment model from the Hermes chain
+            # (xai-oauth grok-4.7). Never grok-build / glm / Relace (todo #2564).
+            $cl->{selected} = 'supergrok/grok-4.7';
+            return ('supergrok', 'grok-4.7');
         }
     }
 
@@ -1623,13 +1742,21 @@ sub dispatch_chat {
     my ($self, $c, $requested_model, $messages, %opts) = @_;
 
     my $can_select = delete $opts{can_select} // 1;
+    # Agent/phase are routing inputs, not provider options: forward them into the
+    # selection and keep them out of chat_with_fallback (todo #2564).
+    my $sel_agent  = delete $opts{agent_id};
+    my $sel_phase  = delete $opts{phase};
+    my $sel_nollm  = delete $opts{no_llm_classify};
     # log_usage => 'purpose': write the success row to the one ledger
     # (Model::AI::Usage::log -> /ai/usage, tagged branch/sitename/username) for
     # callers that do not log themselves (git commit message, GitFix, TodoRank,
     # CoA generate). Failures are already ledgered by chat_with_fallback.
     my $log_purpose = delete $opts{log_usage};
     my ($provider_name, $use_model) = $self->select_model($c,
-        requested_model => $requested_model, can_select => $can_select);
+        requested_model => $requested_model, can_select => $can_select,
+        (defined $sel_agent ? (agent_id => $sel_agent) : ()),
+        (defined $sel_phase ? (phase    => $sel_phase) : ()),
+        (defined $sel_nollm ? (no_llm_classify => $sel_nollm) : ()));
 
     # Remaining opts (purpose, failover => 0, request_type, ...) go to the
     # failover walk (AISYSTEM plan §5e).

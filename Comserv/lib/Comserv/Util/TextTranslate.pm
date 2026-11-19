@@ -71,6 +71,26 @@ sub lang_name {
     return $LANG_NAME{$lang} || $lang;
 }
 
+# Is this a language code we can actually translate into? Used to reject an
+# unknown ui.language preference instead of storing a code that renders nothing.
+sub is_supported {
+    my ($class, $lang) = @_;
+    return 0 unless defined $lang && $lang =~ /\S/;
+    return exists $LANG_NAME{$lang} ? 1 : 0;
+}
+
+# Supported codes with their display names as an ARRAY REF (English first, then
+# alphabetical). Callers build a picker from this; nothing else should hardcode
+# the list. Returns a ref, not a list, so scalar context is not a surprise count.
+sub languages {
+    my ($class) = @_;
+    my @codes = sort {
+        ($a eq 'en' ? 0 : 1) <=> ($b eq 'en' ? 0 : 1)
+            || $LANG_NAME{$a} cmp $LANG_NAME{$b}
+    } keys %LANG_NAME;
+    return [ map { { code => $_, name => $LANG_NAME{$_} } } @codes ];
+}
+
 sub _inventory_conf {
     my ($class, $c) = @_;
     my $inv = eval { $c && $c->config && $c->config->{Inventory} };

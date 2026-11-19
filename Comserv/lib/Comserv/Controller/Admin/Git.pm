@@ -233,6 +233,24 @@ sub _validate_paths {
     }
 
     my $repo = $tinfo->{repo};
+
+    # Porcelain paths are REPO-ROOT-relative, but the editor/dashboard collectors
+    # emit APP-dir-relative paths when the app sits one level below the toplevel
+    # (this worktree: repo .../aisystem/Comserv, app .../aisystem/Comserv/Comserv).
+    # `data/ai_trials/x.json` was therefore rejected while `Comserv/data/ai_trials/
+    # x.json` was present in the change set. Build the alias once and retry the
+    # candidate with it; the alias can only PREPEND, so the traversal/absolute
+    # guards above still hold.
+    my $alias_prefix = '';
+    if (!$is_remote && $repo) {
+        require Cwd;
+        my $root = Cwd::abs_path($repo) // $repo;
+        my $app  = eval { Cwd::abs_path($c->path_to('')->stringify) } // '';
+        if (length $app && length $root && $app ne $root && index($app, "$root/") == 0) {
+            $alias_prefix = substr($app, length($root) + 1) . '/';
+        }
+    }
+
     my (@valid, @invalid, %untracked);
 
     for my $p (@{ $paths || [] }) {
@@ -240,6 +258,15 @@ sub _validate_paths {
 
         if ($p =~ m{(?:^|/)\.\.(?:/|$)} || $p =~ m{^/}) {
             push @invalid, $p; next;   # traversal or absolute
+        }
+        if (!exists $known{$p} && length $alias_prefix
+            && index($p, $alias_prefix) != 0) {
+            my $aliased = $alias_prefix . $p;
+            if (exists $known{$aliased}) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_validate_paths',
+                    "resolved app-relative path '$p' to repo-relative '$aliased'");
+                $p = $aliased;   # canonical form, also what git gets below
+            }
         }
         unless (exists $known{$p}) {
             push @invalid, $p; next;   # not in the working-tree change set
@@ -264,7 +291,8 @@ sub _validate_paths {
             "Rejected git paths (not in working-tree change set or unsafe): " . join(', ', @invalid));
     }
 
-    return { valid => \@valid, invalid => \@invalid, untracked => \%untracked };
+    return { valid => \@valid, invalid => \@invalid, untracked => \%untracked,
+             alias_prefix => $alias_prefix };
 }
 
 =head2 dashboard_action
@@ -320,7 +348,11 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         $validated = $self->_validate_paths($c, \@paths);
         if (@{ $validated->{invalid} }) {
             $c->flash->{error_msg} =
-                "Rejected unsafe or unknown path(s): " . join(', ', @{ $validated->{invalid} }) . " (must exactly match git status --porcelain on the bound target. Refresh view or select only current dirty paths for this target. Runtime data should be gitignored.)";
+                "Rejected unsafe or unknown path(s): " . join(', ', @{ $validated->{invalid} })
+                . " (must exactly match git status --porcelain on the bound target"
+                . (($validated->{alias_prefix} // '') ne ''
+                    ? ", either app-relative or prefixed with '$validated->{alias_prefix}'" : '')
+                . ". Refresh view or select only current dirty paths for this target. Runtime data should be gitignored.)";
             $c->response->redirect($self->_git_back($c));
             return;
         }

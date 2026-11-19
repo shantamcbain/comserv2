@@ -477,6 +477,26 @@
                         statusEl.textContent = msg;
                         statusEl.style.color = isError ? '#f66' : '#888';
                     }
+                    // A file-load problem must also be visible in the chat panel —
+                    // the status line is small and easy to miss (todo #2739: the
+                    // popup opened with ?file= but the panel stayed empty and
+                    // nothing said why).
+                    if (isError) {
+                        var box = document.getElementById('chat-messages');
+                        if (box) {
+                            var d = document.createElement('div');
+                            d.style.marginBottom = '8px';
+                            var strong = document.createElement('strong');
+                            strong.textContent = 'AI: ';
+                            d.appendChild(strong);
+                            var span = document.createElement('span');
+                            span.style.color = '#f66';
+                            span.textContent = msg;
+                            d.appendChild(span);
+                            box.appendChild(d);
+                            box.scrollTop = box.scrollHeight;
+                        }
+                    }
                 }
 
                 function updateDirtyState() {
@@ -487,31 +507,40 @@
                     setStatus('Unsaved changes');
                 }
 
+                var _loadTries = 0;
                 function tryLoad() {
                     if (window.AI2EditorCore && typeof AI2EditorCore.loadFileContent === 'function') {
                         AI2EditorCore.loadFileContent(filePath).then(function(data) {
-                            if (data && data.content !== undefined) {
-                                if (window.ace && ace.edit) {
-                                    editor = ace.edit('ace-editor');
-                                    editor.setValue(data.content, -1);
-                                    editor.clearSelection();
-                                    editor.session.on('change', function() {
-                                        if (!hasChanges) updateDirtyState();
-                                    });
-                                } else {
-                                    var el = document.getElementById('ace-editor');
-                                    if (el) el.textContent = data.content;
-                                }
-                                if (tabLabel) tabLabel.textContent = fileName;
-                                setStatus('Loaded');
-                                // Make Save available now that a file is loaded
-                                // (it also appears on edit via updateDirtyState).
-                                if (saveBtn) saveBtn.style.display = 'inline-block';
+                            if (!data || data.content === undefined || data.content === null) {
+                                setStatus('Load failed: no content returned for ' + filePath, true);
+                                return;
                             }
+                            if (window.ace && ace.edit) {
+                                editor = ace.edit('ace-editor');
+                                editor.setValue(data.content, -1);
+                                editor.clearSelection();
+                                editor.session.on('change', function() {
+                                    if (!hasChanges) updateDirtyState();
+                                });
+                            } else {
+                                var el = document.getElementById('ace-editor');
+                                if (el) el.textContent = data.content;
+                            }
+                            if (tabLabel) tabLabel.textContent = fileName;
+                            setStatus(String(data.content).length ? 'Loaded' : 'Loaded (file is empty)');
+                            // Make Save available now that a file is loaded
+                            // (it also appears on edit via updateDirtyState).
+                            if (saveBtn) saveBtn.style.display = 'inline-block';
                         }).catch(function(err) {
                             console.error('[AI2] Failed to load file:', err);
-                            setStatus('Error loading: ' + filePath, true);
+                            setStatus('Error loading ' + filePath + ': ' +
+                                (err && err.message ? err.message : err), true);
                         });
+                    } else if (++_loadTries > 20) {
+                        // ~6s of waiting: the editor module never arrived, so the
+                        // panel would stay blank forever with no explanation.
+                        setStatus('Editor module (ai2editor/core.js) did not load — cannot open ' +
+                            filePath + '. Hard-refresh the popup (Ctrl+F5).', true);
                     } else {
                         setTimeout(tryLoad, 300);
                     }

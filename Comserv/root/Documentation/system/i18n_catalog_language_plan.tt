@@ -1,0 +1,579 @@
+[% META
+   title = "Catalog Translation & User Language Plan"
+   description = "One stored catalog language, per-user display translation: preference, shared translation service, inventory display layer, invoice photo and AI chat, preference UI, admin cache management, tests and rollback"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "system"
+   page_version = "0.01"
+   last_updated = "2026-11-17"
+   site_specific = "false"
+   project_id = "313"
+   project_code = "I18N-CATALOG"
+%]
+[% PageVersion = 'Documentation/system/i18n_catalog_language_plan.tt,v 0.01 2026/11/17 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[%#
+  STYLING RULE — no inline styling attributes, no hardcoded colours. Theme-compliant
+  utility classes only (defined in static/css/components/documentation.css) plus
+  the layout .row/.col-100/.col-50 grid.
+%]
+[%#
+  Checkout checklist — every branch needs this .tt and the Util modules it cites:
+    1. lib/Comserv/Util/TextTranslate.pm exists (also present, applied but
+       uncommitted, on the aisystem worktree since 2026-11-17).
+    2. comserv.conf carries <Inventory> with catalog_language / translate_enabled
+       / translate_model.
+    3. local ollama is reachable and the configured translate_model is pulled.
+  Gemma-family models are thinking models: TextTranslate sends think => false. A
+  call without it burns num_predict on the reasoning trace and returns an EMPTY
+  response, which silently falls back to the original untranslated text.
+%]
+
+<div class="container">
+
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'Catalog Translation & User Language Plan'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <p class="doc-muted">Jump to section:</p>
+            <div class="doc-navrow">
+                <a href="#overview" class="doc-navlink">1. Overview</a>
+                <a href="#one-rule" class="doc-navlink">2. The One Rule</a>
+                <a href="#current-state" class="doc-navlink">3. What Already Exists</a>
+                <a href="#architecture" class="doc-navlink">4. Architecture</a>
+                <a href="#phases" class="doc-navlink">5. Phases &amp; Work Orders</a>
+                <a href="#config-ref" class="doc-navlink">6. Configuration</a>
+                <a href="#rollback" class="doc-navlink">7. Rollback</a>
+                <a href="#acceptance" class="doc-navlink">8. Acceptance</a>
+                <a href="#decisions" class="doc-navlink">9. Open Decisions</a>
+                <a href="#handoffs" class="doc-navlink">10. Hand-offs</a>
+                <a href="#see-also" class="doc-navlink">See Also</a>
+                <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" class="doc-h2">1. Overview</h2>
+            <p class="doc-body">The catalog (inventory items, ingredients, descriptions) is stored in exactly one language and every user currently sees that one language. A French-speaking member of an English catalog reads English item names, English ingredient lists and English confirmations in Chat with AI, even though the shop is perfectly capable of translating the strings on demand.</p>
+            <p class="doc-body">This plan adds a <strong>stored per-user language preference</strong> and a <strong>display-time translation layer</strong> that renders the stored catalog text in that user's language. The first half of the machinery already exists and is live: capture-time translation into the catalog language (<code>Comserv::Util::TextTranslate</code>, used by <code>Util::ProductLookup</code> and <code>Util::InventoryBarcode</code>). This plan generalises the same service to the reverse direction — one stored language, many display languages — plus a shared cache, an admin surface, tests and a documented rollback.</p>
+            <div class="doc-info">
+                <p class="doc-body"><strong>Scope boundary.</strong> This work lives on the <strong>aisystem</strong> worktree. Schema DDL for the two new cache tables is a hand-off to the <strong>schema</strong> branch (see <a href="#handoffs" class="doc-link">Hand-offs</a>); Result classes and every piece of application code belong here.</p>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="one-rule" class="doc-h2">2. The One Rule</h2>
+            <p class="doc-body">The catalog language never changes per user. There is ONE stored language, and many display languages.</p>
+            <p class="doc-body">Anything that would store a second language per row is wrong: it forks the inventory and breaks barcode matching — the exact bug that started this work. Concretely:</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Rule</th>
+                    <th class="doc-th">Meaning</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Never translate the matching key</td>
+                    <td class="doc-td">Barcode, SKU and product-name matching always run against the stored catalog language. Only what a human reads is translated.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Never store a second language per row</td>
+                    <td class="doc-td">No per-user copies of item rows, no <code>name_fr</code> columns on inventory items. Translations live in a shared cache keyed by (source_lang, target_lang, text_hash).</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Never block a page or a scan on a model call</td>
+                    <td class="doc-td">A cache hit is the fast path. A miss renders the stored text immediately and the translation fills in lazily on the next view (or a background job).</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Always fall back to the stored text</td>
+                    <td class="doc-td">A missing or failed translation must never blank a field or 500 a page.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">translate_enabled 0 is the rollback</td>
+                    <td class="doc-td">Switching it off returns the whole app to plain catalog-language display with no errors and no half-translated pages.</td>
+                </tr>
+            </table>
+
+            <div class="doc-info">
+                <h3>Translations are reviewed, not trusted</h3>
+                <p class="doc-body">A language model can return a fluent, plausible and wrong string, and nothing in the app can tell by looking at it. So a translated string is treated as a claim, not a fact. Two layers enforce that:</p>
+                <table class="doc-table">
+                    <tr>
+                        <th class="doc-th">Layer</th>
+                        <th class="doc-th">Checks</th>
+                        <th class="doc-th">Catches</th>
+                    </tr>
+                    <tr>
+                        <td class="doc-td">Write-time guards (Phase 1)</td>
+                        <td class="doc-td">Glossary conformance, token and unit preservation, echo / unchanged reply, script sanity, length-ratio bound</td>
+                        <td class="doc-td">Garbage that would otherwise be cached permanently: dropped numbers and units, a prompt echo, English returned for a French target, an ingredient term that contradicts the glossary.</td>
+                    </tr>
+                    <tr class="doc-tr-alt">
+                        <td class="doc-td">Human review (Phase 5)</td>
+                        <td class="doc-td">Report affordance on translated fields, review queue sorted by <code>hit_count</code>, approve / reject, purge-on-reject</td>
+                        <td class="doc-td">The class no machine check reaches: a translation that reads wrong to a native speaker. Review is aimed at the strings people actually see, not the whole cache.</td>
+                    </tr>
+                </table>
+                <p class="doc-body"><strong>A guard failure is not an error page.</strong> The candidate is logged with <code>log_with_details</code>, is <em>not</em> cached, and the stored catalog text is returned — the same fallback rule as a model timeout. Bad output must never become permanent, and it must never blank a field.</p>
+                <p class="doc-body"><strong>English stays free.</strong> The catalog language is <code>en</code>, and a session with no <code>ui.language</code> (or <code>translate_enabled 0</code>) reads the stored text with no model call and no guard. Only a user who has explicitly chosen another language is served a translation at all.</p>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="current-state" class="doc-h2">3. What Already Exists</h2>
+            <p class="doc-body">Do not re-invent these. They were built for catalog capture and are the foundation this plan extends.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Component</th>
+                    <th class="doc-th">What it already does</th>
+                    <th class="doc-th">What this plan adds</th>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>Util/TextTranslate.pm</code></td>
+                    <td class="doc-td"><code>to_language($c,$text,lang=&gt;'fr')</code>, <code>to_english</code>, <code>catalog_language</code>, <code>normalize_lang</code> (<code>fr-CA</code> to <code>fr</code>), <code>in_language</code> / <code>looks_english</code>, md5 disk cache in <code>var/translate_cache</code>, original text returned on any failure, local ollama with <code>think =&gt; false</code>.</td>
+                    <td class="doc-td">DB-backed shared cache, batch helper, glossary, concurrency guard (Phase 1).</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code>Util/ProductLookup.pm</code></td>
+                    <td class="doc-td"><code>_catalog_text</code> resolves a field in the catalog language (source's own <code>*_&lt;lang&gt;</code> field, then the product's own language, then translation); asks Open Food Facts for <code>product_name_&lt;lang&gt;</code> when the catalog is not English; the in-process cache key includes the catalog language.</td>
+                    <td class="doc-td">Nothing — reused as the capture-side reference implementation.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>Util/InventoryBarcode.pm</code></td>
+                    <td class="doc-td">The item form translates captured rows into the catalog language so the app form and the DB agree.</td>
+                    <td class="doc-td">Untouched: capture stays catalog-language only.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code>comserv.conf</code> <code>&lt;Inventory&gt;</code></td>
+                    <td class="doc-td"><code>catalog_language en</code>, <code>translate_enabled 1</code>, <code>translate_model gemma4-64k:latest</code>.</td>
+                    <td class="doc-td">Read as-is by the display layer; no new mandatory keys.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>user_preferences</code> + <code>Util::UserPreferences</code></td>
+                    <td class="doc-td">Per-user key/value store with a whitelist (<code>%ALLOWED_KEYS</code>), typed validation, a stash cache, and a JSON endpoint <code>/user/prefs</code> (GET/POST) in <code>Controller/User.pm</code>. Precedent: <code>ui.theme_override</code>, <code>ui.timezone</code>.</td>
+                    <td class="doc-td">A <code>ui.language</code> key and a <code>Comserv::Util::UserLanguage</code> resolver (Phase 0). <strong>No schema change needed.</strong></td>
+                </tr>
+            </table>
+            <div class="doc-success">
+                <h3>Result of step one (2026-11-17) &mdash; preference surface settled</h3>
+                <p class="doc-body"><strong>Decision.</strong> The per-user language is the existing <code>user_preferences</code> key <code>ui.language</code>. No schema change is needed: the table, the whitelist in <code>Util/UserPreferences.pm</code>, the typed validation and the <code>/user/prefs</code> JSON endpoint (GET/POST) already exist and are in production use for <code>ui.theme_override</code> and <code>ui.timezone</code>.</p>
+                <p class="doc-body"><strong>Added.</strong> <code>ui.language</code> in <code>%ALLOWED_KEYS</code> with a shape check first (<code>xx</code>, <code>french</code>, <code>fr2</code> are rejected instead of being silently normalised to <code>en</code>), <code>fr-CA</code> stored as <code>fr</code>, an empty value deleting the row, and the new resolver <code>Comserv::Util::UserLanguage</code> (<code>current</code>, <code>preference</code>, <code>catalog_language</code>, <code>translation_active</code>, <code>supported_languages</code>) which memoises the language in the stash so a page costs one preference read. <code>Util::TextTranslate</code> gained <code>is_supported</code> and <code>languages</code>.</p>
+                <p class="doc-body"><strong>Evidence (live Ency DB, user #178).</strong> <code>table_available</code> = yes; set <code>fr-CA</code> &rarr; <code>ok=1</code> and the row holds <code>fr</code>; <code>UserLanguage-&gt;current</code> &rarr; <code>fr</code> with catalog <code>en</code> and <code>translation_active=1</code>; a fresh request reads <code>fr</code> from the DB (not a stash memo); <code>xx</code> &rarr; <code>ok=0</code>, &quot;Invalid value for ui.language&quot;, row unchanged; <code>''</code> &rarr; row deleted and <code>current</code> falls back to <code>en</code>; a session with no user id resolves <code>en</code>. <code>prove -l t/i18n_user_language.t</code> = 31 tests, all pass, with no model call and no DB.</p>
+            </div>
+
+            <div class="doc-warning">
+                <h3>The gemma trap</h3>
+                <p class="doc-body">Gemma-family models are thinking models. Without <code>think =&gt; false</code> the model spends the whole <code>num_predict</code> budget on its reasoning trace and returns an <strong>empty</strong> <code>response</code>, which silently falls back to the original language — the bug looks like "translation does not work" when it is really "model answered nothing". Every new call path in this plan must send <code>think =&gt; false</code>.</p>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="architecture" class="doc-h2">4. Architecture</h2>
+            <p class="doc-body">Three layers, in one direction only:</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Layer</th>
+                    <th class="doc-th">Owns</th>
+                    <th class="doc-th">Must never</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Storage / matching</td>
+                    <td class="doc-td">The stored catalog row, the barcode/SKU key, all lookups and de-duplication.</td>
+                    <td class="doc-td">Never see a translated string.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Translation service</td>
+                    <td class="doc-td"><code>Util::TextTranslate</code> (plus the DB cache in Phase 1). Deterministic per (source_lang, target_lang, text_hash); cache hit is instant.</td>
+                    <td class="doc-td">Never invent text; returns the source string on any failure.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Display</td>
+                    <td class="doc-td">A single resolver (<code>Util::DisplayText</code>) that turns a stored string plus the current user's language into what the page renders.</td>
+                    <td class="doc-td">Never write back to the DB, never block a render on a cold model call.</td>
+                </tr>
+            </table>
+            <p class="doc-body"><strong>Resolution order for any displayed catalog string:</strong> user language equals the catalog language, or the string already looks like the target, or <code>translate_enabled</code> is 0 — return the stored text unchanged. Otherwise: file cache hit, then DB cache hit, then (cold) return the stored text now and translate for the next view.</p>
+            <p class="doc-body"><strong>Where the user language comes from:</strong> <code>Comserv::Util::UserLanguage-&gt;current($c)</code> — the logged-in user's <code>ui.language</code> preference, falling back to the catalog language for anonymous sessions and when the preference is unset. It is memoised in the stash so a page costs at most one preference read.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="phases" class="doc-h2">5. Phases &amp; Work Orders</h2>
+            <p class="doc-body">One todo per phase, registered in Project <a href="/project/details?project_id=313" class="doc-link">#313 I18N-CATALOG</a>. Each todo opens with a structured work order (<code>CODER_READY / plan_rev</code>, ROOT CAUSE, DO, DO NOT, ACCEPT) so a cheap Coder can execute it without re-planning. Phases run in order; each one ends in a gate that is observable, not "looks done".</p>
+            <div class="doc-info">
+                <p class="doc-body"><strong>Naming.</strong> "Phase" here always means a step of <em>this</em> plan (I18N-CATALOG). The project is #313; the parent is #114 AI Chat System Enhancement.</p>
+            </div>
+
+<h2 id="p0" class="doc-h2">Phase 0 — Preference and settings audit</h2>
+CODER_READY / plan_rev: 2026-11-17
+ROOT CAUSE: There is no stored per-user language, so display-time translation has no target language and every session renders the catalog as stored. The storage already exists but is unused for this: user_preferences (Result/UserPreference.pm, Util/UserPreferences.pm with %ALLOWED_KEYS and typed validation, the /user/prefs GET+POST JSON endpoint in Controller/User.pm, and the pattern set by ui.theme_override / ui.timezone).
+DO: Verify user_preferences exists and is usable in the live Ency DB, and that Result/UserPreference.pm matches it. Add 'ui.language' => 'string' to %ALLOWED_KEYS in lib/Comserv/Util/UserPreferences.pm, validating through Comserv::Util::TextTranslate->normalize_lang against the supported list in %LANG_NAME, and deleting the row when the value is empty (same rule as ui.theme_override). Add lib/Comserv/Util/UserLanguage.pm with current($c) = logged-in user's ui.language, else catalog language, memoised in $c->stash->{_user_language}, and supported_languages() for the picker. Record the decision (preference key, not a users column) in section 3 of this doc.
+DO NOT: Do not add a users.language column or any schema change — user_preferences already covers it. Do not add a picker here (that is Phase 4). Do not touch <Inventory>/catalog_language. Do not log the raw preference value as a password-style field.
+ACCEPT: POST /user/prefs {"prefs":{"ui.language":"fr"}} returns ok:1 and a user_preferences row exists; GET /user/prefs returns it; an unsupported value (for example "xx") returns ok:0 with a 400 and writes no row; UserLanguage->current returns fr for that user and the catalog language for a session with no preference.
+
+<h2 id="p1" class="doc-h2">Phase 1 — Translation service: shared cache, batch, glossary, concurrency</h2>
+CODER_READY / plan_rev: 2026-11-17
+ROOT CAUSE: TextTranslate caches per (language, text) in var/translate_cache on the local disk of whichever process did the work. That cache is invisible to other processes, hosts and worktrees, so the same string is paid for again everywhere, and there is no way to read coverage, purge after a catalog edit, or share vocabulary. Display-time translation multiplies the (target_lang, text) pairs, so a shared cache is mandatory.
+DO: Get the DDL for translation_cache (text_hash CHAR(32), source_lang, target_lang, translated_text MEDIUMTEXT, model, hit_count, created_at, unique on (source_lang,target_lang,text_hash)) and translation_glossary (source_lang, target_lang, term, translation, unique on the three keys) through the schema branch, then add Result/TranslationCache.pm and Result/TranslationGlossary.pm here. Extend Util/TextTranslate: lookup order file cache then DB, write both; batch_to_language($c, \@texts, lang => ...) resolving all hits in one query and translating only the misses; a glossary object injected into the prompt so 'crème' is always 'cream'; and a per-key lock (SELECT FOR UPDATE INS or a lock file) so two processes never translate the same new string at once. Keep think => false and the local ollama endpoint on every call path. Add Comserv::Util::TranslationGuard with five write-time checks — glossary conformance (every source term that has a glossary row must appear with its pinned translation), token and unit preservation (numbers, %, E-numbers and units such as g / ml / kg survive unchanged), echo and unchanged detection (the reply repeats the prompt, or comes back identical in the target language), script sanity (a French/German/etc. target must not return plain English, and no mojibake), and a length-ratio bound against the source. Wire it between the model call and the cache write: a candidate that fails ANY guard is logged with log_with_details, is NOT cached, and the stored text is returned to the caller. Every cache row records quality='new' on insert so Phase 5 can review it.
+DO NOT: Do not call the model when a cache row exists. Do not translate the matching key. Do not add a paid API. Do not write per-user translation rows — the cache is per language pair and shared. Do not hand-write DDL or prod rows. Do not cache a candidate that failed a guard, and do not treat a guard failure as success — the failure path must return the stored text, never an empty string and never the model's excuse.
+ACCEPT: A cold string is translated once and a second process serves it from the DB with hit_count incremented; a five-string batch issues model calls only for the misses; a glossary row forces the term; two concurrent requests for the same new string produce exactly one model call and one row; with translate_enabled 0 every helper returns its input unchanged and touches neither DB nor model. a stubbed model reply that drops a unit, echoes the prompt, comes back unchanged or violates a glossary term is rejected by the guard, leaves no cache row, and the caller receives the stored text; every cached row starts at quality='new'.
+
+<h2 id="p2" class="doc-h2">Phase 2 — Display layer in inventory</h2>
+CODER_READY / plan_rev: 2026-11-17
+ROOT CAUSE: Inventory controllers and templates render stored columns directly ($item->name, ingredients, description), so a French user sees English and there is no single place to change that. Nothing sits between the row and the page.
+DO: Add lib/Comserv/Util/DisplayText.pm with for_user($c,$text) and for_user_many($c,\@texts) using UserLanguage->current and the resolution order in section 4 (same language or disabled = stored text; cache hit = translation; cold = stored text now plus a queued lazy translation for the next view). Apply it to the display fields only (name, description, ingredients) in the item detail and item list actions and in the barcode scan form — Controller/Inventory.pm and the Inventory/*.pm controllers that own those actions, plus the matching root/Inventory/*.tt field reads. Log every fallback with log_with_details.
+DO NOT: Do not translate anything before matching — the scan form looks the barcode up with the raw stored key and the item is found by id/SKU as today. Do not block a render on a model call. Do not translate inside a DBIC Result class. Do not touch stored rows.
+ACCEPT: With ui.language=fr the item page for an English item shows French name and ingredients while SELECT on the row still returns English; the first view returns in normal page time with no model stall and the second view is served from cache; a session with no preference, and a run with translate_enabled 0, render byte-identical stored English.
+
+<h2 id="p3" class="doc-h2">Phase 3 — Invoice photo and Chat with AI</h2>
+CODER_READY / plan_rev: 2026-11-17
+ROOT CAUSE: The invoice-photo reader and the AI2 chat replies assemble their human-readable text server-side from stored catalog names, so a French user gets English line labels and English confirmations. Any attempt to fix this by translating before matching would stop invoice lines matching inventory items.
+DO: In the invoice-photo path, translate only the strings returned for display (line labels, suggestions, messages) and keep the matching pass, the candidate search and the stored line key on the catalog text. In the AI2 chat path, translate the catalog-derived fragments of the reply — item names, ingredient lists, confirmation sentences — either in the prompt context (translate once, cached) or on the rendered answer with DisplayText, and keep tool-call arguments, SKUs and todo/record payloads untranslated. Log matched key plus display string with log_with_details.
+DO NOT: Do not translate the match key, the SKU, a barcode, or anything passed into an item search. Do not feed a translated name back into matching or into a stored row. Do not change the AI2 permission model or the prompt-selection logic in this phase.
+ACCEPT: A French user's invoice-photo upload returns French line labels while every matched line points at the same item id the English user's upload produces; Chat with AI answers an item question in French while the SKU and any created record carry the stored English values; an English user's response is unchanged from today.
+
+<h2 id="p4" class="doc-h2">Phase 4 — User preference UI</h2>
+CODER_READY / plan_rev: 2026-11-17
+ROOT CAUSE: Even with storage and a resolver, the feature is unreachable: root/user/settings.tt has no language control and Controller/User.pm settings/update_settings does not carry one.
+DO: Add a language select to root/user/settings.tt whose options come from UserLanguage->supported_languages and whose current value comes from UserPreferences, saved through the existing /user/prefs endpoint with the established modular-JS pattern (data-* attribute plus delegated handler in a module loaded by js_load.tt). Wire Controller/User.pm settings and update_settings to read and save ui.language in the same pass as the other account fields. Add one compact affordance on the item page (a translate toggle or a "showing French" note) only where it genuinely helps. Reuse the existing form, card and .doc-* classes and theme variables.
+DO NOT: No inline script, no page-specific CSS, no new bespoke endpoint when /user/prefs already does the job, no hardcoded colours. Do not translate the settings page chrome itself in this phase.
+ACCEPT: A logged-in user picks French in Account Settings, the value survives logout and login (user_preferences row confirmed), and the item page plus scan form then render French; picking the catalog language (empty value) deletes the row and restores stored text; the page works on a second theme without styling damage.
+
+<h2 id="p5" class="doc-h2">Phase 5 — Admin and cache management</h2>
+CODER_READY / plan_rev: 2026-11-17
+ROOT CAUSE: Once the cache is shared it is also opaque. Nobody can read coverage or hit rate, purge a language or one product after its catalog text changed, or correct a bad glossary term — so stale or wrong translations would live forever with no operator remedy.
+DO: Add an admin surface (a thin Controller/Admin/Translation.pm plus root/Admin/translation_cache.tt, roles admin, routed from the admin index) that lists supported languages, shows cache rows and hit/miss totals per language pair, searches by text or hash, purges by language and by product (every cache row whose text_hash matches that item's display fields), and provides glossary CRUD. Reach it from the admin index and link it from this plan. Add the review half of the quality story: a report-this-translation affordance on translated fields (a small link or button that POSTs the text_hash plus the user's note to a translation_flag row, reusing the existing modular-JS data-* pattern), a review queue on the admin page showing source text beside the translation sorted by hit_count so the strings actually on screens are seen first, and approve/reject per row: approve sets quality='ok' with reviewed_at/reviewed_by, reject sets quality='rejected' AND deletes the cache row so the next view re-translates (optionally with a glossary term added from the same screen). Show the share of live translations still at quality='new' — that number is the real quality metric, not the model's opinion of itself.
+DO NOT: No raw SQL in templates. No purge without an explicit confirm. Do not purge an entire language without the operator naming that language in the request. Do not gate the page below admin. Do not let a rejection stay silent — a rejected row must be purged so the bad string cannot be served again; do not delete a flag row on reject (it is the evidence trail), and do not auto-approve anything.
+ACCEPT: The page shows per-language coverage for the existing pairs; purging fr for one product removes only that product's fr rows (row counts before and after) and only that product re-translates on its next view; a glossary edit changes the next translation of that term; a non-admin session gets a 403. reporting a translated field creates a translation_flag row that the admin queue shows; approving sets quality='ok' and the string keeps serving; rejecting sets quality='rejected', removes the cache row and the next view re-translates that string only; the page shows how many live translations are still unreviewed.
+
+<h2 id="p6" class="doc-h2">Phase 6 — Tests, documentation and rollback</h2>
+CODER_READY / plan_rev: 2026-11-17
+ROOT CAUSE: Nothing currently proves the service and the resolver behave under failure (model down, empty response, translation disabled), and translate_enabled 0 must be a guaranteed rollback rather than an assumption.
+DO: Add t/ unit tests — Util::TextTranslate (normalize_lang, catalog_language from config, cache hit avoids the model, failure returns the original text, think=false present in the request body), Util::DisplayText and Util::UserLanguage (same language returns stored text, cache hit returns the translation, cold miss returns stored text and does not block, no preference falls back to the catalog language), and one test asserting translate_enabled 0 produces no model call and unchanged output. Write the changelog fragment root/Documentation/changelog/entries/2026-11-17-i18n-catalog-language.inc and refresh this plan plus the routine re-audit todo.
+DO NOT: Do not edit CHANGELOG.tt (it is a generated reader). Do not write tests that need a live model — stub the HTTP layer. Do not claim acceptance from a green unit test alone when the live path can be exercised.
+ACCEPT: prove -l t/i18n_*.t passes with the model unreachable; setting <Inventory>/translate_enabled 0 and reloading shows plain catalog text everywhere with no error in the log; the changelog fragment exists; this doc's phase table and status row are current.
+
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="config-ref" class="doc-h2">6. Configuration</h2>
+            <p class="doc-body">All translation settings live in the <code>&lt;Inventory&gt;</code> block of <code>comserv.conf</code> so a catalog-language change or a rollback is a config edit, not a code change. Read per call, so a reload picks a change up immediately.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Parameter</th>
+                    <th class="doc-th">Type</th>
+                    <th class="doc-th">Default</th>
+                    <th class="doc-th">Description</th>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>catalog_language</code></td>
+                    <td class="doc-td">string</td>
+                    <td class="doc-td"><code>en</code></td>
+                    <td class="doc-td">The ONE language the catalog is stored in. Also the default display language for a user with no preference.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code>translate_enabled</code></td>
+                    <td class="doc-td">boolean</td>
+                    <td class="doc-td"><code>1</code></td>
+                    <td class="doc-td">Master switch for every translation path. <code>0</code> is the documented rollback: plain catalog display, no model call, no errors.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>translate_model</code></td>
+                    <td class="doc-td">string</td>
+                    <td class="doc-td"><code>gemma4-64k:latest</code></td>
+                    <td class="doc-td">Local ollama model used for translation. Called with <code>think =&gt; false</code> — required for gemma-family thinking models.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code>translate_cache</code></td>
+                    <td class="doc-td">directory</td>
+                    <td class="doc-td"><code>var/translate_cache</code></td>
+                    <td class="doc-td">Per-process disk cache (fast first hop). Phase 1 adds the shared DB cache behind it.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>ui.language</code></td>
+                    <td class="doc-td">preference</td>
+                    <td class="doc-td">unset</td>
+                    <td class="doc-td">Per-user display language in <code>user_preferences</code>. Unset means "use the catalog language". Values are normalised (<code>fr-CA</code> becomes <code>fr</code>).</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="rollback" class="doc-h2">7. Rollback</h2>
+            <p class="doc-body">The rollback is a single configuration change and it is tested in Phase 6:</p>
+            <div class="doc-codebox">
+                <pre><code>
+# comserv.conf
+&lt;Inventory&gt;
+    catalog_language  en
+    translate_enabled 0     # every translation path returns stored text
+    translate_model   gemma4-64k:latest
+&lt;/Inventory&gt;
+                </code></pre>
+            </div>
+            <p class="doc-body">With <code>translate_enabled 0</code>: no model call is made anywhere, no cache row is written or read, every resolver returns the stored string, and pages render exactly as they do today. Nothing is destroyed — the cache tables and user preferences stay in place, so re-enabling is the same edit in reverse. <strong>A user's <code>ui.language</code> preference deliberately survives</strong>, so re-enabling restores their language.</p>
+            <div class="doc-warning">
+                <p class="doc-body"><strong>Never</strong> rollback by reverting stored catalog rows or by deleting cache tables. Stored rows are the catalog; the cache is disposable but its deletion is not a rollback, it just re-pays for translations.</p>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="acceptance" class="doc-h2">8. Acceptance</h2>
+            <p class="doc-body">Each item is observable and is proved by a named phase. No item is accepted on "the diff looks right".</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">#</th>
+                    <th class="doc-th">Acceptance item</th>
+                    <th class="doc-th">Proved by</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td">Project #313 exists with <code>project_code=I18N-CATALOG</code>, parent 114, one todo per phase, each starting with a structured work order.</td>
+                    <td class="doc-td">Project Tracking table below; todos P0-P6 (Phase 0).</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">2</td>
+                    <td class="doc-td">This plan opens with the correct TOC nav and its META carries the real project id/code.</td>
+                    <td class="doc-td">This page renders; META <code>project_id 313</code> / <code>project_code I18N-CATALOG</code>.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">3</td>
+                    <td class="doc-td">A user with preference <code>fr</code> sees French names and ingredients on the item page, the barcode scan form and in Chat with AI, while the DB still holds English.</td>
+                    <td class="doc-td">Phase 2 + Phase 3 + Phase 4.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">4</td>
+                    <td class="doc-td">Scanning the same barcode as an English user still matches the existing English item — no duplicate, no language-mismatch "not found".</td>
+                    <td class="doc-td">Phase 2 (matching key untouched).</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">5</td>
+                    <td class="doc-td">The second view of a translated page is fast (cache hit) and a cold miss does not freeze the page.</td>
+                    <td class="doc-td">Phase 1 + Phase 2.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">6</td>
+                    <td class="doc-td">Changing <code>&lt;Inventory&gt;/catalog_language</code> still works and does not corrupt stored rows.</td>
+                    <td class="doc-td">Phase 1 (cache keyed by source and target) + Phase 6.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">7</td>
+                    <td class="doc-td"><code>translate_enabled 0</code> returns the app to plain catalog-language display.</td>
+                    <td class="doc-td">Phase 6 test plus a live config flip.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">8</td>
+                    <td class="doc-td">Tests for the service and the display resolver pass.</td>
+                    <td class="doc-td"><code>prove -l t/i18n_*.t</code> (Phase 6).</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">9</td>
+                    <td class="doc-td">Added 2026-11-17 with the quality decision (beyond the original work order): a bad translation cannot reach a user silently — write-time guards reject and never cache it, and a human can report and purge one from the admin page.</td>
+                    <td class="doc-td">Phase 1 (guards) + Phase 5 (review queue, purge-on-reject).</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="decisions" class="doc-h2">9. Open Decisions</h2>
+            <p class="doc-body">These do not block Phase 0 or Phase 1. Each resolves in place, with <strong>DECIDED</strong> and the accepted cost recorded in this table.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">#</th>
+                    <th class="doc-th">Decision</th>
+                    <th class="doc-th">Resolution</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">D1</td>
+                    <td class="doc-td">Where the per-user language lives.</td>
+                    <td class="doc-td"><strong>DECIDED 2026-11-17 — <code>user_preferences</code> key <code>ui.language</code>.</strong> Reason: the table, the whitelist, the validation and the <code>/user/prefs</code> endpoint already exist and are used by <code>ui.theme_override</code> / <code>ui.timezone</code>. Accepted cost: the preference is a string key with no DB-level enum, so validation lives in Perl.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">D2</td>
+                    <td class="doc-td">Which model does display translation.</td>
+                    <td class="doc-td">Open. Candidate: a smaller fast local model for display strings (the 64k gemma is slow for short strings) while capture keeps <code>translate_model</code>. Evidence needed: latency and quality on 50 real item names.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">D3</td>
+                    <td class="doc-td">Cold-miss behaviour.</td>
+                    <td class="doc-td">Open. Options: lazy translate on the next view (simplest, no job system) versus a queued background job. Leaning lazy-then-job for lists; a single item view may translate inline behind a short timeout with the stored text as the fallback.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">D4</td>
+                    <td class="doc-td">Chat with AI scope.</td>
+                    <td class="doc-td">Open. Translate only catalog-derived fragments (cheap, predictable) versus the whole answer (reads better, more model cost, and the answer may contain numbers and record ids that must not drift).</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">D5</td>
+                    <td class="doc-td">Stale-translation policy.</td>
+                    <td class="doc-td">Open. Manual purge from the Phase 5 admin page (default) versus invalidating a product's rows automatically when its catalog text changes. Manual is safe but can silently serve a rename; automatic needs a write hook on the item save path.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">D6</td>
+                    <td class="doc-td">Which languages are offered.</td>
+                    <td class="doc-td">Open. <code>%LANG_NAME</code> already lists 26 codes. Leaning: expose a curated subset in the picker (en, fr, es, de, pt, it, nl, zh, ja) and keep the rest accepted if set directly.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">D7</td>
+                    <td class="doc-td">How a wrong translation is caught.</td>
+                    <td class="doc-td"><strong>DECIDED 2026-11-17 — write-time guards plus human review.</strong> Five deterministic guards (glossary, tokens/units, echo, script, length) run before anything is cached, and the Phase 5 page makes review cheap by sorting unreviewed strings by <code>hit_count</code>. Rejected strings are purged and re-translated. Accepted cost: no automated check catches a fluent mistranslation, so quality ultimately depends on someone looking at the top strings — the plan budgets for that rather than pretending the model is reliable.</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="handoffs" class="doc-h2">10. Hand-offs</h2>
+            <p class="doc-body">Work that belongs to another branch or worktree. This plan owns none of these and does not edit their files.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Owner</th>
+                    <th class="doc-th">Work</th>
+                </tr>
+                <tr>
+                    <td class="doc-td"><strong>schema</strong> branch</td>
+                    <td class="doc-td">DDL for <code>translation_cache</code> and <code>translation_glossary</code>, applied through the in-app schema-compare flow. This branch adds only the Result classes. No ad-hoc DDL, no hand-written prod rows. <strong>Passed to the schema branch</strong> as <a href="/todo/details?record_id=2756" class="doc-link">schema todo #2756</a> under <a href="/project/details?project_id=5" class="doc-link">project #5 (Schema management)</a>, P2, due 2026-12-15, with the full column spec and its own ACCEPT — amended 2026-11-17 to carry the quality columns (<code>quality</code>, <code>reviewed_at</code>, <code>reviewed_by</code>, <code>rejected_reason</code>) and the <code>translation_flag</code> table the Phase 5 review queue needs. This branch keeps <a href="/todo/details?record_id=2755" class="doc-link">todo #2755</a> open purely as the dependency marker; it blocks Phase 1, and until the tables exist Phase 1 keeps using the disk cache in <code>var/translate_cache</code> and must not assume a DB cache.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><strong>3d</strong> / <strong>healthkitchen</strong> worktrees</td>
+                    <td class="doc-td">Their own display surfaces (print queue names, recipe/meal text) opt into <code>Util::DisplayText</code> after Phase 2 proves the resolver. Not in scope here.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><strong>comserv-inventory-android</strong></td>
+                    <td class="doc-td">The handheld app must send and display its own <code>ui.language</code>; the server API stays language-agnostic and the app picks display strings. Not in scope here.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><strong>main</strong></td>
+                    <td class="doc-td">This plan asserts nothing about production until a <code>git merge main</code> has been done in this worktree and the schema DDL has landed from the schema branch.</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="doc-success">
+                <h2 class="doc-h3">See Also</h2>
+                <ul class="doc-body">
+                    <li><a href="/Documentation/ai_plan_project_tracking_standard" class="doc-link">AI Plan Project Tracking Standard</a></li>
+                    <li><a href="/Documentation/DocumentationTtTemplate" class="doc-link">Documentation .tt Template</a></li>
+                    <li><a href="/Documentation/PlanningLanguageStandard" class="doc-link">Planning Language Standard</a></li>
+                    <li><a href="/Documentation/AISYSTEMPlan" class="doc-link">AI System Plan</a></li>
+                    <li><a href="/Documentation/MASTER_PLAN" class="doc-link">Master Plan (global coordinator)</a></li>
+                </ul>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" class="doc-h2">Project Tracking</h2>
+            <p class="doc-body">
+                Owning project:
+                <a href="/project/details?project_id=313" class="doc-link">#313 (I18N-CATALOG) Catalog Translation &amp; User Language</a>
+                &mdash; parent: <a href="/project/details?project_id=114" class="doc-link">#114 (AIC-ENH) AI Chat System Enhancement</a>.
+                Each phase below is one todo of this project; the work order lives in the todo description.
+            </p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Phase</th>
+                    <th class="doc-th">Tracking item</th>
+                    <th class="doc-th">Gate / done when</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Phase 0 &mdash; Preference and settings audit</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2747" class="doc-link">todo #2747</a></td>
+                    <td class="doc-td"><code>ui.language</code> round-trips through <code>/user/prefs</code>; <code>UserLanguage-&gt;current</code> resolves per session.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Phase 1 &mdash; Translation service</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2748" class="doc-link">todo #2748</a></td>
+                    <td class="doc-td">Shared DB cache, batch and glossary live; one model call per new string across processes.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Phase 2 &mdash; Inventory display layer</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2749" class="doc-link">todo #2749</a></td>
+                    <td class="doc-td">French user sees French on item page and scan form; DB still English; no render stall.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Phase 3 &mdash; Invoice photo and AI chat</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2750" class="doc-link">todo #2750</a></td>
+                    <td class="doc-td">French display strings, matching still on the stored English key.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Phase 4 &mdash; Preference UI</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2751" class="doc-link">todo #2751</a></td>
+                    <td class="doc-td">Picker persists across sessions and applies everywhere.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Phase 5 &mdash; Admin and cache management</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2752" class="doc-link">todo #2752</a></td>
+                    <td class="doc-td">Coverage visible, purge by language and product works, glossary editable.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Phase 6 &mdash; Tests, docs, rollback</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2753" class="doc-link">todo #2753</a></td>
+                    <td class="doc-td"><code>prove -l t/i18n_*.t</code> green with the model unreachable; rollback verified live.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Dependency &mdash; DDL (schema branch)</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2756" class="doc-link">schema todo #2756</a></td>
+                    <td class="doc-td">Both cache tables exist in the ency DB; unblocks Phase 1.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">ROUTINE re-audit (RULE P2)</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2754" class="doc-link">todo #2754</a> (recurring)</td>
+                    <td class="doc-td">Quarterly check that this doc still matches the code and the cache is populated.</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Owner: Shanta. Branch <code>aisystem</code>, worktree <code>/home/shanta/.comserv/worktrees/aisystem/Comserv</code>.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+[%# ai-plan-sync created todo_ids: ai-plan-sync created todo_ids: 2747,2748,2749,2750,2751,2752,2753 under project_id=313 %]
