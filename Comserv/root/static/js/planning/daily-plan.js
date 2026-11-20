@@ -327,13 +327,17 @@
 
     // === Daily Log Start/End buttons ===
     window.dailyLogAction = function(action) {
+        if (window.__dailyLogBusy) return;
+        window.__dailyLogBusy = true;
         var startBtn = document.getElementById('dl-start-btn');
         var endBtn   = document.getElementById('dl-end-btn');
         var feedback = document.getElementById('dl-feedback');
         if (startBtn) startBtn.disabled = true;
         if (endBtn)   endBtn.disabled   = true;
-        feedback.textContent = action === 'start' ? 'Starting…' : 'Closing…';
-        feedback.style.color = '';
+        if (feedback) {
+            feedback.textContent = action === 'start' ? 'Starting…' : 'Closing…';
+            feedback.style.color = '';
+        }
 
         fetch('/planning/daily_log', {
             method: 'POST',
@@ -349,22 +353,29 @@
             var plainMsg = msg.replace(/<[^>]+>/g, '');
             if (d.success) {
                 alert(plainMsg);
-                feedback.innerHTML = msg;
-                feedback.style.color = '#2a7a2a';
+                if (feedback) {
+                    feedback.innerHTML = msg;
+                    feedback.style.color = '#2a7a2a';
+                }
                 window.location.reload();
             } else {
                 alert(plainMsg);
-                feedback.innerHTML = msg;
-                feedback.style.color = '#9b0000';
+                if (feedback) {
+                    feedback.innerHTML = msg;
+                    feedback.style.color = '#9b0000';
+                }
             }
         })
         .catch(function(e) {
             if (startBtn) startBtn.disabled = false;
             if (endBtn)   endBtn.disabled   = false;
             alert('Request failed: ' + e);
-            feedback.textContent = 'Request failed';
-            feedback.style.color = '#9b0000';
-        });
+            if (feedback) {
+                feedback.textContent = 'Request failed';
+                feedback.style.color = '#9b0000';
+            }
+        })
+        .then(function() { window.__dailyLogBusy = false; });
     };
 
     window.toggleLogPanel = function() {

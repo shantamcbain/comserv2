@@ -217,8 +217,10 @@
                 <tr><th class="doc-th">Req</th><th class="doc-th">Need</th><th class="doc-th">Raised on</th></tr>
                 <tr>
                     <td class="doc-td">INV-R1</td>
-                    <td class="doc-td">Recurring supplier subscription + payment source</td>
-                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2190" class="doc-link">#2190</a> / #207 — InventoryAccounting</td>
+                    <td class="doc-td">Recurring supplier subscription + payment source —
+                        <strong>delivered 2026-11-19</strong>: schedules page, Run Due, cron script
+                        <code>script/generate_recurring_invoices.pl</code></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2190" class="doc-link">#2190</a> (status 3) / #207 — InventoryAccounting</td>
                 </tr>
                 <tr class="doc-tr-alt">
                     <td class="doc-td">FM-R1</td>
@@ -251,7 +253,7 @@
                 </tr>
                 <tr>
                     <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=207" class="doc-link">#207 INV</a></td>
-                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2190" class="doc-link">#2190 INV-R1</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2190" class="doc-link">#2190 INV-R1</a> — delivered 2026-11-19</td>
                     <td class="doc-td">Recurring AP exists or honest workaround</td>
                 </tr>
                 <tr class="doc-tr-alt">

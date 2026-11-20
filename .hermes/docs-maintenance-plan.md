@@ -1,7 +1,7 @@
 # Documentation Maintenance Plan — Comserv2
 
 Owned by: the Documentation expert (`.hermes.md` role).
-Status: active. Last refreshed: 2026-10-28 (Proxmox: merge conflict cleanup; merge state verified).
+Status: active. Last refreshed: 2026-11-19 (InventoryAccounting: INV-R1 recurring supplier invoices documented, dependency marked delivered).
 
 Purpose: keep every documentation surface accurate, consistent, and in sync with the
 code — and to give a repeatable process so the docs don't drift again.
@@ -180,3 +180,22 @@ branch. P3 needs a quick owner sign-off.
 ## 9. Recent session — Result-side decimal size, and a frozen merge (2026-11-12, healthkitchen)
 
 Schema comparison listed every `decimal` column with no Size on the Result row, so "Update Table" emitted `MODIFY … decimal NULL` and MariaDB resolved it to `decimal(10,0)`; `inventory_items.net_weight_g` could not be corrected at all. The hole was the *read* direction: Result files declare `size => [10, 2]` and `ResultParser` had no array branch, so the size parsed as `undef` (the nested-hash branch turned `[10, 2]` into an empty list). Parser and `schema_compare_table`/`get_result_field_info` now flatten the array to the DB parser's `"p,s"` form before the grid or the ALTER is built. Verified by calling `Admin::SchemaComparison::schema_compare_table` in-process — Result sizes now `(10,0)/(6,2)/(10,2)`, with `net_weight_g` and `markup_percent` still `(10,0)` on the table side, which is real pre-existing drift to apply. The reason the fix looked inert for hours: a dashboard merge of `main` into `healthkitchen` had left four conflicted files with markers inside `Git.pm` and `Api.pm`, so the app could not compile and `:4015` kept serving 14:53 code. Marker scan before any "still broken" verdict. Docs: `SchemaMasterPlan.tt` §11 defect 5, `HealthKitchenPlan.tt` HK-PANTRY stock-out, changelog `2026-11-12-schema-compare-decimal-size.inc`. Todo 2469 (status 5, dead clock) stopped to 2; 2638 open at 1 pending a work order.
+
+---
+
+## 10. Recent session — INV-R1 recurring supplier invoices (2026-11-19, InventoryAccounting)
+
+Recurring AP is in: schedules (`inventory_recurring_invoices` + `..._lines`) generate draft supplier
+invoices from `/Accounting/recurring` or `script/generate_recurring_invoices.pl`, with calendar-correct
+stepping, an idempotent per-period run and a row lock so the button and the cron job cannot bill the
+same period twice. Two reviewer rounds shaped the code: the local-IP auth bypass and the hardcoded
+admin username were removed (administrator role only), every POST is same-origin gated via
+`Util::OriginCheck`, the site comes from the session (a `sitename` param cannot switch it), supplier
+and account ids are re-validated against the site, money fields must be numeric, dates are real
+calendar dates, tax/shipping and item/location line links survive an edit, and the list page no longer
+does an N+1 line count. Docs: `Accounting/invoices.tt` §6a (admin-only/site note, tax+shipping fields,
+cron script), `3dPrintingPlan.tt` INV-R1 marked delivered, changelog
+`2026-11-19-inv-r1-recurring-supplier-invoice.inc`. Todos: #2190 and #2763 status 3, duplicate #2764
+cancelled. STILL OWED: the two tables are not yet created in the live `ency` DB — that is an in-app
+schema-compare "Create Table from Result" step (never hand DDL), so Run Due has nothing to read until
+it runs.

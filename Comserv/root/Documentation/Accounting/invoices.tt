@@ -4,16 +4,16 @@
     roles = "admin"
     TemplateType = "Documentation"
     category = "Accounting"
-    page_version = "1.01"
-    last_updated = "2026-08-26"
+    page_version = "1.02"
+    last_updated = "2026-11-19"
     site_specific = "false"
 %]
-[% PageVersion = 'Documentation/Accounting/invoices.tt v1.01 2026-08-26 shanta' %]
+[% PageVersion = 'Documentation/Accounting/invoices.tt v1.02 2026-11-19 shanta' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container">
     <h1 style="color:var(--text-color);font-family:var(--header-font)">Supplier Invoices (Accounts Payable)</h1>
-    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-08-26 | Version: 1.01 | Audience: Administrators &amp; Accounting</div>
+    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-11-19 | Version: 1.02 | Audience: Administrators &amp; Accounting</div>
 
     <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--card-bg, rgba(255,255,255,0.15));padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
         <div class="col-100">
@@ -26,6 +26,7 @@
                 <a href="#gl"           style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">GL Entry</a>
                 <a href="#tax-shipping" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Tax &amp; Shipping</a>
                 <a href="#viewing"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Viewing Invoices</a>
+                <a href="#recurring"    style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Recurring Subscriptions</a>
                 <a href="#popup"        style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Popup Support</a>
                 <a href="#troubleshoot" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Troubleshooting</a>
             </div>
@@ -180,6 +181,59 @@
                 <li>Linked GL entry with all debit/credit lines</li>
                 <li>Stock update confirmation per line item</li>
             </ul>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="recurring" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">6a. Recurring Supplier Subscriptions</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Vendors that bill the same amount every month (memberships, support plans, software subscriptions)
+                do not have to be re-entered by hand. Record the charge <strong>once</strong> as a schedule at
+                <a href="/Accounting/recurring" style="color:var(--link-color)">/Accounting/recurring</a>; Comserv
+                then generates the supplier invoice for you each period.
+            </p>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Field</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Required?</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Notes</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Supplier</td><td style="border:1px solid var(--border-color);padding:5px 8px">✅ Yes</td><td style="border:1px solid var(--border-color);padding:5px 8px">The vendor being billed. Must already exist.</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Cadence</td><td style="border:1px solid var(--border-color);padding:5px 8px">✅ Yes</td><td style="border:1px solid var(--border-color);padding:5px 8px">How often to bill — e.g. monthly or yearly. Short months are clamped correctly (a 31st schedule bills the last day of February).</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Next Generate Date</td><td style="border:1px solid var(--border-color);padding:5px 8px">✅ Yes</td><td style="border:1px solid var(--border-color);padding:5px 8px">The date the next draft invoice is created. Advances automatically after each run.</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">End Date</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">Blank = runs until you deactivate it. Set it for fixed-term memberships.</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Payment Source Account</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">A real bank or credit-card <strong>asset</strong> account from the Chart of Accounts that the charge is paid <em>from</em> — not free text, and it must be an account this site can see. This is what lets AP reports show where money actually leaves.</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">AP Account</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">Liability account credited on the generated invoice. Usually 2000 Accounts Payable.</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Default Expense Account</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">Used for line templates that have no item/account of their own — e.g. 5900 Subscriptions &amp; Dues.</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Tax / shipping amount</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">Fixed amounts added to every generated bill (GST/PST and freight). Stored on the schedule and kept when you edit it.</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Auto-pay</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">Marks the schedule as charged automatically to the payment source (credit card / pre-authorized debit).</td></tr>
+                </tbody>
+            </table>
+            <p style="color:var(--text-color);font-family:var(--body-font);margin-top:0.5em">
+                Line templates attached to the schedule are copied onto each generated invoice, so the coding
+                (expense account, description, amount) is consistent month to month.
+            </p>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                <strong>Run Due</strong> on the schedule list generates the invoices whose next generate date has
+                arrived. Generated invoices land as <strong>drafts</strong> on
+                <a href="/Inventory/invoice" style="color:var(--link-color)">/Inventory/invoice</a> — open each one,
+                review it, then Post. Posting and the resulting GL entry stay a human step: nothing is posted
+                automatically. Re-running Run Due on the same day will not create a duplicate for the same period,
+                and two runs happening at once (the button and the cron job) cannot bill the same period twice.
+            </p>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                <strong>Who and where.</strong> This page is for administrators, and every schedule belongs to the
+                site you are signed in to: the supplier list, the accounts and the schedules you see (and the ones
+                Run Due touches) are that site's only. Changing the <code>sitename</code> in a request does not
+                switch sites. From a terminal, the same run is available unattended as
+                <code>script/generate_recurring_invoices.pl --site CSC</code> (add <code>--dry-run</code> to list
+                what would be billed, <code>--date YYYY-MM-DD</code> to back-date a catch-up run).
+            </p>
             <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
         </div>
     </div>

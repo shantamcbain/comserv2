@@ -1,0 +1,324 @@
+[% PageVersion = 'root/Accounting/recurring/index.tt,v 0.01 2026/11/19 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[%# META
+    title:        Recurring Supplier Invoices
+    description:  Manage recurring supplier invoice subscriptions and generate draft AP invoices when due
+    category:     Accounting
+    roles:        accounting, admin
+    TemplateType: ApplicationTtTemplate
+    last_updated: 2026-11-19
+    page_version: 0.01
+    site_specific: 1
+%]
+[% META title = 'Recurring Supplier Invoices' %]
+
+<h1>Recurring Supplier Invoices</h1>
+<p>
+  <a href="[% c.uri_for('/Inventory/invoice') %]">&#8592; Supplier Invoices</a>
+  &nbsp;|&nbsp;
+  <a href="[% c.uri_for('/Accounting/recurring') %]">Recurring subscriptions</a>
+  &nbsp;|&nbsp;
+  <a href="[% c.uri_for('/Accounting') %]">Accounting</a>
+</p>
+<p style="color: var(--text-muted-color, #6c757d);">
+  Subscriptions for repeat supplier bills (rent, utilities, software, insurance).
+  When a subscription comes due it generates a <strong>draft</strong> supplier invoice
+  so nothing is paid without review. Today is <strong>[% today | html %]</strong>.
+</p>
+
+[% IF flash.success_msg %]<p style="color: var(--success-color, #28a745);font-weight:bold;">[% flash.success_msg | html %]</p>[% END %]
+[% IF flash.error_msg %]<p style="color: var(--danger-color, #dc3545);">[% flash.error_msg | html %]</p>[% END %]
+[% IF error_msg %]<p style="color: var(--danger-color, #dc3545);font-weight:bold;">Error: [% error_msg | html %]</p>[% END %]
+
+<div style="border:1px solid var(--primary-color, #007bff);border-radius:6px;padding:0.8rem 1rem;margin:1rem 0;background:var(--caution-bg, #fff3cd);">
+  <h2 style="margin-top:0;font-size:1.1rem;color: var(--text-color, #333);">Run Due Now</h2>
+  [% IF due_count && due_count > 0 %]
+    <p style="margin:0.3rem 0;color: var(--text-color, #333);">
+      <strong>[% due_count %]</strong> subscription(s) are due as of [% today | html %].
+      Generating creates one draft supplier invoice per subscription for review.
+    </p>
+    <form method="post" action="[% c.uri_for('/Accounting/recurring/run_due') %]" style="display:inline;">
+      <button type="submit"
+              onclick="return confirm('Generate [% due_count %] draft invoice(s) now?')"
+              style="background: var(--success-color, #28a745);color:white;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-weight:bold;">
+        Generate [% due_count %] draft invoice(s)
+      </button>
+    </form>
+  [% ELSE %]
+    <p style="margin:0.3rem 0;color: var(--text-muted-color, #6c757d);">Nothing due today.</p>
+  [% END %]
+</div>
+
+<h2 style="font-size:1.1rem;">Subscriptions</h2>
+[% IF schedules && schedules.size %]
+<table border="1" cellpadding="6" style="width:100%;border-collapse:collapse;">
+  <thead>
+    <tr style="background:var(--bg-subtle,#eee);">
+      <th>Name</th>
+      <th>Supplier</th>
+      <th>Cadence</th>
+      <th>Next due</th>
+      <th style="text-align:right">Expected</th>
+      <th>Payment source</th>
+      <th>Auto-pay</th>
+      <th>Last generated</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH s IN schedules %]
+  <tr[% IF s.is_due %] style="background: var(--caution-bg, #fff3cd);"[% END %]>
+    <td>
+      <strong>[% s.name | html %]</strong>
+      [% IF s.line_count && s.line_count > 0 %]
+        <span style="color: var(--text-muted-color, #6c757d);font-size:0.8em;">([% s.line_count %] line[% IF s.line_count != 1 %]s[% END %])</span>
+      [% END %]
+    </td>
+    <td>[% s.supplier_name | html %]</td>
+    <td>[% s.cadence | html %]</td>
+    <td>
+      [% IF s.next_date %][% s.next_date | html %][% ELSE %]<span style="color: var(--text-muted-color, #6c757d);">&mdash;</span>[% END %]
+      [% IF s.next_preview %]<br><span style="color: var(--text-muted-color, #6c757d);font-size:0.8em;">then [% s.next_preview | html %]</span>[% END %]
+      [% IF s.end_date %]<br><span style="color: var(--text-muted-color, #6c757d);font-size:0.8em;">ends [% s.end_date | html %]</span>[% END %]
+    </td>
+    <td style="text-align:right;">$[% s.next_amount | html %]</td>
+    <td>
+      [% IF s.payment_label %][% s.payment_label | html %][% ELSE %]<span style="color: var(--text-muted-color, #6c757d);">&mdash;</span>[% END %]
+    </td>
+    <td>
+      [% IF s.auto_pay %]
+        <span style="background: var(--success-color, #28a745);color:white;padding:1px 7px;border-radius:3px;font-size:0.85em;"
+              title="[% s.auto_pay_method | html %]">AUTO</span>
+        [% IF s.auto_pay_method %]<br><span style="color: var(--text-muted-color, #6c757d);font-size:0.75em;">[% s.auto_pay_method | html %]</span>[% END %]
+      [% ELSE %]
+        <span style="color: var(--text-muted-color, #6c757d);">no</span>
+      [% END %]
+    </td>
+    <td>
+      [% IF s.last_invoice_id %]
+        <a href="[% c.uri_for('/Inventory/invoice/view', [s.last_invoice_id]) %]">Invoice #[% s.last_invoice_id %]</a>
+        [% IF s.last_run_date %]<br><span style="color: var(--text-muted-color, #6c757d);font-size:0.8em;">[% s.last_run_date | html %]</span>[% END %]
+      [% ELSE %]
+        <span style="color: var(--text-muted-color, #6c757d);">never</span>
+      [% END %]
+    </td>
+    <td>
+      [% IF s.is_due %]
+        <span style="background: var(--danger-color, #dc3545);color:white;padding:1px 7px;border-radius:3px;font-size:0.85em;font-weight:bold;">DUE</span>
+      [% END %]
+      [% IF !s.is_active %]
+        <span style="background: var(--text-muted-color, #6c757d);color:white;padding:1px 7px;border-radius:3px;font-size:0.85em;">paused</span>
+      [% ELSE %]
+        <span style="background: var(--success-color, #28a745);color:white;padding:1px 7px;border-radius:3px;font-size:0.85em;">active</span>
+      [% END %]
+    </td>
+    <td style="white-space:nowrap;">
+      <a href="[% c.uri_for('/Accounting/recurring') %]?edit=[% s.id %]">Edit</a>
+      [% IF s.is_active %]
+        | <form method="post" action="[% c.uri_for('/Accounting/recurring/pause') %]/[% s.id %]" style="display:inline;">
+            <button type="submit" style="background:none;border:none;color: var(--link-color, #007bff);cursor:pointer;padding:0;font:inherit;text-decoration:underline;">Pause</button>
+          </form>
+      [% ELSE %]
+        | <form method="post" action="[% c.uri_for('/Accounting/recurring/resume') %]/[% s.id %]" style="display:inline;">
+            <button type="submit" style="background:none;border:none;color: var(--link-color, #007bff);cursor:pointer;padding:0;font:inherit;text-decoration:underline;">Resume</button>
+          </form>
+      [% END %]
+      | <form method="post" action="[% c.uri_for('/Accounting/recurring/delete') %]/[% s.id %]" style="display:inline;"
+               onsubmit="return confirm('Delete subscription &#34;[% s.name | html %]&#34;? This cannot be undone.');">
+          <button type="submit" style="background:none;border:none;color: var(--danger-color, #dc3545);cursor:pointer;padding:0;font:inherit;text-decoration:underline;">Delete</button>
+        </form>
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p style="color: var(--text-muted-color, #6c757d);">No recurring subscriptions yet.</p>
+[% END %]
+
+<h2 style="font-size:1.1rem;margin-top:1.6rem;">
+  [% IF editing %]Edit subscription[% ELSE %]Add a subscription[% END %]
+</h2>
+
+[% SET cat_labels = {A = 'Asset', L = 'Liability', Q = 'Equity', I = 'Income', E = 'Expense'} %]
+
+<form method="post" action="[% c.uri_for('/Accounting/recurring/save') %]">
+  <input type="hidden" name="schedule_id" value="[% form.schedule_id | html %]">
+
+  <fieldset style="border:1px solid var(--border-color, #ccc);border-radius:6px;padding:0.8rem 1rem;margin-bottom:1rem;">
+    <legend style="font-weight:bold;">Subscription</legend>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;">Name <span style="color: var(--danger-color, #dc3545);">*</span></label>
+      <input type="text" name="name" required size="44" value="[% form.name | html %]">
+    </p>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;">Supplier <span style="color: var(--danger-color, #dc3545);">*</span></label>
+      <select name="supplier_id" required>
+        <option value="">&mdash; choose supplier &mdash;</option>
+        [% FOREACH sup IN suppliers %]
+          <option value="[% sup.id %]"[% IF form.supplier_id == sup.id %] selected[% END %]>[% sup.name | html %]</option>
+        [% END %]
+      </select>
+    </p>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;">Cadence</label>
+      <select name="recurrence_unit">
+        <option value="day"[%   IF form.recurrence_unit == 'day'   %] selected[% END %]>Day</option>
+        <option value="week"[%  IF form.recurrence_unit == 'week'  %] selected[% END %]>Week</option>
+        <option value="month"[% IF form.recurrence_unit == 'month' || !form.recurrence_unit %] selected[% END %]>Month</option>
+        <option value="year"[%  IF form.recurrence_unit == 'year'  %] selected[% END %]>Year</option>
+      </select>
+      every
+      <input type="number" name="recurrence_interval" min="1" step="1" value="[% form.recurrence_interval || 1 %]" style="width:5em;">
+    </p>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;">Start date</label>
+      <input type="date" name="recurrence_start_date" value="[% form.recurrence_start_date | html %]">
+    </p>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;">Next generate date</label>
+      <input type="date" name="recurrence_next_date" value="[% form.recurrence_next_date | html %]">
+    </p>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;">End date <span style="color: var(--text-muted-color, #6c757d);font-size:0.85em;">(optional)</span></label>
+      <input type="date" name="recurrence_end_date" value="[% form.recurrence_end_date | html %]">
+    </p>
+  </fieldset>
+
+  <fieldset style="border:1px solid var(--border-color, #ccc);border-radius:6px;padding:0.8rem 1rem;margin-bottom:1rem;">
+    <legend style="font-weight:bold;">Accounts</legend>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;">Payment source (paid from)</label>
+      <select name="payment_account_id">
+        <option value="">&mdash; none &mdash;</option>
+        [% FOREACH acct IN accounts %]
+          [% NEXT UNLESS acct.category == 'A' %]
+          <option value="[% acct.id %]"[% IF form.payment_account_id == acct.id %] selected[% END %]>[% acct.label | html %]</option>
+        [% END %]
+      </select>
+    </p>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;">AP account</label>
+      <select name="ap_account_id">
+        <option value="">&mdash; none &mdash;</option>
+        [% FOREACH acct IN accounts %]
+          [% NEXT UNLESS acct.category == 'L' %]
+          <option value="[% acct.id %]"[% IF form.ap_account_id == acct.id %] selected[% END %]>[% acct.label | html %]</option>
+        [% END %]
+      </select>
+    </p>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;">Default expense account</label>
+      <select name="expense_account_id">
+        <option value="">&mdash; none &mdash;</option>
+        [% FOREACH acct IN accounts %]
+          [% NEXT UNLESS acct.category == 'E' %]
+          <option value="[% acct.id %]"[% IF form.expense_account_id == acct.id %] selected[% END %]>[% acct.label | html %]</option>
+        [% END %]
+      </select>
+    </p>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;">Tax account</label>
+      <select name="tax_account_id">
+        <option value="">&mdash; none &mdash;</option>
+        [% FOREACH acct IN accounts %]
+          [% NEXT UNLESS acct.category == 'L' %]
+          <option value="[% acct.id %]"[% IF form.tax_account_id == acct.id %] selected[% END %]>[% acct.label | html %]</option>
+        [% END %]
+      </select>
+    </p>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;">Tax amount</label>
+      <input type="number" name="tax_amount" step="0.01" min="0" value="[% form.tax_amount | html %]" style="width:9em;text-align:right;">
+      <span style="color: var(--text-muted-color, #6c757d);font-size:0.85em;">added to every generated bill</span>
+    </p>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;">Shipping amount</label>
+      <input type="number" name="shipping_amount" step="0.01" min="0" value="[% form.shipping_amount | html %]" style="width:9em;text-align:right;">
+    </p>
+  </fieldset>
+
+  <fieldset style="border:1px solid var(--border-color, #ccc);border-radius:6px;padding:0.8rem 1rem;margin-bottom:1rem;">
+    <legend style="font-weight:bold;">Auto-pay &amp; notes</legend>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;">Auto-pay</label>
+      <input type="checkbox" name="auto_pay" value="1"[% IF form.auto_pay %] checked[% END %]>
+      <span style="color: var(--text-muted-color, #6c757d);font-size:0.85em;">mark generated invoices as auto-pay</span>
+    </p>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;">Auto-pay method</label>
+      <input type="text" name="auto_pay_method" size="34" value="[% form.auto_pay_method | html %]" placeholder="e.g. Visa ending 4242">
+    </p>
+
+    <p style="margin:0.4rem 0;">
+      <label style="display:inline-block;width:14em;vertical-align:top;">Notes</label>
+      <textarea name="notes" rows="3" cols="50">[% form.notes | html %]</textarea>
+    </p>
+  </fieldset>
+
+  <fieldset style="border:1px solid var(--border-color, #ccc);border-radius:6px;padding:0.8rem 1rem;margin-bottom:1rem;">
+    <legend style="font-weight:bold;">Invoice lines</legend>
+    <p style="color: var(--text-muted-color, #6c757d);font-size:0.85em;margin-top:0;">
+      One row per default line. A line with no description and no cost is ignored; a
+      schedule copied from an invoice lists all of its lines here.
+    </p>
+    <table border="0" cellpadding="4" style="border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="text-align:left;">Description</th>
+          <th style="text-align:right;">Qty</th>
+          <th style="text-align:right;">Unit cost</th>
+          <th style="text-align:left;">Expense account</th>
+        </tr>
+      </thead>
+      <tbody>
+      [% FOREACH line IN form.lines %]
+        [% n = loop.index %]
+        <tr>
+          <td>
+            <input type="hidden" name="line_id_[% n %]"          value="[% line.line_id | html %]">
+            <input type="hidden" name="line_item_id_[% n %]"     value="[% line.item_id | html %]">
+            <input type="hidden" name="line_location_id_[% n %]" value="[% line.location_id | html %]">
+            <input type="text" name="line_description_[% n %]" size="42" value="[% line.description | html %]">
+          </td>
+          <td><input type="number" name="line_quantity_[% n %]" step="0.01" min="0" value="[% line.item_quantity %]" style="width:7em;text-align:right;"></td>
+          <td><input type="number" name="line_unit_cost_[% n %]" step="0.01" min="0" value="[% line.unit_cost %]" style="width:8em;text-align:right;"></td>
+          <td>
+            <select name="line_account_id_[% n %]">
+              <option value="">&mdash; none &mdash;</option>
+              [% FOREACH acct IN accounts %]
+                [% NEXT UNLESS acct.category == 'E' %]
+                <option value="[% acct.id %]"[% IF line.account_id == acct.id %] selected[% END %]>[% acct.label | html %]</option>
+              [% END %]
+            </select>
+          </td>
+        </tr>
+      [% END %]
+      </tbody>
+    </table>
+  </fieldset>
+
+  <p>
+    <button type="submit" style="background: var(--primary-color, #007bff);color:white;border:none;padding:8px 18px;border-radius:4px;cursor:pointer;font-weight:bold;">
+      [% IF editing %]Update subscription[% ELSE %]Save subscription[% END %]
+    </button>
+    [% IF editing %]
+      <a href="[% c.uri_for('/Accounting/recurring') %]" style="margin-left:0.75em;">Cancel</a>
+    [% END %]
+  </p>
+</form>
