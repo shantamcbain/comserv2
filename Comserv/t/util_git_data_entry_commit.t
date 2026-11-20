@@ -46,4 +46,12 @@ like($git->data_entry_blob_error($state, "<<<<<<< HEAD\n{}\n"), qr/conflict mark
 like($git->data_entry_blob_error($state, '{'), qr/not valid JSON/, 'broken JSON still refuses');
 like($git->data_entry_blob_error('data/ai_trials/x.tasks.jsonl', qq{{"ok":1}\nnot-json\n}), qr/line 2/, 'broken task log line still refuses');
 
+my $repo = "$FindBin::Bin/../..";
+my $junk = $git->junk_files(undef, [
+    'Comserv/data/ai_trials/particle_1.state.json',
+    'Comserv/data/ai_trials/x.tasks.jsonl',
+    'Comserv/lib/Comserv/Util/Git.pm',
+], $repo);
+is(scalar(@$junk), 2, 'trial state and task log are junk; source is not');
+
 done_testing;

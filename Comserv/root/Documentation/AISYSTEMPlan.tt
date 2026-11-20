@@ -4,13 +4,13 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "planning,ai"
-   page_version = "1.06"
-   last_updated = "2026-11-02"
+   page_version = "1.07"
+   last_updated = "2026-11-20"
    site_specific = "false"
    project_id = "280"
    project_code = "AISYSTEM"
 %]
-[% PageVersion = 'Documentation/AISYSTEMPlan.tt,v 1.08 2026/10/01 shanta Exp - auto-improver, supergrok switch, health' %]
+[% PageVersion = 'Documentation/AISYSTEMPlan.tt,v 1.09 2026/11/20 shanta Exp - trial state is runtime, not merged' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container">
@@ -655,8 +655,9 @@
                     <code>openrouter|cohere/north-mini-code:free</code>. <code>gpt_56_luna</code> is
                     <strong>stopped</strong> at 10 of 10 sessions awaiting audit approval; <code>kimi_k27_code</code> stopped on the
                     spend cap. <code>opencode-free</code> is dead for agent use and must not appear in any chain.</li>
-                <li><code>data/ai_trials/</code> is now gitignored. The three existing state files are still tracked, so a
-                    deliberate state change needs <code>git add -f</code>; untracking them is a separate decision.</li>
+                <li><code>data/ai_trials/</code> is gitignored runtime data. A tracked
+                    <code>*.state.json</code> is rewritten on every trial check and conflicts on every merge.
+                    Do not <code>git add -f</code> it. Untrack from the Git page (Untrack + gitignore); the file stays on disk.</li>
             </ul>
 
             <h3 class="doc-h3">Ledger and usage_live</h3>

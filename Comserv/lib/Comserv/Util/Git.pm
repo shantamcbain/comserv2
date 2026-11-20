@@ -70,7 +70,8 @@ my %ALLOWED_FLAGS = (
     # Ignored UNTRACKED files never appear in porcelain, so -f cannot stage anything
     # the operator did not see and tick.
     add      => { map { $_ => 1 } qw(-f) },
-    commit   => { map { $_ => 1 } qw(-m --amend) },
+    # --no-edit finishes a merge after runtime trial conflicts were dropped.
+    commit   => { map { $_ => 1 } qw(-m --amend --no-edit) },
     stash    => { map { $_ => 1 } qw(push pop drop list -m) },
     checkout => { map { $_ => 1 } qw(-b) },
     show     => { map { $_ => 1 } qw(--no-color) },
@@ -615,6 +616,12 @@ sub _run {
     $result->{exit_code} = $code;
     $result->{output}    = defined $out ? $out : '';
     $result->{error}     = defined $err ? $err : '';
+    # aikido-local-scanner prints this alone on stderr for a CLEAN commit scan.
+    # It is not a failure. Strip it only when it is the entire stderr of a
+    # commit, so other commands and mixed hook messages are left intact.
+    if ($subcmd eq 'commit' && $result->{error} =~ /\A\s*No secrets detected in staged files\.?\s*\z/) {
+        $result->{error} = '';
+    }
     $result->{success}   = ($code == 0) ? 1 : 0;
 
     # Log level: a non-zero exit is usually an error, but some expected/graceful
@@ -676,6 +683,11 @@ sub _run {
     my $abort_noop = ($subcmd eq 'merge')
         && (grep { defined $_ && $_ eq '--abort' } @argv)
         && $combined =~ /There is no merge to abort|MERGE_HEAD missing/i;
+    # `git commit -- <path>` with that file still in the worktree is a no-op
+    # ("no changes added to commit", exit 1). The caller classifies it. Do not
+    # spawn an error-audit todo for a commit that recorded nothing.
+    my $commit_noop = ($subcmd eq 'commit')
+        && $combined =~ /no changes added to commit|nothing to commit|nothing added to commit/i;
     # `rev-parse --verify --quiet <ref>` is an EXISTENCE PROBE: "the ref is not
     # there" is signalled by exit 1 with empty stdout AND empty stderr. Callers
     # (get_available_branches, catch_up) already branch on that. Logging the
@@ -706,6 +718,7 @@ sub _run {
                  : $ff_only_refused         ? 'warn'
                  : $merge_conflict          ? 'warn'
                  : $merge_local_changes     ? 'warn'
+                 : $commit_noop             ? 'warn'
                  : $benign                  ? 'info'
                  :                            'error';
     my $shown = ($result->{output} // '');
@@ -2365,6 +2378,37 @@ sub merge_branch {
     # Untracked files do not count: git itself refuses if one would be overwritten.
     my @tracked_dirty = map { my $l = $_; $l =~ s/^\s*[0-9A-Za-z.!? ]{1,2}\s+//; $l =~ s/^.* -> //; $l }
                         grep { /\S/ && !/^\?\?/ } split /\n/, ($st->{output} // '');
+    # Trial snapshots are rewritten in every checkout. A dirty copy must not
+    # refuse the merge, and a tracked copy on main is re-added on the next sync.
+    # Untrack keeps the file on disk.
+    if (grep { $self->data_entry_runtime_path($_) } @tracked_dirty) {
+        my $u = $self->commit_untrack_runtime_trials($c, $repo);
+        unless ($u->{success}) {
+            $result->{uncommitted} = 1;
+            $result->{reason}    = 'uncommitted';
+            $result->{error_msg} = "Could not untrack runtime trial state before merge: " . ($u->{error} || '');
+            $result->{fix_hint}  = 'Retry Merge. If it still refuses, tick Comserv/data/ai_trials/*.state.json, Untrack + gitignore, commit. A "No secrets detected" line is a clean scan, not the reason.';
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge', $result->{error_msg});
+            return $result;
+        }
+        @tracked_dirty = grep { !$self->data_entry_runtime_path($_) } @tracked_dirty;
+    }
+    my $merging_main = ($branch eq 'main' || $branch eq 'master');
+    my $on_main = ($current eq 'main' || $current eq 'master');
+    if ($merging_main || $on_main) {
+        my $main_repo = $on_main ? $repo : $self->main_repo_path($c);
+        if ($main_repo || $on_main) {
+            my $u = $self->commit_untrack_runtime_trials($c, $main_repo);
+            unless ($u->{success}) {
+                $result->{uncommitted} = 1;
+                $result->{reason}    = 'uncommitted_on_main';
+                $result->{error_msg} = "Could not untrack runtime trial state on main: " . ($u->{error} || '');
+                $result->{fix_hint}  = 'Retry Merge. If it still refuses, on :3001 /admin/git tick Comserv/data/ai_trials/*.state.json, Untrack + gitignore, commit. A "No secrets detected" line is a clean scan, not the reason.';
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge', $result->{error_msg});
+                return $result;
+            }
+        }
+    }
     if ($opts->{refuse_dirty} && @tracked_dirty) {
         my @dirty = @tracked_dirty;
         $result->{uncommitted} = 1;
@@ -2398,6 +2442,7 @@ sub merge_branch {
     my @merge_argv = ('merge', '--no-ff');
     push @merge_argv, '--autostash' if $use_autostash;
     push @merge_argv, $branch;
+    my $trial_keep = $self->snapshot_runtime_trials($repo);
     my $r = $self->_run($c, @merge_argv, $run_opts);
     # CRITICAL: git prints almost all merge failures on stderr. _run keeps
     # stdout/stderr separate — reading only {output} produced the useless UI
@@ -2417,6 +2462,7 @@ sub merge_branch {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_merge',
             "merge_branch: merged '$branch' into $current"
             . ($repo ? " (repo=$repo)" : '') . ' (success)');
+        $self->restore_runtime_trial_snapshots($c, $repo, $trial_keep);
         return $result;
     }
 
@@ -2444,6 +2490,26 @@ sub merge_branch {
           . "'$branch' → main there. Never run git checkout main inside a worktree.";
     }
     elsif ($out =~ /CONFLICT|Automatic merge failed/) {
+        my $fin = $self->finish_merge_if_only_runtime_trials($c, $repo);
+        if ($fin->{committed}) {
+            $result->{success} = 1;
+            $result->{output} = "Merge of '$branch' into $current completed. "
+                . "Untracked runtime trial state (kept on disk): "
+                . join(', ', @{$fin->{dropped} || []});
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_merge', $result->{output});
+            $self->restore_runtime_trial_snapshots($c, $repo, $trial_keep);
+            return $result;
+        }
+        if ($fin->{applied} && !@{$fin->{remaining} || []}) {
+            $result->{conflict}  = 1;
+            $result->{reason}    = 'conflict';
+            $result->{error_msg} = "Trial state was untracked, but the merge commit was refused: "
+                . ($fin->{error} || 'unknown') . " Commit the merge from the Git page, or abort.";
+            $result->{fix_hint}  = "Commit the merge on the Git page (the trial files are already untracked), or Abort.";
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge', $result->{error_msg});
+            $self->restore_runtime_trial_snapshots($c, $repo, $trial_keep);
+            return $result;
+        }
         $result->{conflict} = 1;
         $result->{reason}   = 'conflict';
         my @files = $out =~ /Merge conflict in ([^\s]+)/g;
@@ -2543,6 +2609,7 @@ sub merge_branch {
         $log_level = 'warn';
     }
     $self->logging->log_with_details($c, $log_level, __FILE__, __LINE__, 'git_merge', $log_line);
+    $self->restore_runtime_trial_snapshots($c, $repo, $trial_keep);
 
     return $result;
 }
@@ -3082,6 +3149,18 @@ sub update_all_from_main {
     my %listed = map { ($_ => 1) } @{ ref $cfg->{update_all_skip} eq 'ARRAY' ? $cfg->{update_all_skip} : [] };
     my $listening = $opts->{port_listening} || \&_port_listening_local;
     my @rows;
+    my $main_repo = $opts->{main_repo} || $self->main_repo_path($c);
+    my $main_untrack = { paths => [], committed => 0, success => 1 };
+    if ($main_repo) {
+        $main_untrack = $dry
+            ? { paths => $self->tracked_runtime_trial_paths($c, $main_repo), committed => 0, success => 1 }
+            : $self->commit_untrack_runtime_trials($c, $main_repo);
+        unless ($main_untrack->{success}) {
+            my $why = 'Update all stopped: could not untrack runtime trial state on main: ' . ($main_untrack->{error} || '');
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge', $why);
+            return { rows => [], summary => $why, restart_ports => [], dry_run => $dry };
+        }
+    }
 
     for my $t ($self->_update_all_targets($c, $cfg, $opts->{main_repo})) {
         my $dir = $t->{path};
@@ -3125,6 +3204,15 @@ sub update_all_from_main {
             elsif ($line =~ /^\?\? /)                     { push @untracked, $p }
             else                                          { push @dirty, $p }
         }
+        my @runtime_dirty = grep { $self->data_entry_runtime_path($_) } @dirty;
+        if (@runtime_dirty && !$dry) {
+            my $u = $self->commit_untrack_runtime_trials($c, $dir);
+            unless ($u->{success}) {
+                $set->('error', 'could not untrack runtime trial state: ' . ($u->{error} || ''), \@runtime_dirty);
+                next;
+            }
+            @dirty = grep { !$self->data_entry_runtime_path($_) } @dirty;
+        }
         $row->{tree} = (@unmerged || @dirty) ? scalar(@unmerged + @dirty) . ' uncommitted' : 'tree clean';
 
         if (_worktree_merge_in_progress($dir)) {
@@ -3144,10 +3232,14 @@ sub update_all_from_main {
         my $tree = shift(@mt) // '';
         if (($mt->{exit_code} // -1) == 1) {
             my %u; my @cf = grep { !$u{$_}++ } map { _trim($_) } @mt;
-            $set->('skipped_conflict', 'main and this branch change the same lines; resolve in this worktree (git rerere records the fix)', \@cf);
-            next;
+            my @real = grep { !$self->data_entry_runtime_path($_) } @cf;
+            if (@real) {
+                $set->('skipped_conflict', 'main and this branch change the same lines; resolve in this worktree (git rerere records the fix)', \@cf);
+                next;
+            }
+            # Only trial snapshots. The merge below drops them; the disk copy stays.
         }
-        if (!$mt->{success} || $tree !~ /^[0-9a-f]{40,64}\z/) {
+        elsif (!$mt->{success} || $tree !~ /^[0-9a-f]{40,64}\z/) {
             $set->('error', 'merge-tree failed: ' . substr(_trim($mt->{error} || $mt->{output}), 0, 200)); next;
         }
 
@@ -3169,13 +3261,24 @@ sub update_all_from_main {
         if ($dry) { $set->('would_update', $row->{ahead} ? 'clean - would merge (merge commit)' : 'clean - would fast-forward'); next }
 
         my @m = $row->{ahead} ? ('merge', '--no-ff', '--no-edit', 'main') : ('merge', '--ff-only', 'main');
+        my $trial_keep = $self->snapshot_runtime_trials($dir);
         my $m = $self->_run($c, @m, { repo => $dir });
         if ($m->{success}) {
+            $self->restore_runtime_trial_snapshots($c, $dir, $trial_keep);
             $row->{after_sha} = _trim($self->_run($c, 'rev-parse', 'HEAD', { repo => $dir })->{output});
             $set->('updated', $row->{ahead} ? 'merged main (merge commit)' : 'fast-forwarded to main');
             next;
         }
         my $out = join("\n", grep { defined && length } $m->{output}, $m->{error});
+        if ($out =~ /CONFLICT|Automatic merge failed/) {
+            my $fin = $self->finish_merge_if_only_runtime_trials($c, $dir);
+            if ($fin->{committed}) {
+                $self->restore_runtime_trial_snapshots($c, $dir, $trial_keep);
+                $row->{after_sha} = _trim($self->_run($c, 'rev-parse', 'HEAD', { repo => $dir })->{output});
+                $set->('updated', 'merged main; untracked runtime trial state (kept on disk)');
+                next;
+            }
+        }
         $row->{will_restart} = 0;
         my $why = $out =~ /secret-guard:|junk-guard:|pre-merge-commit:|^\s*BLOCKED:/m
             ? 'secret/junk guard refused the merge (not bypassed)'
@@ -3184,6 +3287,7 @@ sub update_all_from_main {
             my $ab = $self->_run($c, 'merge', '--abort', { repo => $dir });
             $why .= $ab->{success} ? ' (aborted, branch unchanged)' : ' (ABORT FAILED - check this worktree)';
         }
+        $self->restore_runtime_trial_snapshots($c, $dir, $trial_keep);
         $set->('error', $why);
     }
 
@@ -3202,6 +3306,11 @@ sub update_all_from_main {
         unless grep { $n{$_} } qw(updated would_update error skipped_dirty skipped_untracked skipped_conflict missing);
     $summary .= '. Will auto-restart (-r): ' . join(', ', map { ":$_" } @restart) if @restart && $dry;
     $summary .= '. Auto-restarted (-r): '    . join(', ', map { ":$_" } @restart) if @restart && !$dry;
+    if ($main_untrack && @{$main_untrack->{paths} || []}) {
+        $summary .= $main_untrack->{committed}
+            ? '. Untracked trial state on main (kept on disk)'
+            : '. Preview: would untrack trial state on main';
+    }
     if (my @attention = grep { $_->{needs_manual} } @rows) {
         $summary .= '. Needs attention: ' . join('; ', map {
             my $f = @{ $_->{files} || [] } ? ' [' . join(', ', @{ $_->{files} }[0 .. ($#{ $_->{files} } < 9 ? $#{ $_->{files} } : 9)]) . (@{ $_->{files} } > 10 ? ', ...' : '') . ']' : '';
@@ -3223,6 +3332,187 @@ sub data_entry_runtime_path {
     return 0 unless defined $path && length $path;
     $path =~ s{\\}{/}g;
     return $path =~ m{(?:^|/)data/ai_trials/[^/]+\.(?:state\.json|tasks\.jsonl)\z} ? 1 : 0;
+}
+
+# Tracked trial snapshots. Ignore rules do not apply until these leave the index.
+# Returns the repo-relative paths still tracked. Does not change the index.
+sub tracked_runtime_trial_paths {
+    my ($self, $c, $repo) = @_;
+    my $run = (defined $repo && length $repo) ? { repo => $repo } : {};
+    my $ls = $self->_run($c, 'ls-files', '--', 'Comserv/data/ai_trials', $run);
+    return [] unless $ls->{success};
+    return [ grep { $self->data_entry_runtime_path($_) } _lines($ls->{output}) ];
+}
+
+# Drop tracked trial snapshots from the index and commit that deletion only.
+# The files stay on disk (the app rewrites them). No-op when none are tracked.
+# On commit refusal the tree is unchanged.
+#
+# Do not `git rm --cached` and then `git commit -- <paths>` while the files
+# are still on disk. A path-limited commit is `git commit --only`: git rebuilds
+# those paths from the worktree, drops the staged deletion, and exits 1 with
+# "no changes added to commit". Rename each file to a sibling in the same
+# directory, commit the absence, rename it back. Same-directory rename keeps
+# mode, owner, and mtime, and a crash leaves the file next to its path rather
+# than only in a temp dir. The next call renames a leftover aside file back
+# before committing. Other staged files stay staged.
+sub commit_untrack_runtime_trials {
+    my ($self, $c, $repo) = @_;
+    my $run = (defined $repo && length $repo) ? { repo => $repo } : {};
+    my $paths = $self->tracked_runtime_trial_paths($c, $repo);
+    return { success => 1, paths => [], committed => 0 } unless @$paths;
+
+    my $root = $repo;
+    if (!defined $root || !length $root || !-d $root) {
+        my $top = $self->_run($c, 'rev-parse', '--show-toplevel', $run);
+        $root = $top->{success} ? ($top->{output} // '') : '';
+        $root =~ s/\s+\z//;
+    }
+    unless (defined $root && length $root && -d $root) {
+        my $err = 'could not resolve checkout to untrack trial state';
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "commit_untrack_runtime_trials: $err");
+        return { success => 0, paths => $paths, committed => 0, error => $err };
+    }
+
+    my @held;
+    my $fail;
+    for my $rel (@$paths) {
+        if ($rel =~ m{\A/} || $rel =~ m{(^|/)\.\.(/|\z)}) {
+            $fail = "refusing to move a path outside the checkout: $rel";
+            last;
+        }
+        my $dest  = "$root/$rel";
+        my $aside = "$dest.untrack-aside";
+        if (!-e $dest && -f $aside) {
+            unless (rename $aside, $dest) {
+                $fail = "could not restore leftover aside file for $rel: $!";
+                last;
+            }
+        }
+        next unless -f $dest;
+        if (-e $aside) {
+            $fail = "aside file already exists for $rel";
+            last;
+        }
+        unless (rename $dest, $aside) {
+            $fail = "could not move $rel aside: $!";
+            last;
+        }
+        push @held, { dest => $dest, aside => $aside, rel => $rel };
+    }
+
+    my $restore = sub {
+        for my $h (@held) {
+            if (-e $h->{dest}) {
+                unlink $h->{aside} if -f $h->{aside};
+                next;
+            }
+            unless (rename $h->{aside}, $h->{dest}) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+                    "commit_untrack_runtime_trials: could not restore $h->{rel}: $!");
+            }
+        }
+    };
+
+    if ($fail) {
+        $restore->();
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "commit_untrack_runtime_trials: $fail");
+        return { success => 0, paths => $paths, committed => 0, error => $fail };
+    }
+
+    my $cm = $self->_run($c, 'commit', '-m',
+        'untrack AI trial state (runtime snapshots were blocking merges)',
+        '--', @$paths, $run);
+    $restore->();
+    unless ($cm->{success}) {
+        my $err = $cm->{output} || $cm->{error} || 'untrack commit refused';
+        $err =~ s/\s+\z//;
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "commit_untrack_runtime_trials: commit refused: $err");
+        return { success => 0, paths => $paths, committed => 0, error => $err };
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_merge',
+        'untracked runtime trial state (kept on disk): ' . join(', ', @$paths));
+    return { success => 1, paths => $paths, committed => 1 };
+}
+
+# Copy live trial files aside. A merge of the untrack commit deletes the
+# worktree copy on any checkout that still tracked them.
+sub snapshot_runtime_trials {
+    my ($self, $repo) = @_;
+    return [] unless defined $repo && length $repo;
+    my $src_dir = "$repo/Comserv/data/ai_trials";
+    return [] unless -d $src_dir;
+    my $keep = ($ENV{TMPDIR} || '/tmp') . '/ai-trials-keep-' . $$ . '-' . int(rand(1_000_000));
+    mkdir $keep or return [];
+    opendir my $dh, $src_dir or return [];
+    my @saved;
+    for my $name (readdir $dh) {
+        next unless $name =~ /\.(?:state\.json|tasks\.jsonl)\z/;
+        my $dest = "$src_dir/$name";
+        next unless -f $dest;
+        my $tmp = "$keep/$name";
+        next unless copy($dest, $tmp);
+        push @saved, { rel => "Comserv/data/ai_trials/$name", dest => $dest, tmp => $tmp, keep => $keep };
+    }
+    closedir $dh;
+    return \@saved;
+}
+
+# Put the pre-merge copy back when the merge dropped the path from the index.
+# A still-tracked file is left alone (a failed merge must not overwrite it).
+sub restore_runtime_trial_snapshots {
+    my ($self, $c, $repo, $saved) = @_;
+    return unless $saved && @$saved;
+    my %tracked = map { $_ => 1 } @{ $self->tracked_runtime_trial_paths($c, $repo) };
+    my $keep;
+    for my $s (@$saved) {
+        $keep = $s->{keep};
+        if (!$tracked{ $s->{rel} } && -f $s->{tmp}) {
+            copy($s->{tmp}, $s->{dest});
+        }
+        unlink $s->{tmp} if -f $s->{tmp};
+    }
+    rmdir $keep if $keep;
+}
+
+# A merge that conflicted only on trial snapshots: keep the deletion, finish the merge.
+# Real conflicts are left for the operator. Disk copies of the trial files stay.
+sub finish_merge_if_only_runtime_trials {
+    my ($self, $c, $repo) = @_;
+    my $run = (defined $repo && length $repo) ? { repo => $repo } : {};
+    my $st = $self->_run($c, 'status', '--porcelain', $run);
+    my (@runtime, @other);
+    for my $line (_lines($st->{output})) {
+        next unless $line =~ /^(?:UU|AA|DD|AU|UA|DU|UD) /;
+        my $p = _porcelain_path($line);
+        next unless length $p;
+        if ($self->data_entry_runtime_path($p)) { push @runtime, $p }
+        else { push @other, $p }
+    }
+    return { applied => 0, dropped => [], remaining => \@other } unless @runtime;
+    my $rm = $self->_run($c, 'rm', '--cached', '--', @runtime, $run);
+    unless ($rm->{success}) {
+        my $err = $rm->{error} || $rm->{output} || 'git rm --cached failed';
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "finish_merge_if_only_runtime_trials: $err");
+        return { applied => 0, dropped => [], remaining => [ @runtime, @other ], error => $err };
+    }
+    if (@other) {
+        return { applied => 1, dropped => \@runtime, remaining => \@other, committed => 0 };
+    }
+    my $cm = $self->_run($c, 'commit', '--no-edit', $run);
+    unless ($cm->{success}) {
+        my $err = $cm->{error} || $cm->{output} || 'merge commit refused';
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "finish_merge_if_only_runtime_trials: $err");
+        return { applied => 1, dropped => \@runtime, remaining => [], committed => 0, error => $err };
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_merge',
+        'merge completed after untracking runtime trial state: ' . join(', ', @runtime));
+    return { applied => 1, dropped => \@runtime, remaining => [], committed => 1 };
 }
 
 # Drop data-entry hunks so the reviewer and the confirm hash see only code.
