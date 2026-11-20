@@ -10,6 +10,12 @@
  */
 (function() {
     'use strict';
+    /* js_load.tt used to include this file twice on /planning/daily.
+       A second execution registered a second click handler and every
+       Start Day / End Day click posted twice. */
+    if (window.__dailyPlanUtilsLoaded) return;
+    window.__dailyPlanUtilsLoaded = true;
+    var dailyLogBusy = false;
 
     /* ── Tab switching ────────────────────────────────────────────────────
 
@@ -185,6 +191,8 @@
     /* ── Daily log actions ──────────────────────────────────────────────── */
 
     function dailyLogAction(action) {
+        if (dailyLogBusy) return;
+        dailyLogBusy = true;
         var startBtn = document.getElementById('dl-start-btn');
         var endBtn   = document.getElementById('dl-end-btn');
         var feedback = document.getElementById('dl-feedback');
@@ -233,7 +241,8 @@
                 feedback.textContent = 'Request failed';
                 feedback.style.color = '#9b0000';
             }
-        });
+        })
+        .then(function() { dailyLogBusy = false; });
     }
 
     function toggleLogPanel() {
@@ -1127,7 +1136,11 @@
             var action = da.getAttribute('data-action');
             if (action === 'start-day') { dailyLogAction('start'); return; }
             if (action === 'end-day')   { dailyLogAction('end');   return; }
-            if (action === 'dismiss-log-panel') { toggleLogPanel(); document.getElementById('log-panel').style.display = 'none'; return; }
+            if (action === 'dismiss-log-panel') {
+                var logPanel = document.getElementById('log-panel');
+                if (logPanel) logPanel.style.display = 'none';
+                return;
+            }
             if (action === 'toggle-log-panel')  { toggleLogPanel(); return; }
             if (action === 'close-deploy-center') { if (typeof openDeployControlCenter !== 'undefined') closeDeployControlCenter(); return; }
             if (action === 'start-deploy-center') { if (typeof startDeploymentAction !== 'undefined') startDeploymentAction(); return; }

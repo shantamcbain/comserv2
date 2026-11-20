@@ -39,7 +39,7 @@
                 user is told a log needs attention. Distinct from the permanent 'Logs'
                 link above, which always lets them check what is still open today. %]
             [% IF open_log_entry %]
-            <a href="#log-panel" class="ActionBarLink ActionBarLink--green" data-action="toggle-log-panel" title="Today's log is still open — a log was started but not closed">🌅 Open Logs</a>
+            <a href="/log?status=open" class="ActionBarLink ActionBarLink--green" title="Today's log is still open — open the log list">🌅 Open Logs</a>
             [% END %]
             <button class="ActionBarBtn ActionBarBtn--orange" data-action="end-day" title="End your day — closes today's open log entry">🌙 End Day</button>
             <span id="dl-feedback" class="ActionBarFeedback" aria-live="polite"></span>

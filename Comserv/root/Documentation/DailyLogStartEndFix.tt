@@ -1,0 +1,124 @@
+[% META
+   title = "Daily log Start Day and End Day fix"
+   description = "Start Day was posting twice, so OK showed 'already one for the day'. End Day could report closed while another open row for the same day remained."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "planning"
+   page_version = "0.01"
+   last_updated = "2026-11-20"
+   site_specific = "false"
+   project_id = "138"
+   project_code = "PLANNING"
+%]
+[% PageVersion = 'Documentation/DailyLogStartEndFix.tt,v 0.01 2026/11/20 hermes-agent Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+[% INCLUDE 'admin/documentation/_doc_header.tt'
+    page_title = 'Daily log Start Day and End Day fix'
+    last_updated = '2026-11-20'
+    doc_project_id = 138
+    doc_project_code = 'PLANNING'
+%]
+
+<div class="doc-info" id="now">
+<p class="doc-body"><strong>Now.</strong> Start Day posts once. End Day closes every open daily-log row for that user and date, then re-reads the row. If the status did not become closed, the page gets an error instead of "closed".</p>
+<p class="doc-body"><strong>Blocked by.</strong> Nothing in code. The change is in the planning worktree only. Port 3001 will not show it until this branch is merged. JavaScript needs a hard refresh. The Perl change is picked up by the running <code>-r</code> server on port 4005 when <code>Planning.pm</code> is saved.</p>
+<p class="doc-body"><strong>Next.</strong> Hard-refresh <a class="doc-link" href="/planning/daily">/planning/daily</a> on the planning server, click Start Day once, then End Day once. The day should stay closed after reload.</p>
+</div>
+
+<div id="toc" class="row">
+<div class="col-100">
+<h2 class="doc-h2">Quick navigation</h2>
+<div class="doc-navrow">
+<a class="doc-navlink" href="#tracking">Project</a>
+<a class="doc-navlink" href="#what">What you saw</a>
+<a class="doc-navlink" href="#cause">Cause</a>
+<a class="doc-navlink" href="#change">What changed</a>
+<a class="doc-navlink" href="#check">How to check</a>
+</div>
+</div>
+</div>
+
+<div class="row" id="tracking">
+<div class="col-100">
+<h2 class="doc-h2">Project</h2>
+<div class="doc-navrow">
+<a class="doc-navlink" href="[% c.uri_for('/project/details') %]?project_id=138">Open project #138 (PLANNING)</a>
+<a class="doc-navlink" href="[% c.uri_for('/todo') %]?project_id=138">View todos</a>
+<a class="doc-navlink" href="[% c.uri_for('/Documentation/DailyPlanSystem') %]">Planning system doc</a>
+<a class="doc-navlink" href="[% c.uri_for('/Documentation/features/daily_plan') %]">Daily Plan how-to</a>
+</div>
+<p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+</div>
+</div>
+
+<div class="row" id="what">
+<div class="col-100">
+<h2 class="doc-h2">What you saw</h2>
+<p class="doc-body">Start Day did create the log. Dismissing the OK dialog then showed "you already have one for the day", as if the button had been clicked again.</p>
+<p class="doc-body">End Day (the orange button, not the Open Logs link) said the log was closed. After that the day was still open.</p>
+<p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+</div>
+</div>
+
+<div class="row" id="cause">
+<div class="col-100">
+<h2 class="doc-h2">Cause</h2>
+<p class="doc-body"><code>js_load.tt</code> included <code>daily-plan-utils.js</code> twice on <code>/planning/daily</code>: once because the URL matches, and again because the same page sets <code>needs_todo_card_js</code>. Each copy registered its own click handler, so one click sent two posts.</p>
+<p class="doc-body">The first Start Day post created the log. The second found it and returned "already have an open daily log". The browser showed that second message when OK was clicked on the first alert.</p>
+<p class="doc-body">End Day closed only the newest open row (<code>rows =&gt; 1</code>). A second open row for the same day — left by the double Start Day — stayed status 2, so the page still showed the day as open after the "closed" message. The success text was sent before anyone checked that the row had actually changed.</p>
+<p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+</div>
+</div>
+
+<div class="row" id="change">
+<div class="col-100">
+<h2 class="doc-h2">What changed</h2>
+<table class="doc-table">
+<tr>
+<th class="doc-th">File</th>
+<th class="doc-th">Change</th>
+</tr>
+<tr>
+<td class="doc-td"><code>root/js_load.tt</code></td>
+<td class="doc-td">Do not include <code>daily-plan-utils.js</code> a second time on pages that already loaded it.</td>
+</tr>
+<tr class="doc-tr-alt">
+<td class="doc-td"><code>root/static/js/planning/daily-plan-utils.js</code></td>
+<td class="doc-td">Ignore a second load of the file. Ignore a second click while a post is in flight. Do not touch a missing log panel.</td>
+</tr>
+<tr>
+<td class="doc-td"><code>root/static/js/planning/daily-plan.js</code></td>
+<td class="doc-td">Do not write the feedback line if that element is missing. Same in-flight guard for the old inline button.</td>
+</tr>
+<tr class="doc-tr-alt">
+<td class="doc-td"><code>lib/Comserv/Controller/Planning.pm</code></td>
+<td class="doc-td">End Day closes every open daily-log row for that user and date, re-reads each row, and returns an error if status is still open. A second click on an already-closed day says already closed instead of failing silently.</td>
+</tr>
+<tr>
+<td class="doc-td"><code>root/admin/planning/DailyPlan.tt</code></td>
+<td class="doc-td">The green Open Logs link goes to <code>/log?status=open</code>. It no longer points at a <code>#log-panel</code> that this page does not have.</td>
+</tr>
+</table>
+<p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+</div>
+</div>
+
+<div class="row" id="check">
+<div class="col-100">
+<h2 class="doc-h2">How to check</h2>
+<ol class="doc-body">
+<li>Hard-refresh <a class="doc-link" href="/planning/daily">/planning/daily</a> on the planning server (port 4005). Port 3001 is a different tree.</li>
+<li>Click Start Day once. One message. No second "already one for the day" after OK.</li>
+<li>Click End Day once. The message names the log number. Reload. The green Open Logs link is gone, and the log at <a class="doc-link" href="/log?status=open">/log?status=open</a> is not still open for today.</li>
+</ol>
+<p class="doc-muted">Not committed. Review the diff and commit when it looks right.</p>
+<p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+</div>
+</div>
+
+<div class="doc-footer">
+<p class="doc-body">Owning project <a class="doc-link" href="[% c.uri_for('/project/details') %]?project_id=138">#138 PLANNING</a>. Route checked against <code>Documentation.pm</code> <code>view :Path('/Documentation') :Args(1)</code> — this file is <code>/Documentation/DailyLogStartEndFix</code>.</p>
+</div>
+</div>

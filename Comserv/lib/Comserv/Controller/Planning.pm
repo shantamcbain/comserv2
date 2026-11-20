@@ -2148,35 +2148,82 @@ sub _daily_log_action {
     }
 
     if ($action eq 'end') {
-        my $open_entry;
+        # Match the page lookup (username + today's abstract + status 2). Do not
+        # stop at one row: a double Start Day left two open rows, End Day closed
+        # only the newest, and the page still showed the day as open.
+        my @open;
         eval {
-            $open_entry = $schema->resultset('Log')->search(
-                { username => $username, sitename => $sitename,
+            @open = $schema->resultset('Log')->search(
+                { username => $username,
                   abstract => { -like => "%Good Morning - Daily Log - $today%" },
                   status   => 2 },
-                { order_by => { -desc => 'record_id' }, rows => 1 }
-            )->first;
+                { order_by => { -desc => 'record_id' } }
+            )->all;
         };
-        unless ($open_entry) {
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_daily_log_action',
+                "End-of-day lookup failed for $username $today: $@");
+            return { success => JSON::false, error => 'Could not look up the daily log' };
+        }
+        unless (@open) {
+            my $closed;
+            eval {
+                $closed = $schema->resultset('Log')->search(
+                    { username => $username,
+                      abstract => { -like => "%Good Morning - Daily Log - $today%" },
+                      status   => 3 },
+                    { order_by => { -desc => 'record_id' }, rows => 1 }
+                )->first;
+            };
+            if ($closed) {
+                return {
+                    success  => JSON::true,
+                    action   => 'end',
+                    entry_id => $closed->record_id + 0,
+                    response => "Daily log #" . $closed->record_id . " is already closed.",
+                    message  => 'Daily log already closed.',
+                };
+            }
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_daily_log_action',
+                "End-of-day found no open log for $username sitename=$sitename date=$today");
             return {
                 success  => JSON::false,
                 response => "No open daily log found for today. Click \x{1F305} Start Day or type \"good morning\" to start one.",
                 error    => 'No open log entry for today',
             };
         }
+
         my $now_end = Comserv::Util::AppTime->now_hms_utc;
-        eval { $open_entry->update({ status => 3, end_time => $now_end }) };
-        return { success => JSON::false, error => "Could not close log entry: $@" } if $@;
-
+        my @closed_ids;
+        for my $row (@open) {
+            eval { $row->update({ status => 3, end_time => $now_end }) };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_daily_log_action',
+                    "End-of-day update failed for #" . $row->record_id . ": $@");
+                return { success => JSON::false, error => "Could not close log entry: $@" };
+            }
+            eval { $row->discard_changes };
+            my $st = eval { $row->status };
+            if (!defined $st || $st != 3) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_daily_log_action',
+                    "End-of-day Log #" . $row->record_id . " still status '$st' after update");
+                return {
+                    success => JSON::false,
+                    error   => 'Close did not stick. The log is still open.',
+                    message => 'Failed to close day.',
+                };
+            }
+            push @closed_ids, $row->record_id + 0;
+        }
+        my $id_list = join(', ', map { "#$_" } @closed_ids);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
-            "End-of-day Log #" . $open_entry->record_id . " closed by $username");
-
+            "End-of-day $id_list closed by $username");
         return {
             success  => JSON::true,
             action   => 'end',
-            entry_id => $open_entry->record_id + 0,
-            response => "\x{1F319} Good night, $username! Your daily log has been closed (Log #" . $open_entry->record_id . "). View it at <a href='/log'>/log</a>.",
-            message  => "Daily log closed.",
+            entry_id => $closed_ids[0],
+            response => "\x{1F319} Good night, $username! Daily log $id_list closed. View it at <a href='/log'>/log</a>.",
+            message  => 'Daily log closed.',
         };
     }
 
