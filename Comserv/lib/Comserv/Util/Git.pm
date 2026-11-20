@@ -616,6 +616,12 @@ sub _run {
     $result->{exit_code} = $code;
     $result->{output}    = defined $out ? $out : '';
     $result->{error}     = defined $err ? $err : '';
+    # aikido-local-scanner prints this alone on stderr for a CLEAN commit scan.
+    # It is not a failure. Strip it only when it is the entire stderr of a
+    # commit, so other commands and mixed hook messages are left intact.
+    if ($subcmd eq 'commit' && $result->{error} =~ /\A\s*No secrets detected in staged files\.?\s*\z/) {
+        $result->{error} = '';
+    }
     $result->{success}   = ($code == 0) ? 1 : 0;
 
     # Log level: a non-zero exit is usually an error, but some expected/graceful
@@ -677,6 +683,11 @@ sub _run {
     my $abort_noop = ($subcmd eq 'merge')
         && (grep { defined $_ && $_ eq '--abort' } @argv)
         && $combined =~ /There is no merge to abort|MERGE_HEAD missing/i;
+    # `git commit -- <path>` with that file still in the worktree is a no-op
+    # ("no changes added to commit", exit 1). The caller classifies it. Do not
+    # spawn an error-audit todo for a commit that recorded nothing.
+    my $commit_noop = ($subcmd eq 'commit')
+        && $combined =~ /no changes added to commit|nothing to commit|nothing added to commit/i;
     # `rev-parse --verify --quiet <ref>` is an EXISTENCE PROBE: "the ref is not
     # there" is signalled by exit 1 with empty stdout AND empty stderr. Callers
     # (get_available_branches, catch_up) already branch on that. Logging the
@@ -707,6 +718,7 @@ sub _run {
                  : $ff_only_refused         ? 'warn'
                  : $merge_conflict          ? 'warn'
                  : $merge_local_changes     ? 'warn'
+                 : $commit_noop             ? 'warn'
                  : $benign                  ? 'info'
                  :                            'error';
     my $shown = ($result->{output} // '');
@@ -2372,9 +2384,10 @@ sub merge_branch {
     if (grep { $self->data_entry_runtime_path($_) } @tracked_dirty) {
         my $u = $self->commit_untrack_runtime_trials($c, $repo);
         unless ($u->{success}) {
+            $result->{uncommitted} = 1;
             $result->{reason}    = 'uncommitted';
             $result->{error_msg} = "Could not untrack runtime trial state before merge: " . ($u->{error} || '');
-            $result->{fix_hint}  = "On the Git page, tick Comserv/data/ai_trials/*.state.json, choose Untrack + gitignore, and commit.";
+            $result->{fix_hint}  = 'Retry Merge. If it still refuses, tick Comserv/data/ai_trials/*.state.json, Untrack + gitignore, commit. A "No secrets detected" line is a clean scan, not the reason.';
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge', $result->{error_msg});
             return $result;
         }
@@ -2387,9 +2400,10 @@ sub merge_branch {
         if ($main_repo || $on_main) {
             my $u = $self->commit_untrack_runtime_trials($c, $main_repo);
             unless ($u->{success}) {
+                $result->{uncommitted} = 1;
                 $result->{reason}    = 'uncommitted_on_main';
                 $result->{error_msg} = "Could not untrack runtime trial state on main: " . ($u->{error} || '');
-                $result->{fix_hint}  = "On :3001 /admin/git, tick Comserv/data/ai_trials/*.state.json, Untrack + gitignore, commit.";
+                $result->{fix_hint}  = 'Retry Merge. If it still refuses, on :3001 /admin/git tick Comserv/data/ai_trials/*.state.json, Untrack + gitignore, commit. A "No secrets detected" line is a clean scan, not the reason.';
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge', $result->{error_msg});
                 return $result;
             }
@@ -3332,27 +3346,91 @@ sub tracked_runtime_trial_paths {
 
 # Drop tracked trial snapshots from the index and commit that deletion only.
 # The files stay on disk (the app rewrites them). No-op when none are tracked.
-# On commit refusal the staged deletion is unstaged so the tree is unchanged.
+# On commit refusal the tree is unchanged.
+#
+# Do not `git rm --cached` and then `git commit -- <paths>` while the files
+# are still on disk. A path-limited commit is `git commit --only`: git rebuilds
+# those paths from the worktree, drops the staged deletion, and exits 1 with
+# "no changes added to commit". Rename each file to a sibling in the same
+# directory, commit the absence, rename it back. Same-directory rename keeps
+# mode, owner, and mtime, and a crash leaves the file next to its path rather
+# than only in a temp dir. The next call renames a leftover aside file back
+# before committing. Other staged files stay staged.
 sub commit_untrack_runtime_trials {
     my ($self, $c, $repo) = @_;
     my $run = (defined $repo && length $repo) ? { repo => $repo } : {};
     my $paths = $self->tracked_runtime_trial_paths($c, $repo);
     return { success => 1, paths => [], committed => 0 } unless @$paths;
-    my $rm = $self->_run($c, 'rm', '--cached', '--', @$paths, $run);
-    unless ($rm->{success}) {
-        my $err = $rm->{error} || $rm->{output} || 'git rm --cached failed';
+
+    my $root = $repo;
+    if (!defined $root || !length $root || !-d $root) {
+        my $top = $self->_run($c, 'rev-parse', '--show-toplevel', $run);
+        $root = $top->{success} ? ($top->{output} // '') : '';
+        $root =~ s/\s+\z//;
+    }
+    unless (defined $root && length $root && -d $root) {
+        my $err = 'could not resolve checkout to untrack trial state';
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
             "commit_untrack_runtime_trials: $err");
         return { success => 0, paths => $paths, committed => 0, error => $err };
     }
+
+    my @held;
+    my $fail;
+    for my $rel (@$paths) {
+        if ($rel =~ m{\A/} || $rel =~ m{(^|/)\.\.(/|\z)}) {
+            $fail = "refusing to move a path outside the checkout: $rel";
+            last;
+        }
+        my $dest  = "$root/$rel";
+        my $aside = "$dest.untrack-aside";
+        if (!-e $dest && -f $aside) {
+            unless (rename $aside, $dest) {
+                $fail = "could not restore leftover aside file for $rel: $!";
+                last;
+            }
+        }
+        next unless -f $dest;
+        if (-e $aside) {
+            $fail = "aside file already exists for $rel";
+            last;
+        }
+        unless (rename $dest, $aside) {
+            $fail = "could not move $rel aside: $!";
+            last;
+        }
+        push @held, { dest => $dest, aside => $aside, rel => $rel };
+    }
+
+    my $restore = sub {
+        for my $h (@held) {
+            if (-e $h->{dest}) {
+                unlink $h->{aside} if -f $h->{aside};
+                next;
+            }
+            unless (rename $h->{aside}, $h->{dest}) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+                    "commit_untrack_runtime_trials: could not restore $h->{rel}: $!");
+            }
+        }
+    };
+
+    if ($fail) {
+        $restore->();
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "commit_untrack_runtime_trials: $fail");
+        return { success => 0, paths => $paths, committed => 0, error => $fail };
+    }
+
     my $cm = $self->_run($c, 'commit', '-m',
         'untrack AI trial state (runtime snapshots were blocking merges)',
         '--', @$paths, $run);
+    $restore->();
     unless ($cm->{success}) {
-        my $err = $cm->{error} || $cm->{output} || 'untrack commit refused';
-        $self->_run($c, 'restore', '--staged', '--', @$paths, $run);
+        my $err = $cm->{output} || $cm->{error} || 'untrack commit refused';
+        $err =~ s/\s+\z//;
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
-            "commit_untrack_runtime_trials: commit refused, index restored: $err");
+            "commit_untrack_runtime_trials: commit refused: $err");
         return { success => 0, paths => $paths, committed => 0, error => $err };
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_merge',
