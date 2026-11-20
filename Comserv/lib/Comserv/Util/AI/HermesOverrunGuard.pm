@@ -534,8 +534,10 @@ sub chain_candidates {
         }
         elsif ($t eq 'local')  { $cand = $find->('ollama-launch', $m) || { name => "ollama-launch/$m", provider => 'ollama-launch', default => $m,
                       base_url => 'http://127.0.0.1:11434/v1', api_mode => 'chat_completions', ollama => $m, free => 1 } }
+        # Nov 20 2026 (Shanta): free steps on another provider (nous = Nous Portal) keep that provider;
+        # only the base_url differs (set_model writes it when the guard switches to the step).
         else                   { $cand = $find->($prov, $m) || { name => "$prov/$m", provider => $prov, default => $m,
-                      base_url => 'https://openrouter.ai/api/v1', api_mode => 'chat_completions', health => "$prov|$m", free => 1 } }
+                      base_url => ($prov eq 'nous' ? 'https://inference-api.nousresearch.com/v1' : 'https://openrouter.ai/api/v1'), api_mode => 'chat_completions', health => "$prov|$m", free => 1 } }
         next if $seen{ $cand->{name} }++;
         push @main, $cand;
     }

@@ -367,12 +367,41 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     my $msg = '';
 
     if ($op eq 'stage') {
-        # -f: a tracked path can be matched by a .gitignore added later (e.g.
-        # data/ai_trials/), and plain `git add` refuses it. Paths are already
-        # validated against git status --porcelain, so -f adds no new exposure.
-        my ($out, $code) = $self->_git_list($c, 'add', '-f', '--', @{ $validated->{valid} });
-        $ok = ($code == 0);
-        $msg = $ok ? "Staged " . scalar(@{ $validated->{valid} }) . " file(s)." : "Stage failed: $out";
+        # Trial snapshots are runtime. Staging them as content re-commits a
+        # timestamp and the next merge conflicts. Untrack instead; the file stays.
+        my (@runtime, @rest);
+        for my $p (@{ $validated->{valid} }) {
+            if ($self->git_service->data_entry_runtime_path($p)) { push @runtime, $p }
+            else { push @rest, $p }
+        }
+        my @msgs;
+        my $failed = 0;
+        if (@runtime) {
+            my @tracked = grep { !$validated->{untracked}{$_} } @runtime;
+            if (@tracked) {
+                my ($out, $code) = $self->_git_list($c, 'rm', '--cached', '--', @tracked);
+                if ($code != 0) {
+                    $ok = 0;
+                    $msg = "Untrack failed: $out";
+                    $failed = 1;
+                }
+                else {
+                    push @msgs, "Untracked " . scalar(@tracked) . " runtime trial file(s) (kept on disk). Commit to finish.";
+                }
+            }
+            my $left = @runtime - @tracked;
+            push @msgs, "Left $left untracked trial file(s) out of git." if $left && !$failed;
+        }
+        if (!$failed && @rest) {
+            my ($out, $code) = $self->_git_list($c, 'add', '-f', '--', @rest);
+            $ok = ($code == 0);
+            $msg = $ok ? "Staged " . scalar(@rest) . " file(s)." : "Stage failed: $out";
+            $msg .= ' ' . join(' ', @msgs) if @msgs && $ok;
+        }
+        elsif (!$failed) {
+            $ok = @msgs ? 1 : 0;
+            $msg = join(' ', @msgs) || 'Nothing staged.';
+        }
     }
     elsif ($op eq 'unstage') {
         my ($out, $code) = $self->_git_list($c, 'restore', '--staged', '--', @{ $validated->{valid} });
@@ -410,10 +439,19 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
                     }
                 }
                 my @to_add = grep { $stage_needed{$_} } @{ $validated->{valid} };
+                # Never re-add a trial snapshot. A ticked one is untracked
+                # (file stays on disk) so the commit records the deletion.
+                my @runtime = grep { $self->git_service->data_entry_runtime_path($_) } @{ $validated->{valid} };
+                my @runtime_tracked = grep { !$validated->{untracked}{$_} } @runtime;
+                if (@runtime_tracked) {
+                    my ($rout, $rcode) = $self->_git_list($c, 'rm', '--cached', '--', @runtime_tracked);
+                    if ($rcode != 0) {
+                        $msg = "Untrack-before-commit failed: $rout";
+                        goto COMMIT_DONE;
+                    }
+                }
+                @to_add = grep { !$self->git_service->data_entry_runtime_path($_) } @to_add;
                 if (@to_add) {
-                    # -f: without it, a tracked file that a LATER .gitignore rule now
-                    # matches (Comserv/data/ai_trials/) fails with "paths are ignored"
-                    # and the whole commit aborts. See ALLOWED_FLAGS{add} in Util::Git.
                     my ($aout, $acode) = $self->_git_list($c, 'add', '-f', '--', @to_add);
                     if ($acode != 0) {
                         $msg = "Stage-before-commit failed: $aout";

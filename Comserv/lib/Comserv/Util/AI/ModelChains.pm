@@ -26,6 +26,9 @@ our @PURPOSES = qw(chat docs coding title);
 # Slug grammar: provider|model. Providers the Router can dispatch.
 # Oct 31 2026 (Shanta): xai = paid x.ai direct API (cash, shared caps with OpenRouter).
 our $SLUG_RE = qr/^(?:openrouter|external|supergrok|grok|ollama|xai)\|[A-Za-z0-9._:\/~+\-]+$/;
+# Nov 20 2026 (Shanta): the Hermes chains may also name Nous Portal (provider nous). Hermes calls
+# it directly (not the AI2 Router), so only hermes_fallback_chain / hermes_emergency_chain accept it.
+our $HERMES_SLUG_RE = qr/^(?:openrouter|external|supergrok|grok|ollama|xai|nous)\|[A-Za-z0-9._:\/~+\-]+$/;
 # "ollama|auto" = first installed chat-capable Ollama tag at call time.
 our $OLLAMA_AUTO = 'ollama|auto';
 
@@ -157,6 +160,7 @@ sub slug_tier {
     return 'supergrok' if $p =~ /^(?:supergrok|grok)$/;
     return 'local'     if $p eq 'ollama';
     return ($m =~ /:free\z/ ? 'free' : 'paid') if $p eq 'openrouter';
+    return 'free' if $p eq 'nous' && $m =~ /:free\z/;   # Nov 20 2026: Nous Portal free plan ($0)
     return 'paid';
 }
 
@@ -169,7 +173,7 @@ sub _validate_hermes {
         unless (ref $v eq 'ARRAY' && @$v) { push @e, "$k must be a non-empty list"; next }
         my %seen;
         for my $s (@$v) {
-            if (!defined $s || ref $s || $s !~ $SLUG_RE) { push @e, "$k: bad slug " . (defined $s && !ref $s ? $s : '(non-string)'); next }
+            if (!defined $s || ref $s || $s !~ $HERMES_SLUG_RE) { push @e, "$k: bad slug " . (defined $s && !ref $s ? $s : '(non-string)'); next }
             push @e, "$k: duplicate slug $s" if $seen{$s}++;
             my ($p, $m) = split /\|/, $s, 2;
             push @e, "$k: $s is banned on openrouter (grok only through Super Grok; no glm / v4-pro)"

@@ -21,3 +21,7 @@ Comserv/data/ai_review_scores.json
 Comserv/data/ai_reviewer_spend.json
 Comserv/data/supergrok_pacing.json
 Comserv/root/static/ai/*_seen.json
+# Trial snapshots. *_state.json above does not match particle_1.state.json (dot, not underscore).
+# Tracked copies are rewritten on every check and conflict on every merge.
+Comserv/data/ai_trials/*.state.json
+Comserv/data/ai_trials/*.tasks.jsonl

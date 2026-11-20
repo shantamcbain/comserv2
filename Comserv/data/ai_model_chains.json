@@ -122,12 +122,17 @@
     "supergrok|grok-4.7",
     "openrouter|particle-ai/particle-1",
     "openrouter|openai/gpt-5.6-luna",
-    "openrouter|baidu/ernie-5.5-flash-preview:free",
-    "openrouter|cohere/north-mini-code:free"
+    "nous|qwen/qwen4-max:free",
+    "nous|tencent/hy4-flash:free",
+    "nous|meituan/longcat-2.5:free",
+    "nous|stepfun/step-3.7-flash:free",
+    "openrouter|baidu/ernie-5.5-flash-preview:free"
   ],
   "hermes_emergency_chain": [
     "ollama|gemma4-64k:latest",
-    "openrouter|nvidia/nemotron-3.5-lightning:free"
+    "openrouter|nvidia/nemotron-3.5-lightning:free",
+    "nous|upstage/solar-mini4:free"
   ],
-  "_hermes_chain_20261112": "Nov 12 2026 (Shanta): baidu/ernie-5.5-flash-preview:free inserted ahead of north-mini as the free Hermes step (Crouton Alpha gone; inkling-2-small:free failed a direct test). When Super Grok is unavailable the default/switch target stays particle-1 (cap_exempt). Do not re-add xai|grok-4.7."
+  "_hermes_chain_20261112": "Nov 12 2026 (Shanta): baidu/ernie-5.5-flash-preview:free inserted ahead of north-mini as the free Hermes step (Crouton Alpha gone; inkling-2-small:free failed a direct test). When Super Grok is unavailable the default/switch target stays particle-1 (cap_exempt). Do not re-add xai|grok-4.7.",
+  "_hermes_chain_20261120": "Nov 20 2026 (Shanta): Nous Portal free models added after the guard's Nov 19 rebuild dropped them; north-mini removed (gone from OpenRouter)."
 }
