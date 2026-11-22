@@ -277,9 +277,9 @@ sub _label_models {
             price_known      => $known ? 1 : 0,
         };
     }
-    # Pin grok-4.6 first — same as the Hermes SuperGrok picker.
+    # Pin grok-4.7 first (Shanta Nov 21: no cost difference vs 4.6, use the better model).
     @out = sort {
-        ($b->{id} eq 'grok-4.6') <=> ($a->{id} eq 'grok-4.6')
+        ($b->{id} eq 'grok-4.7') <=> ($a->{id} eq 'grok-4.7')
         || $a->{id} cmp $b->{id}
     } @out;
     return @out;

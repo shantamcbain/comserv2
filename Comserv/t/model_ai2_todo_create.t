@@ -98,4 +98,44 @@ ok(!Comserv::Model::AI2::ChatIntent::looks_like_todo_create('plan the refactor a
 ok(Comserv::Model::AI2::ChatIntent::looks_like_todo_create('add a todo pin SuperGrok'),
     'explicit add-a-todo still matches in editor context');
 
+
+# CSC-20260914-9320: open-this-todo is not create-todo.
+ok(Comserv::Model::AI2::ChatIntent::looks_like_todo_open('open this todo'),
+    'open this todo is open intent');
+ok(Comserv::Model::AI2::ChatIntent::looks_like_todo_open('please open todo #2772'),
+    'open todo #N is open intent');
+ok(Comserv::Model::AI2::ChatIntent::looks_like_todo_open('take me to the current todo'),
+    'take me to the current todo is open intent');
+ok(!Comserv::Model::AI2::ChatIntent::looks_like_todo_open('open a new todo for the editor'),
+    'open a new todo is not open intent');
+ok(!Comserv::Model::AI2::ChatIntent::looks_like_todo_open('open a support ticket about todos'),
+    'open a support ticket is not todo-open');
+ok(!Comserv::Model::AI2::ChatIntent::looks_like_todo_create('open this todo'),
+    'open this todo is not create intent');
+ok(!$m->detect_create_intent('open this todo'),
+    'TodoCreate detect_create_intent ignores open this todo');
+
+{
+    package local::FakeTodoC;
+    sub new { bless { session => { username => 'cscdeveloper' } }, shift }
+    sub session { shift->{session} }
+    sub stash { return {} }
+}
+my $oc = local::FakeTodoC->new;
+my $open_hit = $m->try_chat_create($oc, prompt => 'open this todo', page_path => '/todo/details?record_id=2772');
+ok($open_hit && $open_hit->{handled}, 'open this todo is handled');
+ok($open_hit->{todo_action} && $open_hit->{todo_action}{action} eq 'open', 'action is open, not create');
+is($open_hit->{todo_action}{todo_id}, 2772, 'resolves record_id from page_path');
+like($open_hit->{response} // '', qr{/todo/details\?record_id=2772}, 'reply includes todo URL');
+unlike($open_hit->{response} // '', qr/short subject/i, 'does not ask for a create-todo subject');
+
+my $open_num = $m->try_chat_create($oc, prompt => 'open todo 2772');
+ok($open_num && $open_num->{todo_action} && $open_num->{todo_action}{todo_id} == 2772,
+    'resolves todo number from prompt');
+
+my $open_ask = $m->try_chat_create($oc, prompt => 'open this todo');
+ok($open_ask && $open_ask->{todo_action}{need_clarify},
+    'asks for a todo number when none is in context');
+unlike($open_ask->{response} // '', qr/short subject/i, 'clarify is for the todo number, not a subject');
+
 done_testing();

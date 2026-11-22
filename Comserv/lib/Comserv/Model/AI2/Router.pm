@@ -605,6 +605,8 @@ sub select_model {
     }
     # ONE definition of "editor agent" (ChatIntent::is_editor_agent). Router had
     # its own copy of this regex and the two drifted (skill: keep one definition).
+    # Nov 21 2026: load it here; without this the Router died in tests (no plan).
+    require Comserv::Model::AI2::ChatIntent;
     my $is_editor_agent = Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id) ? 1 : 0;
     my $is_cheap_default = ($requested // '') =~ /cohere\/north-mini|gemma-4-31b-it:free|nemotron-3\.5-lightning:free|north-mini-code:free/i;
     my $editor_read_phase = ($is_editor_agent && lc($phase // '') =~ /^(analyze|plan|clarify)$/) ? 1 : 0;

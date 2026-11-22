@@ -789,9 +789,9 @@
                     automatic.value = '';
                     automatic.textContent = 'Use automatic model selection';
                     aiModelSelect.insertBefore(automatic, aiModelSelect.firstChild);
-                    // Default to north-mini-code (cheap/free coding model) for commit message drafting
+                    // Default to nemotron-3.5-lightning:free (north-mini-code:free retired by OpenRouter Nov 2026) for commit message drafting
                     // instead of letting automatic selection potentially pick Grok/SuperGrok.
-                    aiModelSelect.value = 'openrouter|cohere/north-mini-code:free';
+                    aiModelSelect.value = 'openrouter|nvidia/nemotron-3.5-lightning:free';
                 },
                 onError: function () {
                     aiModelSelect.innerHTML = '<option value="">Automatic model selection</option>';

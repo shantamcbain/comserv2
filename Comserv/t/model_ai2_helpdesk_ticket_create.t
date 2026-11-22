@@ -102,5 +102,234 @@ ok((($guest_ready->{ticket_action}{error} // '') ne 'Login required'),
     'guest+email never Login required');
 
 
+
+# todo #2490: AI ticket create fail-closes on the shared honeypot / rate guards.
+{
+    package local::FakeReq2;
+    sub new { my ($c, %p) = @_; bless { params => { %p }, address => '127.0.0.1' }, $c }
+    sub params  { $_[0]{params} }
+    sub address { $_[0]{address} }
+    sub header  { undef }
+    package local::FakeGuestC2;
+    sub new {
+        my ($c, %a) = @_;
+        bless {
+            session => { username => 'guest', email => '', hd_public_submits => $a{stamps} || [] },
+            req     => $a{req} || local::FakeReq2->new(website => ''),
+            stash   => {},
+        }, $c;
+    }
+    sub session { $_[0]{session} }
+    sub stash   { $_[0]{stash} }
+    sub req     { $_[0]{req} }
+}
+my $hp_create = $hd->create_from_params(
+    local::FakeGuestC2->new(req => local::FakeReq2->new(website => 'http://bot.example')),
+    { subject => 'Need help with billing', description => 'Please call me', email => 'guest@example.com' },
+);
+ok($hp_create && !$hp_create->{success}, 'honeypot does not create a ticket');
+like($hp_create->{error} // '', qr/Submission failed/i, 'honeypot fail-closed message');
+
+my $now = time();
+my $rate_create = $hd->create_from_params(
+    local::FakeGuestC2->new(stamps => [ $now - 5, $now - 10, $now - 15 ]),
+    { subject => 'Need help with billing', description => 'Please call me', email => 'guest@example.com' },
+);
+ok($rate_create && !$rate_create->{success}, 'session rate does not create a ticket');
+like($rate_create->{error} // '', qr/Too many submissions/i, 'rate fail-closed message');
+
+
+# ── Reply / status / close (#2491), no notify (#2494) ───────────────────────
+ok(!$hd->detect_update_intent('Create a HelpDesk ticket: login is broken'),
+    'create prompt is not an update intent');
+ok(!$hd->detect_update_intent('how do I close a ticket'),
+    'how-to is not an update intent');
+
+my $close_i = $hd->detect_update_intent('Please close ticket CSC-20261122-0001');
+ok($close_i && $close_i->{action} eq 'status' && $close_i->{status} eq 'closed',
+    'detects close ticket');
+is($close_i->{ticket_key}, 'CSC-20261122-0001', 'close extracts ticket number');
+
+my $resolve_i = $hd->detect_update_intent('resolve ticket #84');
+ok($resolve_i && $resolve_i->{action} eq 'status' && $resolve_i->{status} eq 'resolved',
+    'detects resolve ticket #id');
+
+my $reopen_i = $hd->detect_update_intent('reopen ticket CSC-20261122-0001');
+ok($reopen_i && $reopen_i->{status} eq 'open', 'reopen maps to open');
+
+my $reply_i = $hd->detect_update_intent('Reply to ticket CSC-20261122-0001: still happening on /planning/daily');
+ok($reply_i && $reply_i->{action} eq 'reply', 'detects reply to ticket');
+like($reply_i->{body}, qr/still happening/i, 'reply body keeps the message');
+is($reply_i->{ticket_key}, 'CSC-20261122-0001', 'reply extracts ticket number');
+
+{
+    package t::FakeTicket;
+    sub new { my ($class, %h) = @_; bless { %h }, $class }
+    sub id { $_[0]{id} }
+    sub ticket_number { $_[0]{ticket_number} }
+    sub user_id { $_[0]{user_id} }
+    sub username { $_[0]{username} }
+    sub email { $_[0]{email} }
+    sub status {
+        my ($self, $v) = @_;
+        $self->{status} = $v if @_ > 1;
+        return $self->{status};
+    }
+    sub closed_at {
+        my ($self, $v) = @_;
+        $self->{closed_at} = $v if @_ > 1;
+        return $self->{closed_at};
+    }
+    sub can { return 1 if $_[1] eq 'closed_at'; return $_[0]->SUPER::can($_[1]); }
+    sub update { $_[0]{updated} = 1; 1 }
+}
+
+{
+    package t::FakeMsg;
+    sub new { my ($class, $row) = @_; bless { %$row, id => 99 }, $class }
+    sub id { $_[0]{id} }
+}
+
+{
+    package t::FakeMsgRS;
+    sub new { my ($class) = @_; bless { created => [] }, $class }
+    sub create {
+        my ($self, $row) = @_;
+        my $msg = t::FakeMsg->new($row);
+        push @{ $self->{created} }, $msg;
+        return $msg;
+    }
+}
+
+{
+    package t::FakeSchema;
+    sub new { my ($class, %h) = @_; bless { %h }, $class }
+    sub resultset {
+        my ($self, $name) = @_;
+        return $self->{msg_rs} if $name eq 'TicketMessage';
+        return $self;
+    }
+    sub find { $_[0]{ticket} }
+}
+
+{
+    package t::FakeC;
+    sub new { my ($class, %h) = @_; bless { %h }, $class }
+    sub session { $_[0]{session} ||= {} }
+    sub stash   { $_[0]{stash}   ||= {} }
+}
+
+{
+    package t::QuietLog;
+    sub instance { bless {}, shift }
+    sub log_message { 1 }
+    sub log_with_details { 1 }
+}
+
+my $ticket = t::FakeTicket->new(
+    id => 84, ticket_number => 'CSC-20261122-0001',
+    user_id => 7, username => 'pat', email => 'pat@example.com',
+    status => 'open',
+);
+my $msg_rs = t::FakeMsgRS->new;
+my $schema = t::FakeSchema->new(ticket => $ticket, msg_rs => $msg_rs);
+$hd->{logging} = t::QuietLog->instance if eval { $hd->can('logging') };
+# The accessor is usually a Moose attr; force via logging() if needed later.
+
+{
+    no warnings 'redefine';
+    local *Comserv::Model::AI2::HelpDeskTicketCreate::_schema = sub { $schema };
+    local *Comserv::Model::AI2::HelpDeskTicketCreate::_find_ticket = sub { $ticket };
+    my $webhook_calls = 0;
+    local *Comserv::Util::HelpDeskWebhook::notify_ticket_change = sub { $webhook_calls++; die 'webhook should not fire' };
+
+    my $guest = t::FakeC->new(session => { username => 'guest' }, stash => { user_roles => ['guest'] });
+    my $g_reply = $hd->reply_from_params($guest, {
+        ticket_number => 'CSC-20261122-0001', body => 'hi',
+    });
+    ok(!$g_reply->{success}, 'guest cannot reply');
+    my $g_status = $hd->set_status_from_params($guest, {
+        ticket_number => 'CSC-20261122-0001', status => 'closed',
+    });
+    ok(!$g_status->{success}, 'guest cannot close');
+
+    my $g_hit = $hd->try_chat_update($guest, prompt => 'close ticket CSC-20261122-0001');
+    ok($g_hit && $g_hit->{handled}, 'guest update is handled');
+    ok(!$g_hit->{ticket_action}{success}, 'guest update is denied');
+    like($g_hit->{response}, qr/log in/i, 'guest is asked to log in');
+
+    my $owner = t::FakeC->new(
+        session => { username => 'pat', user_id => 7, email => 'pat@example.com' },
+        stash   => { user_roles => ['member'] },
+    );
+    my $o_reply = $hd->reply_from_params($owner, {
+        ticket_number => 'CSC-20261122-0001',
+        body          => 'still happening on /planning/daily',
+    });
+    ok($o_reply->{success}, 'owner can reply');
+    is($o_reply->{notified}, JSON::false, 'owner reply is not notified');
+    is(scalar @{ $msg_rs->{created} }, 1, 'TicketMessage row created for owner reply');
+    is($msg_rs->{created}[0]{sender_type}, 'user', 'owner reply sender_type is user');
+    my $o_close = $hd->set_status_from_params($owner, {
+        ticket_number => 'CSC-20261122-0001', status => 'closed',
+    });
+    ok(!$o_close->{success}, 'owner cannot close');
+
+    my $other = t::FakeC->new(
+        session => { username => 'sam', user_id => 8, email => 'sam@example.com' },
+        stash   => { user_roles => ['member'] },
+    );
+    my $x_reply = $hd->reply_from_params($other, {
+        ticket_number => 'CSC-20261122-0001', body => 'not mine',
+    });
+    ok(!$x_reply->{success}, 'non-owner member cannot reply');
+
+    my $staff = t::FakeC->new(
+        session => { username => 'helpdesksupport', user_id => 2 },
+        stash   => { user_roles => ['helpdesksupport'] },
+    );
+    my $s_reply = $hd->reply_from_params($staff, {
+        ticket_number => 'CSC-20261122-0001', body => 'we are looking at it',
+    });
+    ok($s_reply->{success}, 'staff can reply');
+    is($s_reply->{notified}, JSON::false, 'staff reply is not notified');
+    is($msg_rs->{created}[-1]{sender_type}, 'staff', 'staff reply sender_type is staff');
+    my $s_close = $hd->set_status_from_params($staff, {
+        ticket_number => 'CSC-20261122-0001', status => 'closed',
+    });
+    ok($s_close->{success}, 'staff can close');
+    is($s_close->{status}, 'closed', 'staff close sets closed');
+    is($s_close->{notified}, JSON::false, 'staff close is not notified');
+    is($ticket->{status}, 'closed', 'ticket status updated');
+    ok($ticket->{updated}, 'ticket->update called');
+    is($webhook_calls, 0, 'no HelpDeskWebhook notify on reply or status');
+
+    # Editor skip is at the Chat/AI2 caller (#2495); the brain still works if
+    # invoked, and Chat already gates try_chat_create with is_editor_agent.
+}
+
+# chat_contract: guests do not get reply/status actions; staff do.
+my $guest_c = t::FakeC->new(session => { username => 'guest' }, stash => {});
+my $g_contract = $hd->chat_contract($guest_c);
+unlike($g_contract, qr/reply_helpdesk_ticket/, 'guest contract has no reply action');
+unlike($g_contract, qr/close_helpdesk_ticket/, 'guest contract has no close action');
+
+my $staff_c = t::FakeC->new(
+    session => { username => 'helpdesksupport' },
+    stash   => { user_roles => ['helpdesksupport'] },
+);
+my $s_contract = $hd->chat_contract($staff_c);
+like($s_contract, qr/reply_helpdesk_ticket/, 'staff contract includes reply action');
+like($s_contract, qr/close_helpdesk_ticket/, 'staff contract includes close action');
+
+my $mem_c = t::FakeC->new(
+    session => { username => 'pat' },
+    stash   => { user_roles => ['member'] },
+);
+my $m_contract = $hd->chat_contract($mem_c);
+like($m_contract, qr/reply_helpdesk_ticket/, 'member contract includes reply action');
+unlike($m_contract, qr/close_helpdesk_ticket/, 'member contract has no close action');
+
+
 done_testing();
 

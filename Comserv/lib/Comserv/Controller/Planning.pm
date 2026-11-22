@@ -58,7 +58,7 @@ sub daily :Path('/planning/daily') :Args {
     my $user_roles = $c->stash->{user_roles} || $c->session->{roles} || [];
     $user_roles = [$user_roles] unless ref $user_roles eq 'ARRAY';
     my $has_access = $c->stash->{is_admin}
-        || grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$user_roles;
+        || grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal|helpdesksupport|helpdesk|staff)$/ } @$user_roles;
     unless ($has_access) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
             "Access denied for user: " . ($c->session->{username} || 'Guest'));
@@ -181,6 +181,11 @@ sub daily :Path('/planning/daily') :Args {
                     $dev eq $filter_user || $uop eq $filter_user;
                 } @$all_todos_calendar];
             }
+            # CSC-20260915-9174: same viewer ACL as the Focus queue so the
+            # calendar `todos` stash is not an owner-scale dump for members.
+            $all_todos_calendar = $self->_filter_calendar_todos(
+                $c, $all_todos_calendar, $is_csc_admin, \@_filtered_sites
+            );
             if ($all_todos_calendar && ref($all_todos_calendar) eq 'ARRAY') {
                 my $week_first_day = $week_dates[0]{date_str};
                 my $today_str = $current_date_str;
@@ -528,17 +533,11 @@ sub daily :Path('/planning/daily') :Args {
     my @active_priorities;
     eval {
         my $roles    = $c->stash->{user_roles} || [];
-        # Determine ai_role_tier for client-side JavaScript consistency
-        my $is_admin = $c->stash->{is_admin} || 0;
-        my $is_staff = 0;
-        if ($c->session->{user_id}) {
-            my $user_roles = $c->stash->{user_roles} || [];
-            $is_staff = grep { $_ eq 'helpdesksupport' || $_ eq 'staff' } @$user_roles;
-        }
-        my $ai_role_tier = $is_admin ? 'priv' : 
-                           $is_staff ? 'staff' : 
-                           $c->session->{user_id} ? 'member' : 'guest';
-        $c->stash->{ai_role_tier} = $ai_role_tier;
+        # Determine ai_role_tier for client-side JavaScript consistency.
+        # Must use ModelCatalog (guest|member|priv) — JS does not rank 'staff',
+        # so helpdesksupport used to look like a guest (CSC-20260915-9174).
+        require Comserv::Util::ModelCatalog;
+        $c->stash->{ai_role_tier} = Comserv::Util::ModelCatalog->_role_tier($c);
 
         my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
         my %ap_cond = (status => { -not_in => \@done_statuses });
@@ -637,6 +636,10 @@ sub daily :Path('/planning/daily') :Args {
             my %filter_ctx = (
                 role_filtered   => $is_csc_admin ? 0 : 1,
                 is_csc_admin    => $is_csc_admin ? 1 : 0,
+                viewer_username => $c->session->{username} || '',
+                viewer_roles    => {
+                    map { lc($_) => 1 } grep { defined && length } @$roles
+                },
                 permitted_roles => {
                     map { lc($_) => 1 } grep { defined && length } @$roles
                 },
@@ -1344,7 +1347,7 @@ sub daily_impl :Private {
     my $user_roles = $c->stash->{user_roles} || $c->session->{roles} || [];
     $user_roles = [$user_roles] unless ref $user_roles eq 'ARRAY';
     my $has_access = $c->stash->{is_admin}
-        || grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$user_roles;
+        || grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal|helpdesksupport|helpdesk|staff)$/ } @$user_roles;
     unless ($has_access) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
             "Access denied for user: " . ($c->session->{username} || 'Guest'));
@@ -1467,6 +1470,11 @@ sub daily_impl :Private {
                     $dev eq $filter_user || $uop eq $filter_user;
                 } @$all_todos_calendar];
             }
+            # CSC-20260915-9174: same viewer ACL as the Focus queue so the
+            # calendar `todos` stash is not an owner-scale dump for members.
+            $all_todos_calendar = $self->_filter_calendar_todos(
+                $c, $all_todos_calendar, $is_csc_admin, \@_filtered_sites
+            );
             if ($all_todos_calendar && ref($all_todos_calendar) eq 'ARRAY') {
                 my $week_first_day = $week_dates[0]{date_str};
                 my $today_str = $current_date_str;
@@ -1593,10 +1601,25 @@ sub daily_impl :Private {
         }
         my %scope = map { $_ => 1 } @branch_pids;
 
+        my $impl_roles = $c->stash->{user_roles} || $c->session->{roles} || [];
+        $impl_roles = [$impl_roles] unless ref $impl_roles eq 'ARRAY';
+        my %impl_filter_ctx = (
+            role_filtered   => $is_csc_admin ? 0 : 1,
+            is_csc_admin    => $is_csc_admin ? 1 : 0,
+            viewer_username => $c->session->{username} || '',
+            viewer_roles    => { map { lc($_) => 1 } grep { defined && length } @$impl_roles },
+            permitted_roles => { map { lc($_) => 1 } grep { defined && length } @$impl_roles },
+            site_filtered   => $is_csc_admin ? 0 : 1,
+            checked_sites   => { $sitename => 1 },
+        );
         for my $t (@_focus_all) {
             my $h = $row_by_id{ $t->record_id };
             next if Comserv::Util::TodoTypes::is_calendar_fixture($h);
             next if ($h->{is_recurring} // 0);
+            $h->{role_cats} ||= $self->_classify_todo_roles(
+                $h->{project_name} // '', $h->{project_code} // '', $h->{subject} // ''
+            );
+            next unless Comserv::Util::FocusRanking::passes_filters($h, \%impl_filter_ctx);
             Comserv::Util::TodoRanking::score_todo($h, { now_epoch => $now_epoch });
             my $tod       = $h->{time_of_day} // '';
             my $time_min  = 9 * 60;   # default when no time set (matches _reschedule_time_min)
@@ -1922,6 +1945,43 @@ sub daily_log :Path('/planning/daily_log') :Args(0) {
 
     my $result = $self->_daily_log_action($c, $action, $username, $user_id);
     $c->response->body(encode_json($result));
+}
+
+=head2 _filter_calendar_todos
+
+Apply FocusRanking::passes_filters to a list of calendar todo rows so
+/planning/daily's `todos` stash (and the week/day lists derived from it)
+uses the same own-only / programming-only / staff ACL as the Focus queue.
+
+=cut
+
+sub _filter_calendar_todos {
+    my ($self, $c, $todos, $is_csc_admin, $sites) = @_;
+    return $todos unless $todos && ref $todos eq 'ARRAY';
+    return $todos if $is_csc_admin;
+    my $roles = $c->stash->{user_roles} || $c->session->{roles} || [];
+    $roles = [$roles] unless ref $roles eq 'ARRAY';
+    my %checked = map { $_ => 1 } @{ $sites || [] };
+    unless (%checked) {
+        my $sn = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        $checked{$sn} = 1;
+    }
+    my %ctx = (
+        role_filtered   => 1,
+        is_csc_admin    => 0,
+        viewer_username => $c->session->{username} || '',
+        viewer_roles    => { map { lc($_) => 1 } grep { defined && length } @$roles },
+        permitted_roles => { map { lc($_) => 1 } grep { defined && length } @$roles },
+        site_filtered   => 1,
+        checked_sites   => \%checked,
+    );
+    return [ grep {
+        my $h = Comserv::Util::FocusRanking::attrs_from_todo($_);
+        $h->{role_cats} ||= $self->_classify_todo_roles(
+            $h->{project_name} // '', $h->{project_code} // '', $h->{subject} // ''
+        );
+        Comserv::Util::FocusRanking::passes_filters($h, \%ctx);
+    } @$todos ];
 }
 
 =head2 _classify_todo_roles

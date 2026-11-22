@@ -383,8 +383,8 @@
             return ra - rb;
         });
 
-        // Coding default (free north-mini-code). Accept full "provider|model" or bare slug.
-        var CODING_DEFAULT = 'openrouter|cohere/north-mini-code:free';
+        // Coding default (free nemotron-3.5-lightning; north-mini-code retired Nov 2026). Accept full "provider|model" or bare slug.
+        var CODING_DEFAULT = 'openrouter|nvidia/nemotron-3.5-lightning:free';
         var pinTarget = null;
         if (typeof pinModel === 'string' && pinModel) {
             pinTarget = (pinModel.indexOf('|') !== -1)

@@ -50,4 +50,39 @@ my ($s) = Comserv::Controller::HelpDesk->_spam_score('a', 'b https://telegra.ph/
 my ($s2) = $G->score('a', 'b https://telegra.ph/x', 'e@x.com', 1);
 is($s, $s2, 'HelpDesk delegates score');
 
+
+# 6. Shared honeypot + session rate helpers (todo #2490 / AI ticket create)
+ok($G->honeypot_filled('http://spam.example'), 'filled honeypot trips');
+ok(!$G->honeypot_filled(''), 'empty honeypot is ok');
+ok(!$G->honeypot_filled(undef), 'undef honeypot is ok');
+
+{
+    package local::FakeReq;
+    sub new { my ($c, %p) = @_; bless { params => { %p }, address => '127.0.0.1' }, $c }
+    sub params  { $_[0]{params} }
+    sub address { $_[0]{address} }
+    sub header  { undef }
+    package local::FakeC;
+    sub new { my ($c, %a) = @_; bless { session => ($a{session} || {}), req => $a{req} }, $c }
+    sub session { $_[0]{session} }
+    sub req     { $_[0]{req} }
+}
+
+my $hp_c = local::FakeC->new(session => {}, req => local::FakeReq->new(website => 'http://bot'));
+is($G->submit_guard_error($hp_c), 'Submission failed. Please try again.', 'honeypot fail-closed');
+
+my $ok_c = local::FakeC->new(session => {}, req => local::FakeReq->new(website => ''));
+is($G->submit_guard_error($ok_c), '', 'clean stub is not rate-blocked');
+ok($G->record_submit($ok_c), 'record_submit writes session stamp');
+is(scalar @{ $ok_c->session->{hd_public_submits} || [] }, 1, 'one session stamp recorded');
+
+# Three stamps in the last hour already is the public-form session cap.
+my $now = time();
+my $rate_c = local::FakeC->new(
+    session => { hd_public_submits => [ $now - 10, $now - 20, $now - 30 ] },
+    req     => local::FakeReq->new(website => ''),
+);
+is($G->submit_guard_error($rate_c), 'Too many submissions. Please wait before trying again.',
+    'session rate fail-closed at 3/hour');
+
 done_testing;

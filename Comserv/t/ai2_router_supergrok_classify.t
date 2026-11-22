@@ -23,7 +23,7 @@ like $chit->{notes}, qr/skipping supergrok: complexity=/, 'real skip reason logg
 
 my $admin  = FakeC->new({ username => 'Shanta', user_id => 178, roles => ['admin'] });
 my $member = FakeC->new({ username => 'bob', user_id => 5, roles => ['member'] });
-is_deeply [ $r->select_model($admin, prompt => $Q, agent_id => 'general') ], [ 'supergrok', 'grok-4.6' ], 'admin substantive -> SuperGrok';
+is_deeply [ $r->select_model($admin, prompt => $Q, agent_id => 'general') ], [ 'supergrok', 'grok-4.7' ], 'admin substantive -> SuperGrok';
 isnt +($r->select_model($member, prompt => $Q, agent_id => 'general'))[0], 'supergrok', 'member substantive -> not SuperGrok';
 is +($r->select_model($admin, prompt => 'hi', agent_id => 'general'))[1], 'free/chat:free', 'admin chit-chat -> free pick';
 

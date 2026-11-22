@@ -814,10 +814,10 @@ $diff
 PROMPT
 
     # An explicit model from the Git dashboard wins. For commit message suggestion
-    # we default to north-mini-code:free (cheap, reliable coding model) rather than
+    # we default to nemotron-3.5-lightning:free (north-mini-code:free was retired by OpenRouter Nov 2026) rather than
     # letting routing pick Grok/SuperGrok. The dropdown offers the full catalog;
     # value is "provider|model".
-    my $requested_model = $c->req->param('model') || 'openrouter|cohere/north-mini-code:free';
+    my $requested_model = $c->req->param('model') || 'openrouter|nvidia/nemotron-3.5-lightning:free';
     $requested_model = '' if $requested_model =~ /[\x00\r\n]/;
 
     # SINGLE dispatch brain — identical code path to the chat widget and the

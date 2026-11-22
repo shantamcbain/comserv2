@@ -57,4 +57,15 @@ $site_admin->{session}{is_admin} = 1;
 ok(Comserv::Util::ModelCatalog->can_select_model($site_admin), 'session is_admin is priv');
 is(Comserv::Util::ModelCatalog->_role_tier($site_admin), 'priv', 'session is_admin tier');
 
+
+# CSC-20260915-9174: staff roles are members, not guests, and not priv.
+is(rank_for(['helpdesksupport']), 1, 'helpdesksupport = member rank');
+is(Comserv::Util::ModelCatalog->_role_tier(MockC->new(['helpdesksupport'])), 'member',
+    'helpdesksupport tier is member not guest');
+is(rank_for(['staff']), 1, 'staff = member rank');
+is(rank_for(['normal']), 1, 'normal = member rank');
+is(rank_for(['helpdesk']), 1, 'helpdesk = member rank');
+ok(!Comserv::Util::ModelCatalog->can_select_model(MockC->new(['helpdesksupport'])),
+    'helpdesksupport cannot select models (not priv)');
+
 done_testing();

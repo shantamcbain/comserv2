@@ -145,4 +145,28 @@ subtest 'hosted catalogue list_publicly filtering' => sub {
     *Comserv::Controller::Navigation::_hosting_list_publicly_for_sitename = $orig_list;
 };
 
+
+# CSC-20260914-6545: built-in Manufacturing Traveler shortcut when DB has none.
+{
+    my $user_rank = $nav->_role_rank('user');
+    my $guest_rank = $nav->_role_rank('guest');
+    my @none;
+    $nav->_add_builtin_traveler_shortcut(\@none, $user_rank);
+    is(scalar @none, 1, 'adds builtin traveler when list is empty');
+    is($none[0]{url}, '/Accounting/manufacturing', 'builtin traveler URL');
+    ok(grep { $_ eq 'traveler' } @{ $none[0]{trigger_phrases} || [] }, 'traveler trigger present');
+
+    my @guest;
+    $nav->_add_builtin_traveler_shortcut(\@guest, $guest_rank);
+    is(scalar @guest, 0, 'guests do not get the traveler shortcut');
+
+    my @existing = ({
+        label => 'Manufacturing Traveler',
+        url => '/Accounting/manufacturing',
+        trigger_phrases => ['traveler'],
+    });
+    $nav->_add_builtin_traveler_shortcut(\@existing, $user_rank);
+    is(scalar @existing, 1, 'does not duplicate when a DB row already covers traveler');
+}
+
 done_testing;

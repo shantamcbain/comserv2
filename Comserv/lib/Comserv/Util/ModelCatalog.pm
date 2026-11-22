@@ -131,7 +131,10 @@ sub _role_tier {
     my $is_priv  = 0;
     for my $r (@$roles) {
         next unless defined $r && length $r;
-        $is_guest = 0 if $r =~ /^(admin|developer|editor|member|user)$/i;
+        # CSC-20260915-9174: helpdesksupport/staff/normal were treated as guest,
+        # so ComservConfig.roleTier became guest while the page was loaded.
+        # They are members (rank 1), never priv (that unlocks every model).
+        $is_guest = 0 if $r =~ /^(admin|developer|editor|member|user|normal|helpdesksupport|helpdesk|staff|devops)$/i;
         # Editor shares the member catalog + picker rules (not full priv).
         $is_priv  = 1 if $r =~ /^(admin|developer)$/i;
     }
@@ -282,7 +285,7 @@ our @FREE_PREFERENCE = (
     'openrouter|stealth/ox-alpha',                     # 0/0 priced, no :free suffix
 );
 
-our $CODING_DEFAULT = 'openrouter|cohere/north-mini-code:free';
+our $CODING_DEFAULT = 'openrouter|nvidia/nemotron-3.5-lightning:free';   # Nov 22 2026: north-mini-code:free retired by OpenRouter (404)
 
 # AISYSTEM plan §5e: the ordered lists now live in data/ai_model_chains.json
 # (admin-tunable from /ai/eval). @FREE_PREFERENCE / $CODING_DEFAULT above are

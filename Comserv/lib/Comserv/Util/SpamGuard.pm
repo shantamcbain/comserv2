@@ -8,8 +8,10 @@ use utf8;
 #   - HelpDesk /HelpDesk/contact (all SiteNames incl. "none"/default)
 #   - HelpDesk new ticket form
 #   - AI2 HelpDeskTicketCreate and AI2 Actions create_helpdesk_ticket
-# Pure class methods (no $c) so they are testable; callers keep their own
-# honeypot / rate-limit / Turnstile layers (HelpDesk::_spam_guard_fail).
+# Content scoring is pure (no $c) and testable. Honeypot and submit-rate helpers
+# are also here so Chat/Actions ticket create (HelpDeskTicketCreate) can fail-closed
+# on the same session/IP limits as the public forms (todo #2490). Turnstile/math
+# stay on the web form (HelpDesk::_spam_guard_fail).
 #
 #   looks_like_spam($subject, $body)            -> 1/0 known crypto/phish patterns
 #   score($subject, $body, $email, $is_guest)   -> ($score, \@reasons)
@@ -140,6 +142,109 @@ sub valid_email {
     return 0 unless defined $e && length($e) <= 254;
     return 0 if $e =~ /[\r\n\s<>,;"]/;
     return $e =~ /^[A-Za-z0-9._%+'-]+\@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/ ? 1 : 0;
+}
+
+
+# Honeypot field name used by public HelpDesk / contact forms (`website`).
+# Chat rarely sends it; if a bot fills it, fail closed (no ticket).
+sub honeypot_filled {
+    my ($class, $value) = @_;
+    return 1 if defined $value && $value ne '';
+    return 0;
+}
+
+# Same session key and IP rate files as HelpDesk public forms so both paths
+# share one budget (3 submits / session / hour, 5 / IP / hour).
+our $PUBLIC_RATE_SESSION_KEY = 'hd_public_submits';
+our $PUBLIC_RATE_DIR         = '/tmp/comserv_hd_public_rate';
+our $SESSION_RATE_PER_HOUR   = 3;
+our $IP_RATE_PER_HOUR        = 5;
+
+sub _sanitize_ip {
+    my ($class, $ip) = @_;
+    $ip = defined $ip ? "$ip" : 'unknown';
+    $ip =~ s/[^0-9a-fA-F.:]/_/g;
+    $ip = 'unknown' if $ip eq '';
+    return $ip;
+}
+
+sub _client_ip {
+    my ($class, $c) = @_;
+    return 'unknown' unless $c;
+    my $ip = eval {
+        require Comserv::Util::ClientIP;
+        Comserv::Util::ClientIP->from_c($c);
+    };
+    return $class->_sanitize_ip($ip) if defined $ip && $ip ne '';
+    my $addr = eval { $c->req->address } || 'unknown';
+    return $class->_sanitize_ip($addr);
+}
+
+sub session_rate_exceeded {
+    my ($class, $c) = @_;
+    return 0 unless $c && eval { $c->can('session') };
+    my $now  = time();
+    my $list = eval { $c->session->{$PUBLIC_RATE_SESSION_KEY} } || [];
+    return 0 unless ref $list eq 'ARRAY';
+    my @recent = grep { defined $_ && ($_ > $now - 3600) } @$list;
+    return @recent >= $SESSION_RATE_PER_HOUR ? 1 : 0;
+}
+
+sub ip_rate_exceeded {
+    my ($class, $c) = @_;
+    my $ip   = $class->_client_ip($c);
+    my $file = "$PUBLIC_RATE_DIR/$ip";
+    return 0 unless -f $file;
+    my $now = time();
+    my $fh;
+    open $fh, '<', $file or return 0;
+    my $count = 0;
+    while (my $line = <$fh>) {
+        $line =~ s/^\s+|\s+$//g;
+        next unless $line =~ /^\d+$/;
+        $count++ if ($line + 0) > ($now - 3600);
+    }
+    close $fh;
+    return $count >= $IP_RATE_PER_HOUR ? 1 : 0;
+}
+
+# Returns an error message when the shared honeypot or rate guard trips, else ''.
+# $c may be a real Catalyst context or a test stub with session() / req().
+sub submit_guard_error {
+    my ($class, $c) = @_;
+    return '' unless $c;
+    my $hp = eval { $c->req->params->{website} };
+    $hp = '' unless defined $hp;
+    if ($class->honeypot_filled($hp)) {
+        return 'Submission failed. Please try again.';
+    }
+    if ($class->session_rate_exceeded($c) || $class->ip_rate_exceeded($c)) {
+        return 'Too many submissions. Please wait before trying again.';
+    }
+    return '';
+}
+
+sub record_submit {
+    my ($class, $c) = @_;
+    return unless $c && eval { $c->can('session') };
+    my $now  = time();
+    my $list = eval { $c->session->{$PUBLIC_RATE_SESSION_KEY} } || [];
+    $list = [] unless ref $list eq 'ARRAY';
+    push @$list, $now;
+    @$list = grep { defined $_ && ($_ > $now - 3600) } @$list;
+    $c->session->{$PUBLIC_RATE_SESSION_KEY} = $list;
+
+    my $dir = $PUBLIC_RATE_DIR;
+    unless (-d $dir) {
+        mkdir $dir, 0700 or return;
+    }
+    my $ip   = $class->_client_ip($c);
+    my $file = "$dir/$ip";
+    my $fh;
+    open $fh, '>>', $file or return;
+    print {$fh} "$now\n";
+    close $fh;
+    return 1;
 }
 
 1;
