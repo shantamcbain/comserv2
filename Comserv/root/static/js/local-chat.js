@@ -238,7 +238,11 @@
     function _roleRankFromName(name) {
         var n = String(name || '').toLowerCase();
         if (n === 'admin' || n === 'developer' || n === 'priv') return 2;
-        if (n === 'member' || n === 'user' || n === 'editor') return 1;
+        // CSC-20260915-9174: staff / helpdesksupport / normal used to fall
+        // through to rank 0 (guest) even when the page had already loaded.
+        if (n === 'member' || n === 'user' || n === 'editor' || n === 'staff'
+            || n === 'helpdesksupport' || n === 'helpdesk' || n === 'normal'
+            || n === 'devops') return 1;
         return 0;
     }
     function _userRoleRank() {

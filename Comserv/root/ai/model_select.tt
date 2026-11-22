@@ -6,7 +6,7 @@
     close-tag sequence inside this block or the remainder leaks into the page.
 %]
 [% cat = catalog || [];
-   coding_default = 'openrouter|cohere/north-mini-code:free';
+   coding_default = 'openrouter|nvidia/nemotron-3.5-lightning:free';
    svc_order  = [ 'ollama', 'supergrok', 'grok', 'openrouter' ];
    svc_labels = { ollama = 'Ollama (Local)', supergrok = 'SuperGrok (prepaid)', grok = 'xAI Grok (auto-fill)', openrouter = 'OpenRouter' };
 
@@ -33,7 +33,7 @@
 [% ELSE %]
   [%# Editor surface pins the coding model to the very top. %]
   [% IF page == 'editor' && has_coding_default %]
-  <option value="[% coding_default | html %]"[% IF current == coding_default %] selected[% END %]>&#9889; cohere/north-mini-code:free (OpenRouter)</option>
+  <option value="[% coding_default | html %]"[% IF current == coding_default %] selected[% END %]>&#9889; nvidia/nemotron-3.5-lightning:free (OpenRouter)</option>
   [% END %]
   [% FOREACH svc IN svcs %]
     [% items = [];

@@ -422,8 +422,77 @@ sub normalize_subject_description {
 
 # Short-circuit /ai2/chat when the user asked to create a todo.
 # Returns a chat-shaped hash (handled=>1) or undef to fall through to the LLM.
+
+# CSC-20260914-9320: "open this todo" must open, not ask for a create-todo subject.
+sub detect_open_intent {
+    my ($self, $prompt) = @_;
+    require Comserv::Model::AI2::ChatIntent;
+    return unless Comserv::Model::AI2::ChatIntent::looks_like_todo_open($prompt);
+    my $id;
+    if ($prompt =~ /\b(?:todo|task|to-do|to\s+do)s?\s*#?\s*(\d{1,7})\b/i) {
+        $id = $1;
+    }
+    elsif ($prompt =~ /\brecord_id\s*=\s*(\d{1,7})\b/i) {
+        $id = $1;
+    }
+    elsif ($prompt =~ /\b#(\d{1,7})\b/) {
+        $id = $1;
+    }
+    return { record_id => $id };
+}
+
+sub _todo_id_from_page_path {
+    my ($self, $path) = @_;
+    return unless defined $path && $path =~ /\S/;
+    return $1 if $path =~ /[?&]record_id=(\d{1,7})\b/;
+    return $1 if $path =~ m{/todo/(?:details|view|edit)/(\d{1,7})\b};
+    return;
+}
+
+sub try_chat_open {
+    my ($self, $c, %args) = @_;
+    my $intent = $self->detect_open_intent($args{prompt} // '') or return;
+    my $id = $intent->{record_id}
+        || $args{task_id}
+        || $args{todo_id}
+        || $self->_todo_id_from_page_path($args{page_path} // '');
+    unless ($id) {
+        return {
+            handled     => 1,
+            success     => 1,
+            response    => 'I can open that todo. What is the todo number, or open it from the todo page?',
+            model       => '(todo-open)',
+            provider    => 'ai2-todo',
+            todo_action => {
+                success      => JSON::false,
+                need_clarify => JSON::true,
+                field        => 'record_id',
+                action       => 'open',
+            },
+        };
+    }
+    $id = 0 + $id;
+    my $url = "/todo/details?record_id=$id";
+    return {
+        handled     => 1,
+        success     => 1,
+        response    => "Opening todo #$id: $url",
+        model       => '(todo-open)',
+        provider    => 'ai2-todo',
+        todo_action => {
+            success  => JSON::true,
+            action   => 'open',
+            todo_id  => $id,
+            todo_url => $url,
+        },
+    };
+}
+
 sub try_chat_create {
     my ($self, $c, %args) = @_;
+    if (my $open = $self->try_chat_open($c, %args)) {
+        return $open;
+    }
     my $intent = $self->detect_create_intent($args{prompt} // '') or return;
     if ($self->_is_guest($c)) {
         return {

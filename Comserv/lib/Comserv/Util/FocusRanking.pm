@@ -54,11 +54,92 @@ use Comserv::Util::TodoRanking ();
 #       checked_projects=> { 235=>1, 240=>1 },
 #   }
 #
-# Semantics:
+# Semantics (CSC-20260915-9174 security):
 #   - CSC administrators bypass role and SiteName restrictions.
-#   - Every other viewer must match an assigned role or the general category.
+#   - Site admins (admin role, not CSC admin) see their already site-filtered list.
+#   - Developers see programming todos (role_cats includes developer) or their own.
+#   - Editors see editor-classified todos or their own.
+#   - HelpDesk staff see admin/helpdesk-classified todos or their own.
+#   - Members / normal / user see ONLY todos they own, are assigned, reported,
+#     or posted — not the owner-scale site dump. "general" is not a universal pass.
 #   - SiteName is then enforced before project filtering and sorting.
 # ----------------------------------------------------------------------------
+
+# viewer_kind(\%ctx) -> csc_admin|site_admin|developer|editor|staff|member|guest
+# Turn a DBIx row or hashref into the hash passes_filters expects.
+# Used by the Focus queue and by the /planning/daily calendar stash so both
+# surfaces share one ACL (CSC-20260915-9174 calendar leftover).
+sub attrs_from_todo {
+    my ($todo) = @_;
+    $todo = $_[1] if @_ >= 2 && defined $_[0] && !ref($_[0]);
+    return {} unless defined $todo;
+    if (ref $todo eq 'HASH') {
+        return { %$todo };
+    }
+    my %h;
+    if (eval { $todo->can('get_columns') }) {
+        %h = $todo->get_columns;
+    }
+    else {
+        for my $f (qw(record_id sitename project_id parent_id subject project_code
+                      project_name developer owner reporter username_of_poster
+                      role_cats status)) {
+            next unless eval { $todo->can($f) };
+            $h{$f} = $todo->$f();
+        }
+    }
+    return \%h;
+}
+
+sub viewer_kind {
+    my ($ctx) = @_;
+    $ctx //= {};
+    return 'csc_admin' if $ctx->{is_csc_admin};
+    my $raw = $ctx->{viewer_roles} || $ctx->{permitted_roles} || {};
+    my %r;
+    if (ref $raw eq 'HASH') {
+        %r = map { lc($_) => 1 } keys %$raw;
+    }
+    elsif (ref $raw eq 'ARRAY') {
+        %r = map { lc($_) => 1 } grep { defined && length } @$raw;
+    }
+    return 'site_admin' if $r{admin};
+    return 'developer'  if $r{developer} || $r{devops};
+    return 'editor'     if $r{editor};
+    return 'staff'      if $r{helpdesksupport} || $r{helpdesk} || $r{staff};
+    return 'member'     if $r{member} || $r{user} || $r{normal} || ($ctx->{viewer_username} // '') =~ /\S/;
+    return 'guest';
+}
+
+sub is_own_todo {
+    my ($t, $username) = @_;
+    return 0 unless defined $username && $username =~ /\S/;
+    my $want = lc $username;
+    for my $f (qw(developer owner reporter username_of_poster)) {
+        my $v = $t->{$f};
+        next unless defined $v && $v =~ /\S/;
+        return 1 if lc($v) eq $want;
+    }
+    return 0;
+}
+
+sub _todo_role_list {
+    my ($t) = @_;
+    my @roles = split /,/, ($t->{role_cats} // 'general');
+    for my $role (@roles) {
+        $role =~ s/^\s+|\s+$//g;
+    }
+    return grep { length } @roles;
+}
+
+sub _has_role_cat {
+    my ($t, $want) = @_;
+    for my $role (_todo_role_list($t)) {
+        return 1 if lc($role) eq lc($want);
+    }
+    return 0;
+}
+
 sub passes_filters {
     my ($t, $ctx) = @_;
     $t   //= {};
@@ -69,16 +150,26 @@ sub passes_filters {
     if ($ctx->{is_csc_admin}) {
         $show_role = 1;
     } elsif ($ctx->{role_filtered}) {
-        my $permitted = $ctx->{permitted_roles} || {};
-        my @todo_roles = split /,/, ($t->{role_cats} // 'general');
+        my $kind = viewer_kind($ctx);
+        my $own  = is_own_todo($t, $ctx->{viewer_username});
         $show_role = 0;
-        for my $role (@todo_roles) {
-            $role =~ s/^\s+|\s+$//g;
-            next unless length $role;
-            if ($role eq 'general' || $permitted->{$role}) {
-                $show_role = 1;
-                last;
-            }
+        if ($kind eq 'site_admin') {
+            $show_role = 1;
+        }
+        elsif ($kind eq 'developer') {
+            $show_role = 1 if $own || _has_role_cat($t, 'developer');
+        }
+        elsif ($kind eq 'editor') {
+            $show_role = 1 if $own || _has_role_cat($t, 'editor');
+        }
+        elsif ($kind eq 'staff') {
+            $show_role = 1 if $own || _has_role_cat($t, 'admin');
+        }
+        elsif ($kind eq 'member') {
+            $show_role = 1 if $own;
+        }
+        else {
+            $show_role = 0;    # guest
         }
     }
     return 0 unless $show_role;

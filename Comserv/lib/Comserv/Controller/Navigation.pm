@@ -3280,7 +3280,44 @@ sub get_ai_navigation_shortcuts {
         $c->log->error("Error loading AI navigation shortcuts: $@");
     }
 
+    # CSC-20260914-6545: Manufacturing traveler had 0 DB shortcuts, so Chat
+    # claimed the page was unknown. Built-in only when no DB row already covers it.
+    $self->_add_builtin_traveler_shortcut(\@out, $user_rank);
+
     return \@out;
+}
+
+sub _add_builtin_traveler_shortcut {
+    my ($self, $out, $user_rank) = @_;
+    return unless $out && ref $out eq 'ARRAY';
+    my $min_rank = $self->_role_rank('user');
+    return if ($user_rank // 0) < $min_rank;
+    for my $sc (@$out) {
+        my $blob = lc(join ' ',
+            $sc->{label} // '',
+            $sc->{url} // '',
+            join(' ', @{ $sc->{trigger_phrases} || [] }),
+        );
+        return if $blob =~ /traveler/;
+    }
+    push @$out, {
+        id              => 0,
+        label           => 'Manufacturing Traveler',
+        url             => '/Accounting/manufacturing',
+        category        => 'Main_links',
+        sitename        => 'All',
+        is_private      => 0,
+        owner_username  => '',
+        min_role        => 'user',
+        trigger_phrases => [
+            'manufacturing traveler',
+            'traveler',
+            'production traveler',
+            'shop traveler',
+            'open traveler',
+            'open the traveler',
+        ],
+    };
 }
 
 # Match a user phrase against shortcuts (for "open my X account")

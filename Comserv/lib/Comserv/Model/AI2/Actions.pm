@@ -529,8 +529,21 @@ sub perform {
         my $user_id     = $c->session->{user_id} || undef;
         my $username    = $current_user;
 
-        # Shared spam guard (CSC-20261012-0420): spam -> quarantined ticket, no webhook.
+        # Shared spam guard (CSC-20261012-0420 / todo #2490): honeypot + rate
+        # fail closed; content spam is quarantined (no webhook).
         require Comserv::Util::SpamGuard;
+        $subject = Comserv::Util::SpamGuard->clean_header($subject, 255);
+        $email   = Comserv::Util::SpamGuard->clean_header($email, 254) if $email;
+        if (my $guard_err = Comserv::Util::SpamGuard->submit_guard_error($c)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'action',
+                "AI create_helpdesk_ticket blocked by shared submit guard: $guard_err");
+            $c->response->status(429);
+            $c->response->body(encode_json({ success => JSON::false, error => $guard_err }));
+            return;
+        }
+        if ((!$user_id || lc($username // '') eq 'guest') && $priority =~ /^(high|critical|urgent)$/i) {
+            $priority = 'normal';
+        }
         my $sg = Comserv::Util::SpamGuard->verdict(subject => $subject, body => $description,
             email => $email, guest => ($user_id ? 0 : 1));
         $sg->{quarantine} = 1 if Comserv::Util::SpamGuard->looks_like_spam($subject, $description);
@@ -567,6 +580,7 @@ sub perform {
             $c->response->body(encode_json({ success => JSON::false, error => 'Ticket creation failed' }));
             return;
         }
+        eval { Comserv::Util::SpamGuard->record_submit($c) };
         my $ticket_id  = $new_ticket->id // '?';
         my $ticket_num = $new_ticket->ticket_number // $ticket_number;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
@@ -586,6 +600,39 @@ sub perform {
             ticket_number => $ticket_num,
             ticket_url    => "/HelpDesk/ticket/$ticket_num",
         }));
+        return;
+    }
+
+
+    # ── reply / status / close HelpDesk ticket (#2491). No notifications (#2494).
+    if ($action_name eq 'reply_helpdesk_ticket') {
+        require Comserv::Model::AI2::HelpDeskTicketCreate;
+        my $brain = eval { $c->model('AI2::HelpDeskTicketCreate') };
+        $brain = Comserv::Model::AI2::HelpDeskTicketCreate->new if !$brain || !ref $brain;
+        my $result = eval { $brain->reply_from_params($c, $params) };
+        if ($@ || !$result) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action',
+                "reply_helpdesk_ticket failed: $@");
+            $c->response->body(encode_json({ success => JSON::false, error => 'Reply failed' }));
+            return;
+        }
+        $c->response->body(encode_json($result));
+        return;
+    }
+    if ($action_name eq 'set_helpdesk_ticket_status' || $action_name eq 'close_helpdesk_ticket') {
+        require Comserv::Model::AI2::HelpDeskTicketCreate;
+        my $brain = eval { $c->model('AI2::HelpDeskTicketCreate') };
+        $brain = Comserv::Model::AI2::HelpDeskTicketCreate->new if !$brain || !ref $brain;
+        my %p = %{ $params || {} };
+        $p{status} = 'closed' if $action_name eq 'close_helpdesk_ticket' && !$p{status};
+        my $result = eval { $brain->set_status_from_params($c, \%p) };
+        if ($@ || !$result) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action',
+                "$action_name failed: $@");
+            $c->response->body(encode_json({ success => JSON::false, error => 'Status update failed' }));
+            return;
+        }
+        $c->response->body(encode_json($result));
         return;
     }
 

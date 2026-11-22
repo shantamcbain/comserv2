@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use Exporter 'import';
 
-our @EXPORT_OK = qw(is_editor_agent looks_like_todo_create looks_like_helpdesk_ticket_create looks_like_page_create);
+our @EXPORT_OK = qw(is_editor_agent looks_like_todo_create looks_like_todo_open looks_like_helpdesk_ticket_create looks_like_page_create);
 
 # AI Editor agents plan/analyze/implement code. Their buffers and phase
 # contracts mention "todo" constantly; intercepts must never fire (#2423).
@@ -30,6 +30,23 @@ sub looks_like_todo_create {
     return 1 if $p =~ /\b(?:can you|could you|would you|please)\s+(?:add|create|make|track)\b.{0,60}\b(?:todos?|tasks?|to-dos?)\b/i;
     return 1 if $p =~ /\b(?:need|want)\s+(?:a|an|new)\s+(?:todos?|tasks?)\b/i;
     return 1 if $p =~ /\bput\s+(?:this|it|that)\s+on\s+(?:the\s+)?(?:todo|task)\s+list\b/i;
+    return 0;
+}
+
+
+# "open this todo" / "open todo 2771" must not fall through to create-todo
+# (CSC-20260914-9320). Yields to ticket-create when the object is a ticket.
+sub looks_like_todo_open {
+    my ($prompt) = @_;
+    return 0 unless defined $prompt && $prompt =~ /\S/;
+    my $p = $prompt;
+    $p =~ s/^\s+|\s+$//g;
+    return 0 if $p =~ /^(how\s+(do\s+i|to)|what\s+is|explain|where\s+(is|do))\b/i;
+    return 0 if looks_like_helpdesk_ticket_create($p);
+    # "open a new todo" is create, not open.
+    return 0 if $p =~ /\bopen\s+(?:a|an|new)\s+(?:new\s+)?(?:todos?|tasks?|to-dos?|to\s+dos?)\b/i;
+    return 1 if $p =~ /\b(?:open|show|view|display|go\s+to|navigate\s+to|take\s+me\s+to)\s+(?:(?:this|that|the|current|my)\s+)*(?:todos?|tasks?|to-dos?|to\s+dos?)\b/i;
+    return 1 if $p =~ /\b(?:open|show|view|display)\s+(?:todos?|tasks?|to-dos?|to\s+dos?)\s*#?\s*\d+\b/i;
     return 0;
 }
 

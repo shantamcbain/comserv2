@@ -440,7 +440,9 @@ sub process {
 
     # HelpDesk-ticket AGENT first — must beat TodoCreate when the prompt
     # mentions both "ticket" and "todo" (3180 / 6510 hijack).
-    # Skip for AI Editor: loaded files mention tickets/todos (#2423).
+    # Skip for AI Editor: loaded files mention tickets/todos (#2423 / #2495).
+    # try_chat_create also handles reply / status / close (#2491) and never
+    # notifies the customer (#2494).
     my $hd_hit = (!$editor_todo_skip) && eval {
         require Comserv::Model::AI2::HelpDeskTicketCreate;
         my $hbrain = eval { $c->model('AI2::HelpDeskTicketCreate') };
