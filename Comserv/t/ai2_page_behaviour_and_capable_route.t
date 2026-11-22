@@ -66,5 +66,5 @@ ok !$r->capable_chain_pick(undef, chains => { data => { chain_coding => ['openro
     health => undef, available => sub { 1 }), 'only weak models -> undef (falls back to ModelPick)';
 my $real = Comserv::Util::AI::ModelChains->load(undef, path => "$ROOT/data/ai_model_chains.json", logger => sub {});
 is_deeply $r->capable_chain_pick(undef, chains => $real, health => undef, available => sub { 1 }),
-    [ 'openrouter', 'cohere/north-mini-code:free' ], 'repo chain: north-mini-code is the cheapest capable';
+    [ 'openrouter', 'nvidia/nemotron-3.5-lightning:free' ], 'repo chain: nemotron is the cheapest capable (north-mini removed Nov 21 2026)';
 done_testing;

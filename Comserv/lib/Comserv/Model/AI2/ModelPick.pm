@@ -126,8 +126,15 @@ sub hermes_chain {
         }
     }
 
-    # SuperGrok head: whatever Hermes switched AWAY from is the allotment model.
-    $push->($sw->{from}, 'supergrok-head') if ref $sw eq 'HASH' && $sw->{from};
+    # SuperGrok head: when the guard switched AWAY from Super Grok, the model it left is
+    # the allotment model. Nov 21 2026 (Shanta: "super grok is not used by ai editor to
+    # analize code"): only a Super Grok 'from' may lead. A switch BACK to Super Grok
+    # (from=openrouter/particle-ai/particle-1, to=xai-oauth/grok-4.7) put particle-1 first,
+    # so every editor call after the Nov 19 reset went to particle-1.
+    if (ref $sw eq 'HASH' && $sw->{from}) {
+        my ($from_prov) = $self->_map_chain_entry($sw->{from});
+        $push->($sw->{from}, 'supergrok-head') if ($from_prov // '') eq 'supergrok';
+    }
     # Current Hermes model (guard switch target) comes next.
     $push->($sw->{to}, 'guard-switch') if ref $sw eq 'HASH' && $sw->{to};
 
