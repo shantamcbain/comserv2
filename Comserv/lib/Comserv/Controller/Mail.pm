@@ -47,13 +47,9 @@ sub index :Path :Args(0) {
     my $is_member = grep { $_ eq 'member' } @$roles;
     my $is_logged_in = $username ? 1 : 0;
     
-    # Check if user has a mail account (assume username-based for now)
-    my $has_mail_account = 0;
-    if ($is_logged_in) {
-        # TODO: Query actual mail account database when available
-        # For now, members, developers, and admins get mail access
-        $has_mail_account = $is_member || $is_developer || $is_admin;
-    }
+    # Synced with a real connected UserMailbox for this user on this site
+    # (CSC-20260831-6017). Membership role alone does not mean they have a mailbox.
+    my $has_mail_account = $is_logged_in ? $self->_user_has_mail_account($c) : 0;
     
     # Set stash variables for template
     $c->stash(
@@ -3074,6 +3070,19 @@ sub _mc_rs {
     return undef unless $rs;
     # table may not exist yet (pending schema_compare)
     return eval { $rs->search({}, { rows => 1 })->count; 1 } ? $rs : undef;
+}
+
+# True when the logged-in user has connected their own mailbox on this site.
+# Site-managed shared boxes do not count as the user's personal email account.
+sub _user_has_mail_account {
+    my ($self, $c) = @_;
+    my $user_id = $c->session->{user_id};
+    return 0 unless defined $user_id && $user_id =~ /^\d+$/;
+    my $rs = $self->_mc_rs($c);
+    return 0 unless $rs;
+    my $site = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $n = eval { $rs->search({ sitename => $site, user_id => $user_id })->count };
+    return ($n && $n > 0) ? 1 : 0;
 }
 
 sub _mc_params {

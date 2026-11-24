@@ -9,13 +9,16 @@ use Crypt::URandom ();
 # (web login, change/reset password, HybridDB fallback auth, ...) agrees.
 #
 #   new hashes   : PBKDF2 (HMAC-SHA256, 100,000 iterations, 16-byte random salt from
-#                  the OS CSPRNG via Crypt::URandom), "{X-PBKDF2}..." string
-#   legacy hashes: unsalted SHA-256 (64 hex chars). Still ACCEPTED so existing
-#                  users can log in, and re-hashed to PBKDF2 at the next
-#                  successful login (see needs_upgrade). Never written again.
-#   weaker PBKDF2: a PBKDF2 hash with fewer iterations than ITERATIONS, or a salt
-#                  shorter than SALT_LEN (our first release: 10,000 / 4 bytes), is
-#                  also re-hashed at the next successful login.
+#                  the OS CSPRNG via Crypt::URandom), "{X-PBKDF2}HMACSHA2+256:..." string
+#   legacy hashes that still VERIFY, then upgrade on the next successful login
+#   (see needs_upgrade). Never written again:
+#     * unsalted SHA-256 (64 hex chars) — the format used before PBKDF2
+#     * first PBKDF2 release: Crypt::PBKDF2->new() defaults (HMAC-SHA1, 1,000
+#       iterations, 4-byte salt), "{X-PBKDF2}HMACSHA1:..."
+#     * later PBKDF2 with HMAC-SHA256 but fewer iterations / a shorter salt
+#       than we use now (first HMAC-SHA256 release: 10,000 / 4 bytes)
+#   There is no MD5, crypt(3), or non-PBKDF2 SHA-1 login hash in this
+#   codebase's history; unknown stored formats never match.
 # Raise ITERATIONS later and every account upgrades itself the same way.
 
 # 100,000 is the low end of the agreed 100k-300k range on purpose: Crypt::PBKDF2 is
@@ -67,12 +70,16 @@ sub pbkdf2_params {
 }
 
 # True when $stored should be replaced by a current PBKDF2 hash (call only
-# after verify() succeeded): legacy SHA-256, or PBKDF2 with fewer iterations /
-# a shorter salt than we use now, or a PBKDF2 string we cannot parse.
+# after verify() succeeded): legacy SHA-256, first-release HMAC-SHA1 PBKDF2,
+# PBKDF2 with fewer iterations / a shorter salt than we use now, a different
+# PRF than HMAC-SHA256, or a PBKDF2 string we cannot parse.
 sub needs_upgrade {
     my ($class, $stored) = @_;
     return 1 if $class->is_legacy_sha256($stored);
     return 0 unless $class->is_pbkdf2($stored);
+    # Any PRF other than HMAC-SHA256 (notably the first-release HMAC-SHA1
+    # default) must be re-hashed, even if iterations/salt already meet the bar.
+    return 1 unless $stored =~ /^\{X-PBKDF2\}HMACSHA2\+256:/;
     my ($iter, $salt_len) = $class->pbkdf2_params($stored);
     return 1 unless defined $iter;
     return ($iter < $ITERATIONS || $salt_len < $SALT_LEN) ? 1 : 0;

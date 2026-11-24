@@ -74,6 +74,30 @@ ok(!$PH->needs_upgrade('garbage'), 'garbage is not upgraded');
 isnt($PH->hash($PW{newbie}), $h, 'salted: two hashes of one password differ');
 ok($PH->verify($legacy->($PW{unic}), $PW{unic}), 'legacy hash of a latin-1 character password still verifies');
 
+# Every historical stored format found in this codebase must still verify.
+# History: unsalted SHA-256, then Crypt::PBKDF2->new() defaults (HMAC-SHA1,
+# 1,000 iterations, 4-byte salt), then HMAC-SHA256 at 10,000 / 4-byte salt,
+# then the current HMAC-SHA256 / 100,000 / 16-byte CSPRNG salt.
+# No MD5, crypt(3), or non-PBKDF2 SHA-1 login hash exists in the code history.
+{
+    my $pw = 'fake-hist-format-pw';
+    ok($PH->verify($legacy->($pw), $pw), 'historical format: unsalted SHA-256 still verifies');
+    ok(!$PH->verify($legacy->($pw), 'fake-wrong'), 'historical format: unsalted SHA-256 rejects a wrong password');
+    ok($PH->needs_upgrade($legacy->($pw)), 'historical format: unsalted SHA-256 is marked for upgrade');
+
+    my $sha1_default = Crypt::PBKDF2->new->generate($pw);   # HMACSHA1, 1000, 4-byte salt
+    like($sha1_default, qr/^\{X-PBKDF2\}HMACSHA1:/, 'fixture: first-release default is HMAC-SHA1 PBKDF2');
+    ok($PH->verify($sha1_default, $pw), 'historical format: first-release HMAC-SHA1 / 1k / 4-byte still verifies');
+    ok(!$PH->verify($sha1_default, 'fake-wrong'), 'historical format: first-release HMAC-SHA1 rejects a wrong password');
+    ok($PH->needs_upgrade($sha1_default), 'historical format: first-release HMAC-SHA1 is marked for upgrade');
+
+    my $v10k = Crypt::PBKDF2->new(hash_class => 'HMACSHA2', hash_args => { sha_size => 256 }, iterations => 10_000, output_len => 32);
+    my $h10k = $v10k->generate($pw);
+    ok($PH->verify($h10k, $pw), 'historical format: HMAC-SHA256 / 10k / 4-byte still verifies');
+    ok(!$PH->verify($h10k, 'fake-wrong'), 'historical format: HMAC-SHA256 / 10k rejects a wrong password');
+    ok($PH->needs_upgrade($h10k), 'historical format: HMAC-SHA256 / 10k / 4-byte is marked for upgrade');
+}
+
 # ---- 2. Result::User->check_password -------------------------------------------
 my $alice = $schema->resultset('User')->find({ username => 'alice' });
 ok($alice->check_password($PW{alice}), 'Result::User accepts legacy hash');
@@ -339,9 +363,16 @@ unlike($logs, qr/[0-9a-f]{64}|X-PBKDF2/, 'log lines contain no hash text');
     ok($PH->verify($old_hash, $PW{alice}), 'old 10k hash still verifies');
     ok($PH->needs_upgrade($old_hash), 'old 10k / 4-byte-salt hash needs upgrade');
     my $iter_only = Crypt::PBKDF2->new(hash_class => 'HMACSHA2', hash_args => { sha_size => 256 }, iterations => 10_000, output_len => 32, salt_len => 16)->generate('x');
+    ok($PH->verify($iter_only, 'x'), '10k / 16-byte-salt hash still verifies');
     ok($PH->needs_upgrade($iter_only), 'lower iteration count alone needs upgrade');
     my $salt_only = Crypt::PBKDF2->new(hash_class => 'HMACSHA2', hash_args => { sha_size => 256 }, iterations => $REAL_ITER, output_len => 32, salt_len => 4)->generate('x');
+    ok($PH->verify($salt_only, 'x'), 'current-iter / 4-byte-salt hash still verifies');
     ok($PH->needs_upgrade($salt_only), 'short salt alone needs upgrade');
+    my $sha1_old = Crypt::PBKDF2->new->generate($PW{alice});
+    like($sha1_old, qr/^\{X-PBKDF2\}HMACSHA1:/, 'fixture: Crypt::PBKDF2->new default is HMAC-SHA1');
+    ok($PH->verify($sha1_old, $PW{alice}), 'first-release HMAC-SHA1 / 1k / 4-byte hash still verifies at the real work factor');
+    ok(!$PH->verify($sha1_old, 'fake-WRONG'), 'first-release HMAC-SHA1 rejects a wrong password');
+    ok($PH->needs_upgrade($sha1_old), 'first-release HMAC-SHA1 needs upgrade even when iteration count is compared at 100k');
     ok($PH->needs_upgrade('{X-PBKDF2}HMACSHA2+256:broken'), 'unparseable PBKDF2 string is re-hashed');
     ok(!$PH->needs_upgrade('garbage'), 'garbage (not PBKDF2, not SHA-256) is still left alone');
 
@@ -359,6 +390,21 @@ unlike($logs, qr/[0-9a-f]{64}|X-PBKDF2/, 'log lines contain no hash text');
     $r = login(user => 'alice', pass => $PW{alice}, ip => '203.0.113.160', throttle => $t);
     ok($r->{ok}, 'upgraded account logs in again');
     is(stored('alice'), $cur, 'current hash is NOT re-written');
+
+    # login: first-release HMAC-SHA1 default also logs in and upgrades once
+    $schema->resultset('User')->find({ username => 'alice' })->update({ password => $sha1_old });
+    $r = login(user => 'alice', pass => 'fake-WRONG', ip => '203.0.113.161', throttle => $t);
+    is(stored('alice'), $sha1_old, 'wrong password does not upgrade the HMAC-SHA1 hash');
+    $r = login(user => 'alice', pass => $PW{alice}, ip => '203.0.113.161', throttle => $t);
+    ok($r->{ok}, 'first-release HMAC-SHA1 hash logs in');
+    isnt(stored('alice'), $sha1_old, 'first-release HMAC-SHA1 hash was re-hashed at login');
+    like(stored('alice'), qr/^\{X-PBKDF2\}HMACSHA2\+256:/, 'upgraded hash is current HMAC-SHA256 PBKDF2');
+    my ($si, $ss) = $PH->pbkdf2_params(stored('alice'));
+    is($si, $REAL_ITER, 'HMAC-SHA1 upgrade has the current iteration count'); is($ss, 16, 'HMAC-SHA1 upgrade has a 16-byte salt');
+    my $after_sha1 = stored('alice');
+    $r = login(user => 'alice', pass => $PW{alice}, ip => '203.0.113.161', throttle => $t);
+    ok($r->{ok}, 'account upgraded from HMAC-SHA1 logs in again');
+    is(stored('alice'), $after_sha1, 'upgraded HMAC-SHA1 hash is NOT re-written');
 }
 
 # ---- 12. client IP used by the throttle -------------------------------------------
@@ -449,6 +495,11 @@ unlike($logs, qr/[0-9a-f]{64}|X-PBKDF2/, 'log lines contain no hash text');
     my $src = do { local (@ARGV, $/) = ("$FindBin::Bin/../lib/Comserv/Controller/User.pm"); <> };
     like($src, qr/eval \{\s*my \$hashed_password = \$self->hash_password\(\$new_password\);\s*\$user->update/, 'do_change_password hashes inside the eval');
     unlike($src, qr/my \$hashed_password = \$self->hash_password\(\$new_password\);\s*\n\s*eval/, 'no hash_password call left outside the eval');
+    unlike($src, qr/sleep\s*\(\s*2\s*\*/, 'Controller::User has no 2-second-per-failure sleep');
+    unlike($src, qr/sleep\s*\(\s*2\s*\*\s*\$account_failures\s*\)/, 'account-level 2s sleep was removed from _check_rate_limit');
+    like($src, qr/sub _check_rate_limit.*?Comserv::Util::ClientIP->from_c\(\$c\)/s, '_check_rate_limit uses the trusted-proxy ClientIP helper');
+    like($src, qr/sub _record_login_failure.*?Comserv::Util::ClientIP->from_c\(\$c\)/s, '_record_login_failure uses the trusted-proxy ClientIP helper');
+    like($src, qr/sub _record_login_success.*?Comserv::Util::ClientIP->from_c\(\$c\)/s, '_record_login_success uses the trusted-proxy ClientIP helper');
 }
 
 done_testing;

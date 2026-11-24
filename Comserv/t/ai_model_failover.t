@@ -289,6 +289,20 @@ for my $t (@types) {
     ($r) = run(guard => { locked => 1 }, provider => 'supergrok', model => 'grok-4.6',
                chains => chains(chain_chat => [ 'openrouter|paid/x' ], supergrok_locked_coding_model => ''), spend => { ok => 1, day => 9, week => 9, month => 9, by_model_day => {} });
     ok($r->{all_exhausted} && !@CALLS, 'all candidates blocked -> all_exhausted without any call');
+
+    # A replace-verdict pin whose chain only has an empty placeholder must still
+    # reach the last-resort tail. Skip-only drains used to die as all_exhausted
+    # with zero calls (git suggest, 2026-11-24).
+    %SCRIPT = ('supergrok|grok-4.7' => $OK->('draft'));
+    ($r) = run(
+        provider => 'openrouter', model => 'nvidia/nemotron-3.5-lightning:free',
+        chains => chains(chain_chat => ['openrouter|nvidia/nemotron-3.5-lightning:free', 'ollama|auto']),
+        signals => { verdicts => { 'openrouter|nvidia/nemotron-3.5-lightning:free' => { verdict => 'replace', why => 'test' } }, anomalies => [] },
+    );
+    ok($r->{success}, 'replace-verdict skip still reaches last resort');
+    is($r->{response}, 'draft', '... SuperGrok answered');
+    ok((grep { $_ eq 'supergrok|grok-4.7' } @CALLS), '... last resort was called');
+    ok(!(grep { /^openrouter\|/ } @CALLS), '... replace-verdict model was not called');
 }
 
 # failover => 0 (Focus-Tune): requested model only.

@@ -783,21 +783,22 @@ sub hash_password {
     return Comserv::Util::PasswordHash->hash($password);
 }
 
-# Rate-limit failed login attempts.
-# Policy (mirrors the PBKDF2 hardening spec):
+# Rate-limit failed login attempts (session-level backup used when the login
+# form itself is shown). The authoritative limiter is
+# Comserv::Util::LoginThrottle on do_login:
 #   - 5 failures from one IP on one account block that IP for up to 15 minutes.
-#   - Failures across all IPs on one account add a 2-second delay per attempt
-#     (never a block).
+#   - Failures across all IPs on one account add a short soft delay (0.2 s,
+#     hard cap 0.25 s) — never a multi-second sleep, so a worker is never parked.
 #   - 30 failures from one IP across accounts block that IP for up to 15 minutes.
 #   - Admins can always log in from an unblocked IP.
 #   - A successful login clears the counters for that account/IP pair.
-# Implementation stores counters in the session rather than the logging table,
-# because logging rows can be merged or disabled and would silently disable the
-# limit.
+# This session store is kept as a backup because it does not depend on
+# system_log; it uses the same trusted-proxy-aware client IP as LoginThrottle
+# (Comserv::Util::ClientIP). The previous 2-second-per-failure sleep was dropped.
 sub _check_rate_limit {
     my ($self, $c, $type) = @_;
 
-    my $ip       = $c->req->address || 'unknown';
+    my $ip       = Comserv::Util::ClientIP->from_c($c);
     my $username = '';
     if ($type && $type eq 'login') {
         $username = $c->req->param('username') // '';
@@ -837,13 +838,7 @@ sub _check_rate_limit {
             if ($account_ip_failures >= 5) {
                 return 0;
             }
-
-            # Account-level delay: 2 seconds per recent failure across all IPs
-            # (never blocks, only slows down guesses).
-            my $account_failures = grep { ($_->{username} // '') eq $username } @failures;
-            if ($account_failures > 0) {
-                sleep(2 * $account_failures);
-            }
+            # Account-level delay lives in LoginThrottle (0.2 s cap), not here.
         }
     }
 
@@ -853,7 +848,7 @@ sub _check_rate_limit {
 
 sub _record_login_failure {
     my ($self, $c, $username) = @_;
-    my $ip = $c->req->address || 'unknown';
+    my $ip = Comserv::Util::ClientIP->from_c($c);
     push @{$c->session->{_login_failures} ||= []}, {
         ip       => $ip,
         username => $username // '',
@@ -864,7 +859,7 @@ sub _record_login_failure {
 sub _record_login_success {
     my ($self, $c, $username) = @_;
     return unless $username;
-    my $ip = $c->req->address || 'unknown';
+    my $ip = Comserv::Util::ClientIP->from_c($c);
     my @remaining = grep {
         !(($_->{ip} // '') eq $ip && ($_->{username} // '') eq $username)
     } @{$c->session->{_login_failures} || []};

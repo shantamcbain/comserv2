@@ -841,6 +841,11 @@ PROMPT
             $messages,
             can_select => 1,
             log_usage  => 'git_commit_message',
+            # coding chain (local coder after the free pin) and no 5s Ollama
+            # classifier — an explicit model is already chosen. A replace-verdict
+            # pin must still fall through; that walk lives in chat_with_fallback.
+            purpose         => 'coding',
+            no_llm_classify => 1,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,

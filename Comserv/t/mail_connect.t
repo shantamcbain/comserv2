@@ -204,4 +204,76 @@ like($c->stash->{error_msg}, qr/outgoing \(SMTP\).*public mail server/, 'SMTP ho
 $c = post(user => 'bob', uid => 5, roles => ['admin'], email => 'int@example.com', imap_host => '192.168.1.5', op => 'test');
 ok($c->stash->{result}, 'site admin may test an internal server');
 
+
+# ---- 5. /mail "Email Account Not Active" follows real UserMailbox state (CSC-20260831-6017)
+sub has_acct {
+    my (%a) = @_;
+    my $c = FakeCtx->new(
+        schema  => $schema,
+        session => { username => $a{user} || 'pat', user_id => $a{uid} // 9001, roles => $a{roles} || ['normal'],
+                     SiteName => $a{site} || 'CSC' },
+        stash   => { SiteName => $a{site} || 'CSC' },
+    );
+    return $ctrl->_user_has_mail_account($c);
+}
+sub index_flag {
+    my (%a) = @_;
+    my $c = FakeCtx->new(
+        schema  => $schema,
+        session => { username => $a{user} || 'pat', user_id => $a{uid} // 9001, roles => $a{roles} || ['member'],
+                     SiteName => $a{site} || 'CSC' },
+        stash   => { SiteName => $a{site} || 'CSC' },
+    );
+    $ctrl->index($c);
+    return $c->stash->{has_mail_account};
+}
+
+my $uid = 9001;
+is(has_acct(uid => $uid, roles => ['member']), 0, 'member with no mailbox is not active');
+is(index_flag(uid => $uid, roles => ['member', 'admin', 'developer']), 0,
+   'index: member/admin/developer roles alone do not set has_mail_account');
+is(index_flag(user => '', uid => undef, roles => []), 0, 'index: logged-out user is not active');
+
+$schema->resultset('UserMailbox')->create({
+    user_id        => $uid,
+    sitename       => 'CSC',
+    email_address  => 'pat@example.com',
+    login_username => 'pat@example.com',
+    password_enc   => 'ENC:dGVzdA==',
+    imap_host      => 'mail.example.com',
+    smtp_host      => 'mail.example.com',
+    last_test_ok   => 1,
+});
+is(has_acct(uid => $uid), 1, 'connected UserMailbox for this user is active');
+is(index_flag(uid => $uid, roles => ['normal']), 1, 'index: non-member with a connected mailbox is active');
+is(has_acct(uid => $uid, site => 'OTHER'), 0, 'mailbox on another site does not count');
+is(has_acct(uid => 9002), 0, "another user's mailbox does not count");
+
+# A saved-anyway (failed test) connection still counts as connected
+$schema->resultset('UserMailbox')->create({
+    user_id        => 9004,
+    sitename       => 'CSC',
+    email_address  => 'saved-anyway@example.com',
+    login_username => 'saved-anyway@example.com',
+    password_enc   => 'ENC:dGVzdA==',
+    imap_host      => 'mail.example.com',
+    smtp_host      => 'mail.example.com',
+    last_test_ok   => 0,
+});
+is(has_acct(uid => 9004), 1, 'save-anyway connected mailbox still counts as having a mail account');
+
+# site-managed shared box (no user_id) is not a personal mail account
+$schema->resultset('UserMailbox')->create({
+    user_id        => undef,
+    sitename       => 'CSC',
+    email_address  => 'shared-invoices@example.com',
+    login_username => 'shared-invoices@example.com',
+    password_enc   => 'ENC:dGVzdA==',
+    imap_host      => 'mail.example.com',
+    smtp_host      => 'mail.example.com',
+    site_managed   => 1,
+    last_test_ok   => 1,
+});
+is(has_acct(uid => 9003, roles => ['member']), 0, 'site-managed shared mailbox does not mark a different user active');
+
 done_testing;

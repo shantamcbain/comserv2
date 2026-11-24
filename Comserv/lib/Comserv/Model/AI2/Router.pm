@@ -988,8 +988,13 @@ sub fallback_hops {
 # tries later free models and requests include_ollama.
 # No hardcoded model slugs — catalog is the source of truth.
 sub pick_free_fallback {
-    my ($self, $c, $skip_provider, $skip_model) = @_;
-    my $catalog = try { $self->get_available_models($c) } catch {
+    my ($self, $c, $skip_provider, $skip_model, $include_ollama) = @_;
+    # Failover hops (ollama|auto, live_tail) must see local tags. Ordinary
+    # catalog reads still omit Ollama — this flag is only set by
+    # _expand_placeholder, which runs during an actual chat, not a page render.
+    my $catalog = try {
+        $self->get_available_models($c, ($include_ollama ? (include_ollama => 1) : ()))
+    } catch {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'pick_free_fallback',
             "Catalog for fallback failed: $_");
         [];
@@ -1376,7 +1381,7 @@ sub failover_candidates {
 
 sub _expand_placeholder {
     my ($self, $c, $ph, $seen) = @_;
-    my ($free, $local) = $self->pick_free_fallback($c);
+    my ($free, $local) = $self->pick_free_fallback($c, undef, undef, 1);
     my @out;
     for my $hop ($ph->{placeholder} eq 'ollama_auto' ? ($local) : ($free, $local)) {
         next unless $hop && ref $hop eq 'HASH';
@@ -1561,9 +1566,40 @@ sub chat_with_fallback {
 
     my (@attempts, @failed, @skipped, $postcheck_keep, %down);
     my $attempt_no = 0;
-    while (my $cand = shift @queue) {
+    # Last resort (once): queue ran dry with no answer -> try Super Grok
+    # (xai-oauth, still subject to the guard via _skip_reason) and local Ollama
+    # before reporting all_exhausted. Never paid OpenRouter.
+    # A skip-only drain (effectiveness_replace, budget, empty ollama|auto)
+    # must enqueue this too. The old site only ran after a failed HTTP attempt,
+    # so a replace-verdict default with no other live hop died as all_exhausted
+    # without calling anything (git suggest, 2026-11-24).
+    my $enqueue_tail = sub {
+        return if $opts{_tail_added};
+        return if defined $opts{failover} && !$opts{failover};
+        return if @queue;
+        $opts{_tail_added} = 1;
+        for my $t (['supergrok', 'grok-4.7', 'last_resort'], [undef, undef, 'ollama_auto']) {
+            if (!defined $t->[0]) {
+                push @queue, { placeholder => 'ollama_auto', step => 99, source => 'last_resort', slug => 'ollama_auto' };
+                next;
+            }
+            my $slug = Comserv::Util::AI::ModelHealth->normalize_slug($t->[0], $t->[1]);
+            next if $seen{$slug}++ || $down{ $t->[0] };
+            push @queue, { provider => $t->[0], model => $t->[1], slug => $slug, step => 99, source => $t->[2] };
+        }
+    };
+    while (1) {
+        $enqueue_tail->() unless @queue;
+        last unless @queue;
+        my $cand = shift @queue;
         if ($cand->{placeholder}) {
-            unshift @queue, $self->_expand_placeholder($c, $cand, \%seen);
+            my @exp = $self->_expand_placeholder($c, $cand, \%seen);
+            unless (@exp) {
+                push @skipped, { slug => $cand->{slug}, step => $cand->{step}, reason => 'no_fallback' };
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'chat_with_fallback',
+                    "failover skip $cand->{slug} (step $cand->{step}): no_fallback");
+            }
+            unshift @queue, @exp;
             next;
         }
         # A provider that just proved unreachable (e.g. Ollama host down) is
@@ -1652,20 +1688,6 @@ sub chat_with_fallback {
         # don't burn attempts on its other models this turn.
         $down{ $cand->{provider} } = 1 if $reason eq 'auth';
         push @failed, $att;
-        # Last resort (once): queue ran dry with no answer -> try Super Grok
-        # (xai-oauth, still subject to the guard via _skip_reason) and local Ollama
-        # before reporting all_exhausted. Never paid OpenRouter.
-        if (!@queue && !$opts{_tail_added}++ && !(defined $opts{failover} && !$opts{failover})) {
-            for my $t (['supergrok', 'grok-4.7', 'last_resort'], [undef, undef, 'ollama_auto']) {
-                if (!defined $t->[0]) {
-                    push @queue, { placeholder => 'ollama_auto', step => 99, source => 'last_resort', slug => 'ollama_auto' };
-                    next;
-                }
-                my $slug = Comserv::Util::AI::ModelHealth->normalize_slug($t->[0], $t->[1]);
-                next if $seen{$slug}++ || $down{ $t->[0] };
-                push @queue, { provider => $t->[0], model => $t->[1], slug => $slug, step => 99, source => $t->[2] };
-            }
-        }
     }
 
     # Grounded turn where every answer was stripped to nothing: the post-check
@@ -1710,7 +1732,9 @@ sub chat_with_fallback {
     return {
         success         => 0,
         all_exhausted   => 1,
-        error           => $ALL_EXHAUSTED_MSG,
+        error           => (!@failed && @skipped)
+            ? ('No AI model was called (' . join(', ', map { "$_->{slug}: $_->{reason}" } @skipped) . ').')
+            : $ALL_EXHAUSTED_MSG,
         detail          => join('; ', map { "$_->{slug}: " . ($_->{error} // $_->{reason}) } @failed),
         provider        => $provider_name,
         model           => $use_model,
